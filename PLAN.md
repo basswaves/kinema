@@ -388,6 +388,83 @@ focusable rendered *inside* the row is unreachable by D-pad for exactly the
 geometric reason the overlay nav was — see GOTCHAS.md, which now carries the
 general form of the rule.
 
+## Player: previous / next episode ✅
+
+`next_episode` and `previous_episode` are one query with the comparison and the
+sort flipped, so the two directions cannot disagree about ordering — a separate
+"previous" query is the obvious place for that to drift. Both return the shared
+`EpisodeRef` shape.
+
+The buttons are rendered only when a neighbour actually exists, so they never
+appear on a film or at the ends of a run. Neighbours are fetched once per file
+and **cleared first**: until the answer for the current file arrives, the
+previous file's neighbours are wrong, and a button that jumps somewhere
+unrelated is worse than one that appears a moment late.
+
+Keys are `n` / `p`, plus `MediaTrackNext` / `MediaTrackPrevious` — what the
+transport buttons on a TV remote actually send, since a remote has no letters.
+
+## End-credit skipping ✅
+
+The player already had a complete credits path; what it never had was a marker,
+because **Skiptro 1.2.0 detects intros only**. So the work was producing a
+credits start, and the design question was how much to trust each way of getting
+one. Three sources, in strict order:
+
+1. **The sidecar.** Measured. Wins whenever a producer ever writes one.
+2. **A named chapter.** Many remuxes carry an "End Credits" chapter — that is
+   the author of the file stating where the credits are, which is evidence
+   rather than inference. Guarded: only the back half of the file counts,
+   because "Opening Credits" is a real chapter name and taking it would end the
+   episode at the title sequence.
+3. **A fixed tail**, `duration − N` (default 60s, cycling setting in Settings,
+   0 disables). This one is a guess and is fenced as one — it never fires
+   without a next episode to go to, and by default it only *offers*.
+
+Because the guess only offers, the Up next card now has **two states**. With a
+countdown, the file has genuinely ended and the next episode is coming either
+way. Without one, the credits have merely started, the video is still running
+underneath, and the card offers rather than announces: **Play next** or **Keep
+watching**. A guess is not entitled to make the decision.
+
+The credits prompt no longer times out after ten seconds either. That timeout is
+right for an intro and wrong here, where the offer *is* the route onward and
+runs to the end of the file.
+
+**Fixed in passing:** automatic skip mode never checked whether there was a next
+episode. Taking a credits segment ends the file, so on a film that meant quitting
+a minute before the end. The prompt path had always refused it; auto mode had
+not, and the two new sources make it reachable in a way a measured sidecar never
+was.
+
+## Stats for nerds ✅
+
+`i` in the player, or the **Stats** button. The panel exists because this project
+decides its own rendering settings and offers no quality selector, which makes
+"is it doing what it claims?" the only question left — and there was previously
+no way to answer it without reading `mpv.log` line by line.
+
+It reports the source (resolution, codec, pixel format, frame rate, bitrate),
+the display (**measured from the webview**, which can see the actual panel), the
+rendering path, **what scaling is happening and why**, the colour and HDR
+pipeline, audio in *and* out (so a downmix is visible), and dropped frames, A/V
+sync and demuxer cache.
+
+Every value is a flat scalar read, never a `node` — the crash in GOTCHAS.md
+applies to `chapter-list` and the rest, not just `track-list`. Every read is
+individually fallible, because property names move between mpv and libplacebo
+versions and reading one in an unimplemented format *throws* rather than
+returning null (the `sid`/`aid` lesson). An unavailable field shows `—` instead
+of emptying the panel.
+
+It **polls**, at 1 Hz, and does not observe. Observed properties are registered
+once when mpv initialises, so a panel that added its own would show nothing until
+the whole app restarted and would look exactly like a panel that was wrong.
+
+This is also the first thing in the project that can answer the **HDR
+passthrough** question — `target-params/gamma` against the source transfer, plus
+what the webview believes about the panel's dynamic range.
+
 ---
 
 ## Backlog (not in the original plan, worth doing)

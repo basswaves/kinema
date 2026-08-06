@@ -28,8 +28,9 @@ I'm continuing work on **Personal Netflix**, a local serverless media library
 The app works end to end and the roadmap is complete: scanning, matching,
 browsing, playback with resume and next-episode autoplay, cached artwork, the
 manual fix-match queue, intro skipping, local-file trailers, a 10-foot TV
-layout, a Settings screen with automatic background scanning, and NFO
-read/write.
+layout, a Settings screen with automatic background scanning, NFO read/write,
+watched tracking, previous/next episode stepping, end-credit skipping, and a
+"stats for nerds" diagnostic panel.
 
 **What is left, all of it currently blocked on something:**
 
@@ -46,6 +47,11 @@ read/write.
   a round trip through this app's own export, but no NFO written by MediaElch or
   tinyMediaManager has ever been tested. A dialect too far logs
   `nfo: nothing usable in <path>` rather than failing silently.
+- **A credits chapter to calibrate against** — the chapter source for
+  end-credit skipping is written and cannot be confirmed until a file in the
+  library actually carries a chapter named for its credits. Until then the tail
+  guess is what fires. `credits marker from <source>` in `app.log` says which
+  won on any given file.
 
 **Known unverified, all needing hardware or a bigger library:** HDR
 *passthrough* (this display is 1440p SDR — decode and tone-mapping to SDR are

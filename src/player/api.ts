@@ -24,7 +24,8 @@ export interface ContinueItem {
   updated_at: number;
 }
 
-export interface NextEpisode {
+/** Enough to play a neighbouring episode and label it, in either direction. */
+export interface EpisodeRef {
   file_id: number;
   path: string;
   season: number;
@@ -69,7 +70,10 @@ export const continueWatching = (limit: number) =>
   invoke<ContinueItem[]>('continue_watching', { limit });
 
 export const nextEpisode = (fileId: number) =>
-  invoke<NextEpisode | null>('next_episode', { fileId });
+  invoke<EpisodeRef | null>('next_episode', { fileId });
+
+export const previousEpisode = (fileId: number) =>
+  invoke<EpisodeRef | null>('previous_episode', { fileId });
 
 export const getTitlePrefs = (titleId: number) =>
   invoke<TitlePrefs>('get_title_prefs', { titleId });

@@ -17,6 +17,13 @@ array-of-maps across the FFI boundary; every flat scalar format is stable.
 **Do:** read `track-list/count`, then `track-list/N/type`, `track-list/N/id`,
 `track-list/N/lang` … as scalars. See `src/player/tracks.ts`.
 
+This is a property of the *format*, not of `track-list`. Every other list-shaped
+property is the same trap: `chapter-list`, `playlist`, `vo-passes`,
+`demuxer-cache-state`. `src/player/chapters.ts` reads `chapters` for the count
+and then `chapter-list/N/time` and `chapter-list/N/title` as scalars, for exactly
+this reason. `src/player/stats.ts` is scalars throughout and reads no list
+property whole.
+
 The crash is silent from JS — no exception, the process just dies. Symptom: exit code
 5 / `STATUS_ACCESS_VIOLATION` shortly after an action, nothing in the console.
 

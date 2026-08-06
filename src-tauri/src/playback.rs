@@ -98,6 +98,42 @@ pub fn save_progress(
     Ok(())
 }
 
+/// Mark a file watched, or clear it, by hand.
+///
+/// "Watched" is deliberately the *same* `completed` flag that playback sets when
+/// a file reaches the end, not a second column beside it. Two notions of "seen"
+/// would disagree the first time one was written without the other, and the
+/// disagreement would be invisible — the row would show a tick while Continue
+/// Watching still offered it.
+///
+/// Un-watching **deletes** the row rather than clearing the flag. "Not watched"
+/// and "no history" are the same state, and leaving the position behind would
+/// resume a file the user has just declared unseen.
+#[tauri::command]
+pub fn set_watched(db: tauri::State<Db>, file_id: i64, watched: bool) -> Result<(), String> {
+    let conn = db.0.lock().map_err(to_string_err)?;
+
+    if watched {
+        conn.execute(
+            "INSERT INTO playback_state
+                (file_id, position_secs, duration_secs, completed, updated_at)
+             VALUES (?1, 0, NULL, 1, ?2)
+             ON CONFLICT(file_id) DO UPDATE SET
+                completed  = 1,
+                updated_at = excluded.updated_at",
+            params![file_id, now_secs()],
+        )
+    } else {
+        conn.execute(
+            "DELETE FROM playback_state WHERE file_id = ?1",
+            params![file_id],
+        )
+    }
+    .map_err(to_string_err)?;
+
+    Ok(())
+}
+
 #[tauri::command]
 pub fn get_progress(db: tauri::State<Db>, file_id: i64) -> Result<Option<Progress>, String> {
     let conn = db.0.lock().map_err(to_string_err)?;

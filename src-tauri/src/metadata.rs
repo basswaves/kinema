@@ -89,6 +89,12 @@ pub struct Episode {
     /// Path of the file backing this episode, if the library actually has it.
     pub file_path: Option<String>,
     pub file_id: Option<i64>,
+    /// Watched to the end, or marked watched by hand — the same flag either way.
+    pub watched: bool,
+    /// Resume point, so a part-watched episode can show how far in it is.
+    /// Both are `None` until the file has actually been played.
+    pub position_secs: Option<f64>,
+    pub duration_secs: Option<f64>,
 }
 
 #[derive(Serialize)]
@@ -98,6 +104,7 @@ pub struct TitleDetail {
     /// For movies: the playable file.
     pub movie_path: Option<String>,
     pub movie_file_id: Option<i64>,
+    pub movie_watched: bool,
 }
 
 /// Upsert by (provider, provider_id) so re-matching never duplicates a title.
@@ -284,12 +291,16 @@ pub fn get_title_detail(
             "SELECT e.id, e.season, e.episode, e.name, e.overview, e.air_date,
                     e.runtime_mins, e.still_url, m.path, m.id,
                     (SELECT :art || a.local_path FROM artwork_cache a
-                      WHERE a.url = e.still_url AND a.local_path <> '')
+                      WHERE a.url = e.still_url AND a.local_path <> ''),
+                    COALESCE(p.completed, 0), p.position_secs, p.duration_secs
                FROM episodes e
                LEFT JOIN media_files m ON m.title_id = e.title_id
                                       AND m.parsed_season = e.season
                                       AND m.parsed_episode = e.episode
                                       AND m.missing = 0
+               -- Joined through the file, so an episode the library does not
+               -- hold can never inherit another file's progress.
+               LEFT JOIN playback_state p ON p.file_id = m.id
               WHERE e.title_id = :id
               ORDER BY e.season, e.episode",
         )
@@ -309,19 +320,24 @@ pub fn get_title_detail(
                 file_path: r.get(8)?,
                 file_id: r.get(9)?,
                 still_path: r.get(10)?,
+                watched: r.get::<_, i64>(11)? != 0,
+                position_secs: r.get(12)?,
+                duration_secs: r.get(13)?,
             })
         })
         .map_err(to_string_err)?
         .collect::<rusqlite::Result<Vec<_>>>()
         .map_err(to_string_err)?;
 
-    let movie: Option<(String, i64)> = conn
+    let movie: Option<(String, i64, bool)> = conn
         .query_row(
-            "SELECT path, id FROM media_files
-              WHERE title_id = ?1 AND missing = 0
-              ORDER BY size_bytes DESC LIMIT 1",
+            "SELECT m.path, m.id, COALESCE(p.completed, 0)
+               FROM media_files m
+               LEFT JOIN playback_state p ON p.file_id = m.id
+              WHERE m.title_id = ?1 AND m.missing = 0
+              ORDER BY m.size_bytes DESC LIMIT 1",
             params![title_id],
-            |r| Ok((r.get(0)?, r.get(1)?)),
+            |r| Ok((r.get(0)?, r.get(1)?, r.get::<_, i64>(2)? != 0)),
         )
         .ok();
 
@@ -329,7 +345,8 @@ pub fn get_title_detail(
         title,
         episodes,
         movie_path: movie.as_ref().map(|m| m.0.clone()),
-        movie_file_id: movie.map(|m| m.1),
+        movie_file_id: movie.as_ref().map(|m| m.1),
+        movie_watched: movie.map(|m| m.2).unwrap_or(false),
     })
 }
 

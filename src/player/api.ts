@@ -56,6 +56,15 @@ export const saveProgress = (fileId: number, positionSecs: number, durationSecs:
 
 export const getProgress = (fileId: number) => invoke<Progress | null>('get_progress', { fileId });
 
+/**
+ * Mark a file watched or unwatched by hand.
+ *
+ * Unwatching clears the resume point as well: "not watched" and "no history"
+ * are the same state, so a file declared unseen must not then resume.
+ */
+export const setWatched = (fileId: number, watched: boolean) =>
+  invoke<void>('set_watched', { fileId, watched });
+
 export const continueWatching = (limit: number) =>
   invoke<ContinueItem[]>('continue_watching', { limit });
 

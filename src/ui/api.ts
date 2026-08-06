@@ -35,6 +35,11 @@ export interface Episode {
   still_path: string | null;
   file_path: string | null;
   file_id: number | null;
+  /** Played to the end, or marked watched by hand — the same flag either way. */
+  watched: boolean;
+  /** Resume point. Both null until the file has actually been played. */
+  position_secs: number | null;
+  duration_secs: number | null;
 }
 
 export interface TitleDetail {
@@ -42,6 +47,7 @@ export interface TitleDetail {
   episodes: Episode[];
   movie_path: string | null;
   movie_file_id: number | null;
+  movie_watched: boolean;
 }
 
 export const listTitles = () => invoke<Title[]>('list_titles');

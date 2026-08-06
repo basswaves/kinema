@@ -32,6 +32,7 @@ thin client that does nothing without a Jellyfin server running.
 | 10-foot TV layout | **Done.** One `--ui-scale` knob, persisted; overscan-safe gutters; every control reachable by D-pad |
 | Settings + background scan | **Done.** Scan/parse/match out of the dev tab; scans once per launch; developer stages kept behind a disclosure |
 | NFO read/write | **Done.** Read as an authoritative override during matching; export is an explicit action |
+| Watched tracking | **Done.** One flag shared with playback completion; ticks and progress on episode rows, manual toggle per episode and per film |
 
 ## Setup
 
@@ -51,7 +52,7 @@ That pulls `libmpv-2.dll` (LGPL build, from zhongfly/mpv-winbuild) and
 `libmpv-wrapper.dll` into `src-tauri/lib/`.
 
 ```bash
-npm run tauri dev     # run
+npm run tauri dev     # run from source, with HMR
 npm run check         # tsc --noEmit && eslint .
 ```
 
@@ -173,6 +174,13 @@ another tool and carries fields this app does not model.
 
 **Missing episodes are shown greyed out, not hidden.** A season with gaps should look
 like a season with gaps.
+
+**There is one notion of "watched."** Marking an episode by hand writes the same
+`completed` flag that playback sets at 94%, not a column beside it. Two of them
+would disagree the first time either was written without the other, and the
+disagreement would be invisible — a row showing a tick while Continue Watching
+still offered it. Un-watching deletes the row: "not watched" and "no history" are
+the same state, and a file just declared unseen must not then resume.
 
 **One layout, one scale knob — not a TV skin.** Every dimension in `ui.css` is in
 `rem`; TV mode multiplies the root font size and everything follows. A parallel set

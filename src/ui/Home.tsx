@@ -71,7 +71,10 @@ export default function Home({ titles, resumable, onSelect, onPlay, onResume }: 
     return (
       <div className="empty-state">
         <h1>Nothing here yet</h1>
-        <p>Add a folder in the Library tab, then scan, parse and match.</p>
+        {/* The scan runs itself, so the only thing being asked for is a
+            folder. Naming the stages here would describe the machinery
+            rather than the one action that is needed. */}
+        <p>Add a folder in Settings — scanning and matching happen on their own.</p>
       </div>
     );
   }

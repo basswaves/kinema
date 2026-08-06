@@ -60,8 +60,8 @@ after matching and backfilled on every Browse mount.
 
 ### Manual fix-match ✅
 The safety net the strict threshold assumes exists — refusing to guess is only
-defensible if correcting the refusal is easy. A **Needs attention** view in the
-Library tab lists everything the matcher declined, grouped exactly as matching
+defensible if correcting the refusal is easy. A **Needs attention** view in
+Settings lists everything the matcher declined, grouped exactly as matching
 groups it (a season fails as a unit), each with the reason it recorded. A search
 box re-queries the provider — deliberately *without* the parsed year, since a
 wrong year is often what caused the failure — and picking a result links every

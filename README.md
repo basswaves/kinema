@@ -7,9 +7,15 @@ Built because nothing existing fits: every serverless option (Kodi) locks the UI
 skin XML, and every good-looking option (Jellyfin Media Player, jellium-desktop) is a
 thin client that does nothing without a Jellyfin server running.
 
-- **[PLAN.md](PLAN.md)** — roadmap, what's done, what's next. Read this first.
+- **[CLAUDE.md](CLAUDE.md)** — working rules, the settled decisions that must not be
+  re-opened, and how to verify a change. Read this first.
+- **[PLAN.md](PLAN.md)** — roadmap, what's done, and why each decision went the way it
+  did.
 - **[GOTCHAS.md](GOTCHAS.md)** — hard-won traps in libmpv and this toolchain. Read this
-  before touching the player. Every entry cost a real debugging round.
+  before touching the player or D-pad navigation. Every entry cost a real debugging
+  round, and most describe failures that produce no error at all.
+- **[HANDOVER.md](HANDOVER.md)** — what is left, and what each remaining item is blocked
+  on.
 
 ## Status
 
@@ -81,9 +87,10 @@ src-tauri/src/
   settings.rs    Key/value settings (API keys) + the frontend log bridge
 
 src/
-  ui/            Browse shell, Home, rails, cards, detail page, search.
-                 tv.ts holds the 10-foot scale switch; FocusButton is the
-                 D-pad-reachable button every browsing control goes through
+  ui/            Browse shell, Home, rails, cards, detail page, search,
+                 Settings. tv.ts holds the 10-foot scale switch; focus.ts
+                 recovers focus after a view change; FocusButton/FocusInput are
+                 the D-pad-reachable controls everything else is built from
   player/        Player, shared mpv lifecycle, track handling, mpv options
   library/       pipeline.ts — the scan→parse→match→artwork→trailers sequence,
                  shared by the startup scan and the Scan now button. LibraryView

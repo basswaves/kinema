@@ -92,6 +92,39 @@ export const BASE_MPV_OPTIONS: Record<string, string | boolean | number> = {
 };
 
 /**
+ * Setting key: how video frames are timed against the display.
+ *
+ * `'display'` selects mpv's `display-resample`; anything else leaves the
+ * default audio clock. See `VIDEO_SYNC_MODES` for why this is a switch at all
+ * when nothing else here is.
+ */
+export const VIDEO_SYNC_KEY = 'video_sync_mode';
+
+export const VIDEO_SYNC_MODES = {
+  /**
+   * mpv's default. Video is timed to the audio clock and frames are dropped or
+   * repeated to keep up. Nothing touches the audio, so this is the only mode
+   * compatible with bitstream passthrough.
+   */
+  audio: 'audio',
+  /**
+   * Video is timed to the display's actual refresh clock, and the audio is
+   * resampled by a fraction of a percent to match. Removes the drift and the
+   * occasional dropped frame that the audio clock produces on a display whose
+   * true refresh rate is not exactly what it claims.
+   *
+   * It does **not** remove 3:2 pulldown judder — 24p on a 60Hz panel is an
+   * uneven cadence no timing strategy can make even. Only a display running at
+   * 24, 48 or 120Hz fixes that, and switching display modes is the OS's job.
+   *
+   * Resampling audio makes this **incompatible with bitstream passthrough**: a
+   * TrueHD or DTS:X stream sent untouched to an AVR cannot be resampled,
+   * because nothing here has decoded it.
+   */
+  display: 'display-resample',
+} as const;
+
+/**
  * Options that are correct but not essential. They are applied one at a time
  * *after* mpv is already running, so that a version-specific option name being
  * rejected degrades the picture slightly instead of preventing startup.
@@ -118,6 +151,23 @@ export const TONE_MAPPING_OPTIONS: Record<string, string | boolean | number> = {
   // returns M_PROPERTY_UNKNOWN (-3) for it — the option was removed upstream.
   // As an *initial* option it aborted mpv init entirely; that is why these
   // settings are applied after startup rather than at init.
+
+  // ---- Interlaced sources -----------------------------------------------
+  // The one place where *adding* a processing stage serves creator's intent
+  // rather than working against it. Interlaced fields were meant to be woven
+  // for display; showing them raw produces combing on every motion, which is
+  // an artifact of the playback path and not something anyone shot.
+  //
+  // `auto` is what makes it safe: it acts only on streams the container
+  // actually flags as interlaced, so every progressive file — which is to say
+  // everything modern — goes through completely untouched. That is the same
+  // "do nothing unless necessary" rule as `scaler-resizes-only`, applied to
+  // time instead of space.
+  //
+  // Here rather than in the init set because the `auto` value is newer than
+  // the option: on a build that predates it, a rejected option would abort
+  // mpv init entirely and take the whole player with it.
+  deinterlace: 'auto',
 };
 
 /**

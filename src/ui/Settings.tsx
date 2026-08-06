@@ -49,6 +49,7 @@ import {
   CREDITS_TAIL_KEY,
   DEFAULT_CREDITS_TAIL_SECS,
 } from '../player/skip';
+import { VIDEO_SYNC_KEY } from '../player/mpvOptions';
 import { buildNfoExports, writeNfo } from '../metadata/nfo';
 import FixMatch from '../library/FixMatch';
 import LibraryView from '../library/LibraryView';
@@ -92,6 +93,7 @@ export default function Settings() {
   const [mdblistKey, setMdblistKey] = useState('');
   const [autoSkip, setAutoSkip] = useState(false);
   const [creditsTail, setCreditsTail] = useState(DEFAULT_CREDITS_TAIL_SECS);
+  const [displaySync, setDisplaySync] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [panel, setPanel] = useState<'none' | 'review' | 'developer'>('none');
@@ -129,6 +131,8 @@ export default function Settings() {
       const raw = await getSetting(CREDITS_TAIL_KEY);
       const secs = raw === null ? NaN : Number(raw);
       if (Number.isFinite(secs) && secs >= 0) setCreditsTail(secs);
+
+      setDisplaySync((await getSetting(VIDEO_SYNC_KEY)) === 'display');
     })();
   }, []);
 
@@ -355,6 +359,39 @@ export default function Settings() {
               next episode this far before the end. A named end-credits chapter always wins, and
               this never applies to a film or to the last episode of a run — there is nothing to
               move on to. Off means the offer waits for the file to finish.
+            </span>
+          </div>
+          {/* The one rendering switch in the app, and it exists only because
+              the right answer depends on hardware this code cannot see: the
+              display's true refresh rate, and whether audio is being sent to a
+              receiver as an untouched bitstream. Everything else the app
+              decides for itself. */}
+          <div className="settings-toggle-row">
+            <FocusButton
+              className={displaySync ? 'btn-primary' : 'btn-secondary'}
+              onSelect={() => {
+                const next = !displaySync;
+                setDisplaySync(next);
+                void setSetting(VIDEO_SYNC_KEY, next ? 'display' : 'audio').catch((e) =>
+                  setError(String(e))
+                );
+              }}
+            >
+              Frame timing: {displaySync ? 'display clock' : 'audio clock'}
+            </FocusButton>
+            <span className="muted">
+              Times frames to the display's real refresh rate instead of the audio clock,
+              removing drift and the odd dropped frame. It does <strong>not</strong> fix 24p
+              judder on a 60&nbsp;Hz screen — that is an uneven 3:2 cadence no timing strategy
+              can even out, and only a 24, 48 or 120&nbsp;Hz display mode removes it.{' '}
+              <strong>
+                It works by resampling audio slightly, so it is incompatible with bitstream
+                passthrough
+              </strong>{' '}
+              — a TrueHD or DTS:X stream sent untouched to an AVR cannot be resampled, because
+              nothing has decoded it. This app does not currently do passthrough (it decodes to
+              PCM), so nothing breaks today; turn this off first if passthrough is ever added.
+              Press <kbd>i</kbd> during playback to see the cadence you are actually getting.
             </span>
           </div>
         </section>

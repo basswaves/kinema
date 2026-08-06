@@ -45,6 +45,7 @@ import {
   DEFAULT_CREDITS_TAIL_SECS,
 } from './skip';
 import { readChapters, type Chapter } from './chapters';
+import { VIDEO_SYNC_KEY, VIDEO_SYNC_MODES } from './mpvOptions';
 import { readPlaybackStats, type StatGroup } from './stats';
 import { getSetting } from '../metadata/api';
 
@@ -130,6 +131,12 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   const endHandled = useRef(false);
   /** Segments already acted on automatically, so each is skipped once only. */
   const autoHandled = useRef(new Set<string>());
+  /**
+   * Frame-timing mode, in a ref rather than state because it is applied inside
+   * the mpv event listener — reading it from a closure would apply whatever the
+   * setting was when that listener was registered.
+   */
+  const videoSync = useRef<string>(VIDEO_SYNC_MODES.audio);
 
   const showOsd = useCallback(() => {
     setOsdVisible(true);
@@ -285,6 +292,14 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
             }
           }
           await applyPrefs();
+
+          // Applied per file rather than once at init, so changing it in
+          // Settings takes effect on the next thing you play instead of on the
+          // next launch. mpv is definitely up by the time a file has loaded.
+          await command('set', ['video-sync', videoSync.current]).catch((e) =>
+            console.warn('could not set video-sync', e)
+          );
+
           // Chapters only exist once a file is open, and they are one of the
           // three sources a credits marker can come from.
           setChapters(await readChapters());
@@ -442,6 +457,13 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         if (Number.isFinite(secs) && secs >= 0) setCreditsTailSecs(secs);
       })
       .catch((e) => console.warn('could not read credits tail', e));
+
+    void getSetting(VIDEO_SYNC_KEY)
+      .then((mode) => {
+        videoSync.current =
+          mode === 'display' ? VIDEO_SYNC_MODES.display : VIDEO_SYNC_MODES.audio;
+      })
+      .catch((e) => console.warn('could not read video sync mode', e));
   }, []);
 
   /**

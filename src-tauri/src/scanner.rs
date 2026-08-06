@@ -77,9 +77,24 @@ fn mtime_secs(meta: &std::fs::Metadata) -> i64 {
 }
 
 fn is_video(path: &Path) -> bool {
-    path.extension()
+    let is_container = path
+        .extension()
         .and_then(|e| e.to_str())
         .map(|e| VIDEO_EXTENSIONS.contains(&e.to_lowercase().as_str()))
+        .unwrap_or(false);
+
+    if !is_container {
+        return false;
+    }
+
+    // A `-trailer` file sitting beside the feature is not a title. The
+    // `trailers/` *directory* is already skipped above; this covers the suffix
+    // convention, which would otherwise add a junk entry to the library — and
+    // a group in the review queue — for every film that has one.
+    !path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .map(crate::trailer::is_trailer_file_name)
         .unwrap_or(false)
 }
 

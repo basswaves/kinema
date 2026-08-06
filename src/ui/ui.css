@@ -914,3 +914,11 @@
     transform: none;
   }
 }
+
+/* Play / Trailer sit together under the title. */
+.detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}

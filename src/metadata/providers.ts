@@ -28,6 +28,52 @@ export interface TitleMetadata {
   rating: number | null;
   poster_url: string | null;
   backdrop_url: string | null;
+  /** YouTube video id for the trailer, when the provider knows one. */
+  trailer_key: string | null;
+  trailer_site: string | null;
+}
+
+export interface Trailer {
+  /** The site's own video id — a YouTube key, not a URL. */
+  key: string;
+  site: string;
+}
+
+/** One entry from TMDB's `/videos` list. */
+interface TmdbVideo {
+  key: string;
+  site: string;
+  type: string;
+  official?: boolean;
+  size?: number;
+  iso_639_1?: string;
+  published_at?: string;
+}
+
+/**
+ * Pick the trailer worth showing.
+ *
+ * Only YouTube is considered: it is what TMDB overwhelmingly carries, and a
+ * second embed host would be a second failure mode for one or two titles.
+ * Preference order is official over fan-uploaded, a real trailer over a teaser,
+ * and English over other languages — a teaser is still better than nothing,
+ * which is why it is a fallback rather than a filter.
+ */
+function pickTrailer(videos: TmdbVideo[] | undefined): Trailer | null {
+  const youtube = (videos ?? []).filter((v) => v.site === 'YouTube' && v.key);
+  if (youtube.length === 0) return null;
+
+  const score = (v: TmdbVideo): number =>
+    (v.type === 'Trailer' ? 4 : v.type === 'Teaser' ? 2 : 0) +
+    (v.official ? 2 : 0) +
+    (v.iso_639_1 === 'en' ? 1 : 0);
+
+  const best = [...youtube].sort((a, b) => score(b) - score(a))[0];
+  // Everything that is neither a trailer nor a teaser — featurettes, clips,
+  // behind-the-scenes — is not what "play trailer" promises.
+  if (best.type !== 'Trailer' && best.type !== 'Teaser') return null;
+
+  return { key: best.key, site: best.site };
 }
 
 export interface EpisodeMetadata {
@@ -145,6 +191,9 @@ export async function tvmazeGetShow(id: string): Promise<TitleMetadata> {
       rating: show.rating?.average ?? null,
       poster_url: show.image?.original ?? null,
       backdrop_url: backdrop,
+      // TVmaze carries no video links at all.
+      trailer_key: null,
+      trailer_site: null,
     };
   });
 }
@@ -254,7 +303,14 @@ export async function tmdbGetTitle(
     poster_path: string | null;
     backdrop_path: string | null;
     external_ids?: { imdb_id: string | null };
-  }>(key, kind === 'movie' ? `/movie/${id}` : `/tv/${id}`, { append_to_response: 'external_ids' });
+    videos?: { results: TmdbVideo[] };
+    // Appending videos to the detail request keeps a new match at one round
+    // trip instead of two — the trailer key arrives with everything else.
+  }>(key, kind === 'movie' ? `/movie/${id}` : `/tv/${id}`, {
+    append_to_response: 'external_ids,videos',
+  });
+
+  const trailer = pickTrailer(detail.videos?.results);
 
   return {
     kind,
@@ -270,7 +326,26 @@ export async function tmdbGetTitle(
     rating: detail.vote_average || null,
     poster_url: detail.poster_path ? `${TMDB_IMAGE}${detail.poster_path}` : null,
     backdrop_url: detail.backdrop_path ? `${TMDB_IMAGE}${detail.backdrop_path}` : null,
+    trailer_key: trailer?.key ?? null,
+    trailer_site: trailer?.site ?? null,
   };
+}
+
+/**
+ * Trailer for a title already in the database. Used to backfill titles matched
+ * before trailers were stored; a fresh match gets one from `tmdbGetTitle` for
+ * free.
+ */
+export async function tmdbGetTrailer(
+  key: string,
+  id: string,
+  kind: 'movie' | 'series'
+): Promise<Trailer | null> {
+  const data = await tmdbGet<{ results: TmdbVideo[] }>(
+    key,
+    kind === 'movie' ? `/movie/${id}/videos` : `/tv/${id}/videos`
+  );
+  return pickTrailer(data.results);
 }
 
 export async function tmdbGetEpisodes(key: string, id: string): Promise<EpisodeMetadata[]> {
@@ -375,7 +450,9 @@ export async function omdbGetMovie(key: string, imdbId: string): Promise<TitleMe
     runtime_mins: Number.isFinite(runtime) && runtime > 0 ? runtime : null,
     rating: Number.isFinite(rating) ? rating : null,
     poster_url: d.Poster && d.Poster !== 'N/A' ? d.Poster : null,
-    // OMDb has no backdrop/fanart of any kind.
+    // OMDb has no backdrop/fanart of any kind, and no video links either.
     backdrop_url: null,
+    trailer_key: null,
+    trailer_site: null,
   };
 }

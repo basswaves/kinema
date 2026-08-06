@@ -183,6 +183,16 @@ CREATE TABLE skip_markers (
 );
 "#;
 
+/// Schema version 6: the provider's trailer video id, stored on the title.
+///
+/// Kept on the title row rather than fetched when the detail page opens: the
+/// key arrives with the rest of the metadata during matching at no extra cost,
+/// and browsing should not depend on a provider being reachable.
+const SCHEMA_V6: &str = r#"
+ALTER TABLE titles ADD COLUMN trailer_key  TEXT;
+ALTER TABLE titles ADD COLUMN trailer_site TEXT;
+"#;
+
 pub fn open(path: &Path) -> rusqlite::Result<Connection> {
     let conn = Connection::open(path)?;
 
@@ -221,6 +231,11 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
     if version < 5 {
         conn.execute_batch(SCHEMA_V5)?;
         conn.execute_batch("PRAGMA user_version=5;")?;
+    }
+
+    if version < 6 {
+        conn.execute_batch(SCHEMA_V6)?;
+        conn.execute_batch("PRAGMA user_version=6;")?;
     }
 
     Ok(())

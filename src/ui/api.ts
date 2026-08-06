@@ -15,6 +15,9 @@ export interface Title {
   /** Cached copy in app data, when one has been downloaded. */
   poster_path: string | null;
   backdrop_path: string | null;
+  /** YouTube video id, empty string once checked and none exists. */
+  trailer_key: string | null;
+  trailer_site: string | null;
   rating: number | null;
   file_count: number;
   added_at: number | null;
@@ -45,6 +48,10 @@ export const listTitles = () => invoke<Title[]>('list_titles');
 
 export const getTitleDetail = (titleId: number) =>
   invoke<TitleDetail>('get_title_detail', { titleId });
+
+/** Path of a trailer file sitting next to the video, or null. */
+export const findLocalTrailer = (videoPath: string) =>
+  invoke<string | null>('find_local_trailer', { videoPath });
 
 /** Genres arrive as a JSON array string, or null. */
 export function parseGenres(raw: string | null): string[] {

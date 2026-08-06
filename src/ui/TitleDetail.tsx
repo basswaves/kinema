@@ -7,12 +7,25 @@
  */
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { useEffect, useMemo, useState } from 'react';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import Art from './Art';
-import { getTitleDetail, parseGenres, type Episode, type Title, type TitleDetail } from './api';
+import {
+  findLocalTrailer,
+  getTitleDetail,
+  parseGenres,
+  type Episode,
+  type Title,
+  type TitleDetail,
+} from './api';
 
 interface Props {
   title: Title;
-  onPlayFile: (path: string, label: string, fileId: number | null) => void;
+  onPlayFile: (
+    path: string,
+    label: string,
+    fileId: number | null,
+    titleId?: number | null
+  ) => void;
   onBack: () => void;
 }
 
@@ -26,6 +39,7 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
   const [detail, setDetail] = useState<TitleDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [season, setSeason] = useState<number | null>(null);
+  const [trailerPath, setTrailerPath] = useState<string | null>(null);
 
   const { ref, focusKey } = useFocusable({ trackChildren: true, saveLastFocusedChild: true });
 
@@ -54,6 +68,25 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
     () => detail?.episodes.filter((e) => e.season === season) ?? [],
     [detail, season]
   );
+
+  /**
+   * Look for a trailer file on disk, anchored on any video we hold for this
+   * title — trailers live beside the media, so without a file there is nowhere
+   * to look.
+   */
+  useEffect(() => {
+    const anchor = detail?.movie_path ?? detail?.episodes.find((e) => e.file_path)?.file_path;
+    if (!anchor) return;
+
+    let cancelled = false;
+    findLocalTrailer(anchor)
+      .then((found) => !cancelled && setTrailerPath(found))
+      .catch((e) => console.warn('local trailer lookup failed', e));
+
+    return () => {
+      cancelled = true;
+    };
+  }, [detail]);
 
   const ownedCount = detail?.episodes.filter((e) => e.file_path).length ?? 0;
 
@@ -98,14 +131,47 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
               </div>
               {title.overview && <p className="detail-overview">{title.overview}</p>}
 
-              {detail?.movie_path && (
-                <PlayButton
-                  label="▶ Play"
-                  onPlay={() =>
-                    onPlayFile(detail.movie_path as string, title.title, detail.movie_file_id)
-                  }
-                />
-              )}
+              <div className="detail-actions">
+                {detail?.movie_path && (
+                  <PlayButton
+                    label="▶ Play"
+                    onPlay={() =>
+                      onPlayFile(detail.movie_path as string, title.title, detail.movie_file_id)
+                    }
+                  />
+                )}
+
+                {/* A local file always wins: no ads, no network, and it plays
+                    through the same mpv pipeline as everything else. */}
+                {trailerPath && (
+                  <PlayButton
+                    label="▶ Trailer"
+                    secondary
+                    onPlay={() =>
+                      // fileId and titleId are both null on purpose. A trailer
+                      // is ephemeral: no resume point, no Continue Watching
+                      // row, and no writing this file's audio/subtitle choice
+                      // into the show's remembered languages.
+                      onPlayFile(trailerPath, `${title.title} — Trailer`, null, null)
+                    }
+                  />
+                )}
+
+                {/* Falls back to the browser rather than an in-app embed:
+                    whatever ad blocking the user already runs applies there,
+                    and this app ships nothing to maintain. */}
+                {!trailerPath && shown.trailer_key && (
+                  <PlayButton
+                    label="Trailer on YouTube ↗"
+                    secondary
+                    onPlay={() =>
+                      void openUrl(
+                        `https://www.youtube.com/watch?v=${shown.trailer_key as string}`
+                      ).catch((e) => setError(String(e)))
+                    }
+                  />
+                )}
+              </div>
             </div>
           </div>
 
@@ -153,10 +219,22 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
   );
 }
 
-function PlayButton({ label, onPlay }: { label: string; onPlay: () => void }) {
+function PlayButton({
+  label,
+  onPlay,
+  secondary,
+}: {
+  label: string;
+  onPlay: () => void;
+  secondary?: boolean;
+}) {
   const { ref, focused } = useFocusable({ onEnterPress: onPlay });
   return (
-    <button ref={ref} className={`btn-primary ${focused ? 'focused' : ''}`} onClick={onPlay}>
+    <button
+      ref={ref}
+      className={`${secondary ? 'btn-secondary' : 'btn-primary'} ${focused ? 'focused' : ''}`}
+      onClick={onPlay}
+    >
       {label}
     </button>
   );

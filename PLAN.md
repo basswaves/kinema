@@ -127,12 +127,43 @@ player side is unaffected by which producer is used.
 
 ### 5b. Trailers
 
-- TMDB `/movie/{id}/videos` and `/tv/{id}/videos` return YouTube keys.
-- mpv plays YouTube URLs directly **via yt-dlp** — needs the `yt-dlp` binary available
-  (bundle as a Tauri sidecar; it needs periodic updating).
-- Play on the same mpv surface, from the detail page. Treat as ephemeral: no resume
-  point, no progress row.
-- Store the trailer key on the `titles` row during matching to avoid a second fetch.
+**Keys ✅.** `trailer_key` / `trailer_site` live on the `titles` row. New TMDB
+matches get them free — `videos` is appended to the detail request, so a match is
+still one round trip — and `backfillTrailers` fills in titles that predate this.
+Selection prefers official over fan-uploaded, trailer over teaser, English over
+other languages; anything that is neither trailer nor teaser is rejected, since a
+featurette is not what "play trailer" promises. A title checked with no trailer
+records an empty key so it is not re-asked every pass. Re-matching through a
+provider with no video data (TVmaze, OMDb) `COALESCE`s rather than wiping a key
+TMDB already found.
+
+**Playback ✅ — local files first, browser second, nothing live in-app.**
+
+`yt-dlp` was rejected: it needs an install step or a bundled binary, and it
+breaks every few weeks because it scrapes something that does not want to be
+scraped. An in-app YouTube iframe was rejected too — it shows ads, and blocking
+them is the same treadmill relocated, on a project intended to be published.
+
+What the other projects do settles it. Plex serves trailers from its own
+backend, which needs content agreements. Kodi resolves YouTube streams through
+an addon that visibly breaks. Jellyfin supports both, and its ecosystem has
+converged on **plugins that download trailers to local files** — because local
+files are the path that keeps working.
+
+So: a trailer is an ordinary video file on disk, found with Jellyfin/Kodi
+conventions (`trailers/` subfolder, `trailer.ext`, or a `-trailer` suffix) and
+played on the mpv surface. No ads, no network, no binary, full rendering
+pipeline, and the layout stays interoperable with other media apps.
+
+The space-separated form Jellyfin also accepts (`Movie trailer.mkv`) is
+deliberately unsupported: it cannot be distinguished from a film whose title
+ends in the word, and misreading one removes a real title from the library
+with nothing to notice. The scanner shares this test, so a `-trailer` file is
+never indexed as a feature.
+
+Titles with no local file offer **"Trailer on YouTube ↗"**, which opens the
+stored key in the user's own browser — where their own ad blocking already
+applies, and where this app ships nothing to maintain.
 
 ---
 

@@ -39,6 +39,7 @@ import {
   type StoredTitle,
 } from '../metadata/api';
 import {
+  backfillTrailers,
   loadProviderKeys,
   matchFiles,
   returnFilesToReview,
@@ -144,10 +145,16 @@ export default function LibraryView() {
       setBusy('Caching artwork…');
       const art = await cacheArtwork();
 
+      // Newly matched TMDB titles already carry their trailer key from the
+      // detail fetch; this only picks up anything that predates that.
+      setBusy('Fetching trailers…');
+      const trailers = await backfillTrailers();
+
       await refresh();
       setDiagnosis(
         `Matched ${outcome.matched} file(s), ${outcome.unmatched} left for review. ` +
-          `Cached ${art.stored} image(s)${art.failed ? `, ${art.failed} failed` : ''}.` +
+          `Cached ${art.stored} image(s)${art.failed ? `, ${art.failed} failed` : ''}. ` +
+          `${trailers.found} trailer(s).` +
           (outcome.errors.length ? ` Errors: ${outcome.errors.slice(0, 3).join('; ')}` : '')
       );
     } catch (e) {
@@ -202,6 +209,25 @@ export default function LibraryView() {
     },
     [refresh]
   );
+
+  const runTrailers = useCallback(async () => {
+    setBusy('Fetching trailers…');
+    setError(null);
+    try {
+      const result = await backfillTrailers();
+      await refresh();
+      setDiagnosis(
+        result.found === 0 && result.none === 0
+          ? 'Every TMDB title already has its trailer looked up.'
+          : `Found ${result.found} trailer(s); ${result.none} title(s) have none.` +
+              (result.errors.length ? ` Errors: ${result.errors.slice(0, 3).join('; ')}` : '')
+      );
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(null);
+    }
+  }, [refresh]);
 
   const runCacheArtwork = useCallback(async () => {
     setBusy('Caching artwork…');
@@ -367,6 +393,13 @@ export default function LibraryView() {
             {busy === 'Caching artwork…'
               ? busy
               : `Cache artwork${art?.files ? ` (${art.files})` : ''}`}
+          </button>
+          <button
+            disabled={!!busy || titles.length === 0}
+            title="Look up TMDB trailer keys for titles matched before they were stored"
+            onClick={() => void runTrailers()}
+          >
+            {busy === 'Fetching trailers…' ? busy : 'Fetch trailers'}
           </button>
           <button
             className={needsReview > 0 ? 'attention' : ''}

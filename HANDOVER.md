@@ -9,9 +9,10 @@ I'm continuing work on **Personal Netflix**, a local serverless media library
 
 `C:\Projects\kinema`
 
-Phases 0–4 are complete and committed (`git log`). The app works end to end:
-scanning, metadata matching, browsing, and playback with resume and
-next-episode autoplay.
+Phases 0–5 are complete and committed (`git log`). The app works end to end:
+scanning, metadata matching, browsing, playback with resume and next-episode
+autoplay, locally cached artwork, a manual fix-match queue, intro skipping from
+Skiptro sidecars, and trailers from local files.
 
 **Before writing any code, read these three files in the repo:**
 
@@ -24,16 +25,15 @@ next-episode autoplay.
 **What I want next**, in priority order — but confirm the order with me before
 starting:
 
-1. **Artwork caching** (backlog) — posters/backdrops currently re-fetch from
-   TMDB on every render, so browsing needs a live connection. Cache to app data
-   and serve via Tauri's asset protocol.
-2. **Manual fix-match UI** (backlog) — the safety net the strict matching
-   threshold assumes exists. `link_file_to_title` already exists in Rust.
-3. **Phase 5a — intro/outro skip** via Skiptro `.skiptro.json` sidecars.
-   **Ask me before downloading the Skiptro binary** — it's a third-party
-   executable.
-4. **Phase 5b — in-app trailers** via TMDB video keys + yt-dlp on the mpv
-   surface.
+1. **10-foot TV layout** — D-pad navigation works everywhere already, but there
+   is no larger-type couch layout yet.
+2. **Library management out of the dev tab** — scan/parse/match still live in a
+   developer-facing Library view. Should become a settings screen with
+   background scanning.
+3. **NFO read/write** — interop with MediaElch/tinyMediaManager; read as an
+   authoritative override during matching.
+4. **Delete `src/spike/`** — the Phase 0 harness, plus the dev switcher in
+   `src/App.tsx`. Keep only until the real player is trusted for HDR.
 
 **Constraints that must not be violated** (these are settled decisions, not
 open questions):
@@ -44,6 +44,13 @@ open questions):
 - **Vendor-neutral** — must work equally on AMD, Intel and NVIDIA.
 - **Wrong metadata matches are worse than no match.** Keep the strict threshold
   and the ambiguity guard; surface failures for review instead of guessing.
+- **Nothing that needs periodic maintenance to keep working.** This has to run
+  untended for years, and it may be published as open source. That is why
+  `yt-dlp`, the Kodi-style YouTube resolver and an in-app embed with an ad
+  blocker were all rejected for trailers: trailers are local files, with the
+  provider link opening in the user's own browser as the fallback.
+- **No third-party binaries in the repo or the bundle.** Skiptro is run
+  separately by hand; the app only reads the sidecars it leaves behind.
 - The window is transparent so mpv can render behind the webview. **Never give
   `html`, `body` or `#root` an opaque background** — it hides the video
   entirely. Full-screen browsing views paint their own background; the player

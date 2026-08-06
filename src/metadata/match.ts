@@ -12,8 +12,10 @@ import type { MediaFile } from '../library/api';
 import {
   getSetting,
   linkFileToTitle,
+  listTitlesWithoutTrailer,
   saveEpisodes,
   saveTitle,
+  setTitleTrailer,
   type StoredTitle,
 } from './api';
 import {
@@ -21,6 +23,7 @@ import {
   omdbSearch,
   tmdbGetEpisodes,
   tmdbGetTitle,
+  tmdbGetTrailer,
   tmdbSearch,
   tvmazeGetEpisodes,
   tvmazeGetShow,
@@ -196,6 +199,43 @@ export async function applyMatch(
   }
 
   return titleId;
+}
+
+export interface TrailerBackfill {
+  found: number;
+  none: number;
+  errors: string[];
+}
+
+/**
+ * Fill in trailer keys for titles matched before they were stored.
+ *
+ * A fresh match gets its key from the detail fetch for free; this exists only
+ * for titles that predate that. Titles with no trailer are recorded as checked
+ * by writing an empty string, so a library with no trailers stops re-asking
+ * TMDB on every pass.
+ */
+export async function backfillTrailers(): Promise<TrailerBackfill> {
+  const result: TrailerBackfill = { found: 0, none: 0, errors: [] };
+  const keys = await loadProviderKeys();
+  if (!keys.tmdb) return result;
+
+  for (const target of await listTitlesWithoutTrailer()) {
+    try {
+      const trailer = await tmdbGetTrailer(
+        keys.tmdb,
+        target.tmdb_id,
+        target.kind === 'series' ? 'series' : 'movie'
+      );
+      await setTitleTrailer(target.id, trailer?.key ?? '', trailer?.site ?? null);
+      if (trailer) result.found++;
+      else result.none++;
+    } catch (e) {
+      result.errors.push(`${target.tmdb_id}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  return result;
 }
 
 /**

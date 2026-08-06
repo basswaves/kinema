@@ -4,8 +4,9 @@
 //! module only stores results. Keeping them separate means matching rules can
 //! be re-run against cached titles without re-hitting any API.
 
+use crate::artwork::path_prefix;
 use crate::library::Db;
-use rusqlite::params;
+use rusqlite::{named_params, params};
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -60,6 +61,10 @@ pub struct Title {
     pub runtime_mins: Option<i64>,
     pub poster_url: Option<String>,
     pub backdrop_url: Option<String>,
+    /// Absolute path to the cached copy, when there is one. The URL is kept
+    /// alongside it so the UI can fall back rather than showing nothing.
+    pub poster_path: Option<String>,
+    pub backdrop_path: Option<String>,
     pub rating: Option<f64>,
     pub file_count: i64,
     /// When this title's first file appeared, for the "recently added" rail.
@@ -76,6 +81,7 @@ pub struct Episode {
     pub air_date: Option<String>,
     pub runtime_mins: Option<i64>,
     pub still_url: Option<String>,
+    pub still_path: Option<String>,
     /// Path of the file backing this episode, if the library actually has it.
     pub file_path: Option<String>,
     pub file_id: Option<i64>,
@@ -202,11 +208,19 @@ pub fn reset_matches(db: tauri::State<Db>) -> Result<usize, String> {
 }
 
 /// Shared projection so list and detail views cannot drift apart.
+///
+/// `:art` is the absolute prefix for cached artwork. Prepending it here rather
+/// than storing absolute paths keeps the database portable — the cache lives
+/// beside it in app data, and both move together.
 const TITLE_SELECT: &str = "
     SELECT t.id, t.kind, t.provider, t.title, t.year, t.overview, t.genres,
            t.runtime_mins, t.poster_url, t.backdrop_url, t.rating,
            (SELECT COUNT(*) FROM media_files m WHERE m.title_id = t.id),
-           (SELECT MIN(m.first_seen_at) FROM media_files m WHERE m.title_id = t.id)
+           (SELECT MIN(m.first_seen_at) FROM media_files m WHERE m.title_id = t.id),
+           (SELECT :art || a.local_path FROM artwork_cache a
+             WHERE a.url = t.poster_url   AND a.local_path <> ''),
+           (SELECT :art || a.local_path FROM artwork_cache a
+             WHERE a.url = t.backdrop_url AND a.local_path <> '')
       FROM titles t";
 
 fn map_title(r: &rusqlite::Row) -> rusqlite::Result<Title> {
@@ -224,6 +238,8 @@ fn map_title(r: &rusqlite::Row) -> rusqlite::Result<Title> {
         rating: r.get(10)?,
         file_count: r.get(11)?,
         added_at: r.get(12)?,
+        poster_path: r.get(13)?,
+        backdrop_path: r.get(14)?,
     })
 }
 
@@ -231,13 +247,18 @@ fn map_title(r: &rusqlite::Row) -> rusqlite::Result<Title> {
 /// (each flagged with whether the library actually holds the file), and for a
 /// movie the playable path.
 #[tauri::command]
-pub fn get_title_detail(db: tauri::State<Db>, title_id: i64) -> Result<TitleDetail, String> {
+pub fn get_title_detail(
+    app: tauri::AppHandle,
+    db: tauri::State<Db>,
+    title_id: i64,
+) -> Result<TitleDetail, String> {
+    let art = path_prefix(&app)?;
     let conn = db.0.lock().map_err(to_string_err)?;
 
     let title = conn
         .query_row(
-            &format!("{TITLE_SELECT} WHERE t.id = ?1"),
-            params![title_id],
+            &format!("{TITLE_SELECT} WHERE t.id = :id"),
+            named_params! { ":art": &art, ":id": title_id },
             map_title,
         )
         .map_err(to_string_err)?;
@@ -247,19 +268,21 @@ pub fn get_title_detail(db: tauri::State<Db>, title_id: i64) -> Result<TitleDeta
     let mut stmt = conn
         .prepare(
             "SELECT e.id, e.season, e.episode, e.name, e.overview, e.air_date,
-                    e.runtime_mins, e.still_url, m.path, m.id
+                    e.runtime_mins, e.still_url, m.path, m.id,
+                    (SELECT :art || a.local_path FROM artwork_cache a
+                      WHERE a.url = e.still_url AND a.local_path <> '')
                FROM episodes e
                LEFT JOIN media_files m ON m.title_id = e.title_id
                                       AND m.parsed_season = e.season
                                       AND m.parsed_episode = e.episode
                                       AND m.missing = 0
-              WHERE e.title_id = ?1
+              WHERE e.title_id = :id
               ORDER BY e.season, e.episode",
         )
         .map_err(to_string_err)?;
 
     let episodes = stmt
-        .query_map(params![title_id], |r| {
+        .query_map(named_params! { ":art": &art, ":id": title_id }, |r| {
             Ok(Episode {
                 id: r.get(0)?,
                 season: r.get(1)?,
@@ -271,6 +294,7 @@ pub fn get_title_detail(db: tauri::State<Db>, title_id: i64) -> Result<TitleDeta
                 still_url: r.get(7)?,
                 file_path: r.get(8)?,
                 file_id: r.get(9)?,
+                still_path: r.get(10)?,
             })
         })
         .map_err(to_string_err)?
@@ -296,10 +320,13 @@ pub fn get_title_detail(db: tauri::State<Db>, title_id: i64) -> Result<TitleDeta
 }
 
 #[tauri::command]
-pub fn list_titles(db: tauri::State<Db>) -> Result<Vec<Title>, String> {
+pub fn list_titles(app: tauri::AppHandle, db: tauri::State<Db>) -> Result<Vec<Title>, String> {
+    let art = path_prefix(&app)?;
     let conn = db.0.lock().map_err(to_string_err)?;
     let mut stmt = conn.prepare(TITLE_SELECT).map_err(to_string_err)?;
-    let rows = stmt.query_map([], map_title).map_err(to_string_err)?;
+    let rows = stmt
+        .query_map(named_params! { ":art": &art }, map_title)
+        .map_err(to_string_err)?;
 
     rows.collect::<rusqlite::Result<Vec<_>>>()
         .map_err(to_string_err)

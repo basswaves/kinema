@@ -139,6 +139,26 @@ CREATE TABLE title_prefs (
 CREATE INDEX idx_playback_updated ON playback_state(updated_at DESC);
 "#;
 
+/// Schema version 4: locally cached artwork.
+///
+/// Keyed by the remote URL rather than by title, so posters, backdrops and
+/// episode stills all share one mechanism, and re-matching a title never
+/// orphans a downloaded file — the same TMDB URL comes back and hits the cache.
+///
+/// `local_path` is relative to the app data directory, not absolute: the cache
+/// and this database live in the same place, so a relative path survives that
+/// directory moving. An **empty** `local_path` is a row whose download failed;
+/// it stays so the URL is retried on the next pass rather than being silently
+/// abandoned.
+const SCHEMA_V4: &str = r#"
+CREATE TABLE artwork_cache (
+    url        TEXT PRIMARY KEY,
+    local_path TEXT NOT NULL,
+    bytes      INTEGER NOT NULL,
+    fetched_at INTEGER NOT NULL
+);
+"#;
+
 pub fn open(path: &Path) -> rusqlite::Result<Connection> {
     let conn = Connection::open(path)?;
 
@@ -167,6 +187,11 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
     if version < 3 {
         conn.execute_batch(SCHEMA_V3)?;
         conn.execute_batch("PRAGMA user_version=3;")?;
+    }
+
+    if version < 4 {
+        conn.execute_batch(SCHEMA_V4)?;
+        conn.execute_batch("PRAGMA user_version=4;")?;
     }
 
     Ok(())

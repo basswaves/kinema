@@ -7,6 +7,7 @@
  */
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { useMemo } from 'react';
+import Art from './Art';
 import Rail from './Rail';
 import ContinueRail from './ContinueRail';
 import type { ContinueItem } from '../player/api';
@@ -106,9 +107,11 @@ function Hero({
   return (
     <FocusContext.Provider value={focusKey}>
       <header className="hero" ref={ref}>
-        {title.backdrop_url && (
-          <img className="hero-backdrop" src={title.backdrop_url} alt="" draggable={false} />
-        )}
+        <Art
+          className="hero-backdrop"
+          local={title.backdrop_path}
+          remote={title.backdrop_url}
+        />
         <div className="hero-scrim" />
         <div className="hero-content">
           <h1 className="hero-title">{title.title}</h1>

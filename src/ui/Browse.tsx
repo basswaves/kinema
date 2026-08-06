@@ -12,6 +12,7 @@ import TitleDetailView from './TitleDetail';
 import Card from './Card';
 import Player, { type PlaybackTarget } from '../player/Player';
 import { continueWatching, type ContinueItem } from '../player/api';
+import { cacheArtwork } from '../metadata/api';
 import { getTitleDetail, listTitles, type Title } from './api';
 import './ui.css';
 
@@ -54,6 +55,22 @@ export default function Browse({ onPlaybackChange }: BrowseProps) {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
+  }, [load]);
+
+  // Fill in any artwork that is not cached yet, then reload so the local copies
+  // are actually used. Titles matched before this existed have no local copy,
+  // and a fresh match adds more — so this runs on every mount rather than once.
+  useEffect(() => {
+    let cancelled = false;
+    cacheArtwork()
+      .then((result) => {
+        if (result.failed > 0) console.warn(`artwork: ${result.failed} download(s) failed`);
+        if (!cancelled && result.stored > 0) void load();
+      })
+      .catch((e) => console.warn('artwork cache:', e));
+    return () => {
+      cancelled = true;
+    };
   }, [load]);
 
   /**

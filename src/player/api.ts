@@ -19,6 +19,8 @@ export interface ContinueItem {
   position_secs: number;
   duration_secs: number | null;
   image_url: string | null;
+  /** Cached copy of exactly the image `image_url` points at. */
+  image_path: string | null;
   updated_at: number;
 }
 

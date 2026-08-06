@@ -79,6 +79,35 @@ deliberately **off** in `src/main.tsx` for this reason.
 
 ---
 
+## Tauri
+
+### The asset protocol needs a **Cargo feature**, not just config
+
+`app.security.assetProtocol.enable = true` in `tauri.conf.json` looks like the
+whole switch. It is not: the `asset://` handler is compiled in only when the
+`tauri` crate has the **`protocol-asset`** feature. Without it the config key is
+accepted and ignored, `convertFileSrc()` still returns a perfectly plausible
+`http://asset.localhost/...` URL, and every image fails to load.
+
+```toml
+tauri = { version = "2", features = ["protocol-asset"] }
+```
+
+Both halves are required, and neither one warns about the other being missing.
+
+### Scope patterns are matched with a literal separator
+
+The scope is a glob, and `require_literal_separator` is on (it closes a real
+advisory). `$APPDATA/artwork/*` therefore covers files directly in `artwork/`
+but **nothing in a subdirectory** — a nested layout needs `/**`. Tauri
+normalises `/` to the platform separator itself, so writing the pattern with
+forward slashes is correct on Windows.
+
+`$APPDATA` here means the *app's* data directory
+(`…\Roaming\com.personalnetflix.app`), not the OS `%APPDATA%`.
+
+---
+
 ## Frontend
 
 ### `process is not defined` from guessit-js

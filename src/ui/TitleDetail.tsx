@@ -7,6 +7,7 @@
  */
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { useEffect, useMemo, useState } from 'react';
+import Art from './Art';
 import { getTitleDetail, parseGenres, type Episode, type Title, type TitleDetail } from './api';
 
 interface Props {
@@ -56,12 +57,19 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
 
   const ownedCount = detail?.episodes.filter((e) => e.file_path).length ?? 0;
 
+  // Artwork comes from the freshly fetched row once it arrives: the title in
+  // props is a snapshot from the rail, and may predate the artwork cache
+  // filling in.
+  const shown = detail?.title ?? title;
+
   return (
     <FocusContext.Provider value={focusKey}>
       <div className="detail" ref={ref}>
-        {title.backdrop_url && (
-          <img className="detail-backdrop" src={title.backdrop_url} alt="" draggable={false} />
-        )}
+        <Art
+          className="detail-backdrop"
+          local={shown.backdrop_path}
+          remote={shown.backdrop_url}
+        />
         <div className="detail-scrim" />
 
         <button className="back-button" onClick={onBack}>
@@ -70,9 +78,11 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
 
         <div className="detail-body">
           <div className="detail-head">
-            {title.poster_url && (
-              <img className="detail-poster" src={title.poster_url} alt="" draggable={false} />
-            )}
+            <Art
+              className="detail-poster"
+              local={shown.poster_path}
+              remote={shown.poster_url}
+            />
             <div className="detail-info">
               <h1>{title.title}</h1>
               <div className="detail-meta">
@@ -166,11 +176,12 @@ function EpisodeRow({ episode, onPlay }: { episode: Episode; onPlay: () => void 
       onClick={available ? onPlay : undefined}
     >
       <div className="episode-still">
-        {episode.still_url ? (
-          <img src={episode.still_url} alt="" loading="lazy" draggable={false} />
-        ) : (
-          <div className="episode-still-empty" />
-        )}
+        <Art
+          local={episode.still_path}
+          remote={episode.still_url}
+          lazy
+          fallback={<div className="episode-still-empty" />}
+        />
         <span className="episode-number">{episode.episode}</span>
       </div>
       <div className="episode-text">

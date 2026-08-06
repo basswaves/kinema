@@ -5,6 +5,7 @@
  */
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { useEffect, useRef } from 'react';
+import Art from './Art';
 import type { Title } from './api';
 
 interface Props {
@@ -40,11 +41,12 @@ export default function Card({ title, onSelect }: Props) {
         tabIndex={0}
       >
         <div className="card-art">
-          {title.poster_url ? (
-            <img src={title.poster_url} alt="" loading="lazy" draggable={false} />
-          ) : (
-            <div className="card-art-empty">{title.title}</div>
-          )}
+          <Art
+            local={title.poster_path}
+            remote={title.poster_url}
+            lazy
+            fallback={<div className="card-art-empty">{title.title}</div>}
+          />
           {title.file_count > 0 && title.kind === 'series' && (
             <span className="card-badge">{title.file_count} ep</span>
           )}

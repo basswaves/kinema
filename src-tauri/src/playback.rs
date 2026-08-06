@@ -1,7 +1,8 @@
 //! Resume points, Continue Watching, next-episode lookup and track memory.
 
+use crate::artwork::path_prefix;
 use crate::library::Db;
-use rusqlite::params;
+use rusqlite::{named_params, params};
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -41,6 +42,7 @@ pub struct ContinueItem {
     pub position_secs: f64,
     pub duration_secs: Option<f64>,
     pub image_url: Option<String>,
+    pub image_path: Option<String>,
     pub updated_at: i64,
 }
 
@@ -120,15 +122,26 @@ pub fn get_progress(db: tauri::State<Db>, file_id: i64) -> Result<Option<Progres
 /// Partly-watched items, most recent first. Finished items are excluded, and
 /// so are ones barely started — neither is something you want to resume.
 #[tauri::command]
-pub fn continue_watching(db: tauri::State<Db>, limit: i64) -> Result<Vec<ContinueItem>, String> {
+pub fn continue_watching(
+    app: tauri::AppHandle,
+    db: tauri::State<Db>,
+    limit: i64,
+) -> Result<Vec<ContinueItem>, String> {
+    let art = path_prefix(&app)?;
     let conn = db.0.lock().map_err(to_string_err)?;
+    // The cached copy is looked up for the *same* URL the COALESCE picked, not
+    // by a second COALESCE over the cache: those could disagree and show the
+    // backdrop where the episode still was meant to be.
     let mut stmt = conn
         .prepare(
             "SELECT p.file_id, m.path, t.id, t.title, t.kind,
                     m.parsed_season, m.parsed_episode, e.name,
                     p.position_secs, p.duration_secs,
                     COALESCE(e.still_url, t.backdrop_url, t.poster_url),
-                    p.updated_at
+                    p.updated_at,
+                    (SELECT :art || a.local_path FROM artwork_cache a
+                      WHERE a.url = COALESCE(e.still_url, t.backdrop_url, t.poster_url)
+                        AND a.local_path <> '')
                FROM playback_state p
                JOIN media_files m ON m.id = p.file_id
                JOIN titles t      ON t.id = m.title_id
@@ -136,30 +149,34 @@ pub fn continue_watching(db: tauri::State<Db>, limit: i64) -> Result<Vec<Continu
                                    AND e.season  = m.parsed_season
                                    AND e.episode = m.parsed_episode
               WHERE p.completed = 0
-                AND p.position_secs >= ?2
+                AND p.position_secs >= :min
                 AND m.missing = 0
               ORDER BY p.updated_at DESC
-              LIMIT ?1",
+              LIMIT :limit",
         )
         .map_err(to_string_err)?;
 
     let rows = stmt
-        .query_map(params![limit, MIN_RESUME_SECS], |r| {
-            Ok(ContinueItem {
-                file_id: r.get(0)?,
-                path: r.get(1)?,
-                title_id: r.get(2)?,
-                title: r.get(3)?,
-                kind: r.get(4)?,
-                season: r.get(5)?,
-                episode: r.get(6)?,
-                episode_name: r.get(7)?,
-                position_secs: r.get(8)?,
-                duration_secs: r.get(9)?,
-                image_url: r.get(10)?,
-                updated_at: r.get(11)?,
-            })
-        })
+        .query_map(
+            named_params! { ":art": &art, ":limit": limit, ":min": MIN_RESUME_SECS },
+            |r| {
+                Ok(ContinueItem {
+                    file_id: r.get(0)?,
+                    path: r.get(1)?,
+                    title_id: r.get(2)?,
+                    title: r.get(3)?,
+                    kind: r.get(4)?,
+                    season: r.get(5)?,
+                    episode: r.get(6)?,
+                    episode_name: r.get(7)?,
+                    position_secs: r.get(8)?,
+                    duration_secs: r.get(9)?,
+                    image_url: r.get(10)?,
+                    updated_at: r.get(11)?,
+                    image_path: r.get(12)?,
+                })
+            },
+        )
         .map_err(to_string_err)?;
 
     rows.collect::<rusqlite::Result<Vec<_>>>()

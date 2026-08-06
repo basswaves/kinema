@@ -12,6 +12,9 @@ export interface Title {
   runtime_mins: number | null;
   poster_url: string | null;
   backdrop_url: string | null;
+  /** Cached copy in app data, when one has been downloaded. */
+  poster_path: string | null;
+  backdrop_path: string | null;
   rating: number | null;
   file_count: number;
   added_at: number | null;
@@ -26,6 +29,7 @@ export interface Episode {
   air_date: string | null;
   runtime_mins: number | null;
   still_url: string | null;
+  still_path: string | null;
   file_path: string | null;
   file_id: number | null;
 }

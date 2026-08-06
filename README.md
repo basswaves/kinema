@@ -57,12 +57,14 @@ Full-screen browsing views paint their own background; the player must not.
 
 ```
 src-tauri/src/
-  db.rs          SQLite schema + migrations (user_version, currently 3)
+  db.rs          SQLite schema + migrations (user_version, currently 4)
   scanner.rs     Filesystem walk. NAS-aware: identity is (path, size, mtime),
                  never a content hash — never read file bytes during a scan
   library.rs     Roots, scan, parse write-back, stats
   metadata.rs    Titles, episodes, file→title links, detail queries
   playback.rs    Resume points, Continue Watching, next episode, track prefs
+  artwork.rs     Downloads posters/backdrops/stills into app data, keyed by
+                 remote URL; served back through the asset protocol
   settings.rs    Key/value settings (API keys) + the frontend log bridge
 
 src/
@@ -110,6 +112,13 @@ layer** — mpv is not a native DV output engine. Known limitation, not a bug to
 0.05 margin over the runner-up. Genuine ties are refused and surfaced for review rather
 than guessed. An unmatched file is visible work; a confidently wrong one silently
 corrupts the library.
+
+**The artwork cache is an accelerator, never a source of truth.** Provider URLs stay
+in `titles` and `episodes`; the cache is a separate table keyed by URL. Every query
+returns both, and the UI falls back to the URL whenever the local file is missing —
+so a half-built or hand-deleted cache degrades to the pre-cache behaviour rather than
+to blank posters. `local_path` is stored *relative* to app data, because the cache and
+the database live in the same directory and should move together.
 
 **Track memory stores languages, not indices.** Track numbering differs between releases
 of the same show, so "index 3" would pick the wrong track on the next episode; "da"

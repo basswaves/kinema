@@ -27,14 +27,19 @@ import {
 } from './api';
 import { clearParseError, lastParseError, parseMediaFile, selfTest, toPayload } from './parse';
 import {
+  artworkStats,
+  cacheArtwork,
+  clearArtworkCache,
   getSetting,
   listTitles,
   listUnmatched,
   resetMatches,
   setSetting,
+  type ArtworkStats,
   type StoredTitle,
 } from '../metadata/api';
 import { matchFiles, type MatchProgress } from '../metadata/match';
+import Art from '../ui/Art';
 import './library.css';
 
 const PARSE_BATCH = 500;
@@ -63,6 +68,7 @@ export default function LibraryView() {
   const [onlyProblems, setOnlyProblems] = useState(false);
   const [diagnosis, setDiagnosis] = useState<string | null>(null);
   const [titles, setTitles] = useState<StoredTitle[]>([]);
+  const [art, setArt] = useState<ArtworkStats | null>(null);
   const [omdbKey, setOmdbKey] = useState('');
   const [mdblistKey, setMdblistKey] = useState('');
   const [tmdbKey, setTmdbKey] = useState('');
@@ -71,16 +77,18 @@ export default function LibraryView() {
 
   const refresh = useCallback(async () => {
     try {
-      const [r, s, f, t] = await Promise.all([
+      const [r, s, f, t, a] = await Promise.all([
         listLibraryRoots(),
         libraryStats(),
         listMediaFiles(2000),
         listTitles(),
+        artworkStats(),
       ]);
       setRoots(r);
       setStats(s);
       setFiles(f);
       setTitles(t);
+      setArt(a);
     } catch (e) {
       setError(String(e));
     }
@@ -131,9 +139,16 @@ export default function LibraryView() {
         { tmdb: tmdb?.trim() || null, omdb: omdb?.trim() || null },
         setProgress
       );
+
+      // Pull the new artwork down straight away: matching is the moment the
+      // URLs become known, and browsing should not need the network afterwards.
+      setBusy('Caching artwork…');
+      const art = await cacheArtwork();
+
       await refresh();
       setDiagnosis(
-        `Matched ${outcome.matched} file(s), ${outcome.unmatched} left for review.` +
+        `Matched ${outcome.matched} file(s), ${outcome.unmatched} left for review. ` +
+          `Cached ${art.stored} image(s)${art.failed ? `, ${art.failed} failed` : ''}.` +
           (outcome.errors.length ? ` Errors: ${outcome.errors.slice(0, 3).join('; ')}` : '')
       );
     } catch (e) {
@@ -141,6 +156,24 @@ export default function LibraryView() {
     } finally {
       setBusy(null);
       setProgress(null);
+    }
+  }, [refresh]);
+
+  const runCacheArtwork = useCallback(async () => {
+    setBusy('Caching artwork…');
+    setError(null);
+    try {
+      const result = await cacheArtwork();
+      await refresh();
+      setDiagnosis(
+        result.stored === 0 && result.failed === 0
+          ? 'Artwork cache is already complete.'
+          : `Cached ${result.stored} image(s)${result.failed ? `, ${result.failed} failed` : ''}.`
+      );
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(null);
     }
   }, [refresh]);
 
@@ -269,6 +302,15 @@ export default function LibraryView() {
           >
             Re-match all
           </button>
+          <button
+            disabled={!!busy || titles.length === 0}
+            title="Download any poster, backdrop or still that is not cached yet"
+            onClick={() => void runCacheArtwork()}
+          >
+            {busy === 'Caching artwork…'
+              ? busy
+              : `Cache artwork${art?.files ? ` (${art.files})` : ''}`}
+          </button>
           <button onClick={() => setShowSettings((v) => !v)}>Settings</button>
           <button onClick={() => setDiagnosis(`Self-test: ${selfTest()}`)}>Self-test parser</button>
         </div>
@@ -315,6 +357,28 @@ export default function LibraryView() {
           </label>
           <button className="primary" onClick={() => void saveKeys()}>
             Save keys
+          </button>
+
+          <p className="muted">
+            Artwork cache:{' '}
+            {art
+              ? `${art.files} image(s), ${formatBytes(art.bytes)}${
+                  art.failed ? ` · ${art.failed} failed download(s), retried on the next pass` : ''
+                }`
+              : '—'}
+            . Cached images are served from app data, so browsing works offline.
+          </p>
+          <button
+            disabled={!!busy || !art?.files}
+            onClick={() =>
+              void (async () => {
+                const removed = await clearArtworkCache();
+                await refresh();
+                setDiagnosis(`Removed ${removed} cached image(s). Artwork falls back to the URLs.`);
+              })()
+            }
+          >
+            Clear artwork cache
           </button>
         </section>
       )}
@@ -392,11 +456,12 @@ export default function LibraryView() {
         <section className="titles-strip">
           {titles.map((title) => (
             <div key={title.id} className="title-card" title={title.overview ?? ''}>
-              {title.poster_url ? (
-                <img src={title.poster_url} alt="" loading="lazy" />
-              ) : (
-                <div className="poster-placeholder">no poster</div>
-              )}
+              <Art
+                local={title.poster_path}
+                remote={title.poster_url}
+                lazy
+                fallback={<div className="poster-placeholder">no poster</div>}
+              />
               <div className="title-card-name">{title.title}</div>
               <div className="title-card-meta">
                 {title.year ?? '—'} · {title.file_count} file{title.file_count === 1 ? '' : 's'}

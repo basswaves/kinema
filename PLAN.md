@@ -48,6 +48,16 @@ Resume points (saved every 5s and on exit), Continue Watching rail with progress
 per-show audio/subtitle memory **by language**, next-episode autoplay with a countdown.
 Completion (≥94%) is decided in Rust so the rule lives in one place.
 
+### Artwork caching ✅
+Posters, backdrops and episode stills are downloaded once into `app data/artwork`
+and served through Tauri's asset protocol, so browsing no longer needs a live
+connection. The cache is keyed by **remote URL**, not by title, so all three
+artwork kinds share one mechanism and re-matching never orphans a file. Every
+query returns the URL *and* the local path; the UI prefers the local copy and
+falls back to the URL — including on an `onError`, so a cache row that outlived
+its file degrades to the old behaviour instead of to a blank poster. Filled in
+after matching and backfilled on every Browse mount.
+
 ---
 
 ## Phase 5 — Intro skip + in-app trailers (NEXT)
@@ -94,11 +104,6 @@ player side is unaffected by which producer is used.
 ---
 
 ## Backlog (not in the original plan, worth doing)
-
-**Artwork caching** — posters and backdrops currently load from TMDB on every render,
-so browsing needs a live connection and isn't instant. Download to app data, store the
-local path, serve via Tauri's asset protocol (`convertFileSrc`). Highest-value item
-for perceived speed.
 
 **Manual fix-match UI** — the safety net the strict matching threshold *assumes* exists.
 Refusing to guess is only reasonable if correcting it is easy. Needs: a "Needs

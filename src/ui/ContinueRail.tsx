@@ -8,6 +8,7 @@
  */
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { useEffect, useRef } from 'react';
+import Art from './Art';
 import type { ContinueItem } from '../player/api';
 
 interface Props {
@@ -74,11 +75,12 @@ function ContinueCard({ item, onResume }: { item: ContinueItem; onResume: (i: Co
       tabIndex={0}
     >
       <div className="continue-art">
-        {item.image_url ? (
-          <img src={item.image_url} alt="" loading="lazy" draggable={false} />
-        ) : (
-          <div className="continue-art-empty" />
-        )}
+        <Art
+          local={item.image_path}
+          remote={item.image_url}
+          lazy
+          fallback={<div className="continue-art-empty" />}
+        />
         <div className="continue-play">▶</div>
         <div className="continue-progress">
           <div className="continue-progress-fill" style={{ width: `${percent}%` }} />

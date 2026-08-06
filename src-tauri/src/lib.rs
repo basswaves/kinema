@@ -1,3 +1,4 @@
+mod artwork;
 mod db;
 mod library;
 mod metadata;
@@ -46,6 +47,9 @@ pub fn run() {
             metadata::get_title_detail,
             metadata::list_unmatched,
             metadata::reset_matches,
+            artwork::cache_artwork,
+            artwork::artwork_stats,
+            artwork::clear_artwork_cache,
             playback::save_progress,
             playback::get_progress,
             playback::continue_watching,

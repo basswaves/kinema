@@ -484,6 +484,8 @@ opened relative to the current directory.
 
 ---
 
+---
+
 ## Backlog (not in the original plan, worth doing)
 
 **Delete `src/spike/`** — the Phase 0 harness. No longer reachable from the UI (the dev
@@ -495,6 +497,20 @@ passthrough and that is still unverified for want of an HDR display. Delete it, 
 `confidence` value nothing reads yet. A skip fired on a bad detection jumps over real
 content, which is the same class of silent wrongness as a bad metadata match. Needs a
 low-confidence sample to calibrate against; everything in the library so far reports `1`.
+
+**Audio is decoded and downmixed, never passed through.** There is no
+`audio-spdif` configuration, so mpv decodes everything to PCM and hands it to
+the default Windows device — which on this machine is onboard stereo, so a 5.1
+AAC track arrives as 2.0. An AVR would receive that downmix rather than the
+original bitstream, and TrueHD/Atmos and DTS:X object metadata are lost entirely
+before they ever leave the app. This is a bigger departure from creator's intent
+than anything in the scaler path.
+
+Not fixed blind: enabling passthrough on a device that does not support the
+codec produces silence or noise, so it needs the real AVR present to verify, and
+it needs a device selection (mpv's `--audio-device`) because the default device
+is the wrong one here. Note also that it is mutually exclusive with the new
+display-clock frame timing.
 
 **`playTitle` picks the largest file, not the first episode** — `get_title_detail`
 returns `movie_path` for a *series* too (largest file by size), so pressing Play

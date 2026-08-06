@@ -57,6 +57,7 @@ pub fn run() {
             artwork::clear_artwork_cache,
             playback::save_progress,
             playback::get_progress,
+            playback::set_watched,
             playback::continue_watching,
             playback::next_episode,
             playback::get_title_prefs,

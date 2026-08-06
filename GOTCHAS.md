@@ -193,6 +193,29 @@ image. The top row is the one place where the correct scroll position is
 absolute, not relative: see `scrollPageToTop` in `src/ui/focus.ts` and
 `keepInView="page-top"`.
 
+### Two focusables inside one row need a container, not adjacency
+
+The same geometry that stops focus reaching an overlay nav stops it reaching a
+control drawn *inside* another focusable. Going right requires
+`sibling.left >= current.right`; a button rendered within the row's own
+rectangle can never satisfy that, so adding a second `useFocusable` next to the
+row's produces a control that renders, styles, hovers and clicks — and that a
+D-pad simply cannot reach. Identical symptom to the four bare `<button>`s, and
+identically invisible with a mouse.
+
+**Do:** make the row a **container** (`trackChildren`, `saveLastFocusedChild`)
+holding the two focusables as children, each declared in a component of its own
+so `useFocusable` runs inside the container's provider. Left/right then moves
+within the row and up/down still moves between rows, because norigin walks up to
+the parent level when the current level yields no candidate. `PlayableEpisodeRow`
+in `src/ui/TitleDetail.tsx`.
+
+A container is only worth having if it has a reachable child. An episode the
+library does not hold has neither a play target nor anything to mark, so it is
+rendered by `MissingEpisodeRow` with no focusable at all — a container whose
+children are all unfocusable becomes a landing spot that swallows focus and
+answers nothing, which looks exactly like the dead-key hang below.
+
 ### A bare `<button>` is invisible to a remote
 
 `useFocusable` is what puts a control in the focus tree. A plain `<button>`

@@ -546,22 +546,33 @@ html {
   flex-direction: column;
 }
 
+/* The row is a container holding two focusables — play, and the watched
+   toggle — so the ring belongs on whichever half the remote is actually on,
+   never on the row. */
 .episode-row {
   display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.episode-main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
   align-items: center;
   gap: 1rem;
   padding: 0.75rem;
   border-radius: 0.625rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
   cursor: pointer;
   transition: background 120ms ease;
 }
 
-.episode-row:hover {
+.episode-main:hover {
   background: rgba(255, 255, 255, 0.06);
 }
 
-.episode-row.focused {
+.episode-main.focused {
   background: rgba(255, 255, 255, 0.12);
   outline: var(--focus-ring) solid #fff;
 }
@@ -570,11 +581,62 @@ html {
    a season with gaps should look like one. */
 .episode-row.missing {
   opacity: 0.38;
+}
+
+.episode-row.missing .episode-main {
   cursor: default;
 }
 
-.episode-row.missing:hover {
+.episode-row.missing .episode-main:hover {
   background: transparent;
+}
+
+/* Watched episodes stay legible but stop competing for attention — the point
+   of the list is what you have *not* seen. */
+.episode-row.watched .episode-still img {
+  opacity: 0.45;
+}
+
+.episode-row.watched .episode-name {
+  opacity: 0.72;
+}
+
+/* A state-showing button rather than a checkbox: a checkbox is a poor target
+   for a remote, and its state is much harder to read from across a room. */
+.watched-toggle {
+  flex: 0 0 auto;
+  padding: 0.4375rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.watched-toggle:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.watched-toggle.on {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: transparent;
+  color: #0a0a0c;
+}
+
+.watched-toggle.focused {
+  outline: var(--focus-ring) solid #fff;
+  outline-offset: 2px;
+}
+
+/* The movie equivalent, which is an ordinary action button rather than a pill:
+   it sits beside Play and Trailer, so it has to match them. */
+.btn-secondary.watched-on {
+  background: rgba(255, 255, 255, 0.9);
+  color: #0a0a0c;
 }
 
 .episode-still {
@@ -607,6 +669,39 @@ html {
   background: rgba(0, 0, 0, 0.72);
   font-size: 0.6875rem;
   font-weight: 700;
+}
+
+/* On the still rather than in the text, so a season reads as watched or not at
+   a glance without anyone having to read it. */
+.episode-watched-badge {
+  position: absolute;
+  right: 0.375rem;
+  top: 0.3125rem;
+  width: 1.125rem;
+  height: 1.125rem;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #0a0a0c;
+  font-size: 0.6875rem;
+  font-weight: 800;
+}
+
+/* Part-watched: the same language as the Continue Watching rail. */
+.episode-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 0.1875rem;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.episode-progress-fill {
+  display: block;
+  height: 100%;
+  background: #e50914;
 }
 
 .episode-text {
@@ -1195,7 +1290,7 @@ html {
 
 /* Episode rows are the one list long enough to scroll, and the row background
    alone is a weak focus signal once the rows are this tall. */
-:root[data-tv='on'] .episode-row.focused {
+:root[data-tv='on'] .episode-main.focused {
   background: rgba(255, 255, 255, 0.16);
 }
 

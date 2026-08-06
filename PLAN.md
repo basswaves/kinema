@@ -365,6 +365,31 @@ to pull if a real one ever misbehaves.
 
 ---
 
+## Watched tracking ✅
+
+There is **one** notion of "seen": `playback_state.completed`, the flag playback
+already set at 94%. Marking by hand writes that same flag rather than a column
+beside it. Two of them would disagree the first time either was written without
+the other, and the disagreement would be invisible — a row showing a tick while
+Continue Watching still offered it.
+
+Un-watching **deletes** the row rather than clearing the flag. "Not watched" and
+"no history" are the same state, and leaving the position behind would resume a
+file the user had just declared unseen.
+
+Episode rows show a tick on the still, a progress bar when part-watched, and a
+dimmed still once seen; the meta line counts how many of a season are done. The
+manual toggle is a state-showing pill, not a checkbox, for the same reason the
+Settings toggles are.
+
+Getting it reachable by remote forced a structural change: **the row is now a
+focus container with two children** rather than one focusable. A second
+focusable rendered *inside* the row is unreachable by D-pad for exactly the
+geometric reason the overlay nav was — see GOTCHAS.md, which now carries the
+general form of the rule.
+
+---
+
 ## Backlog (not in the original plan, worth doing)
 
 **Delete `src/spike/`** — the Phase 0 harness. No longer reachable from the UI (the dev
@@ -376,6 +401,13 @@ passthrough and that is still unverified for want of an HDR display. Delete it, 
 `confidence` value nothing reads yet. A skip fired on a bad detection jumps over real
 content, which is the same class of silent wrongness as a bad metadata match. Needs a
 low-confidence sample to calibrate against; everything in the library so far reports `1`.
+
+**`playTitle` picks the largest file, not the first episode** — `get_title_detail`
+returns `movie_path` for a *series* too (largest file by size), so pressing Play
+on a series card, or the detail page's Play button, starts whichever episode
+happens to be biggest rather than the first one. Predates this session and is
+left alone deliberately: changing what Play does is not a silent fix. The
+episode list and Continue Watching are both unaffected.
 
 ## Verification
 

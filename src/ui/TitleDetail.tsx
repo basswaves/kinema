@@ -6,11 +6,12 @@
  * with gaps, not like a shorter season.
  */
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import Art from './Art';
 import FocusButton from './FocusButton';
 import { useClaimFocus } from './focus';
+import { setWatched } from '../player/api';
 import {
   findLocalTrailer,
   getTitleDetail,
@@ -35,6 +36,14 @@ interface Props {
  * Stable keys, so focus can be aimed at this page and land somewhere useful.
  * The container is the target; it forwards to whichever of the two landing
  * spots actually exists on this title.
+ *
+ * `DETAIL_FIRST_EPISODE_KEY` now names the episode **row**, which is itself a
+ * container of two focusables rather than a leaf. That is fine — resolving a
+ * preferred child recurses, so aiming at the page descends through the row to
+ * its play area. It does mean the key must stay on a row that has a focusable
+ * child: a row for an episode the library lacks would end the descent on
+ * something that cannot be actioned, which is why `firstOwnedId` below picks a
+ * playable one.
  */
 const DETAIL_FOCUS_KEY = 'detail-root';
 const DETAIL_PLAY_KEY = 'detail-play';
@@ -44,6 +53,22 @@ function runtimeLabel(mins: number | null): string {
   if (!mins) return '';
   if (mins < 60) return `${mins}m`;
   return `${Math.floor(mins / 60)}h ${mins % 60}m`;
+}
+
+/**
+ * How far into an episode the resume point sits, as a percentage — or null when
+ * there is nothing worth drawing.
+ *
+ * A watched episode never shows a bar: the tick already says so, and a finished
+ * file can hold any position at all (marking one watched by hand leaves whatever
+ * position it had). Under 1% is a stray press rather than progress.
+ */
+function progressPercent(episode: Episode): number | null {
+  if (episode.watched) return null;
+  const { position_secs: position, duration_secs: total } = episode;
+  if (!position || !total || total <= 0) return null;
+  const pct = (position / total) * 100;
+  return pct >= 1 ? Math.min(pct, 100) : null;
 }
 
 export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
@@ -111,7 +136,27 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
     };
   }, [detail]);
 
+  /**
+   * Flip the watched flag, then re-read the whole detail rather than patching
+   * the row in place. One file can back both an episode row and the movie
+   * entry, so a local patch would update one of them and leave the other
+   * disagreeing with the database.
+   */
+  const toggleWatched = useCallback(
+    async (fileId: number, watched: boolean) => {
+      try {
+        await setWatched(fileId, watched);
+        const fresh = await getTitleDetail(title.id);
+        setDetail(fresh);
+      } catch (e) {
+        setError(String(e));
+      }
+    },
+    [title.id]
+  );
+
   const ownedCount = detail?.episodes.filter((e) => e.file_path).length ?? 0;
+  const watchedCount = detail?.episodes.filter((e) => e.file_path && e.watched).length ?? 0;
 
   // The landing spot for a series: the first episode in the visible season that
   // is actually playable. Missing episodes are rendered but not focusable, so
@@ -152,6 +197,9 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
                   title.rating ? `★ ${title.rating.toFixed(1)}` : null,
                   runtimeLabel(title.runtime_mins),
                   title.kind === 'series' ? `${ownedCount} episodes in library` : null,
+                  title.kind === 'series' && watchedCount > 0
+                    ? `${watchedCount} watched`
+                    : null,
                   parseGenres(title.genres).join(', ') || null,
                 ]
                   .filter(Boolean)
@@ -170,6 +218,25 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
                     }
                   >
                     ▶ Play
+                  </FocusButton>
+                )}
+
+                {/* Series get their watched toggle per episode, on the rows.
+                    A film is a single file, so this is the only place it can
+                    go — and it is what makes "watched" correctable when a
+                    stopped playback never reached the completion threshold. */}
+                {title.kind !== 'series' && detail?.movie_file_id != null && (
+                  <FocusButton
+                    className={`btn-secondary ${detail.movie_watched ? 'watched-on' : ''}`}
+                    keepInView="page-top"
+                    onSelect={() =>
+                      void toggleWatched(
+                        detail.movie_file_id as number,
+                        !detail.movie_watched
+                      )
+                    }
+                  >
+                    {detail.movie_watched ? '✓ Watched' : 'Mark watched'}
                   </FocusButton>
                 )}
 
@@ -236,6 +303,9 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
                     key={episode.id}
                     episode={episode}
                     focusKey={episode.id === firstOwnedId ? DETAIL_FIRST_EPISODE_KEY : undefined}
+                    onToggleWatched={() =>
+                      void toggleWatched(episode.file_id as number, !episode.watched)
+                    }
                     onPlay={() =>
                       episode.file_path &&
                       onPlayFile(
@@ -257,41 +327,88 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
   );
 }
 
-function EpisodeRow({
-  episode,
-  onPlay,
-  focusKey,
-}: {
+interface EpisodeRowProps {
   episode: Episode;
   onPlay: () => void;
+  onToggleWatched: () => void;
   focusKey?: string;
-}) {
-  const available = Boolean(episode.file_path);
-  const { ref, focused } = useFocusable({
+}
+
+function EpisodeRow(props: EpisodeRowProps) {
+  // An episode the library does not hold has nothing to play and nothing to
+  // mark, so it is not a focus container at all — only a rendered gap. Giving
+  // it one would put a landing spot in the focus tree with no reachable child
+  // inside it: focus arrives and every further press does nothing, which is the
+  // same silent dead end as focus parked on an unmounted component.
+  return props.episode.file_path ? (
+    <PlayableEpisodeRow {...props} />
+  ) : (
+    <MissingEpisodeRow episode={props.episode} />
+  );
+}
+
+/**
+ * A row the library actually holds.
+ *
+ * The row is a focus *container* with two children, not a single focusable:
+ * left/right moves between playing the episode and marking it watched, up/down
+ * still moves between rows. A focusable nested inside another focusable cannot
+ * be reached geometrically — going right requires the candidate's left edge to
+ * be past the current element's right edge, which nothing drawn *inside* it can
+ * ever satisfy. Same shape as the overlay-nav problem in GOTCHAS.md.
+ *
+ * Both children are declared in components of their own, because `useFocusable`
+ * reads the focus context of the component it is called in: calling them here
+ * would parent them to the episode list and leave this container childless.
+ */
+function PlayableEpisodeRow({ episode, onPlay, onToggleWatched, focusKey }: EpisodeRowProps) {
+  const { ref, focusKey: rowKey, hasFocusedChild } = useFocusable({
     focusKey,
-    focusable: available,
-    onEnterPress: onPlay,
+    trackChildren: true,
+    saveLastFocusedChild: true,
   });
 
-  const element = useRef<HTMLDivElement | null>(null);
+  return (
+    <FocusContext.Provider value={rowKey}>
+      <div
+        ref={ref}
+        className={`episode-row ${hasFocusedChild ? 'row-active' : ''} ${
+          episode.watched ? 'watched' : ''
+        }`}
+      >
+        <EpisodePlayArea episode={episode} onPlay={onPlay} />
+        <FocusButton
+          className={`watched-toggle ${episode.watched ? 'on' : ''}`}
+          keepInView="nearest"
+          onSelect={onToggleWatched}
+        >
+          {episode.watched ? '✓ Watched' : 'Mark watched'}
+        </FocusButton>
+      </div>
+    </FocusContext.Provider>
+  );
+}
+
+/** The part of the row that plays the episode: still, title, overview, runtime. */
+function EpisodePlayArea({ episode, onPlay }: { episode: Episode; onPlay: () => void }) {
+  const { ref, focused } = useFocusable<object, HTMLDivElement>({ onEnterPress: onPlay });
 
   // A season is the one list here long enough to run off the bottom of the
   // screen, and more so at TV scale, where a third as many rows fit. Without
   // this, arrowing down past the fold moves focus to a row you cannot see.
   useEffect(() => {
     if (focused) {
-      element.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
-  }, [focused]);
+  }, [focused, ref]);
+
+  const percent = progressPercent(episode);
 
   return (
     <div
-      ref={(node) => {
-        ref.current = node;
-        element.current = node;
-      }}
-      className={`episode-row ${focused ? 'focused' : ''} ${available ? '' : 'missing'}`}
-      onClick={available ? onPlay : undefined}
+      ref={ref}
+      className={`episode-main ${focused ? 'focused' : ''}`}
+      onClick={onPlay}
     >
       <div className="episode-still">
         <Art
@@ -301,15 +418,49 @@ function EpisodeRow({
           fallback={<div className="episode-still-empty" />}
         />
         <span className="episode-number">{episode.episode}</span>
+        {episode.watched && (
+          <span className="episode-watched-badge" aria-label="watched">
+            ✓
+          </span>
+        )}
+        {percent !== null && (
+          <span className="episode-progress">
+            <span className="episode-progress-fill" style={{ width: `${percent}%` }} />
+          </span>
+        )}
       </div>
       <div className="episode-text">
-        <div className="episode-name">
-          {episode.name ?? `Episode ${episode.episode}`}
-          {!available && <span className="episode-missing-tag">not in library</span>}
-        </div>
+        <div className="episode-name">{episode.name ?? `Episode ${episode.episode}`}</div>
         {episode.overview && <p className="episode-overview">{episode.overview}</p>}
       </div>
       <div className="episode-runtime">{runtimeLabel(episode.runtime_mins)}</div>
+    </div>
+  );
+}
+
+/** A gap in the season: shown, greyed, and out of the focus tree entirely. */
+function MissingEpisodeRow({ episode }: { episode: Episode }) {
+  return (
+    <div className="episode-row missing">
+      <div className="episode-main">
+        <div className="episode-still">
+          <Art
+            local={episode.still_path}
+            remote={episode.still_url}
+            lazy
+            fallback={<div className="episode-still-empty" />}
+          />
+          <span className="episode-number">{episode.episode}</span>
+        </div>
+        <div className="episode-text">
+          <div className="episode-name">
+            {episode.name ?? `Episode ${episode.episode}`}
+            <span className="episode-missing-tag">not in library</span>
+          </div>
+          {episode.overview && <p className="episode-overview">{episode.overview}</p>}
+        </div>
+        <div className="episode-runtime">{runtimeLabel(episode.runtime_mins)}</div>
+      </div>
     </div>
   );
 }

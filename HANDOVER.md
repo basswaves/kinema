@@ -32,6 +32,9 @@ layout, a Settings screen with automatic background scanning, NFO read/write,
 watched tracking, previous/next episode stepping, end-credit skipping, and a
 "stats for nerds" diagnostic panel.
 
+It launches from a desktop shortcut rather than a terminal: `npm run app:build`
+assembles `dist-app/` and refreshes the shortcut.
+
 **What is left, all of it currently blocked on something:**
 
 - **Delete `src/spike/`** — the Phase 0 mpv harness. Already off the UI and

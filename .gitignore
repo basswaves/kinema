@@ -29,6 +29,10 @@ src-tauri/lib/
 # Rust build output
 src-tauri/target/
 
+# Portable app folder assembled by `npm run app:build` — the exe plus ~95MB of
+# native libraries, all of it reproducible from source.
+dist-app/
+
 # Diagnostic logs
 mpv.log
 src-tauri/mpv.log

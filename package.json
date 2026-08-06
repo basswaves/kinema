@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "check": "tsc --noEmit && eslint .",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "app:build": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-app.ps1"
   },
   "dependencies": {
     "@noriginmedia/norigin-spatial-navigation": "^3.3.0",

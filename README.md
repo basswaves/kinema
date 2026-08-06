@@ -20,7 +20,9 @@ thin client that does nothing without a Jellyfin server running.
 | 2 — Metadata engine | **Done.** TMDB / TVmaze / OMDb, match scoring, ambiguity guard |
 | 3 — Browsing UI | **Done.** Hero, rails, detail pages, search, D-pad navigation |
 | 4 — Playback | **Done.** Resume, Continue Watching, per-show track memory, next-episode autoplay |
-| 5 — Intro skip + trailers | **Not started** |
+| 5 — Intro skip + trailers | **Done.** Skip intro from Skiptro sidecars, trailers from local files |
+| Artwork cache | **Done.** Posters/backdrops/stills in app data, served over the asset protocol — browsing works offline |
+| Manual fix-match | **Done.** Review queue with reasons, provider search, ignore and unlink |
 
 ## Setup
 

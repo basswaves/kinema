@@ -9,7 +9,7 @@
  * The window is transparent and mpv renders behind the webview, so nothing here
  * may paint an opaque background.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   command,
   getProperty,
@@ -29,12 +29,16 @@ import {
 } from './tracks';
 import {
   getProgress,
+  getSkipMarkers,
   getTitlePrefs,
   nextEpisode,
   saveProgress,
   setTitlePrefs,
   type NextEpisode,
+  type SkipMarkers,
 } from './api';
+import { activeSkip } from './skip';
+import { getSetting } from '../metadata/api';
 
 export interface PlaybackTarget {
   path: string;
@@ -56,6 +60,10 @@ const MIN_RESUME_SECS = 30;
 /** Or one that is effectively finished. */
 const RESUME_MAX_FRACTION = 0.94;
 const NEXT_EPISODE_COUNTDOWN = 12;
+/** How long a Skip prompt stays on screen before getting out of the way. */
+const SKIP_PROMPT_MS = 10000;
+/** Setting key: 'auto' skips without asking, anything else shows the button. */
+const SKIP_MODE_KEY = 'skip_mode';
 
 function formatTime(seconds: number | null): string {
   if (seconds === null || Number.isNaN(seconds)) return '--:--';
@@ -81,6 +89,11 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   const [upNext, setUpNext] = useState<NextEpisode | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [resumedFrom, setResumedFrom] = useState<number | null>(null);
+  const [markers, setMarkers] = useState<SkipMarkers | null>(null);
+  const [autoSkip, setAutoSkip] = useState(false);
+  const [hasNext, setHasNext] = useState(false);
+  /** Prompt occurrences the user (or the timer) has already dismissed. */
+  const [dismissed, setDismissed] = useState<string | null>(null);
 
   const seekingRef = useRef(false);
   const hideTimer = useRef<number | undefined>(undefined);
@@ -90,6 +103,8 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   const pendingSeek = useRef<number | null>(null);
   /** Guards against handling the end of the same file twice. */
   const endHandled = useRef(false);
+  /** Segments already acted on automatically, so each is skipped once only. */
+  const autoHandled = useRef(new Set<string>());
 
   const showOsd = useCallback(() => {
     setOsdVisible(true);
@@ -298,6 +313,104 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     }, 1000);
     return () => window.clearInterval(id);
   }, [handlePlaybackEnded]);
+
+  // ---- intro / credits skip ------------------------------------------------
+
+  /**
+   * Read the sidecar once per file. Deliberately not polled: it sits on the
+   * same share as the video, and markers do not change mid-episode.
+   */
+  useEffect(() => {
+    let cancelled = false;
+
+    // A new file means the previous file's prompts are meaningless. Two
+    // episodes commonly share an intro start, so these must be cleared by file
+    // rather than left to the segment keys to distinguish.
+    /* eslint-disable-next-line react-hooks/set-state-in-effect */
+    setDismissed(null);
+    autoHandled.current.clear();
+
+    void (async () => {
+      try {
+        const found = await getSkipMarkers(target.path, target.fileId);
+        if (cancelled) return;
+        setMarkers(found);
+
+        // Only worth knowing when there is a credits marker: it decides whether
+        // the credits prompt can offer anything.
+        if (found?.credits && target.fileId !== null) {
+          const next = await nextEpisode(target.fileId);
+          if (!cancelled) setHasNext(next !== null);
+        } else if (!cancelled) {
+          setHasNext(false);
+        }
+      } catch (e) {
+        // Never fatal — no markers simply means no skip button.
+        console.warn('skip markers unavailable', e);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [target.path, target.fileId]);
+
+  // Read at playback time rather than held in the shell, so changing the
+  // setting takes effect on the next episode without a restart.
+  useEffect(() => {
+    void getSetting(SKIP_MODE_KEY)
+      .then((mode) => setAutoSkip(mode === 'auto'))
+      .catch((e) => console.warn('could not read skip mode', e));
+  }, []);
+
+  const active = useMemo(() => activeSkip(markers, timePos), [markers, timePos]);
+  const activeKey = active?.key ?? null;
+
+  const performSkip = useCallback(async () => {
+    if (!active) return;
+    setDismissed(active.key);
+    if (active.kind === 'intro') {
+      await command('seek', [active.seekTo, 'absolute']).catch((e) => setError(String(e)));
+      showOsd();
+    } else if (!endHandled.current) {
+      // Credits: end the episode early rather than seeking. That routes into
+      // the same up-next flow as a natural end, so there is one path to the
+      // next episode instead of two that can disagree.
+      endHandled.current = true;
+      await handlePlaybackEnded();
+    }
+  }, [active, handlePlaybackEnded, showOsd]);
+
+  // Automatic mode. The guard set makes this idempotent, which matters because
+  // `active` is a fresh object on every position tick.
+  useEffect(() => {
+    if (!autoSkip || !active) return;
+    if (autoHandled.current.has(active.key)) return;
+    autoHandled.current.add(active.key);
+    void performSkip();
+  }, [autoSkip, active, performSkip]);
+
+  /**
+   * Get the prompt out of the way on its own.
+   *
+   * Keyed on the segment rather than on `active`, which changes identity every
+   * second — depending on the object would restart this timer continuously and
+   * the prompt would never dismiss.
+   */
+  useEffect(() => {
+    if (!activeKey || autoSkip) return;
+    const id = window.setTimeout(() => setDismissed(activeKey), SKIP_PROMPT_MS);
+    return () => window.clearTimeout(id);
+  }, [activeKey, autoSkip]);
+
+  const skipPrompt =
+    active && !autoSkip && !upNext && dismissed !== active.key
+      ? // A credits prompt with nothing to move on to would be a button that
+        // does nothing useful.
+        active.kind === 'intro' || hasNext
+        ? active
+        : null
+      : null;
 
   // ---- persist progress ---------------------------------------------------
   useEffect(() => {
@@ -515,6 +628,12 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
             </div>
           </div>
         </div>
+      )}
+
+      {skipPrompt && (
+        <button className="skip-button" onClick={() => void performSkip()}>
+          {skipPrompt.kind === 'intro' ? 'Skip intro' : 'Next episode ›'}
+        </button>
       )}
 
       {showTracks && (

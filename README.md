@@ -57,7 +57,7 @@ Full-screen browsing views paint their own background; the player must not.
 
 ```
 src-tauri/src/
-  db.rs          SQLite schema + migrations (user_version, currently 4)
+  db.rs          SQLite schema + migrations (user_version, currently 5)
   scanner.rs     Filesystem walk. NAS-aware: identity is (path, size, mtime),
                  never a content hash — never read file bytes during a scan
   library.rs     Roots, scan, parse write-back, stats
@@ -65,6 +65,8 @@ src-tauri/src/
   playback.rs    Resume points, Continue Watching, next episode, track prefs
   artwork.rs     Downloads posters/backdrops/stills into app data, keyed by
                  remote URL; served back through the asset protocol
+  skip.rs        Reads .skiptro.json sidecars for intro/credits markers,
+                 cached against the sidecar's own size and mtime
   settings.rs    Key/value settings (API keys) + the frontend log bridge
 
 src/

@@ -33,6 +33,18 @@ export interface NextEpisode {
   title: string;
 }
 
+export interface Segment {
+  start: number;
+  end: number;
+}
+
+export interface SkipMarkers {
+  intro: Segment | null;
+  credits: Segment | null;
+  /** Which sidecar these came from, for diagnostics. */
+  sidecar: string | null;
+}
+
 export interface TitlePrefs {
   audio_lang: string | null;
   sub_lang: string | null;
@@ -55,3 +67,7 @@ export const getTitlePrefs = (titleId: number) =>
 
 export const setTitlePrefs = (titleId: number, prefs: TitlePrefs) =>
   invoke<void>('set_title_prefs', { titleId, prefs });
+
+/** Null when the file has no `.skiptro.json` sidecar beside it. */
+export const getSkipMarkers = (path: string, fileId: number | null) =>
+  invoke<SkipMarkers | null>('get_skip_markers', { path, fileId });

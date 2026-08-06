@@ -80,6 +80,7 @@ export default function LibraryView() {
   const [mdblistKey, setMdblistKey] = useState('');
   const [tmdbKey, setTmdbKey] = useState('');
   const [showSettings, setShowSettings] = useState(false);
+  const [autoSkip, setAutoSkip] = useState(false);
   const [progress, setProgress] = useState<MatchProgress | null>(null);
 
   const refresh = useCallback(async () => {
@@ -114,6 +115,7 @@ export default function LibraryView() {
       setOmdbKey((await getSetting('omdb_api_key')) ?? '');
       setMdblistKey((await getSetting('mdblist_api_key')) ?? '');
       setTmdbKey((await getSetting('tmdb_api_key')) ?? '');
+      setAutoSkip((await getSetting('skip_mode')) === 'auto');
     })();
   }, []);
 
@@ -419,6 +421,26 @@ export default function LibraryView() {
           <button className="primary" onClick={() => void saveKeys()}>
             Save keys
           </button>
+
+          <label className="settings-toggle">
+            <input
+              type="checkbox"
+              checked={autoSkip}
+              onChange={(e) => {
+                const on = e.target.checked;
+                setAutoSkip(on);
+                void setSetting('skip_mode', on ? 'auto' : 'button').catch((err) =>
+                  setError(String(err))
+                );
+              }}
+            />
+            Skip intros automatically{' '}
+            <span className="muted">
+              — otherwise a Skip button appears for 10 seconds. Needs a{' '}
+              <code>.skiptro.json</code> sidecar next to the video; without one, nothing
+              changes.
+            </span>
+          </label>
 
           <p className="muted">
             Artwork cache:{' '}

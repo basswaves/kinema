@@ -83,22 +83,43 @@ video files. No server, no Kodi needed — the sidecar format is player-agnostic
 - Repo: <https://github.com/MikeSiLVO/skiptro-releases>
 - Companion Kodi addon (GPL-2, useful as a reference for consuming the format):
   <https://github.com/MikeSiLVO/service.skiptro>
-- Sidecar shape (verified for intro; **confirm whether credits/outro are also emitted**):
+- Sidecar shape, **confirmed against real output from Skiptro 1.2.0**:
   ```json
-  { "intro": { "start": 0, "end": 87.5 } }
+  {
+    "intro": { "start": 0.2, "end": 45.6 },
+    "skiptro": { "confidence": 1, "version": "1.2.0" }
+  }
   ```
+  Named `<video stem>.skiptro.json`, i.e. the extension is replaced, not appended.
+  **There is no credits/outro segment** — 1.2.0 detects intros only. The reader
+  and the player handle one anyway, since the cost is a few lines and any other
+  producer (including the ffmpeg fallback below) could emit one.
 
-**Work:**
-1. Rust command `get_skip_markers(file_path)` → reads `<video basename>.skiptro.json`
-   next to the file, returns `{ intro?: {start,end}, credits?: {start,end} }`.
-   Cache in the DB keyed by `file_id` so a NAS isn't hit on every play.
-2. `Player.tsx`: when `time-pos` enters the intro region, show a **Skip Intro** button
-   bottom-right; auto-dismiss after ~10s; clicking seeks to `intro.end`.
-   Same for credits → trigger next episode early.
-3. Settings toggle: show button vs. skip automatically.
-4. **Ask before downloading the Skiptro binary** — it's a third-party executable.
-   Decide then whether to bundle it as a Tauri sidecar or just document running it
-   separately. Bundling means shipping an ONNX model too.
+**Player side ✅ — the consumer is done and independent of the producer.**
+`get_skip_markers` reads the sidecar (both `<stem>.skiptro.json` and
+`<name.ext>.skiptro.json` are checked, since the naming convention is the
+producer's choice) and caches the result against the sidecar's own size and
+mtime — so running the detector *after* a file has been played is picked up
+rather than leaving "no markers" cached forever. `Player.tsx` shows a **Skip
+intro** button for 10 seconds on entering the intro, seeks to `intro.end`, and
+on entering credits offers the next episode through the same up-next path as a
+natural end. A settings toggle switches between prompting and skipping
+automatically.
+
+Parsing accepts `credits`, `outro` or `ending` for the closing segment and
+rejects segments that would seek backwards or nowhere. A sidecar that exists but
+yields nothing usable logs its actual top-level keys — an unreadable format must
+not look like a show with no intro.
+
+Skiptro itself is run **manually, not bundled** — no third-party executable
+enters the repo or the ship. Verified end to end against real 1.2.0 sidecars on
+a full season: button, seek, auto-skip, and no effect on files without one.
+
+**Open:** the sidecar carries a `confidence` value that nothing currently reads.
+A skip fired on a bad detection jumps over real content, which is the same class
+of silent wrongness as a bad metadata match — so a minimum confidence is worth
+adding once there is a low-confidence sample to calibrate against. Every marker
+in the library so far reports `1`.
 
 **Fallback if Skiptro proves awkward:** the detection is reproducible with
 `ffmpeg` + chromaprint (already installed). The sidecar format is trivial, so the

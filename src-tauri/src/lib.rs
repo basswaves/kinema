@@ -5,6 +5,7 @@ mod metadata;
 mod playback;
 mod scanner;
 mod settings;
+mod skip;
 
 use library::Db;
 use std::sync::Mutex;
@@ -56,6 +57,7 @@ pub fn run() {
             playback::next_episode,
             playback::get_title_prefs,
             playback::set_title_prefs,
+            skip::get_skip_markers,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -159,6 +159,30 @@ CREATE TABLE artwork_cache (
 );
 "#;
 
+/// Schema version 5: cached intro/credits markers read from `.skiptro.json`
+/// sidecars next to the video files.
+///
+/// Cached so playing an episode does not re-read a file over SMB every time.
+/// The sidecar's own size and mtime are stored with it, which is what keeps the
+/// cache honest: running the detector *after* a file has been played would
+/// otherwise leave "no markers" cached forever.
+const SCHEMA_V5: &str = r#"
+CREATE TABLE skip_markers (
+    file_id       INTEGER PRIMARY KEY REFERENCES media_files(id) ON DELETE CASCADE,
+
+    sidecar_path  TEXT    NOT NULL,
+    sidecar_size  INTEGER NOT NULL,
+    sidecar_mtime INTEGER NOT NULL,
+
+    intro_start   REAL,
+    intro_end     REAL,
+    credits_start REAL,
+    credits_end   REAL,
+
+    checked_at    INTEGER NOT NULL
+);
+"#;
+
 pub fn open(path: &Path) -> rusqlite::Result<Connection> {
     let conn = Connection::open(path)?;
 
@@ -192,6 +216,11 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
     if version < 4 {
         conn.execute_batch(SCHEMA_V4)?;
         conn.execute_batch("PRAGMA user_version=4;")?;
+    }
+
+    if version < 5 {
+        conn.execute_batch(SCHEMA_V5)?;
+        conn.execute_batch("PRAGMA user_version=5;")?;
     }
 
     Ok(())

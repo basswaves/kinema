@@ -35,9 +35,10 @@ thin client that does nothing without a Jellyfin server running.
 | Watched tracking | **Done.** One flag shared with playback completion; ticks and progress on episode rows, manual toggle per episode and per film |
 | Player episode stepping | **Done.** Previous/next buttons and keys, shown only where a neighbour exists |
 | End-credit skipping | **Done.** Credits resolved from sidecar, then a named chapter, then a fenced time guess |
-| Stats for nerds | **Done.** `i` in the player — source, display, scaling and why, HDR pipeline, audio in/out, dropped frames |
+| Stats for nerds | **Done.** `i` in the player — madVR-style: cadence, scaling and why, HDR pipeline, audio in/out, dropped frames |
 | Launchable exe | **Done.** `npm run app:build` → portable folder + desktop shortcut, no installer |
 | Creator's-intent audit | **Done.** Verified against mpv's own verbose log; `deinterlace=auto` added, 24p cadence reported, frame-timing switch |
+| Continue Watching removal | **Done.** Per-card Remove below the card, where a D-pad can actually reach it; window opens maximised |
 
 ## Setup
 
@@ -95,7 +96,8 @@ src-tauri/src/
                  never a content hash — never read file bytes during a scan
   library.rs     Roots, scan, parse write-back, stats
   metadata.rs    Titles, episodes, file→title links, detail queries
-  playback.rs    Resume points, Continue Watching, next episode, track prefs
+  playback.rs    Resume points, Continue Watching, watched state, the
+                 adjacent-episode lookup (both directions), track prefs
   artwork.rs     Downloads posters/backdrops/stills into app data, keyed by
                  remote URL; served back through the asset protocol
   skip.rs        Reads .skiptro.json sidecars for intro/credits markers,

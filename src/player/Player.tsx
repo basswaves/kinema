@@ -557,13 +557,39 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           e.preventDefault();
           void seekRelative(10);
           break;
+        // OK on a remote, for the two prompts that appear over the video.
+        // Both are time-limited offers, and reaching them with a mouse is not
+        // an option from the sofa — which is the only place they matter.
+        // Deliberately does nothing when no prompt is showing: Enter already
+        // falls through to revealing the OSD, and rebinding it to play/pause
+        // would change a behaviour nobody asked to change.
+        case 'Enter':
+          if (skipPrompt) {
+            e.preventDefault();
+            void performSkip();
+          } else if (upNext) {
+            e.preventDefault();
+            setCountdown(0);
+          } else {
+            showOsd();
+          }
+          break;
         default:
           showOsd();
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [togglePause, toggleFullscreen, exit, seekRelative, showOsd]);
+  }, [
+    togglePause,
+    toggleFullscreen,
+    exit,
+    seekRelative,
+    showOsd,
+    skipPrompt,
+    performSkip,
+    upNext,
+  ]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect

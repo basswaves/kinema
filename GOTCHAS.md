@@ -108,6 +108,101 @@ forward slashes is correct on Windows.
 
 ---
 
+## Spatial navigation (D-pad)
+
+Both entries below are invisible with a mouse. Hovering re-establishes focus and
+clicking reaches anything, so the UI tests perfectly on a desk and is unusable
+from a sofa. **Test D-pad changes with the mouse physically untouched.**
+
+### Focus cannot travel up into an overlay nav
+
+Going up, the library requires a candidate whose **bottom** edge is above the
+current element's **top** edge:
+
+```js
+// smartNavigate, direction 'up'
+sibling.bottom <= current.top
+```
+
+A nav bar drawn *over* the content can never satisfy this — its bottom edge is
+by definition below the content's top edge — and here the hero deliberately
+slides further under it (`margin-top: -4rem`). No rearrangement of the markup
+fixes it, which is worth knowing before spending an afternoon trying.
+
+**Do:** put a `nextFocusResolver` on the nearest common parent of the nav and
+the content (`resolveNavHop` in `src/ui/Browse.tsx`). It is consulted only after
+the geometric search inside the content comes up empty, so ordinary rail-to-rail
+movement is untouched — only a press that has run out of content reaches it.
+
+Note that the resolver **replaces** the geometric search at that level rather
+than supplementing it, so it has to return `null` for the directions it does not
+handle, and the parent needs exactly the children you think it has. The search
+view got a container of its own for that reason: without one, its grid cards
+were direct children of the shell and every vertical move inside the grid hit
+the resolver.
+
+### `useFocusable` reads the context of the component it is *called in*
+
+Rendering a `FocusContext.Provider` does not put your own `useFocusable` inside
+it. The hook reads the context that was already in scope when the component
+rendered, so all of these end up as children of the **root**, not of the shell:
+
+```tsx
+// WRONG — nav and shell both end up parented to ROOT
+function Browse() {
+  const shell = useFocusable({ focusKey: 'browse-shell', nextFocusResolver });
+  const nav = useFocusable({ focusKey: 'top-nav' });   // context here is ROOT
+  return (
+    <FocusContext.Provider value={shell.focusKey}>
+      <FocusContext.Provider value={nav.focusKey}>…
+```
+
+The markup looks nested and the focus tree is flat. Everything still renders,
+every button still focuses, and left/right inside the nav still works — the only
+symptom is that a `nextFocusResolver` on the parent never sees the children it
+was written for, because they are its siblings. It silently returns `null` and
+navigation just stops.
+
+**Do:** give each container its own component (`TopNav`, `SearchView` in
+`src/ui/Browse.tsx`), so the hook runs in a render scope that is genuinely
+inside the parent's provider.
+
+### Focus parked on an unmounted component is silent death
+
+Each view replaces the last entirely — opening a detail page unmounts every card
+on Home. The spatial system keeps pointing at whatever was focused, so after the
+transition the current focus key names a component that no longer exists. No
+error, no ring, and every arrow press does nothing: indistinguishable from a
+frozen app.
+
+`getCurrentFocusKey()` still returns that dead key, so testing for
+`ROOT_FOCUS_KEY` alone is not enough — pair it with `doesFocusableExist()`. Every
+top-level view claims focus on arrival through `useClaimFocus` in
+`src/ui/focus.ts`.
+
+The same applies at startup: nothing holds focus until something claims it, and
+a remote has no equivalent of a hover to bootstrap it.
+
+### `scrollIntoView({ block: 'nearest' })` is a no-op once on screen
+
+Which is what you want almost everywhere, and wrong for the top row. Arrowing
+down through the rails scrolls the page; arrowing back up to the hero reveals
+nothing, because the hero's buttons are already visible — so the page stays
+where the rails left it, with the hero cropped and the nav floating over half an
+image. The top row is the one place where the correct scroll position is
+absolute, not relative: see `scrollPageToTop` in `src/ui/focus.ts` and
+`keepInView="page-top"`.
+
+### A bare `<button>` is invisible to a remote
+
+`useFocusable` is what puts a control in the focus tree. A plain `<button>`
+renders, styles, hovers and clicks perfectly while being completely unreachable
+by D-pad. Four of them survived several phases of development this way.
+
+**Do:** use `src/ui/FocusButton.tsx` in the browsing UI.
+
+---
+
 ## Frontend
 
 ### `process is not defined` from guessit-js
@@ -118,6 +213,23 @@ appeared to work and find nothing. Fixed by a Vite `define` mapping `process.env
 `({})` — those three debug flags are its only `process` usage.
 
 **Lesson:** a library working under Node proves nothing about WebView2. Test in the app.
+
+### …and that `define` value must be `{}`, not `({})`
+
+The obvious fix has a second trap in it. esbuild requires a `define` value to be
+a JS literal or an entity name, and rejects `'({})'` with:
+
+```
+Invalid define value (must be an entity name or JS literal): ({})
+```
+
+`vite dev` never validates defines, so the parenthesised form worked perfectly in
+development while `vite build` — and therefore `tauri build`, which runs
+`npm run build` — could not produce a bundle at all. Nothing that runs day to
+day touches the failing path, so it stayed broken silently.
+
+**Do:** run `npm run build`, not just `npm run check`, before trusting that the
+app can still be shipped. `check` is `tsc + eslint` and never invokes the bundler.
 
 ### Don't swallow errors in a parser or a command wrapper
 

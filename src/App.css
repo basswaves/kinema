@@ -23,45 +23,11 @@ body {
   user-select: none;
 }
 
-/* Temporary dev-phase view switcher. Removed once the real UI lands. */
-.dev-switch {
-  position: fixed;
-  right: 14px;
-  bottom: 12px;
-  z-index: 100;
-  display: flex;
-  gap: 4px;
-  padding: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 999px;
-  background: rgba(10, 10, 12, 0.88);
-  backdrop-filter: blur(6px);
-}
-
-.dev-switch button {
-  padding: 5px 14px;
-  border: none;
-  border-radius: 999px;
-  background: transparent;
-  color: #f2f2f2;
-  font-size: 11px;
-  cursor: pointer;
-}
-
-.dev-switch button.active {
-  background: #e50914;
-  font-weight: 600;
-}
-
-.dev-switch.hidden {
-  opacity: 0;
-  pointer-events: none;
-}
-
-.dev-switch {
-  transition: opacity 220ms ease;
-}
-
+/*
+ * Everything below styles src/spike/PlayerSpike.tsx, the Phase 0 mpv harness.
+ * It is no longer reachable from the UI — it is kept for verifying HDR
+ * passthrough, which needs a display nobody here has yet. Both go together.
+ */
 .spike-root {
   position: relative;
   display: flex;

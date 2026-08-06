@@ -13,7 +13,10 @@
  * Provider keys are never held in state here — they are read from the database
  * at the moment of each search and each link. See `loadProviderKeys`.
  */
-import { useCallback, useMemo, useState } from 'react';
+import { useFocusable } from '@noriginmedia/norigin-spatial-navigation';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import FocusButton from '../ui/FocusButton';
+import FocusInput from '../ui/FocusInput';
 import type { MediaFile } from './api';
 import {
   applyMatch,
@@ -27,6 +30,7 @@ import {
   type Provider,
 } from '../metadata/match';
 import type { Candidate } from '../metadata/score';
+import './fixmatch.css';
 
 interface Props {
   /** Every file in the library; this component picks out what needs review. */
@@ -97,7 +101,7 @@ export default function FixMatch({ files, onChanged }: Props) {
       </header>
 
       {error && (
-        <div className="library-error" onClick={() => setError(null)}>
+        <div className="fixmatch-error" onClick={() => setError(null)}>
           {error}
         </div>
       )}
@@ -139,9 +143,9 @@ export default function FixMatch({ files, onChanged }: Props) {
 
       {ignored.length > 0 && (
         <div className="fixmatch-ignored">
-          <button onClick={() => setShowIgnored((v) => !v)}>
+          <FocusButton keepInView="nearest" onSelect={() => setShowIgnored((v) => !v)}>
             {showIgnored ? 'Hide' : 'Show'} ignored ({ignored.length})
-          </button>
+          </FocusButton>
           {showIgnored &&
             ignored.map((group) => (
               <div key={group.key} className="fixmatch-row ignored">
@@ -152,9 +156,10 @@ export default function FixMatch({ files, onChanged }: Props) {
                     <span className="muted"> · {group.files.length} file(s)</span>
                   </div>
                 </div>
-                <button
+                <FocusButton
+                  keepInView="nearest"
                   disabled={busy}
-                  onClick={() =>
+                  onSelect={() =>
                     void run(async () => {
                       await returnFilesToReview(group.files);
                       return `Restored ${group.files.length} file(s) to the review queue.`;
@@ -162,7 +167,7 @@ export default function FixMatch({ files, onChanged }: Props) {
                   }
                 >
                   Un-ignore
-                </button>
+                </FocusButton>
               </div>
             ))}
         </div>
@@ -228,9 +233,28 @@ function GroupRow({
     }
   }, [query, isSeries]);
 
+  // The summary is the row's own control: it expands the group. Focusable in
+  // its own right rather than as a button, because it carries the title and the
+  // refusal reason and needs to read as a row, not a control strip.
+  const { ref: summaryRef, focused: summaryFocused } = useFocusable<object, HTMLDivElement>({
+    onEnterPress: onToggle,
+  });
+
+  useEffect(() => {
+    if (summaryFocused) {
+      summaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [summaryFocused, summaryRef]);
+
   return (
     <div className={`fixmatch-row ${open ? 'open' : ''}`}>
-      <div className="fixmatch-summary" onClick={onToggle} role="button" tabIndex={0}>
+      <div
+        ref={summaryRef}
+        className={`fixmatch-summary ${summaryFocused ? 'focused' : ''}`}
+        onClick={onToggle}
+        role="button"
+        tabIndex={0}
+      >
         <div className="fixmatch-title">
           {group.title}
           {group.year ? ` (${group.year})` : ''}
@@ -255,33 +279,33 @@ function GroupRow({
           </ul>
 
           <div className="fixmatch-search">
-            <input
+            <FocusInput
+              className="fixmatch-input"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && void search()}
+              onChange={setQuery}
+              onEnter={() => void search()}
               placeholder="Search for the right title…"
             />
-            <label className="fixmatch-kind">
-              <input
-                type="checkbox"
-                checked={isSeries}
-                onChange={(e) => setIsSeries(e.target.checked)}
-              />
-              TV series
-            </label>
-            <button
+            {/* A button showing its state rather than a checkbox: a checkbox is
+                a poor target for a remote, and this screen has to work from
+                one. */}
+            <FocusButton keepInView="nearest" onSelect={() => setIsSeries((v) => !v)}>
+              {isSeries ? 'TV series' : 'Movie'}
+            </FocusButton>
+            <FocusButton
               className="primary"
+              keepInView="nearest"
               disabled={searching || !query.trim()}
-              onClick={() => void search()}
+              onSelect={() => void search()}
             >
               {searching ? 'Searching…' : 'Search'}
-            </button>
-            <button disabled={busy} onClick={onIgnore}>
+            </FocusButton>
+            <FocusButton keepInView="nearest" disabled={busy} onSelect={onIgnore}>
               Ignore these
-            </button>
+            </FocusButton>
           </div>
 
-          {searchError && <div className="library-error">{searchError}</div>}
+          {searchError && <div className="fixmatch-error">{searchError}</div>}
 
           {results && results.length === 0 && (
             <p className="muted">No results. Try a shorter or differently spelled query.</p>
@@ -316,13 +340,14 @@ function GroupRow({
                         <p className="fixmatch-candidate-overview">{candidate.overview}</p>
                       )}
                     </div>
-                    <button
+                    <FocusButton
                       className="primary"
+                      keepInView="nearest"
                       disabled={busy}
-                      onClick={() => onLink(used.provider, candidate, used.isSeries)}
+                      onSelect={() => onLink(used.provider, candidate, used.isSeries)}
                     >
                       Link {group.files.length} file{group.files.length === 1 ? '' : 's'}
-                    </button>
+                    </FocusButton>
                   </div>
                 ))}
               </div>

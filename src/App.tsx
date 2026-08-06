@@ -1,41 +1,39 @@
-import { useState } from 'react';
+import { useEffect } from 'react';
 import Browse from './ui/Browse';
-import LibraryView from './library/LibraryView';
-import PlayerSpike from './spike/PlayerSpike';
+import { loadTvMode, setTvMode, useTvMode } from './ui/tv';
 import './App.css';
 
-type Section = 'browse' | 'library' | 'spike';
-
 /**
- * Browse is the real app. Library (scan/parse/match) and the Phase 0 mpv spike
- * are development surfaces reached from the switcher; both go away once the
- * library management moves into a proper settings screen.
+ * Browse is the whole app now. Library management lives in its Settings screen,
+ * with the stage-by-stage developer tools folded in behind a disclosure there.
+ *
+ * `src/spike/PlayerSpike.tsx` is deliberately still on disk but no longer
+ * reachable: it is the diagnostic harness for HDR passthrough, which remains
+ * unverified for want of an HDR display. It goes when that is confirmed.
  */
 export default function App() {
-  const [section, setSection] = useState<Section>('browse');
-  const [playing, setPlaying] = useState(false);
+  const tv = useTvMode();
 
-  return (
-    <>
-      {section === 'browse' && <Browse onPlaybackChange={setPlaying} />}
-      {section === 'library' && <LibraryView />}
-      {section === 'spike' && <PlayerSpike />}
+  // Applied at the root so the scale reaches the player OSD too, not just the
+  // browsing views — the controls are exactly what you need to read from the
+  // sofa, and they live outside Browse.
+  useEffect(() => {
+    void loadTvMode();
+  }, []);
 
-      {/* Hidden during playback — nothing should sit over the picture. */}
-      <nav className={`dev-switch ${playing ? 'hidden' : ''}`}>
-        <button className={section === 'browse' ? 'active' : ''} onClick={() => setSection('browse')}>
-          Browse
-        </button>
-        <button
-          className={section === 'library' ? 'active' : ''}
-          onClick={() => setSection('library')}
-        >
-          Library
-        </button>
-        <button className={section === 'spike' ? 'active' : ''} onClick={() => setSection('spike')}>
-          Spike
-        </button>
-      </nav>
-    </>
-  );
+  // Ctrl+Shift+T toggles the layout without a trip to the settings screen.
+  // Comparing the layouts means switching back and forth repeatedly, and doing
+  // that through two menus tells you nothing about how either one feels.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 't') {
+        e.preventDefault();
+        setTvMode(!tv);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [tv]);
+
+  return <Browse />;
 }

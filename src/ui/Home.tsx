@@ -10,6 +10,8 @@ import { useMemo } from 'react';
 import Art from './Art';
 import Rail from './Rail';
 import ContinueRail from './ContinueRail';
+import FocusButton from './FocusButton';
+import { useClaimFocus } from './focus';
 import type { ContinueItem } from '../player/api';
 import { parseGenres, type Title } from './api';
 
@@ -23,6 +25,13 @@ interface Props {
 
 /** Minimum titles before a genre earns its own rail. */
 const MIN_PER_GENRE = 2;
+
+/**
+ * Where focus starts. A remote has no way to bootstrap focus the way a mouse
+ * does by hovering, so without an explicit landing spot the first arrow press
+ * from the couch does nothing at all and the app looks dead.
+ */
+const HERO_PLAY_FOCUS_KEY = 'hero-play';
 
 export default function Home({ titles, resumable, onSelect, onPlay, onResume }: Props) {
   const { ref, focusKey } = useFocusable({ trackChildren: true, saveLastFocusedChild: true });
@@ -55,6 +64,8 @@ export default function Home({ titles, resumable, onSelect, onPlay, onResume }: 
       .sort((a, b) => b[1].length - a[1].length)
       .slice(0, 8);
   }, [titles]);
+
+  useClaimFocus(HERO_PLAY_FOCUS_KEY, Boolean(hero));
 
   if (titles.length === 0) {
     return (
@@ -95,14 +106,6 @@ function Hero({
   onSelect: (title: Title) => void;
 }) {
   const { ref, focusKey } = useFocusable({ trackChildren: true });
-  // Destructured rather than kept as objects: reading `obj.ref` in JSX reads a
-  // ref during render, which React's rules disallow.
-  const { ref: playRef, focused: playFocused } = useFocusable({
-    onEnterPress: () => onPlay(title),
-  });
-  const { ref: infoRef, focused: infoFocused } = useFocusable({
-    onEnterPress: () => onSelect(title),
-  });
 
   return (
     <FocusContext.Provider value={focusKey}>
@@ -123,20 +126,24 @@ function Hero({
           </div>
           {title.overview && <p className="hero-overview">{title.overview}</p>}
           <div className="hero-actions">
-            <button
-              ref={playRef}
-              className={`btn-primary ${playFocused ? 'focused' : ''}`}
-              onClick={() => onPlay(title)}
+            {/* Top row of the page: arriving here from the rails below has to
+                put the hero back on screen whole, not merely reveal the
+                button. */}
+            <FocusButton
+              focusKey={HERO_PLAY_FOCUS_KEY}
+              className="btn-primary"
+              keepInView="page-top"
+              onSelect={() => onPlay(title)}
             >
               ▶ Play
-            </button>
-            <button
-              ref={infoRef}
-              className={`btn-secondary ${infoFocused ? 'focused' : ''}`}
-              onClick={() => onSelect(title)}
+            </FocusButton>
+            <FocusButton
+              className="btn-secondary"
+              keepInView="page-top"
+              onSelect={() => onSelect(title)}
             >
               More info
-            </button>
+            </FocusButton>
           </div>
         </div>
       </header>

@@ -37,6 +37,7 @@ thin client that does nothing without a Jellyfin server running.
 | End-credit skipping | **Done.** Credits resolved from sidecar, then a named chapter, then a fenced time guess |
 | Stats for nerds | **Done.** `i` in the player — source, display, scaling and why, HDR pipeline, audio in/out, dropped frames |
 | Launchable exe | **Done.** `npm run app:build` → portable folder + desktop shortcut, no installer |
+| Creator's-intent audit | **Done.** Verified against mpv's own verbose log; `deinterlace=auto` added, 24p cadence reported, frame-timing switch |
 
 ## Setup
 
@@ -147,6 +148,27 @@ correctness passes; `scaler-resizes-only` means nothing touches the image at 1:1
 They synthesise detail that was never in the master. The path is vendor-neutral d3d11 —
 identical on NVIDIA, AMD and Intel — and light enough for a GTX 1060 / RX 480 at 4K.
 **Do not add ML upscaling or a quality-preset UI to this project.**
+
+**Do nothing unless necessary — in time as well as space.** `scaler-resizes-only`
+keeps every luma scaler out of the path when the frame is already at output size;
+`deinterlace=auto` is the same rule applied to time, weaving only streams the
+container actually flags as interlaced so every progressive file passes through
+untouched. Combed fields are an artifact of the playback path rather than
+something anyone shot, which is the one case where *adding* a stage serves
+intent. Chroma upscaling is the honest exception: 4:2:0 → 4:4:4 runs on every
+consumer encode whatever the resolution, and no setting can suppress it, so the
+stats panel says so rather than implying nothing is touching the image.
+
+**24p judder is reported, not fixed.** 23.976p on a 60Hz panel is 3:2 pulldown,
+and it is the largest visible departure from intent in a typical setup — larger
+than any scaler choice, and invisible in any discussion of them. No frame-timing
+strategy makes an uneven division even, and interpolating the difference away
+would invent frames nobody shot. So the panel names the cadence and the display
+mode that would remove it. The one switch offered, display-clock frame timing,
+removes drift and stray dropped frames but explicitly not the cadence — and
+resamples audio, which makes it incompatible with bitstream passthrough. It is
+the sole rendering preference in the app, and only because the right answer
+depends on hardware the code cannot see.
 
 **HDR: one config for both display types.** `target-colorspace-hint` lets an HDR display
 take the signal untouched; on SDR, mpv tone maps with BT.2390 (the ITU reference EETF)

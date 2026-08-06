@@ -484,6 +484,56 @@ opened relative to the current directory.
 
 ---
 
+## The creator's-intent audit ✅
+
+Prompted by "does it handle this optimally for every resolution, new and old,
+always avoiding processing it does not need?" — answered by reading what mpv
+actually did (`mpv.log`, verbose) rather than by reasoning about the config.
+
+**What was already right, and stays.** `scaler-resizes-only` genuinely keeps
+every luma scaler out of the path at 1:1. `spline36` up / `mitchell` down with
+sigmoidised upscaling and linear downscaling is confirmed running — the shader
+dump contains `pl_shader_sigmoidize` and its inverse. `dither-depth=auto`
+resolved to 10-bit. Interpolation is off. All four post-init options applied.
+Nothing was rejected and nothing warned. The scaler choices are **not** re-opened:
+`ewa_lanczossharp` is sharper, and that sharpness is contrast the colourist did
+not put there.
+
+**Three real gaps, only one of which is about scaling at all.**
+
+1. **24p on a 60Hz display.** The largest visible departure from intent in the
+   whole setup, and invisible in any discussion of scalers: `Assuming 59.972 FPS
+   for display sync` against `Container reported FPS: 23.976` is 3:2 pulldown,
+   frames alternating between three refreshes and two, juddering on every pan.
+   No timing strategy makes an uneven division even, and interpolating the
+   difference away would invent frames nobody shot. So the app **reports** it —
+   the stats panel names the cadence and says what display mode would fix it —
+   and offers `video-sync=display-resample` as a switch, which removes drift and
+   stray dropped frames but explicitly *not* the cadence.
+
+   That switch is the one rendering preference in the app, and it exists only
+   because the right answer depends on hardware the code cannot see: the panel's
+   true refresh rate, and whether audio is leaving as an untouched bitstream. It
+   resamples audio, so it is incompatible with passthrough, and Settings says so.
+
+2. **Interlaced sources.** `--deinterlace` was off, which is right for
+   everything modern and wrong for DVD-era TV: combed fields are an artifact of
+   the playback path, not something anyone shot. Now `auto`, which acts only on
+   streams the container flags as interlaced — the same "do nothing unless
+   necessary" rule as `scaler-resizes-only`, applied to time instead of space.
+   Applied post-init, because the `auto` value is newer than the option and a
+   rejected *initial* option aborts mpv entirely.
+
+3. **Chroma upscaling always runs.** 4:2:0 → 4:4:4 happens on every consumer
+   encode whatever the resolution, and `scaler-resizes-only` neither does nor
+   can suppress it. Nothing to fix — but "no processing" was never literally
+   true, and the panel now says so rather than implying otherwise.
+
+**Found while checking, not yet acted on:** audio is decoded to PCM and
+**downmixed 5.1 → 2.0**, because there is no `audio-spdif` configuration at all
+and the default Windows device is onboard stereo. That is a larger loss of
+intent than any scaler question. See the backlog.
+
 ---
 
 ## Backlog (not in the original plan, worth doing)

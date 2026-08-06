@@ -72,6 +72,19 @@ and apply them individually *after* startup — losing one refinement beats losi
 player. `tone-mapping-mode` is exactly such a case: this libplacebo build returns
 `M_PROPERTY_UNKNOWN` for it.
 
+### The verbose log answers rendering questions that reasoning cannot
+
+`msg-level=all=v` records what libplacebo *did*, not what it was asked to do:
+the shader dump names each pass (`pl_shader_sigmoidize`), `Dithering to 10 bit
+depth` confirms `dither-depth=auto` resolved, `Assuming 59.972000 FPS for
+display sync` against `Container reported FPS: 23.976024` is the whole 3:2
+judder story, and `Set property: X -> 1` proves each post-init option landed.
+The audio chain prints `[af] [in]`/`[out]`, which is how a silent 5.1 → 2.0
+downmix was found.
+
+**Do:** read `mpv.log` before theorising about the rendering path. Every claim
+in the stats panel was checked against it first.
+
 ### `loadfile` is asynchronous
 
 Seeking immediately after it fails — there is nothing loaded yet. Decide the resume

@@ -46,8 +46,10 @@ pub struct ContinueItem {
     pub updated_at: i64,
 }
 
+/// Enough to play a neighbouring episode and label it. Used in both directions
+/// — the up-next card and the player's previous/next buttons.
 #[derive(Serialize)]
-pub struct NextEpisode {
+pub struct EpisodeRef {
     pub file_id: i64,
     pub path: String,
     pub season: i64,
@@ -219,13 +221,17 @@ pub fn continue_watching(
         .map_err(to_string_err)
 }
 
-/// The next episode we actually hold, in (season, episode) order. Gaps in the
-/// library are skipped rather than stopping playback — if you own E01 and E03,
-/// E03 is next.
-#[tauri::command]
-pub fn next_episode(db: tauri::State<Db>, file_id: i64) -> Result<Option<NextEpisode>, String> {
-    let conn = db.0.lock().map_err(to_string_err)?;
-
+/// The episode either side of this one, in (season, episode) order.
+///
+/// Gaps in the library are skipped rather than stopping: if you own E01 and E03,
+/// E03 is what follows E01. The two directions are one query with the comparison
+/// and the sort flipped, so they can never disagree about the ordering — a
+/// separate "previous" query would be the obvious place for them to drift.
+fn adjacent_episode(
+    conn: &rusqlite::Connection,
+    file_id: i64,
+    forward: bool,
+) -> Result<Option<EpisodeRef>, String> {
     let current: Option<(i64, i64, i64)> = conn
         .query_row(
             "SELECT title_id, parsed_season, parsed_episode FROM media_files WHERE id = ?1",
@@ -238,22 +244,28 @@ pub fn next_episode(db: tauri::State<Db>, file_id: i64) -> Result<Option<NextEpi
         return Ok(None);
     };
 
+    // Interpolated rather than bound because they are operators and sort
+    // keywords, not values — both come from `forward`, never from input.
+    let (cmp, order) = if forward { (">", "ASC") } else { ("<", "DESC") };
+
     conn.query_row(
-        "SELECT m.id, m.path, m.parsed_season, m.parsed_episode, e.name, t.title
-           FROM media_files m
-           JOIN titles t ON t.id = m.title_id
-           LEFT JOIN episodes e ON e.title_id = m.title_id
-                               AND e.season  = m.parsed_season
-                               AND e.episode = m.parsed_episode
-          WHERE m.title_id = ?1
-            AND m.missing = 0
-            AND (m.parsed_season > ?2
-                 OR (m.parsed_season = ?2 AND m.parsed_episode > ?3))
-          ORDER BY m.parsed_season, m.parsed_episode
-          LIMIT 1",
+        &format!(
+            "SELECT m.id, m.path, m.parsed_season, m.parsed_episode, e.name, t.title
+               FROM media_files m
+               JOIN titles t ON t.id = m.title_id
+               LEFT JOIN episodes e ON e.title_id = m.title_id
+                                   AND e.season  = m.parsed_season
+                                   AND e.episode = m.parsed_episode
+              WHERE m.title_id = ?1
+                AND m.missing = 0
+                AND (m.parsed_season {cmp} ?2
+                     OR (m.parsed_season = ?2 AND m.parsed_episode {cmp} ?3))
+              ORDER BY m.parsed_season {order}, m.parsed_episode {order}
+              LIMIT 1"
+        ),
         params![title_id, season, episode],
         |r| {
-            Ok(NextEpisode {
+            Ok(EpisodeRef {
                 file_id: r.get(0)?,
                 path: r.get(1)?,
                 season: r.get(2)?,
@@ -268,6 +280,18 @@ pub fn next_episode(db: tauri::State<Db>, file_id: i64) -> Result<Option<NextEpi
         rusqlite::Error::QueryReturnedNoRows => Ok(None),
         other => Err(to_string_err(other)),
     })
+}
+
+#[tauri::command]
+pub fn next_episode(db: tauri::State<Db>, file_id: i64) -> Result<Option<EpisodeRef>, String> {
+    let conn = db.0.lock().map_err(to_string_err)?;
+    adjacent_episode(&conn, file_id, true)
+}
+
+#[tauri::command]
+pub fn previous_episode(db: tauri::State<Db>, file_id: i64) -> Result<Option<EpisodeRef>, String> {
+    let conn = db.0.lock().map_err(to_string_err)?;
+    adjacent_episode(&conn, file_id, false)
 }
 
 #[tauri::command]

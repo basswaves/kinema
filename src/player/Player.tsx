@@ -32,12 +32,20 @@ import {
   getSkipMarkers,
   getTitlePrefs,
   nextEpisode,
+  previousEpisode,
   saveProgress,
   setTitlePrefs,
-  type NextEpisode,
+  type EpisodeRef,
   type SkipMarkers,
 } from './api';
-import { activeSkip } from './skip';
+import {
+  activeSkip,
+  withResolvedCredits,
+  CREDITS_TAIL_KEY,
+  DEFAULT_CREDITS_TAIL_SECS,
+} from './skip';
+import { readChapters, type Chapter } from './chapters';
+import { readPlaybackStats, type StatGroup } from './stats';
 import { getSetting } from '../metadata/api';
 
 export interface PlaybackTarget {
@@ -62,8 +70,17 @@ const RESUME_MAX_FRACTION = 0.94;
 const NEXT_EPISODE_COUNTDOWN = 12;
 /** How long a Skip prompt stays on screen before getting out of the way. */
 const SKIP_PROMPT_MS = 10000;
+/** Stats refresh. Fast enough to watch a drop counter, slow enough to be free. */
+const STATS_REFRESH_MS = 1000;
 /** Setting key: 'auto' skips without asking, anything else shows the button. */
 const SKIP_MODE_KEY = 'skip_mode';
+
+/** The label an episode carries into the player, in one place. */
+function episodeLabel(episode: EpisodeRef): string {
+  return `${episode.title} — S${String(episode.season).padStart(2, '0')}E${String(
+    episode.episode
+  ).padStart(2, '0')}`;
+}
 
 function formatTime(seconds: number | null): string {
   if (seconds === null || Number.isNaN(seconds)) return '--:--';
@@ -83,15 +100,23 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   const [osdVisible, setOsdVisible] = useState(true);
   const [tracks, setTracks] = useState<MpvTrack[]>([]);
   const [showTracks, setShowTracks] = useState(false);
+  const [showStats, setShowStats] = useState(false);
+  const [stats, setStats] = useState<StatGroup[]>([]);
   const [sid, setSid] = useState<number | null>(null);
   const [aid, setAid] = useState<number | null>(null);
   const [subVisible, setSubVisible] = useState(true);
-  const [upNext, setUpNext] = useState<NextEpisode | null>(null);
+  const [upNext, setUpNext] = useState<EpisodeRef | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [resumedFrom, setResumedFrom] = useState<number | null>(null);
   const [markers, setMarkers] = useState<SkipMarkers | null>(null);
+  const [chapters, setChapters] = useState<Chapter[]>([]);
   const [autoSkip, setAutoSkip] = useState(false);
-  const [hasNext, setHasNext] = useState(false);
+  const [creditsTailSecs, setCreditsTailSecs] = useState(DEFAULT_CREDITS_TAIL_SECS);
+  /** The episodes either side of this file, or null where there is none. */
+  const [neighbours, setNeighbours] = useState<{
+    prev: EpisodeRef | null;
+    next: EpisodeRef | null;
+  }>({ prev: null, next: null });
   /** Prompt occurrences the user (or the timer) has already dismissed. */
   const [dismissed, setDismissed] = useState<string | null>(null);
 
@@ -115,6 +140,28 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   // ---- load, resume, and apply remembered tracks --------------------------
   useEffect(() => {
     let cancelled = false;
+
+    /*
+     * Forget where the *previous* file was before loading this one.
+     *
+     * Everything that decides whether a skip fires is derived from `timePos`
+     * and `duration`, and mpv does not update either until the new file is
+     * genuinely open. Autoplaying from one episode to the next therefore leaves
+     * a window in which the position is near the end, the duration is the old
+     * file's, and the credits logic concludes that a file which has not started
+     * yet is finishing — flashing the Up next card seconds into the new
+     * episode. Nulling both closes it: `activeSkip` refuses a null position and
+     * `withResolvedCredits` refuses a null duration.
+     *
+     * Runs after the progress-save cleanup, which is declared later and has
+     * already written the outgoing file's position by this point.
+     */
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setTimePos(null);
+    setDuration(null);
+    setMarkers(null);
+    /* eslint-enable react-hooks/set-state-in-effect */
+    latest.current = { position: 0, duration: null };
 
     (async () => {
       try {
@@ -238,6 +285,9 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
             }
           }
           await applyPrefs();
+          // Chapters only exist once a file is open, and they are one of the
+          // three sources a credits marker can come from.
+          setChapters(await readChapters());
         })();
       }
 
@@ -328,22 +378,15 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     // rather than left to the segment keys to distinguish.
     /* eslint-disable-next-line react-hooks/set-state-in-effect */
     setDismissed(null);
+    // Chapters belong to the file that is open. Carrying the previous file's
+    // over would place a credits marker at a time that means nothing here.
+    setChapters([]);
     autoHandled.current.clear();
 
     void (async () => {
       try {
         const found = await getSkipMarkers(target.path, target.fileId);
-        if (cancelled) return;
-        setMarkers(found);
-
-        // Only worth knowing when there is a credits marker: it decides whether
-        // the credits prompt can offer anything.
-        if (found?.credits && target.fileId !== null) {
-          const next = await nextEpisode(target.fileId);
-          if (!cancelled) setHasNext(next !== null);
-        } else if (!cancelled) {
-          setHasNext(false);
-        }
+        if (!cancelled) setMarkers(found);
       } catch (e) {
         // Never fatal — no markers simply means no skip button.
         console.warn('skip markers unavailable', e);
@@ -355,16 +398,84 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     };
   }, [target.path, target.fileId]);
 
+  /**
+   * What is either side of this episode.
+   *
+   * Fetched once per file rather than on demand, because it decides whether the
+   * previous/next buttons are drawn at all — a button that appears and then
+   * turns out to lead nowhere is worse than one that was never offered.
+   */
+  useEffect(() => {
+    const fileId = target.fileId;
+
+    // Cleared first: until the answer for *this* file arrives, the previous
+    // file's neighbours are wrong, and a button that jumps somewhere unrelated
+    // is worse than one that appears a moment late.
+    /* eslint-disable-next-line react-hooks/set-state-in-effect */
+    setNeighbours({ prev: null, next: null });
+    if (fileId === null) return;
+
+    let cancelled = false;
+    void Promise.all([previousEpisode(fileId), nextEpisode(fileId)])
+      .then(([prev, next]) => {
+        if (!cancelled) setNeighbours({ prev, next });
+      })
+      .catch((e) => console.warn('neighbouring episodes unavailable', e));
+
+    return () => {
+      cancelled = true;
+    };
+  }, [target.fileId]);
+
   // Read at playback time rather than held in the shell, so changing the
   // setting takes effect on the next episode without a restart.
   useEffect(() => {
     void getSetting(SKIP_MODE_KEY)
       .then((mode) => setAutoSkip(mode === 'auto'))
       .catch((e) => console.warn('could not read skip mode', e));
+
+    void getSetting(CREDITS_TAIL_KEY)
+      .then((raw) => {
+        const secs = raw === null ? NaN : Number(raw);
+        // An unset or unparsable value keeps the default; 0 is a real value
+        // meaning "never guess", so it must not be treated as absent.
+        if (Number.isFinite(secs) && secs >= 0) setCreditsTailSecs(secs);
+      })
+      .catch((e) => console.warn('could not read credits tail', e));
   }, []);
 
-  const active = useMemo(() => activeSkip(markers, timePos), [markers, timePos]);
+  /**
+   * The markers actually acted on: the sidecar's, with a credits segment folded
+   * in from a chapter or from the tail guess when it has none of its own.
+   *
+   * The guess is gated on there being a next episode. Without one, "skip the
+   * credits" can only mean ending the film early, which is not a skip.
+   */
+  const resolved = useMemo(
+    () =>
+      withResolvedCredits(markers, {
+        chapters,
+        duration,
+        tailSecs: creditsTailSecs,
+        allowTailGuess: neighbours.next !== null,
+      }),
+    [markers, chapters, duration, creditsTailSecs, neighbours.next]
+  );
+
+  // One line per file in app.log. Which source won is the first thing worth
+  // knowing when a skip fires somewhere surprising.
+  useEffect(() => {
+    if (resolved.creditsSource) {
+      console.log(`credits marker from ${resolved.creditsSource} for ${target.path}`);
+    }
+  }, [resolved.creditsSource, target.path]);
+
+  const active = useMemo(
+    () => activeSkip(resolved.markers, timePos),
+    [resolved.markers, timePos]
+  );
   const activeKey = active?.key ?? null;
+  const activeKind = active?.kind ?? null;
 
   const performSkip = useCallback(async () => {
     if (!active) return;
@@ -385,10 +496,30 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   // `active` is a fresh object on every position tick.
   useEffect(() => {
     if (!autoSkip || !active) return;
+    // Taking a credits segment *ends the file*. With nothing to move on to that
+    // is not a skip, it is quitting a film a minute before the end. The prompt
+    // path has always refused this; automatic mode did not, and the two new
+    // credits sources make it reachable in a way a measured sidecar never was.
+    if (active.kind === 'credits' && !neighbours.next) return;
     if (autoHandled.current.has(active.key)) return;
     autoHandled.current.add(active.key);
     void performSkip();
-  }, [autoSkip, active, performSkip]);
+  }, [autoSkip, active, performSkip, neighbours.next]);
+
+  /**
+   * Offer the next episode as soon as the credits start, without ending the
+   * file.
+   *
+   * The card sits over the still-running video and carries **no countdown**:
+   * the marker behind it may be a guess, and a guess is not entitled to make
+   * the decision. A natural end still starts the countdown, as it always did.
+   */
+  useEffect(() => {
+    if (autoSkip || activeKind !== 'credits') return;
+    if (!neighbours.next || upNext || dismissed === activeKey) return;
+    /* eslint-disable-next-line react-hooks/set-state-in-effect */
+    setUpNext(neighbours.next);
+  }, [autoSkip, activeKind, activeKey, dismissed, neighbours.next, upNext]);
 
   /**
    * Get the prompt out of the way on its own.
@@ -399,18 +530,35 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
    */
   useEffect(() => {
     if (!activeKey || autoSkip) return;
+    // Only the intro prompt gets out of the way on its own. The credits offer
+    // is the route on to the next episode and runs to the end of the file, so
+    // timing it out would remove the control at exactly the moment it is for.
+    if (activeKind !== 'intro') return;
     const id = window.setTimeout(() => setDismissed(activeKey), SKIP_PROMPT_MS);
     return () => window.clearTimeout(id);
-  }, [activeKey, autoSkip]);
+  }, [activeKey, activeKind, autoSkip]);
 
   const skipPrompt =
     active && !autoSkip && !upNext && dismissed !== active.key
       ? // A credits prompt with nothing to move on to would be a button that
         // does nothing useful.
-        active.kind === 'intro' || hasNext
+        active.kind === 'intro' || neighbours.next !== null
         ? active
         : null
       : null;
+
+  /** Jump straight to a neighbouring episode, keeping the show's identity. */
+  const playNeighbour = useCallback(
+    (episode: EpisodeRef) => {
+      onPlayTarget({
+        path: episode.path,
+        label: episodeLabel(episode),
+        fileId: episode.file_id,
+        titleId: target.titleId,
+      });
+    },
+    [onPlayTarget, target.titleId]
+  );
 
   // ---- persist progress ---------------------------------------------------
   useEffect(() => {
@@ -430,7 +578,6 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       // Reading the ref's *latest* value at cleanup is the point here: this is
       // a mutable value holder for the current playback position, not a DOM
       // node. Copying it into the effect would save a stale position.
-      // eslint-disable-next-line react-hooks/exhaustive-deps
       const { position, duration: total } = latest.current;
       if (position > 0) {
         void saveProgress(fileId, position, total).catch(() => undefined);
@@ -454,9 +601,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       if (upNext) {
         onPlayTarget({
           path: upNext.path,
-          label: `${upNext.title} — S${String(upNext.season).padStart(2, '0')}E${String(
-            upNext.episode
-          ).padStart(2, '0')}`,
+          label: episodeLabel(upNext),
           fileId: upNext.file_id,
           titleId: target.titleId,
         });
@@ -469,6 +614,34 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     const id = window.setTimeout(() => setCountdown((c) => (c === null ? null : c - 1)), 1000);
     return () => window.clearTimeout(id);
   }, [countdown, upNext, onPlayTarget, target.titleId]);
+
+  /**
+   * Poll the pipeline while the stats panel is open, and only then.
+   *
+   * Polling rather than observing, for the reason in GOTCHAS: observed
+   * properties are registered when mpv initialises, which happens once per
+   * window — a panel that added its own would show nothing until the whole app
+   * restarted, and would look exactly like a panel that was simply wrong.
+   */
+  useEffect(() => {
+    if (!showStats) return;
+
+    let cancelled = false;
+    const read = () => {
+      void readPlaybackStats()
+        .then((groups) => {
+          if (!cancelled) setStats(groups);
+        })
+        .catch((e) => console.warn('stats read failed', e));
+    };
+
+    read();
+    const id = window.setInterval(read, STATS_REFRESH_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [showStats]);
 
   // ---- controls -----------------------------------------------------------
   const togglePause = useCallback(async () => {
@@ -557,6 +730,28 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           e.preventDefault();
           void seekRelative(10);
           break;
+        // Episode stepping. `n`/`p` for a keyboard; the media-key names are
+        // what the transport buttons on a TV remote actually send, and a remote
+        // has no letters to press instead.
+        case 'n':
+        case 'MediaTrackNext':
+          if (neighbours.next) {
+            e.preventDefault();
+            playNeighbour(neighbours.next);
+          }
+          break;
+        case 'p':
+        case 'MediaTrackPrevious':
+          if (neighbours.prev) {
+            e.preventDefault();
+            playNeighbour(neighbours.prev);
+          }
+          break;
+        // mpv's own key for its stats overlay, so the reflex transfers.
+        case 'i':
+          e.preventDefault();
+          setShowStats((v) => !v);
+          break;
         // OK on a remote, for the two prompts that appear over the video.
         // Both are time-limited offers, and reaching them with a mouse is not
         // an option from the sofa — which is the only place they matter.
@@ -589,6 +784,8 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     skipPrompt,
     performSkip,
     upNext,
+    neighbours,
+    playNeighbour,
   ]);
 
   useEffect(() => {
@@ -606,11 +803,21 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       className={`player ${osdVisible || showTracks ? '' : 'osd-hidden'}`}
       onMouseMove={showOsd}
       onClick={(e) => {
-        if ((e.target as HTMLElement).closest('button, input, .track-panel, .up-next')) return;
+        if (
+          (e.target as HTMLElement).closest(
+            'button, input, .track-panel, .up-next, .stats-panel'
+          )
+        )
+          return;
         void togglePause();
       }}
       onDoubleClick={(e) => {
-        if ((e.target as HTMLElement).closest('button, input, .track-panel, .up-next')) return;
+        if (
+          (e.target as HTMLElement).closest(
+            'button, input, .track-panel, .up-next, .stats-panel'
+          )
+        )
+          return;
         void toggleFullscreen();
       }}
     >
@@ -629,6 +836,10 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         <span className="player-label">{target.label}</span>
       </div>
 
+      {/* Two states, one card. With a countdown the file has genuinely ended
+          and the next episode is coming either way; without one the credits
+          have merely started and the video is still running underneath, so the
+          card offers rather than announces. */}
       {upNext && (
         <div className="up-next">
           <div className="up-next-body">
@@ -639,18 +850,33 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
             </div>
             <div className="up-next-actions">
               <button className="btn-primary" onClick={() => setCountdown(0)}>
-                ▶ Play now {countdown !== null ? `(${countdown})` : ''}
+                {countdown !== null ? `▶ Play now (${countdown})` : '▶ Play next'}
               </button>
-              <button
-                className="btn-secondary"
-                onClick={() => {
-                  setCountdown(null);
-                  setUpNext(null);
-                  void exit();
-                }}
-              >
-                Back to library
-              </button>
+              {countdown !== null ? (
+                <button
+                  className="btn-secondary"
+                  onClick={() => {
+                    setCountdown(null);
+                    setUpNext(null);
+                    void exit();
+                  }}
+                >
+                  Back to library
+                </button>
+              ) : (
+                <button
+                  className="btn-secondary"
+                  onClick={() => {
+                    // Refuse the offer for the rest of this file. Dismissing by
+                    // segment rather than by a flag also silences the small
+                    // credits prompt, which would otherwise take its place.
+                    setUpNext(null);
+                    if (activeKey) setDismissed(activeKey);
+                  }}
+                >
+                  Keep watching
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -660,6 +886,33 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         <button className="skip-button" onClick={() => void performSkip()}>
           {skipPrompt.kind === 'intro' ? 'Skip intro' : 'Next episode ›'}
         </button>
+      )}
+
+      {/* Deliberately outside the OSD: the panel is for watching numbers move
+          while the video plays, so hiding it with the idle timer would defeat
+          the one thing it is for. */}
+      {showStats && (
+        <aside className="stats-panel">
+          <div className="stats-head">
+            <span>Stats for nerds</span>
+            <button onClick={() => setShowStats(false)}>close</button>
+          </div>
+          {stats.length === 0 && <div className="stats-empty">reading…</div>}
+          {stats.map((group) => (
+            <section key={group.heading} className="stats-group">
+              <h3>{group.heading}</h3>
+              {group.rows.map((row) => (
+                <div key={row.label} className="stats-row">
+                  <span className="stats-label">{row.label}</span>
+                  <span className="stats-value">
+                    {row.value}
+                    {row.note && <em className="stats-note">{row.note}</em>}
+                  </span>
+                </div>
+              ))}
+            </section>
+          ))}
+        </aside>
       )}
 
       {showTracks && (
@@ -726,11 +979,31 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         </div>
 
         <div className="player-buttons">
+          {/* Rendered only for episodes that genuinely have a neighbour, so
+              these never appear on a film or at the ends of a run. */}
+          {neighbours.prev && (
+            <button
+              className="episode-step"
+              title={`Previous: ${episodeLabel(neighbours.prev)}`}
+              onClick={() => playNeighbour(neighbours.prev as EpisodeRef)}
+            >
+              ⏮ Prev
+            </button>
+          )}
           <button onClick={() => void seekRelative(-10)}>−10s</button>
           <button className="btn-primary" onClick={() => void togglePause()}>
             {paused ? '▶ Play' : '❚❚ Pause'}
           </button>
           <button onClick={() => void seekRelative(10)}>+10s</button>
+          {neighbours.next && (
+            <button
+              className="episode-step"
+              title={`Next: ${episodeLabel(neighbours.next)}`}
+              onClick={() => playNeighbour(neighbours.next as EpisodeRef)}
+            >
+              Next ⏭
+            </button>
+          )}
           <button
             className={showTracks ? 'active' : ''}
             onClick={() => {
@@ -739,6 +1012,13 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
             }}
           >
             Audio &amp; subtitles
+          </button>
+          <button
+            className={showStats ? 'active' : ''}
+            title="Playback diagnostics (i)"
+            onClick={() => setShowStats((v) => !v)}
+          >
+            Stats
           </button>
           <button onClick={() => void toggleFullscreen()}>Fullscreen</button>
         </div>

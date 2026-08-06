@@ -44,6 +44,11 @@ import {
   setSetting,
   type ArtworkStats,
 } from '../metadata/api';
+import {
+  CREDITS_TAIL_CHOICES,
+  CREDITS_TAIL_KEY,
+  DEFAULT_CREDITS_TAIL_SECS,
+} from '../player/skip';
 import { buildNfoExports, writeNfo } from '../metadata/nfo';
 import FixMatch from '../library/FixMatch';
 import LibraryView from '../library/LibraryView';
@@ -86,6 +91,7 @@ export default function Settings() {
   const [omdbKey, setOmdbKey] = useState('');
   const [mdblistKey, setMdblistKey] = useState('');
   const [autoSkip, setAutoSkip] = useState(false);
+  const [creditsTail, setCreditsTail] = useState(DEFAULT_CREDITS_TAIL_SECS);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [panel, setPanel] = useState<'none' | 'review' | 'developer'>('none');
@@ -117,6 +123,12 @@ export default function Settings() {
       setOmdbKey((await getSetting('omdb_api_key')) ?? '');
       setMdblistKey((await getSetting('mdblist_api_key')) ?? '');
       setAutoSkip((await getSetting('skip_mode')) === 'auto');
+
+      // Unset keeps the default; 0 is a real value meaning "never guess", so it
+      // must not be mistaken for absent.
+      const raw = await getSetting(CREDITS_TAIL_KEY);
+      const secs = raw === null ? NaN : Number(raw);
+      if (Number.isFinite(secs) && secs >= 0) setCreditsTail(secs);
     })();
   }, []);
 
@@ -322,6 +334,27 @@ export default function Settings() {
             <span className="muted">
               Needs a <code>.skiptro.json</code> sidecar next to the video; without one, nothing
               changes either way.
+            </span>
+          </div>
+          <div className="settings-toggle-row">
+            <FocusButton
+              className={creditsTail > 0 ? 'btn-primary' : 'btn-secondary'}
+              onSelect={() => {
+                const index = CREDITS_TAIL_CHOICES.indexOf(creditsTail);
+                const next =
+                  CREDITS_TAIL_CHOICES[(index + 1) % CREDITS_TAIL_CHOICES.length] ??
+                  DEFAULT_CREDITS_TAIL_SECS;
+                setCreditsTail(next);
+                void setSetting(CREDITS_TAIL_KEY, String(next)).catch((e) => setError(String(e)));
+              }}
+            >
+              Assume credits: {creditsTail > 0 ? `last ${creditsTail}s` : 'off'}
+            </FocusButton>
+            <span className="muted">
+              When a file has neither a sidecar nor a chapter named for its credits, offer the
+              next episode this far before the end. A named end-credits chapter always wins, and
+              this never applies to a film or to the last episode of a run — there is nothing to
+              move on to. Off means the offer waits for the file to finish.
             </span>
           </div>
         </section>

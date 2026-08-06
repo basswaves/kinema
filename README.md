@@ -33,6 +33,9 @@ thin client that does nothing without a Jellyfin server running.
 | Settings + background scan | **Done.** Scan/parse/match out of the dev tab; scans once per launch; developer stages kept behind a disclosure |
 | NFO read/write | **Done.** Read as an authoritative override during matching; export is an explicit action |
 | Watched tracking | **Done.** One flag shared with playback completion; ticks and progress on episode rows, manual toggle per episode and per film |
+| Player episode stepping | **Done.** Previous/next buttons and keys, shown only where a neighbour exists |
+| End-credit skipping | **Done.** Credits resolved from sidecar, then a named chapter, then a fenced time guess |
+| Stats for nerds | **Done.** `i` in the player — source, display, scaling and why, HDR pipeline, audio in/out, dropped frames |
 
 ## Setup
 
@@ -92,7 +95,10 @@ src/
                  Settings. tv.ts holds the 10-foot scale switch; focus.ts
                  recovers focus after a view change; FocusButton/FocusInput are
                  the D-pad-reachable controls everything else is built from
-  player/        Player, shared mpv lifecycle, track handling, mpv options
+  player/        Player, shared mpv lifecycle, track handling, mpv options.
+                 chapters.ts and stats.ts read mpv as flat scalars only;
+                 skip.ts resolves a credits marker from the sidecar, a named
+                 chapter, or a fenced guess at the tail of the file
   library/       pipeline.ts — the scan→parse→match→artwork→trailers sequence,
                  shared by the startup scan and the Scan now button. LibraryView
                  is the developer surface behind a disclosure in Settings and
@@ -181,6 +187,19 @@ would disagree the first time either was written without the other, and the
 disagreement would be invisible — a row showing a tick while Continue Watching
 still offered it. Un-watching deletes the row: "not watched" and "no history" are
 the same state, and a file just declared unseen must not then resume.
+
+**A guessed credits marker may offer, never decide.** Skiptro detects intros
+only, so the closing segment is resolved from the sidecar, then a chapter named
+for it, then `duration − 60s`. The first two are measurement and evidence; the
+third is inference, so it never fires without a next episode to move to, and it
+shows an Up next card over the still-playing video rather than ending the file.
+A wrong guess then costs a card on screen instead of an ending nobody saw.
+
+**Stats for nerds is the answer to having no quality selector.** The app decides
+the rendering settings, so the only question left is whether it is doing what it
+claims. `i` in the player reports the source, the measured display, what scaling
+is running and why, the HDR pipeline, audio in and out, and dropped frames — all
+as flat scalar reads, polled rather than observed.
 
 **One layout, one scale knob — not a TV skin.** Every dimension in `ui.css` is in
 `rem`; TV mode multiplies the root font size and everything follows. A parallel set

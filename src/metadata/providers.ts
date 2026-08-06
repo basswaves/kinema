@@ -456,3 +456,66 @@ export async function omdbGetMovie(key: string, imdbId: string): Promise<TitleMe
     trailer_site: null,
   };
 }
+
+// ---------------------------------------------------------------------------
+// External-id lookups
+//
+// Only used when an NFO hands over a provider id. There is no scoring here on
+// purpose: an id is an answer, not a candidate, so these either resolve to
+// exactly one entry or to nothing at all.
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve an IMDb id to a TMDB id.
+ *
+ * `/find` returns per-kind buckets, so the kind asked for is the kind checked —
+ * an IMDb id for a series must not come back as a movie result that then gets
+ * stored with no episodes.
+ */
+export async function tmdbFindByImdb(
+  key: string,
+  imdbId: string,
+  isSeries: boolean
+): Promise<string | null> {
+  const data = await tmdbGet<{
+    movie_results?: Array<{ id: number }>;
+    tv_results?: Array<{ id: number }>;
+  }>(key, `/find/${encodeURIComponent(imdbId)}`, { external_source: 'imdb_id' });
+
+  const hit = (isSeries ? data.tv_results : data.movie_results)?.[0];
+  return hit ? String(hit.id) : null;
+}
+
+/**
+ * Resolve a TheTVDB id to a TVmaze show id.
+ *
+ * TVmaze answers 404 for an id it does not carry, which is an ordinary outcome
+ * rather than a failure — an older library can easily hold TVDB ids for shows
+ * TVmaze never indexed.
+ */
+export async function tvmazeLookupByTvdb(tvdbId: string): Promise<string | null> {
+  return tvmazeQueued(async () => {
+    const response = await fetch(
+      `https://api.tvmaze.com/lookup/shows?thetvdb=${encodeURIComponent(tvdbId)}`,
+      { method: 'GET' }
+    );
+    if (response.status === 404) return null;
+    if (!response.ok) throw new Error(`TVmaze lookup failed: HTTP ${response.status}`);
+    const show = (await response.json()) as { id?: number };
+    return show.id ? String(show.id) : null;
+  });
+}
+
+/** Same, for an IMDb id, when TMDB is unavailable but the show is on TVmaze. */
+export async function tvmazeLookupByImdb(imdbId: string): Promise<string | null> {
+  return tvmazeQueued(async () => {
+    const response = await fetch(
+      `https://api.tvmaze.com/lookup/shows?imdb=${encodeURIComponent(imdbId)}`,
+      { method: 'GET' }
+    );
+    if (response.status === 404) return null;
+    if (!response.ok) throw new Error(`TVmaze lookup failed: HTTP ${response.status}`);
+    const show = (await response.json()) as { id?: number };
+    return show.id ? String(show.id) : null;
+  });
+}

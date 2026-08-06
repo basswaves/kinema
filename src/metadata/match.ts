@@ -30,6 +30,7 @@ import {
   tvmazeSearch,
 } from './providers';
 import { pickBest, type Candidate, type ScoreContext } from './score';
+import { nfoForGroup, resolveNfoIds, sourceName } from './nfo';
 
 export interface MatchProgress {
   groupsTotal: number;
@@ -275,9 +276,45 @@ async function resolveGroup(
   reason: string;
   matched: boolean;
 }> {
+  /**
+   * An NFO beside the files outranks everything below.
+   *
+   * With an id there is nothing to score: somebody already decided, usually by
+   * hand, and the whole class of confidently-wrong matches disappears for this
+   * group. Without an id, its title and year still replace the ones guessit
+   * took off the filename — a curated title is a better question to ask the
+   * provider, though the answer still has to clear the normal threshold.
+   */
+  const nfo = await nfoForGroup(group).catch(() => null);
+
+  if (nfo) {
+    const resolved = await resolveNfoIds(nfo, group.isSeries, keys).catch(() => null);
+    if (resolved) {
+      return {
+        provider: resolved.provider,
+        providerId: resolved.providerId,
+        confidence: 1,
+        reason: `nfo: ${resolved.via} from ${sourceName(nfo.source)}`,
+        matched: true,
+      };
+    }
+  }
+
+  // The NFO's own title, when it has one, is what gets searched from here on.
+  // Recorded in the reason either way: a match made against a different title
+  // from the one on the filename should be obvious when reading it back.
+  let searchTitle = group.title;
+  let searchYear = group.year;
+  let nfoNote = '';
+  if (nfo?.title?.trim()) {
+    searchTitle = nfo.title.trim();
+    searchYear = nfo.year ?? group.year;
+    nfoNote = ` · searched as “${searchTitle}” from ${sourceName(nfo.source)}`;
+  }
+
   const ctx: ScoreContext = {
-    parsedTitle: group.title,
-    parsedYear: group.year,
+    parsedTitle: searchTitle,
+    parsedYear: searchYear,
     maxSeason: group.maxSeason,
   };
 
@@ -292,14 +329,14 @@ async function resolveGroup(
     };
   }
 
-  const candidates = await searchProvider(provider, keys, group.title, group.year, group.isSeries);
+  const candidates = await searchProvider(provider, keys, searchTitle, searchYear, group.isSeries);
 
   if (candidates.length === 0) {
     return {
       provider,
       providerId: null,
       confidence: 0,
-      reason: 'no candidates returned',
+      reason: `no candidates returned${nfoNote}`,
       matched: false,
     };
   }
@@ -310,7 +347,7 @@ async function resolveGroup(
       provider,
       providerId: null,
       confidence: 0,
-      reason: 'no candidates scored',
+      reason: `no candidates scored${nfoNote}`,
       matched: false,
     };
   }
@@ -321,7 +358,7 @@ async function resolveGroup(
     provider,
     providerId: best.providerId,
     confidence: best.confidence,
-    reason: best.reason,
+    reason: `${best.reason}${nfoNote}`,
     matched,
   };
 }

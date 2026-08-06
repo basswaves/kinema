@@ -232,9 +232,12 @@ A wrong guess then costs a card on screen instead of an ending nobody saw.
 
 **Stats for nerds is the answer to having no quality selector.** The app decides
 the rendering settings, so the only question left is whether it is doing what it
-claims. `i` in the player reports the source, the measured display, what scaling
-is running and why, the HDR pipeline, audio in and out, and dropped frames — all
-as flat scalar reads, polled rather than observed.
+claims. `i` in the player, modelled on madVR's OSD, which gets two things right
+that a property dump does not: it reports the **cadence** rather than two frame
+rates in separate rows, and it lists the **render passes that actually ran**
+rather than the settings that were requested — different claims, and only the
+second answers "is anything touching my image?". All flat scalar reads, polled
+rather than observed, each one individually allowed to fail.
 
 **One layout, one scale knob — not a TV skin.** Every dimension in `ui.css` is in
 `rem`; TV mode multiplies the root font size and everything follows. A parallel set

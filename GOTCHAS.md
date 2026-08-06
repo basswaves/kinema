@@ -72,6 +72,34 @@ and apply them individually *after* startup — losing one refinement beats losi
 player. `tone-mapping-mode` is exactly such a case: this libplacebo build returns
 `M_PROPERTY_UNKNOWN` for it.
 
+### `video-params/pixelformat` reports `d3d11` under hardware decode
+
+It is the *surface* type, not the frame format. The real one is
+`video-params/hw-pixelformat` (`p010`, `nv12`, …). Reading only the first gives
+a plausible-looking value that silently loses the bit depth and makes every
+subsampled source test as not subsampled — which is exactly the sort of wrong
+answer a diagnostic panel must not give.
+
+**Do:** prefer `hw-pixelformat`, fall back to `pixelformat`.
+
+### `osd-dimensions` is the surface, not the video
+
+It includes the letterbox margins, so comparing the source resolution against it
+describes an image the frame was never drawn at. A 3840×1600 scope master in a
+2560×1600 window reported "downscale 1.000×" — wrong, and self-contradictory
+enough to notice; a 16:9 source in the same window reported 1.481× instead of
+1.333×, which is wrong and looks perfectly reasonable.
+
+**Do:** subtract `osd-dimensions/ml|mr|mt|mb` to get the rectangle the video is
+actually scaled into.
+
+### Peak-luminance properties report 0 rather than going absent
+
+`video-params/sig-peak` and `max-luma` both read `0` on SDR content, so a
+null-check passes them straight through and the panel confidently states
+"0.00× SDR white". Treat non-positive as absent, and gate on the transfer
+function instead.
+
 ### The verbose log answers rendering questions that reasoning cannot
 
 `msg-level=all=v` records what libplacebo *did*, not what it was asked to do:

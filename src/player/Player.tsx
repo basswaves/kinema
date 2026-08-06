@@ -921,10 +921,13 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           </div>
           {stats.length === 0 && <div className="stats-empty">reading…</div>}
           {stats.map((group) => (
-            <section key={group.heading} className="stats-group">
+            <section
+              key={group.heading}
+              className={`stats-group ${group.wideLabels ? 'wide-labels' : ''}`}
+            >
               <h3>{group.heading}</h3>
               {group.rows.map((row) => (
-                <div key={row.label} className="stats-row">
+                <div key={row.label} className={`stats-row ${row.warn ? 'warn' : ''}`}>
                   <span className="stats-label">{row.label}</span>
                   <span className="stats-value">
                     {row.value}

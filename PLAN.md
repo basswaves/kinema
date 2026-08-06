@@ -534,6 +534,48 @@ not put there.
 and the default Windows device is onboard stereo. That is a larger loss of
 intent than any scaler question. See the backlog.
 
+## Stats for nerds, second pass ✅
+
+Rebuilt along madVR's lines after using it, because a property dump gets two
+things wrong that madVR's OSD gets right.
+
+**It reports the cadence, not just two frame rates.** "23.976" and "59.97" in
+separate rows do not tell you that motion judders; `3:2 pulldown — uneven` does,
+and the note names the display mode that would fix it.
+
+**It lists the render passes that actually ran.** Every other row reports what
+was *requested*; `vo-passes` reports what libplacebo executed on the last frame,
+with timings. Those are different claims, and only the second answers "is
+anything touching my image?". Read as indexed scalars with the sub-path probed
+rather than assumed — it moved between mpv versions, and an unsupported build
+simply contributes no section.
+
+Also added: scan type and whether the deinterlacer is engaged, bit depth off the
+pixel format, chroma siting (which is what MPEG-2 era content gets wrong),
+primaries conversion, frame-timing mode, and an amber highlight on rows that are
+costing quality — a downmix, an un-deinterlaced interlaced source, dropped
+frames, debanding.
+
+**Four of its own bugs, found by reading it against real files** — which is the
+argument for building it at all, since every one produced a confident wrong
+number rather than a blank:
+
+- Luma scaling compared the source against the whole output *surface* rather
+  than the letterboxed video rectangle. A scope master read "downscale 1.000×";
+  a 16:9 file read 1.481× where the truth was 1.333×.
+- Pixel format read `d3d11`, the hardware surface type, so bit depth vanished
+  and p010 tested as "not subsampled".
+- Mastering peak read "0.00× SDR white" on SDR content, because the peak
+  properties report zero rather than going absent.
+- Cadence used the container frame rate, which is the wrong input on precisely
+  the interlaced content the deinterlacer exists for — one interlaced frame
+  becomes two progressive ones.
+
+`vo-passes` returns nothing on this gpu-next build. Rather than omit the section
+silently — indistinguishable from "no passes ran" — the panel now states that
+the VO does not report them and carries the error, so what is left reads
+honestly as *requested* settings rather than as observed ones.
+
 ---
 
 ## Backlog (not in the original plan, worth doing)

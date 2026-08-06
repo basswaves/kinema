@@ -36,6 +36,7 @@ thin client that does nothing without a Jellyfin server running.
 | Player episode stepping | **Done.** Previous/next buttons and keys, shown only where a neighbour exists |
 | End-credit skipping | **Done.** Credits resolved from sidecar, then a named chapter, then a fenced time guess |
 | Stats for nerds | **Done.** `i` in the player — source, display, scaling and why, HDR pipeline, audio in/out, dropped frames |
+| Launchable exe | **Done.** `npm run app:build` → portable folder + desktop shortcut, no installer |
 
 ## Setup
 
@@ -58,6 +59,18 @@ That pulls `libmpv-2.dll` (LGPL build, from zhongfly/mpv-winbuild) and
 npm run tauri dev     # run from source, with HMR
 npm run check         # tsc --noEmit && eslint .
 ```
+
+To get a version that launches without a terminal:
+
+```bash
+npm run app:build
+```
+
+That builds the release binary, assembles `dist-app/` (exe plus the two native
+libraries) and refreshes a **Personal Netflix** shortcut on the desktop. It is a
+portable folder rather than an installer on purpose — nothing to reinstall after
+a rebuild. The identifier is unchanged, so it reads the same library database as
+the dev build.
 
 API keys are entered in the app (**Settings → Metadata providers**) and stored in the
 SQLite database in app data — **never** in the repo. TV metadata works with no key at

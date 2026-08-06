@@ -336,7 +336,23 @@ Get-NetTCPConnection -LocalPort 1420 -State Listen -ErrorAction SilentlyContinue
 
 ### `cargo build` fails while the app is running
 
-The running `.exe` is locked. Stop `personal-netflix` first.
+The running `.exe` is locked. Stop `personal-netflix` first. `npm run app:build`
+checks for the process and says so, rather than letting it surface as a linker
+error.
+
+### `libmpv-2.dll` must sit beside the **exe**, not beside the wrapper
+
+The plugin looks for `libmpv-wrapper.dll` in the executable's directory *and* in
+`<exe dir>/lib`, so putting the pair in a `lib/` subfolder looks like it should
+work. It does not: `libmpv-2.dll` is a load-time dependency of the wrapper, and
+Windows resolves that through its own search order, which starts at the
+**executable's** directory and never looks in the directory the wrapper itself
+was loaded from.
+
+The failure is at load, before any of this app's code runs, so there is nothing
+in `app.log` — and `mpv.log` does not exist yet either.
+
+**Do:** copy both DLLs next to the exe. `scripts/build-app.ps1` does.
 
 ### Verify a Rust rebuild by timestamp
 

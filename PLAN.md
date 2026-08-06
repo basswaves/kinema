@@ -465,6 +465,23 @@ This is also the first thing in the project that can answer the **HDR
 passthrough** question — `target-params/gamma` against the source transfer, plus
 what the webview believes about the panel's dynamic range.
 
+## A launchable exe ✅
+
+`npm run app:build` produces `dist-app/` — release exe plus the two native
+libraries — and refreshes a desktop shortcut. Deliberately **not** an installer:
+`--no-bundle` skips MSI and NSIS, which need extra toolchains and would mean
+reinstalling on every rebuild. A folder and a shortcut have neither cost.
+
+Both DLLs go *beside* the exe, not in a `lib/` subfolder. The plugin would find
+the wrapper in either place, but `libmpv-2.dll` is resolved by Windows' own
+search order, which starts at the executable's directory and never looks where
+the wrapper was loaded from. See GOTCHAS.md.
+
+The identifier is unchanged, so the built app reads the **same** database in app
+data as the dev build — no re-scan, no second library. The shortcut sets its
+working directory to the app folder, because `app.log` and `mpv.log` are both
+opened relative to the current directory.
+
 ---
 
 ## Backlog (not in the original plan, worth doing)

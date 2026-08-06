@@ -10,6 +10,7 @@
  */
 import type { MediaFile } from '../library/api';
 import {
+  getSetting,
   linkFileToTitle,
   saveEpisodes,
   saveTitle,
@@ -41,7 +42,7 @@ export interface MatchOutcome {
   errors: string[];
 }
 
-interface FileGroup {
+export interface FileGroup {
   key: string;
   title: string;
   year: number | null;
@@ -93,24 +94,147 @@ export interface ProviderKeys {
   omdb: string | null;
 }
 
+export type Provider = 'tmdb' | 'tvmaze' | 'omdb';
+
 /**
- * Which provider handles a group.
+ * Read the provider keys from the database, at the moment they are needed.
+ *
+ * Never take these from component state: a key captured in a closure before it
+ * was entered once made matching fall back to OMDb while the UI showed TMDB as
+ * active, with no error anywhere. State also reflects unsaved edits in the
+ * input boxes, and only what was saved should be used.
+ */
+export async function loadProviderKeys(): Promise<ProviderKeys> {
+  const [tmdb, omdb] = await Promise.all([
+    getSetting('tmdb_api_key'),
+    getSetting('omdb_api_key'),
+  ]);
+  return { tmdb: tmdb?.trim() || null, omdb: omdb?.trim() || null };
+}
+
+/**
+ * Which provider handles a title of this kind.
  *
  * TMDB first when a key exists: it is the only source here with backdrops,
  * logos and episode stills, which is what a poster-and-hero UI needs. Without
  * it, TV still works fully via keyless TVmaze, and movies fall back to OMDb
  * (poster only, no fanart).
  */
-function providerFor(group: FileGroup, keys: ProviderKeys): 'tmdb' | 'tvmaze' | 'omdb' | null {
+export function providerForKind(isSeries: boolean, keys: ProviderKeys): Provider | null {
   if (keys.tmdb) return 'tmdb';
-  if (group.isSeries) return 'tvmaze';
+  if (isSeries) return 'tvmaze';
   return keys.omdb ? 'omdb' : null;
 }
 
+function providerFor(group: FileGroup, keys: ProviderKeys): Provider | null {
+  return providerForKind(group.isSeries, keys);
+}
+
+/** Search one provider. Shared so manual and automatic matching cannot diverge. */
+export function searchProvider(
+  provider: Provider,
+  keys: ProviderKeys,
+  title: string,
+  year: number | null,
+  isSeries: boolean
+): Promise<Candidate[]> {
+  if (provider === 'tmdb') {
+    return tmdbSearch(keys.tmdb as string, title, year, isSeries ? 'series' : 'movie');
+  }
+  if (provider === 'tvmaze') return tvmazeSearch(title);
+  return omdbSearch(keys.omdb as string, title, year);
+}
+
+/**
+ * Fetch a chosen title and its episodes, store both, and point every file in
+ * the group at it.
+ *
+ * Both the automatic and the manual path end here, so a title picked by hand is
+ * stored exactly like one picked by the scorer — only the confidence and reason
+ * differ, which is what makes a manual fix auditable afterwards.
+ */
+export async function applyMatch(
+  files: MediaFile[],
+  provider: Provider,
+  providerId: string,
+  isSeries: boolean,
+  keys: ProviderKeys,
+  confidence: number,
+  reason: string
+): Promise<number> {
+  const kind = isSeries ? 'series' : 'movie';
+
+  // OMDb has no series data and TVmaze has no films. Either mismatch would
+  // happily store a title of the wrong kind instead of failing, so refuse the
+  // combination rather than rely on callers picking the provider correctly.
+  if (isSeries && provider === 'omdb') {
+    throw new Error('OMDb has no TV data — use TMDB or TVmaze for a series.');
+  }
+  if (!isSeries && provider === 'tvmaze') {
+    throw new Error('TVmaze has no film data — use TMDB or OMDb for a movie.');
+  }
+
+  const metadata =
+    provider === 'tmdb'
+      ? await tmdbGetTitle(keys.tmdb as string, providerId, kind)
+      : provider === 'tvmaze'
+        ? await tvmazeGetShow(providerId)
+        : await omdbGetMovie(keys.omdb as string, providerId);
+
+  const titleId = await saveTitle(metadata);
+
+  if (isSeries) {
+    const episodes =
+      provider === 'tmdb'
+        ? await tmdbGetEpisodes(keys.tmdb as string, providerId)
+        : await tvmazeGetEpisodes(providerId);
+    if (episodes.length > 0) await saveEpisodes(titleId, episodes);
+  }
+
+  for (const file of files) {
+    await linkFileToTitle(file.id, titleId, confidence, reason, 'matched');
+  }
+
+  return titleId;
+}
+
+/**
+ * Take files out of the review queue without matching them — trailers, samples
+ * and extras are not work, and leaving them in the list forever would make
+ * "needs attention" meaningless. Reversible: the files keep their parse data.
+ */
+export async function ignoreFiles(files: MediaFile[]): Promise<void> {
+  for (const file of files) {
+    await linkFileToTitle(file.id, null, null, 'ignored by hand', 'ignored');
+  }
+}
+
+/**
+ * Put files back into the review queue: un-ignoring, and undoing a match that
+ * turned out to be wrong. Both are the same operation — drop the link and the
+ * verdict, keep the parse data — so they share one implementation.
+ */
+export async function returnFilesToReview(files: MediaFile[]): Promise<void> {
+  for (const file of files) {
+    await linkFileToTitle(file.id, null, null, null, 'parsed');
+  }
+}
+
+/**
+ * Decide which provider entry a group refers to. Deliberately fetches nothing
+ * beyond the search: a group that fails to match should cost one request, and
+ * the decision stays separate from the act of storing it.
+ */
 async function resolveGroup(
   group: FileGroup,
   keys: ProviderKeys
-): Promise<{ titleId: number | null; confidence: number; reason: string; matched: boolean }> {
+): Promise<{
+  provider: Provider | null;
+  providerId: string | null;
+  confidence: number;
+  reason: string;
+  matched: boolean;
+}> {
   const ctx: ScoreContext = {
     parsedTitle: group.title,
     parsedYear: group.year,
@@ -120,57 +244,46 @@ async function resolveGroup(
   const provider = providerFor(group, keys);
   if (!provider) {
     return {
-      titleId: null,
+      provider: null,
+      providerId: null,
       confidence: 0,
       reason: 'no provider available for movies (add a TMDB or OMDb key)',
       matched: false,
     };
   }
 
-  const kind = group.isSeries ? 'series' : 'movie';
-  let candidates: Candidate[];
-
-  if (provider === 'tmdb') {
-    candidates = await tmdbSearch(keys.tmdb as string, group.title, group.year, kind);
-  } else if (provider === 'tvmaze') {
-    candidates = await tvmazeSearch(group.title);
-  } else {
-    candidates = await omdbSearch(keys.omdb as string, group.title, group.year);
-  }
+  const candidates = await searchProvider(provider, keys, group.title, group.year, group.isSeries);
 
   if (candidates.length === 0) {
-    return { titleId: null, confidence: 0, reason: 'no candidates returned', matched: false };
+    return {
+      provider,
+      providerId: null,
+      confidence: 0,
+      reason: 'no candidates returned',
+      matched: false,
+    };
   }
 
   const { best, matched } = pickBest(candidates, ctx);
   if (!best) {
-    return { titleId: null, confidence: 0, reason: 'no candidates scored', matched: false };
+    return {
+      provider,
+      providerId: null,
+      confidence: 0,
+      reason: 'no candidates scored',
+      matched: false,
+    };
   }
 
-  // Below threshold or ambiguous: record why, but do not fetch or link. The
-  // file stays visible as work to review.
-  if (!matched) {
-    return { titleId: null, confidence: best.confidence, reason: best.reason, matched: false };
-  }
-
-  const metadata =
-    provider === 'tmdb'
-      ? await tmdbGetTitle(keys.tmdb as string, best.providerId, kind)
-      : provider === 'tvmaze'
-        ? await tvmazeGetShow(best.providerId)
-        : await omdbGetMovie(keys.omdb as string, best.providerId);
-
-  const titleId = await saveTitle(metadata);
-
-  if (group.isSeries) {
-    const episodes =
-      provider === 'tmdb'
-        ? await tmdbGetEpisodes(keys.tmdb as string, best.providerId)
-        : await tvmazeGetEpisodes(best.providerId);
-    if (episodes.length > 0) await saveEpisodes(titleId, episodes);
-  }
-
-  return { titleId, confidence: best.confidence, reason: best.reason, matched: true };
+  // Below threshold or ambiguous: report why, but fetch nothing. The caller
+  // marks the files for review and they stay visible as work.
+  return {
+    provider,
+    providerId: best.providerId,
+    confidence: best.confidence,
+    reason: best.reason,
+    matched,
+  };
 }
 
 export async function matchFiles(
@@ -194,18 +307,23 @@ export async function matchFiles(
     try {
       const result = await resolveGroup(group, keys);
 
-      for (const file of group.files) {
-        await linkFileToTitle(
-          file.id,
-          result.titleId,
+      if (result.matched && result.provider && result.providerId) {
+        await applyMatch(
+          group.files,
+          result.provider,
+          result.providerId,
+          group.isSeries,
+          keys,
           result.confidence,
-          result.reason,
-          result.matched ? 'matched' : 'unmatched'
+          result.reason
         );
+        outcome.matched += group.files.length;
+      } else {
+        for (const file of group.files) {
+          await linkFileToTitle(file.id, null, result.confidence, result.reason, 'unmatched');
+        }
+        outcome.unmatched += group.files.length;
       }
-
-      if (result.matched) outcome.matched += group.files.length;
-      else outcome.unmatched += group.files.length;
     } catch (e) {
       const message = `${group.title}: ${e instanceof Error ? e.message : String(e)}`;
       outcome.errors.push(message);

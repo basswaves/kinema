@@ -91,6 +91,13 @@ export interface Candidate {
   popularity?: number | null;
   /** Number of user votes, a proxy for "this is the entry people mean". */
   voteCount?: number | null;
+  /**
+   * Display only, for the manual fix-match picker — scoring ignores both.
+   * Choosing between two same-named entries by hand is far easier with the
+   * poster and one line of plot than with a title and a year.
+   */
+  posterUrl?: string | null;
+  overview?: string | null;
 }
 
 export interface ScoredCandidate extends Candidate {

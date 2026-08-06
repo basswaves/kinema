@@ -38,8 +38,14 @@ import {
   type ArtworkStats,
   type StoredTitle,
 } from '../metadata/api';
-import { matchFiles, type MatchProgress } from '../metadata/match';
+import {
+  loadProviderKeys,
+  matchFiles,
+  returnFilesToReview,
+  type MatchProgress,
+} from '../metadata/match';
 import Art from '../ui/Art';
+import FixMatch from './FixMatch';
 import './library.css';
 
 const PARSE_BATCH = 500;
@@ -69,6 +75,7 @@ export default function LibraryView() {
   const [diagnosis, setDiagnosis] = useState<string | null>(null);
   const [titles, setTitles] = useState<StoredTitle[]>([]);
   const [art, setArt] = useState<ArtworkStats | null>(null);
+  const [showFixMatch, setShowFixMatch] = useState(false);
   const [omdbKey, setOmdbKey] = useState('');
   const [mdblistKey, setMdblistKey] = useState('');
   const [tmdbKey, setTmdbKey] = useState('');
@@ -126,19 +133,9 @@ export default function LibraryView() {
         setDiagnosis('Nothing to match — parse files first.');
         return;
       }
-      // Read keys from the database rather than component state. State can be
-      // stale in a closure, and it also reflects unsaved edits in the input
-      // boxes — matching must use what was actually saved.
-      const [tmdb, omdb] = await Promise.all([
-        getSetting('tmdb_api_key'),
-        getSetting('omdb_api_key'),
-      ]);
-
-      const outcome = await matchFiles(
-        pending,
-        { tmdb: tmdb?.trim() || null, omdb: omdb?.trim() || null },
-        setProgress
-      );
+      // Keys come from the database, never from component state: state can be
+      // stale in a closure and also reflects unsaved edits in the input boxes.
+      const outcome = await matchFiles(pending, await loadProviderKeys(), setProgress);
 
       // Pull the new artwork down straight away: matching is the moment the
       // URLs become known, and browsing should not need the network afterwards.
@@ -158,6 +155,51 @@ export default function LibraryView() {
       setProgress(null);
     }
   }, [refresh]);
+
+  /**
+   * Undo a match that is wrong. The files go back to the review queue with
+   * their parse data intact, so they can be pointed at the right title by hand.
+   * This is the other half of the strict threshold: refusing to guess only
+   * helps if a guess that slipped through can be taken back.
+   */
+  const unlinkTitle = useCallback(
+    async (title: StoredTitle) => {
+      const owned = files.filter((f) => f.title_id === title.id);
+      if (owned.length === 0) return;
+      setBusy('Unlinking…');
+      setError(null);
+      try {
+        await returnFilesToReview(owned);
+        await refresh();
+        setShowFixMatch(true);
+        setDiagnosis(
+          `Unlinked ${owned.length} file(s) from “${title.title}” — they are back under Needs attention.`
+        );
+      } catch (e) {
+        setError(String(e));
+      } finally {
+        setBusy(null);
+      }
+    },
+    [files, refresh]
+  );
+
+  /**
+   * After a manual link: a new title brings new artwork URLs, so cache them
+   * here rather than leaving the browse view to discover them.
+   */
+  const afterFix = useCallback(
+    async (message: string) => {
+      try {
+        await cacheArtwork();
+      } catch (e) {
+        console.warn('artwork cache after manual match:', e);
+      }
+      await refresh();
+      setDiagnosis(message);
+    },
+    [refresh]
+  );
 
   const runCacheArtwork = useCallback(async () => {
     setBusy('Caching artwork…');
@@ -269,6 +311,19 @@ export default function LibraryView() {
     [files]
   );
 
+  // Must agree with what FixMatch actually lists: it groups by parsed title, so
+  // a file with no parsed title is not something the review queue can show.
+  const needsReview = useMemo(
+    () =>
+      files.filter(
+        (f) =>
+          (f.match_status === 'parsed' || f.match_status === 'unmatched') &&
+          !f.missing &&
+          f.parsed_title
+      ).length,
+    [files]
+  );
+
   return (
     <div className="library-root">
       <header className="library-header">
@@ -310,6 +365,12 @@ export default function LibraryView() {
             {busy === 'Caching artwork…'
               ? busy
               : `Cache artwork${art?.files ? ` (${art.files})` : ''}`}
+          </button>
+          <button
+            className={needsReview > 0 ? 'attention' : ''}
+            onClick={() => setShowFixMatch((v) => !v)}
+          >
+            Needs attention{needsReview > 0 ? ` (${needsReview})` : ''}
           </button>
           <button onClick={() => setShowSettings((v) => !v)}>Settings</button>
           <button onClick={() => setDiagnosis(`Self-test: ${selfTest()}`)}>Self-test parser</button>
@@ -402,6 +463,8 @@ export default function LibraryView() {
         </div>
       )}
 
+      {showFixMatch && <FixMatch files={files} onChanged={afterFix} />}
+
       <section className="library-roots">
         {roots.length === 0 && <p className="muted">No folders yet. Add a movies or TV folder to begin.</p>}
         {roots.map((root) => (
@@ -472,6 +535,15 @@ export default function LibraryView() {
                   was used". */}
               <div className="title-card-provider">via {title.provider}</div>
               {!title.backdrop_url && <div className="title-card-warn">no backdrop</div>}
+              {title.file_count > 0 && (
+                <button
+                  className="title-card-unlink"
+                  disabled={!!busy}
+                  onClick={() => void unlinkTitle(title)}
+                >
+                  Wrong? Unlink
+                </button>
+              )}
             </div>
           ))}
         </section>

@@ -70,7 +70,8 @@ src-tauri/src/
 src/
   ui/            Browse shell, Home, rails, cards, detail page, search
   player/        Player, shared mpv lifecycle, track handling, mpv options
-  library/       Scan/parse/match dev surface (Library tab)
+  library/       Scan/parse/match dev surface (Library tab), plus FixMatch —
+                 the review queue for everything the matcher refused to guess
   metadata/      Providers, match scoring, orchestration
   spike/         Phase 0 diagnostic harness — deletable once trusted
   devlog.ts      Forwards console + unhandled errors to src-tauri/app.log
@@ -111,7 +112,10 @@ layer** — mpv is not a native DV output engine. Known limitation, not a bug to
 **Wrong matches are worse than no matches.** Matching needs 0.75 confidence *and* a
 0.05 margin over the runner-up. Genuine ties are refused and surfaced for review rather
 than guessed. An unmatched file is visible work; a confidently wrong one silently
-corrupts the library.
+corrupts the library. That stance is only defensible because the refusals are
+correctable by hand: the **Needs attention** view carries the reason for each refusal
+and a provider search, links are recorded with a `manual:` reason so they stay
+auditable, and a wrong match can be unlinked back into the queue.
 
 **The artwork cache is an accelerator, never a source of truth.** Provider URLs stay
 in `titles` and `episodes`; the cache is a separate table keyed by URL. Every query

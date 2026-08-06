@@ -102,6 +102,8 @@ export async function tvmazeSearch(title: string): Promise<Candidate[]> {
       // TVmaze's `weight` (0-100) is its own popularity ranking.
       popularity: show.weight ?? null,
       voteCount: null,
+      posterUrl: show.image?.medium ?? null,
+      overview: stripHtml(show.summary),
     }));
   });
 }
@@ -201,6 +203,8 @@ interface TmdbSearchResult {
   first_air_date?: string;
   popularity?: number;
   vote_count?: number;
+  poster_path?: string | null;
+  overview?: string;
 }
 
 export async function tmdbSearch(
@@ -224,6 +228,10 @@ export async function tmdbSearch(
     year: yearOf(r.release_date ?? r.first_air_date ?? null),
     popularity: r.popularity ?? null,
     voteCount: r.vote_count ?? null,
+    // A smaller size than the detail fetch uses: these are thumbnails in a
+    // picker, and eight originals would be tens of megabytes.
+    posterUrl: r.poster_path ? `https://image.tmdb.org/t/p/w185${r.poster_path}` : null,
+    overview: r.overview || null,
   }));
 }
 
@@ -338,6 +346,9 @@ export async function omdbSearch(
     providerId: item.imdbID,
     title: item.Title,
     year: Number(item.Year?.slice(0, 4)) || null,
+    posterUrl: item.Poster && item.Poster !== 'N/A' ? item.Poster : null,
+    // OMDb's search endpoint returns no plot; only the detail lookup has one.
+    overview: null,
   }));
 }
 

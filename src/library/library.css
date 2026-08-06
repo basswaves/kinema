@@ -439,3 +439,205 @@
   background: rgba(255, 255, 255, 0.08);
   opacity: 0.7;
 }
+
+/* ---------------------------------------------------------------------------
+ * Manual fix-match — the review queue for everything the matcher refused to
+ * guess at. Uses the same amber as `.match-unmatched`, so "needs attention"
+ * looks the same here as it does in the files table.
+ * ------------------------------------------------------------------------- */
+
+.library-root button.attention {
+  border-color: rgba(240, 136, 62, 0.6);
+  color: #f0883e;
+}
+
+.fixmatch {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.fixmatch-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.fixmatch-head h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.fixmatch-row {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+
+.fixmatch-row.open {
+  border-color: rgba(240, 136, 62, 0.45);
+}
+
+.fixmatch-row.ignored {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  opacity: 0.65;
+}
+
+.fixmatch-summary {
+  padding: 9px 12px;
+  cursor: pointer;
+}
+
+.fixmatch-row.ignored .fixmatch-summary {
+  padding: 0;
+  cursor: default;
+}
+
+.fixmatch-summary:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.fixmatch-title {
+  font-weight: 600;
+}
+
+.fixmatch-reason {
+  margin-top: 3px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #f0883e;
+  opacity: 0.85;
+  word-break: break-word;
+}
+
+.fixmatch-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.fixmatch-files {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 11px;
+  opacity: 0.6;
+  line-height: 1.6;
+}
+
+.fixmatch-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.fixmatch-search input[type='text'],
+.fixmatch-search input:not([type]) {
+  flex: 1 1 240px;
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.4);
+  color: #f2f2f2;
+  font-size: 13px;
+}
+
+.fixmatch-kind {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  opacity: 0.8;
+}
+
+.fixmatch-results {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fixmatch-candidate {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.fixmatch-candidate img,
+.fixmatch-candidate .poster-placeholder {
+  width: 46px;
+  height: 69px;
+  flex: 0 0 auto;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+.fixmatch-candidate-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fixmatch-candidate-name {
+  font-weight: 600;
+}
+
+.fixmatch-candidate-overview {
+  margin: 3px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  opacity: 0.6;
+  /* Two lines is enough to tell a remake from the original. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.fixmatch-ignored {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.title-card-unlink {
+  margin-top: 6px;
+  width: 100%;
+  font-size: 10px;
+  padding: 4px 6px;
+  opacity: 0.55;
+}
+
+.title-card-unlink:hover:not(:disabled) {
+  opacity: 1;
+  border-color: rgba(240, 136, 62, 0.6);
+  color: #f0883e;
+}
+
+.fixmatch-source {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+/* The search box spans the header row; on a wide window an uncapped field
+   stretches the full width and looks like a mistake. */
+.fixmatch-search input[type='text'],
+.fixmatch-search input:not([type]) {
+  max-width: 520px;
+}

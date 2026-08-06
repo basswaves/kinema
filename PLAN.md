@@ -58,6 +58,18 @@ falls back to the URL — including on an `onError`, so a cache row that outlive
 its file degrades to the old behaviour instead of to a blank poster. Filled in
 after matching and backfilled on every Browse mount.
 
+### Manual fix-match ✅
+The safety net the strict threshold assumes exists — refusing to guess is only
+defensible if correcting the refusal is easy. A **Needs attention** view in the
+Library tab lists everything the matcher declined, grouped exactly as matching
+groups it (a season fails as a unit), each with the reason it recorded. A search
+box re-queries the provider — deliberately *without* the parsed year, since a
+wrong year is often what caused the failure — and picking a result links every
+file in the group at confidence 1 with a `manual:` reason, so a hand-made link
+stays distinguishable from a scored one. Files can be **ignored** (samples,
+trailers) and un-ignored, and a wrong match can be **unlinked** from the titles
+strip, which returns its files to the queue with parse data intact.
+
 ---
 
 ## Phase 5 — Intro skip + in-app trailers (NEXT)
@@ -104,12 +116,6 @@ player side is unaffected by which producer is used.
 ---
 
 ## Backlog (not in the original plan, worth doing)
-
-**Manual fix-match UI** — the safety net the strict matching threshold *assumes* exists.
-Refusing to guess is only reasonable if correcting it is easy. Needs: a "Needs
-attention" view listing unmatched files with their reasons, a provider search box, and
-a command to link a file to a chosen title. Data layer already supports it
-(`link_file_to_title`).
 
 **10-foot TV layout** — D-pad navigation works everywhere already, but there's no
 larger-type couch layout yet.

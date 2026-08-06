@@ -45,7 +45,10 @@ export default function Browse({ onPlaybackChange }: BrowseProps) {
   const load = useCallback(async () => {
     try {
       const [list, resume] = await Promise.all([listTitles(), continueWatching(20)]);
-      setTitles(list);
+      // A title with no files left is not watchable — unlinking a wrong match
+      // leaves the cached title row behind, and it should not show up as a
+      // card that plays nothing.
+      setTitles(list.filter((t) => t.file_count > 0));
       setResumable(resume);
     } catch (e) {
       setError(String(e));

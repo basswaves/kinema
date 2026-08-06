@@ -42,12 +42,16 @@ export const saveTitle = (title: TitleMetadata) => invoke<number>('save_title', 
 export const saveEpisodes = (titleId: number, episodes: EpisodeMetadata[]) =>
   invoke<number>('save_episodes', { titleId, episodes });
 
+/**
+ * `status` mirrors the `match_status` lifecycle: 'parsed' puts a file back in
+ * the review queue, 'ignored' takes it out without pretending it was matched.
+ */
 export const linkFileToTitle = (
   fileId: number,
   titleId: number | null,
   confidence: number | null,
   reason: string | null,
-  status: 'matched' | 'unmatched'
+  status: 'matched' | 'unmatched' | 'ignored' | 'parsed'
 ) => invoke<void>('link_file_to_title', { fileId, titleId, confidence, reason, status });
 
 export const listTitles = () => invoke<StoredTitle[]>('list_titles');

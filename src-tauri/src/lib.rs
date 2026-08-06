@@ -6,6 +6,7 @@ mod playback;
 mod scanner;
 mod settings;
 mod skip;
+mod trailer;
 
 use library::Db;
 use std::sync::Mutex;
@@ -48,6 +49,8 @@ pub fn run() {
             metadata::get_title_detail,
             metadata::list_unmatched,
             metadata::reset_matches,
+            metadata::list_titles_without_trailer,
+            metadata::set_title_trailer,
             artwork::cache_artwork,
             artwork::artwork_stats,
             artwork::clear_artwork_cache,
@@ -58,6 +61,7 @@ pub fn run() {
             playback::get_title_prefs,
             playback::set_title_prefs,
             skip::get_skip_markers,
+            trailer::find_local_trailer,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

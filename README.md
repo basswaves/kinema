@@ -67,6 +67,8 @@ src-tauri/src/
                  remote URL; served back through the asset protocol
   skip.rs        Reads .skiptro.json sidecars for intro/credits markers,
                  cached against the sidecar's own size and mtime
+  trailer.rs     Finds local trailer files by Jellyfin/Kodi convention; the
+                 scanner shares its test so trailers never become titles
   settings.rs    Key/value settings (API keys) + the frontend log bridge
 
 src/
@@ -129,6 +131,14 @@ the database live in the same directory and should move together.
 **Track memory stores languages, not indices.** Track numbering differs between releases
 of the same show, so "index 3" would pick the wrong track on the next episode; "da"
 survives.
+
+**Trailers are local files, never a live stream in-app.** A trailer beside the media
+plays on the mpv surface: no ads, no network, no bundled binary, and the same
+rendering path as the feature. Anything that resolves YouTube streams — yt-dlp, an
+addon, an embed with an ad blocker — is a maintenance treadmill, which is exactly
+what Kodi's YouTube addon demonstrates and why Jellyfin's ecosystem downloads
+trailers to disk instead. Titles with no local file open the provider's link in the
+user's own browser, where their own ad blocking applies.
 
 **Missing episodes are shown greyed out, not hidden.** A season with gaps should look
 like a season with gaps.

@@ -36,6 +36,8 @@ pub struct TitleInput {
     pub rating: Option<f64>,
     pub poster_url: Option<String>,
     pub backdrop_url: Option<String>,
+    pub trailer_key: Option<String>,
+    pub trailer_site: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -65,6 +67,8 @@ pub struct Title {
     /// alongside it so the UI can fall back rather than showing nothing.
     pub poster_path: Option<String>,
     pub backdrop_path: Option<String>,
+    pub trailer_key: Option<String>,
+    pub trailer_site: Option<String>,
     pub rating: Option<f64>,
     pub file_count: i64,
     /// When this title's first file appeared, for the "recently added" rail.
@@ -103,18 +107,25 @@ pub fn save_title(db: tauri::State<Db>, title: TitleInput) -> Result<i64, String
     conn.execute(
         "INSERT INTO titles
             (kind, provider, provider_id, imdb_id, tmdb_id, title, year, overview,
-             genres, runtime_mins, rating, poster_url, backdrop_url, fetched_at)
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14)
+             genres, runtime_mins, rating, poster_url, backdrop_url, fetched_at,
+             trailer_key, trailer_site)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16)
          ON CONFLICT(provider, provider_id) DO UPDATE SET
             imdb_id = excluded.imdb_id, tmdb_id = excluded.tmdb_id,
             title = excluded.title, year = excluded.year, overview = excluded.overview,
             genres = excluded.genres, runtime_mins = excluded.runtime_mins,
             rating = excluded.rating, poster_url = excluded.poster_url,
-            backdrop_url = excluded.backdrop_url, fetched_at = excluded.fetched_at",
+            backdrop_url = excluded.backdrop_url, fetched_at = excluded.fetched_at,
+            -- A provider that supplies no trailer must not wipe one that an
+            -- earlier fetch found: re-matching a title through TVmaze would
+            -- otherwise silently lose the TMDB trailer.
+            trailer_key  = COALESCE(excluded.trailer_key,  titles.trailer_key),
+            trailer_site = COALESCE(excluded.trailer_site, titles.trailer_site)",
         params![
             title.kind, title.provider, title.provider_id, title.imdb_id, title.tmdb_id,
             title.title, title.year, title.overview, title.genres, title.runtime_mins,
-            title.rating, title.poster_url, title.backdrop_url, now_secs()
+            title.rating, title.poster_url, title.backdrop_url, now_secs(),
+            title.trailer_key, title.trailer_site
         ],
     )
     .map_err(to_string_err)?;
@@ -220,7 +231,8 @@ const TITLE_SELECT: &str = "
            (SELECT :art || a.local_path FROM artwork_cache a
              WHERE a.url = t.poster_url   AND a.local_path <> ''),
            (SELECT :art || a.local_path FROM artwork_cache a
-             WHERE a.url = t.backdrop_url AND a.local_path <> '')
+             WHERE a.url = t.backdrop_url AND a.local_path <> ''),
+           t.trailer_key, t.trailer_site
       FROM titles t";
 
 fn map_title(r: &rusqlite::Row) -> rusqlite::Result<Title> {
@@ -240,6 +252,8 @@ fn map_title(r: &rusqlite::Row) -> rusqlite::Result<Title> {
         added_at: r.get(12)?,
         poster_path: r.get(13)?,
         backdrop_path: r.get(14)?,
+        trailer_key: r.get(15)?,
+        trailer_site: r.get(16)?,
     })
 }
 
@@ -330,6 +344,61 @@ pub fn list_titles(app: tauri::AppHandle, db: tauri::State<Db>) -> Result<Vec<Ti
 
     rows.collect::<rusqlite::Result<Vec<_>>>()
         .map_err(to_string_err)
+}
+
+#[derive(Serialize)]
+pub struct TrailerTarget {
+    pub id: i64,
+    pub tmdb_id: String,
+    pub kind: String,
+}
+
+/// Titles that could have a trailer but do not yet.
+///
+/// Restricted to titles with a TMDB id, because that is the only provider here
+/// that carries video links at all — asking about the others would be querying
+/// for something that cannot exist.
+#[tauri::command]
+pub fn list_titles_without_trailer(db: tauri::State<Db>) -> Result<Vec<TrailerTarget>, String> {
+    let conn = db.0.lock().map_err(to_string_err)?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, tmdb_id, kind FROM titles
+              WHERE tmdb_id IS NOT NULL AND tmdb_id <> ''
+                AND (trailer_key IS NULL OR trailer_key = '')
+              ORDER BY id",
+        )
+        .map_err(to_string_err)?;
+
+    let rows = stmt
+        .query_map([], |r| {
+            Ok(TrailerTarget {
+                id: r.get(0)?,
+                tmdb_id: r.get(1)?,
+                kind: r.get(2)?,
+            })
+        })
+        .map_err(to_string_err)?;
+
+    rows.collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(to_string_err)
+}
+
+/// Record a trailer found by the backfill pass.
+#[tauri::command]
+pub fn set_title_trailer(
+    db: tauri::State<Db>,
+    title_id: i64,
+    trailer_key: Option<String>,
+    trailer_site: Option<String>,
+) -> Result<(), String> {
+    let conn = db.0.lock().map_err(to_string_err)?;
+    conn.execute(
+        "UPDATE titles SET trailer_key = ?2, trailer_site = ?3 WHERE id = ?1",
+        params![title_id, trailer_key, trailer_site],
+    )
+    .map_err(to_string_err)?;
+    Ok(())
 }
 
 /// Files that have been parsed but not yet matched to a title.

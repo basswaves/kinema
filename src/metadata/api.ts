@@ -14,6 +14,8 @@ export interface StoredTitle {
   backdrop_url: string | null;
   poster_path: string | null;
   backdrop_path: string | null;
+  trailer_key: string | null;
+  trailer_site: string | null;
   rating: number | null;
   file_count: number;
 }
@@ -28,6 +30,13 @@ export interface ArtworkStats {
   files: number;
   bytes: number;
   failed: number;
+}
+
+/** A title that could carry a trailer key but has none stored yet. */
+export interface TrailerTarget {
+  id: number;
+  tmdb_id: string;
+  kind: string;
 }
 
 export const getSetting = (key: string) => invoke<string | null>('get_setting', { key });
@@ -69,3 +78,12 @@ export const cacheArtwork = () => invoke<CacheResult>('cache_artwork');
 export const artworkStats = () => invoke<ArtworkStats>('artwork_stats');
 
 export const clearArtworkCache = () => invoke<number>('clear_artwork_cache');
+
+export const listTitlesWithoutTrailer = () =>
+  invoke<TrailerTarget[]>('list_titles_without_trailer');
+
+export const setTitleTrailer = (
+  titleId: number,
+  trailerKey: string | null,
+  trailerSite: string | null
+) => invoke<void>('set_title_trailer', { titleId, trailerKey, trailerSite });

@@ -263,10 +263,17 @@ export default function Browse({ onPlaybackChange }: BrowseProps) {
         <TitleDetailView
           title={view.title}
           onBack={() => setView({ name: 'home' })}
-          onPlayFile={(path, label, fileId) =>
+          onPlayFile={(path, label, fileId, titleId) =>
             setView({
               name: 'player',
-              target: { path, label, fileId, titleId: (view as { title: Title }).title.id },
+              target: {
+                path,
+                label,
+                fileId,
+                // Explicit null means "not on behalf of this title" — a trailer
+                // must not adopt or overwrite the show's track preferences.
+                titleId: titleId === undefined ? (view as { title: Title }).title.id : titleId,
+              },
             })
           }
         />

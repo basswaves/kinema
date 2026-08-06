@@ -1360,6 +1360,22 @@ html {
   opacity: 0.4;
 }
 
+/* Something in this row is costing quality. Amber rather than red: none of it
+   is broken, and the panel should not cry wolf about a downmix you chose. */
+.stats-row.warn .stats-value {
+  color: #ffc75a;
+}
+
+.stats-row.warn .stats-note {
+  opacity: 0.6;
+}
+
+/* libplacebo describes its render passes in full sentences, not field names. */
+.stats-group.wide-labels .stats-label {
+  flex: 0 0 13rem;
+  opacity: 0.75;
+}
+
 /*
  * Skip intro / credits prompt.
  *

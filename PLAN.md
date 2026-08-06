@@ -72,7 +72,7 @@ strip, which returns its files to the queue with parse data intact.
 
 ---
 
-## Phase 5 — Intro skip + in-app trailers (NEXT)
+## Phase 5 — Intro skip + in-app trailers ✅
 
 ### 5a. Intro/outro skip
 
@@ -167,20 +167,160 @@ applies, and where this app ships nothing to maintain.
 
 ---
 
+## 10-foot TV layout ✅
+
+One knob. `ui.css` is expressed entirely in `rem`, `--ui-scale` multiplies the
+root font size, and the whole browsing UI and player OSD follow. There is no
+second set of TV styles on purpose: two stylesheets describing one layout drift
+apart the first time either is edited, and the drift is invisible until someone
+is sitting in front of the screen the other one was for.
+
+The switch is **manual and persisted** (`tv_mode` in settings), not a viewport
+heuristic. The webview can measure the panel but not the viewing distance, and a
+4K monitor at arm's length looks exactly like a 4K TV across the room. It is one
+switch rather than a slider, for the same reason there is no quality preset:
+the question is "where am I sitting", which has two answers.
+`Ctrl`+`Shift`+`T` toggles it from anywhere, which is what makes comparing the
+two layouts practical.
+
+TV mode is a little more than an enlargement. The gutter grows faster than the
+type, because many TVs still crop a few percent of every edge; focused artwork
+gets a dark halo outside the white ring, which is otherwise invisible against a
+bright poster from three metres; and the hero overview drops to two lines, since
+three crowd the buttons at that size.
+
+With TV mode **off** the layout is numerically identical to the pre-conversion
+px version — verified declaration by declaration against `git show HEAD:` — so
+the desk experience is unchanged.
+
+**Remote reachability.** The layout was the stated gap, but D-pad navigation
+turned out not to work everywhere after all. None of this is visible with a
+mouse, which is why it survived: hovering re-establishes focus and clicking
+reaches anything, so the UI tests perfectly on a desk. See the new **Spatial
+navigation** section in GOTCHAS.md.
+
+- The top-nav **Home/Search** buttons and the detail page's **Back** button had
+  no `useFocusable` at all — unreachable by D-pad. `FocusButton` now exists so a
+  bare `<button>` in the browsing UI is the exception that has to justify itself.
+- The **search box** was never registered, so `setFocus('search-input')` had no
+  target and focus could not descend into the results.
+- **Nothing claimed focus**, at startup or after any view change. Each view
+  replaces the last entirely, so the remembered focus key routinely pointed at
+  an unmounted card — no ring, no response to any arrow press, indistinguishable
+  from a hang. `useClaimFocus` (`src/ui/focus.ts`) fixes this for every
+  top-level view; the **detail page had no focus entry point at all**, which is
+  why nothing on it responded.
+- **Up could never reach the nav**, and not for want of a focusable: the
+  library requires `sibling.bottom <= current.top` to move up, which an overlay
+  nav can never satisfy. Solved with a `nextFocusResolver` on the shell, the
+  only component that parents both. Details in GOTCHAS.md — it is not a bug that
+  markup changes can fix.
+- The resolver then **still did nothing**, because `useFocusable` reads the
+  focus context of the component it is *called in*: declaring the shell and the
+  nav containers side by side in `Browse` parented both to the root, so the
+  resolver's "siblings" never included the nav. The markup was nested and the
+  focus tree was flat. `TopNav` and `SearchView` are separate components for
+  exactly this reason.
+- **The page never scrolled back up.** `scrollIntoView({ block: 'nearest' })`
+  does nothing once an element is on screen, so arrowing up to the hero left the
+  page wherever the rails had scrolled it. Top-row controls now use
+  `keepInView="page-top"`, which is absolute rather than relative.
+- **Episode rows** did not scroll into view when focused, so arrowing down a
+  season moved focus below the fold. Worse at TV scale, where a third as many
+  rows fit.
+- In the player, **Skip intro** and **Up next** were click-only. `Enter` now
+  takes whichever is showing, and still just reveals the OSD when neither is —
+  rebinding it to play/pause would change a behaviour nobody asked to change.
+
+A detail page opens on its Play button for a movie, or the first episode it
+actually holds for a series — via `preferredChildFocusKey`, so the choice of
+landing spot lives next to the markup that knows which controls exist.
+
+**Verified** on a desk, keyboard only with the mouse untouched: startup focus,
+nav↔content in both directions, scroll return to the top of Home and of a detail
+page, detail-page entry and episode navigation, search box to grid and back, and
+`Enter` on both player prompts.
+
+**Unverified:** real overscan behaviour on an actual TV, and whether 1.45 is the
+right scale at typical sofa distance. Both need a TV; the value is one constant
+in `ui.css`.
+
+---
+
+## Library management out of the dev tab ✅
+
+Scan, parse and match no longer live behind a developer switcher. **Settings** is
+a third nav entry beside Home and Search, and the dev switcher in `App.tsx` is
+gone — `App` now renders `Browse` and nothing else.
+
+**Scanning is automatic**, once per launch, in the background. Not on a timer and
+not by watching the filesystem: a watcher over SMB is unreliable in exactly the
+place most of the library lives, and a timer re-walks a NAS that may be asleep.
+Once per launch plus a **Scan now** button is the version with no standing cost,
+which is the same reasoning that kept `yt-dlp` out.
+
+The startup scan is deliberately not awaited. Shelves render from the database
+immediately and anything new appears when it appears; failures are logged rather
+than surfaced, because an unreachable root at startup is normal and the scanner
+already skips it. The nav shows the current stage where the title count sits.
+
+`src/library/pipeline.ts` is the single sequence — scan → parse → match →
+artwork → trailers — shared by the automatic scan and the button, so the two can
+never disagree about what "up to date" means. It refuses a second concurrent run
+rather than queueing one.
+
+The individual stages survive under **Developer tools** in Settings, along with
+the raw file table. Re-matching after changing a key or a scoring rule should not
+cost a filesystem walk, and re-parsing should not cost a re-scan; that property
+is why each stage was independently runnable in the first place.
+
+Settings is fully D-pad operable — `FocusButton` and the new `FocusInput` — which
+matters more here than anywhere else, since this is the screen where TV mode is
+switched on. Toggles are buttons showing their state rather than checkboxes: a
+checkbox is a poor target for a remote.
+
+### Fix-match split out of the developer stylesheet ✅
+
+The review queue was the one part of the old harness that is genuinely
+user-facing, so it now has its own stylesheet, `src/library/fixmatch.css`, in
+`rem` like the rest of the app. `library.css` stays in fixed px on purpose and
+says so: it is a diagnostic table read at a desk, and scaling twelve columns to
+1.45× would only push them off the screen. Its `font-size` pin is what holds it
+at one size when TV mode changes the root.
+
+Splitting it turned up a defect in the previous step. `FixMatch` was styled
+entirely by `.library-root button`, and inside Settings it is not a descendant
+of `.library-root` — so every control in the review queue was an unstyled
+browser button on a dark background. It now carries its own button styling.
+
+Its controls were also all mouse-only, the same class of bug as before: five
+buttons, a text field, a checkbox and the expand/collapse row, none of them in
+the focus tree. All now go through `FocusButton` / `FocusInput`, the checkbox is
+a state-showing button, and `FocusButton` gained a `disabled` prop that also
+removes it from the focus tree — a control a remote can land on but not activate
+is a dead end with nothing to distinguish it from a bug.
+
+The queue is no longer duplicated in the developer view; Settings owns it.
+
+Conversion verified the same way as `ui.css`: every `rem` resolves to its
+original pixel value at scale 1, with no property dropped.
+
+---
+
 ## Backlog (not in the original plan, worth doing)
 
-**10-foot TV layout** — D-pad navigation works everywhere already, but there's no
-larger-type couch layout yet.
-
-**Delete `src/spike/`** — the Phase 0 harness. Keep until the real player is trusted for
-HDR, subtitle and track handling; then remove it and `src/App.tsx`'s dev switcher.
-
 **NFO read/write** — interop with MediaElch/tinyMediaManager. Read as an authoritative
-override during matching.
+override during matching. **Next.**
 
-**Library management out of the dev tab** — scan/parse/match currently live in a
-developer-facing Library view. Should become a proper settings screen with automatic
-background scanning.
+**Delete `src/spike/`** — the Phase 0 harness. No longer reachable from the UI (the dev
+switcher is gone) but still on disk, because it is the diagnostic harness for HDR
+passthrough and that is still unverified for want of an HDR display. Delete it, its
+`App.css` styles and its `.skiptro`-era dependencies once that is confirmed.
+
+**Confidence floor for skip markers** — the `.skiptro.json` sidecar carries a
+`confidence` value nothing reads yet. A skip fired on a bad detection jumps over real
+content, which is the same class of silent wrongness as a bad metadata match. Needs a
+low-confidence sample to calibrate against; everything in the library so far reports `1`.
 
 ## Verification
 
@@ -189,8 +329,10 @@ background scanning.
   regression fixtures.
 - **Playback:** H.264, HEVC 10-bit, AV1, HDR10, DV P5, DV P7, PGS + ASS subs, TrueHD/Atmos.
 - **NAS:** full scan timed over SMB; verify no full-file reads and no UI blocking.
-- **TV mode:** navigate every screen with arrow keys + Enter + Back only. Anything
-  unreachable by D-pad is a bug.
+- **TV mode:** navigate every screen with arrow keys + Enter + Back only, **without
+  touching the mouse at all**. Anything unreachable by D-pad is a bug, and every
+  one of them found so far was invisible in mouse testing — a stray hover repairs
+  focus and hides the failure.
 
 ## Still unverified
 

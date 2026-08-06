@@ -6,13 +6,22 @@
  * it keeps typing responsive on a TV remote.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { init as initSpatial, setFocus } from '@noriginmedia/norigin-spatial-navigation';
+import {
+  init as initSpatial,
+  setFocus,
+  useFocusable,
+  FocusContext,
+  type FocusableComponent,
+} from '@noriginmedia/norigin-spatial-navigation';
 import Home from './Home';
 import TitleDetailView from './TitleDetail';
 import Card from './Card';
+import FocusButton from './FocusButton';
+import Settings from './Settings';
 import Player, { type PlaybackTarget } from '../player/Player';
 import { continueWatching, type ContinueItem } from '../player/api';
 import { cacheArtwork } from '../metadata/api';
+import { runScanPipeline, useScanStatus } from '../library/pipeline';
 import { getTitleDetail, listTitles, type Title } from './api';
 import './ui.css';
 
@@ -24,23 +33,67 @@ initSpatial({
   useGetBoundingClientRect: true,
 });
 
+/** The nav entries, in order. Detail and player are reached, not navigated to. */
+type NavTarget = 'home' | 'search' | 'settings';
+
+/** The three nav views carry no payload, which is exactly what makes them nav. */
 type View =
-  | { name: 'home' }
+  | { name: NavTarget }
   | { name: 'detail'; title: Title }
-  | { name: 'search' }
   | { name: 'player'; target: PlaybackTarget };
 
-interface BrowseProps {
-  /** Lets the shell hide chrome while video is playing. */
-  onPlaybackChange?: (playing: boolean) => void;
+
+const NAV_FOCUS_KEY = 'top-nav';
+
+/**
+ * Move focus between the nav bar and the content beneath it.
+ *
+ * This one hop cannot be done geometrically, and the reason is worth writing
+ * down. To go up, the spatial system requires a candidate whose **bottom** edge
+ * is above the current element's **top** edge. The nav is an overlay: it is
+ * drawn over the content, so its bottom edge is always *below* the content's
+ * top edge — and the hero deliberately slides further under it still. There is
+ * no arrangement of an overlay nav and the content it overlays that satisfies
+ * that test, so no amount of adjusting the markup would have fixed this.
+ *
+ * `nextFocusResolver` is the library's escape hatch for exactly this: it is
+ * consulted only once the geometric search inside the content has come up
+ * empty, so pressing up from the third rail still reaches the second rail
+ * normally. Only a press that has run out of content arrives here.
+ */
+function resolveNavHop(
+  direction: string,
+  fromKey: string,
+  siblings: FocusableComponent[]
+): FocusableComponent | null {
+  const nav = siblings.find((s) => s.focusKey === NAV_FOCUS_KEY);
+  const content = siblings.find((s) => s.focusKey !== NAV_FOCUS_KEY);
+  if (!nav) return null;
+
+  if (direction === 'up') return fromKey === NAV_FOCUS_KEY ? null : nav;
+  if (direction === 'down') return fromKey === NAV_FOCUS_KEY ? (content ?? null) : null;
+  return null;
 }
 
-export default function Browse({ onPlaybackChange }: BrowseProps) {
+export default function Browse() {
   const [titles, setTitles] = useState<Title[]>([]);
   const [resumable, setResumable] = useState<ContinueItem[]>([]);
   const [view, setView] = useState<View>({ name: 'home' });
   const [query, setQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  // The shell owns the nav↔content rule, because it is the only component that
+  // is a parent of both. The nav and the search view get their containers in
+  // components of their own (below) rather than here — `useFocusable` reads the
+  // focus context of the component it is *called in*, so declaring them at this
+  // level would parent them to the root alongside the shell instead of beneath
+  // it, and the resolver would never see the nav at all.
+  const { ref: shellRef, focusKey: shellFocusKey } = useFocusable({
+    focusKey: 'browse-shell',
+    trackChildren: true,
+    saveLastFocusedChild: true,
+    nextFocusResolver: resolveNavHop,
+  });
 
   const load = useCallback(async () => {
     try {
@@ -71,6 +124,34 @@ export default function Browse({ onPlaybackChange }: BrowseProps) {
         if (!cancelled && result.stored > 0) void load();
       })
       .catch((e) => console.warn('artwork cache:', e));
+    return () => {
+      cancelled = true;
+    };
+  }, [load]);
+
+  /**
+   * Bring the library up to date once per launch, in the background.
+   *
+   * Deliberately not awaited and deliberately not blocking: the shelves render
+   * from the database immediately, and anything the scan turns up appears when
+   * it appears. A first run on an empty library is the one case where the wait
+   * is visible, and an empty screen that fills itself is a better answer than a
+   * spinner in front of nothing.
+   *
+   * Failures are logged, not surfaced. An unreachable NAS at startup is normal
+   * and the scanner already skips that root; an error banner over a library
+   * that is browsing perfectly well from cache would be noise.
+   */
+  useEffect(() => {
+    let cancelled = false;
+    runScanPipeline()
+      .then((outcome) => {
+        if (outcome.status === 'failed') console.warn('startup scan failed:', outcome.error);
+        if (cancelled || outcome.status !== 'done') return;
+        const { filesAdded, matched } = outcome.summary;
+        if (filesAdded > 0 || matched > 0) void load();
+      })
+      .catch((e) => console.warn('startup scan:', e));
     return () => {
       cancelled = true;
     };
@@ -166,13 +247,6 @@ export default function Browse({ onPlaybackChange }: BrowseProps) {
     if (view.name === 'search') setFocus('search-input');
   }, [view.name]);
 
-  // Report playback state so the shell can hide its chrome, and make sure a
-  // switch away from Browse while playing does not leave it hidden forever.
-  useEffect(() => {
-    onPlaybackChange?.(view.name === 'player');
-    return () => onPlaybackChange?.(false);
-  }, [view.name, onPlaybackChange]);
-
   if (view.name === 'player') {
     return (
       <Player
@@ -188,96 +262,190 @@ export default function Browse({ onPlaybackChange }: BrowseProps) {
   }
 
   return (
-    <div className="browse">
-      <nav className="top-nav">
-        <span className="brand">Personal Netflix</span>
-        <button
-          className={view.name === 'home' ? 'active' : ''}
-          onClick={() => setView({ name: 'home' })}
-        >
-          Home
-        </button>
-        <button
-          className={view.name === 'search' ? 'active' : ''}
-          onClick={() => setView({ name: 'search' })}
-        >
-          Search
-        </button>
-        <span className="nav-count">{titles.length} titles</span>
-      </nav>
+    <div className="browse" ref={shellRef}>
+      <FocusContext.Provider value={shellFocusKey}>
+        <TopNav active={view.name} titleCount={titles.length} onNavigate={setView} />
 
-      {error && (
-        <div className="browse-error" onClick={() => setError(null)}>
-          {error}
-        </div>
-      )}
-
-      {view.name === 'home' && (
-        <Home
-          titles={titles}
-          resumable={resumable}
-          onSelect={(title) => setView({ name: 'detail', title })}
-          onPlay={(title) => void playTitle(title)}
-          onResume={(item) =>
-            setView({
-              name: 'player',
-              target: {
-                path: item.path,
-                label:
-                  item.season !== null && item.episode !== null
-                    ? `${item.title} — S${String(item.season).padStart(2, '0')}E${String(
-                        item.episode
-                      ).padStart(2, '0')}`
-                    : item.title,
-                fileId: item.file_id,
-                titleId: item.title_id,
-              },
-            })
-          }
-        />
-      )}
-
-      {view.name === 'search' && (
-        <div className="search">
-          <input
-            autoFocus
-            className="search-input"
-            placeholder="Search your library…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <div className="search-grid">
-            {results.map((title) => (
-              <Card
-                key={title.id}
-                title={title}
-                onSelect={(t) => setView({ name: 'detail', title: t })}
-              />
-            ))}
+        {error && (
+          <div className="browse-error" onClick={() => setError(null)}>
+            {error}
           </div>
-          {results.length === 0 && <p className="muted center">No matches.</p>}
-        </div>
-      )}
+        )}
 
-      {view.name === 'detail' && (
-        <TitleDetailView
-          title={view.title}
-          onBack={() => setView({ name: 'home' })}
-          onPlayFile={(path, label, fileId, titleId) =>
-            setView({
-              name: 'player',
-              target: {
-                path,
-                label,
-                fileId,
-                // Explicit null means "not on behalf of this title" — a trailer
-                // must not adopt or overwrite the show's track preferences.
-                titleId: titleId === undefined ? (view as { title: Title }).title.id : titleId,
-              },
-            })
-          }
-        />
-      )}
+        {view.name === 'home' && (
+          <Home
+            titles={titles}
+            resumable={resumable}
+            onSelect={(title) => setView({ name: 'detail', title })}
+            onPlay={(title) => void playTitle(title)}
+            onResume={(item) =>
+              setView({
+                name: 'player',
+                target: {
+                  path: item.path,
+                  label:
+                    item.season !== null && item.episode !== null
+                      ? `${item.title} — S${String(item.season).padStart(2, '0')}E${String(
+                          item.episode
+                        ).padStart(2, '0')}`
+                      : item.title,
+                  fileId: item.file_id,
+                  titleId: item.title_id,
+                },
+              })
+            }
+          />
+        )}
+
+        {view.name === 'search' && (
+          <SearchView
+            query={query}
+            onQueryChange={setQuery}
+            results={results}
+            onSelect={(title) => setView({ name: 'detail', title })}
+          />
+        )}
+
+        {view.name === 'settings' && <Settings />}
+
+        {view.name === 'detail' && (
+          <TitleDetailView
+            title={view.title}
+            onBack={() => setView({ name: 'home' })}
+            onPlayFile={(path, label, fileId, titleId) =>
+              setView({
+                name: 'player',
+                target: {
+                  path,
+                  label,
+                  fileId,
+                  // Explicit null means "not on behalf of this title" — a trailer
+                  // must not adopt or overwrite the show's track preferences.
+                  titleId: titleId === undefined ? (view as { title: Title }).title.id : titleId,
+                },
+              })
+            }
+          />
+        )}
+      </FocusContext.Provider>
     </div>
+  );
+}
+
+/**
+ * The nav bar, as its own component so that its container is created *inside*
+ * the shell's focus context and is therefore parented to the shell. Declaring
+ * this `useFocusable` up in `Browse` would read `Browse`'s own context — the
+ * root — no matter which providers `Browse` renders, which is a quiet way to
+ * end up with a focus tree that does not match the markup.
+ */
+function TopNav({
+  active,
+  titleCount,
+  onNavigate,
+}: {
+  active: string;
+  titleCount: number;
+  onNavigate: (view: { name: NavTarget }) => void;
+}) {
+  const { ref, focusKey } = useFocusable({
+    focusKey: NAV_FOCUS_KEY,
+    trackChildren: true,
+    saveLastFocusedChild: true,
+  });
+
+  // A scan is the only long-running thing the app does on its own, so it says
+  // so where the title count normally sits rather than interrupting anything.
+  const scan = useScanStatus();
+
+  return (
+    <FocusContext.Provider value={focusKey}>
+      <nav className="top-nav" ref={ref}>
+        <span className="brand">Personal Netflix</span>
+        {(['home', 'search', 'settings'] as const).map((name) => (
+          <FocusButton
+            key={name}
+            className={active === name ? 'active' : ''}
+            keepInView="page-top"
+            onSelect={() => onNavigate({ name })}
+          >
+            {name === 'home' ? 'Home' : name === 'search' ? 'Search' : 'Settings'}
+          </FocusButton>
+        ))}
+        <span className="nav-count">
+          {scan ? `${scan.stage}…` : `${titleCount} titles`}
+        </span>
+      </nav>
+    </FocusContext.Provider>
+  );
+}
+
+/**
+ * The search view needs a container of its own so the shell has exactly two
+ * children. Without it the grid cards become the shell's children directly, and
+ * `resolveNavHop` — which cannot tell a card from a view — would fire on every
+ * vertical move inside the grid.
+ */
+function SearchView({
+  query,
+  onQueryChange,
+  results,
+  onSelect,
+}: {
+  query: string;
+  onQueryChange: (v: string) => void;
+  results: Title[];
+  onSelect: (title: Title) => void;
+}) {
+  const { ref, focusKey } = useFocusable({
+    focusKey: 'search-view',
+    trackChildren: true,
+    saveLastFocusedChild: true,
+  });
+
+  return (
+    <FocusContext.Provider value={focusKey}>
+      <div className="search" ref={ref}>
+        <SearchInput value={query} onChange={onQueryChange} />
+        <div className="search-grid">
+          {results.map((title) => (
+            <Card key={title.id} title={title} onSelect={onSelect} />
+          ))}
+        </div>
+        {results.length === 0 && <p className="muted center">No matches.</p>}
+      </div>
+    </FocusContext.Provider>
+  );
+}
+
+/**
+ * The search box, as a focusable.
+ *
+ * It has to be registered with the spatial system for two reasons. Focus has to
+ * be able to *leave* it downwards into the results, which cannot happen if the
+ * system does not know it exists — and `setFocus('search-input')` above is
+ * addressed to this key, so without it that call has no target and silently
+ * does nothing.
+ *
+ * Spatial focus and DOM focus are separate: the first decides where the remote
+ * is, the second decides where the characters go. Both are needed here.
+ */
+function SearchInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { ref, focused } = useFocusable<object, HTMLInputElement>({
+    focusKey: 'search-input',
+  });
+
+  useEffect(() => {
+    if (focused) ref.current?.focus();
+  }, [focused, ref]);
+
+  return (
+    <input
+      ref={ref}
+      className={`search-input ${focused ? 'focused' : ''}`}
+      placeholder="Search your library…"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    />
   );
 }

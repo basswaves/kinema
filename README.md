@@ -23,6 +23,8 @@ thin client that does nothing without a Jellyfin server running.
 | 5 — Intro skip + trailers | **Done.** Skip intro from Skiptro sidecars, trailers from local files |
 | Artwork cache | **Done.** Posters/backdrops/stills in app data, served over the asset protocol — browsing works offline |
 | Manual fix-match | **Done.** Review queue with reasons, provider search, ignore and unlink |
+| 10-foot TV layout | **Done.** One `--ui-scale` knob, persisted; overscan-safe gutters; every control reachable by D-pad |
+| Settings + background scan | **Done.** Scan/parse/match out of the dev tab; scans once per launch; developer stages kept behind a disclosure |
 
 ## Setup
 
@@ -46,8 +48,12 @@ npm run tauri dev     # run
 npm run check         # tsc --noEmit && eslint .
 ```
 
-API keys are entered in the app (Library tab → Settings) and stored in the SQLite
-database in app data — **never** in the repo.
+API keys are entered in the app (**Settings → Metadata providers**) and stored in the
+SQLite database in app data — **never** in the repo. TV metadata works with no key at
+all via TVmaze, so the library is usable before you enter anything.
+
+`npm run check` is `tsc + eslint` and never runs the bundler. Run `npm run build` too
+before trusting that the app can still ship — see GOTCHAS.md.
 
 ## Architecture
 
@@ -74,10 +80,15 @@ src-tauri/src/
   settings.rs    Key/value settings (API keys) + the frontend log bridge
 
 src/
-  ui/            Browse shell, Home, rails, cards, detail page, search
+  ui/            Browse shell, Home, rails, cards, detail page, search.
+                 tv.ts holds the 10-foot scale switch; FocusButton is the
+                 D-pad-reachable button every browsing control goes through
   player/        Player, shared mpv lifecycle, track handling, mpv options
-  library/       Scan/parse/match dev surface (Library tab), plus FixMatch —
-                 the review queue for everything the matcher refused to guess
+  library/       pipeline.ts — the scan→parse→match→artwork→trailers sequence,
+                 shared by the startup scan and the Scan now button. LibraryView
+                 is the developer surface behind a disclosure in Settings and
+                 keeps library.css in fixed px; FixMatch, the user-facing review
+                 queue, has its own fixmatch.css in rem so it scales
   metadata/      Providers, match scoring, orchestration
   spike/         Phase 0 diagnostic harness — deletable once trusted
   devlog.ts      Forwards console + unhandled errors to src-tauri/app.log
@@ -144,6 +155,18 @@ user's own browser, where their own ad blocking applies.
 
 **Missing episodes are shown greyed out, not hidden.** A season with gaps should look
 like a season with gaps.
+
+**One layout, one scale knob — not a TV skin.** Every dimension in `ui.css` is in
+`rem`; TV mode multiplies the root font size and everything follows. A parallel set
+of TV styles would drift out of step with the desk styles the first time either was
+edited, and the drift would only be visible to whoever was sitting in front of the
+*other* screen. The switch is manual and persisted, because the webview can measure
+the panel but not how far away you are sitting.
+
+**Every browsing control goes through `FocusButton`.** A bare `<button>` is
+reachable by mouse and invisible to a remote, and nothing about it looks wrong until
+someone is holding one — the same silent-failure shape as the rest of GOTCHAS.md.
+Four controls were already in that state when the TV layout was built.
 
 ## Debugging
 

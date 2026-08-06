@@ -29,12 +29,10 @@ import { clearParseError, lastParseError, parseMediaFile, selfTest, toPayload } 
 import {
   artworkStats,
   cacheArtwork,
-  clearArtworkCache,
   getSetting,
   listTitles,
   listUnmatched,
   resetMatches,
-  setSetting,
   type ArtworkStats,
   type StoredTitle,
 } from '../metadata/api';
@@ -46,7 +44,6 @@ import {
   type MatchProgress,
 } from '../metadata/match';
 import Art from '../ui/Art';
-import FixMatch from './FixMatch';
 import './library.css';
 
 const PARSE_BATCH = 500;
@@ -76,12 +73,7 @@ export default function LibraryView() {
   const [diagnosis, setDiagnosis] = useState<string | null>(null);
   const [titles, setTitles] = useState<StoredTitle[]>([]);
   const [art, setArt] = useState<ArtworkStats | null>(null);
-  const [showFixMatch, setShowFixMatch] = useState(false);
-  const [omdbKey, setOmdbKey] = useState('');
-  const [mdblistKey, setMdblistKey] = useState('');
-  const [tmdbKey, setTmdbKey] = useState('');
-  const [showSettings, setShowSettings] = useState(false);
-  const [autoSkip, setAutoSkip] = useState(false);
+  const [providers, setProviders] = useState({ tmdb: false, omdb: false, mdblist: false });
   const [progress, setProgress] = useState<MatchProgress | null>(null);
 
   const refresh = useCallback(async () => {
@@ -110,22 +102,22 @@ export default function LibraryView() {
     void refresh();
   }, [refresh]);
 
-  // Keys live in the database in app data, never in the repo.
+  // Whether a key exists, not the key itself — this screen only reports which
+  // provider a match run would use. Editing happens in Settings.
   useEffect(() => {
     void (async () => {
-      setOmdbKey((await getSetting('omdb_api_key')) ?? '');
-      setMdblistKey((await getSetting('mdblist_api_key')) ?? '');
-      setTmdbKey((await getSetting('tmdb_api_key')) ?? '');
-      setAutoSkip((await getSetting('skip_mode')) === 'auto');
+      const [tmdb, omdb, mdblist] = await Promise.all([
+        getSetting('tmdb_api_key'),
+        getSetting('omdb_api_key'),
+        getSetting('mdblist_api_key'),
+      ]);
+      setProviders({
+        tmdb: !!tmdb?.trim(),
+        omdb: !!omdb?.trim(),
+        mdblist: !!mdblist?.trim(),
+      });
     })();
   }, []);
-
-  const saveKeys = useCallback(async () => {
-    await setSetting('omdb_api_key', omdbKey.trim());
-    await setSetting('mdblist_api_key', mdblistKey.trim());
-    await setSetting('tmdb_api_key', tmdbKey.trim());
-    setDiagnosis('API keys saved to the local database.');
-  }, [omdbKey, mdblistKey, tmdbKey]);
 
   const runMatch = useCallback(async () => {
     setBusy('Matching…');
@@ -180,7 +172,6 @@ export default function LibraryView() {
       try {
         await returnFilesToReview(owned);
         await refresh();
-        setShowFixMatch(true);
         setDiagnosis(
           `Unlinked ${owned.length} file(s) from “${title.title}” — they are back under Needs attention.`
         );
@@ -191,23 +182,6 @@ export default function LibraryView() {
       }
     },
     [files, refresh]
-  );
-
-  /**
-   * After a manual link: a new title brings new artwork URLs, so cache them
-   * here rather than leaving the browse view to discover them.
-   */
-  const afterFix = useCallback(
-    async (message: string) => {
-      try {
-        await cacheArtwork();
-      } catch (e) {
-        console.warn('artwork cache after manual match:', e);
-      }
-      await refresh();
-      setDiagnosis(message);
-    },
-    [refresh]
   );
 
   const runTrailers = useCallback(async () => {
@@ -339,19 +313,6 @@ export default function LibraryView() {
     [files]
   );
 
-  // Must agree with what FixMatch actually lists: it groups by parsed title, so
-  // a file with no parsed title is not something the review queue can show.
-  const needsReview = useMemo(
-    () =>
-      files.filter(
-        (f) =>
-          (f.match_status === 'parsed' || f.match_status === 'unmatched') &&
-          !f.missing &&
-          f.parsed_title
-      ).length,
-    [files]
-  );
-
   return (
     <div className="library-root">
       <header className="library-header">
@@ -401,103 +362,27 @@ export default function LibraryView() {
           >
             {busy === 'Fetching trailers…' ? busy : 'Fetch trailers'}
           </button>
-          <button
-            className={needsReview > 0 ? 'attention' : ''}
-            onClick={() => setShowFixMatch((v) => !v)}
-          >
-            Needs attention{needsReview > 0 ? ` (${needsReview})` : ''}
-          </button>
-          <button onClick={() => setShowSettings((v) => !v)}>Settings</button>
           <button onClick={() => setDiagnosis(`Self-test: ${selfTest()}`)}>Self-test parser</button>
         </div>
       </header>
 
-      {showSettings && (
-        <section className="settings-panel">
-          <p className="muted">
-            Keys are stored in the local database in app data — never in the project folder.
-            TV metadata via TVmaze needs no key at all.
-          </p>
-          <div className="provider-status">
-            {[
-              ['TMDB', tmdbKey.trim().length > 0, 'movies + TV, posters/backdrops/stills'],
-              ['TVmaze', true, 'TV fallback, keyless'],
-              ['OMDb', omdbKey.trim().length > 0, 'movie fallback, no backdrops'],
-              ['MDBList', mdblistKey.trim().length > 0, 'ratings, not yet used'],
-            ].map(([name, active, note]) => (
-              <span key={String(name)} className={`provider-pill ${active ? 'on' : 'off'}`}>
-                {String(name)} {active ? '✓' : '—'}
-                <em>{String(note)}</em>
-              </span>
-            ))}
-          </div>
-          <p className="muted">
-            Whichever is highest in this list and configured wins. Saved keys only take effect
-            for matches run afterwards — use “Re-match all” to redo existing ones.
-          </p>
-          <label>
-            TMDB key <span className="muted">(preferred: posters, backdrops, episode stills)</span>
-            <input value={tmdbKey} onChange={(e) => setTmdbKey(e.target.value)} placeholder="TMDB API key (v3)" />
-          </label>
-          <label>
-            OMDb key <span className="muted">(movies fallback: plot, ratings, poster only)</span>
-            <input value={omdbKey} onChange={(e) => setOmdbKey(e.target.value)} placeholder="OMDb API key" />
-          </label>
-          <label>
-            MDBList key <span className="muted">(ratings + ID cross-referencing)</span>
-            <input
-              value={mdblistKey}
-              onChange={(e) => setMdblistKey(e.target.value)}
-              placeholder="MDBList API key"
-            />
-          </label>
-          <button className="primary" onClick={() => void saveKeys()}>
-            Save keys
-          </button>
-
-          <label className="settings-toggle">
-            <input
-              type="checkbox"
-              checked={autoSkip}
-              onChange={(e) => {
-                const on = e.target.checked;
-                setAutoSkip(on);
-                void setSetting('skip_mode', on ? 'auto' : 'button').catch((err) =>
-                  setError(String(err))
-                );
-              }}
-            />
-            Skip intros automatically{' '}
-            <span className="muted">
-              — otherwise a Skip button appears for 10 seconds. Needs a{' '}
-              <code>.skiptro.json</code> sidecar next to the video; without one, nothing
-              changes.
-            </span>
-          </label>
-
-          <p className="muted">
-            Artwork cache:{' '}
-            {art
-              ? `${art.files} image(s), ${formatBytes(art.bytes)}${
-                  art.failed ? ` · ${art.failed} failed download(s), retried on the next pass` : ''
-                }`
-              : '—'}
-            . Cached images are served from app data, so browsing works offline.
-          </p>
-          <button
-            disabled={!!busy || !art?.files}
-            onClick={() =>
-              void (async () => {
-                const removed = await clearArtworkCache();
-                await refresh();
-                setDiagnosis(`Removed ${removed} cached image(s). Artwork falls back to the URLs.`);
-              })()
-            }
-          >
-            Clear artwork cache
-          </button>
-        </section>
-      )}
+      {/* Read-only: which provider a match run will actually use. The keys
+          themselves are edited in Settings — this is here because it changes
+          what "Match metadata" below will do, and that is worth seeing next to
+          the button rather than one screen away. */}
+      <div className="provider-status">
+        {[
+          ['TMDB', providers.tmdb, 'movies + TV, posters/backdrops/stills'],
+          ['TVmaze', true, 'TV fallback, keyless'],
+          ['OMDb', providers.omdb, 'movie fallback, no backdrops'],
+          ['MDBList', providers.mdblist, 'ratings, not yet used'],
+        ].map(([name, active, note]) => (
+          <span key={String(name)} className={`provider-pill ${active ? 'on' : 'off'}`}>
+            {String(name)} {active ? '✓' : '—'}
+            <em>{String(note)}</em>
+          </span>
+        ))}
+      </div>
 
       {progress && progress.currentTitle && (
         <div className="library-diagnosis">
@@ -518,7 +403,6 @@ export default function LibraryView() {
         </div>
       )}
 
-      {showFixMatch && <FixMatch files={files} onChanged={afterFix} />}
 
       <section className="library-roots">
         {roots.length === 0 && <p className="muted">No folders yet. Add a movies or TV folder to begin.</p>}

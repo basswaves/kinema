@@ -6,9 +6,11 @@
  * with gaps, not like a shorter season.
  */
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import Art from './Art';
+import FocusButton from './FocusButton';
+import { useClaimFocus } from './focus';
 import {
   findLocalTrailer,
   getTitleDetail,
@@ -29,6 +31,15 @@ interface Props {
   onBack: () => void;
 }
 
+/**
+ * Stable keys, so focus can be aimed at this page and land somewhere useful.
+ * The container is the target; it forwards to whichever of the two landing
+ * spots actually exists on this title.
+ */
+const DETAIL_FOCUS_KEY = 'detail-root';
+const DETAIL_PLAY_KEY = 'detail-play';
+const DETAIL_FIRST_EPISODE_KEY = 'detail-first-episode';
+
 function runtimeLabel(mins: number | null): string {
   if (!mins) return '';
   if (mins < 60) return `${mins}m`;
@@ -41,7 +52,19 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
   const [season, setSeason] = useState<number | null>(null);
   const [trailerPath, setTrailerPath] = useState<string | null>(null);
 
-  const { ref, focusKey } = useFocusable({ trackChildren: true, saveLastFocusedChild: true });
+  // A movie opens on its Play button, a series on the first episode it actually
+  // holds. Landing on Back instead — the first control in the markup — would be
+  // technically navigable and useless.
+  const { ref, focusKey } = useFocusable({
+    focusKey: DETAIL_FOCUS_KEY,
+    trackChildren: true,
+    saveLastFocusedChild: true,
+    preferredChildFocusKey: detail?.movie_path ? DETAIL_PLAY_KEY : DETAIL_FIRST_EPISODE_KEY,
+  });
+
+  // Waits for the load: claiming earlier would land on Back, the only control
+  // that exists before the episodes arrive, and then stay there.
+  useClaimFocus(DETAIL_FOCUS_KEY, Boolean(detail));
 
   useEffect(() => {
     let cancelled = false;
@@ -90,6 +113,11 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
 
   const ownedCount = detail?.episodes.filter((e) => e.file_path).length ?? 0;
 
+  // The landing spot for a series: the first episode in the visible season that
+  // is actually playable. Missing episodes are rendered but not focusable, so
+  // aiming at one would leave focus nowhere.
+  const firstOwnedId = visibleEpisodes.find((e) => e.file_path)?.id ?? null;
+
   // Artwork comes from the freshly fetched row once it arrives: the title in
   // props is a snapshot from the rail, and may predate the artwork cache
   // filling in.
@@ -105,9 +133,9 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
         />
         <div className="detail-scrim" />
 
-        <button className="back-button" onClick={onBack}>
+        <FocusButton className="back-button" keepInView="page-top" onSelect={onBack}>
           ← Back
-        </button>
+        </FocusButton>
 
         <div className="detail-body">
           <div className="detail-head">
@@ -133,43 +161,51 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
 
               <div className="detail-actions">
                 {detail?.movie_path && (
-                  <PlayButton
-                    label="▶ Play"
-                    onPlay={() =>
+                  <FocusButton
+                    focusKey={DETAIL_PLAY_KEY}
+                    className="btn-primary"
+                    keepInView="page-top"
+                    onSelect={() =>
                       onPlayFile(detail.movie_path as string, title.title, detail.movie_file_id)
                     }
-                  />
+                  >
+                    ▶ Play
+                  </FocusButton>
                 )}
 
                 {/* A local file always wins: no ads, no network, and it plays
                     through the same mpv pipeline as everything else. */}
                 {trailerPath && (
-                  <PlayButton
-                    label="▶ Trailer"
-                    secondary
-                    onPlay={() =>
+                  <FocusButton
+                    className="btn-secondary"
+                    keepInView="page-top"
+                    onSelect={() =>
                       // fileId and titleId are both null on purpose. A trailer
                       // is ephemeral: no resume point, no Continue Watching
                       // row, and no writing this file's audio/subtitle choice
                       // into the show's remembered languages.
                       onPlayFile(trailerPath, `${title.title} — Trailer`, null, null)
                     }
-                  />
+                  >
+                    ▶ Trailer
+                  </FocusButton>
                 )}
 
                 {/* Falls back to the browser rather than an in-app embed:
                     whatever ad blocking the user already runs applies there,
                     and this app ships nothing to maintain. */}
                 {!trailerPath && shown.trailer_key && (
-                  <PlayButton
-                    label="Trailer on YouTube ↗"
-                    secondary
-                    onPlay={() =>
+                  <FocusButton
+                    className="btn-secondary"
+                    keepInView="page-top"
+                    onSelect={() =>
                       void openUrl(
                         `https://www.youtube.com/watch?v=${shown.trailer_key as string}`
                       ).catch((e) => setError(String(e)))
                     }
-                  />
+                  >
+                    Trailer on YouTube ↗
+                  </FocusButton>
                 )}
               </div>
             </div>
@@ -182,13 +218,14 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
               {seasons.length > 1 && (
                 <div className="season-tabs">
                   {seasons.map((s) => (
-                    <button
+                    <FocusButton
                       key={s}
                       className={season === s ? 'active' : ''}
-                      onClick={() => setSeason(s)}
+                      keepInView="nearest"
+                      onSelect={() => setSeason(s)}
                     >
                       {s === 0 ? 'Specials' : `Season ${s}`}
-                    </button>
+                    </FocusButton>
                   ))}
                 </div>
               )}
@@ -198,6 +235,7 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
                   <EpisodeRow
                     key={episode.id}
                     episode={episode}
+                    focusKey={episode.id === firstOwnedId ? DETAIL_FIRST_EPISODE_KEY : undefined}
                     onPlay={() =>
                       episode.file_path &&
                       onPlayFile(
@@ -219,37 +257,39 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
   );
 }
 
-function PlayButton({
-  label,
+function EpisodeRow({
+  episode,
   onPlay,
-  secondary,
+  focusKey,
 }: {
-  label: string;
+  episode: Episode;
   onPlay: () => void;
-  secondary?: boolean;
+  focusKey?: string;
 }) {
-  const { ref, focused } = useFocusable({ onEnterPress: onPlay });
-  return (
-    <button
-      ref={ref}
-      className={`${secondary ? 'btn-secondary' : 'btn-primary'} ${focused ? 'focused' : ''}`}
-      onClick={onPlay}
-    >
-      {label}
-    </button>
-  );
-}
-
-function EpisodeRow({ episode, onPlay }: { episode: Episode; onPlay: () => void }) {
   const available = Boolean(episode.file_path);
   const { ref, focused } = useFocusable({
+    focusKey,
     focusable: available,
     onEnterPress: onPlay,
   });
 
+  const element = useRef<HTMLDivElement | null>(null);
+
+  // A season is the one list here long enough to run off the bottom of the
+  // screen, and more so at TV scale, where a third as many rows fit. Without
+  // this, arrowing down past the fold moves focus to a row you cannot see.
+  useEffect(() => {
+    if (focused) {
+      element.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [focused]);
+
   return (
     <div
-      ref={ref}
+      ref={(node) => {
+        ref.current = node;
+        element.current = node;
+      }}
       className={`episode-row ${focused ? 'focused' : ''} ${available ? '' : 'missing'}`}
       onClick={available ? onPlay : undefined}
     >

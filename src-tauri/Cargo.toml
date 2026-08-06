@@ -28,6 +28,10 @@ serde_json = "1"
 tauri-plugin-libmpv = "0.3.2"
 rusqlite = { version = "0.40.1", features = ["bundled"] }
 walkdir = "2.5.0"
+# NFO sidecars are XML. Event-based rather than deserialised into a struct:
+# the shape varies between MediaElch, tinyMediaManager and Kodi itself, and a
+# reader that ignores what it does not recognise survives all three.
+quick-xml = "0.38"
 tauri-plugin-dialog = "2"
 tauri-plugin-http = "2"
 

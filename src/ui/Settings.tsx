@@ -44,6 +44,7 @@ import {
   setSetting,
   type ArtworkStats,
 } from '../metadata/api';
+import { buildNfoExports, writeNfo } from '../metadata/nfo';
 import FixMatch from '../library/FixMatch';
 import LibraryView from '../library/LibraryView';
 
@@ -88,6 +89,7 @@ export default function Settings() {
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [panel, setPanel] = useState<'none' | 'review' | 'developer'>('none');
+  const [writingNfo, setWritingNfo] = useState(false);
 
   const tvMode = useTvMode();
   const scan = useScanStatus();
@@ -166,6 +168,26 @@ export default function Settings() {
       setError(String(e));
     }
   }, [tmdbKey, omdbKey, mdblistKey]);
+
+  const exportNfo = useCallback(async (overwrite: boolean) => {
+    setError(null);
+    setNote(null);
+    setWritingNfo(true);
+    try {
+      const report = await writeNfo(await buildNfoExports(), overwrite);
+      const parts = [`Wrote ${report.written} NFO file(s)`];
+      if (report.skipped) parts.push(`${report.skipped} already existed and were left alone`);
+      if (report.errors.length) parts.push(`${report.errors.length} failed`);
+      setNote(`${parts.join(' · ')}.`);
+      // Only the first few: a read-only share fails once per file, and a
+      // thousand identical lines say nothing the first three did not.
+      if (report.errors.length) setError(report.errors.slice(0, 3).join(' · '));
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setWritingNfo(false);
+    }
+  }, []);
 
   const last = getLastScanSummary();
 
@@ -373,6 +395,40 @@ export default function Settings() {
           >
             Clear artwork cache
           </FocusButton>
+        </section>
+
+        {/* ---- nfo ---- */}
+        <section className="settings-section">
+          <h2>NFO files</h2>
+          <p className="muted">
+            The interop format MediaElch, tinyMediaManager and Kodi all read. An NFO found beside
+            a video is treated as <strong>authoritative</strong> during matching: when it carries a
+            provider id there is nothing left to guess at, and when it only carries a title, that
+            title is what gets searched instead of the one taken off the filename. Nothing needs
+            enabling — this happens on every scan.
+          </p>
+          <p className="muted">
+            Exporting writes what this library knows back out, so another tool can read it.
+            Existing NFO files are left alone: they were almost certainly written by one of those
+            tools and carry fields this app does not model, so replacing them would throw away
+            someone else&rsquo;s work. Media folders on read-only shares are reported and skipped.
+          </p>
+          <div className="settings-row">
+            <FocusButton
+              className="btn-secondary"
+              disabled={writingNfo}
+              onSelect={() => void exportNfo(false)}
+            >
+              {writingNfo ? 'Writing…' : 'Write missing NFO files'}
+            </FocusButton>
+            <FocusButton
+              className="btn-secondary"
+              disabled={writingNfo}
+              onSelect={() => void exportNfo(true)}
+            >
+              Overwrite all NFO files
+            </FocusButton>
+          </div>
         </section>
 
         {/* ---- developer ---- */}

@@ -2,6 +2,7 @@ mod artwork;
 mod db;
 mod library;
 mod metadata;
+mod nfo;
 mod playback;
 mod scanner;
 mod settings;
@@ -62,6 +63,10 @@ pub fn run() {
             playback::set_title_prefs,
             skip::get_skip_markers,
             trailer::find_local_trailer,
+            nfo::read_nfo,
+            nfo::read_show_nfo,
+            nfo::write_nfo,
+            nfo::nfo_targets,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

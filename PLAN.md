@@ -307,10 +307,65 @@ original pixel value at scale 1, with no property dropped.
 
 ---
 
-## Backlog (not in the original plan, worth doing)
+## NFO read/write ✅
 
-**NFO read/write** — interop with MediaElch/tinyMediaManager. Read as an authoritative
-override during matching. **Next.**
+Interop with MediaElch, tinyMediaManager and Kodi, and the strongest available
+answer to "a wrong match is worse than no match": **an NFO beside a video is
+somebody having already answered the question the matcher is about to guess at.**
+
+**Reading is authoritative and automatic.** It happens on every scan, with
+nothing to enable. When the NFO carries a provider id there is no search, no
+scoring and no ambiguity guard — the whole class of confidently-wrong matches
+disappears for that group, because there is nothing left to get wrong. Recorded
+as `nfo: tmdb:335984 from Movie.nfo`, so it stays as auditable as a `manual:`
+link.
+
+When there is no id, the override is on the *question*, not the standard of
+proof: the NFO's `<title>` and `<year>` replace the guessit-parsed ones as the
+search, and whatever comes back still has to clear the usual threshold and
+margin. The reason records that the search title came from an NFO.
+
+Ids resolve by how much the result carries rather than how direct the lookup is
+— TMDB first, since it is the only source here with backdrops and episode
+stills. `tmdb` goes straight through; `imdb` via TMDB `/find`, falling back to
+OMDb for films and TVmaze for shows; `tvdb` via TVmaze lookup.
+
+A series is matched as a unit, so the id that resolves twelve episodes is the
+show's: only `tvshow.nfo` counts for a group, found up to two levels up.
+An `<episodedetails>` id would link a whole season to one episode.
+
+**Parsing is in Rust** (`src-tauri/src/nfo.rs`), with `quick-xml`. Not for
+consistency but because the alternative — parsing in the webview — means
+granting it filesystem read scope over the entire library including NAS shares,
+and Rust already walks those paths. Tolerant of shape, strict about values: it
+accepts `<uniqueid>`, legacy `<tmdbid>`/`<imdbid>`, ambiguous `<id>` routed by
+what it looks like, `<premiered>` as a year source, a BOM, Windows-1252 bytes,
+and Kodi's oldest convention of a file containing only a URL. Ids that are not
+plausibly ids are dropped rather than sent to a provider. 11 unit tests.
+
+**Writing is an explicit action only**, in Settings. These files live in the
+user's media folders, which are frequently read-only shares, so writing must
+never be a side effect of scanning. Existing NFO files are skipped unless
+overwrite is chosen: one already there was almost certainly written by MediaElch
+or tinyMediaManager and carries fields this app does not model, and replacing it
+wholesale would discard someone else's work. `tvshow.nfo` goes in the *show*
+folder, not the season folder the episodes sit in — an existing one wins, else
+a `Season 01` / `S01` / `Specials` parent is stepped over.
+
+**Verified** as a round trip against the real library: export, then re-match and
+watch the reasons change from scores to `nfo:` ids; a deliberately unrecognisable
+filename still matching correctly from an id beside it; and an implausible id
+falling through to normal matching rather than erroring.
+
+**Still unverified:** an NFO written by MediaElch or tinyMediaManager itself.
+Every fixture here is synthetic, so the dialects are as documented rather than as
+observed. A file that turns out to be a dialect too far logs
+`nfo: nothing usable in <path>` rather than failing silently, which is the thread
+to pull if a real one ever misbehaves.
+
+---
+
+## Backlog (not in the original plan, worth doing)
 
 **Delete `src/spike/`** — the Phase 0 harness. No longer reachable from the UI (the dev
 switcher is gone) but still on disk, because it is the diagnostic harness for HDR

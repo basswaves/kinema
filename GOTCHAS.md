@@ -252,6 +252,39 @@ rather than from component state.
 
 ---
 
+## quick-xml (NFO parsing)
+
+Two behaviours that both silently truncate text rather than failing. A
+round-trip test — render an NFO, parse it back, compare — caught both; reading
+real files would not have, because most titles contain neither an entity nor an
+ampersand.
+
+### An entity reference is its own event
+
+`&amp;` does not arrive inside `Event::Text`. It arrives as a separate
+`Event::GeneralRef` between two text events, so code that reads the first
+`Text` and moves on turns `Fish &amp; Chips` into `Fish`.
+
+**Do:** accumulate text across events and commit at the closing tag, handling
+`GeneralRef` (`resolve_char_ref()` for `&#38;`, the name for `&amp;` and
+friends) and `CData` into the same buffer.
+
+### `trim_text(true)` trims every run, not the whole value
+
+Combine it with the above and `Fish &amp; Chips` becomes `Fish&Chips` — each
+fragment is trimmed individually, so the spaces around the entity disappear.
+
+**Do:** leave trimming off and trim the accumulated buffer once.
+
+### Fields belong to a depth, not a document
+
+`<movie>` legitimately contains `<set><name>` and `<actor><name>`, and
+tinyMediaManager writes a `<title>` inside `<set>`. A parser that takes the
+first `<title>` anywhere gets the collection's name and searches the provider
+for it. Only accept fields that are direct children of the root.
+
+---
+
 ## Environment (Windows)
 
 ### Spawned shells inherit a stale PATH

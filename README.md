@@ -25,6 +25,7 @@ thin client that does nothing without a Jellyfin server running.
 | Manual fix-match | **Done.** Review queue with reasons, provider search, ignore and unlink |
 | 10-foot TV layout | **Done.** One `--ui-scale` knob, persisted; overscan-safe gutters; every control reachable by D-pad |
 | Settings + background scan | **Done.** Scan/parse/match out of the dev tab; scans once per launch; developer stages kept behind a disclosure |
+| NFO read/write | **Done.** Read as an authoritative override during matching; export is an explicit action |
 
 ## Setup
 
@@ -65,7 +66,7 @@ Full-screen browsing views paint their own background; the player must not.
 
 ```
 src-tauri/src/
-  db.rs          SQLite schema + migrations (user_version, currently 5)
+  db.rs          SQLite schema + migrations (user_version, currently 6)
   scanner.rs     Filesystem walk. NAS-aware: identity is (path, size, mtime),
                  never a content hash — never read file bytes during a scan
   library.rs     Roots, scan, parse write-back, stats
@@ -152,6 +153,16 @@ addon, an embed with an ad blocker — is a maintenance treadmill, which is exac
 what Kodi's YouTube addon demonstrates and why Jellyfin's ecosystem downloads
 trailers to disk instead. Titles with no local file open the provider's link in the
 user's own browser, where their own ad blocking applies.
+
+**An NFO outranks the matcher.** A `.nfo` beside a video is someone having already
+answered the question the scorer is about to guess at, usually by hand. With a provider
+id in it there is no search and no score — the whole class of confidently-wrong matches
+disappears for that title, which is the strongest form of the rule above. Without an id,
+its `<title>` overrides the one guessit took off the filename, but the result still has
+to clear the same threshold: the override is on the question asked, not the standard of
+proof. Reading happens on every scan; **writing is an explicit action**, because these
+files live in the user's media folders and an existing one was probably written by
+another tool and carries fields this app does not model.
 
 **Missing episodes are shown greyed out, not hidden.** A season with gaps should look
 like a season with gaps.

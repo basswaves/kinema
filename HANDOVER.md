@@ -1,6 +1,12 @@
 # Handover — starting a new session
 
-Paste the block below into a fresh chat to continue development.
+In Claude Code, **CLAUDE.md is loaded automatically** and carries the working
+rules, the settled decisions and the verification commands. Nothing needs
+pasting there; just say what you want next.
+
+The block below is for a fresh chat *without* that (claude.ai, a different
+tool). It deliberately does not repeat the constraints — they live in CLAUDE.md,
+and two copies of a rule drift apart the moment either is edited.
 
 ---
 
@@ -9,68 +15,44 @@ I'm continuing work on **Personal Netflix**, a local serverless media library
 
 `C:\Projects\kinema`
 
-Phases 0–5 are complete and committed (`git log`). The app works end to end:
-scanning, metadata matching, browsing, playback with resume and next-episode
-autoplay, locally cached artwork, a manual fix-match queue, intro skipping from
-Skiptro sidecars, and trailers from local files.
+**Read these before writing any code:**
 
-**Before writing any code, read these three files in the repo:**
+1. `CLAUDE.md` — working rules, settled decisions that must not be re-opened,
+   and how to verify. Start here.
+2. `PLAN.md` — what is done and why each decision went the way it did.
+3. `GOTCHAS.md` — traps in libmpv, Tauri, spatial navigation and XML parsing.
+   **Read before touching the player or D-pad navigation.** Nearly every entry
+   describes a failure that produces no error at all.
+4. `README.md` — architecture and data flow.
 
-1. `PLAN.md` — roadmap, what's done, and the Phase 5 spec
-2. `GOTCHAS.md` — libmpv and toolchain traps. **Read this before touching the
-   player.** Every entry cost a real debugging round, and several describe
-   failures that produce no error at all
-3. `README.md` — architecture, data flow, and the design decisions to preserve
+The app works end to end and the roadmap is complete: scanning, matching,
+browsing, playback with resume and next-episode autoplay, cached artwork, the
+manual fix-match queue, intro skipping, local-file trailers, a 10-foot TV
+layout, a Settings screen with automatic background scanning, and NFO
+read/write.
 
-**What I want next**, in priority order — but confirm the order with me before
-starting:
+**What is left, all of it currently blocked on something:**
 
-1. **10-foot TV layout** — D-pad navigation works everywhere already, but there
-   is no larger-type couch layout yet.
-2. **Library management out of the dev tab** — scan/parse/match still live in a
-   developer-facing Library view. Should become a settings screen with
-   background scanning.
-3. **NFO read/write** — interop with MediaElch/tinyMediaManager; read as an
-   authoritative override during matching.
-4. **Delete `src/spike/`** — the Phase 0 harness, plus the dev switcher in
-   `src/App.tsx`. Keep only until the real player is trusted for HDR.
+- **Delete `src/spike/`** — the Phase 0 mpv harness. Already off the UI and
+  unreachable, but still on disk because it is the diagnostic tool for HDR
+  passthrough, which is unverified for want of an HDR display. Delete it, its
+  styles in `App.css`, and this note once that is confirmed.
+- **Minimum confidence for skip markers** — `.skiptro.json` carries a
+  `confidence` value nothing reads. A skip fired on a bad detection jumps over
+  real content, which is the same class of silent wrongness as a bad metadata
+  match. Needs a low-confidence sample to calibrate against; every marker in the
+  library reports `1`.
+- **NFO against a real third-party file** — reading and writing are verified as
+  a round trip through this app's own export, but no NFO written by MediaElch or
+  tinyMediaManager has ever been tested. A dialect too far logs
+  `nfo: nothing usable in <path>` rather than failing silently.
 
-**Constraints that must not be violated** (these are settled decisions, not
-open questions):
+**Known unverified, all needing hardware or a bigger library:** HDR
+*passthrough* (this display is 1440p SDR — decode and tone-mapping to SDR are
+confirmed), per-show track memory across episodes, real TV overscan behaviour
+and whether `--ui-scale: 1.45` is right at sofa distance, and behaviour with a
+large movie library (currently one film and one TV season).
 
-- **No machine-learning upscaling.** No FSRCNNX, RAVU, Anime4K, RTX VSR, Intel
-  VSR. Classical resampling only.
-- **No quality-preset UI.** The app decides; "potato mode" is the only switch.
-- **Vendor-neutral** — must work equally on AMD, Intel and NVIDIA.
-- **Wrong metadata matches are worse than no match.** Keep the strict threshold
-  and the ambiguity guard; surface failures for review instead of guessing.
-- **Nothing that needs periodic maintenance to keep working.** This has to run
-  untended for years, and it may be published as open source. That is why
-  `yt-dlp`, the Kodi-style YouTube resolver and an in-app embed with an ad
-  blocker were all rejected for trailers: trailers are local files, with the
-  provider link opening in the user's own browser as the fallback.
-- **No third-party binaries in the repo or the bundle.** Skiptro is run
-  separately by hand; the app only reads the sidecars it leaves behind.
-- The window is transparent so mpv can render behind the webview. **Never give
-  `html`, `body` or `#root` an opaque background** — it hides the video
-  entirely. Full-screen browsing views paint their own background; the player
-  must not.
-
-**How I work:**
-
-- Run `npm run check` (tsc + eslint) before telling me something is done.
-  `react-hooks/exhaustive-deps` is set to **error** deliberately — it caught
-  real stale-closure bugs that produced silently wrong behaviour.
-- When something fails, read `src-tauri/app.log` (frontend console + unhandled
-  errors) and `src-tauri/mpv.log` (mpv's own verbose log) instead of guessing.
-  The webview console is otherwise invisible from outside the app.
-- Changing mpv's observed-property list requires a **full app restart**, not
-  HMR — mpv initialises once per window.
-- Ask before downloading any third-party binary.
-- I test in the real app and report back with screenshots; tell me exactly what
-  to click and what a pass looks like.
-
-**Known unverified:** HDR *passthrough* (my display is 1440p SDR — decode and
-tone-mapping to SDR are confirmed), per-show track memory across episodes, and
-behaviour with a large movie library (I currently have one film and one TV
-season).
+**How I work:** I test in the real app and report back — tell me exactly what to
+click, what a pass looks like, and what a failure would look like. Confirm the
+order with me before starting a multi-item request.

@@ -444,15 +444,31 @@ decides its own rendering settings and offers no quality selector, which makes
 "is it doing what it claims?" the only question left — and there was previously
 no way to answer it without reading `mpv.log` line by line.
 
-It reports the source (resolution, codec, pixel format, frame rate, bitrate),
-the display (**measured from the webview**, which can see the actual panel), the
-rendering path, **what scaling is happening and why**, the colour and HDR
-pipeline, audio in *and* out (so a downmix is visible), and dropped frames, A/V
-sync and demuxer cache.
+Modelled on madVR's OSD, which gets two things right that a property dump does
+not.
+
+**It reports the cadence, not just two frame rates.** "23.976" and "59.97" in
+separate rows do not tell you that motion judders; `3:2 pulldown — uneven` does,
+and the note names the display mode that would fix it.
+
+**It lists the render passes that actually ran.** Every other row reports what
+was *requested*; `vo-passes` reports what libplacebo executed on the last frame.
+Those are different claims, and only the second answers "is anything touching my
+image?". This gpu-next build does not implement it — so rather than omit the
+section, which is indistinguishable from "no passes ran", the panel states that
+the VO does not report them and carries the error.
+
+Beyond that it reports the source (resolution, codec, pixel format and bit depth,
+frame rate, bitrate, scan type and whether the deinterlacer engaged), the display
+(**measured from the webview**, which can see the actual panel), the rendering
+path, **what scaling is happening and why**, the colour and HDR pipeline
+including chroma siting and primaries conversion, audio in *and* out (so a
+downmix is visible), and dropped frames, A/V sync and demuxer cache. Rows that
+are costing quality are highlighted amber.
 
 Every value is a flat scalar read, never a `node` — the crash in GOTCHAS.md
-applies to `chapter-list` and the rest, not just `track-list`. Every read is
-individually fallible, because property names move between mpv and libplacebo
+applies to `chapter-list` and `vo-passes` too, not just `track-list`. Every read
+is individually fallible, because property names move between mpv and libplacebo
 versions and reading one in an unimplemented format *throws* rather than
 returning null (the `sid`/`aid` lesson). An unavailable field shows `—` instead
 of emptying the panel.
@@ -463,7 +479,49 @@ the whole app restarted and would look exactly like a panel that was wrong.
 
 This is also the first thing in the project that can answer the **HDR
 passthrough** question — `target-params/gamma` against the source transfer, plus
-what the webview believes about the panel's dynamic range.
+what the webview believes about the panel's dynamic range. It has already
+confirmed the SDR half on real content: a 4K HDR10 remux reads pq / bt.2020-ncl /
+1000 nits in, tone mapped with bt.2390 off a measured frame peak.
+
+Rebuilt along madVR's lines after using it, because a property dump gets two
+things wrong that madVR's OSD gets right.
+
+**It reports the cadence, not just two frame rates.** "23.976" and "59.97" in
+separate rows do not tell you that motion judders; `3:2 pulldown — uneven` does,
+and the note names the display mode that would fix it.
+
+**It lists the render passes that actually ran.** Every other row reports what
+was *requested*; `vo-passes` reports what libplacebo executed on the last frame,
+with timings. Those are different claims, and only the second answers "is
+anything touching my image?". Read as indexed scalars with the sub-path probed
+rather than assumed — it moved between mpv versions, and an unsupported build
+simply contributes no section.
+
+Also added: scan type and whether the deinterlacer is engaged, bit depth off the
+pixel format, chroma siting (which is what MPEG-2 era content gets wrong),
+primaries conversion, frame-timing mode, and an amber highlight on rows that are
+costing quality — a downmix, an un-deinterlaced interlaced source, dropped
+frames, debanding.
+
+**Four of its own bugs, found by reading it against real files** — which is the
+argument for building it at all, since every one produced a confident wrong
+number rather than a blank:
+
+- Luma scaling compared the source against the whole output *surface* rather
+  than the letterboxed video rectangle. A scope master read "downscale 1.000×";
+  a 16:9 file read 1.481× where the truth was 1.333×.
+- Pixel format read `d3d11`, the hardware surface type, so bit depth vanished
+  and p010 tested as "not subsampled".
+- Mastering peak read "0.00× SDR white" on SDR content, because the peak
+  properties report zero rather than going absent.
+- Cadence used the container frame rate, which is the wrong input on precisely
+  the interlaced content the deinterlacer exists for — one interlaced frame
+  becomes two progressive ones.
+
+`vo-passes` returns nothing on this gpu-next build. Rather than omit the section
+silently — indistinguishable from "no passes ran" — the panel now states that
+the VO does not report them and carries the error, so what is left reads
+honestly as *requested* settings rather than as observed ones.
 
 ## A launchable exe ✅
 
@@ -534,48 +592,6 @@ not put there.
 and the default Windows device is onboard stereo. That is a larger loss of
 intent than any scaler question. See the backlog.
 
-## Stats for nerds, second pass ✅
-
-Rebuilt along madVR's lines after using it, because a property dump gets two
-things wrong that madVR's OSD gets right.
-
-**It reports the cadence, not just two frame rates.** "23.976" and "59.97" in
-separate rows do not tell you that motion judders; `3:2 pulldown — uneven` does,
-and the note names the display mode that would fix it.
-
-**It lists the render passes that actually ran.** Every other row reports what
-was *requested*; `vo-passes` reports what libplacebo executed on the last frame,
-with timings. Those are different claims, and only the second answers "is
-anything touching my image?". Read as indexed scalars with the sub-path probed
-rather than assumed — it moved between mpv versions, and an unsupported build
-simply contributes no section.
-
-Also added: scan type and whether the deinterlacer is engaged, bit depth off the
-pixel format, chroma siting (which is what MPEG-2 era content gets wrong),
-primaries conversion, frame-timing mode, and an amber highlight on rows that are
-costing quality — a downmix, an un-deinterlaced interlaced source, dropped
-frames, debanding.
-
-**Four of its own bugs, found by reading it against real files** — which is the
-argument for building it at all, since every one produced a confident wrong
-number rather than a blank:
-
-- Luma scaling compared the source against the whole output *surface* rather
-  than the letterboxed video rectangle. A scope master read "downscale 1.000×";
-  a 16:9 file read 1.481× where the truth was 1.333×.
-- Pixel format read `d3d11`, the hardware surface type, so bit depth vanished
-  and p010 tested as "not subsampled".
-- Mastering peak read "0.00× SDR white" on SDR content, because the peak
-  properties report zero rather than going absent.
-- Cadence used the container frame rate, which is the wrong input on precisely
-  the interlaced content the deinterlacer exists for — one interlaced frame
-  becomes two progressive ones.
-
-`vo-passes` returns nothing on this gpu-next build. Rather than omit the section
-silently — indistinguishable from "no passes ran" — the panel now states that
-the VO does not report them and carries the error, so what is left reads
-honestly as *requested* settings rather than as observed ones.
-
 ---
 
 ## Backlog (not in the original plan, worth doing)
@@ -604,6 +620,18 @@ it needs a device selection (mpv's `--audio-device`) because the default device
 is the wrong one here. Note also that it is mutually exclusive with the new
 display-clock frame timing.
 
+**Smooth motion (`tscale=oversample`) — deferred, not rejected.** The one
+remaining lever on 24p judder short of a display-mode change. mpv's
+`--interpolation` with `--tscale=oversample` is madVR's "smooth motion": it does
+not synthesise intermediate frames the way a true interpolator does — most
+refreshes still show a pure source frame and only the transition refresh is a
+blend of two — so it trades the discrete 3-2 judder for a slight smear on those
+refreshes. It requires display-clock timing, which now exists.
+
+It does alter frames, which cuts against "nothing invents frames or detail", so
+it is a decision rather than an improvement. Raised and explicitly set aside;
+**ask before enabling it.**
+
 **`playTitle` picks the largest file, not the first episode** — `get_title_detail`
 returns `movie_path` for a *series* too (largest file by size), so pressing Play
 on a series card, or the detail page's Play button, starts whichever episode
@@ -625,8 +653,17 @@ episode list and Continue Watching are both unaffected.
 
 ## Still unverified
 
-- **HDR passthrough** — untestable so far on a 1440p SDR panel. HDR *decode* and
-  tone-mapping to SDR are confirmed working.
+- **HDR passthrough** — untestable on this 2560×1600 SDR panel. HDR *decode* and
+  tone-mapping to SDR are now confirmed **on real content by the stats panel**,
+  not merely by the picture looking right: a 4K HDR10 remux reads pq /
+  bt.2020-ncl / 1000 nits in, tone mapped with bt.2390 off a measured peak.
 - **Per-show track memory across episodes** — implemented, but a bug in reading `sid`
   was aborting the apply path until late in Phase 4; worth re-confirming.
 - **Movies at scale** — only one film in the library so far.
+- **`vo-passes`** — returns nothing on this gpu-next build, so the stats panel's
+  render-pass list is empty and every rendering row is a *requested* setting
+  rather than an observed one. The panel carries the error; worth revisiting if
+  mpv is ever updated.
+- **The four stats fixes** (video rectangle, `hw-pixelformat`, SDR peak, cadence
+  after deinterlacing) are written and built but not yet eyeballed against the
+  three test files that exposed them.

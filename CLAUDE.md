@@ -24,6 +24,17 @@ breaking one, say so rather than quietly working around it.
   only.
 - **No quality-preset UI.** The correct settings depend on the frame and the
   display, both of which mpv already knows. The app decides.
+  - **One deliberate exception: frame timing** (Settings → Playback). It is a
+    switch because the right answer depends on hardware the code cannot see —
+    the panel's true refresh rate, and whether audio is leaving as an untouched
+    bitstream. It is not a taste preference and must not become the first of
+    several. Anything mpv can determine for itself still gets decided, not asked.
+- **Nothing invents frames or detail.** The rule above covers pixels; this one
+  covers time. No frame interpolation — 24p judder on a 60 Hz panel is reported
+  by the stats panel and
+  deliberately not "fixed". mpv's `tscale=oversample` — madVR's "smooth motion"
+  — has been raised and **deferred, not rejected**; it is in the PLAN backlog.
+  Do not enable it without asking.
 - **Vendor-neutral.** Must behave identically on AMD, Intel and NVIDIA.
 - **A wrong metadata match is worse than no match.** Keep the 0.75 threshold and
   the 0.05 runner-up margin. Refuse and surface for review rather than guess.
@@ -56,6 +67,15 @@ cargo test --manifest-path src-tauri/Cargo.toml
 
 Rust changes only. `cargo build` fails while the app is running; stop it first.
 
+```bash
+npm run app:build    # release exe into dist-app/ + desktop shortcut
+```
+
+How the user actually launches it. Note that `tauri build` runs Vite **first**
+and then spends minutes in cargo — editing a frontend file during that window
+ships a stale bundle. Check that nothing under `src/` is newer than
+`dist/index.html` before trusting a build.
+
 `react-hooks/exhaustive-deps` is **error** on purpose — it caught stale-closure
 bugs that produced silently wrong behaviour, not crashes.
 
@@ -70,6 +90,14 @@ of guessing** — the webview console is otherwise invisible from outside the ap
 
 - `src-tauri/app.log` — frontend `console.*`, uncaught errors, rejections.
 - `src-tauri/mpv.log` — mpv's own verbose log.
+
+Running from the desktop shortcut instead, both land in `dist-app/` — they are
+opened relative to the working directory.
+
+`mpv.log` is the authority on anything about rendering. It records what
+libplacebo *did*, not what it was asked to do: which shader passes ran, what
+dither depth was resolved, the real display refresh rate, and whether each
+post-init option was accepted. **Read it before theorising about the pipeline.**
 
 `F12` opens WebView2 DevTools in the app window.
 

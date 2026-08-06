@@ -1,0 +1,40 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Native playback libraries — ~95MB, fetched by `npx tauri-plugin-libmpv-api setup-lib`
+src-tauri/lib/
+
+# Rust build output
+src-tauri/target/
+
+# Diagnostic logs
+mpv.log
+src-tauri/mpv.log
+app.log
+src-tauri/app.log
+
+# Local secrets (TMDB / fanart.tv API keys)
+.env
+.env.local

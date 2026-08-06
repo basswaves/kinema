@@ -1,0 +1,25 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Capability for the main window",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "opener:default",
+    "libmpv:default",
+    "core:window:allow-set-fullscreen",
+    "core:window:allow-is-fullscreen",
+    "dialog:default",
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "https://api.tvmaze.com/*" },
+        { "url": "https://www.omdbapi.com/*" },
+        { "url": "https://api.mdblist.com/*" },
+        { "url": "https://api.themoviedb.org/*" }
+      ]
+    }
+  ]
+}

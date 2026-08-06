@@ -1,0 +1,871 @@
+/*
+ * Browsing UI.
+ *
+ * The window is transparent so mpv can render behind the webview. Browsing
+ * views therefore paint their own opaque background; the player view must not.
+ */
+
+.browse {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: #0a0a0c;
+  color: #f5f5f7;
+}
+
+/* ---- top nav ------------------------------------------------------------ */
+.top-nav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 42px;
+  background: linear-gradient(180deg, rgba(10, 10, 12, 0.96), rgba(10, 10, 12, 0));
+  backdrop-filter: blur(8px);
+}
+
+.brand {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #e50914;
+  margin-right: 10px;
+}
+
+.top-nav button {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(245, 245, 247, 0.7);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.top-nav button:hover,
+.top-nav button.active {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.nav-count {
+  margin-left: auto;
+  font-size: 12px;
+  opacity: 0.4;
+}
+
+.browse-error {
+  margin: 0 42px 12px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: rgba(218, 54, 51, 0.92);
+  cursor: pointer;
+}
+
+/* ---- hero --------------------------------------------------------------- */
+.hero {
+  position: relative;
+  height: 62vh;
+  min-height: 380px;
+  margin-top: -64px; /* slide under the transparent nav */
+  display: flex;
+  align-items: flex-end;
+}
+
+.hero-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Two gradients: one to lift text off the image, one to blend into the rails
+   below so the hero has no hard edge. */
+.hero-scrim {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(10, 10, 12, 0.95) 0%, rgba(10, 10, 12, 0.55) 45%, transparent 75%),
+    linear-gradient(0deg, #0a0a0c 2%, transparent 55%);
+}
+
+.hero-content {
+  position: relative;
+  max-width: 620px;
+  padding: 0 42px 44px;
+}
+
+.hero-title {
+  margin: 0 0 10px;
+  font-size: clamp(30px, 4.4vw, 54px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  text-shadow: 0 2px 20px rgba(0, 0, 0, 0.6);
+}
+
+.hero-meta {
+  font-size: 13px;
+  opacity: 0.75;
+  margin-bottom: 12px;
+}
+
+.hero-overview {
+  margin: 0 0 20px;
+  font-size: 14px;
+  line-height: 1.55;
+  opacity: 0.88;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* ---- buttons ------------------------------------------------------------ */
+.btn-primary,
+.btn-secondary {
+  padding: 10px 24px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 120ms ease, background 120ms ease;
+}
+
+.btn-primary {
+  background: #fff;
+  color: #0a0a0c;
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+  backdrop-filter: blur(4px);
+}
+
+.btn-primary:hover,
+.btn-secondary:hover {
+  transform: scale(1.04);
+}
+
+/* Focus ring for D-pad navigation. Must be clearly visible from three metres
+   away, so it is a solid outline rather than a subtle tint. */
+.btn-primary.focused,
+.btn-secondary.focused {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+  transform: scale(1.06);
+}
+
+/* ---- rails -------------------------------------------------------------- */
+.home {
+  padding-bottom: 60px;
+}
+
+.rail {
+  margin: 26px 0;
+}
+
+.rail-heading {
+  margin: 0 0 10px 42px;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.rail-track {
+  display: flex;
+  gap: 12px;
+  padding: 4px 42px 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.rail-track::-webkit-scrollbar {
+  display: none;
+}
+
+/* ---- cards -------------------------------------------------------------- */
+.card {
+  flex: 0 0 152px;
+  width: 152px;
+  cursor: pointer;
+  transition: transform 140ms ease;
+}
+
+.card:hover,
+.card.focused {
+  transform: scale(1.07);
+}
+
+.card-art {
+  position: relative;
+  width: 152px;
+  height: 228px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #17171b;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+
+.card.focused .card-art {
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+}
+
+.card-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.card-art-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 10px;
+  font-size: 12px;
+  text-align: center;
+  opacity: 0.5;
+}
+
+.card-badge {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.75);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.card-title {
+  margin-top: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-meta {
+  font-size: 11px;
+  opacity: 0.5;
+}
+
+/* ---- continue watching --------------------------------------------------- */
+.continue-card {
+  flex: 0 0 268px;
+  width: 268px;
+  cursor: pointer;
+  transition: transform 140ms ease;
+}
+
+.continue-card:hover,
+.continue-card.focused {
+  transform: scale(1.05);
+}
+
+.continue-art {
+  position: relative;
+  width: 268px;
+  height: 151px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #17171b;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+
+.continue-card.focused .continue-art {
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+}
+
+.continue-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.continue-art-empty {
+  width: 100%;
+  height: 100%;
+}
+
+.continue-play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  color: #fff;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
+  opacity: 0;
+  background: rgba(0, 0, 0, 0.28);
+  transition: opacity 140ms ease;
+}
+
+.continue-card:hover .continue-play,
+.continue-card.focused .continue-play {
+  opacity: 1;
+}
+
+.continue-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.continue-progress-fill {
+  height: 100%;
+  background: #e50914;
+}
+
+.continue-title {
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.continue-meta {
+  font-size: 11.5px;
+  opacity: 0.6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.continue-remaining {
+  font-size: 11px;
+  opacity: 0.42;
+}
+
+/* ---- detail ------------------------------------------------------------- */
+.detail {
+  position: relative;
+  min-height: 100%;
+  padding-bottom: 60px;
+}
+
+.detail-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 70vh;
+  object-fit: cover;
+}
+
+.detail-scrim {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 70vh;
+  background: linear-gradient(0deg, #0a0a0c 5%, rgba(10, 10, 12, 0.35) 60%, rgba(10, 10, 12, 0.7));
+}
+
+.back-button {
+  position: relative;
+  z-index: 5;
+  margin: 16px 0 0 42px;
+  padding: 7px 15px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.back-button:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.detail-body {
+  position: relative;
+  padding: 26px 42px 0;
+}
+
+.detail-head {
+  display: flex;
+  gap: 26px;
+  margin-bottom: 34px;
+}
+
+.detail-poster {
+  width: 190px;
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6);
+}
+
+.detail-info h1 {
+  margin: 0 0 10px;
+  font-size: clamp(26px, 3.4vw, 42px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.detail-meta {
+  font-size: 13px;
+  opacity: 0.7;
+  margin-bottom: 14px;
+}
+
+.detail-overview {
+  max-width: 720px;
+  margin: 0 0 20px;
+  font-size: 14px;
+  line-height: 1.6;
+  opacity: 0.9;
+}
+
+.detail-error {
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: rgba(218, 54, 51, 0.9);
+  margin-bottom: 16px;
+}
+
+/* ---- seasons + episodes -------------------------------------------------- */
+.season-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.season-tabs button {
+  padding: 7px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(245, 245, 247, 0.75);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.season-tabs button.active {
+  background: #fff;
+  border-color: #fff;
+  color: #0a0a0c;
+  font-weight: 700;
+}
+
+.episode-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.episode-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px;
+  border-radius: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.episode-row:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.episode-row.focused {
+  background: rgba(255, 255, 255, 0.12);
+  outline: 2px solid #fff;
+}
+
+/* Episodes the provider knows about but we do not hold. Shown, not hidden —
+   a season with gaps should look like one. */
+.episode-row.missing {
+  opacity: 0.38;
+  cursor: default;
+}
+
+.episode-row.missing:hover {
+  background: transparent;
+}
+
+.episode-still {
+  position: relative;
+  flex: 0 0 150px;
+  width: 150px;
+  height: 85px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #17171b;
+}
+
+.episode-still img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.episode-still-empty {
+  width: 100%;
+  height: 100%;
+}
+
+.episode-number {
+  position: absolute;
+  left: 6px;
+  top: 5px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.72);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.episode-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.episode-name {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+
+.episode-missing-tag {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.episode-overview {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  opacity: 0.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.episode-runtime {
+  font-size: 12px;
+  opacity: 0.5;
+  white-space: nowrap;
+}
+
+/* ---- search ------------------------------------------------------------- */
+.search {
+  padding: 20px 42px 60px;
+}
+
+.search-input {
+  width: 100%;
+  max-width: 560px;
+  padding: 13px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
+  font-size: 15px;
+}
+
+.search-input:focus {
+  outline: 2px solid #fff;
+  outline-offset: 1px;
+}
+
+.search-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(152px, 1fr));
+  gap: 20px 12px;
+  margin-top: 24px;
+}
+
+.empty-state {
+  padding: 90px 42px;
+  text-align: center;
+}
+
+.empty-state h1 {
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+.muted {
+  opacity: 0.55;
+}
+
+.center {
+  text-align: center;
+}
+
+/* ---- player ------------------------------------------------------------- */
+/* No background anywhere: mpv renders behind the webview. */
+.player {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: transparent;
+  cursor: default;
+}
+
+.player.osd-hidden .player-top,
+.player.osd-hidden .player-controls {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.player-top,
+.player-controls {
+  transition: opacity 260ms ease;
+}
+
+.player-top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 24px 40px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.8), transparent);
+}
+
+.player-top .back-button {
+  margin: 0;
+}
+
+.player-label {
+  font-size: 14px;
+  font-weight: 600;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
+}
+
+.player-error {
+  align-self: center;
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: rgba(218, 54, 51, 0.92);
+}
+
+.player-controls {
+  padding: 50px 24px 20px;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.86), transparent);
+}
+
+.player-seek-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.player-time {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  min-width: 56px;
+  text-align: center;
+  opacity: 0.9;
+}
+
+.player-seek {
+  flex: 1;
+  accent-color: #e50914;
+  cursor: pointer;
+}
+
+.player-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.player-buttons button {
+  padding: 8px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.player-buttons button:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.player-buttons .btn-primary {
+  min-width: 106px;
+}
+
+.player-buttons button.active {
+  background: rgba(229, 9, 20, 0.85);
+  border-color: #e50914;
+}
+
+/* ---- resume toast -------------------------------------------------------- */
+.resume-toast {
+  position: absolute;
+  top: 76px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 9px 18px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.8);
+  font-size: 13px;
+  animation: toast-fade 4s ease forwards;
+}
+
+@keyframes toast-fade {
+  0% { opacity: 0; }
+  12% { opacity: 1; }
+  75% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ---- track panel --------------------------------------------------------- */
+.track-panel {
+  position: absolute;
+  right: 24px;
+  bottom: 132px;
+  width: 292px;
+  max-height: 54vh;
+  overflow-y: auto;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  background: rgba(12, 12, 14, 0.93);
+  backdrop-filter: blur(10px);
+}
+
+.track-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 10px 0 7px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.75;
+}
+
+.track-panel-head:first-child {
+  margin-top: 0;
+}
+
+.track-panel-head button {
+  padding: 3px 9px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.track-option {
+  display: block;
+  width: 100%;
+  margin-bottom: 5px;
+  padding: 8px 11px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.track-option:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.track-option.active {
+  background: rgba(229, 9, 20, 0.28);
+  border-color: #e50914;
+  font-weight: 600;
+}
+
+.track-empty {
+  font-size: 11px;
+  opacity: 0.5;
+  padding: 3px 0;
+}
+
+.track-note {
+  margin: 10px 0 0;
+  font-size: 10.5px;
+  opacity: 0.45;
+}
+
+/* ---- up next ------------------------------------------------------------- */
+.up-next {
+  position: absolute;
+  right: 28px;
+  bottom: 132px;
+  width: 380px;
+  padding: 20px 22px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 14px;
+  background: rgba(12, 12, 14, 0.94);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+}
+
+.up-next-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.6;
+  margin-bottom: 6px;
+}
+
+.up-next-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  line-height: 1.35;
+}
+
+.up-next-actions {
+  display: flex;
+  gap: 9px;
+}
+
+.up-next-actions button {
+  padding: 9px 16px;
+  font-size: 13px;
+}

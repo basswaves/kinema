@@ -1,0 +1,348 @@
+/*
+ * Transparency is load-bearing: mpv renders in a native surface *behind* the
+ * WebView2 control. Any opaque background anywhere in the chain hides the
+ * video completely. html, body and #root must all stay transparent.
+ */
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: transparent;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  color: #f2f2f2;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* Temporary dev-phase view switcher. Removed once the real UI lands. */
+.dev-switch {
+  position: fixed;
+  right: 14px;
+  bottom: 12px;
+  z-index: 100;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(10, 10, 12, 0.88);
+  backdrop-filter: blur(6px);
+}
+
+.dev-switch button {
+  padding: 5px 14px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: #f2f2f2;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.dev-switch button.active {
+  background: #e50914;
+  font-weight: 600;
+}
+
+.dev-switch.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.dev-switch {
+  transition: opacity 220ms ease;
+}
+
+.spike-root {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* ---- header ------------------------------------------------------------ */
+.spike-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 16px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0));
+}
+
+.spike-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+
+.badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.badge.ok {
+  background: rgba(46, 160, 67, 0.9);
+}
+.badge.fail {
+  background: rgba(218, 54, 51, 0.9);
+}
+.badge.wait {
+  background: rgba(158, 106, 3, 0.9);
+}
+
+/* Smoothness probe: a constant-velocity animation. Any hitching here during
+   playback means the webview and the video surface are contending. */
+.stutter-probe {
+  position: relative;
+  width: 160px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.15);
+  overflow: hidden;
+}
+
+.stutter-probe-dot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 40px;
+  height: 100%;
+  border-radius: 3px;
+  background: #e50914;
+  animation: probe-slide 1.4s linear infinite;
+}
+
+@keyframes probe-slide {
+  from {
+    transform: translateX(-40px);
+  }
+  to {
+    transform: translateX(160px);
+  }
+}
+
+/* ---- error / dropzone --------------------------------------------------- */
+.spike-error {
+  margin: 0 16px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: rgba(218, 54, 51, 0.92);
+  font-size: 13px;
+}
+
+.spike-dropzone {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(560px, 80vw);
+  padding: 28px;
+  border: 2px dashed rgba(255, 255, 255, 0.25);
+  border-radius: 14px;
+  background: rgba(12, 12, 12, 0.82);
+  text-align: center;
+  font-size: 14px;
+}
+
+.spike-path-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.spike-path-row input {
+  flex: 1;
+  padding: 9px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font-size: 13px;
+  user-select: text;
+}
+
+/* ---- diagnostics -------------------------------------------------------- */
+.spike-diagnostics {
+  position: absolute;
+  top: 56px;
+  right: 16px;
+  width: 260px;
+  /* Remux files can carry a dozen subtitle tracks — keep the panel on screen. */
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  /* Deliberately semi-transparent: you should see moving video through it. */
+  background: rgba(10, 10, 10, 0.66);
+  backdrop-filter: blur(6px);
+  font-size: 12px;
+}
+
+.spike-diagnostics-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.spike-diagnostics dl {
+  margin: 0;
+}
+
+.diag-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 2px 0;
+}
+
+.diag-row dt {
+  opacity: 0.66;
+}
+
+.diag-row dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 140px;
+}
+
+/* ---- track selection ---------------------------------------------------- */
+.track-section {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.track-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 8px 0 5px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.track-empty {
+  font-size: 11px;
+  opacity: 0.5;
+  padding: 2px 0;
+}
+
+.spike-root button.track {
+  display: block;
+  width: 100%;
+  margin-bottom: 4px;
+  padding: 5px 8px;
+  text-align: left;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- controls ----------------------------------------------------------- */
+.spike-controls {
+  padding: 24px 16px 14px;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.86), rgba(0, 0, 0, 0));
+}
+
+.seek-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.time {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+  min-width: 52px;
+  text-align: center;
+}
+
+.seek {
+  flex: 1;
+  accent-color: #e50914;
+  cursor: pointer;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.spike-root button {
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #f2f2f2;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.spike-root button:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.spike-root button.primary {
+  min-width: 74px;
+  background: #e50914;
+  border-color: #e50914;
+  font-weight: 600;
+}
+
+.spike-root button.active {
+  background: rgba(229, 9, 20, 0.28);
+  border-color: #e50914;
+}
+
+.divider {
+  width: 1px;
+  height: 20px;
+  margin: 0 6px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.now-playing {
+  margin-top: 8px;
+  font-size: 12px;
+  opacity: 0.7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

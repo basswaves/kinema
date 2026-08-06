@@ -1,0 +1,441 @@
+/*
+ * The app window is transparent so mpv can render behind the webview, which
+ * means any full-screen view needs to supply its own background — otherwise
+ * you see straight through to the desktop.
+ */
+.library-root {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 22px;
+  overflow-y: auto;
+  background: #0b0b0d;
+  color: #f2f2f2;
+  font-size: 13px;
+}
+
+.library-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.library-header h1 {
+  margin: 0;
+  font-size: 20px;
+  letter-spacing: -0.01em;
+}
+
+.library-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.library-root button {
+  padding: 7px 13px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #f2f2f2;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.library-root button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.library-root button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.library-root button.primary {
+  background: #e50914;
+  border-color: #e50914;
+  font-weight: 600;
+}
+
+.library-error {
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: rgba(218, 54, 51, 0.9);
+  cursor: pointer;
+}
+
+.library-diagnosis {
+  padding: 10px 14px;
+  border: 1px solid rgba(88, 166, 255, 0.4);
+  border-radius: 8px;
+  background: rgba(56, 139, 253, 0.14);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  word-break: break-all;
+  cursor: pointer;
+}
+
+/* ---- settings ----------------------------------------------------------- */
+.settings-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.settings-panel label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+}
+
+.settings-panel input {
+  padding: 8px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.35);
+  color: inherit;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+}
+
+.settings-panel button {
+  align-self: flex-start;
+}
+
+/* ---- matched titles ----------------------------------------------------- */
+.titles-strip {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.title-card {
+  flex: 0 0 132px;
+  width: 132px;
+}
+
+.title-card img,
+.poster-placeholder {
+  width: 132px;
+  height: 198px;
+  object-fit: cover;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.poster-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  opacity: 0.4;
+}
+
+.title-card-name {
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.title-card-meta {
+  font-size: 11px;
+  opacity: 0.55;
+}
+
+.title-card-provider {
+  font-size: 10px;
+  opacity: 0.4;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.provider-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.provider-pill {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 11px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.provider-pill em {
+  font-size: 10px;
+  font-weight: 400;
+  font-style: normal;
+  opacity: 0.6;
+}
+
+.provider-pill.on {
+  background: rgba(46, 160, 67, 0.22);
+  color: #7ee787;
+}
+
+.provider-pill.off {
+  background: rgba(255, 255, 255, 0.06);
+  opacity: 0.6;
+}
+
+/* Flags the movie-artwork gap: OMDb supplies no backdrop at all. */
+.title-card-warn {
+  margin-top: 3px;
+  font-size: 10px;
+  color: #f0883e;
+  opacity: 0.9;
+}
+
+.muted {
+  opacity: 0.55;
+}
+
+.center {
+  text-align: center;
+  padding: 24px;
+}
+
+/* ---- roots -------------------------------------------------------------- */
+.library-roots {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.root-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.root-path {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 12px;
+}
+
+.kind {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.kind-movies {
+  background: rgba(56, 139, 253, 0.25);
+  color: #79c0ff;
+}
+
+.kind-tv {
+  background: rgba(163, 113, 247, 0.25);
+  color: #d2a8ff;
+}
+
+/* ---- stats -------------------------------------------------------------- */
+.library-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.library-stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 96px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.library-stats strong {
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.library-stats span {
+  font-size: 11px;
+  opacity: 0.55;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.library-stats .warn strong {
+  color: #f0883e;
+}
+
+.scan-report {
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 12px;
+}
+
+.scan-report ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+/* ---- table -------------------------------------------------------------- */
+.library-table-wrap {
+  flex: 1;
+  min-height: 0;
+}
+
+.table-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.table-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+}
+
+.library-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.library-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 8px 10px;
+  background: #131317;
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.library-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  vertical-align: top;
+}
+
+.library-table tr.problem {
+  background: rgba(240, 136, 62, 0.09);
+}
+
+.file-cell {
+  max-width: 420px;
+}
+
+.file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, Consolas, monospace;
+}
+
+.file-dir {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  opacity: 0.45;
+}
+
+.episode-name {
+  margin-top: 2px;
+  font-size: 11px;
+  opacity: 0.6;
+  font-style: italic;
+}
+
+.match-cell {
+  max-width: 340px;
+}
+
+.match-status {
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.match-matched {
+  background: rgba(46, 160, 67, 0.28);
+  color: #7ee787;
+}
+
+.match-unmatched {
+  background: rgba(240, 136, 62, 0.24);
+  color: #f0883e;
+}
+
+.match-parsed {
+  background: rgba(255, 255, 255, 0.08);
+  opacity: 0.7;
+}
+
+.match-reason {
+  margin-top: 3px;
+  font-size: 10px;
+  line-height: 1.4;
+  opacity: 0.6;
+  word-break: break-word;
+}
+
+.src {
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Highlighted because a parent-directory fallback is exactly the case worth
+   eyeballing for correctness. */
+.src-parent {
+  background: rgba(163, 113, 247, 0.25);
+  color: #d2a8ff;
+}
+
+.src-file {
+  background: rgba(255, 255, 255, 0.08);
+  opacity: 0.7;
+}

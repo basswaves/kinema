@@ -7,13 +7,15 @@
  * fresh show.
  */
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import Art from './Art';
+import FocusButton from './FocusButton';
 import type { ContinueItem } from '../player/api';
 
 interface Props {
   items: ContinueItem[];
   onResume: (item: ContinueItem) => void;
+  onRemove: (item: ContinueItem) => void;
 }
 
 function remainingLabel(item: ContinueItem): string {
@@ -23,7 +25,7 @@ function remainingLabel(item: ContinueItem): string {
   return mins > 0 ? `${mins} min left` : 'nearly done';
 }
 
-export default function ContinueRail({ items, onResume }: Props) {
+export default function ContinueRail({ items, onResume, onRemove }: Props) {
   const { ref, focusKey } = useFocusable({ trackChildren: true, saveLastFocusedChild: true });
 
   if (items.length === 0) return null;
@@ -34,7 +36,12 @@ export default function ContinueRail({ items, onResume }: Props) {
         <h2 className="rail-heading">Continue watching</h2>
         <div className="rail-track">
           {items.map((item) => (
-            <ContinueCard key={item.file_id} item={item} onResume={onResume} />
+            <ContinueCard
+              key={item.file_id}
+              item={item}
+              onResume={onResume}
+              onRemove={onRemove}
+            />
           ))}
         </div>
       </section>
@@ -42,15 +49,62 @@ export default function ContinueRail({ items, onResume }: Props) {
   );
 }
 
-function ContinueCard({ item, onResume }: { item: ContinueItem; onResume: (i: ContinueItem) => void }) {
-  const { ref, focused } = useFocusable({ onEnterPress: () => onResume(item) });
-  const element = useRef<HTMLDivElement | null>(null);
+/**
+ * One card: the artwork and text, plus a Remove control beneath it.
+ *
+ * The card is a focus container with two children rather than one focusable,
+ * for the reason in GOTCHAS.md — a focusable drawn *inside* another focusable
+ * cannot be reached by D-pad at all.
+ *
+ * Remove sits **below** the card rather than overlaid on the corner, and that
+ * is a navigation decision, not a visual one. Spatial movement is geometric: an
+ * overlaid button lies inside the card's own rectangle, so no direction can ever
+ * reach it. Below the card, Down reaches it and Left/Right still steps one card
+ * at a time — putting it beside the card would have doubled the presses needed
+ * to travel the rail.
+ */
+function ContinueCard({
+  item,
+  onResume,
+  onRemove,
+}: {
+  item: ContinueItem;
+  onResume: (i: ContinueItem) => void;
+  onRemove: (i: ContinueItem) => void;
+}) {
+  const { ref, focusKey, hasFocusedChild } = useFocusable({
+    trackChildren: true,
+    saveLastFocusedChild: true,
+  });
+
+  return (
+    <FocusContext.Provider value={focusKey}>
+      <div className={`continue-card ${hasFocusedChild ? 'card-active' : ''}`} ref={ref}>
+        <ContinueCardBody item={item} onResume={onResume} />
+        <FocusButton className="continue-remove" onSelect={() => onRemove(item)}>
+          ✕ Remove
+        </FocusButton>
+      </div>
+    </FocusContext.Provider>
+  );
+}
+
+function ContinueCardBody({
+  item,
+  onResume,
+}: {
+  item: ContinueItem;
+  onResume: (i: ContinueItem) => void;
+}) {
+  const { ref, focused } = useFocusable<object, HTMLDivElement>({
+    onEnterPress: () => onResume(item),
+  });
 
   useEffect(() => {
     if (focused) {
-      element.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
     }
-  }, [focused]);
+  }, [focused, ref]);
 
   const percent = item.duration_secs
     ? Math.min(100, (item.position_secs / item.duration_secs) * 100)
@@ -65,11 +119,8 @@ function ContinueCard({ item, onResume }: { item: ContinueItem; onResume: (i: Co
 
   return (
     <div
-      ref={(node) => {
-        ref.current = node;
-        element.current = node;
-      }}
-      className={`continue-card ${focused ? 'focused' : ''}`}
+      ref={ref}
+      className={`continue-body ${focused ? 'focused' : ''}`}
       onClick={() => onResume(item)}
       role="button"
       tabIndex={0}

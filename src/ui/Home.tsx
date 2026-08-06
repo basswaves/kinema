@@ -21,6 +21,7 @@ interface Props {
   onSelect: (title: Title) => void;
   onPlay: (title: Title) => void;
   onResume: (item: ContinueItem) => void;
+  onRemoveResumable: (item: ContinueItem) => void;
 }
 
 /** Minimum titles before a genre earns its own rail. */
@@ -33,7 +34,14 @@ const MIN_PER_GENRE = 2;
  */
 const HERO_PLAY_FOCUS_KEY = 'hero-play';
 
-export default function Home({ titles, resumable, onSelect, onPlay, onResume }: Props) {
+export default function Home({
+  titles,
+  resumable,
+  onSelect,
+  onPlay,
+  onResume,
+  onRemoveResumable,
+}: Props) {
   const { ref, focusKey } = useFocusable({ trackChildren: true, saveLastFocusedChild: true });
 
   const hero = useMemo(() => {
@@ -86,7 +94,7 @@ export default function Home({ titles, resumable, onSelect, onPlay, onResume }: 
 
         {/* First rail, as on any streaming service: the thing you were most
             recently in the middle of is what you probably want. */}
-        <ContinueRail items={resumable} onResume={onResume} />
+        <ContinueRail items={resumable} onResume={onResume} onRemove={onRemoveResumable} />
 
         <Rail heading="Recently added" titles={recentlyAdded} onSelect={onSelect} />
         <Rail heading="TV shows" titles={series} onSelect={onSelect} />

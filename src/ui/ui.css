@@ -326,15 +326,19 @@ html {
 }
 
 /* ---- continue watching --------------------------------------------------- */
+/* The card is a focus container; `.continue-body` is the half that plays. */
 .continue-card {
   flex: 0 0 16.75rem;
   width: 16.75rem;
+}
+
+.continue-body {
   cursor: pointer;
   transition: transform 140ms ease;
 }
 
-.continue-card:hover,
-.continue-card.focused {
+.continue-body:hover,
+.continue-body.focused {
   transform: scale(1.05);
 }
 
@@ -348,7 +352,7 @@ html {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
 }
 
-.continue-card.focused .continue-art {
+.continue-body.focused .continue-art {
   outline: var(--focus-ring) solid #fff;
   outline-offset: 2px;
 }
@@ -378,8 +382,8 @@ html {
   transition: opacity 140ms ease;
 }
 
-.continue-card:hover .continue-play,
-.continue-card.focused .continue-play {
+.continue-body:hover .continue-play,
+.continue-body.focused .continue-play {
   opacity: 1;
 }
 
@@ -417,6 +421,46 @@ html {
 .continue-remaining {
   font-size: 0.6875rem;
   opacity: 0.42;
+}
+
+/*
+ * Remove, below the card rather than overlaid on its corner.
+ *
+ * That is a navigation constraint, not a style choice: spatial focus is
+ * geometric, so a control drawn inside the card's own rectangle is unreachable
+ * from it in every direction. Below, Down reaches it and Left/Right still steps
+ * one card at a time.
+ *
+ * It keeps its space when invisible, so revealing it never shifts the rail.
+ */
+.continue-remove {
+  margin-top: 0.25rem;
+  padding: 0.125rem 0.4375rem;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  font-size: 0.6875rem;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 140ms ease, background 140ms ease;
+}
+
+.continue-card:hover .continue-remove,
+.continue-card.card-active .continue-remove {
+  opacity: 0.75;
+}
+
+.continue-remove:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.continue-remove.focused {
+  opacity: 1;
+  background: rgba(229, 9, 20, 0.9);
+  outline: var(--focus-ring) solid #fff;
+  outline-offset: 2px;
 }
 
 /* ---- detail ------------------------------------------------------------- */
@@ -1381,7 +1425,7 @@ html {
    halo sits outside the outline and gives it an edge to read against on any
    artwork, which matters far more at three metres than at fifty centimetres. */
 :root[data-tv='on'] .card.focused .card-art,
-:root[data-tv='on'] .continue-card.focused .continue-art {
+:root[data-tv='on'] .continue-body.focused .continue-art {
   box-shadow: 0 0 0 0.5rem rgba(0, 0, 0, 0.55), 0 8px 30px rgba(0, 0, 0, 0.7);
 }
 

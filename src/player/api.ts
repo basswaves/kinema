@@ -66,6 +66,16 @@ export const getProgress = (fileId: number) => invoke<Progress | null>('get_prog
 export const setWatched = (fileId: number, watched: boolean) =>
   invoke<void>('set_watched', { fileId, watched });
 
+/**
+ * Drop a file's resume point, taking it out of Continue Watching.
+ *
+ * Deliberately the same operation as un-watching rather than a second command
+ * beside it: the resume row *is* the history, so "stop offering me this" and
+ * "forget where I was" cannot sensibly disagree. Naming it separately is only
+ * so the call site reads as what the user asked for.
+ */
+export const forgetProgress = (fileId: number) => setWatched(fileId, false);
+
 export const continueWatching = (limit: number) =>
   invoke<ContinueItem[]>('continue_watching', { limit });
 

@@ -19,7 +19,7 @@ import Card from './Card';
 import FocusButton from './FocusButton';
 import Settings from './Settings';
 import Player, { type PlaybackTarget } from '../player/Player';
-import { continueWatching, type ContinueItem } from '../player/api';
+import { continueWatching, forgetProgress, type ContinueItem } from '../player/api';
 import { cacheArtwork } from '../metadata/api';
 import { runScanPipeline, useScanStatus } from '../library/pipeline';
 import { getTitleDetail, listTitles, type Title } from './api';
@@ -222,6 +222,26 @@ export default function Browse() {
     [resumable]
   );
 
+  /**
+   * Take an item out of Continue Watching.
+   *
+   * The rail is updated locally *and* reloaded: dropping the card immediately is
+   * what makes the press feel like it did something, and the reload is what
+   * keeps the list honest if anything else changed underneath.
+   */
+  const removeResumable = useCallback(
+    async (item: ContinueItem) => {
+      setResumable((current) => current.filter((i) => i.file_id !== item.file_id));
+      try {
+        await forgetProgress(item.file_id);
+      } catch (e) {
+        setError(String(e));
+      }
+      await load();
+    },
+    [load]
+  );
+
   const results = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return titles;
@@ -278,6 +298,7 @@ export default function Browse() {
             resumable={resumable}
             onSelect={(title) => setView({ name: 'detail', title })}
             onPlay={(title) => void playTitle(title)}
+            onRemoveResumable={(item) => void removeResumable(item)}
             onResume={(item) =>
               setView({
                 name: 'player',

@@ -200,6 +200,21 @@ image. The top row is the one place where the correct scroll position is
 absolute, not relative: see `scrollPageToTop` in `src/ui/focus.ts` and
 `keepInView="page-top"`.
 
+### A control overlaid on a card is unreachable, wherever you put it
+
+The corollary of the two entries above, and the one that decides layout. Spatial
+movement is geometric, so a button drawn *inside* another focusable's rectangle
+— a ✕ in the corner of a card, a badge on a thumbnail — cannot be reached from
+it in **any** direction: right needs the candidate's left edge past the current
+right edge, up needs its bottom edge above the current top edge, and an overlay
+satisfies none of them by construction.
+
+So the position of a secondary control is a navigation decision before it is a
+visual one. Continue Watching's **Remove** sits *below* its card rather than in
+the corner for exactly this reason — and below rather than beside, because in a
+horizontal rail a sibling to the right doubles the presses needed to travel the
+rail, while one below is reached by Down and costs nothing.
+
 ### Two focusables inside one row need a container, not adjacency
 
 The same geometry that stops focus reaching an overlay nav stops it reaching a

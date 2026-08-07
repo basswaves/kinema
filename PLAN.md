@@ -907,6 +907,31 @@ about six minutes of a 45-minute episode. `-ss` goes before `-i` so ffmpeg seeks
 rather than decoding and discarding. That is the difference between a season
 taking minutes and taking an hour.
 
+### Found by shipping it: the Up next card outliving its file
+
+A measured credits marker exposed a latent bug the guesses never could. The
+player nulled `timePos` and `duration` on a change of file, with a comment
+saying that stopped the previous episode's position leaking in. It could not:
+both are **observed properties**, so mpv pushed the outgoing file's values back
+within milliseconds — `loadfile` had not taken effect and the old file was still
+open and still reporting.
+
+So the *incoming* episode's credits start was compared against the *outgoing*
+episode's position, the segment read as active, and the Up next card went up
+thirty seconds into a fresh episode. It then never came down, because the offer
+effect only ever sets `upNext` — and nothing cleared it on a change of file
+either, only the countdown path that normally causes one.
+
+Fixed with a `fileReady` flag: false on a new target, true on `file-loaded`, and
+`active` is null until then. One gate covering the Skip button, automatic mode
+and the offer. The end-of-file handlers take the same gate through a ref — an
+`eof` arriving before the new file is open belongs to the old one, and acting on
+it would mark the incoming episode finished and roll straight past it.
+
+The lesson is in GOTCHAS and generalises past this feature: **clearing an
+observed property in React does not clear it**, and derived UI must be reset on
+the state change itself rather than on the path that usually produces it.
+
 ### One button
 
 Detect now runs Skiptro (if configured) and then the analysis, per TV folder,

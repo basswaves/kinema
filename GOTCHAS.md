@@ -113,6 +113,34 @@ downmix was found.
 **Do:** read `mpv.log` before theorising about the rendering path. Every claim
 in the stats panel was checked against it first.
 
+### Clearing an observed property in React does not clear it
+
+`Player.tsx` nulls `timePos` and `duration` when the target changes, with a
+comment explaining that it stops the previous file's position leaking into the
+new one. It does not, and cannot: **both are observed properties**, so mpv pushes
+the outgoing file's values straight back in — `loadfile` has not taken effect
+yet, so the old file is still open and still reporting. The React state is
+correct for a few milliseconds and then overwritten by the thing it was
+protecting against.
+
+This stayed invisible for as long as credits markers were guesses. A *measured*
+credits marker exposed it immediately: the incoming episode's credits start
+(~1360 s) was compared against the outgoing episode's position (~1400 s), the
+segment read as active, and the Up next card was raised. Nothing ever lowered
+it, because the offer effect only ever *sets* — so the card sat on top of a
+freshly started episode for its entire duration.
+
+**Do:** gate on whether the file mpv has open is the one you think it is.
+`fileReady` goes false on a target change and true on `file-loaded`, and
+`active` returns null until then — one check covering the Skip button, automatic
+mode and the Up next offer. The event handlers use a **ref** of the same flag,
+because re-registering mpv listeners to pick up a state change is its own
+gotcha, three entries above.
+
+**And:** clear derived UI on a target change, not only on the path that usually
+causes it. `upNext` was cleared when a countdown advanced and by nothing else,
+so every other route into a new file carried the old card in.
+
 ### `loadfile` is asynchronous
 
 Seeking immediately after it fails — there is nothing loaded yet. Decide the resume

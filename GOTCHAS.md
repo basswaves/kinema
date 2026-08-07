@@ -285,7 +285,40 @@ answers nothing, which looks exactly like the dead-key hang below.
 renders, styles, hovers and clicks perfectly while being completely unreachable
 by D-pad. Four of them survived several phases of development this way.
 
-**Do:** use `src/ui/FocusButton.tsx` in the browsing UI.
+**Do:** use `src/ui/FocusButton.tsx` in the browsing UI. The player OSD was the
+last place still holding eighteen of them — every control except the two
+prompts, including audio and subtitle selection, which is the one a remote needs
+most.
+
+### Two live key handlers cannot share the arrow keys
+
+The player binds its own `window` `keydown` for seeking; the spatial system
+binds one of its own at `init()`. Both fire on every press, and **`preventDefault`
+does not stop the other listener** — it is a separate handler on the same event,
+and the spatial system's was registered first, so even `stopImmediatePropagation`
+would be too late. Handling `ArrowLeft` in both places seeks *and* moves the
+focus ring on one press.
+
+**Do:** make exactly one of them live at a time. `pause()` and `resume()`,
+exported from the spatial navigation package, are the switch — the player starts
+paused so arrows seek, and `resume()`s only once Up hands the OSD focus. The
+player's own handler then has to `break` on every arrow *and* on `Enter`, or
+both handlers act again.
+
+**Also:** `resume()` before `setFocus()`. Navigation is ignored while paused, so
+focus aimed at a control the system is not yet listening for lands nowhere.
+
+**And:** `resume()` on unmount. The player pausing on the way in and not undoing
+it leaves the browsing UI underneath unable to navigate at all, with no error
+and nothing on screen to suggest why.
+
+### A focus ring that lies is worse than no focus ring
+
+The ring means "the arrow keys move between these". In the player that is only
+true in OSD focus mode; the rest of the time arrows seek. Whatever the spatial
+system believes is focused after the browsing UI unmounted beneath it, no
+control may show a ring outside that mode — `.player:not(.osd-focused) .focused`
+in `ui.css` enforces it.
 
 ---
 

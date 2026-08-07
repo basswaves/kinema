@@ -33,6 +33,9 @@ interface Props {
    * the pointer equivalent, a greyed-out button, at least looks disabled.
    */
   disabled?: boolean;
+  /** Pointer tooltip. A remote never sees it, so it must never be the only
+   *  place a control's meaning is written down. */
+  title?: string;
 }
 
 export default function FocusButton({
@@ -42,6 +45,7 @@ export default function FocusButton({
   focusKey,
   keepInView,
   disabled = false,
+  title,
 }: Props) {
   const { ref, focused } = useFocusable<object, HTMLButtonElement>({
     focusKey,
@@ -60,6 +64,7 @@ export default function FocusButton({
       ref={ref}
       className={`${className} ${focused ? 'focused' : ''}`.trim()}
       disabled={disabled}
+      title={title}
       onClick={onSelect}
     >
       {children}

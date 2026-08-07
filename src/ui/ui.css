@@ -1038,6 +1038,24 @@ html {
   pointer-events: none;
 }
 
+/*
+ * The focus ring means one specific thing: "the arrow keys move between these".
+ *
+ * In the player that is only true once the OSD has been given focus with Up —
+ * the rest of the time arrows seek, and the spatial system is paused. So no
+ * control may show a ring outside that mode, whatever the spatial system
+ * happens to believe is focused after the browsing UI unmounted beneath it. A
+ * ring that lies about what the arrows do is worse than no ring at all.
+ *
+ * Written as a suppression rather than by scoping each rule, because the
+ * shared `.btn-primary.focused` and `.back-button.focused` are defined for the
+ * browsing UI and are not the player's to rewrite.
+ */
+.player:not(.osd-focused) .focused {
+  outline: none;
+  transform: none;
+}
+
 .player-top,
 .player-controls {
   transition: opacity 260ms ease;
@@ -1129,6 +1147,16 @@ html {
   border-color: #e50914;
 }
 
+/* The D-pad ring, over video rather than over a page background — so it is a
+   solid white outline plus a lift of the button's own fill, because an outline
+   alone can land on a bright frame and disappear. `.btn-primary.focused` and
+   `.back-button.focused` already cover the play button and Back. */
+.player-buttons button.focused {
+  background: rgba(255, 255, 255, 0.24);
+  outline: var(--focus-ring) solid #fff;
+  outline-offset: 2px;
+}
+
 /* ---- resume toast -------------------------------------------------------- */
 .resume-toast {
   position: absolute;
@@ -1190,6 +1218,13 @@ html {
   cursor: pointer;
 }
 
+.track-panel-head button.focused,
+.stats-head button.focused {
+  background: rgba(255, 255, 255, 0.28);
+  outline: var(--focus-ring) solid #fff;
+  outline-offset: 2px;
+}
+
 .track-option {
   display: block;
   width: 100%;
@@ -1215,6 +1250,14 @@ html {
   background: rgba(229, 9, 20, 0.28);
   border-color: #e50914;
   font-weight: 600;
+}
+
+/* Inset rather than offset: these sit in a narrow scrolling column, and an
+   outward ring on the selected row would be clipped by the panel edge. */
+.track-option.focused {
+  background: rgba(255, 255, 255, 0.2);
+  outline: var(--focus-ring) solid #fff;
+  outline-offset: -1px;
 }
 
 .track-empty {
@@ -1403,6 +1446,7 @@ html {
 }
 
 .skip-button:hover,
+.skip-button.focused,
 .skip-button:focus-visible {
   background: #fff;
   border-color: #fff;

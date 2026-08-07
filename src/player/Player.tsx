@@ -359,12 +359,29 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   }, [target.titleId]);
 
   /**
+   * The only way out of the player, and the only place that gives the desktop
+   * back. Nothing in the browsing views can leave fullscreen, so landing on a
+   * fullscreen Home is a state with no way out of it except starting another
+   * video — which is why every exit path goes through here, including the ones
+   * nobody pressed a key for.
+   *
+   * Declared up here with `handlePlaybackEnded` for the same reason that one is:
+   * it is called from below, and defining it below only worked by accident of
+   * effect ordering.
+   */
+  const exit = useCallback(async () => {
+    const win = getCurrentWindow();
+    if (await win.isFullscreen()) await win.setFullscreen(false);
+    onExit();
+  }, [onExit]);
+
+  /**
    * End of file. Declared above the listener that calls it — defining it below
    * only worked by accident of effect ordering.
    */
   const handlePlaybackEnded = useCallback(async () => {
     if (target.fileId === null) {
-      onExit();
+      await exit();
       return;
     }
 
@@ -379,12 +396,12 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         setUpNext(next);
         setCountdown(NEXT_EPISODE_COUNTDOWN);
       } else {
-        onExit();
+        await exit();
       }
     } catch {
-      onExit();
+      await exit();
     }
-  }, [target.fileId, onExit]);
+  }, [target.fileId, exit]);
 
   // ---- react to mpv events ------------------------------------------------
   useEffect(() => {
@@ -874,9 +891,23 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     await win.setFullscreen(!(await win.isFullscreen()));
   }, []);
 
-  const exit = useCallback(async () => {
+  /**
+   * The last rung of the Back ladder. Fullscreen is a layer in exactly the way
+   * the panels are — something a key press put you into — so Back has to undo
+   * it before it is allowed to mean anything else. Leaving the player from
+   * fullscreen is then two presses, which is what every other video player on
+   * this machine does.
+   *
+   * The window is asked rather than a `useState` mirror because fullscreen can
+   * also change from outside this component — the title bar, Windows itself —
+   * and a mirror would quietly disagree the first time it did.
+   */
+  const backOut = useCallback(async () => {
     const win = getCurrentWindow();
-    if (await win.isFullscreen()) await win.setFullscreen(false);
+    if (await win.isFullscreen()) {
+      await win.setFullscreen(false);
+      return;
+    }
     onExit();
   }, [onExit]);
 
@@ -925,8 +956,12 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           void toggleFullscreen();
           break;
         // Back, one layer at a time: close whichever panel is open, then drop
-        // out of OSD focus, then leave the player. Anything else would make the
-        // only way out of a panel a mouse click.
+        // out of OSD focus, then leave fullscreen, then leave the player.
+        // Anything else would make the only way out of a panel a mouse click.
+        //
+        // Backspace is deliberately still the same key as Escape here: it is
+        // what a remote's Back button sends, and two Back keys that stop at
+        // different layers is the sort of split nobody remembers later.
         case 'Escape':
         case 'Backspace':
           e.preventDefault();
@@ -937,7 +972,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           } else if (osdFocus) {
             leaveOsdFocus();
           } else {
-            void exit();
+            void backOut();
           }
           break;
         // Up is what hands the arrow keys over. Once the OSD has them, every
@@ -1014,7 +1049,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   }, [
     togglePause,
     toggleFullscreen,
-    exit,
+    backOut,
     seekRelative,
     showOsd,
     skipPrompt,

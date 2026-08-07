@@ -43,15 +43,29 @@ breaking one, say so rather than quietly working around it.
 - **Nothing that needs periodic maintenance.** This has to run untended for
   years and may be published. `yt-dlp`, the Kodi YouTube resolver and an in-app
   embed with an ad blocker were all rejected on exactly this ground.
+  - **TheIntroDB is not an exception to this**, and the reason is worth keeping:
+    the app already needs TMDB to have a library at all, so a second read-only
+    metadata service is not a new class of dependency. It is used strictly on
+    their terms — one episode at a time when it is played, never the library in
+    bulk, cached with an expiry rather than kept, attribution in Settings — and
+    those terms are documented in `introdb.rs` rather than here, next to the
+    code that has to honour them. **Do not add a bulk prefetch**, however
+    tempting it looks for a "scan the whole library" button.
 - **No third-party binaries in the repo or the bundle.** Unchanged, and it is
   the rule that matters. What *has* moved: the app may now **invoke** a Skiptro
   the user installed themselves, at a path they chose, with the command lines
-  editable in Settings. It still ships nothing, downloads nothing and depends on
-  nothing being present — without a path set, intro skipping behaves exactly as
-  it did, reading whatever sidecars it finds. The templates are text fields
+  editable in Settings, and **read its database** at
+  `%APPDATA%\Skiptro\skiptro.db`. It still ships nothing, downloads nothing and
+  depends on nothing being present — without Skiptro, intro skipping falls back
+  to whatever sidecars it finds and to TheIntroDB. The templates are text fields
   precisely so a change to Skiptro's CLI is an edit, not a rebuild.
   Ask before downloading any binary. A Rust crate or npm package is a
   dependency, not a binary — but weigh it against the maintenance rule above.
+- **Sidecars are read, never written.** The `.skiptro.json` export is off by
+  default (an empty command template) because the app reads Skiptro's database
+  directly. Do not re-enable it to "make markers work" — that is the clutter the
+  current design exists to remove. The reader stays so any other producer of
+  that format still works.
 - **The window is transparent so mpv can render behind the webview.** Never give
   `html`, `body` or `#root` an opaque background — it hides the video entirely.
   Full-screen browsing views paint their own background; the player must not.

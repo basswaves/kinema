@@ -1,6 +1,7 @@
 mod artwork;
 mod db;
 mod detect;
+mod introdb;
 mod library;
 mod metadata;
 mod nfo;
@@ -8,6 +9,7 @@ mod playback;
 mod scanner;
 mod settings;
 mod skip;
+mod skiptro;
 mod trailer;
 
 use library::{Db, ScanDb};

@@ -162,6 +162,10 @@ CREATE TABLE artwork_cache (
 /// Schema version 5: cached intro/credits markers read from `.skiptro.json`
 /// sidecars next to the video files.
 ///
+/// **Superseded by V8**, which drops this table. Kept here because a fresh
+/// install still runs every migration in order, and a V6 database in the wild
+/// has to reach V8 by the same route.
+///
 /// Cached so playing an episode does not re-read a file over SMB every time.
 /// The sidecar's own size and mtime are stored with it, which is what keeps the
 /// cache honest: running the detector *after* a file has been played would
@@ -220,6 +224,49 @@ CREATE TABLE people (
 );
 
 CREATE INDEX idx_people_title ON people(title_id);
+"#;
+
+/// Schema version 8: skip markers stop being *the sidecar's* markers.
+///
+/// V5 keyed the cache on one sidecar's path, size and mtime, because a sidecar
+/// was the only thing that could produce a marker. There are now three sources
+/// — Skiptro's own database, a sidecar, and TheIntroDB — so the cache has to
+/// record which one won each segment, and it needs two different notions of
+/// staleness rather than one:
+///
+/// * `local_key` fingerprints whatever the **local** sources looked like when
+///   this row was written. It changes when Skiptro rescans or a sidecar is
+///   rewritten, which is what stops "no markers" being cached forever.
+/// * `remote_at` is when the **network** source was last asked. Local sources
+///   are free to re-read; a remote one must not be, so it is re-asked on a
+///   schedule instead of on every play.
+///
+/// The old table is dropped rather than migrated. It is a cache with no
+/// authority — every row in it can be rebuilt from the sources in one query —
+/// and carrying three sidecar columns forward to describe data that no longer
+/// comes from a sidecar would be a lie in the schema.
+const SCHEMA_V8: &str = r#"
+DROP TABLE IF EXISTS skip_markers;
+
+CREATE TABLE skip_markers (
+    file_id        INTEGER PRIMARY KEY REFERENCES media_files(id) ON DELETE CASCADE,
+
+    intro_start    REAL,
+    intro_end      REAL,
+    intro_source   TEXT,
+
+    credits_start  REAL,
+    -- NULL means "to the end of the file". Credits run to the end by
+    -- definition, and TheIntroDB says so with a null of its own; inventing a
+    -- number here would be inventing data.
+    credits_end    REAL,
+    credits_source TEXT,
+
+    local_key      TEXT    NOT NULL,
+    remote_at      INTEGER,
+
+    checked_at     INTEGER NOT NULL
+);
 "#;
 
 /// How long a statement waits for the write lock before giving up.
@@ -296,6 +343,11 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
     if version < 7 {
         conn.execute_batch(SCHEMA_V7)?;
         conn.execute_batch("PRAGMA user_version=7;")?;
+    }
+
+    if version < 8 {
+        conn.execute_batch(SCHEMA_V8)?;
+        conn.execute_batch("PRAGMA user_version=8;")?;
     }
 
     Ok(())

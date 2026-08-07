@@ -2,15 +2,16 @@
  * Intro/credits skip logic, kept out of the player component so it stays
  * testable by reading rather than by watching an episode.
  *
- * Intro markers come from a `.skiptro.json` sidecar produced separately;
- * nothing here detects one. See `src-tauri/src/skip.rs`.
+ * Markers arrive already ranked from `src-tauri/src/skip.rs`, which picks
+ * between Skiptro's database, a `.skiptro.json` sidecar and TheIntroDB. Nothing
+ * here detects anything.
  *
- * Credits are different, because **Skiptro 1.2.0 does not detect them at all**
- * — it emits an intro segment and nothing else. So the closing segment is
- * resolved here from whatever the file itself can be made to admit, in strict
- * order of how much it is worth trusting:
+ * What is still resolved here is the **fallback** for a credits segment,
+ * because a marker is not guaranteed: Skiptro cannot detect credits at all, and
+ * TheIntroDB only has them where somebody has submitted them. So the ladder
+ * continues, in strict order of how much each rung is worth trusting:
  *
- *  1. **The sidecar**, if some producer ever writes one. Measured, so it wins.
+ *  1. **A marker**, from `skip.rs`. Somebody measured or timed this; it wins.
  *  2. **A chapter that says so.** Many remuxes carry a named "End Credits"
  *     chapter. That is the author of the file stating where the credits are,
  *     which is evidence rather than inference.
@@ -51,8 +52,12 @@ export function activeSkip(
 
   const { intro, credits } = markers;
 
+  // An intro with no end has nowhere to seek to, so there is no skip to offer.
+  // Every source drops one, but the type allows it because credits genuinely
+  // have no end, and a check costs less than two segment types would.
   if (
     intro &&
+    intro.end !== null &&
     timePos >= intro.start &&
     timePos < intro.end - MIN_WORTH_SKIPPING_SECS
   ) {
@@ -75,8 +80,14 @@ export function hasAnyMarkers(markers: SkipMarkers | null): boolean {
 
 // ---- resolving a credits segment ------------------------------------------
 
-/** Where a credits segment came from, so the player can say. */
-export type CreditsSource = 'sidecar' | 'chapter' | 'tail';
+/**
+ * Where a credits segment came from, so the player can say.
+ *
+ * `introdb` and `sidecar` are decided in Rust and arrive on the markers;
+ * `chapter` and `tail` are resolved below. `skiptro-db` cannot appear — Skiptro
+ * has no credits type to report.
+ */
+export type CreditsSource = 'introdb' | 'sidecar' | 'chapter' | 'tail';
 
 /** Setting key: seconds before the end to assume credits. `'0'` turns it off. */
 export const CREDITS_TAIL_KEY = 'credits_tail_secs';
@@ -146,17 +157,23 @@ export function creditsFromChapters(chapters: Chapter[], duration: number | null
 }
 
 /**
- * Fold a resolved credits segment into the sidecar's markers.
+ * Fold a guessed credits segment into the markers, when nothing supplied one.
  *
- * Returns the markers unchanged when the sidecar already carries credits, and
- * reports which source won so the player can show it rather than leaving the
+ * Returns the markers unchanged when a real marker is already there, and
+ * reports which source won so the player can log it rather than leaving the
  * user to guess why an episode ended when it did.
  */
 export function withResolvedCredits(
   markers: SkipMarkers | null,
   inputs: CreditsInputs
 ): { markers: SkipMarkers | null; creditsSource: CreditsSource | null } {
-  if (markers?.credits) return { markers, creditsSource: 'sidecar' };
+  if (markers?.credits) {
+    // Rust already said where it came from. Fall back to 'sidecar' only for a
+    // marker with no source recorded, which is what a pre-existing cache row
+    // looks like.
+    const source = (markers.credits_source as CreditsSource | null) ?? 'sidecar';
+    return { markers, creditsSource: source };
+  }
 
   const { chapters, duration, tailSecs, allowTailGuess } = inputs;
 
@@ -182,8 +199,9 @@ export function withResolvedCredits(
   return {
     markers: {
       intro: markers?.intro ?? null,
+      intro_source: markers?.intro_source ?? null,
       credits,
-      sidecar: markers?.sidecar ?? null,
+      credits_source: source,
     },
     creditsSource: source,
   };

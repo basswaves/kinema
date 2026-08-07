@@ -185,6 +185,33 @@ commits every 500 files rather than once per root, and — more importantly —
 gathers file metadata *outside* the transaction. Stat calls over SMB are the
 slow part of a scan, and they were all happening with the write lock held.
 
+### `immutable=1` reports a WAL database as **empty**, with no error
+
+Reading another application's SQLite file — Skiptro's, in `skiptro.rs` — the
+obvious flag is `immutable=1`: it promises not to touch the file at all, which
+is exactly the guarantee you want over someone else's data.
+
+It also ignores the write-ahead log completely. Skiptro runs in WAL mode, so on
+this machine `skiptro.db` is **4 KB** and all twenty-four detections live in
+`skiptro.db-wal`. An immutable open therefore returns a database with no tables
+in it: every query fails with `no such table: DetectedSegments`, which reads
+exactly like "Skiptro has never scanned anything". Verified both ways against
+the real file.
+
+**Do:** `file:…?mode=ro`, which reads the WAL and still cannot write. It needs
+the `-shm` file to be present and readable; when it is not, the open *fails
+loudly*, which is the right failure.
+
+### A WAL database's mtime is not its version
+
+Following directly from the above: `skiptro.db` can go untouched through a scan
+that adds hundreds of rows, because they land in `skiptro.db-wal`. Any cache
+keyed on the main file's size and mtime looks completely correct and never
+notices new data — the same shape of bug as caching "no markers" forever.
+
+**Do:** stamp the `-wal` file too. `skiptro::version_stamp` covers both, and
+there is a test that fails if the `-wal` is dropped from it.
+
 ---
 
 ## Child processes
@@ -418,6 +445,24 @@ rather than from component state.
 
 `src/devlog.ts` forwards `console.*`, uncaught errors and unhandled rejections to
 `src-tauri/app.log`. Without it, frontend failures leave no external trace at all.
+
+### Confirmation at the top of a long page makes a working button look dead
+
+Settings shows one `settings-note` banner directly under its `<h1>`, and every
+action on the page writes to it. That is fine near the top and useless near the
+bottom: **Save commands** sits roughly 300 lines of markup further down, so
+pressing it saved three settings and put "Commands saved." somewhere entirely
+off screen. It was reported as a dead button, and reading the handler is the
+only thing that shows it is not — there is no error, and the state really did
+persist.
+
+**Do:** put a button's confirmation next to the button once the page is longer
+than a screen. `commandsSaved` renders "Saved." in the same row, and is cleared
+by any edit to the three fields so it always describes the current text rather
+than a previous press.
+
+**Note** the same banner still serves the shorter sections higher up, where it
+is genuinely visible from the control that wrote it.
 
 ---
 

@@ -2,22 +2,25 @@
 //!
 //! Skiptro is **not bundled and never will be** — no third-party binary enters
 //! this repo or its output. What this module does is run a copy the user has
-//! installed themselves, at a path they chose, so that generating sidecars stops
-//! being a separate chore in another window. The app still only ever *reads*
-//! `.skiptro.json`; `skip.rs` is unchanged and works identically whether the
-//! sidecars came from here, from Skiptro's own UI, or from something else.
-//!
-//! Two steps, because that is what Skiptro's CLI does:
+//! installed themselves, at a path they chose, so that detecting intros stops
+//! being a separate chore in another window.
 //!
 //!   skiptro scan <dir>      detect intros, into Skiptro's own database
-//!   skiptro export <dir>    write the .skiptro.json sidecars beside the videos
+//!   skiptro export <dir>    write .skiptro.json sidecars beside the videos
 //!
-//! Both are stored as **editable argument templates** rather than hard-coded.
-//! The maintenance rule that kept yt-dlp out applies here too: when a tool's
-//! command line changes, this should be a line of text in Settings, not a
-//! rebuild.
+//! **The export step is now off by default**, and that is the point of it being
+//! a template rather than a flag. `skip.rs` reads Skiptro's database directly,
+//! so the sidecars were one redundant file per episode sitting in the media
+//! folders for information the app could already ask for. An empty template
+//! means "do not run this step"; anyone who wants the sidecars — to feed some
+//! other player from the same scan — types `export {dir}` back in.
+//!
+//! Both templates are **editable text** rather than hard-coded. The maintenance
+//! rule that kept yt-dlp out applies here too: when a tool's command line
+//! changes, this should be a line of text in Settings, not a rebuild.
 
 use crate::library::Db;
+use crate::settings::setting;
 use serde::Serialize;
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
@@ -35,7 +38,10 @@ pub const SCAN_ARGS_KEY: &str = "skiptro_scan_args";
 pub const EXPORT_ARGS_KEY: &str = "skiptro_export_args";
 
 pub const DEFAULT_SCAN_ARGS: &str = "scan {dir}";
-pub const DEFAULT_EXPORT_ARGS: &str = "export {dir}";
+
+/// Empty: no export, no sidecars. See the module note — the app reads Skiptro's
+/// database, so exporting is now opt-in rather than the way markers arrive.
+pub const DEFAULT_EXPORT_ARGS: &str = "";
 
 #[derive(Serialize, Clone)]
 pub struct DetectProgress {
@@ -101,16 +107,6 @@ fn build_args(template: &str, dir: &str) -> Vec<String> {
         .into_iter()
         .map(|token| token.replace("{dir}", dir))
         .collect()
-}
-
-fn setting(conn: &rusqlite::Connection, key: &str) -> Option<String> {
-    conn.query_row(
-        "SELECT value FROM settings WHERE key = ?1",
-        rusqlite::params![key],
-        |r| r.get::<_, String>(0),
-    )
-    .ok()
-    .filter(|v| !v.trim().is_empty())
 }
 
 /// Run one Skiptro command, streaming its output to the frontend as it arrives.
@@ -197,8 +193,7 @@ fn drain<R: std::io::Read>(app: &tauri::AppHandle, step: &str, stream: R) -> Vec
     lines
 }
 
-/// Detect intros for one library root, then export the sidecars beside the
-/// videos.
+/// Detect intros for one library root.
 ///
 /// Long-running by nature, so the work happens off the main thread. The Skiptro
 /// process touches *its own* database and the media folders; nothing here writes
@@ -233,6 +228,13 @@ pub async fn detect_intros(
 
         for (name, template) in [("scan", &scan_args), ("export", &export_args)] {
             let args = build_args(template, &root_path);
+            // An empty template is "skip this step", which is how exporting is
+            // switched off. Running the executable with no arguments at all
+            // would print its help and exit 1, reporting a failure that never
+            // happened.
+            if args.is_empty() {
+                continue;
+            }
             let report = run_step(&app, &exe, name, &args)?;
             let failed = report.exit_code != Some(0);
             steps.push(report);
@@ -287,8 +289,12 @@ mod tests {
         assert_eq!(args, vec!["export", r"D:\My Shows"]);
     }
 
+    /// How the export step is turned off: no arguments means the step is
+    /// skipped rather than run bare.
     #[test]
     fn an_empty_template_produces_no_arguments() {
         assert!(tokenise("   ").is_empty());
+        assert!(build_args("", r"C:\media").is_empty());
+        assert!(build_args(super::DEFAULT_EXPORT_ARGS, r"C:\media").is_empty());
     }
 }

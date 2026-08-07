@@ -43,14 +43,27 @@ export interface EpisodeRef {
 
 export interface Segment {
   start: number;
-  end: number;
+  /**
+   * `null` means "to the end of the file". Credits do exactly that, and
+   * TheIntroDB states it with a null of its own rather than a number, so
+   * storing one here would be inventing data.
+   *
+   * An **intro** always has a real end — every source drops one that does not,
+   * since there would be nowhere for Skip to seek to.
+   */
+  end: number | null;
 }
 
 export interface SkipMarkers {
   intro: Segment | null;
   credits: Segment | null;
-  /** Which sidecar these came from, for diagnostics. */
-  sidecar: string | null;
+  /**
+   * Which source each segment came from — `skiptro-db`, `sidecar` or
+   * `introdb`. Diagnostic: a skip that fires somewhere surprising should be
+   * traceable to the thing that claimed it, without reading the database.
+   */
+  intro_source: string | null;
+  credits_source: string | null;
 }
 
 export interface TitlePrefs {
@@ -128,6 +141,12 @@ export const getTitlePrefs = (titleId: number) =>
 export const setTitlePrefs = (titleId: number, prefs: TitlePrefs) =>
   invoke<void>('set_title_prefs', { titleId, prefs });
 
-/** Null when the file has no `.skiptro.json` sidecar beside it. */
+/**
+ * Intro and credits markers, from whichever source has them.
+ *
+ * Null when no source does. Rust ranks Skiptro's database, a `.skiptro.json`
+ * sidecar and TheIntroDB and returns the winner per segment, so there is one
+ * call here regardless of how many sources are configured.
+ */
 export const getSkipMarkers = (path: string, fileId: number | null) =>
   invoke<SkipMarkers | null>('get_skip_markers', { path, fileId });

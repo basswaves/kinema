@@ -49,13 +49,33 @@ it is a decision rather than an improvement. **Ask before enabling it.**
 
 ### Minimum confidence for skip markers
 
-`.skiptro.json` carries a `confidence` value nothing reads. A skip fired on a bad
-detection jumps over real content — the same class of silent wrongness as a bad
-metadata match. Needs a low-confidence sample to calibrate against; every marker
-in the library so far reports `1`.
+Skiptro records a `Confidence` per detection and nothing acts on it. A skip fired
+on a bad detection jumps over real content — the same class of silent wrongness
+as a bad metadata match. Needs a low-confidence sample to calibrate against;
+every detection in the library so far reports `1`.
 
-Now more likely to come up than it was, since detection can be run from inside
-the app over a whole library rather than by hand on one season at a time.
+Half-done: `skip.rs` now logs `skiptro: confidence <n> for <file>` for anything
+below 1, which is how the missing sample gets found. Once there is one, the
+threshold goes in the same place.
+
+### Own intro/credits detection, if the sources leave a gap
+
+The deferred third option from the marker work — see PLAN, *Where markers come
+from*. Fingerprint every episode in a season, find the audio they share, sharpen
+the boundary with black-frame detection. It is the only approach that produces
+its own answer, works on files with **no metadata match at all**, and finds
+credits as well as intros.
+
+The groundwork is unusually favourable and worth not re-deriving: `ffmpeg 8.1.2`
+on this machine is built `--enable-chromaprint` and has the muxer, and
+`rusty-chromaprint` (MIT, pure Rust) already exposes `match_fingerprints`.
+Symphonia alone is not enough — no AC-3, E-AC-3, DTS or TrueHD, which is most of
+a remux library — so ffmpeg does the decoding. Jellyfin's intro-skipper is
+**GPL-3.0**: the method is documented and reusable, the code is not.
+
+Reasons to leave it: weeks of work, and its failure mode is a threshold slightly
+wrong and a skip over real dialogue. Reasons to do it: TheIntroDB has no credits
+for Sex and the City, and no answer at all for an unmatched file.
 
 ### Delete `src/spike/`
 
@@ -89,8 +109,13 @@ the current behaviour annoys them.
   logs `nfo: nothing usable in <path>` rather than failing silently.
 - **A credits chapter to calibrate against** — the chapter source for end-credit
   skipping cannot be confirmed until a file actually carries a chapter named for
-  its credits. Until then the tail guess is what fires; `credits marker from
-  <source>` in `app.log` says which won.
+  its credits. `credits marker from <source>` in `app.log` says which won, and
+  `intro marker from <source>` does the same for the intro.
+- **A credits marker from TheIntroDB, in this library** — the source is verified
+  against the live API (Breaking Bad S01E01 returns one) but **Sex and the City
+  has none**, and it is the only series here. So on this machine the tail guess
+  is still what fires for credits, and the introdb credits path is untested
+  against a real playback. Any show with community credits data confirms it.
 - **Real TV overscan**, and whether `--ui-scale: 1.45` is right at sofa
   distance. Both need a TV; the value is one constant in `ui.css`.
 - **Behaviour at scale** — the library is small. Rails cap at 30 with a "See

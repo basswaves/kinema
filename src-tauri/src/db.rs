@@ -269,6 +269,36 @@ CREATE TABLE skip_markers (
 );
 "#;
 
+/// Schema version 9: segments this app detected itself.
+///
+/// Kept in its own table rather than as more columns on `skip_markers`, because
+/// the two have different lifetimes. `skip_markers` is a **cache** — every row
+/// is rebuildable in one query and it is dropped wholesale when its shape
+/// changes. This is the opposite: minutes of ffmpeg and fingerprinting per
+/// season, and losing it means doing that again.
+///
+/// A row whose four segment columns are all NULL is meaningful: "analysed, and
+/// there is no intro or credits here". Without it a show that genuinely has no
+/// intro would be re-analysed on every run, forever.
+///
+/// `file_size` and `file_mtime` are copied from `media_files` at analysis time
+/// so a replaced file is re-analysed rather than keeping markers measured
+/// against bytes that are gone.
+const SCHEMA_V9: &str = r#"
+CREATE TABLE analysed_segments (
+    file_id       INTEGER PRIMARY KEY REFERENCES media_files(id) ON DELETE CASCADE,
+
+    intro_start   REAL,
+    intro_end     REAL,
+    credits_start REAL,
+    credits_end   REAL,
+
+    file_size     INTEGER NOT NULL,
+    file_mtime    INTEGER NOT NULL,
+    analysed_at   INTEGER NOT NULL
+);
+"#;
+
 /// How long a statement waits for the write lock before giving up.
 ///
 /// Load-bearing from the moment there is more than one connection. SQLite
@@ -348,6 +378,11 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
     if version < 8 {
         conn.execute_batch(SCHEMA_V8)?;
         conn.execute_batch("PRAGMA user_version=8;")?;
+    }
+
+    if version < 9 {
+        conn.execute_batch(SCHEMA_V9)?;
+        conn.execute_batch("PRAGMA user_version=9;")?;
     }
 
     Ok(())

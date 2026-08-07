@@ -741,8 +741,9 @@ intros**, so the end of an episode was never a measured thing.
 
 Three options were looked at properly before any code was written.
 
-**Jellyfin's intro-skipper**, reimplemented here. Rejected *for now*, not on
-merit. Its method — fingerprint every episode in a season, find the stretch of
+**Jellyfin's intro-skipper**, reimplemented here. Deferred at the time, then
+**built** — see [Detecting intros and credits in the app](#detecting-intros-and-credits-in-the-app-).
+Its method — fingerprint every episode in a season, find the stretch of
 audio they share, then sharpen the boundary with black-frame detection — is the
 only one of the three that produces its own answer, works on files with no
 metadata match at all, and finds credits as well as intros. Three things count
@@ -834,6 +835,86 @@ database path is read during **playback**, not by detect at all.
 So the fields now save themselves on a 600 ms debounce, like every other control
 on the page, and the button is gone. `runDetect` flushes them before invoking
 Rust, which turns the debounce from a race into a courtesy.
+
+## Detecting intros and credits in the app ✅
+
+The deferred third option, built. `analyse.rs` fingerprints the audio of every
+episode in a season and looks for the stretch they have in common: near the
+start that is the intro, near the end it is the closing theme. It is the only
+source that finds credits by *measuring* them, and the only one that works on a
+file with no metadata match at all.
+
+**Why it stopped being deferred:** the other two left exactly the gap it fills.
+TheIntroDB has no credits for Sex and the City, which is the only series in this
+library, so the closing segment was still the fenced tail guess in practice.
+
+### What was taken from intro-skipper, and what could not be
+
+Its code is GPL-3.0 C# and none of it is here. Its **published operating values**
+are, and they are what turned this from months of guessing into an afternoon:
+intro searched in the first 25% of an episode or the first 10 minutes, whichever
+is smaller; intro 15 s–2 min; credits under about 4 minutes. Those are facts
+about how television is cut, and they transferred unchanged.
+
+What could not transfer is the layer below — the score threshold that decides
+whether two fingerprint frames match, and how far apart two candidates can be
+and still be the same segment. Those are calibrated against the fingerprints
+Jellyfin's ffmpeg emits; `rusty-chromaprint` produces a different fingerprint, so
+their numbers are not on the same scale. `MAX_SCORE = 8.0` and a 3-second
+cluster tolerance were set by running the real season, and
+`calibrate_against_a_real_season` — `#[ignore]`d, because it needs media — is
+how to re-check them.
+
+### Agreement, not detection
+
+Nothing is believed from one comparison. A segment must appear between an
+episode and at least two *others* before it becomes a marker, and the reported
+time is the median of that cluster rather than any single measurement. One
+episode that happens to open on a similar chord cannot produce a marker alone —
+which matters, because a wrong intro marker skips content the viewer never sees.
+
+### Verified against the real library
+
+Twelve episodes, one season, ~13 s each:
+
+- **Intro** `0.0 → 45.6–45.8` on all twelve. Skiptro independently says
+  `0.19 → 45.5–46.7`; TheIntroDB says `46.0`. Three methods, one answer.
+- **Credits** ~69.3 s long, starting ~80 s before the end, on eleven of twelve —
+  consistent to a tenth of a second.
+- **The pilot is the exception**, and instructively so: it shares only the final
+  27.7 s with the others because its credit music differs, so its marker fires
+  *late* rather than early. That is the failure direction to have — a late offer
+  costs a few seconds of credits, an early one costs the end of the episode.
+
+### Ordering: Skiptro first, by decision not by measurement
+
+Both fingerprint the same bytes on the same disk, and on real content they agree
+within a second. Skiptro is ranked above anyway, because it has years of tuning
+behind it and because ranking the newer thing second means **it cannot regress
+an intro skip that already works**. When they disagree, `app.log` names which
+spoke. For credits there is no contest: Skiptro has none.
+
+### ffmpeg, and why not pure Rust
+
+`rusty-chromaprint` is pure Rust and MIT, so fingerprinting needs nothing
+external. Decoding does. Symphonia cannot read AC-3, E-AC-3, DTS or TrueHD,
+which is most of a remux library, and a detector that silently skipped every
+remux would be worse than none. ffmpeg has the same standing as Skiptro:
+invoked, never shipped, path configurable, and skipped entirely when absent.
+
+Only *windows* are decoded — the opening quarter and the closing eight minutes,
+about six minutes of a 45-minute episode. `-ss` goes before `-i` so ffmpeg seeks
+rather than decoding and discarding. That is the difference between a season
+taking minutes and taking an hour.
+
+### One button
+
+Detect now runs Skiptro (if configured) and then the analysis, per TV folder,
+reporting both through the same progress stream. It is no longer hidden when
+Skiptro is unset, because the analysis needs only ffmpeg — gating the detector on
+a tool it does not use would hide it from anyone who never installs that tool.
+A season whose every file is already analysed against its current bytes is
+skipped, so the second run costs nothing.
 
 Sidecars are still **read** and no longer **written**. The export step became an
 empty template — "do not run this" — rather than a deleted feature, so anyone

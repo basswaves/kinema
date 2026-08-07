@@ -34,4 +34,9 @@ walkdir = "2.5.0"
 quick-xml = "0.38"
 tauri-plugin-dialog = "2"
 tauri-plugin-http = "2"
+# Pure Rust, MIT, no C library. The audio fingerprinting behind intro/credits
+# detection — and the reason a detector can live in this app at all rather than
+# being another installed tool. Decoding still needs ffmpeg (see ffmpeg.rs):
+# Symphonia cannot read AC-3, E-AC-3, DTS or TrueHD, which is most of a remux.
+rusty-chromaprint = "0.3.0"
 

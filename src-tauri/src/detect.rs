@@ -193,11 +193,140 @@ fn drain<R: std::io::Read>(app: &tauri::AppHandle, step: &str, stream: R) -> Vec
     lines
 }
 
-/// Detect intros for one library root.
+/// Run this app's own audio analysis over a library root.
 ///
-/// Long-running by nature, so the work happens off the main thread. The Skiptro
-/// process touches *its own* database and the media folders; nothing here writes
-/// to this app's database at all, which is why no lock is held for the duration.
+/// Reported as one more step so the UI needs no second button and no second
+/// progress display. It is deliberately **not** fatal: a missing ffmpeg or an
+/// unreadable season leaves whatever Skiptro found intact, which is the same
+/// arrangement every other source has.
+fn run_analysis(app: &tauri::AppHandle, root_path: &str) -> StepReport {
+    let mut tail: Vec<String> = Vec::new();
+    let mut say = |line: String| {
+        let _ = app.emit(
+            PROGRESS_EVENT,
+            DetectProgress {
+                step: "analyse".into(),
+                line: line.clone(),
+            },
+        );
+        tail.push(line);
+    };
+
+    let (ffmpeg_path, root_id) = {
+        let db = app.state::<Db>();
+        let Ok(conn) = db.0.lock() else {
+            say("could not read settings".into());
+            return step("analyse", None, tail);
+        };
+        let ffmpeg_path = crate::ffmpeg::resolve(setting(&conn, crate::ffmpeg::PATH_KEY).as_deref());
+        let root_id: Option<i64> = conn
+            .query_row(
+                "SELECT id FROM library_roots WHERE path = ?1",
+                rusqlite::params![root_path],
+                |r| r.get(0),
+            )
+            .ok();
+        (ffmpeg_path, root_id)
+    };
+
+    let Some(root_id) = root_id else {
+        say(format!("no library root matches {root_path}"));
+        return step("analyse", None, tail);
+    };
+
+    if !crate::ffmpeg::is_available(&ffmpeg_path) {
+        say(format!(
+            "ffmpeg not found at '{}' — set its location in Settings, or leave it blank to use PATH",
+            ffmpeg_path.display()
+        ));
+        return step("analyse", None, tail);
+    }
+
+    // The season list is taken under the lock and the lock is then released.
+    // Analysis is minutes of ffmpeg per season and must not hold the database
+    // against the rest of the app — the same rule the scanner follows.
+    let seasons = {
+        let db = app.state::<Db>();
+        let Ok(conn) = db.0.lock() else {
+            say("could not read the library".into());
+            return step("analyse", None, tail);
+        };
+        match crate::analyse::seasons_in_root(&conn, root_id) {
+            Ok(seasons) => seasons,
+            Err(e) => {
+                say(format!("could not list episodes: {e}"));
+                return step("analyse", None, tail);
+            }
+        }
+    };
+
+    if seasons.is_empty() {
+        say("nothing new to analyse".into());
+        return step("analyse", Some(0), tail);
+    }
+
+    let mut found = 0usize;
+
+    for season in &seasons {
+        say(format!(
+            "{}: {} episodes",
+            season.label,
+            season.episodes.len()
+        ));
+
+        let results = crate::analyse::analyse_season(&ffmpeg_path, &season.episodes, |line| {
+            let _ = app.emit(
+                PROGRESS_EVENT,
+                DetectProgress {
+                    step: "analyse".into(),
+                    line,
+                },
+            );
+        });
+
+        found += results.iter().filter(|a| !a.is_empty()).count();
+
+        let db = app.state::<Db>();
+        let Ok(conn) = db.0.lock() else {
+            say("could not save results".into());
+            return step("analyse", None, tail);
+        };
+        if let Err(e) = crate::analyse::store(&conn, &season.episodes, &results, now_secs()) {
+            say(format!("could not save {}: {e}", season.label));
+        }
+    }
+
+    say(format!("analysed {} episodes with markers", found));
+    step("analyse", Some(0), tail)
+}
+
+fn step(name: &str, exit_code: Option<i32>, mut tail: Vec<String>) -> StepReport {
+    if tail.len() > TAIL_LINES {
+        tail.drain(..tail.len() - TAIL_LINES);
+    }
+    StepReport {
+        step: name.to_string(),
+        exit_code,
+        tail,
+    }
+}
+
+fn now_secs() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
+}
+
+/// Detect intros and credits for one library root.
+///
+/// Two producers behind one button. Skiptro finds intros by fingerprinting
+/// against its own model; this app's analysis finds intros *and credits* by
+/// comparing the episodes to each other. Neither is required — with no Skiptro
+/// configured the first is skipped, with no ffmpeg the second is, and with
+/// neither the button simply reports that there was nothing to run.
+///
+/// Long-running by nature, so the work happens off the main thread.
 #[tauri::command]
 pub async fn detect_intros(
     app: tauri::AppHandle,
@@ -206,46 +335,53 @@ pub async fn detect_intros(
     let (exe, scan_args, export_args) = {
         let db = app.state::<Db>();
         let conn = db.0.lock().map_err(to_string_err)?;
-        let exe = setting(&conn, PATH_KEY).ok_or_else(|| {
-            "No Skiptro executable chosen — set one in Settings → Intro detection.".to_string()
-        })?;
         (
-            exe,
+            setting(&conn, PATH_KEY),
             setting(&conn, SCAN_ARGS_KEY).unwrap_or_else(|| DEFAULT_SCAN_ARGS.to_string()),
             setting(&conn, EXPORT_ARGS_KEY).unwrap_or_else(|| DEFAULT_EXPORT_ARGS.to_string()),
         )
     };
 
-    if !std::path::Path::new(&exe).is_file() {
-        return Err(format!("Skiptro executable not found: {exe}"));
-    }
     if !std::path::Path::new(&root_path).is_dir() {
         return Err(format!("folder not reachable: {root_path}"));
+    }
+    if let Some(exe) = &exe {
+        if !std::path::Path::new(exe).is_file() {
+            return Err(format!("Skiptro executable not found: {exe}"));
+        }
     }
 
     tauri::async_runtime::spawn_blocking(move || {
         let mut steps = Vec::new();
 
-        for (name, template) in [("scan", &scan_args), ("export", &export_args)] {
-            let args = build_args(template, &root_path);
-            // An empty template is "skip this step", which is how exporting is
-            // switched off. Running the executable with no arguments at all
-            // would print its help and exit 1, reporting a failure that never
-            // happened.
-            if args.is_empty() {
-                continue;
-            }
-            let report = run_step(&app, &exe, name, &args)?;
-            let failed = report.exit_code != Some(0);
-            steps.push(report);
-            // Exporting after a failed scan would write sidecars from stale
-            // detections, or none at all while reporting success.
-            if failed {
-                return Ok(DetectReport { ok: false, steps });
+        // Skiptro first, when there is one. Its intro outranks the analysis
+        // below, so running it first means the better answer is already in
+        // place by the time anything reads either.
+        if let Some(exe) = exe {
+            for (name, template) in [("scan", &scan_args), ("export", &export_args)] {
+                let args = build_args(template, &root_path);
+                // An empty template is "skip this step", which is how exporting
+                // is switched off. Running the executable with no arguments at
+                // all would print its help and exit 1, reporting a failure that
+                // never happened.
+                if args.is_empty() {
+                    continue;
+                }
+                let report = run_step(&app, &exe, name, &args)?;
+                let failed = report.exit_code != Some(0);
+                steps.push(report);
+                // Exporting after a failed scan would write sidecars from stale
+                // detections, or none at all while reporting success.
+                if failed {
+                    return Ok(DetectReport { ok: false, steps });
+                }
             }
         }
 
-        Ok(DetectReport { ok: true, steps })
+        steps.push(run_analysis(&app, &root_path));
+
+        let ok = steps.iter().all(|s| s.exit_code == Some(0));
+        Ok(DetectReport { ok, steps })
     })
     .await
     .map_err(to_string_err)?

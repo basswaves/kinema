@@ -58,24 +58,29 @@ Half-done: `skip.rs` now logs `skiptro: confidence <n> for <file>` for anything
 below 1, which is how the missing sample gets found. Once there is one, the
 threshold goes in the same place.
 
-### Own intro/credits detection, if the sources leave a gap
+### Black-frame refinement for the credits boundary
 
-The deferred third option from the marker work — see PLAN, *Where markers come
-from*. Fingerprint every episode in a season, find the audio they share, sharpen
-the boundary with black-frame detection. It is the only approach that produces
-its own answer, works on files with **no metadata match at all**, and finds
-credits as well as intros.
+`analyse.rs` finds the credits from shared audio, which puts the marker where the
+closing *theme* starts. intro-skipper also runs ffmpeg's `blackdetect` to snap
+the boundary to the fade-to-black, which is where the credits visually begin.
 
-The groundwork is unusually favourable and worth not re-deriving: `ffmpeg 8.1.2`
-on this machine is built `--enable-chromaprint` and has the muxer, and
-`rusty-chromaprint` (MIT, pure Rust) already exposes `match_fingerprints`.
-Symphonia alone is not enough — no AC-3, E-AC-3, DTS or TrueHD, which is most of
-a remux library — so ffmpeg does the decoding. Jellyfin's intro-skipper is
-**GPL-3.0**: the method is documented and reusable, the code is not.
+Worth having for the case this library already shows: the Sex and the City pilot
+shares only its final 27.7 s with the other episodes, because its credit music
+differs, so its marker lands late. A black frame would find the real edge. Not
+urgent — late is the safe direction — but it is the obvious next increment, and
+it needs a second ffmpeg pass rather than any new machinery.
 
-Reasons to leave it: weeks of work, and its failure mode is a threshold slightly
-wrong and a skip over real dialogue. Reasons to do it: TheIntroDB has no credits
-for Sex and the City, and no answer at all for an unmatched file.
+### Retiring Skiptro
+
+Now genuinely on the table. `analyse.rs` does everything Skiptro does and finds
+credits as well, on the same files, agreeing within a second. Skiptro is ranked
+first for intros deliberately, so nothing regressed — but if a few months of use
+show no case where it wins, dropping it removes an external binary, a private
+schema read at `%APPDATA%\Skiptro\skiptro.db`, and the whole `detect.rs` command
+template arrangement.
+
+**Do not do this on one season's evidence.** The comparison it needs is a
+library with several shows in it.
 
 ### Delete `src/spike/`
 
@@ -113,9 +118,17 @@ the current behaviour annoys them.
   `intro marker from <source>` does the same for the intro.
 - **A credits marker from TheIntroDB, in this library** — the source is verified
   against the live API (Breaking Bad S01E01 returns one) but **Sex and the City
-  has none**, and it is the only series here. So on this machine the tail guess
-  is still what fires for credits, and the introdb credits path is untested
-  against a real playback. Any show with community credits data confirms it.
+  has none**, and it is the only series here. The app's own analysis now supplies
+  the credits instead, so the introdb credits path is still untested against a
+  real playback. Any show with community credits data confirms it.
+- **`analyse.rs` on a second show** — verified thoroughly on one season and not
+  at all on anything else. The numbers there are excellent (see PLAN), but a
+  single season cannot tell you whether `MAX_SCORE = 8.0` holds for a show with
+  a quiet intro, a spoken cold open, or no closing theme. `calibrate_against_a_real_season`
+  is the tool: point `PN_SEASON_DIR` at a folder and run it with `--ignored`.
+- **A season where Skiptro and `analyse.rs` disagree** — they agree within a
+  second on everything here, so the ranking between them has never actually been
+  exercised. `intro marker from <source>` in `app.log` is what to watch.
 - **Real TV overscan**, and whether `--ui-scale: 1.45` is right at sofa
   distance. Both need a TV; the value is one constant in `ui.css`.
 - **Behaviour at scale** — the library is small. Rails cap at 30 with a "See

@@ -15,7 +15,7 @@ thin client that does nothing without a Jellyfin server running.
   before touching the player or D-pad navigation. Every entry cost a real debugging
   round, and most describe failures that produce no error at all.
 - **[HANDOVER.md](HANDOVER.md)** — what is left, and what each remaining item is blocked
-  on.
+  on. The **only** place open items live.
 
 ## Status
 
@@ -39,6 +39,12 @@ thin client that does nothing without a Jellyfin server running.
 | Launchable exe | **Done.** `npm run app:build` → portable folder + desktop shortcut, no installer |
 | Creator's-intent audit | **Done.** Verified against mpv's own verbose log; `deinterlace=auto` added, 24p cadence reported, frame-timing switch |
 | Continue Watching removal | **Done.** Per-card Remove below the card, where a D-pad can actually reach it; window opens maximised |
+| Continue Watching "next up" | **Done.** A finished episode hands the rail on to the next one instead of the show vanishing; one card per show |
+| Player OSD by remote | **Done.** Up hands the arrows to the OSD, Escape hands them back — subtitles reachable without a mouse |
+| Scan without freezing | **Done.** The scanner has its own connection; `busy_timeout` set; metadata gathered outside the transaction |
+| Browsing at scale | **Done.** Rails cap at 30 with a "See all" grid; guessit-js off the startup bundle; Settings counts instead of fetching |
+| Logos + cast | **Done.** Title treatment on the hero, cast row on detail pages — both free on the TMDB request already made |
+| Intro detection in-app | **Done.** Runs a Skiptro you installed yourself, at a path you chose. Nothing bundled |
 
 ## Setup
 
@@ -91,32 +97,43 @@ Full-screen browsing views paint their own background; the player must not.
 
 ```
 src-tauri/src/
-  db.rs          SQLite schema + migrations (user_version, currently 6)
+  db.rs          SQLite schema + migrations (user_version, currently 7).
+                 busy_timeout is load-bearing: two connections exist
   scanner.rs     Filesystem walk. NAS-aware: identity is (path, size, mtime),
-                 never a content hash — never read file bytes during a scan
-  library.rs     Roots, scan, parse write-back, stats
-  metadata.rs    Titles, episodes, file→title links, detail queries
-  playback.rs    Resume points, Continue Watching, watched state, the
-                 adjacent-episode lookup (both directions), track prefs
-  artwork.rs     Downloads posters/backdrops/stills into app data, keyed by
-                 remote URL; served back through the asset protocol
+                 never a content hash — never read file bytes during a scan.
+                 Gathers metadata outside the transaction and commits in
+                 batches, so the write lock is never held for network I/O
+  library.rs     Roots, scan, parse write-back, stats. Owns both `Db` and
+                 `ScanDb` — the scanner's separate connection
+  metadata.rs    Titles, episodes, cast, file→title links, detail queries
+  playback.rs    Resume points, Continue Watching (part-watched *and* next-up),
+                 watched state, the adjacent-episode lookup shared by three
+                 callers, track prefs
+  artwork.rs     Downloads posters/backdrops/logos/stills/cast faces into app
+                 data, keyed by remote URL; served back through the asset
+                 protocol
   skip.rs        Reads .skiptro.json sidecars for intro/credits markers,
                  cached against the sidecar's own size and mtime
+  detect.rs      Runs the user's own Skiptro to *produce* those sidecars.
+                 Nothing is bundled; the command lines are settings
   trailer.rs     Finds local trailer files by Jellyfin/Kodi convention; the
                  scanner shares its test so trailers never become titles
   settings.rs    Key/value settings (API keys) + the frontend log bridge
 
 src/
-  ui/            Browse shell, Home, rails, cards, detail page, search,
-                 Settings. tv.ts holds the 10-foot scale switch; focus.ts
-                 recovers focus after a view change; FocusButton/FocusInput are
-                 the D-pad-reachable controls everything else is built from
+  ui/            Browse shell, Home, rails, cards, detail page, search, the
+                 "See all" grid, Settings. tv.ts holds the 10-foot scale switch;
+                 focus.ts recovers focus after a view change;
+                 FocusButton/FocusInput are the D-pad-reachable controls
+                 everything else is built from. Rail.tsx owns the one cap on
+                 how long a rail gets
   player/        Player, shared mpv lifecycle, track handling, mpv options.
                  chapters.ts and stats.ts read mpv as flat scalars only;
                  skip.ts resolves a credits marker from the sidecar, a named
                  chapter, or a fenced guess at the tail of the file
-  library/       pipeline.ts — the scan→parse→match→artwork→trailers sequence,
-                 shared by the startup scan and the Scan now button. LibraryView
+  library/       pipeline.ts — the scan→parse→match→artwork→details sequence,
+                 shared by the startup scan and the Scan now button.
+                 parse.ts loads guessit-js on demand, not at startup. LibraryView
                  is the developer surface behind a disclosure in Settings and
                  keeps library.css in fixed px; FixMatch, the user-facing review
                  queue, has its own fixmatch.css in rem so it scales
@@ -131,6 +148,8 @@ src/
 scan (Rust)  →  media_files rows          identity = path + size + mtime
 parse (TS)   →  guessit-js + parent-dir fallback → parsed_title/season/episode
 match (TS)   →  provider search → score → titles + episodes, or "unmatched" with reason
+artwork(Rust)→  posters, backdrops, logos, stills, cast faces into app data
+details (TS) →  re-fetch titles matched before a field was being stored
 browse (TS)  →  titles/episodes → rails, detail pages
 play  (TS)   →  mpv loadfile → resume seek → progress saved every 5s
 ```
@@ -196,6 +215,35 @@ the database live in the same directory and should move together.
 **Track memory stores languages, not indices.** Track numbering differs between releases
 of the same show, so "index 3" would pick the wrong track on the next episode; "da"
 survives.
+
+**Continue Watching answers "what next", not "what did I pause".** A finished
+episode hands the rail on to the next one the library holds, because the moment
+an episode ends is exactly when you want the show offered — not when it should
+disappear. One card per show: three started episodes used to mean three cards.
+The next-up rule is *first episode not finished*, so one you are ten minutes
+into is offered rather than skipped past.
+
+**Exactly one keyboard handler owns the arrow keys at a time.** The player binds
+its own and the spatial navigation library binds another; `preventDefault` cannot
+stop the other listener. So the spatial system is paused while arrows seek and
+resumed only once **Up** hands the OSD focus. Without that split, one press both
+seeks and moves the focus ring. A focus ring never appears in seek mode, because
+the ring means "arrows move between these" and there it would be a lie.
+
+**Rails are capped, and the cap lives in one place.** Every card is a registered
+focusable and spatial navigation measures elements live at navigation time, so
+an uncapped genre rail on a large library is a real cost for something nobody
+scrolls. Thirty, then a **See all** grid — with the tile at the *end* of the row,
+which is where you arrive having scrolled and keeps the rail one straight line
+for a D-pad.
+
+**Skiptro is invoked, never shipped.** The app can run a copy the user installed
+themselves, at a path they chose, with the command lines editable in Settings —
+so generating sidecars is not a chore in another window. It still bundles
+nothing, downloads nothing and requires nothing to be present: with no path set,
+intro skipping behaves exactly as it always did. The templates are text fields
+so a change to Skiptro's CLI is an edit rather than a rebuild, which is the same
+reasoning that keeps anything needing upkeep out.
 
 **Trailers are local files, never a live stream in-app.** A trailer beside the media
 plays on the mpv surface: no ads, no network, no bundled binary, and the same

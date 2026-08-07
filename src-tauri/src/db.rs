@@ -71,7 +71,7 @@ CREATE TABLE settings (
 CREATE TABLE titles (
     id           INTEGER PRIMARY KEY,
     kind         TEXT    NOT NULL,          -- 'movie' | 'series'
-    provider     TEXT    NOT NULL,          -- 'tvmaze' | 'omdb' | 'mdblist'
+    provider     TEXT    NOT NULL,          -- 'tmdb' | 'tvmaze' | 'omdb'
     provider_id  TEXT    NOT NULL,
     imdb_id      TEXT,
     tmdb_id      TEXT,

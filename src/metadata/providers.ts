@@ -6,10 +6,13 @@
  * in the capability file.
  *
  * Provider roles:
- *   TVmaze  — TV. No API key at all, and the only source here that supplies
- *             background/backdrop art as well as episode-level data.
- *   OMDb    — Movies. Plot, genres, runtime, ratings and a poster. No backdrop.
- *   MDBList — Ratings aggregation and ID cross-referencing.
+ *   TMDB    — Preferred for both. The only source here with backdrops, title
+ *             logos, episode stills, cast and trailer keys, and it returns all
+ *             of them on one detail request.
+ *   TVmaze  — TV fallback. No API key at all, and the only *keyless* source
+ *             that supplies background art as well as episode-level data.
+ *   OMDb    — Movie fallback. Plot, genres, runtime, ratings and a poster.
+ *             No backdrop, no logo, no usable cast.
  */
 import { fetch } from '@tauri-apps/plugin-http';
 import type { Candidate } from './score';

@@ -80,7 +80,7 @@ export default function LibraryView() {
   const [diagnosis, setDiagnosis] = useState<string | null>(null);
   const [titles, setTitles] = useState<StoredTitle[]>([]);
   const [art, setArt] = useState<ArtworkStats | null>(null);
-  const [providers, setProviders] = useState({ tmdb: false, omdb: false, mdblist: false });
+  const [providers, setProviders] = useState({ tmdb: false, omdb: false });
   const [progress, setProgress] = useState<MatchProgress | null>(null);
 
   const refresh = useCallback(async () => {
@@ -113,16 +113,11 @@ export default function LibraryView() {
   // provider a match run would use. Editing happens in Settings.
   useEffect(() => {
     void (async () => {
-      const [tmdb, omdb, mdblist] = await Promise.all([
+      const [tmdb, omdb] = await Promise.all([
         getSetting('tmdb_api_key'),
         getSetting('omdb_api_key'),
-        getSetting('mdblist_api_key'),
       ]);
-      setProviders({
-        tmdb: !!tmdb?.trim(),
-        omdb: !!omdb?.trim(),
-        mdblist: !!mdblist?.trim(),
-      });
+      setProviders({ tmdb: !!tmdb?.trim(), omdb: !!omdb?.trim() });
     })();
   }, []);
 
@@ -388,7 +383,6 @@ export default function LibraryView() {
           ['TMDB', providers.tmdb, 'movies + TV, posters/backdrops/stills'],
           ['TVmaze', true, 'TV fallback, keyless'],
           ['OMDb', providers.omdb, 'movie fallback, no backdrops'],
-          ['MDBList', providers.mdblist, 'ratings, not yet used'],
         ].map(([name, active, note]) => (
           <span key={String(name)} className={`provider-pill ${active ? 'on' : 'off'}`}>
             {String(name)} {active ? '✓' : '—'}

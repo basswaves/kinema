@@ -404,6 +404,37 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
               console.warn('resume seek failed', e);
             }
           }
+          /*
+           * Take the position and duration from mpv **by asking**, rather than
+           * waiting to be told.
+           *
+           * `file-loaded` and the property observer are two different Tauri
+           * channels, so their order against each other is not guaranteed:
+           * waiting for the next push can mean acting on the outgoing file's
+           * position for a tick, and *dropping* the pushes risks missing a
+           * `duration` that mpv only ever emits once per file. Reading both
+           * here is the only version that is neither a race nor a guess — this
+           * file is open, so these two values are its own.
+           */
+          try {
+            const [pos, len] = await Promise.all([
+              getProperty('time-pos', 'double') as Promise<number | null>,
+              getProperty('duration', 'double') as Promise<number | null>,
+            ]);
+            setTimePos(pos ?? 0);
+            setDuration(len);
+            latest.current = { position: pos ?? 0, duration: len };
+          } catch (e) {
+            console.warn('could not read position after load', e);
+          }
+
+          // Ready *before* the rest, not after. Everything below is per-file
+          // polish — track languages, frame timing, chapters — and any one of
+          // them throwing must not leave the file permanently unable to offer a
+          // Skip button. Placing this last is exactly how that happened.
+          fileReadyRef.current = true;
+          setFileReady(true);
+
           await applyPrefs();
 
           // Applied per file rather than once at init, so changing it in
@@ -416,11 +447,6 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           // Chapters only exist once a file is open, and they are one of the
           // sources a credits marker can come from.
           setChapters(await readChapters());
-
-          // Last, and only now: from here the position mpv reports belongs to
-          // the file `target` names, so skip decisions may act on it.
-          fileReadyRef.current = true;
-          setFileReady(true);
         })();
       }
 
@@ -448,15 +474,24 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         case 'pause':
           setPaused(data as boolean);
           break;
+        // Both are dropped until the new file is genuinely open, because until
+        // then they describe the *outgoing* one — mpv keeps reporting the file
+        // it still has loaded while `loadfile` is in flight. Nulling the state
+        // in the load effect cannot achieve this on its own: these pushes
+        // arrive milliseconds later and put the old values straight back.
+        // `file-loaded` reads both explicitly, so nothing is lost by ignoring
+        // them here.
         case 'time-pos':
-          if (!seekingRef.current) {
+          if (fileReadyRef.current && !seekingRef.current) {
             setTimePos(data as number | null);
             latest.current.position = (data as number) ?? 0;
           }
           break;
         case 'duration':
-          setDuration(data as number | null);
-          latest.current.duration = data as number | null;
+          if (fileReadyRef.current) {
+            setDuration(data as number | null);
+            latest.current.duration = data as number | null;
+          }
           break;
         case 'eof-reached':
           // The real end-of-playback signal while keep-open holds the last
@@ -669,11 +704,29 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
    * the decision. A natural end still starts the countdown, as it always did.
    */
   useEffect(() => {
-    if (autoSkip || activeKind !== 'credits') return;
-    if (!neighbours.next || upNext || dismissed === activeKey) return;
-    /* eslint-disable-next-line react-hooks/set-state-in-effect */
-    setUpNext(neighbours.next);
-  }, [autoSkip, activeKind, activeKey, dismissed, neighbours.next, upNext]);
+    /* eslint-disable react-hooks/set-state-in-effect */
+    if (autoSkip) return;
+
+    // An offer with no countdown is tied to *being in the credits*. When the
+    // credits are no longer where we are — the file changed, the user seeked
+    // back, or it was raised in error — the offer is stale and comes down.
+    //
+    // This effect used to only ever raise the card, which made every spurious
+    // raise permanent: it sat over the next episode for its whole duration,
+    // hiding the Skip intro button behind it. Being able to lower it again is
+    // what makes the whole path self-correcting rather than one-way.
+    //
+    // A countdown means the file has genuinely ended and the next episode is
+    // coming regardless, so that card is not an offer and must not be withdrawn.
+    if (countdown !== null) return;
+
+    if (activeKind !== 'credits' || !neighbours.next || dismissed === activeKey) {
+      if (upNext) setUpNext(null);
+      return;
+    }
+    if (!upNext) setUpNext(neighbours.next);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [autoSkip, activeKind, activeKey, countdown, dismissed, neighbours.next, upNext]);
 
   /**
    * Get the prompt out of the way on its own.

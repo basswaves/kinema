@@ -137,6 +137,36 @@ mode and the Up next offer. The event handlers use a **ref** of the same flag,
 because re-registering mpv listeners to pick up a state change is its own
 gotcha, three entries above.
 
+**That flag is not enough on its own either**, and the second attempt is the
+instructive one. `file-loaded` and the property observer are **two different
+Tauri channels**, so their order against each other is not guaranteed: the flag
+flipped true while the last `time-pos` push still described the outgoing file,
+which is a one-tick window that fires reliably on every episode change.
+
+**Do:** on `file-loaded`, *ask* for `time-pos` and `duration` with `getProperty`
+rather than waiting to be told, and ignore the observer entirely until the flag
+is true. Dropping the pushes alone is not safe — `duration` may only be emitted
+once per file, and a dropped one never comes back.
+
+**And set the flag early in that handler, not late.** It was placed after
+`applyPrefs`, the `video-sync` write and `readChapters`, so any one of them
+throwing left the file permanently unable to raise a Skip button — with no error
+visible anywhere except a missing button.
+
+### One-way UI state makes every transient bug permanent
+
+The Up next offer effect only ever *raised* the card. So a card raised in error —
+by any of the races above — stayed up for the entire episode, and because
+`skipPrompt` is suppressed while a card is showing, it also silently hid the Skip
+intro button behind it.
+
+**Do:** let the effect lower it too. The offer is tied to being inside the
+credits, so when the credits are no longer where we are, it comes down; a card
+with a **countdown** is exempt, because that one means the file genuinely ended
+and the next episode is coming regardless. One-way state turns a one-tick glitch
+into a permanent one, and it is worth asking of any `setX` in an effect whether
+the matching `setX(null)` exists.
+
 **And:** clear derived UI on a target change, not only on the path that usually
 causes it. `upNext` was cleared when a countdown advanced and by nothing else,
 so every other route into a new file carried the old card in.

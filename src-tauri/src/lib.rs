@@ -9,7 +9,7 @@ mod settings;
 mod skip;
 mod trailer;
 
-use library::Db;
+use library::{Db, ScanDb};
 use std::sync::Mutex;
 use tauri::Manager;
 
@@ -25,8 +25,13 @@ pub fn run() {
             // network shares stay read-only as far as this app is concerned.
             let dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&dir)?;
-            let conn = db::open(&dir.join("library.db"))?;
-            app.manage(Db(Mutex::new(conn)));
+            let path = dir.join("library.db");
+
+            app.manage(Db(Mutex::new(db::open(&path)?)));
+            // Opened second, and only after the first has migrated: the
+            // scanner's connection must never be the one that defines the
+            // schema. See `ScanDb` for why it exists at all.
+            app.manage(ScanDb(Mutex::new(db::open_secondary(&path)?)));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -45,7 +50,7 @@ pub fn run() {
             settings::append_log,
             metadata::save_title,
             metadata::save_episodes,
-            metadata::link_file_to_title,
+            metadata::link_files_to_title,
             metadata::list_titles,
             metadata::get_title_detail,
             metadata::list_unmatched,

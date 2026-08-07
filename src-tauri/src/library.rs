@@ -8,6 +8,16 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 pub struct Db(pub Mutex<Connection>);
 
+/// The scanner's own connection to the same database file.
+///
+/// Separate from `Db` because a scan is the one operation here that can run for
+/// minutes — a NAS share, asleep or over a slow link — and it used to hold the
+/// single lock for all of it. Every other command blocked behind it: the rails
+/// would not load, a detail page would not open, and a resume point could not be
+/// saved. WAL was already enabled but with one connection there was nothing for
+/// it to do.
+pub struct ScanDb(pub Mutex<Connection>);
+
 #[derive(Serialize)]
 pub struct LibraryRoot {
     pub id: i64,
@@ -131,8 +141,9 @@ pub fn list_library_roots(db: tauri::State<Db>) -> Result<Vec<LibraryRoot>, Stri
         .map_err(to_string_err)
 }
 
+/// Walk every configured root. Uses `ScanDb`, never `Db` — see the note there.
 #[tauri::command]
-pub fn scan_library(db: tauri::State<Db>) -> Result<ScanReport, String> {
+pub fn scan_library(db: tauri::State<ScanDb>) -> Result<ScanReport, String> {
     let mut conn = db.0.lock().map_err(to_string_err)?;
     scanner::scan_all(&mut conn).map_err(to_string_err)
 }

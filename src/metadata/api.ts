@@ -52,16 +52,22 @@ export const saveEpisodes = (titleId: number, episodes: EpisodeMetadata[]) =>
   invoke<number>('save_episodes', { titleId, episodes });
 
 /**
- * `status` mirrors the `match_status` lifecycle: 'parsed' puts a file back in
- * the review queue, 'ignored' takes it out without pretending it was matched.
+ * Point a whole group of files at one title, in a single transaction.
+ *
+ * `status` mirrors the `match_status` lifecycle: 'parsed' puts files back in
+ * the review queue, 'ignored' takes them out without pretending they matched.
+ *
+ * Takes a list because every caller has one — matching resolves a group at a
+ * time, and so do ignoring, un-ignoring and unlinking. One file per call meant
+ * one IPC round trip and one transaction each.
  */
-export const linkFileToTitle = (
-  fileId: number,
+export const linkFilesToTitle = (
+  fileIds: number[],
   titleId: number | null,
   confidence: number | null,
   reason: string | null,
   status: 'matched' | 'unmatched' | 'ignored' | 'parsed'
-) => invoke<void>('link_file_to_title', { fileId, titleId, confidence, reason, status });
+) => invoke<number>('link_files_to_title', { fileIds, titleId, confidence, reason, status });
 
 export const listTitles = () => invoke<StoredTitle[]>('list_titles');
 

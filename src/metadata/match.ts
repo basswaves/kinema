@@ -11,7 +11,7 @@
 import type { MediaFile } from '../library/api';
 import {
   getSetting,
-  linkFileToTitle,
+  linkFilesToTitle,
   listTitlesWithoutTrailer,
   saveEpisodes,
   saveTitle,
@@ -195,9 +195,13 @@ export async function applyMatch(
     if (episodes.length > 0) await saveEpisodes(titleId, episodes);
   }
 
-  for (const file of files) {
-    await linkFileToTitle(file.id, titleId, confidence, reason, 'matched');
-  }
+  await linkFilesToTitle(
+    files.map((f) => f.id),
+    titleId,
+    confidence,
+    reason,
+    'matched'
+  );
 
   return titleId;
 }
@@ -245,9 +249,13 @@ export async function backfillTrailers(): Promise<TrailerBackfill> {
  * "needs attention" meaningless. Reversible: the files keep their parse data.
  */
 export async function ignoreFiles(files: MediaFile[]): Promise<void> {
-  for (const file of files) {
-    await linkFileToTitle(file.id, null, null, 'ignored by hand', 'ignored');
-  }
+  await linkFilesToTitle(
+    files.map((f) => f.id),
+    null,
+    null,
+    'ignored by hand',
+    'ignored'
+  );
 }
 
 /**
@@ -256,9 +264,13 @@ export async function ignoreFiles(files: MediaFile[]): Promise<void> {
  * verdict, keep the parse data — so they share one implementation.
  */
 export async function returnFilesToReview(files: MediaFile[]): Promise<void> {
-  for (const file of files) {
-    await linkFileToTitle(file.id, null, null, null, 'parsed');
-  }
+  await linkFilesToTitle(
+    files.map((f) => f.id),
+    null,
+    null,
+    null,
+    'parsed'
+  );
 }
 
 /**
@@ -396,9 +408,13 @@ export async function matchFiles(
         );
         outcome.matched += group.files.length;
       } else {
-        for (const file of group.files) {
-          await linkFileToTitle(file.id, null, result.confidence, result.reason, 'unmatched');
-        }
+        await linkFilesToTitle(
+          group.files.map((f) => f.id),
+          null,
+          result.confidence,
+          result.reason,
+          'unmatched'
+        );
         outcome.unmatched += group.files.length;
       }
     } catch (e) {
@@ -407,9 +423,13 @@ export async function matchFiles(
 
       // A provider failure must not leave files in limbo — mark them for
       // review with the reason attached.
-      for (const file of group.files) {
-        await linkFileToTitle(file.id, null, 0, message, 'unmatched').catch(() => undefined);
-      }
+      await linkFilesToTitle(
+        group.files.map((f) => f.id),
+        null,
+        0,
+        message,
+        'unmatched'
+      ).catch(() => undefined);
       outcome.unmatched += group.files.length;
     }
 

@@ -180,27 +180,45 @@ pub fn save_episodes(
     Ok(n)
 }
 
-/// Attach a file to a title. `status` is 'matched' or 'unmatched' — the caller
+/// Attach files to a title. `status` is 'matched' or 'unmatched' — the caller
 /// decides based on confidence, because the threshold is a matching-policy
 /// decision, not a storage one.
+///
+/// Takes a **list**, because every caller has one. Matching resolves a whole
+/// group at a time and a season is twelve files; ignoring, un-ignoring and
+/// unlinking are all group operations too. Done one file at a time this was a
+/// separate IPC round trip and a separate transaction each, so a twelve-episode
+/// season cost twelve of both and a first run over a large library cost
+/// thousands.
 #[tauri::command]
-pub fn link_file_to_title(
+pub fn link_files_to_title(
     db: tauri::State<Db>,
-    file_id: i64,
+    file_ids: Vec<i64>,
     title_id: Option<i64>,
     confidence: Option<f64>,
     reason: Option<String>,
     status: String,
-) -> Result<(), String> {
-    let conn = db.0.lock().map_err(to_string_err)?;
-    conn.execute(
-        "UPDATE media_files
-            SET title_id = ?2, match_confidence = ?3, match_reason = ?4, match_status = ?5
-          WHERE id = ?1",
-        params![file_id, title_id, confidence, reason, status],
-    )
-    .map_err(to_string_err)?;
-    Ok(())
+) -> Result<usize, String> {
+    let mut conn = db.0.lock().map_err(to_string_err)?;
+    let tx = conn.transaction().map_err(to_string_err)?;
+    let mut n = 0;
+    {
+        let mut stmt = tx
+            .prepare(
+                "UPDATE media_files
+                    SET title_id = ?2, match_confidence = ?3, match_reason = ?4, match_status = ?5
+                  WHERE id = ?1",
+            )
+            .map_err(to_string_err)?;
+
+        for file_id in file_ids {
+            stmt.execute(params![file_id, title_id, confidence, reason, status])
+                .map_err(to_string_err)?;
+            n += 1;
+        }
+    }
+    tx.commit().map_err(to_string_err)?;
+    Ok(n)
 }
 
 /// Unlink every file and drop cached titles so matching runs again from

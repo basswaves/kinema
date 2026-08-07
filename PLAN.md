@@ -1051,6 +1051,42 @@ asking their server about the credits again.
 
 ---
 
+## Back leaves fullscreen before it leaves the player ✅
+
+Escape in fullscreen used to close the video and land on Home — one press
+throwing away both the window state and what you were watching. Fullscreen is
+now a rung on the same Back ladder the panels are on: **track panel → stats →
+OSD focus → fullscreen → leave the player**. Each press undoes one thing that a
+press put there.
+
+`Backspace` stays bound to the same rung as `Escape` deliberately. It is what a
+remote's Back button sends, and two back keys that stop at different layers is a
+distinction nobody remembers six months later. The cost is accepted: from the
+sofa, fullscreen → Home is two presses.
+
+The rung asks the window whether it is fullscreen rather than reading a
+`useState` mirror, because fullscreen can also be left from the title bar and by
+Windows itself — neither routes through the player, and a mirror would be wrong
+the first time either happened.
+
+The **Back button and "Back to library" still exit in one click.** They are not
+on the ladder; a control you aimed at means what it says, and `exit` already
+drops fullscreen on the way out. Only the keys grew a rung.
+
+### The exit nobody pressed a key for
+
+Found while testing the above. A file that ended with no next episode called
+`onExit` **directly**, so watching the last episode of a season in fullscreen
+dropped you on a fullscreen Home — and nothing in the browsing views can leave
+fullscreen, so the only way out was to start another video. Three paths did
+this: no `fileId`, no next episode, and the `catch`.
+
+`exit` therefore moved up beside `handlePlaybackEnded` and is now the single door
+out. The rule it encodes: **whoever leaves the player gives the desktop back**,
+whether a person asked to leave or the file simply ran out. Auto-play of the next
+episode is untouched — that never leaves the player, and staying fullscreen
+between episodes is the whole point of it.
+
 ## Open items
 
 **They live in [HANDOVER.md](HANDOVER.md), and only there.** They used to be

@@ -1,6 +1,8 @@
+mod analyse;
 mod artwork;
 mod db;
 mod detect;
+mod ffmpeg;
 mod introdb;
 mod library;
 mod metadata;

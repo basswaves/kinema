@@ -46,6 +46,7 @@ thin client that does nothing without a Jellyfin server running.
 | Logos + cast | **Done.** Title treatment on the hero, cast row on detail pages — both free on the TMDB request already made |
 | Intro detection in-app | **Done.** Runs a Skiptro you installed yourself, at a path you chose. Nothing bundled |
 | Markers without sidecars | **Done.** Reads Skiptro's own database; TheIntroDB supplies the credits it cannot detect. No files beside the videos |
+| Own intro/credits detection | **Done.** Fingerprints a season's audio and finds what the episodes share. Finds credits, and works on unmatched files |
 
 ## Setup
 
@@ -98,7 +99,7 @@ Full-screen browsing views paint their own background; the player must not.
 
 ```
 src-tauri/src/
-  db.rs          SQLite schema + migrations (user_version, currently 7).
+  db.rs          SQLite schema + migrations (user_version, currently 9).
                  busy_timeout is load-bearing: two connections exist
   scanner.rs     Filesystem walk. NAS-aware: identity is (path, size, mtime),
                  never a content hash — never read file bytes during a scan.
@@ -118,10 +119,15 @@ src-tauri/src/
                  is free to re-read
   skiptro.rs     Reads Skiptro's own SQLite database — the source the
                  .skiptro.json files were only ever an export of
+  analyse.rs     This app's own detector: fingerprints each episode of a
+                 season and finds the audio they share. Intro near the start,
+                 closing theme near the end
+  ffmpeg.rs      Finding ffmpeg, and decoding short windows of audio with it
   introdb.rs     TheIntroDB lookups, keyed on TMDB id. Where end credits come
                  from; per-episode, on play, cached with a TTL
-  detect.rs      Runs the user's own Skiptro to *produce* the detections.
-                 Nothing is bundled; the command lines are settings
+  detect.rs      One Detect button per TV folder: runs the user's own Skiptro
+                 if configured, then analyse.rs. Nothing is bundled; the
+                 command lines and both tool paths are settings
   trailer.rs     Finds local trailer files by Jellyfin/Kodi convention; the
                  scanner shares its test so trailers never become titles
   settings.rs    Key/value settings (API keys) + the frontend log bridge
@@ -271,11 +277,28 @@ dependency; if it goes away, the local sources mean that is a degradation rather
 than a regression.
 
 **Local measurement outranks a community timing, for both segments.** Skiptro
-fingerprinted the exact file on this disk, so its intro beats a timing taken
-against some copy of the episode. The order never changes between segments —
-only which sources have anything to say does, and for credits that is
-TheIntroDB alone, which makes it the only measured answer the closing segment
-has ever had.
+and this app's own analysis both fingerprint the exact file on this disk, so
+their intros beat a timing taken against some copy of the episode. The order
+never changes between segments — only which sources have anything to say does.
+
+**The app detects intros and credits itself.** `analyse.rs` fingerprints every
+episode of a season and finds the stretch of audio they have in common: near the
+start that is the intro, near the end it is the closing theme. It is the method
+Jellyfin's intro-skipper uses, reimplemented — its code is GPL-3.0 C# and none of
+it is here, but its published windows and duration bounds are, because those are
+facts about how television is cut. It is the only source that finds credits by
+measuring them, and the only one that works on a file with no metadata match at
+all.
+
+Nothing is believed from a single comparison. A segment must appear between an
+episode and at least two *others* before it becomes a marker, and the reported
+time is the median of that cluster — one episode that happens to open on a
+similar chord cannot produce a marker on its own.
+
+**Skiptro is ranked above it for intros by decision, not by measurement.** Both
+read the same bytes and agree within a second on real content; putting the older,
+more-tuned one first means adding this cannot regress an intro skip that already
+works. When they disagree, `app.log` names which spoke.
 
 **Trailers are local files, never a live stream in-app.** A trailer beside the media
 plays on the mpv surface: no ads, no network, no bundled binary, and the same

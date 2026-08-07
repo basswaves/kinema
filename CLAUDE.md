@@ -59,6 +59,9 @@ breaking one, say so rather than quietly working around it.
   depends on nothing being present — without Skiptro, intro skipping falls back
   to whatever sidecars it finds and to TheIntroDB. The templates are text fields
   precisely so a change to Skiptro's CLI is an edit, not a rebuild.
+  The same now applies to **ffmpeg**, which `analyse.rs` invokes to decode short
+  windows of audio. Not bundled, not downloaded, path configurable in Settings,
+  and without it that one source is skipped and everything else carries on.
   Ask before downloading any binary. A Rust crate or npm package is a
   dependency, not a binary — but weigh it against the maintenance rule above.
 - **Sidecars are read, never written.** The `.skiptro.json` export is off by

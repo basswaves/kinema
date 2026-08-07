@@ -202,6 +202,24 @@ the real file.
 the `-shm` file to be present and readable; when it is not, the open *fails
 loudly*, which is the right failure.
 
+### A season is not a folder
+
+`analyse.rs` compares every episode of a season against every other, so how the
+episodes are grouped *is* the algorithm — a group of one finds nothing, in
+silence, and looks exactly like a show with no intro.
+
+The obvious grouping is the containing directory. It is wrong on real libraries:
+this machine's Example Show season has ten episodes in a `Season 1`
+subfolder and two still loose in the show folder above it, because a renamer
+moved some and not others. Grouping by folder would have compared ten against
+each other, then two against each other, and quietly produced worse markers for
+the two.
+
+**Do:** group on `title_id` when the file is matched and `parsed_title` when it
+is not, plus `parsed_season`. Falling back to the parsed title is also what lets
+detection work on the Needs attention queue, which is the one thing no other
+marker source can do.
+
 ### A WAL database's mtime is not its version
 
 Following directly from the above: `skiptro.db` can go untouched through a scan

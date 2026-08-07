@@ -29,6 +29,7 @@ import {
   removeLibraryRoot,
   DEFAULT_SKIPTRO_EXPORT_ARGS,
   DEFAULT_SKIPTRO_SCAN_ARGS,
+  FFMPEG_PATH_KEY,
   INTRODB_ENABLED_KEY,
   SKIPTRO_DB_PATH_KEY,
   SKIPTRO_EXPORT_ARGS_KEY,
@@ -116,6 +117,7 @@ export default function Settings() {
   // one root's button can show progress while the others simply disable.
   const [skiptroPath, setSkiptroPath] = useState('');
   const [skiptroDbPath, setSkiptroDbPath] = useState('');
+  const [ffmpegPath, setFfmpegPath] = useState('');
   const [scanArgs, setScanArgs] = useState(DEFAULT_SKIPTRO_SCAN_ARGS);
   const [exportArgs, setExportArgs] = useState(DEFAULT_SKIPTRO_EXPORT_ARGS);
   const [detecting, setDetecting] = useState<string | null>(null);
@@ -174,6 +176,7 @@ export default function Settings() {
 
       setSkiptroPath((await getSetting(SKIPTRO_PATH_KEY)) ?? '');
       setSkiptroDbPath((await getSetting(SKIPTRO_DB_PATH_KEY)) ?? '');
+      setFfmpegPath((await getSetting(FFMPEG_PATH_KEY)) ?? '');
       setScanArgs((await getSetting(SKIPTRO_SCAN_ARGS_KEY)) || DEFAULT_SKIPTRO_SCAN_ARGS);
       // `??` not `||`: an empty export command is the default and means "do not
       // export". `||` would silently put the old sidecar-writing command back.
@@ -185,7 +188,7 @@ export default function Settings() {
   }, []);
 
   /**
-   * Write the three Skiptro text fields as they are edited.
+   * Write the detection text fields as they are edited.
    *
    * Every other control on this page applies the moment it changes; these were
    * the exception, behind a **Save commands** button. That button was a trap in
@@ -193,14 +196,15 @@ export default function Settings() {
    * the *old* one, silently — and its confirmation rendered in the banner at
    * the top of a page far longer than a screen, so it read as doing nothing.
    *
-   * Debounced rather than written per keystroke: these are three database
+   * Debounced rather than written per keystroke: these are four database
    * writes, and the values are only ever read when something else starts.
    */
   const saveSkiptroFields = useCallback(async () => {
     await setSetting(SKIPTRO_SCAN_ARGS_KEY, scanArgs.trim());
     await setSetting(SKIPTRO_EXPORT_ARGS_KEY, exportArgs.trim());
     await setSetting(SKIPTRO_DB_PATH_KEY, skiptroDbPath.trim());
-  }, [scanArgs, exportArgs, skiptroDbPath]);
+    await setSetting(FFMPEG_PATH_KEY, ffmpegPath.trim());
+  }, [scanArgs, exportArgs, skiptroDbPath, ffmpegPath]);
 
   useEffect(() => {
     if (!skiptroLoaded) return;
@@ -516,21 +520,52 @@ export default function Settings() {
 
         {/* ---- where markers come from ----
 
-            Two sources, listed in the order they are trusted, because they are
-            good at different things and the difference is the whole design:
-            Skiptro measured the exact file on this disk but only finds intros;
-            TheIntroDB was timed by people against some copy of the episode, and
-            is the only thing that knows where the credits are. */}
+            Three sources, listed in the order they are trusted, because they
+            are good at different things and the difference is the whole design:
+            Skiptro and this app's own analysis both measure the exact file on
+            this disk, but only the analysis finds credits; TheIntroDB was timed
+            by people against some copy of the episode, and is the only one that
+            answers without reading the file at all. */}
         <section className="settings-section">
           <h2>Intro and credits markers</h2>
+          <p className="muted">
+            One <strong>Detect</strong> button at the bottom of this section runs everything that
+            is configured, per TV folder. Markers found by more than one source are ranked, and{' '}
+            <code>app.log</code> names the winner for every file played.
+          </p>
+
+          <h3>This app&rsquo;s own detection</h3>
+          <p className="muted">
+            Fingerprints the audio of every episode in a season and finds the stretch they have
+            in common — near the start that is the intro, near the end it is the closing theme.{' '}
+            <strong>The only source here that finds credits by measuring them</strong>, and the
+            only one that works on files with no metadata match at all. Needs{' '}
+            <strong>ffmpeg</strong>, which is not bundled: it reads about six minutes of audio
+            per episode, so a season takes a few minutes.
+          </p>
+          <label className="settings-field">
+            <span>
+              ffmpeg <span className="muted">leave empty to use the one on PATH</span>
+            </span>
+            <FocusInput
+              className="settings-input"
+              value={ffmpegPath}
+              onChange={setFfmpegPath}
+              placeholder="ffmpeg"
+            />
+          </label>
+          <p className="muted">
+            ffprobe is taken from the same folder. Without a working ffmpeg this source is simply
+            skipped and the others carry on.
+          </p>
 
           <h3>TheIntroDB</h3>
           <p className="muted">
             A free community database of intro and credits times, looked up by the same TMDB id
-            used to match the title. <strong>This is where end credits come from</strong> —
-            Skiptro below detects intros and nothing else, so without this the end of an episode
-            is a chapter name or a guess. Nothing is sent but the id, season and episode; no
-            account and no key.
+            used to match the title. It answers instantly and without reading the file, which is
+            why it is worth having even alongside the detection above — but coverage is patchy on
+            less-watched shows. Nothing is sent but the id, season and episode; no account and no
+            key.
           </p>
           <div className="settings-toggle-row">
             <FocusButton
@@ -547,7 +582,7 @@ export default function Settings() {
             </FocusButton>
             <span className="muted">
               Asked once per episode when you play it, never for the library in bulk, and the
-              answer is kept for a month. Off means intros only, from Skiptro.
+              answer is kept for a month. Off means markers come only from what is detected here.
             </span>
           </div>
           {/* Attribution. They request it rather than require it, and it costs
@@ -561,11 +596,12 @@ export default function Settings() {
 
           <h3>Skiptro</h3>
           <p className="muted">
-            Detects intros by fingerprinting the audio of the episodes you actually have, which
-            is why it outranks TheIntroDB for the intro: it measured this file rather than a copy
-            of it. <strong>Skiptro is not bundled and never will be</strong> — no third-party
-            binary goes into this app. Point this at a copy you have installed yourself and the
-            detection can at least be started from here instead of in another window.
+            Optional, and detects intros only. It ranks <em>above</em> this app&rsquo;s own
+            detection for the intro — both measure the same file, and Skiptro has years of tuning
+            behind it, so putting it first means adding the detection above cannot spoil an intro
+            skip that already works. <strong>Skiptro is not bundled and never will be</strong> —
+            no third-party binary goes into this app. Point this at a copy you have installed
+            yourself and it can be run from here instead of in another window.
           </p>
           <div className="settings-row">
             <FocusButton
@@ -647,35 +683,46 @@ export default function Settings() {
             />
           </label>
 
-          {/* TV roots only. Intros are a television thing, and offering this on
-              a films folder would be a button that runs for a long time and
-              finds nothing. */}
-          {skiptroPath && roots.filter((r) => r.kind === 'tv').length === 0 && (
-            <p className="muted">Add a TV folder above to detect intros in it.</p>
+          {/* One button per TV root, running every source that is configured.
+              No longer gated on a Skiptro path: this app's own detection needs
+              only ffmpeg, so hiding the button without Skiptro would hide the
+              detector from anyone who never installs it.
+
+              TV roots only. Intros are a television thing, and a films folder
+              would be a button that runs for a long time and finds nothing —
+              the whole method is "what do these episodes have in common". */}
+          <h3>Run detection</h3>
+          {roots.filter((r) => r.kind === 'tv').length === 0 ? (
+            <p className="muted">Add a TV folder above to detect intros and credits in it.</p>
+          ) : (
+            <p className="muted">
+              Runs Skiptro if it is configured, then this app&rsquo;s own analysis of anything
+              not already done. Minutes per season the first time; afterwards only new or
+              changed episodes are read again.
+            </p>
           )}
-          {skiptroPath &&
-            roots
-              .filter((root) => root.kind === 'tv')
-              .map((root) => (
-                <div className="settings-toggle-row" key={root.id}>
-                  <FocusButton
-                    className="btn-secondary"
-                    disabled={detecting !== null}
-                    onSelect={() => void runDetect(root)}
-                  >
-                    {detecting === root.path ? 'Detecting…' : 'Detect intros'}
-                  </FocusButton>
-                  <span className="muted">
-                    <code>{root.path}</code>
-                    {detecting === root.path && detectLine && (
-                      <>
-                        <br />
-                        <span className="settings-progress">{detectLine}</span>
-                      </>
-                    )}
-                  </span>
-                </div>
-              ))}
+          {roots
+            .filter((root) => root.kind === 'tv')
+            .map((root) => (
+              <div className="settings-toggle-row" key={root.id}>
+                <FocusButton
+                  className="btn-secondary"
+                  disabled={detecting !== null}
+                  onSelect={() => void runDetect(root)}
+                >
+                  {detecting === root.path ? 'Detecting…' : 'Detect'}
+                </FocusButton>
+                <span className="muted">
+                  <code>{root.path}</code>
+                  {detecting === root.path && detectLine && (
+                    <>
+                      <br />
+                      <span className="settings-progress">{detectLine}</span>
+                    </>
+                  )}
+                </span>
+              </div>
+            ))}
           <p className="muted">
             This takes minutes per season — it decodes audio and runs a model over it. Everything
             it finds is written next to your video files, so the results stay readable by Kodi and

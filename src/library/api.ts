@@ -92,6 +92,14 @@ export const DEFAULT_SKIPTRO_EXPORT_ARGS = '';
 /** Setting key: `'off'` stops the app asking TheIntroDB anything. */
 export const INTRODB_ENABLED_KEY = 'introdb_enabled';
 
+/**
+ * Setting key: where ffmpeg is. Empty means "whatever is on PATH".
+ *
+ * Needed only by this app's own intro/credits analysis, which decodes short
+ * windows of audio with it. Nothing else in the app uses ffmpeg.
+ */
+export const FFMPEG_PATH_KEY = 'ffmpeg_path';
+
 export interface DetectStepReport {
   step: string;
   exit_code: number | null;

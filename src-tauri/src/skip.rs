@@ -7,7 +7,8 @@
 //! |---|---|---|
 //! | **Skiptro's database** | 1st — measured on *this* file | never has any |
 //! | **`.skiptro.json` sidecar** | 2nd — same detection, exported | 1st, if a producer ever writes one |
-//! | **TheIntroDB** | 3rd — community-timed | 2nd, and in practice the only one |
+//! | **This app's own analysis** | 3rd — measured on this file too | 2nd, and the one that usually answers |
+//! | **TheIntroDB** | 4th — community-timed | 3rd |
 //!
 //! **One rule, applied to both segments: local before remote.** Something
 //! measured against the actual bytes on this disk beats something timed by
@@ -15,11 +16,15 @@
 //! credits ladder in `skip.ts` already makes, and it is why the order does not
 //! change between segments — only which sources have anything to say does.
 //!
-//! Skiptro fingerprinted this exact file, so its intro wins. It cannot detect
-//! credits at all and nothing writes a sidecar that does, so TheIntroDB is in
-//! practice the only source of a closing segment — and the only measured one
-//! there has ever been. Everything below it, in `skip.ts`, is inference: a
-//! chapter name, then a fixed tail, each fenced accordingly.
+//! Skiptro sits above `analyse.rs` for the intro by decision rather than by
+//! measurement: both fingerprint this exact file, Skiptro has years of tuning
+//! behind it, and ranking the newer one second means it cannot regress an intro
+//! skip that already works. They agree to within a second on real content, so
+//! the order rarely matters — but when they disagree, the older one wins and
+//! `app.log` names which spoke.
+//!
+//! Below it, in `skip.ts`, everything is inference: a chapter name, then a
+//! fixed tail, each fenced accordingly.
 //!
 //! Sidecars are no longer produced by default, but are still read. They are how
 //! this worked before, any other tool can write them, and dropping the reader
@@ -60,6 +65,7 @@ const CREDITS_KEYS: [&str; 3] = ["credits", "outro", "ending"];
 /// and three places agreeing on a spelling is cheaper than three enums.
 const FROM_SKIPTRO_DB: &str = "skiptro-db";
 const FROM_SIDECAR: &str = "sidecar";
+const FROM_ANALYSIS: &str = "analysis";
 const FROM_INTRODB: &str = "introdb";
 
 #[derive(Serialize, Clone, Copy, Debug, PartialEq)]
@@ -198,12 +204,51 @@ fn find_sidecar(video: &Path) -> Option<Sidecar> {
 /// It covers both local sources at once, deliberately. They are cheap to read
 /// and re-reading one needlessly costs nothing, while *missing* a change costs
 /// a marker that never appears.
-fn local_key(skiptro_db: Option<&Path>, sidecar: Option<&Sidecar>) -> String {
+fn local_key(
+    skiptro_db: Option<&Path>,
+    sidecar: Option<&Sidecar>,
+    analysed_at: Option<i64>,
+) -> String {
     let db = skiptro_db.map(skiptro::version_stamp).unwrap_or_default();
     let side = sidecar
         .map(|s| format!("{}:{}:{}", s.path.display(), s.size, s.mtime))
         .unwrap_or_default();
-    format!("{db}|{side}")
+    // A fresh analysis has to invalidate the cache too, or running Detect would
+    // leave the file playing with whatever it was given before.
+    let analysed = analysed_at.map(|t| t.to_string()).unwrap_or_default();
+    format!("{db}|{side}|{analysed}")
+}
+
+/// This app's own analysis for one file, if it is still valid for these bytes.
+///
+/// Checked against `media_files` rather than trusted: a replaced episode keeps
+/// its row until Detect runs again, and markers measured on the old file could
+/// be anywhere in the new one.
+fn read_analysis(
+    conn: &rusqlite::Connection,
+    file_id: i64,
+) -> Option<(Option<Segment>, Option<Segment>, i64)> {
+    conn.query_row(
+        "SELECT a.intro_start, a.intro_end, a.credits_start, a.credits_end, a.analysed_at
+           FROM analysed_segments a
+           JOIN media_files m ON m.id = a.file_id
+          WHERE a.file_id = ?1
+            AND a.file_size = m.size_bytes
+            AND a.file_mtime = m.modified_at",
+        params![file_id],
+        |r| {
+            let intro = r.get::<_, Option<f64>>(0)?.map(|start| Segment {
+                start,
+                end: r.get::<_, Option<f64>>(1).unwrap_or(None),
+            });
+            let credits = r.get::<_, Option<f64>>(2)?.map(|start| Segment {
+                start,
+                end: r.get::<_, Option<f64>>(3).unwrap_or(None),
+            });
+            Ok((intro, credits, r.get::<_, i64>(4)?))
+        },
+    )
+    .ok()
 }
 
 struct Cached {
@@ -317,8 +362,13 @@ fn remote_query(conn: &rusqlite::Connection, file_id: i64) -> Option<RemoteQuery
     .filter(|q| !q.tmdb_id.trim().is_empty())
 }
 
-/// Read both local sources and rank them.
-fn local_markers(skiptro_db: Option<&Path>, video: &Path, sidecar: Option<&Sidecar>) -> SkipMarkers {
+/// Read every local source and rank them.
+fn local_markers(
+    skiptro_db: Option<&Path>,
+    video: &Path,
+    sidecar: Option<&Sidecar>,
+    analysis: Option<(Option<Segment>, Option<Segment>)>,
+) -> SkipMarkers {
     let mut markers = SkipMarkers::default();
 
     if let Some(db_path) = skiptro_db {
@@ -359,6 +409,24 @@ fn local_markers(skiptro_db: Option<&Path>, video: &Path, sidecar: Option<&Sidec
         }
     }
 
+    // Last of the local sources for the intro — see the ranking note at the top
+    // of this file for why it sits behind Skiptro rather than ahead of it — and
+    // the first that has ever had a measured closing segment to offer.
+    if let Some((intro, credits)) = analysis {
+        if markers.intro.is_none() {
+            if let Some(intro) = intro {
+                markers.intro = Some(intro);
+                markers.intro_source = Some(FROM_ANALYSIS.into());
+            }
+        }
+        if markers.credits.is_none() {
+            if let Some(credits) = credits {
+                markers.credits = Some(credits);
+                markers.credits_source = Some(FROM_ANALYSIS.into());
+            }
+        }
+    }
+
     markers
 }
 
@@ -378,7 +446,7 @@ pub async fn get_skip_markers(
     // Everything the database is needed for, taken in one lock and then let go.
     // The TheIntroDB lookup below is an await, and a held guard across an await
     // is how a UI freezes on a slow network.
-    let (skiptro_db, introdb_enabled, cached, query) = {
+    let (skiptro_db, introdb_enabled, cached, query, analysis) = {
         let db = app.state::<Db>();
         let conn = db.0.lock().map_err(to_string_err)?;
 
@@ -394,12 +462,17 @@ pub async fn get_skip_markers(
             (Some(id), true) => remote_query(&conn, id),
             _ => None,
         };
+        let analysis = file_id.and_then(|id| read_analysis(&conn, id));
 
-        (skiptro_db, introdb_enabled, cached, query)
+        (skiptro_db, introdb_enabled, cached, query, analysis)
     };
 
     let sidecar = find_sidecar(&video);
-    let key = local_key(skiptro_db.as_deref(), sidecar.as_ref());
+    let key = local_key(
+        skiptro_db.as_deref(),
+        sidecar.as_ref(),
+        analysis.as_ref().map(|(_, _, at)| *at),
+    );
 
     let remote_fresh = |at: Option<i64>| -> bool {
         at.is_some_and(|at| now_secs() - at < introdb::CACHE_TTL_SECS)
@@ -419,7 +492,12 @@ pub async fn get_skip_markers(
         }
     }
 
-    let mut markers = local_markers(skiptro_db.as_deref(), &video, sidecar.as_ref());
+    let mut markers = local_markers(
+        skiptro_db.as_deref(),
+        &video,
+        sidecar.as_ref(),
+        analysis.map(|(intro, credits, _)| (intro, credits)),
+    );
 
     // Reuse a remote answer that is still in date even when a local source has
     // changed underneath it — a Skiptro rescan is no reason to ask their server
@@ -604,13 +682,78 @@ mod tests {
         drop(conn);
 
         let sidecar = find_sidecar(&video);
-        let markers = local_markers(Some(&db), &video, sidecar.as_ref());
+        let markers = local_markers(Some(&db), &video, sidecar.as_ref(), None);
 
         assert_eq!(markers.intro_source.as_deref(), Some(FROM_SKIPTRO_DB));
         assert_eq!(markers.intro.unwrap().end, Some(45.0));
         // …and the sidecar still supplies the credits it cannot.
         assert_eq!(markers.credits_source.as_deref(), Some(FROM_SIDECAR));
         assert_eq!(markers.credits.unwrap().start, 1200.0);
+    }
+
+    /// Skiptro keeps the intro when both have one — the ordering decision — but
+    /// the analysis supplies the credits Skiptro has never been able to.
+    #[test]
+    fn skiptro_keeps_the_intro_and_the_analysis_brings_the_credits() {
+        let dir = std::env::temp_dir().join("pn-skip-analysis");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let video = dir.join("Show S01E03.mkv");
+        std::fs::write(&video, b"").unwrap();
+
+        let db = dir.join("skiptro.db");
+        let conn = rusqlite::Connection::open(&db).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE DetectedSegments (
+                 Id INTEGER PRIMARY KEY AUTOINCREMENT, LibraryId INTEGER NOT NULL,
+                 FilePath TEXT NOT NULL, ShowName TEXT, Season INTEGER, Episode INTEGER,
+                 Type INTEGER NOT NULL, StartSeconds REAL NOT NULL, EndSeconds REAL NOT NULL,
+                 Confidence REAL NOT NULL, DetectedAt TEXT NOT NULL, FileModifiedAt TEXT NOT NULL,
+                 UserStatus INTEGER NOT NULL DEFAULT 0)",
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO DetectedSegments
+                (LibraryId, FilePath, Type, StartSeconds, EndSeconds, Confidence,
+                 DetectedAt, FileModifiedAt)
+             VALUES (1, ?1, 0, 0.2, 46.6, 1.0, '', '')",
+            rusqlite::params![video.to_string_lossy()],
+        )
+        .unwrap();
+        drop(conn);
+
+        let analysis = (
+            Some(Segment {
+                start: 0.0,
+                end: Some(45.7),
+            }),
+            Some(Segment {
+                start: 1430.9,
+                end: Some(1500.3),
+            }),
+        );
+        let markers = local_markers(Some(&db), &video, None, Some(analysis));
+
+        assert_eq!(markers.intro_source.as_deref(), Some(FROM_SKIPTRO_DB));
+        assert_eq!(markers.intro.unwrap().end, Some(46.6));
+        assert_eq!(markers.credits_source.as_deref(), Some(FROM_ANALYSIS));
+        assert_eq!(markers.credits.unwrap().start, 1430.9);
+    }
+
+    /// With no Skiptro at all, the analysis carries both segments on its own.
+    #[test]
+    fn the_analysis_supplies_the_intro_when_nothing_else_does() {
+        let analysis = (
+            Some(Segment {
+                start: 0.0,
+                end: Some(45.7),
+            }),
+            None,
+        );
+        let markers = local_markers(None, Path::new(r"C:\media\x.mkv"), None, Some(analysis));
+        assert_eq!(markers.intro_source.as_deref(), Some(FROM_ANALYSIS));
+        assert_eq!(markers.intro.unwrap().end, Some(45.7));
     }
 
     /// With no Skiptro database at all, the sidecar is the intro source. This
@@ -630,7 +773,7 @@ mod tests {
         .unwrap();
 
         let sidecar = find_sidecar(&video);
-        let markers = local_markers(None, &video, sidecar.as_ref());
+        let markers = local_markers(None, &video, sidecar.as_ref(), None);
         assert_eq!(markers.intro_source.as_deref(), Some(FROM_SIDECAR));
         assert_eq!(markers.intro.unwrap().start, 0.2);
     }
@@ -645,9 +788,17 @@ mod tests {
 
         let db = dir.join("skiptro.db");
         std::fs::write(&db, b"x").unwrap();
-        let before = local_key(Some(&db), None);
+        let before = local_key(Some(&db), None, None);
 
         std::fs::write(db.with_extension("db-wal"), b"a scan happened").unwrap();
-        assert_ne!(local_key(Some(&db), None), before);
+        assert_ne!(local_key(Some(&db), None, None), before);
+    }
+
+    /// …and when Detect produces a fresh analysis, or the cached answer from
+    /// before it would stay on screen.
+    #[test]
+    fn the_local_key_changes_when_the_analysis_is_rerun() {
+        assert_ne!(local_key(None, None, Some(200)), local_key(None, None, Some(100)));
+        assert_ne!(local_key(None, None, Some(100)), local_key(None, None, None));
     }
 }

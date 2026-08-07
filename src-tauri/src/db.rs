@@ -193,6 +193,35 @@ ALTER TABLE titles ADD COLUMN trailer_key  TEXT;
 ALTER TABLE titles ADD COLUMN trailer_site TEXT;
 "#;
 
+/// Schema version 7: title logo artwork, and cast.
+///
+/// Both arrive on the *same* TMDB detail request the match already makes —
+/// `append_to_response` grows by two words and costs no extra round trip — so
+/// neither is a new provider or a new rate-limit concern.
+///
+/// `people` is deliberately denormalised and keyed by title. Cast is a property
+/// of a title here, not an entity with a life of its own: nothing in this app
+/// asks "what else were they in", and a shared `people` table plus a join table
+/// would buy that at the cost of orphan cleanup on every re-match. Re-matching
+/// replaces a title's rows wholesale, which a `title_id` cascade makes free.
+const SCHEMA_V7: &str = r#"
+ALTER TABLE titles ADD COLUMN logo_url TEXT;
+
+CREATE TABLE people (
+    id          INTEGER PRIMARY KEY,
+    title_id    INTEGER NOT NULL REFERENCES titles(id) ON DELETE CASCADE,
+    name        TEXT    NOT NULL,
+    character   TEXT,
+    profile_url TEXT,
+    -- Billing order as the provider gave it. The list is meaningless reordered:
+    -- the first few names are the ones anyone recognises.
+    ord         INTEGER NOT NULL,
+    UNIQUE(title_id, ord)
+);
+
+CREATE INDEX idx_people_title ON people(title_id);
+"#;
+
 /// How long a statement waits for the write lock before giving up.
 ///
 /// Load-bearing from the moment there is more than one connection. SQLite
@@ -262,6 +291,11 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
     if version < 6 {
         conn.execute_batch(SCHEMA_V6)?;
         conn.execute_batch("PRAGMA user_version=6;")?;
+    }
+
+    if version < 7 {
+        conn.execute_batch(SCHEMA_V7)?;
+        conn.execute_batch("PRAGMA user_version=7;")?;
     }
 
     Ok(())

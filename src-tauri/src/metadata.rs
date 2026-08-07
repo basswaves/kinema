@@ -36,8 +36,27 @@ pub struct TitleInput {
     pub rating: Option<f64>,
     pub poster_url: Option<String>,
     pub backdrop_url: Option<String>,
+    pub logo_url: Option<String>,
     pub trailer_key: Option<String>,
     pub trailer_site: Option<String>,
+    /// Billed cast, already capped and ordered by the provider client.
+    #[serde(default)]
+    pub cast: Vec<CastInput>,
+}
+
+#[derive(Deserialize)]
+pub struct CastInput {
+    pub name: String,
+    pub character: Option<String>,
+    pub profile_url: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct CastMember {
+    pub name: String,
+    pub character: Option<String>,
+    pub profile_url: Option<String>,
+    pub profile_path: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -67,6 +86,8 @@ pub struct Title {
     /// alongside it so the UI can fall back rather than showing nothing.
     pub poster_path: Option<String>,
     pub backdrop_path: Option<String>,
+    pub logo_url: Option<String>,
+    pub logo_path: Option<String>,
     pub trailer_key: Option<String>,
     pub trailer_site: Option<String>,
     pub rating: Option<f64>,
@@ -101,6 +122,7 @@ pub struct Episode {
 pub struct TitleDetail {
     pub title: Title,
     pub episodes: Vec<Episode>,
+    pub cast: Vec<CastMember>,
     /// For movies: the playable file.
     pub movie_path: Option<String>,
     pub movie_file_id: Option<i64>,
@@ -110,13 +132,15 @@ pub struct TitleDetail {
 /// Upsert by (provider, provider_id) so re-matching never duplicates a title.
 #[tauri::command]
 pub fn save_title(db: tauri::State<Db>, title: TitleInput) -> Result<i64, String> {
-    let conn = db.0.lock().map_err(to_string_err)?;
-    conn.execute(
+    let mut conn = db.0.lock().map_err(to_string_err)?;
+    let tx = conn.transaction().map_err(to_string_err)?;
+
+    tx.execute(
         "INSERT INTO titles
             (kind, provider, provider_id, imdb_id, tmdb_id, title, year, overview,
              genres, runtime_mins, rating, poster_url, backdrop_url, fetched_at,
-             trailer_key, trailer_site)
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16)
+             trailer_key, trailer_site, logo_url)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17)
          ON CONFLICT(provider, provider_id) DO UPDATE SET
             imdb_id = excluded.imdb_id, tmdb_id = excluded.tmdb_id,
             title = excluded.title, year = excluded.year, overview = excluded.overview,
@@ -125,24 +149,57 @@ pub fn save_title(db: tauri::State<Db>, title: TitleInput) -> Result<i64, String
             backdrop_url = excluded.backdrop_url, fetched_at = excluded.fetched_at,
             -- A provider that supplies no trailer must not wipe one that an
             -- earlier fetch found: re-matching a title through TVmaze would
-            -- otherwise silently lose the TMDB trailer.
+            -- otherwise silently lose the TMDB trailer. The logo is the same
+            -- story — only TMDB has one, so any other provider must leave it.
             trailer_key  = COALESCE(excluded.trailer_key,  titles.trailer_key),
-            trailer_site = COALESCE(excluded.trailer_site, titles.trailer_site)",
+            trailer_site = COALESCE(excluded.trailer_site, titles.trailer_site),
+            logo_url     = COALESCE(excluded.logo_url,     titles.logo_url)",
         params![
             title.kind, title.provider, title.provider_id, title.imdb_id, title.tmdb_id,
             title.title, title.year, title.overview, title.genres, title.runtime_mins,
             title.rating, title.poster_url, title.backdrop_url, now_secs(),
-            title.trailer_key, title.trailer_site
+            title.trailer_key, title.trailer_site, title.logo_url
         ],
     )
     .map_err(to_string_err)?;
 
-    conn.query_row(
-        "SELECT id FROM titles WHERE provider = ?1 AND provider_id = ?2",
-        params![title.provider, title.provider_id],
-        |r| r.get(0),
-    )
-    .map_err(to_string_err)
+    let title_id: i64 = tx
+        .query_row(
+            "SELECT id FROM titles WHERE provider = ?1 AND provider_id = ?2",
+            params![title.provider, title.provider_id],
+            |r| r.get(0),
+        )
+        .map_err(to_string_err)?;
+
+    // Cast is replaced wholesale, but only when the provider actually supplied
+    // some. An empty list means "this provider does not do cast" — TVmaze and
+    // OMDb both send one — and deleting on that would wipe what TMDB found the
+    // last time the title was matched.
+    if !title.cast.is_empty() {
+        tx.execute("DELETE FROM people WHERE title_id = ?1", params![title_id])
+            .map_err(to_string_err)?;
+
+        let mut stmt = tx
+            .prepare(
+                "INSERT INTO people (title_id, name, character, profile_url, ord)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+            )
+            .map_err(to_string_err)?;
+
+        for (index, person) in title.cast.iter().enumerate() {
+            stmt.execute(params![
+                title_id,
+                person.name,
+                person.character,
+                person.profile_url,
+                index as i64
+            ])
+            .map_err(to_string_err)?;
+        }
+    }
+
+    tx.commit().map_err(to_string_err)?;
+    Ok(title_id)
 }
 
 #[tauri::command]
@@ -257,7 +314,10 @@ const TITLE_SELECT: &str = "
              WHERE a.url = t.poster_url   AND a.local_path <> ''),
            (SELECT :art || a.local_path FROM artwork_cache a
              WHERE a.url = t.backdrop_url AND a.local_path <> ''),
-           t.trailer_key, t.trailer_site
+           t.trailer_key, t.trailer_site,
+           t.logo_url,
+           (SELECT :art || a.local_path FROM artwork_cache a
+             WHERE a.url = t.logo_url     AND a.local_path <> '')
       FROM titles t";
 
 fn map_title(r: &rusqlite::Row) -> rusqlite::Result<Title> {
@@ -279,6 +339,8 @@ fn map_title(r: &rusqlite::Row) -> rusqlite::Result<Title> {
         backdrop_path: r.get(14)?,
         trailer_key: r.get(15)?,
         trailer_site: r.get(16)?,
+        logo_url: r.get(17)?,
+        logo_path: r.get(18)?,
     })
 }
 
@@ -359,9 +421,39 @@ pub fn get_title_detail(
         )
         .ok();
 
+    let cast = {
+        let mut stmt = conn
+            .prepare(
+                "SELECT p.name, p.character, p.profile_url,
+                        (SELECT :art || a.local_path FROM artwork_cache a
+                          WHERE a.url = p.profile_url AND a.local_path <> '')
+                   FROM people p
+                  WHERE p.title_id = :id
+                  ORDER BY p.ord",
+            )
+            .map_err(to_string_err)?;
+
+        // Bound to a local before the block ends: returning the collected rows
+        // as the block's tail expression keeps a temporary alive past `stmt`.
+        let rows = stmt
+            .query_map(named_params! { ":art": &art, ":id": title_id }, |r| {
+                Ok(CastMember {
+                    name: r.get(0)?,
+                    character: r.get(1)?,
+                    profile_url: r.get(2)?,
+                    profile_path: r.get(3)?,
+                })
+            })
+            .map_err(to_string_err)?
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(to_string_err)?;
+        rows
+    };
+
     Ok(TitleDetail {
         title,
         episodes,
+        cast,
         movie_path: movie.as_ref().map(|m| m.0.clone()),
         movie_file_id: movie.as_ref().map(|m| m.1),
         movie_watched: movie.map(|m| m.2).unwrap_or(false),
@@ -388,19 +480,23 @@ pub struct TrailerTarget {
     pub kind: String,
 }
 
-/// Titles that could have a trailer but do not yet.
+/// Titles matched before some part of the TMDB detail response was being used.
 ///
-/// Restricted to titles with a TMDB id, because that is the only provider here
-/// that carries video links at all — asking about the others would be querying
-/// for something that cannot exist.
+/// Restricted to titles with a TMDB id, because it is the only provider here
+/// carrying trailers, logos or cast at all — asking about the others would be
+/// querying for something that cannot exist.
+///
+/// `NULL` means never asked; an **empty string** means asked and there is none.
+/// Without that distinction a title genuinely lacking a logo would be re-fetched
+/// on every single pass, forever.
 #[tauri::command]
-pub fn list_titles_without_trailer(db: tauri::State<Db>) -> Result<Vec<TrailerTarget>, String> {
+pub fn list_titles_needing_detail(db: tauri::State<Db>) -> Result<Vec<TrailerTarget>, String> {
     let conn = db.0.lock().map_err(to_string_err)?;
     let mut stmt = conn
         .prepare(
             "SELECT id, tmdb_id, kind FROM titles
               WHERE tmdb_id IS NOT NULL AND tmdb_id <> ''
-                AND (trailer_key IS NULL OR trailer_key = '')
+                AND (trailer_key IS NULL OR logo_url IS NULL)
               ORDER BY id",
         )
         .map_err(to_string_err)?;

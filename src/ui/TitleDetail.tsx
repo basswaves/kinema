@@ -343,6 +343,36 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
 
           {error && <div className="detail-error">{error}</div>}
 
+          {/* Not focusable. Nothing here is actionable — this app has no
+              "more from this person" to navigate to — and a row of dead
+              landing spots between the buttons and the episode list would put
+              ten presses in the way of the thing you came for. */}
+          {detail && detail.cast.length > 0 && (
+            <section className="cast">
+              <h2 className="cast-heading">Cast</h2>
+              <div className="cast-track">
+                {detail.cast.map((person) => (
+                  <div className="cast-member" key={`${person.name}-${person.character ?? ''}`}>
+                    <div className="cast-photo">
+                      <Art
+                        local={person.profile_path}
+                        remote={person.profile_url}
+                        lazy
+                        fallback={
+                          <div className="cast-photo-empty">
+                            {person.name.slice(0, 1).toUpperCase()}
+                          </div>
+                        }
+                      />
+                    </div>
+                    <div className="cast-name">{person.name}</div>
+                    {person.character && <div className="cast-role">{person.character}</div>}
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
           {seasons.length > 0 && (
             <>
               {seasons.length > 1 && (

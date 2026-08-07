@@ -69,7 +69,7 @@ function summaryLine(s: ScanSummary): string {
     `${s.unmatched} left for review`,
   ];
   if (s.artworkStored) parts.push(`${s.artworkStored} image(s) cached`);
-  if (s.trailersFound) parts.push(`${s.trailersFound} trailer(s)`);
+  if (s.detailsFilled) parts.push(`${s.detailsFilled} title(s) enriched`);
   return parts.join(' · ');
 }
 

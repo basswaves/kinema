@@ -12,10 +12,9 @@ import type { MediaFile } from '../library/api';
 import {
   getSetting,
   linkFilesToTitle,
-  listTitlesWithoutTrailer,
+  listTitlesNeedingDetail,
   saveEpisodes,
   saveTitle,
-  setTitleTrailer,
   type StoredTitle,
 } from './api';
 import {
@@ -23,7 +22,6 @@ import {
   omdbSearch,
   tmdbGetEpisodes,
   tmdbGetTitle,
-  tmdbGetTrailer,
   tmdbSearch,
   tvmazeGetEpisodes,
   tvmazeGetShow,
@@ -206,34 +204,39 @@ export async function applyMatch(
   return titleId;
 }
 
-export interface TrailerBackfill {
+export interface DetailBackfill {
   found: number;
   none: number;
   errors: string[];
 }
 
 /**
- * Fill in trailer keys for titles matched before they were stored.
+ * Re-fetch titles matched before some part of the TMDB response was being used.
  *
- * A fresh match gets its key from the detail fetch for free; this exists only
- * for titles that predate that. Titles with no trailer are recorded as checked
- * by writing an empty string, so a library with no trailers stops re-asking
- * TMDB on every pass.
+ * A fresh match gets its trailer key, logo and cast from the detail fetch for
+ * free; this exists only for titles that predate each of those. It re-requests
+ * the whole detail rather than one field, because TMDB returns all of it in a
+ * single response anyway — asking separately would be three round trips for the
+ * data of one.
+ *
+ * Self-limiting: `list_titles_needing_detail` only returns rows where a field is
+ * still `NULL`, and this pass writes an empty string where TMDB genuinely has
+ * nothing. Without that, every title without a logo would be re-fetched forever.
  */
-export async function backfillTrailers(): Promise<TrailerBackfill> {
-  const result: TrailerBackfill = { found: 0, none: 0, errors: [] };
+export async function backfillTitleDetails(): Promise<DetailBackfill> {
+  const result: DetailBackfill = { found: 0, none: 0, errors: [] };
   const keys = await loadProviderKeys();
   if (!keys.tmdb) return result;
 
-  for (const target of await listTitlesWithoutTrailer()) {
+  for (const target of await listTitlesNeedingDetail()) {
+    const kind = target.kind === 'series' ? 'series' : 'movie';
     try {
-      const trailer = await tmdbGetTrailer(
-        keys.tmdb,
-        target.tmdb_id,
-        target.kind === 'series' ? 'series' : 'movie'
-      );
-      await setTitleTrailer(target.id, trailer?.key ?? '', trailer?.site ?? null);
-      if (trailer) result.found++;
+      const metadata = await tmdbGetTitle(keys.tmdb, target.tmdb_id, kind);
+      // Straight back through `saveTitle`, so a backfilled title is stored by
+      // exactly the same path as a freshly matched one — including the cast
+      // rows, which nothing else writes.
+      await saveTitle(metadata);
+      if (metadata.logo_url || metadata.trailer_key) result.found++;
       else result.none++;
     } catch (e) {
       result.errors.push(`${target.tmdb_id}: ${e instanceof Error ? e.message : String(e)}`);

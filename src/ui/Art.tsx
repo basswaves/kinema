@@ -21,18 +21,34 @@ interface Props {
   /** The provider URL, from the `*_url` field. */
   remote: string | null;
   className?: string;
-  /** Rendered when there is no artwork at all. */
+  /**
+   * Rendered when there is no artwork at all — *or* when every source has been
+   * tried and failed. Both are "there is no picture here", and a caller that
+   * has something to show instead should get to show it in either case.
+   */
   fallback?: ReactNode;
   lazy?: boolean;
+  /** Describes the image where it carries meaning, as a logo does. */
+  alt?: string;
 }
 
-export default function Art({ local, remote, className, fallback = null, lazy }: Props) {
-  // Tracking *which* source failed rather than a boolean means this resets by
-  // itself when the props change — no effect, no stale "broken" state.
-  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+export default function Art({
+  local,
+  remote,
+  className,
+  fallback = null,
+  lazy,
+  alt = '',
+}: Props) {
+  // The set of sources that have failed, keyed by URL. Keying by URL rather
+  // than counting attempts means new props are retried automatically — the new
+  // URLs are simply not in the set — with no effect and no stale broken state.
+  const [failed, setFailed] = useState<ReadonlySet<string>>(() => new Set());
 
   const localSrc = local ? convertFileSrc(local) : null;
-  const src = localSrc && localSrc !== failedSrc ? localSrc : remote;
+  // Local first, remote second: the cache is an accelerator, the URL the truth.
+  const sources = [localSrc, remote].filter((s): s is string => Boolean(s));
+  const src = sources.find((candidate) => !failed.has(candidate)) ?? null;
 
   if (!src) return <>{fallback}</>;
 
@@ -40,7 +56,7 @@ export default function Art({ local, remote, className, fallback = null, lazy }:
     <img
       className={className}
       src={src}
-      alt=""
+      alt={alt}
       draggable={false}
       loading={lazy ? 'lazy' : undefined}
       onError={() => {
@@ -49,7 +65,11 @@ export default function Art({ local, remote, className, fallback = null, lazy }:
         // network again. devlog puts this in app.log, so the difference is
         // visible from outside the webview.
         if (src === localSrc) console.warn(`artwork: cached copy failed, using ${remote}`, local);
-        setFailedSrc(src);
+        // Each source is marked failed exactly once, so this terminates. The
+        // previous version tracked a single failed source and flipped between
+        // the two forever when *both* were broken — offline with a half-built
+        // cache, which is precisely when it mattered.
+        setFailed((previous) => new Set(previous).add(src));
       }}
     />
   );

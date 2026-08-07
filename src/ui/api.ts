@@ -15,6 +15,12 @@ export interface Title {
   /** Cached copy in app data, when one has been downloaded. */
   poster_path: string | null;
   backdrop_path: string | null;
+  /**
+   * The title treatment — the name as designed, on transparency — for drawing
+   * over the hero instead of setting the title in the UI font. TMDB only.
+   */
+  logo_url: string | null;
+  logo_path: string | null;
   /** YouTube video id, empty string once checked and none exists. */
   trailer_key: string | null;
   trailer_site: string | null;
@@ -42,9 +48,18 @@ export interface Episode {
   duration_secs: number | null;
 }
 
+export interface CastMember {
+  name: string;
+  character: string | null;
+  profile_url: string | null;
+  profile_path: string | null;
+}
+
 export interface TitleDetail {
   title: Title;
   episodes: Episode[];
+  /** Billed cast in provider order, capped at ten. Empty for non-TMDB titles. */
+  cast: CastMember[];
   movie_path: string | null;
   movie_file_id: number | null;
   movie_watched: boolean;

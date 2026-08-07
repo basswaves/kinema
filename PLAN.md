@@ -1087,6 +1087,27 @@ whether a person asked to leave or the file simply ran out. Auto-play of the nex
 episode is untouched — that never leaves the player, and staying fullscreen
 between episodes is the whole point of it.
 
+## The mouse pointer goes idle with the controls ✅
+
+The OSD faded on the idle timer and the arrow stayed sitting on the picture.
+The pointer now hides with it and returns with it, which is what every other
+player does.
+
+It is **one CSS rule on the class the OSD already toggles**, not a second timer.
+`onMouseMove` on the player shell calls `showOsd()`, so the movement that should
+bring the pointer back is the same event that brings the controls back — there
+is no state to keep in step and no way for the two to disagree. A separate
+cursor timeout would have been a second answer to a question already answered.
+
+The rule reaches descendants (`.player.osd-hidden *`) on purpose. The Skip
+prompt, the Up next card and the stats panel are all deliberately outside the
+OSD and outlive the timeout, and each carries `cursor: pointer`, which wins on
+specificity over a rule on the shell alone — the visible symptom would have been
+an arrow hovering over the video in exactly the cases the feature exists for.
+
+Pausing does not pin the pointer, because pausing does not pin the OSD either.
+Whether it should is one question about the idle timer, not two.
+
 ## Open items
 
 **They live in [HANDOVER.md](HANDOVER.md), and only there.** They used to be

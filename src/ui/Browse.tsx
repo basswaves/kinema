@@ -19,7 +19,13 @@ import Card from './Card';
 import FocusButton from './FocusButton';
 import Settings from './Settings';
 import Player, { type PlaybackTarget } from '../player/Player';
-import { continueWatching, forgetProgress, type ContinueItem } from '../player/api';
+import {
+  continueWatching,
+  episodeLabel,
+  firstUnwatchedEpisode,
+  forgetProgress,
+  type ContinueItem,
+} from '../player/api';
 import { cacheArtwork } from '../metadata/api';
 import { runScanPipeline, useScanStatus } from '../library/pipeline';
 import { getTitleDetail, listTitles, type Title } from './api';
@@ -108,10 +114,24 @@ export default function Browse() {
     }
   }, []);
 
+  /**
+   * Re-read whenever Home is shown, not only when the shell mounts.
+   *
+   * Everything that changes what Home displays happens on some *other* view:
+   * finishing an episode in the player, marking one watched on a detail page,
+   * fixing a match in Settings. A load that ran once at startup left the rails
+   * showing whatever was true when the app opened, and the failure is quiet —
+   * Continue Watching goes on offering an episode you have just declared seen.
+   *
+   * Stating it as "Home reflects the database while Home is visible" is what
+   * makes it hold for the next screen that writes something, too. A callback
+   * per writer would have to be remembered each time.
+   */
   useEffect(() => {
+    if (view.name !== 'home') return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
-  }, [load]);
+  }, [view.name, load]);
 
   // Fill in any artwork that is not cached yet, then reload so the local copies
   // are actually used. Titles matched before this existed have no local copy,
@@ -159,7 +179,13 @@ export default function Browse() {
 
   /**
    * Play the most sensible file for a title without making the user choose:
-   * the movie itself, or the first episode we actually hold.
+   * where you left off, else the earliest episode you have not seen, else the
+   * film itself.
+   *
+   * A series is asked about directly rather than being routed through
+   * `getTitleDetail`, whose `movie_path` is the *largest file by size* for a
+   * series — so Play used to start whichever episode happened to be biggest,
+   * which on a season with a feature-length finale is the ending.
    */
   const playTitle = useCallback(
     async (title: Title) => {
@@ -172,16 +198,29 @@ export default function Browse() {
             name: 'player',
             target: {
               path: inProgress.path,
-              label:
-                inProgress.season !== null && inProgress.episode !== null
-                  ? `${title.title} — S${String(inProgress.season).padStart(2, '0')}E${String(
-                      inProgress.episode
-                    ).padStart(2, '0')}`
-                  : title.title,
+              label: episodeLabel(title.title, inProgress.season, inProgress.episode),
               fileId: inProgress.file_id,
               titleId: title.id,
             },
           });
+          return;
+        }
+
+        if (title.kind === 'series') {
+          const next = await firstUnwatchedEpisode(title.id);
+          if (next) {
+            setView({
+              name: 'player',
+              target: {
+                path: next.path,
+                label: episodeLabel(title.title, next.season, next.episode),
+                fileId: next.file_id,
+                titleId: title.id,
+              },
+            });
+            return;
+          }
+          setError(`No playable episode for “${title.title}”.`);
           return;
         }
 
@@ -199,21 +238,6 @@ export default function Browse() {
           return;
         }
 
-        const firstOwned = detail.episodes.find((e) => e.file_path);
-        if (firstOwned?.file_path) {
-          setView({
-            name: 'player',
-            target: {
-              path: firstOwned.file_path,
-              label: `${title.title} — S${String(firstOwned.season).padStart(2, '0')}E${String(
-                firstOwned.episode
-              ).padStart(2, '0')}`,
-              fileId: firstOwned.file_id,
-              titleId: title.id,
-            },
-          });
-          return;
-        }
         setError(`No playable file for “${title.title}”.`);
       } catch (e) {
         setError(String(e));
@@ -272,11 +296,9 @@ export default function Browse() {
       <Player
         target={view.target}
         onPlayTarget={(target) => setView({ name: 'player', target })}
-        onExit={() => {
-          setView({ name: 'home' });
-          // Reload so progress and Continue Watching reflect what just played.
-          void load();
-        }}
+        // Returning to Home re-reads the library on arrival, so what just
+        // played is reflected without a second load here.
+        onExit={() => setView({ name: 'home' })}
       />
     );
   }
@@ -304,12 +326,7 @@ export default function Browse() {
                 name: 'player',
                 target: {
                   path: item.path,
-                  label:
-                    item.season !== null && item.episode !== null
-                      ? `${item.title} — S${String(item.season).padStart(2, '0')}E${String(
-                          item.episode
-                        ).padStart(2, '0')}`
-                      : item.title,
+                  label: episodeLabel(item.title, item.season, item.episode),
                   fileId: item.file_id,
                   titleId: item.title_id,
                 },

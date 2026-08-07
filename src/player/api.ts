@@ -22,6 +22,13 @@ export interface ContinueItem {
   /** Cached copy of exactly the image `image_url` points at. */
   image_path: string | null;
   updated_at: number;
+  /**
+   * True when this card is the *next* episode to start rather than one already
+   * part-watched. `position_secs` is 0 on these, so the progress bar and the
+   * "x min left" line have to be suppressed — a bar sitting at 0% reads as a
+   * bug, not as "not started yet".
+   */
+  is_next_up: boolean;
 }
 
 /** Enough to play a neighbouring episode and label it, in either direction. */
@@ -50,6 +57,25 @@ export interface TitlePrefs {
   audio_lang: string | null;
   sub_lang: string | null;
   sub_enabled: boolean;
+}
+
+/**
+ * How a playable file is named on screen: `Show — S01E04`, or just the title
+ * when there is no episode numbering.
+ *
+ * Shared because the same expression was being rebuilt at five call sites, and
+ * a label that formats differently depending on which screen launched playback
+ * is the kind of inconsistency nobody reports and everybody notices.
+ */
+export function episodeLabel(
+  showTitle: string,
+  season: number | null,
+  episode: number | null
+): string {
+  if (season === null || episode === null) return showTitle;
+  const s = String(season).padStart(2, '0');
+  const e = String(episode).padStart(2, '0');
+  return `${showTitle} — S${s}E${e}`;
 }
 
 export const saveProgress = (fileId: number, positionSecs: number, durationSecs: number | null) =>
@@ -84,6 +110,17 @@ export const nextEpisode = (fileId: number) =>
 
 export const previousEpisode = (fileId: number) =>
   invoke<EpisodeRef | null>('previous_episode', { fileId });
+
+/**
+ * What pressing Play on a series should start: the earliest episode not yet
+ * seen, or the first one if the whole run has been.
+ *
+ * Asked of the database rather than worked out from a loaded episode list,
+ * because the list comes from the provider and a title can be matched with no
+ * episode data at all. This reads the files themselves, so it answers even then.
+ */
+export const firstUnwatchedEpisode = (titleId: number) =>
+  invoke<EpisodeRef | null>('first_unwatched_episode', { titleId });
 
 export const getTitlePrefs = (titleId: number) =>
   invoke<TitlePrefs>('get_title_prefs', { titleId });

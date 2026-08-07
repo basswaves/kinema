@@ -11,6 +11,15 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  doesFocusableExist,
+  FocusContext,
+  getCurrentFocusKey,
+  pause as pauseSpatial,
+  resume as resumeSpatial,
+  setFocus,
+  useFocusable,
+} from '@noriginmedia/norigin-spatial-navigation';
+import {
   command,
   getProperty,
   listenEvents,
@@ -18,6 +27,7 @@ import {
   setProperty,
 } from 'tauri-plugin-libmpv-api';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import FocusButton from '../ui/FocusButton';
 import { ensureMpvInitialised, OBSERVED_PROPERTIES } from './mpv';
 import {
   describeTrack,
@@ -28,6 +38,7 @@ import {
   type MpvTrack,
 } from './tracks';
 import {
+  episodeLabel,
   getProgress,
   getSkipMarkers,
   getTitlePrefs,
@@ -76,11 +87,19 @@ const STATS_REFRESH_MS = 1000;
 /** Setting key: 'auto' skips without asking, anything else shows the button. */
 const SKIP_MODE_KEY = 'skip_mode';
 
-/** The label an episode carries into the player, in one place. */
-function episodeLabel(episode: EpisodeRef): string {
-  return `${episode.title} — S${String(episode.season).padStart(2, '0')}E${String(
-    episode.episode
-  ).padStart(2, '0')}`;
+/**
+ * Focus keys for the two places focus is aimed at explicitly: the control the
+ * OSD opens on, and the track panel, which should take focus the moment it
+ * appears rather than making you arrow back up to it.
+ */
+const PLAYER_SHELL_KEY = 'player-shell';
+const PLAYER_PLAY_KEY = 'player-play';
+const PLAYER_TRACKS_KEY = 'player-tracks-button';
+const TRACK_PANEL_KEY = 'player-track-panel';
+
+/** The label an episode carries into the player, shared with the browsing UI. */
+function labelFor(episode: EpisodeRef): string {
+  return episodeLabel(episode.title, episode.season, episode.episode);
 }
 
 function formatTime(seconds: number | null): string {
@@ -120,9 +139,31 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   }>({ prev: null, next: null });
   /** Prompt occurrences the user (or the timer) has already dismissed. */
   const [dismissed, setDismissed] = useState<string | null>(null);
+  /**
+   * Whether the OSD holds focus.
+   *
+   * This is the switch that decides which of the two live keyboard handlers
+   * owns the arrow keys. Off (the default) the spatial system is paused and
+   * arrows seek, exactly as a desktop player behaves. On, the spatial system is
+   * resumed and arrows move between controls. Exactly one is ever active, which
+   * is the whole point: `preventDefault` cannot stop the other listener, so
+   * overlapping them would fire both.
+   */
+  const [osdFocus, setOsdFocus] = useState(false);
 
   const seekingRef = useRef(false);
   const hideTimer = useRef<number | undefined>(undefined);
+  /** Mirror of `osdFocus` for the callbacks that must not be rebuilt on it. */
+  const osdFocusRef = useRef(false);
+
+  // Every control in the player hangs off this container, so the OSD has one
+  // place to aim focus at and one place to remember where it was.
+  const { ref: shellRef, focusKey: shellFocusKey } = useFocusable({
+    focusKey: PLAYER_SHELL_KEY,
+    trackChildren: true,
+    saveLastFocusedChild: true,
+    preferredChildFocusKey: PLAYER_PLAY_KEY,
+  });
   // Live values for the unmount save, which cannot read React state.
   const latest = useRef({ position: 0, duration: null as number | null });
   /** Resume position to apply once the file is actually open. */
@@ -141,7 +182,46 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   const showOsd = useCallback(() => {
     setOsdVisible(true);
     window.clearTimeout(hideTimer.current);
+    // Never time out while focus is inside the OSD. Hiding the thing the focus
+    // ring is on leaves a remote pressing arrows at an invisible control, which
+    // is indistinguishable from a hang — the same silent dead end as focus
+    // parked on an unmounted component (GOTCHAS.md).
+    if (osdFocusRef.current) return;
     hideTimer.current = window.setTimeout(() => setOsdVisible(false), OSD_HIDE_MS);
+  }, []);
+
+  /**
+   * Hand the arrow keys to the OSD.
+   *
+   * `resume()` before `setFocus`: the spatial system ignores navigation while
+   * paused, and aiming focus at a control it is not currently listening for
+   * would leave the ring nowhere.
+   */
+  const enterOsdFocus = useCallback(() => {
+    osdFocusRef.current = true;
+    setOsdFocus(true);
+    resumeSpatial();
+    setOsdVisible(true);
+    window.clearTimeout(hideTimer.current);
+    void setFocus(PLAYER_PLAY_KEY);
+  }, []);
+
+  /** Give them back to seeking, and let the OSD start timing out again. */
+  const leaveOsdFocus = useCallback(() => {
+    osdFocusRef.current = false;
+    setOsdFocus(false);
+    pauseSpatial();
+    showOsd();
+  }, [showOsd]);
+
+  /**
+   * Arrows mean "seek" until asked otherwise, so the spatial system starts
+   * paused — and is resumed on the way out, or the browsing UI underneath would
+   * be left unable to navigate after the player closes.
+   */
+  useEffect(() => {
+    pauseSpatial();
+    return () => resumeSpatial();
   }, []);
 
   // ---- load, resume, and apply remembered tracks --------------------------
@@ -574,7 +654,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     (episode: EpisodeRef) => {
       onPlayTarget({
         path: episode.path,
-        label: episodeLabel(episode),
+        label: labelFor(episode),
         fileId: episode.file_id,
         titleId: target.titleId,
       });
@@ -623,7 +703,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       if (upNext) {
         onPlayTarget({
           path: upNext.path,
-          label: episodeLabel(upNext),
+          label: labelFor(upNext),
           fileId: upNext.file_id,
           titleId: target.titleId,
         });
@@ -739,16 +819,42 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         case 'f':
           void toggleFullscreen();
           break;
+        // Back, one layer at a time: close whichever panel is open, then drop
+        // out of OSD focus, then leave the player. Anything else would make the
+        // only way out of a panel a mouse click.
         case 'Escape':
         case 'Backspace':
           e.preventDefault();
-          void exit();
+          if (showTracks) {
+            setShowTracks(false);
+          } else if (showStats) {
+            setShowStats(false);
+          } else if (osdFocus) {
+            leaveOsdFocus();
+          } else {
+            void exit();
+          }
+          break;
+        // Up is what hands the arrow keys over. Once the OSD has them, every
+        // arrow belongs to the spatial system and this handler must not touch
+        // them — `preventDefault` cannot stop the other listener, so acting on
+        // one here would seek *and* move the focus ring on the same press.
+        case 'ArrowUp':
+          if (!osdFocus) {
+            e.preventDefault();
+            enterOsdFocus();
+          }
+          break;
+        case 'ArrowDown':
+          if (!osdFocus) showOsd();
           break;
         case 'ArrowLeft':
+          if (osdFocus) break;
           e.preventDefault();
           void seekRelative(-10);
           break;
         case 'ArrowRight':
+          if (osdFocus) break;
           e.preventDefault();
           void seekRelative(10);
           break;
@@ -774,13 +880,16 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           e.preventDefault();
           setShowStats((v) => !v);
           break;
-        // OK on a remote, for the two prompts that appear over the video.
-        // Both are time-limited offers, and reaching them with a mouse is not
-        // an option from the sofa — which is the only place they matter.
-        // Deliberately does nothing when no prompt is showing: Enter already
-        // falls through to revealing the OSD, and rebinding it to play/pause
-        // would change a behaviour nobody asked to change.
+        // OK on a remote. While the OSD holds focus this belongs entirely to
+        // the spatial system, which activates whichever control the ring is on
+        // — including the Skip and Up next buttons, which are focusable too.
+        // Acting here as well would fire both handlers on one press.
+        //
+        // In seek mode it takes whichever prompt is showing, and otherwise just
+        // reveals the OSD: rebinding it to play/pause would change a behaviour
+        // nobody asked to change.
         case 'Enter':
+          if (osdFocus) break;
           if (skipPrompt) {
             e.preventDefault();
             void performSkip();
@@ -808,6 +917,11 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     upNext,
     neighbours,
     playNeighbour,
+    osdFocus,
+    enterOsdFocus,
+    leaveOsdFocus,
+    showTracks,
+    showStats,
   ]);
 
   useEffect(() => {
@@ -816,13 +930,61 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     return () => window.clearTimeout(hideTimer.current);
   }, [showOsd]);
 
+  /**
+   * Follow the track panel with the focus ring.
+   *
+   * Opening a panel and leaving focus on the button that opened it means the
+   * first thing a remote has to do is work out which direction the new panel is
+   * in. Closing it and leaving focus on a control that no longer exists is
+   * worse: the ring vanishes and no arrow does anything. Only applies once the
+   * OSD holds focus — with a mouse, nothing should move on its own.
+   */
+  useEffect(() => {
+    if (!osdFocus) return;
+    void setFocus(showTracks ? TRACK_PANEL_KEY : PLAYER_TRACKS_KEY);
+  }, [showTracks, osdFocus]);
+
+  /**
+   * Catch the ring when a control disappears from under it.
+   *
+   * Several of these controls come and go on their own: the Skip prompt times
+   * out after ten seconds, Up next is dismissed, the previous/next buttons are
+   * absent at the ends of a run and are cleared on every file change. Focus left
+   * on any of them points at a component that no longer exists — no ring
+   * anywhere and no arrow press doing anything, which is indistinguishable from
+   * a hang (GOTCHAS.md).
+   *
+   * Keyed on whether each thing is present rather than on the values, because
+   * `skipPrompt` is rebuilt on every position tick and would fire this once a
+   * second. The liveness test is the same one the browsing views use.
+   */
+  const hasSkipPrompt = skipPrompt !== null;
+  const hasUpNext = upNext !== null;
+  useEffect(() => {
+    if (!osdFocus) return;
+    if (doesFocusableExist(getCurrentFocusKey())) return;
+    void setFocus(PLAYER_SHELL_KEY);
+  }, [
+    osdFocus,
+    hasSkipPrompt,
+    hasUpNext,
+    showStats,
+    showTracks,
+    neighbours.prev,
+    neighbours.next,
+  ]);
+
   const progress = duration && timePos !== null ? (timePos / duration) * 100 : 0;
   const subTracks = tracks.filter((t) => t.type === 'sub');
   const audioTracks = tracks.filter((t) => t.type === 'audio');
 
   return (
+    <FocusContext.Provider value={shellFocusKey}>
     <div
-      className={`player ${osdVisible || showTracks ? '' : 'osd-hidden'}`}
+      ref={shellRef}
+      className={`player ${osdFocus ? 'osd-focused' : ''} ${
+        osdVisible || showTracks || osdFocus ? '' : 'osd-hidden'
+      }`}
       onMouseMove={showOsd}
       onClick={(e) => {
         if (
@@ -852,9 +1014,9 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       )}
 
       <div className="player-top">
-        <button className="back-button" onClick={() => void exit()}>
+        <FocusButton className="back-button" onSelect={() => void exit()}>
           ← Back
-        </button>
+        </FocusButton>
         <span className="player-label">{target.label}</span>
       </div>
 
@@ -871,24 +1033,24 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
               {upNext.name ? ` · ${upNext.name}` : ''}
             </div>
             <div className="up-next-actions">
-              <button className="btn-primary" onClick={() => setCountdown(0)}>
+              <FocusButton className="btn-primary" onSelect={() => setCountdown(0)}>
                 {countdown !== null ? `▶ Play now (${countdown})` : '▶ Play next'}
-              </button>
+              </FocusButton>
               {countdown !== null ? (
-                <button
+                <FocusButton
                   className="btn-secondary"
-                  onClick={() => {
+                  onSelect={() => {
                     setCountdown(null);
                     setUpNext(null);
                     void exit();
                   }}
                 >
                   Back to library
-                </button>
+                </FocusButton>
               ) : (
-                <button
+                <FocusButton
                   className="btn-secondary"
-                  onClick={() => {
+                  onSelect={() => {
                     // Refuse the offer for the rest of this file. Dismissing by
                     // segment rather than by a flag also silences the small
                     // credits prompt, which would otherwise take its place.
@@ -897,7 +1059,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
                   }}
                 >
                   Keep watching
-                </button>
+                </FocusButton>
               )}
             </div>
           </div>
@@ -905,9 +1067,9 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       )}
 
       {skipPrompt && (
-        <button className="skip-button" onClick={() => void performSkip()}>
+        <FocusButton className="skip-button" onSelect={() => void performSkip()}>
           {skipPrompt.kind === 'intro' ? 'Skip intro' : 'Next episode ›'}
-        </button>
+        </FocusButton>
       )}
 
       {/* Deliberately outside the OSD: the panel is for watching numbers move
@@ -917,7 +1079,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         <aside className="stats-panel">
           <div className="stats-head">
             <span>Stats for nerds</span>
-            <button onClick={() => setShowStats(false)}>close</button>
+            <FocusButton onSelect={() => setShowStats(false)}>close</FocusButton>
           </div>
           {stats.length === 0 && <div className="stats-empty">reading…</div>}
           {stats.map((group) => (
@@ -941,42 +1103,15 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       )}
 
       {showTracks && (
-        <aside className="track-panel">
-          <div className="track-panel-head">
-            <span>Audio</span>
-            <button onClick={() => setShowTracks(false)}>close</button>
-          </div>
-          {audioTracks.length === 0 && <div className="track-empty">no audio tracks</div>}
-          {audioTracks.map((track) => (
-            <button
-              key={track.id}
-              className={`track-option ${aid === track.id ? 'active' : ''}`}
-              onClick={() => void chooseTrack('aid', track)}
-            >
-              {describeTrack(track)}
-            </button>
-          ))}
-
-          <div className="track-panel-head">
-            <span>Subtitles</span>
-          </div>
-          <button
-            className={`track-option ${!subVisible ? 'active' : ''}`}
-            onClick={() => void chooseTrack('sid', null)}
-          >
-            Off
-          </button>
-          {subTracks.map((track) => (
-            <button
-              key={track.id}
-              className={`track-option ${subVisible && sid === track.id ? 'active' : ''}`}
-              onClick={() => void chooseTrack('sid', track)}
-            >
-              {describeTrack(track)}
-            </button>
-          ))}
-          <p className="track-note">Remembered for this show.</p>
-        </aside>
+        <TrackPanel
+          audioTracks={audioTracks}
+          subTracks={subTracks}
+          aid={aid}
+          sid={sid}
+          subVisible={subVisible}
+          onChoose={(kind, track) => void chooseTrack(kind, track)}
+          onClose={() => setShowTracks(false)}
+        />
       )}
 
       <div className="player-controls">
@@ -1007,47 +1142,135 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           {/* Rendered only for episodes that genuinely have a neighbour, so
               these never appear on a film or at the ends of a run. */}
           {neighbours.prev && (
-            <button
+            <FocusButton
               className="episode-step"
-              title={`Previous: ${episodeLabel(neighbours.prev)}`}
-              onClick={() => playNeighbour(neighbours.prev as EpisodeRef)}
+              title={`Previous: ${labelFor(neighbours.prev)}`}
+              onSelect={() => playNeighbour(neighbours.prev as EpisodeRef)}
             >
               ⏮ Prev
-            </button>
+            </FocusButton>
           )}
-          <button onClick={() => void seekRelative(-10)}>−10s</button>
-          <button className="btn-primary" onClick={() => void togglePause()}>
+          <FocusButton onSelect={() => void seekRelative(-10)}>−10s</FocusButton>
+          <FocusButton
+            focusKey={PLAYER_PLAY_KEY}
+            className="btn-primary"
+            onSelect={() => void togglePause()}
+          >
             {paused ? '▶ Play' : '❚❚ Pause'}
-          </button>
-          <button onClick={() => void seekRelative(10)}>+10s</button>
+          </FocusButton>
+          <FocusButton onSelect={() => void seekRelative(10)}>+10s</FocusButton>
           {neighbours.next && (
-            <button
+            <FocusButton
               className="episode-step"
-              title={`Next: ${episodeLabel(neighbours.next)}`}
-              onClick={() => playNeighbour(neighbours.next as EpisodeRef)}
+              title={`Next: ${labelFor(neighbours.next)}`}
+              onSelect={() => playNeighbour(neighbours.next as EpisodeRef)}
             >
               Next ⏭
-            </button>
+            </FocusButton>
           )}
-          <button
+          <FocusButton
+            focusKey={PLAYER_TRACKS_KEY}
             className={showTracks ? 'active' : ''}
-            onClick={() => {
+            onSelect={() => {
               setShowTracks((v) => !v);
               void readTracks().then(setTracks);
             }}
           >
             Audio &amp; subtitles
-          </button>
-          <button
+          </FocusButton>
+          <FocusButton
             className={showStats ? 'active' : ''}
             title="Playback diagnostics (i)"
-            onClick={() => setShowStats((v) => !v)}
+            onSelect={() => setShowStats((v) => !v)}
           >
             Stats
-          </button>
-          <button onClick={() => void toggleFullscreen()}>Fullscreen</button>
+          </FocusButton>
+          <FocusButton onSelect={() => void toggleFullscreen()}>Fullscreen</FocusButton>
         </div>
       </div>
     </div>
+    </FocusContext.Provider>
+  );
+}
+
+/**
+ * Audio and subtitle selection.
+ *
+ * A component of its own because `useFocusable` reads the focus context of the
+ * component it is *called in*: declaring this container up in `Player` would
+ * read `Player`'s own context — the root — and make the panel a **sibling** of
+ * the player shell rather than a child of it. The markup would look nested and
+ * the focus tree would be flat, which is the trap in GOTCHAS.md that cost a
+ * debugging round in the browsing UI.
+ *
+ * This is the panel that most justifies the whole focus mode: on a library with
+ * mixed audio and subtitle languages it is the control reached most often, and
+ * until now a remote could not reach it at all.
+ */
+function TrackPanel({
+  audioTracks,
+  subTracks,
+  aid,
+  sid,
+  subVisible,
+  onChoose,
+  onClose,
+}: {
+  audioTracks: MpvTrack[];
+  subTracks: MpvTrack[];
+  aid: number | null;
+  sid: number | null;
+  subVisible: boolean;
+  onChoose: (kind: 'sid' | 'aid', track: MpvTrack | null) => void;
+  onClose: () => void;
+}) {
+  const { ref, focusKey } = useFocusable({
+    focusKey: TRACK_PANEL_KEY,
+    trackChildren: true,
+    saveLastFocusedChild: true,
+  });
+
+  return (
+    <FocusContext.Provider value={focusKey}>
+      <aside className="track-panel" ref={ref}>
+        <div className="track-panel-head">
+          <span>Audio</span>
+          <FocusButton onSelect={onClose}>close</FocusButton>
+        </div>
+        {audioTracks.length === 0 && <div className="track-empty">no audio tracks</div>}
+        {audioTracks.map((track) => (
+          <FocusButton
+            key={track.id}
+            className={`track-option ${aid === track.id ? 'active' : ''}`}
+            keepInView="nearest"
+            onSelect={() => onChoose('aid', track)}
+          >
+            {describeTrack(track)}
+          </FocusButton>
+        ))}
+
+        <div className="track-panel-head">
+          <span>Subtitles</span>
+        </div>
+        <FocusButton
+          className={`track-option ${!subVisible ? 'active' : ''}`}
+          keepInView="nearest"
+          onSelect={() => onChoose('sid', null)}
+        >
+          Off
+        </FocusButton>
+        {subTracks.map((track) => (
+          <FocusButton
+            key={track.id}
+            className={`track-option ${subVisible && sid === track.id ? 'active' : ''}`}
+            keepInView="nearest"
+            onSelect={() => onChoose('sid', track)}
+          >
+            {describeTrack(track)}
+          </FocusButton>
+        ))}
+        <p className="track-note">Remembered for this show.</p>
+      </aside>
+    </FocusContext.Provider>
   );
 }

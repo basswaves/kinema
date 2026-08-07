@@ -65,6 +65,14 @@ import LibraryView from '../library/LibraryView';
 
 const SETTINGS_FOCUS_KEY = 'settings-root';
 
+/**
+ * How long the Skiptro command fields wait after the last keystroke before
+ * saving themselves. Long enough not to write on every character, short enough
+ * that reaching for Detect immediately afterwards is still safe — and Detect
+ * flushes them first anyway, so this bound is a courtesy rather than a race.
+ */
+const SKIPTRO_SAVE_DEBOUNCE_MS = 600;
+
 function formatBytes(bytes: number): string {
   if (!bytes) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -113,14 +121,13 @@ export default function Settings() {
   const [detecting, setDetecting] = useState<string | null>(null);
   const [detectLine, setDetectLine] = useState('');
   /**
-   * Confirmation for **Save commands**, shown beside the button rather than in
-   * the banner at the top of the page.
+   * Whether the Skiptro fields have finished loading from the database.
    *
-   * The banner is 300 lines of markup above this button, so a press produced a
-   * confirmation the user could not see and the control read as dead. Feedback
-   * for a button belongs next to the button when the page is this long.
+   * They save themselves as they are edited (see below), and without this the
+   * first render would write the hard-coded defaults back over the stored
+   * values before the read that loads them had returned.
    */
-  const [commandsSaved, setCommandsSaved] = useState(false);
+  const [skiptroLoaded, setSkiptroLoaded] = useState(false);
   // Unset means on. Only an explicit 'off' stops the lookups.
   const [introDb, setIntroDb] = useState(true);
 
@@ -171,10 +178,37 @@ export default function Settings() {
       // `??` not `||`: an empty export command is the default and means "do not
       // export". `||` would silently put the old sidecar-writing command back.
       setExportArgs((await getSetting(SKIPTRO_EXPORT_ARGS_KEY)) ?? DEFAULT_SKIPTRO_EXPORT_ARGS);
+      setSkiptroLoaded(true);
 
       setIntroDb((await getSetting(INTRODB_ENABLED_KEY)) !== 'off');
     })();
   }, []);
+
+  /**
+   * Write the three Skiptro text fields as they are edited.
+   *
+   * Every other control on this page applies the moment it changes; these were
+   * the exception, behind a **Save commands** button. That button was a trap in
+   * both directions — typing a command and pressing Detect without saving ran
+   * the *old* one, silently — and its confirmation rendered in the banner at
+   * the top of a page far longer than a screen, so it read as doing nothing.
+   *
+   * Debounced rather than written per keystroke: these are three database
+   * writes, and the values are only ever read when something else starts.
+   */
+  const saveSkiptroFields = useCallback(async () => {
+    await setSetting(SKIPTRO_SCAN_ARGS_KEY, scanArgs.trim());
+    await setSetting(SKIPTRO_EXPORT_ARGS_KEY, exportArgs.trim());
+    await setSetting(SKIPTRO_DB_PATH_KEY, skiptroDbPath.trim());
+  }, [scanArgs, exportArgs, skiptroDbPath]);
+
+  useEffect(() => {
+    if (!skiptroLoaded) return;
+    const id = window.setTimeout(() => {
+      void saveSkiptroFields().catch((e) => setError(String(e)));
+    }, SKIPTRO_SAVE_DEBOUNCE_MS);
+    return () => window.clearTimeout(id);
+  }, [skiptroLoaded, saveSkiptroFields]);
 
   /**
    * Skiptro's output, streamed a line at a time.
@@ -198,6 +232,10 @@ export default function Settings() {
       setDetectLine('');
       setDetecting(root.path);
       try {
+        // Flush the command fields before reading them in Rust. The debounce
+        // above would almost always have fired by now, and "almost always" is
+        // how you get a detect run that silently used the previous command.
+        await saveSkiptroFields();
         const report = await detectIntros(root.path);
         if (report.ok) {
           // No longer "sidecars written": the detections go into Skiptro's own
@@ -218,7 +256,7 @@ export default function Settings() {
         setDetectLine('');
       }
     },
-    []
+    [saveSkiptroFields]
   );
 
   const scanNow = useCallback(async () => {
@@ -565,7 +603,9 @@ export default function Settings() {
 
           {/* Text fields rather than hard-coded so that a change to Skiptro's
               command line is an edit here and not a new build — the same
-              reasoning that keeps anything needing upkeep out. */}
+              reasoning that keeps anything needing upkeep out. They save
+              themselves; see SKIPTRO_SAVE_DEBOUNCE_MS for why there is no
+              button. */}
           <label className="settings-field">
             <span>
               Detect command <span className="muted">{'{dir}'} is the folder</span>
@@ -573,10 +613,7 @@ export default function Settings() {
             <FocusInput
               className="settings-input"
               value={scanArgs}
-              onChange={(v) => {
-                setScanArgs(v);
-                setCommandsSaved(false);
-              }}
+              onChange={setScanArgs}
               placeholder={DEFAULT_SKIPTRO_SCAN_ARGS}
             />
           </label>
@@ -587,10 +624,7 @@ export default function Settings() {
             <FocusInput
               className="settings-input"
               value={exportArgs}
-              onChange={(v) => {
-                setExportArgs(v);
-                setCommandsSaved(false);
-              }}
+              onChange={setExportArgs}
               placeholder="not run"
             />
           </label>
@@ -608,37 +642,10 @@ export default function Settings() {
             <FocusInput
               className="settings-input"
               value={skiptroDbPath}
-              onChange={(v) => {
-                setSkiptroDbPath(v);
-                setCommandsSaved(false);
-              }}
+              onChange={setSkiptroDbPath}
               placeholder="%APPDATA%\Skiptro\skiptro.db"
             />
           </label>
-          {/* The three fields above are the only settings on this page that do
-              not apply the moment they change, so this button has to exist —
-              but its confirmation has to be *here*, not in the banner at the
-              top of the page, which is far off screen from this far down. */}
-          <div className="settings-row">
-            <FocusButton
-              className="btn-secondary"
-              onSelect={() =>
-                void (async () => {
-                  try {
-                    await setSetting(SKIPTRO_SCAN_ARGS_KEY, scanArgs.trim());
-                    await setSetting(SKIPTRO_EXPORT_ARGS_KEY, exportArgs.trim());
-                    await setSetting(SKIPTRO_DB_PATH_KEY, skiptroDbPath.trim());
-                    setCommandsSaved(true);
-                  } catch (e) {
-                    setError(String(e));
-                  }
-                })()
-              }
-            >
-              Save commands
-            </FocusButton>
-            {commandsSaved && <span className="muted">Saved.</span>}
-          </div>
 
           {/* TV roots only. Intros are a television thing, and offering this on
               a films folder would be a button that runs for a long time and

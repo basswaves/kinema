@@ -450,16 +450,21 @@ rather than from component state.
 
 Settings shows one `settings-note` banner directly under its `<h1>`, and every
 action on the page writes to it. That is fine near the top and useless near the
-bottom: **Save commands** sits roughly 300 lines of markup further down, so
+bottom: **Save commands** sat roughly 300 lines of markup further down, so
 pressing it saved three settings and put "Commands saved." somewhere entirely
-off screen. It was reported as a dead button, and reading the handler is the
-only thing that shows it is not — there is no error, and the state really did
-persist.
+off screen. It was reported as a dead button and proposed for deletion, and
+reading the handler is the only thing that showed it was not — there was no
+error, and the state really did persist.
 
-**Do:** put a button's confirmation next to the button once the page is longer
-than a screen. `commandsSaved` renders "Saved." in the same row, and is cleared
-by any edit to the three fields so it always describes the current text rather
-than a previous press.
+**Do:** when the page is longer than a screen, either put the confirmation next
+to the control, or remove the need to confirm at all. The button is gone now —
+the three fields save themselves on a debounce, like every other control on the
+page — which is the better answer where it is available.
+
+**And:** an explicit save button next to fields that something *else* reads is a
+second trap on its own. Typing a new detect command and pressing **Detect**
+without saving ran the previous one, silently. `runDetect` now flushes the
+fields before invoking Rust, so the debounce is a courtesy rather than a race.
 
 **Note** the same banner still serves the shorter sections higher up, where it
 is genuinely visible from the control that wrote it.

@@ -817,16 +817,23 @@ overwriting a sidecar's credits with TheIntroDB's while the fetch path did the
 opposite, so the winner depended on whether the cache happened to be warm — a
 difference nothing would ever have reported.
 
-### Found while testing: a button that was not dead
+### Found while testing: a button that was not dead, and then deleted anyway
 
 **Save commands** was reported as doing nothing and proposed for deletion. It
 was saving all three text fields correctly; its confirmation was rendering in
-the banner under the page title, some 300 lines of markup above the button. The
-button stays — without it the export command and the Skiptro database path
-cannot be saved at all — and the confirmation now appears in the same row, so
-the press has visible consequence where it happened. GOTCHAS carries the general
-form, because the same banner serves every action on a page far longer than a
-screen.
+the banner under the page title, some 300 lines of markup above the button, so
+the press had no visible consequence anywhere the user was looking.
+
+Moving the confirmation next to the button fixed the symptom and left the real
+problem. The fields were the only settings on the page that did *not* apply when
+they changed, and something else read them: typing a new detect command and
+pressing **Detect** without saving first ran the previous one, in silence. The
+"integrate it into Detect" answer does not work either, because the Skiptro
+database path is read during **playback**, not by detect at all.
+
+So the fields now save themselves on a 600 ms debounce, like every other control
+on the page, and the button is gone. `runDetect` flushes them before invoking
+Rust, which turns the debounce from a race into a courtesy.
 
 Sidecars are still **read** and no longer **written**. The export step became an
 empty template — "do not run this" — rather than a deleted feature, so anyone

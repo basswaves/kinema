@@ -187,6 +187,25 @@ slow part of a scan, and they were all happening with the write lock held.
 
 ---
 
+## Child processes
+
+### Draining stdout and stderr in sequence can deadlock
+
+Pipe buffers are finite (~64 KB). A child that fills **stderr** while this side
+is blocked reading **stdout** stops writing — so stdout never closes either, and
+both ends wait forever. The symptom is a long-running job that hangs with no
+output and no error, which is the worst shape a failure can take.
+
+**Do:** drain one stream on its own thread and join it after the other closes.
+`detect.rs` does this even though Skiptro writes progress to stdout and errors
+to stderr, because "it usually does not write much there" is not a guarantee.
+
+**Also:** on Windows, set `CREATE_NO_WINDOW` (`0x08000000`) via
+`CommandExt::creation_flags`, or every spawned step flashes a console window
+over the app.
+
+---
+
 ## Spatial navigation (D-pad)
 
 Both entries below are invisible with a mouse. Hovering re-establishes focus and

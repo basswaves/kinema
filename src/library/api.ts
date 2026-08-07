@@ -72,6 +72,37 @@ export const scanLibrary = () => invoke<ScanReport>('scan_library');
 
 export const listUnparsed = (limit: number) => invoke<MediaFile[]>('list_unparsed', { limit });
 
+/** Settings keys and defaults for running the user's own Skiptro install. */
+export const SKIPTRO_PATH_KEY = 'skiptro_path';
+export const SKIPTRO_SCAN_ARGS_KEY = 'skiptro_scan_args';
+export const SKIPTRO_EXPORT_ARGS_KEY = 'skiptro_export_args';
+export const DEFAULT_SKIPTRO_SCAN_ARGS = 'scan {dir}';
+export const DEFAULT_SKIPTRO_EXPORT_ARGS = 'export {dir}';
+
+export interface DetectStepReport {
+  step: string;
+  exit_code: number | null;
+  tail: string[];
+}
+
+export interface DetectReport {
+  ok: boolean;
+  steps: DetectStepReport[];
+}
+
+/** One line of Skiptro's output, as it arrives. */
+export interface DetectProgress {
+  step: string;
+  line: string;
+}
+
+/**
+ * Run the user's own Skiptro over a library root: detect, then export the
+ * `.skiptro.json` sidecars the player already knows how to read.
+ */
+export const detectIntros = (rootPath: string) =>
+  invoke<DetectReport>('detect_intros', { rootPath });
+
 export const listMediaFiles = (limit: number) => invoke<MediaFile[]>('list_media_files', { limit });
 
 export const saveParseResults = (results: ParseResultPayload[]) =>

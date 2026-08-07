@@ -16,6 +16,7 @@
  */
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { useCallback, useEffect, useState } from 'react';
+import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import FocusButton from './FocusButton';
 import FocusInput from './FocusInput';
@@ -23,8 +24,15 @@ import { useClaimFocus } from './focus';
 import { setTvMode, useTvMode } from './tv';
 import {
   addLibraryRoot,
+  detectIntros,
   listLibraryRoots,
   removeLibraryRoot,
+  DEFAULT_SKIPTRO_EXPORT_ARGS,
+  DEFAULT_SKIPTRO_SCAN_ARGS,
+  SKIPTRO_EXPORT_ARGS_KEY,
+  SKIPTRO_PATH_KEY,
+  SKIPTRO_SCAN_ARGS_KEY,
+  type DetectProgress,
   type LibraryKind,
   type LibraryRoot,
 } from '../library/api';
@@ -95,6 +103,14 @@ export default function Settings() {
   const [panel, setPanel] = useState<'none' | 'review' | 'developer'>('none');
   const [writingNfo, setWritingNfo] = useState(false);
 
+  // Intro detection. `detecting` holds the root currently being worked on, so
+  // one root's button can show progress while the others simply disable.
+  const [skiptroPath, setSkiptroPath] = useState('');
+  const [scanArgs, setScanArgs] = useState(DEFAULT_SKIPTRO_SCAN_ARGS);
+  const [exportArgs, setExportArgs] = useState(DEFAULT_SKIPTRO_EXPORT_ARGS);
+  const [detecting, setDetecting] = useState<string | null>(null);
+  const [detectLine, setDetectLine] = useState('');
+
   const tvMode = useTvMode();
   const scan = useScanStatus();
 
@@ -136,8 +152,54 @@ export default function Settings() {
       if (Number.isFinite(secs) && secs >= 0) setCreditsTail(secs);
 
       setDisplaySync((await getSetting(VIDEO_SYNC_KEY)) === 'display');
+
+      setSkiptroPath((await getSetting(SKIPTRO_PATH_KEY)) ?? '');
+      setScanArgs((await getSetting(SKIPTRO_SCAN_ARGS_KEY)) || DEFAULT_SKIPTRO_SCAN_ARGS);
+      setExportArgs((await getSetting(SKIPTRO_EXPORT_ARGS_KEY)) || DEFAULT_SKIPTRO_EXPORT_ARGS);
     })();
   }, []);
+
+  /**
+   * Skiptro's output, streamed a line at a time.
+   *
+   * A scan of a season runs for minutes, so a progress display that only
+   * appeared at the end would be the same as no progress display.
+   */
+  useEffect(() => {
+    const unlisten = listen<DetectProgress>('skiptro-progress', (event) => {
+      setDetectLine(event.payload.line);
+    });
+    return () => {
+      void unlisten.then((off) => off());
+    };
+  }, []);
+
+  const runDetect = useCallback(
+    async (root: LibraryRoot) => {
+      setError(null);
+      setNote(null);
+      setDetectLine('');
+      setDetecting(root.path);
+      try {
+        const report = await detectIntros(root.path);
+        if (report.ok) {
+          setNote(`Intro detection finished for ${root.path}. Sidecars written beside the videos.`);
+        } else {
+          const failed = report.steps[report.steps.length - 1];
+          setError(
+            `Skiptro "${failed?.step}" exited with ${failed?.exit_code ?? 'no code'}: ` +
+              (failed?.tail.slice(-3).join(' · ') || 'no output')
+          );
+        }
+      } catch (e) {
+        setError(String(e));
+      } finally {
+        setDetecting(null);
+        setDetectLine('');
+      }
+    },
+    []
+  );
 
   const scanNow = useCallback(async () => {
     setError(null);
@@ -392,6 +454,130 @@ export default function Settings() {
               Press <kbd>i</kbd> during playback to see the cadence you are actually getting.
             </span>
           </div>
+        </section>
+
+        {/* ---- intro detection ---- */}
+        <section className="settings-section">
+          <h2>Intro detection</h2>
+          <p className="muted">
+            The <strong>Skip intro</strong> button needs a <code>.skiptro.json</code> file beside
+            each episode, and something has to produce them.{' '}
+            <strong>Skiptro is not bundled and never will be</strong> — no third-party binary goes
+            into this app. Point this at a copy you have installed yourself and the detection can
+            at least be started from here instead of in another window.
+          </p>
+          <div className="settings-row">
+            <FocusButton
+              className="btn-secondary"
+              onSelect={() =>
+                void (async () => {
+                  try {
+                    const chosen = await open({
+                      multiple: false,
+                      filters: [{ name: 'Skiptro', extensions: ['exe'] }],
+                    });
+                    if (typeof chosen !== 'string') return;
+                    setSkiptroPath(chosen);
+                    await setSetting(SKIPTRO_PATH_KEY, chosen);
+                    setNote('Skiptro location saved.');
+                  } catch (e) {
+                    setError(String(e));
+                  }
+                })()
+              }
+            >
+              {skiptroPath ? 'Change Skiptro location' : 'Choose Skiptro executable'}
+            </FocusButton>
+          </div>
+          <p className="muted">
+            {skiptroPath ? (
+              <code>{skiptroPath}</code>
+            ) : (
+              <>
+                Not set. Use <code>skiptro.exe</code> — the command-line one, not{' '}
+                <code>Skiptro-Desktop.exe</code>.
+              </>
+            )}
+          </p>
+
+          {/* Two commands because that is what Skiptro does: `scan` fills its
+              own database, `export` writes the sidecars this app reads. They
+              are text fields rather than hard-coded so that a change to
+              Skiptro's command line is an edit here and not a new build — the
+              same reasoning that keeps anything needing upkeep out. */}
+          <label className="settings-field">
+            <span>
+              Detect command <span className="muted">{'{dir}'} is the folder</span>
+            </span>
+            <FocusInput
+              className="settings-input"
+              value={scanArgs}
+              onChange={setScanArgs}
+              placeholder={DEFAULT_SKIPTRO_SCAN_ARGS}
+            />
+          </label>
+          <label className="settings-field">
+            <span>
+              Export command <span className="muted">writes the .skiptro.json files</span>
+            </span>
+            <FocusInput
+              className="settings-input"
+              value={exportArgs}
+              onChange={setExportArgs}
+              placeholder={DEFAULT_SKIPTRO_EXPORT_ARGS}
+            />
+          </label>
+          <FocusButton
+            className="btn-secondary"
+            onSelect={() =>
+              void (async () => {
+                try {
+                  await setSetting(SKIPTRO_SCAN_ARGS_KEY, scanArgs.trim());
+                  await setSetting(SKIPTRO_EXPORT_ARGS_KEY, exportArgs.trim());
+                  setNote('Commands saved.');
+                } catch (e) {
+                  setError(String(e));
+                }
+              })()
+            }
+          >
+            Save commands
+          </FocusButton>
+
+          {/* TV roots only. Intros are a television thing, and offering this on
+              a films folder would be a button that runs for a long time and
+              finds nothing. */}
+          {skiptroPath && roots.filter((r) => r.kind === 'tv').length === 0 && (
+            <p className="muted">Add a TV folder above to detect intros in it.</p>
+          )}
+          {skiptroPath &&
+            roots
+              .filter((root) => root.kind === 'tv')
+              .map((root) => (
+                <div className="settings-toggle-row" key={root.id}>
+                  <FocusButton
+                    className="btn-secondary"
+                    disabled={detecting !== null}
+                    onSelect={() => void runDetect(root)}
+                  >
+                    {detecting === root.path ? 'Detecting…' : 'Detect intros'}
+                  </FocusButton>
+                  <span className="muted">
+                    <code>{root.path}</code>
+                    {detecting === root.path && detectLine && (
+                      <>
+                        <br />
+                        <span className="settings-progress">{detectLine}</span>
+                      </>
+                    )}
+                  </span>
+                </div>
+              ))}
+          <p className="muted">
+            This takes minutes per season — it decodes audio and runs a model over it. Everything
+            it finds is written next to your video files, so the results stay readable by Kodi and
+            anything else that understands the format, and they survive this app entirely.
+          </p>
         </section>
 
         {/* ---- providers ---- */}

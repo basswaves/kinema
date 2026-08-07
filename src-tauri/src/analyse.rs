@@ -73,6 +73,129 @@ const MAX_SCORE: f64 = 8.0;
 /// vary by a frame or two either way.
 const CLUSTER_TOLERANCE_SECS: f64 = 3.0;
 
+// ---- refining the credits boundary against the picture ----------------------
+//
+// The audio answer says where the closing *theme* starts. What the viewer sees
+// as the start of the credits is the fade to black just before it, and the two
+// are usually a second or two apart — occasionally much more, when an episode's
+// credit music differs from the rest of the season and only its final bars are
+// shared. So the picture gets the last word on the boundary, within limits.
+
+/// How far earlier than the audio answer the boundary may be moved.
+///
+/// Generous, because the case this exists for is exactly a large correction:
+/// this library's pilot shares only its last 27.7 s with the rest of the season
+/// and its marker lands 32 s late. Beyond this the audio consensus — which is a
+/// whole season agreeing — is the better answer.
+const MAX_CREDITS_SHIFT_SECS: f64 = 45.0;
+
+/// …and how far later. Only enough to snap onto a fade that begins a moment
+/// after the music does.
+const SNAP_FORWARD_SECS: f64 = 2.0;
+
+/// Two black periods closer together than this are one credits sequence.
+///
+/// Credits that roll over black are a run of cards separated by short fades,
+/// not one continuous black stretch. This is what joins them up.
+const BLACK_RUN_GAP_SECS: f64 = 10.0;
+
+/// How much of the region being reclaimed must actually be black.
+///
+/// The first of two safety rules. Moving the marker earlier means offering the
+/// next episode sooner, and the standing principle is that late costs a few
+/// seconds of credits while early costs the end of the episode. Requiring the
+/// reclaimed region to be mostly black means what is being skipped is already
+/// black frames and card transitions rather than a scene fading out.
+const BLACK_RUN_MIN_FRACTION: f64 = 0.5;
+
+/// How much longer than the season's own credits a refined segment may be.
+///
+/// **The second safety rule, and the one that actually does the work.** The
+/// fraction above cannot tell a good long walk from a bad short one — measured
+/// here, the pilot's correct 32-second walk crosses *more* visible picture
+/// (15 s) than the wrong 6-second walks do (2 s), so no threshold on blackness
+/// separates them.
+///
+/// What separates them is the season. Every episode agrees its credits run
+/// about 69 seconds; the audio consensus establishes that across the whole
+/// folder and it is the strongest evidence available. A refinement that makes
+/// one episode's credits materially *longer* than its season's is therefore not
+/// finding a boundary, it is reaching back into the episode — regardless of how
+/// black the region looks.
+///
+/// On this library the separation is clean: the pilot's correction yields 59.8 s
+/// and is taken, five episodes that would have stretched to 72–76 s are refused
+/// and keep their audio answer, and the rest move by under a second.
+const CREDITS_LENGTH_TOLERANCE_SECS: f64 = 2.0;
+
+/// Whether a refined boundary may be taken.
+///
+/// `longest` is this season's own credits length plus a tolerance, or `None`
+/// when the season produced no credits at all to measure against.
+fn accept_refined(refined: f64, end: f64, longest: Option<f64>) -> bool {
+    let length = end - refined;
+    length >= CREDITS_MIN_SECS && longest.is_none_or(|limit| length <= limit)
+}
+
+/// How much of `[from, to]` is black.
+fn black_within(periods: &[(f64, f64)], from: f64, to: f64) -> f64 {
+    if to <= from {
+        return 0.0;
+    }
+    periods
+        .iter()
+        .map(|(start, end)| (end.min(to) - start.max(from)).max(0.0))
+        .sum()
+}
+
+/// Move a credits start onto the picture's own boundary, where there is one.
+///
+/// Returns `None` when the picture offers nothing better, which is the common
+/// case for a file that cuts straight to credits over a live shot.
+///
+/// Two steps. First find the black period the audio answer lands in or just
+/// after — that alone fixes the ordinary case, where the theme starts a fraction
+/// of a second into the fade. Then walk *backwards* through the run of card
+/// transitions, and keep that longer answer only if the region it reclaims is
+/// mostly black.
+fn refine_credits_start(periods: &[(f64, f64)], audio_start: f64, earliest: f64) -> Option<f64> {
+    let anchor = periods
+        .iter()
+        .filter(|(start, _)| *start <= audio_start + SNAP_FORWARD_SECS)
+        .max_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal))?;
+
+    let floor = earliest.max(audio_start - MAX_CREDITS_SHIFT_SECS);
+    if anchor.0 < floor {
+        return None;
+    }
+
+    // Walk back while each gap is short enough to be a transition between two
+    // credit cards rather than the end of a scene.
+    let mut start = anchor.0;
+    loop {
+        let previous = periods
+            .iter()
+            .filter(|(s, e)| *s < start && start - *e <= BLACK_RUN_GAP_SECS && *s >= floor)
+            .max_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+        match previous {
+            Some((s, _)) => start = *s,
+            None => break,
+        }
+    }
+
+    if start < anchor.0 {
+        let span = audio_start - start;
+        let black = black_within(periods, start, audio_start);
+        // Not black enough to be credits. Keep the anchor, which is a snap onto
+        // the nearest fade rather than a relocation.
+        if span > 0.0 && black / span < BLACK_RUN_MIN_FRACTION {
+            start = anchor.0;
+        }
+    }
+
+    (start < audio_start - 0.01 || start > audio_start + 0.01).then_some(start)
+}
+
 /// A file to analyse.
 pub struct Episode {
     pub file_id: i64,
@@ -262,6 +385,9 @@ pub fn analyse_season(
     let mut tail_prints: Vec<Vec<u32>> = vec![Vec::new(); count];
     let mut head_offsets = vec![0.0; count];
     let mut tail_offsets = vec![0.0; count];
+    // Kept for the refinement pass: it needs to know how far back the closing
+    // window reaches, so a boundary can never be moved outside it.
+    let mut tail_starts: Vec<Option<f64>> = vec![None; count];
 
     for (i, episode) in episodes.iter().enumerate() {
         let video = Path::new(&episode.path);
@@ -288,6 +414,7 @@ pub fn analyse_season(
         }
 
         if let Some(tail) = windows.tail {
+            tail_starts[i] = Some(tail.0);
             match fingerprint(ffmpeg_path, video, tail, &config) {
                 Ok(print) => {
                     tail_prints[i] = print;
@@ -314,6 +441,60 @@ pub fn analyse_season(
             CREDITS_MIN_SECS,
             CREDITS_MAX_SECS,
         );
+    }
+
+    // ---- second pass: let the picture correct the closing boundary ----------
+    //
+    // Only for episodes that got a credits marker at all, and only over the
+    // stretch the boundary could legally move within — about a minute of video
+    // rather than the eight minutes the audio pass read. Decoding pictures is
+    // far more expensive than decoding sound, and this is the whole reason it
+    // stays affordable.
+
+    // How long this season's credits actually run, from the answers the audio
+    // already agreed on. The median rather than the mean, so the one outlier
+    // this exists to correct cannot move the standard it is judged against.
+    let mut lengths: Vec<f64> = results
+        .iter()
+        .filter_map(|a| a.credits)
+        .map(|(start, end)| end - start)
+        .collect();
+    let longest_credits = (!lengths.is_empty())
+        .then(|| median(&mut lengths) + CREDITS_LENGTH_TOLERANCE_SECS);
+
+    for (i, episode) in episodes.iter().enumerate() {
+        let Some((audio_start, end)) = results[i].credits else {
+            continue;
+        };
+        let Some(tail_start) = tail_starts[i] else {
+            continue;
+        };
+
+        let video = Path::new(&episode.path);
+        let name = video
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| episode.path.clone());
+        progress(format!("checking the picture at the credits: {name}"));
+
+        let from = (audio_start - MAX_CREDITS_SHIFT_SECS).max(tail_start).max(0.0);
+        let to = audio_start + SNAP_FORWARD_SECS;
+        let periods = ffmpeg::black_periods(ffmpeg_path, video, from, to - from);
+
+        if let Some(refined) = refine_credits_start(&periods, audio_start, from) {
+            if accept_refined(refined, end, longest_credits) {
+                progress(format!(
+                    "credits {audio_start:.1}s → {refined:.1}s from the picture: {name}"
+                ));
+                results[i].credits = Some((refined, end));
+            } else {
+                progress(format!(
+                    "kept the audio credits at {audio_start:.1}s — the picture would have \
+                     stretched them to {:.0}s: {name}",
+                    end - refined
+                ));
+            }
+        }
     }
 
     results
@@ -529,6 +710,130 @@ mod tests {
     #[test]
     fn nothing_found_is_not_an_error() {
         assert_eq!(consensus(Vec::new(), 1, INTRO_MIN_SECS, INTRO_MAX_SECS), None);
+    }
+
+    // ---- credits boundary against the picture -------------------------------
+    //
+    // Every fixture below is real `blackdetect` output from this library,
+    // converted to file time. They are the calibration for the three constants.
+
+    /// The pilot. Its credit music differs from the rest of the season, so only
+    /// its last 27.7 s matched and the audio marker landed 32 s late. The run of
+    /// card transitions starts at 1540.7 — exactly 70 s before the end, which is
+    /// the credits length every other episode agrees on.
+    #[test]
+    fn walks_back_through_a_credits_run_that_is_mostly_black() {
+        let periods = vec![
+            (1540.706, 1542.458),
+            (1546.381, 1551.470),
+            (1557.225, 1559.603),
+            (1562.481, 1564.316),
+            (1567.194, 1576.578),
+        ];
+        let refined = refine_credits_start(&periods, 1572.821, 1130.0).unwrap();
+        assert!((refined - 1540.706).abs() < 0.01, "got {refined}");
+    }
+
+    /// The same walk, refused. Episode 3 has fades at 1354.2 and 1357.8 before
+    /// its credits, but the region they would reclaim is only 26% black — the
+    /// last scene fading out, not credit cards. So the marker stays put, moving
+    /// six tenths of a second forward onto the fade the credits actually begin
+    /// with rather than six seconds back into the episode.
+    #[test]
+    fn refuses_to_walk_back_across_a_region_that_is_mostly_picture() {
+        let periods = vec![
+            (1354.228, 1354.603),
+            (1357.815, 1359.066),
+            (1361.026, 1368.617),
+        ];
+        let refined = refine_credits_start(&periods, 1360.397, 960.0).unwrap();
+        assert!(
+            (refined - 1361.026).abs() < 0.01,
+            "expected the snap, not the walk — got {refined}"
+        );
+        assert!(refined > 1360.0, "must not move back into the episode");
+    }
+
+    /// The ordinary case: the theme starts a tenth of a second into the fade,
+    /// and the boundary moves by that tenth. Episode 4.
+    #[test]
+    fn snaps_onto_the_fade_the_music_starts_inside() {
+        let periods = vec![
+            (1332.039, 1332.790),
+            (1334.792, 1346.428),
+            (1354.937, 1359.108),
+        ];
+        let refined = refine_credits_start(&periods, 1334.909, 934.0).unwrap();
+        assert!((refined - 1334.792).abs() < 0.01, "got {refined}");
+    }
+
+    #[test]
+    fn a_file_with_no_black_at_all_keeps_its_audio_answer() {
+        assert_eq!(refine_credits_start(&[], 1360.0, 960.0), None);
+    }
+
+    /// Nothing may be dragged further than the audio consensus is worth — a
+    /// whole season agreeing beats one fade a long way off.
+    #[test]
+    fn refuses_a_boundary_further_back_than_the_shift_allows() {
+        let periods = vec![(1200.0, 1260.0)];
+        assert_eq!(refine_credits_start(&periods, 1400.0, 900.0), None);
+    }
+
+    /// …and never outside the window the audio was measured in.
+    #[test]
+    fn never_moves_the_boundary_out_of_the_closing_window() {
+        let periods = vec![(1000.0, 1050.0), (1355.0, 1360.0)];
+        let refined = refine_credits_start(&periods, 1360.0, 1340.0).unwrap();
+        assert!(refined >= 1340.0, "got {refined}");
+    }
+
+    /// A fade that begins after the music does is still the visual boundary, so
+    /// long as it is close.
+    #[test]
+    fn a_fade_just_after_the_music_still_counts() {
+        let periods = vec![(1361.0, 1370.0)];
+        let refined = refine_credits_start(&periods, 1360.0, 960.0).unwrap();
+        assert!((refined - 1361.0).abs() < 0.01, "got {refined}");
+    }
+
+    /// Black periods far past the marker are the end of the file, not its start.
+    #[test]
+    fn ignores_black_well_past_the_credits_start() {
+        assert_eq!(refine_credits_start(&[(1435.2, 1440.2)], 1360.0, 960.0), None);
+    }
+
+    /// The rule that decides the five awkward episodes. Their credits end at
+    /// 1607.6; the audio starts them at 1538.3 for a 69 s segment, and the
+    /// picture would drag that back to 1531.8 for a 76 s one. The season says
+    /// 69 s, so 76 s is not a boundary — it is two seconds of the last shot.
+    #[test]
+    fn refuses_a_boundary_that_outruns_the_seasons_own_credits() {
+        let limit = Some(69.3 + CREDITS_LENGTH_TOLERANCE_SECS);
+        assert!(!accept_refined(1531.780, 1607.610, limit), "76s should be refused");
+        assert!(accept_refined(1538.277, 1607.610, limit), "69s should be taken");
+    }
+
+    /// …and the pilot's correction, which is the whole point: it *shortens* the
+    /// segment to 59.8 s, so the same rule waves it through.
+    #[test]
+    fn allows_the_correction_that_shortens_a_segment() {
+        let limit = Some(69.3 + CREDITS_LENGTH_TOLERANCE_SECS);
+        assert!(accept_refined(1540.706, 1600.554, limit));
+    }
+
+    #[test]
+    fn a_season_with_nothing_to_measure_against_falls_back_to_the_minimum() {
+        assert!(accept_refined(1000.0, 1100.0, None));
+        // Still never shorter than credits can be.
+        assert!(!accept_refined(1095.0, 1100.0, None));
+    }
+
+    #[test]
+    fn measures_only_the_black_inside_the_span() {
+        let periods = vec![(0.0, 10.0), (20.0, 30.0)];
+        assert!((black_within(&periods, 5.0, 25.0) - 10.0).abs() < 1e-9);
+        assert!((black_within(&periods, 25.0, 5.0)).abs() < 1e-9);
     }
 
     /// Calibration run. **Needs real media**, so it is ignored by default:

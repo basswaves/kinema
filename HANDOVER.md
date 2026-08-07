@@ -58,18 +58,6 @@ Half-done: `skip.rs` now logs `skiptro: confidence <n> for <file>` for anything
 below 1, which is how the missing sample gets found. Once there is one, the
 threshold goes in the same place.
 
-### Black-frame refinement for the credits boundary
-
-`analyse.rs` finds the credits from shared audio, which puts the marker where the
-closing *theme* starts. intro-skipper also runs ffmpeg's `blackdetect` to snap
-the boundary to the fade-to-black, which is where the credits visually begin.
-
-Worth having for the case this library already shows: the Example Show pilot
-shares only its final 27.7 s with the other episodes, because its credit music
-differs, so its marker lands late. A black frame would find the real edge. Not
-urgent — late is the safe direction — but it is the obvious next increment, and
-it needs a second ffmpeg pass rather than any new machinery.
-
 ### Retiring Skiptro
 
 Now genuinely on the table. `analyse.rs` does everything Skiptro does and finds
@@ -126,6 +114,13 @@ the current behaviour annoys them.
   single season cannot tell you whether `MAX_SCORE = 8.0` holds for a show with
   a quiet intro, a spoken cold open, or no closing theme. `calibrate_against_a_real_season`
   is the tool: point `PN_SEASON_DIR` at a folder and run it with `--ignored`.
+- **Black-frame refinement on credits that do *not* roll over black.** Every
+  constant in it was set against one show whose credits are cards on a black
+  background, which is the case it handles best. A show that cuts straight from
+  the last shot to credits over live picture should simply find no black period
+  and keep its audio answer — that is the designed behaviour and it is untested.
+  The `credits … → … from the picture` and `kept the audio credits at …` lines
+  in the Detect output say which happened for every episode.
 - **A season where Skiptro and `analyse.rs` disagree** — they agree within a
   second on everything here, so the ranking between them has never actually been
   exercised. `intro marker from <source>` in `app.log` is what to watch.

@@ -109,11 +109,16 @@ the current behaviour annoys them.
   has none**, and it is the only series here. The app's own analysis now supplies
   the credits instead, so the introdb credits path is still untested against a
   real playback. Any show with community credits data confirms it.
-- **`analyse.rs` on a second show** — verified thoroughly on one season and not
-  at all on anything else. The numbers there are excellent (see PLAN), but a
-  single season cannot tell you whether `MAX_SCORE = 8.0` holds for a show with
-  a quiet intro, a spoken cold open, or no closing theme. `calibrate_against_a_real_season`
-  is the tool: point `PN_SEASON_DIR` at a folder and run it with `--ignored`.
+- **`analyse.rs` on a second *show*** — two seasons of one show now work. Season
+  2 was added later and analysed correctly on its first Detect run, which also
+  exercised the grouping on a real second shape: its episodes sit directly in
+  the show folder with no `Season 2` subfolder, and were still grouped as one
+  season by title and season number rather than by directory.
+
+  What that still cannot tell you is whether `MAX_SCORE = 8.0` holds for a show
+  with a quiet intro, a spoken cold open, or no closing theme — every threshold
+  remains calibrated against one programme. `calibrate_against_a_real_season` is
+  the tool: point `PN_SEASON_DIR` at a folder and run it with `--ignored`.
 - **Black-frame refinement on credits that do *not* roll over black.** Every
   constant in it was set against one show whose credits are cards on a black
   background, which is the case it handles best. A show that cuts straight from

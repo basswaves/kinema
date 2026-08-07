@@ -11,6 +11,21 @@ fn to_string_err<E: std::fmt::Display>(e: E) -> String {
     e.to_string()
 }
 
+/// Read one setting from an already-held connection.
+///
+/// A blank value is treated as unset, so clearing a text field in Settings and
+/// never having filled it in mean the same thing — which is what a user who
+/// just emptied a box expects, and it saves every caller a `trim`.
+pub fn setting(conn: &rusqlite::Connection, key: &str) -> Option<String> {
+    conn.query_row(
+        "SELECT value FROM settings WHERE key = ?1",
+        params![key],
+        |r| r.get::<_, String>(0),
+    )
+    .ok()
+    .filter(|v| !v.trim().is_empty())
+}
+
 #[tauri::command]
 pub fn get_setting(db: tauri::State<Db>, key: String) -> Result<Option<String>, String> {
     let conn = db.0.lock().map_err(to_string_err)?;

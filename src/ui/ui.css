@@ -1045,6 +1045,20 @@ html {
   font-weight: 700;
 }
 
+/* Sub-heading inside a section, for the marker sources — two of them under one
+   heading, and without this they run together into one wall of prose. The top
+   margin is what separates them; the first one loses it so it does not sit off
+   from the section title it belongs to. */
+.settings-section h3 {
+  margin: 1.5rem 0 0.4rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+.settings-section h2 + h3 {
+  margin-top: 0.25rem;
+}
+
 .settings-section p {
   margin: 0 0 0.75rem;
   font-size: 0.8125rem;

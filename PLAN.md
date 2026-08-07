@@ -125,6 +125,12 @@ in the library so far reports `1`.
 `ffmpeg` + chromaprint (already installed). The sidecar format is trivial, so the
 player side is unaffected by which producer is used.
 
+> **Superseded on the marker *transport* — see [Where markers come from](#where-markers-come-from-).**
+> The sidecars are no longer produced or relied on; the app reads Skiptro's own
+> database, and TheIntroDB supplies the credits Skiptro cannot detect. The
+> reader above still exists and still works, and everything about *how a marker
+> is acted on* is unchanged.
+
 ### 5b. Trailers
 
 **Keys ✅.** `trailer_key` / `trailer_site` live on the `titles` row. New TMDB
@@ -726,6 +732,119 @@ anywhere. Offered on TV roots only.
 
 The first implementation drained stderr after stdout and could deadlock on a
 full pipe buffer. GOTCHAS.md carries the general form.
+
+## Where markers come from ✅
+
+Two complaints, one of them the interesting one. The sidecars were clutter — a
+`.skiptro.json` beside every episode forever — and **Skiptro only ever detects
+intros**, so the end of an episode was never a measured thing.
+
+Three options were looked at properly before any code was written.
+
+**Jellyfin's intro-skipper**, reimplemented here. Rejected *for now*, not on
+merit. Its method — fingerprint every episode in a season, find the stretch of
+audio they share, then sharpen the boundary with black-frame detection — is the
+only one of the three that produces its own answer, works on files with no
+metadata match at all, and finds credits as well as intros. Three things count
+against doing it first:
+
+- It is **GPL-3.0 C#**, so the code cannot be reused; only the method, which is
+  documented and not copyrightable. A port would relicense this project.
+- A pure-Rust build is genuinely close — `rusty-chromaprint` (MIT) already
+  exposes `match_fingerprints` — but Symphonia cannot decode AC-3, E-AC-3, DTS
+  or TrueHD, which is most of a remux library. So it needs `ffmpeg` for decode.
+  `ffmpeg 8.1.2` on this machine is built `--enable-chromaprint`, so the door is
+  open; it just swaps one invoked binary for another rather than removing one.
+- It is weeks of work whose failure mode is a threshold slightly wrong and a
+  skip over real dialogue — the silent wrongness the matching rules exist to
+  prevent. It stays in HANDOVER as an upgrade, not a prerequisite.
+
+**Skiptro's own database.** It was there all along: `%APPDATA%\Skiptro\skiptro.db`,
+table `DetectedSegments`, with `FilePath`, `Type`, `StartSeconds`, `EndSeconds`
+and `Confidence`. The sidecars were an *export* of it. Reading the source
+instead removes every sidecar and changes no number. Two costs, both accepted
+knowingly: it is another application's private schema, which can move under us
+with no warning — so it fails loudly into the log, softly into the app, and
+falls through to the sidecar reader — and it matches rows on the **exact file
+path**, so renaming a video loses its detection until Skiptro runs again. That
+was always true; this machine's database already holds twelve rows pointing at
+paths that no longer exist. Sidecars had the same fragility plus the clutter.
+
+**TheIntroDB.** A free community database keyed on **TMDB id + season +
+episode**, which is precisely what `titles` already stores — so it needed no new
+matching, no key and no account. It is where credits actually come from. Tested
+against the real library before committing to it: Example Show returns an
+intro for all twelve episodes agreeing with Skiptro to within a second, and
+Breaking Bad returns both segments.
+
+Three constraints on the way it is used come from **their terms, not from
+taste**, and are in `introdb.rs` so they survive this document:
+
+1. **One episode at a time, on play.** Never the library in bulk. Their licence
+   is for client-side per-user lookups; a sweep is the shape it exists to stop.
+2. **The cache expires** after 30 days. Permanent local copies of everything
+   played would drift towards being a second copy of their database. A TTL also
+   means a corrected timestamp reaches this machine.
+3. **Attribution is shown**, in Settings. They request rather than require it.
+
+**This is not a new class of dependency.** The app already needs TMDB to have a
+library at all, so "nothing that needs periodic maintenance" is not breached by
+a second metadata service — but it is a service that can vanish, and the local
+sources are the reason that would be a degradation rather than a regression.
+
+### The ranking, and why it is per segment
+
+| | intro | credits |
+|---|---|---|
+| Skiptro's database | 1st — measured on *this* file | never has any |
+| `.skiptro.json` sidecar | 2nd — the same detection, exported | 1st, if anything writes one |
+| TheIntroDB | 3rd — community-timed | **2nd, and in practice the only one** |
+
+**One rule: local before remote**, applied to both segments. Something measured
+against the actual bytes on this disk beats something timed by somebody against
+*a* copy of the episode — the same judgement the credits ladder in `skip.ts`
+already made. The order does not change between segments; only which sources
+have anything to say does.
+
+Skiptro fingerprinted this file, so its intro wins. It cannot detect credits at
+all and nothing writes a sidecar that does, so TheIntroDB is the only source of
+a closing segment in practice, and the only measured one that has ever existed.
+The chapter name and tail guess below it in `skip.ts` remain what they always
+were: inference, fenced accordingly.
+
+That "one rule" is not decoration. The first version had the cache-reuse path
+overwriting a sidecar's credits with TheIntroDB's while the fetch path did the
+opposite, so the winner depended on whether the cache happened to be warm — a
+difference nothing would ever have reported.
+
+### Found while testing: a button that was not dead
+
+**Save commands** was reported as doing nothing and proposed for deletion. It
+was saving all three text fields correctly; its confirmation was rendering in
+the banner under the page title, some 300 lines of markup above the button. The
+button stays — without it the export command and the Skiptro database path
+cannot be saved at all — and the confirmation now appears in the same row, so
+the press has visible consequence where it happened. GOTCHAS carries the general
+form, because the same banner serves every action on a page far longer than a
+screen.
+
+Sidecars are still **read** and no longer **written**. The export step became an
+empty template — "do not run this" — rather than a deleted feature, so anyone
+feeding another player from the same scan types `export {dir}` back in.
+
+### Two things that would have been silently wrong
+
+Both are in GOTCHAS. Opening Skiptro's database `immutable=1` — the flag that
+promises not to touch someone else's file — ignores the write-ahead log and
+reports **an empty schema with no error**, indistinguishable from "nothing has
+ever been detected". And a cache keyed on `skiptro.db`'s mtime would never
+notice a rescan, because the main file is 4 KB and every row lives in the
+`-wal`.
+
+The cache itself is now two-part for the same reason: `local_key` fingerprints
+the local sources and is re-checked every play, `remote_at` is when the network
+was last asked and is not. A Skiptro rescan re-reads the local sources without
+asking their server about the credits again.
 
 ---
 

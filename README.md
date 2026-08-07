@@ -26,7 +26,7 @@ thin client that does nothing without a Jellyfin server running.
 | 2 — Metadata engine | **Done.** TMDB / TVmaze / OMDb, match scoring, ambiguity guard |
 | 3 — Browsing UI | **Done.** Hero, rails, detail pages, search, D-pad navigation |
 | 4 — Playback | **Done.** Resume, Continue Watching, per-show track memory, next-episode autoplay |
-| 5 — Intro skip + trailers | **Done.** Skip intro from Skiptro sidecars, trailers from local files |
+| 5 — Intro skip + trailers | **Done.** Skip intro and credits, trailers from local files |
 | Artwork cache | **Done.** Posters/backdrops/stills in app data, served over the asset protocol — browsing works offline |
 | Manual fix-match | **Done.** Review queue with reasons, provider search, ignore and unlink |
 | 10-foot TV layout | **Done.** One `--ui-scale` knob, persisted; overscan-safe gutters; every control reachable by D-pad |
@@ -34,7 +34,7 @@ thin client that does nothing without a Jellyfin server running.
 | NFO read/write | **Done.** Read as an authoritative override during matching; export is an explicit action |
 | Watched tracking | **Done.** One flag shared with playback completion; ticks and progress on episode rows, manual toggle per episode and per film |
 | Player episode stepping | **Done.** Previous/next buttons and keys, shown only where a neighbour exists |
-| End-credit skipping | **Done.** Credits resolved from sidecar, then a named chapter, then a fenced time guess |
+| End-credit skipping | **Done.** Credits from TheIntroDB, then a named chapter, then a fenced time guess |
 | Stats for nerds | **Done.** `i` in the player — madVR-style: cadence, scaling and why, HDR pipeline, audio in/out, dropped frames |
 | Launchable exe | **Done.** `npm run app:build` → portable folder + desktop shortcut, no installer |
 | Creator's-intent audit | **Done.** Verified against mpv's own verbose log; `deinterlace=auto` added, 24p cadence reported, frame-timing switch |
@@ -45,6 +45,7 @@ thin client that does nothing without a Jellyfin server running.
 | Browsing at scale | **Done.** Rails cap at 30 with a "See all" grid; guessit-js off the startup bundle; Settings counts instead of fetching |
 | Logos + cast | **Done.** Title treatment on the hero, cast row on detail pages — both free on the TMDB request already made |
 | Intro detection in-app | **Done.** Runs a Skiptro you installed yourself, at a path you chose. Nothing bundled |
+| Markers without sidecars | **Done.** Reads Skiptro's own database; TheIntroDB supplies the credits it cannot detect. No files beside the videos |
 
 ## Setup
 
@@ -112,9 +113,14 @@ src-tauri/src/
   artwork.rs     Downloads posters/backdrops/logos/stills/cast faces into app
                  data, keyed by remote URL; served back through the asset
                  protocol
-  skip.rs        Reads .skiptro.json sidecars for intro/credits markers,
-                 cached against the sidecar's own size and mtime
-  detect.rs      Runs the user's own Skiptro to *produce* those sidecars.
+  skip.rs        Ranks the marker sources and returns the winner per segment;
+                 caches locals and network separately, since only one of them
+                 is free to re-read
+  skiptro.rs     Reads Skiptro's own SQLite database — the source the
+                 .skiptro.json files were only ever an export of
+  introdb.rs     TheIntroDB lookups, keyed on TMDB id. Where end credits come
+                 from; per-episode, on play, cached with a TTL
+  detect.rs      Runs the user's own Skiptro to *produce* the detections.
                  Nothing is bundled; the command lines are settings
   trailer.rs     Finds local trailer files by Jellyfin/Kodi convention; the
                  scanner shares its test so trailers never become titles
@@ -129,8 +135,8 @@ src/
                  how long a rail gets
   player/        Player, shared mpv lifecycle, track handling, mpv options.
                  chapters.ts and stats.ts read mpv as flat scalars only;
-                 skip.ts resolves a credits marker from the sidecar, a named
-                 chapter, or a fenced guess at the tail of the file
+                 skip.ts continues the credits ladder past the marker Rust
+                 supplies — a named chapter, then a fenced guess at the tail
   library/       pipeline.ts — the scan→parse→match→artwork→details sequence,
                  shared by the startup scan and the Scan now button.
                  parse.ts loads guessit-js on demand, not at startup. LibraryView
@@ -239,11 +245,37 @@ for a D-pad.
 
 **Skiptro is invoked, never shipped.** The app can run a copy the user installed
 themselves, at a path they chose, with the command lines editable in Settings —
-so generating sidecars is not a chore in another window. It still bundles
-nothing, downloads nothing and requires nothing to be present: with no path set,
-intro skipping behaves exactly as it always did. The templates are text fields
-so a change to Skiptro's CLI is an edit rather than a rebuild, which is the same
+so detecting intros is not a chore in another window. It still bundles nothing,
+downloads nothing and requires nothing to be present: with no path set, intro
+skipping behaves exactly as it always did. The templates are text fields so a
+change to Skiptro's CLI is an edit rather than a rebuild, which is the same
 reasoning that keeps anything needing upkeep out.
+
+**Markers are read from the source, not from an export beside every video.**
+Skiptro stores every detection in its own database; the `.skiptro.json` files
+were a copy of that, one per episode, sitting in the media folders forever. The
+app reads the database. The cost is knowingly taken: another application's
+private schema can move without warning, so a mismatch fails loudly into the log
+and falls through to the sidecar reader, which still works and is still how any
+other producer can feed this app.
+
+**End credits come from TheIntroDB, because nothing local can measure them.**
+Skiptro detects intros only. TheIntroDB is a free community database keyed on
+the TMDB id the title already has, so it needed no new matching and no account.
+It is asked about **one episode at a time, when that episode is played** — never
+the library in bulk — and the answer is cached with an expiry rather than kept.
+Both of those are their licence terms rather than a design preference, and they
+are in `introdb.rs` where the code that must honour them lives. Attribution is
+in Settings. It is a second metadata service on top of TMDB, not a new class of
+dependency; if it goes away, the local sources mean that is a degradation rather
+than a regression.
+
+**Local measurement outranks a community timing, for both segments.** Skiptro
+fingerprinted the exact file on this disk, so its intro beats a timing taken
+against some copy of the episode. The order never changes between segments —
+only which sources have anything to say does, and for credits that is
+TheIntroDB alone, which makes it the only measured answer the closing segment
+has ever had.
 
 **Trailers are local files, never a live stream in-app.** A trailer beside the media
 plays on the mpv surface: no ads, no network, no bundled binary, and the same
@@ -273,9 +305,9 @@ disagreement would be invisible — a row showing a tick while Continue Watching
 still offered it. Un-watching deletes the row: "not watched" and "no history" are
 the same state, and a file just declared unseen must not then resume.
 
-**A guessed credits marker may offer, never decide.** Skiptro detects intros
-only, so the closing segment is resolved from the sidecar, then a chapter named
-for it, then `duration − 60s`. The first two are measurement and evidence; the
+**A guessed credits marker may offer, never decide.** The closing segment is
+resolved from TheIntroDB, then a chapter named for it, then `duration − 60s`.
+The first two are measurement and evidence; the
 third is inference, so it never fires without a next episode to move to, and it
 shows an Up next card over the still-playing video rather than ending the file.
 A wrong guess then costs a card on screen instead of an ending nobody saw.

@@ -76,8 +76,21 @@ export const listUnparsed = (limit: number) => invoke<MediaFile[]>('list_unparse
 export const SKIPTRO_PATH_KEY = 'skiptro_path';
 export const SKIPTRO_SCAN_ARGS_KEY = 'skiptro_scan_args';
 export const SKIPTRO_EXPORT_ARGS_KEY = 'skiptro_export_args';
+/** Where Skiptro's own database lives, when it is not in the usual place. */
+export const SKIPTRO_DB_PATH_KEY = 'skiptro_db_path';
 export const DEFAULT_SKIPTRO_SCAN_ARGS = 'scan {dir}';
-export const DEFAULT_SKIPTRO_EXPORT_ARGS = 'export {dir}';
+/**
+ * Empty on purpose: no export step, so no sidecars.
+ *
+ * The app reads Skiptro's own database now, which is where the detections were
+ * all along. Exporting only wrote a redundant `.skiptro.json` next to every
+ * episode. Anyone who wants them — to feed another player from the same scan —
+ * types `export {dir}` back into the field.
+ */
+export const DEFAULT_SKIPTRO_EXPORT_ARGS = '';
+
+/** Setting key: `'off'` stops the app asking TheIntroDB anything. */
+export const INTRODB_ENABLED_KEY = 'introdb_enabled';
 
 export interface DetectStepReport {
   step: string;
@@ -97,8 +110,10 @@ export interface DetectProgress {
 }
 
 /**
- * Run the user's own Skiptro over a library root: detect, then export the
- * `.skiptro.json` sidecars the player already knows how to read.
+ * Run the user's own Skiptro over a library root.
+ *
+ * Detection only, by default: the app reads Skiptro's database directly, so
+ * the export step is empty unless the sidecars are wanted for something else.
  */
 export const detectIntros = (rootPath: string) =>
   invoke<DetectReport>('detect_intros', { rootPath });

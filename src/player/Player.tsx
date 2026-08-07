@@ -547,8 +547,9 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   }, []);
 
   /**
-   * The markers actually acted on: the sidecar's, with a credits segment folded
-   * in from a chapter or from the tail guess when it has none of its own.
+   * The markers actually acted on: whatever `skip.rs` ranked highest, with a
+   * credits segment folded in from a chapter or from the tail guess when no
+   * source supplied one.
    *
    * The guess is gated on there being a next episode. Without one, "skip the
    * credits" can only mean ending the film early, which is not a skip.
@@ -565,7 +566,15 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   );
 
   // One line per file in app.log. Which source won is the first thing worth
-  // knowing when a skip fires somewhere surprising.
+  // knowing when a skip fires somewhere surprising — and with three of them
+  // now, the intro needs saying as much as the credits do.
+  const introSource = resolved.markers?.intro_source ?? null;
+  useEffect(() => {
+    if (introSource) {
+      console.log(`intro marker from ${introSource} for ${target.path}`);
+    }
+  }, [introSource, target.path]);
+
   useEffect(() => {
     if (resolved.creditsSource) {
       console.log(`credits marker from ${resolved.creditsSource} for ${target.path}`);

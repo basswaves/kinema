@@ -29,6 +29,8 @@ import {
   removeLibraryRoot,
   DEFAULT_SKIPTRO_EXPORT_ARGS,
   DEFAULT_SKIPTRO_SCAN_ARGS,
+  INTRODB_ENABLED_KEY,
+  SKIPTRO_DB_PATH_KEY,
   SKIPTRO_EXPORT_ARGS_KEY,
   SKIPTRO_PATH_KEY,
   SKIPTRO_SCAN_ARGS_KEY,
@@ -105,10 +107,22 @@ export default function Settings() {
   // Intro detection. `detecting` holds the root currently being worked on, so
   // one root's button can show progress while the others simply disable.
   const [skiptroPath, setSkiptroPath] = useState('');
+  const [skiptroDbPath, setSkiptroDbPath] = useState('');
   const [scanArgs, setScanArgs] = useState(DEFAULT_SKIPTRO_SCAN_ARGS);
   const [exportArgs, setExportArgs] = useState(DEFAULT_SKIPTRO_EXPORT_ARGS);
   const [detecting, setDetecting] = useState<string | null>(null);
   const [detectLine, setDetectLine] = useState('');
+  /**
+   * Confirmation for **Save commands**, shown beside the button rather than in
+   * the banner at the top of the page.
+   *
+   * The banner is 300 lines of markup above this button, so a press produced a
+   * confirmation the user could not see and the control read as dead. Feedback
+   * for a button belongs next to the button when the page is this long.
+   */
+  const [commandsSaved, setCommandsSaved] = useState(false);
+  // Unset means on. Only an explicit 'off' stops the lookups.
+  const [introDb, setIntroDb] = useState(true);
 
   const tvMode = useTvMode();
   const scan = useScanStatus();
@@ -152,8 +166,13 @@ export default function Settings() {
       setDisplaySync((await getSetting(VIDEO_SYNC_KEY)) === 'display');
 
       setSkiptroPath((await getSetting(SKIPTRO_PATH_KEY)) ?? '');
+      setSkiptroDbPath((await getSetting(SKIPTRO_DB_PATH_KEY)) ?? '');
       setScanArgs((await getSetting(SKIPTRO_SCAN_ARGS_KEY)) || DEFAULT_SKIPTRO_SCAN_ARGS);
-      setExportArgs((await getSetting(SKIPTRO_EXPORT_ARGS_KEY)) || DEFAULT_SKIPTRO_EXPORT_ARGS);
+      // `??` not `||`: an empty export command is the default and means "do not
+      // export". `||` would silently put the old sidecar-writing command back.
+      setExportArgs((await getSetting(SKIPTRO_EXPORT_ARGS_KEY)) ?? DEFAULT_SKIPTRO_EXPORT_ARGS);
+
+      setIntroDb((await getSetting(INTRODB_ENABLED_KEY)) !== 'off');
     })();
   }, []);
 
@@ -181,7 +200,10 @@ export default function Settings() {
       try {
         const report = await detectIntros(root.path);
         if (report.ok) {
-          setNote(`Intro detection finished for ${root.path}. Sidecars written beside the videos.`);
+          // No longer "sidecars written": the detections go into Skiptro's own
+          // database and are read from there. Nothing is written beside the
+          // videos unless an export command has been typed back in.
+          setNote(`Intro detection finished for ${root.path}.`);
         } else {
           const failed = report.steps[report.steps.length - 1];
           setError(
@@ -393,8 +415,8 @@ export default function Settings() {
               Skip intros: {autoSkip ? 'automatically' : 'ask'}
             </FocusButton>
             <span className="muted">
-              Needs a <code>.skiptro.json</code> sidecar next to the video; without one, nothing
-              changes either way.
+              Applies to the credits too. Needs a marker from somewhere — Skiptro, TheIntroDB or
+              a sidecar; without one, nothing changes either way.
             </span>
           </div>
           <div className="settings-toggle-row">
@@ -412,8 +434,9 @@ export default function Settings() {
               Assume credits: {creditsTail > 0 ? `last ${creditsTail}s` : 'off'}
             </FocusButton>
             <span className="muted">
-              When a file has neither a sidecar nor a chapter named for its credits, offer the
-              next episode this far before the end. A named end-credits chapter always wins, and
+              The last resort, when nothing knows where the credits are: no marker from
+              TheIntroDB, and no chapter named for them. Offer the next episode this far before
+              the end. A real marker and a named end-credits chapter both win, and
               this never applies to a film or to the last episode of a run — there is nothing to
               move on to. Off means the offer waits for the file to finish.
             </span>
@@ -453,15 +476,58 @@ export default function Settings() {
           </div>
         </section>
 
-        {/* ---- intro detection ---- */}
+        {/* ---- where markers come from ----
+
+            Two sources, listed in the order they are trusted, because they are
+            good at different things and the difference is the whole design:
+            Skiptro measured the exact file on this disk but only finds intros;
+            TheIntroDB was timed by people against some copy of the episode, and
+            is the only thing that knows where the credits are. */}
         <section className="settings-section">
-          <h2>Intro detection</h2>
+          <h2>Intro and credits markers</h2>
+
+          <h3>TheIntroDB</h3>
           <p className="muted">
-            The <strong>Skip intro</strong> button needs a <code>.skiptro.json</code> file beside
-            each episode, and something has to produce them.{' '}
-            <strong>Skiptro is not bundled and never will be</strong> — no third-party binary goes
-            into this app. Point this at a copy you have installed yourself and the detection can
-            at least be started from here instead of in another window.
+            A free community database of intro and credits times, looked up by the same TMDB id
+            used to match the title. <strong>This is where end credits come from</strong> —
+            Skiptro below detects intros and nothing else, so without this the end of an episode
+            is a chapter name or a guess. Nothing is sent but the id, season and episode; no
+            account and no key.
+          </p>
+          <div className="settings-toggle-row">
+            <FocusButton
+              className={introDb ? 'btn-primary' : 'btn-secondary'}
+              onSelect={() => {
+                const next = !introDb;
+                setIntroDb(next);
+                void setSetting(INTRODB_ENABLED_KEY, next ? 'on' : 'off').catch((e) =>
+                  setError(String(e))
+                );
+              }}
+            >
+              TheIntroDB: {introDb ? 'on' : 'off'}
+            </FocusButton>
+            <span className="muted">
+              Asked once per episode when you play it, never for the library in bulk, and the
+              answer is kept for a month. Off means intros only, from Skiptro.
+            </span>
+          </div>
+          {/* Attribution. They request it rather than require it, and it costs
+              one line; this is the page a user would look at to find out where
+              the timings came from. */}
+          <p className="muted">
+            Segment data from <strong>TheIntroDB</strong> —{' '}
+            <code>https://theintrodb.org</code>. Community-contributed, so accuracy varies and
+            coverage is patchy on less-watched shows.
+          </p>
+
+          <h3>Skiptro</h3>
+          <p className="muted">
+            Detects intros by fingerprinting the audio of the episodes you actually have, which
+            is why it outranks TheIntroDB for the intro: it measured this file rather than a copy
+            of it. <strong>Skiptro is not bundled and never will be</strong> — no third-party
+            binary goes into this app. Point this at a copy you have installed yourself and the
+            detection can at least be started from here instead of in another window.
           </p>
           <div className="settings-row">
             <FocusButton
@@ -497,11 +563,9 @@ export default function Settings() {
             )}
           </p>
 
-          {/* Two commands because that is what Skiptro does: `scan` fills its
-              own database, `export` writes the sidecars this app reads. They
-              are text fields rather than hard-coded so that a change to
-              Skiptro's command line is an edit here and not a new build — the
-              same reasoning that keeps anything needing upkeep out. */}
+          {/* Text fields rather than hard-coded so that a change to Skiptro's
+              command line is an edit here and not a new build — the same
+              reasoning that keeps anything needing upkeep out. */}
           <label className="settings-field">
             <span>
               Detect command <span className="muted">{'{dir}'} is the folder</span>
@@ -509,37 +573,72 @@ export default function Settings() {
             <FocusInput
               className="settings-input"
               value={scanArgs}
-              onChange={setScanArgs}
+              onChange={(v) => {
+                setScanArgs(v);
+                setCommandsSaved(false);
+              }}
               placeholder={DEFAULT_SKIPTRO_SCAN_ARGS}
             />
           </label>
           <label className="settings-field">
             <span>
-              Export command <span className="muted">writes the .skiptro.json files</span>
+              Export command <span className="muted">leave empty — see below</span>
             </span>
             <FocusInput
               className="settings-input"
               value={exportArgs}
-              onChange={setExportArgs}
-              placeholder={DEFAULT_SKIPTRO_EXPORT_ARGS}
+              onChange={(v) => {
+                setExportArgs(v);
+                setCommandsSaved(false);
+              }}
+              placeholder="not run"
             />
           </label>
-          <FocusButton
-            className="btn-secondary"
-            onSelect={() =>
-              void (async () => {
-                try {
-                  await setSetting(SKIPTRO_SCAN_ARGS_KEY, scanArgs.trim());
-                  await setSetting(SKIPTRO_EXPORT_ARGS_KEY, exportArgs.trim());
-                  setNote('Commands saved.');
-                } catch (e) {
-                  setError(String(e));
-                }
-              })()
-            }
-          >
-            Save commands
-          </FocusButton>
+          <p className="muted">
+            The app reads Skiptro&rsquo;s own database directly, so exporting is off. It used to
+            write a <code>.skiptro.json</code> next to every episode for information that was
+            already in the database — one extra file per episode, forever. Type{' '}
+            <code>export {'{dir}'}</code> here if you want them anyway, to feed another player
+            from the same scan.
+          </p>
+          <label className="settings-field">
+            <span>
+              Skiptro database <span className="muted">only if you moved it</span>
+            </span>
+            <FocusInput
+              className="settings-input"
+              value={skiptroDbPath}
+              onChange={(v) => {
+                setSkiptroDbPath(v);
+                setCommandsSaved(false);
+              }}
+              placeholder="%APPDATA%\Skiptro\skiptro.db"
+            />
+          </label>
+          {/* The three fields above are the only settings on this page that do
+              not apply the moment they change, so this button has to exist —
+              but its confirmation has to be *here*, not in the banner at the
+              top of the page, which is far off screen from this far down. */}
+          <div className="settings-row">
+            <FocusButton
+              className="btn-secondary"
+              onSelect={() =>
+                void (async () => {
+                  try {
+                    await setSetting(SKIPTRO_SCAN_ARGS_KEY, scanArgs.trim());
+                    await setSetting(SKIPTRO_EXPORT_ARGS_KEY, exportArgs.trim());
+                    await setSetting(SKIPTRO_DB_PATH_KEY, skiptroDbPath.trim());
+                    setCommandsSaved(true);
+                  } catch (e) {
+                    setError(String(e));
+                  }
+                })()
+              }
+            >
+              Save commands
+            </FocusButton>
+            {commandsSaved && <span className="muted">Saved.</span>}
+          </div>
 
           {/* TV roots only. Intros are a television thing, and offering this on
               a films folder would be a button that runs for a long time and

@@ -81,7 +81,6 @@ pub fn provider_status(db: tauri::State<Db>) -> Result<Vec<(String, bool)>, Stri
         // TVmaze needs no key at all — always available.
         ("tvmaze".into(), true),
         ("omdb".into(), has("omdb_api_key")),
-        ("mdblist".into(), has("mdblist_api_key")),
         ("tmdb".into(), has("tmdb_api_key")),
     ])
 }

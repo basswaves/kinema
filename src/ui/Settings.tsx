@@ -94,7 +94,6 @@ export default function Settings() {
   const [art, setArt] = useState<ArtworkStats | null>(null);
   const [tmdbKey, setTmdbKey] = useState('');
   const [omdbKey, setOmdbKey] = useState('');
-  const [mdblistKey, setMdblistKey] = useState('');
   const [autoSkip, setAutoSkip] = useState(false);
   const [creditsTail, setCreditsTail] = useState(DEFAULT_CREDITS_TAIL_SECS);
   const [displaySync, setDisplaySync] = useState(false);
@@ -142,7 +141,6 @@ export default function Settings() {
     void (async () => {
       setTmdbKey((await getSetting('tmdb_api_key')) ?? '');
       setOmdbKey((await getSetting('omdb_api_key')) ?? '');
-      setMdblistKey((await getSetting('mdblist_api_key')) ?? '');
       setAutoSkip((await getSetting('skip_mode')) === 'auto');
 
       // Unset keeps the default; 0 is a real value meaning "never guess", so it
@@ -239,12 +237,11 @@ export default function Settings() {
     try {
       await setSetting('tmdb_api_key', tmdbKey.trim());
       await setSetting('omdb_api_key', omdbKey.trim());
-      await setSetting('mdblist_api_key', mdblistKey.trim());
       setNote('Keys saved. They apply to matches run from now on — re-match to redo existing ones.');
     } catch (e) {
       setError(String(e));
     }
-  }, [tmdbKey, omdbKey, mdblistKey]);
+  }, [tmdbKey, omdbKey]);
 
   const exportNfo = useCallback(async (overwrite: boolean) => {
     setError(null);
@@ -607,17 +604,6 @@ export default function Settings() {
               value={omdbKey}
               onChange={setOmdbKey}
               placeholder="OMDb API key"
-            />
-          </label>
-          <label className="settings-field">
-            <span>
-              MDBList <span className="muted">ratings and ID cross-referencing</span>
-            </span>
-            <FocusInput
-              className="settings-input"
-              value={mdblistKey}
-              onChange={setMdblistKey}
-              placeholder="MDBList API key"
             />
           </label>
           <FocusButton className="btn-primary" onSelect={() => void saveKeys()}>

@@ -452,11 +452,14 @@ separate rows do not tell you that motion judders; `3:2 pulldown — uneven` doe
 and the note names the display mode that would fix it.
 
 **It lists the render passes that actually ran.** Every other row reports what
-was *requested*; `vo-passes` reports what libplacebo executed on the last frame.
-Those are different claims, and only the second answers "is anything touching my
-image?". This gpu-next build does not implement it — so rather than omit the
-section, which is indistinguishable from "no passes ran", the panel states that
-the VO does not report them and carries the error.
+was *requested*; `vo-passes` reports what libplacebo executed on the last frame,
+with timings. Those are different claims, and only the second answers "is
+anything touching my image?". Read as indexed scalars with the sub-path probed
+rather than assumed — it moved between mpv versions. This gpu-next build does
+not implement it at all, so rather than omit the section — indistinguishable
+from "no passes ran" — the panel states that the VO does not report them and
+carries the error, leaving what remains reading honestly as *requested* settings
+rather than observed ones.
 
 Beyond that it reports the source (resolution, codec, pixel format and bit depth,
 frame rate, bitrate, scan type and whether the deinterlacer engaged), the display
@@ -483,20 +486,6 @@ what the webview believes about the panel's dynamic range. It has already
 confirmed the SDR half on real content: a 4K HDR10 remux reads pq / bt.2020-ncl /
 1000 nits in, tone mapped with bt.2390 off a measured frame peak.
 
-Rebuilt along madVR's lines after using it, because a property dump gets two
-things wrong that madVR's OSD gets right.
-
-**It reports the cadence, not just two frame rates.** "23.976" and "59.97" in
-separate rows do not tell you that motion judders; `3:2 pulldown — uneven` does,
-and the note names the display mode that would fix it.
-
-**It lists the render passes that actually ran.** Every other row reports what
-was *requested*; `vo-passes` reports what libplacebo executed on the last frame,
-with timings. Those are different claims, and only the second answers "is
-anything touching my image?". Read as indexed scalars with the sub-path probed
-rather than assumed — it moved between mpv versions, and an unsupported build
-simply contributes no section.
-
 Also added: scan type and whether the deinterlacer is engaged, bit depth off the
 pixel format, chroma siting (which is what MPEG-2 era content gets wrong),
 primaries conversion, frame-timing mode, and an amber highlight on rows that are
@@ -517,11 +506,6 @@ number rather than a blank:
 - Cadence used the container frame rate, which is the wrong input on precisely
   the interlaced content the deinterlacer exists for — one interlaced frame
   becomes two progressive ones.
-
-`vo-passes` returns nothing on this gpu-next build. Rather than omit the section
-silently — indistinguishable from "no passes ran" — the panel now states that
-the VO does not report them and carries the error, so what is left reads
-honestly as *requested* settings rather than as observed ones.
 
 ## A launchable exe ✅
 
@@ -590,80 +574,179 @@ not put there.
 **Found while checking, not yet acted on:** audio is decoded to PCM and
 **downmixed 5.1 → 2.0**, because there is no `audio-spdif` configuration at all
 and the default Windows device is onboard stereo. That is a larger loss of
-intent than any scaler question. See the backlog.
+intent than any scaler question. See HANDOVER.md.
 
 ---
 
-## Backlog (not in the original plan, worth doing)
+## The review follow-up ✅
 
-**Delete `src/spike/`** — the Phase 0 harness. No longer reachable from the UI (the dev
-switcher is gone) but still on disk, because it is the diagnostic harness for HDR
-passthrough and that is still unverified for want of an HDR display. Delete it, its
-`App.css` styles and its `.skiptro`-era dependencies once that is confirmed.
+Prompted by a full read of the project against its original prompt. The code was
+in good shape; what the review found were places where the app fell short of
+goals *this project had already written down*. Seven stages, each verified in the
+real app before the next began.
 
-**Confidence floor for skip markers** — the `.skiptro.json` sidecar carries a
-`confidence` value nothing reads yet. A skip fired on a bad detection jumps over real
-content, which is the same class of silent wrongness as a bad metadata match. Needs a
-low-confidence sample to calibrate against; everything in the library so far reports `1`.
+### Continue Watching offers what to watch next ✅
 
-**Audio is decoded and downmixed, never passed through.** There is no
-`audio-spdif` configuration, so mpv decodes everything to PCM and hands it to
-the default Windows device — which on this machine is onboard stereo, so a 5.1
-AAC track arrives as 2.0. An AVR would receive that downmix rather than the
-original bitstream, and TrueHD/Atmos and DTS:X object metadata are lost entirely
-before they ever leave the app. This is a bigger departure from creator's intent
-than anything in the scaler path.
+`continue_watching` filtered `completed = 0`, so a show **left the rail the
+moment an episode finished** — which is exactly the point at which you want it
+offered. It now has two sources: a part-watched file, or for a series you have
+finished an episode of and started nothing since, the next episode the library
+holds. Merged in Rust rather than SQL: one query covering both would be
+unreadable, and the existing one was the tested one.
 
-Not fixed blind: enabling passthrough on a device that does not support the
-codec produces silence or noise, so it needs the real AVR present to verify, and
-it needs a device selection (mpv's `--audio-device`) because the default device
-is the wrong one here. Note also that it is mutually exclusive with the new
-display-clock frame timing.
+**One card per show.** Starting three episodes of a series used to produce three
+cards and push everything else off the rail.
 
-**Smooth motion (`tscale=oversample`) — deferred, not rejected.** The one
-remaining lever on 24p judder short of a display-mode change. mpv's
-`--interpolation` with `--tscale=oversample` is madVR's "smooth motion": it does
-not synthesise intermediate frames the way a true interpolator does — most
-refreshes still show a pure source frame and only the transition refresh is a
-blend of two — so it trades the discrete 3-2 judder for a slight smear on those
-refreshes. It requires display-clock timing, which now exists.
+The ordering logic is shared with the player's previous/next buttons through
+`adjacent_from` — three callers, one definition of what "next" means. Its
+predicate is *not finished* rather than *never started*: an episode you are ten
+minutes into is the next one to watch, and testing for the absence of a playback
+row would skip straight past it.
 
-It does alter frames, which cuts against "nothing invents frames or detail", so
-it is a decision rather than an improvement. Raised and explicitly set aside;
-**ask before enabling it.**
+Pressing Play on a series used to start `movie_path`, which for a series is the
+**largest file by size** — often a feature-length finale. Both Play buttons now
+ask `first_unwatched_episode`, and the detail page names the episode on the
+button so a press is never a surprise.
 
-**`playTitle` picks the largest file, not the first episode** — `get_title_detail`
-returns `movie_path` for a *series* too (largest file by size), so pressing Play
-on a series card, or the detail page's Play button, starts whichever episode
-happens to be biggest rather than the first one. Predates this session and is
-left alone deliberately: changing what Play does is not a silent fix. The
-episode list and Continue Watching are both unaffected.
+**Found while testing:** the browsing shell loaded the library once, on mount.
+Marking an episode watched on a detail page changed the tick on the row and
+nothing on Home. Replaced with the invariant *Home reflects the database
+whenever Home is visible* — one effect keyed on the view — rather than a
+callback per writer, which the next screen that writes something would have to
+remember to call.
+
+### The player OSD is reachable by remote ✅
+
+Eighteen bare `<button>`s and no `FocusButton` anywhere: audio and subtitle
+selection, stats and fullscreen were **mouse-only**, on the one screen where a
+remote is most likely to be the only input. CLAUDE.md, README and GOTCHAS all
+stated the rule this broke.
+
+Left/Right still seek. **Up** hands the arrow keys to the OSD, **Escape** hands
+them back — one layer at a time, closing a panel before dropping out of focus
+mode before leaving the player.
+
+The crux is that `preventDefault` cannot stop the *other* listener, so exactly
+one of the two key handlers may be live at a time: the spatial system starts
+`pause()`d and is `resume()`d only in OSD mode. Details in GOTCHAS.md, including
+`resume()` on unmount — without it the browsing UI underneath is left unable to
+navigate, silently.
+
+A focus ring may never appear in seek mode. The ring means "arrows move between
+these"; there it would be a lie, and a ring that lies is worse than none.
+
+### A scan no longer freezes the app ✅
+
+`scan_library` held the single `Mutex<Connection>` for the whole walk — minutes
+over SMB, with every other command blocked behind it. WAL had been enabled since
+the beginning with a comment saying it "keeps reads from blocking the scan
+writer"; it never did, because WAL lets separate *connections* work concurrently
+and there was only one.
+
+The scanner now has its own connection, `busy_timeout` is set on both (without
+it a second writer fails immediately rather than waiting, and `save_progress`
+fires every five seconds during playback), and the walk gathers file metadata
+**outside** any transaction — the stat calls over SMB were the slow part and
+they were all happening with the write lock held.
+
+Matching writes are batched: `link_files_to_title` takes a list in one
+transaction. Every call site was already a loop over a group's files, so the
+single-file command had no remaining users and was removed rather than left as
+dead API.
+
+### Browsing stays fast at scale ✅
+
+Rails were uncapped except "Recently added" — every title in "Movies" and in
+each of up to eight genre rails, each card a registered focusable, with spatial
+navigation measuring elements live at navigation time. Capped at 30 with a **See
+all** tile at the *end of the row*, which is where you arrive having scrolled
+and keeps the rail one straight line for a D-pad.
+
+**guessit-js was 390 kB of a 566 kB startup bundle** for code that only runs
+during a scan. Dynamic-imported on first parse; startup JS is now 374 kB.
+`parseMediaFile` stayed synchronous so the batch `.map()` did not have to become
+a sequence of awaits, and parsing without loading **throws** rather than
+recording every file as unparseable — which would look identical to a library of
+unrecognisable names.
+
+Settings fetched 2,000 rows of eighteen columns to call `.length` on a filter of
+them, and silently under-reported past 2,000 files. Now a count query, with the
+review queue loading its own rows.
+
+### Logos and cast ✅
+
+Both were in the original plan and never built, and both arrive on the TMDB
+detail request the matcher **already makes** — `append_to_response` grew by two
+words. No extra round trips, no new provider.
+
+The hero draws the title treatment where every streaming service does. The `<h1>`
+is the *fallback* rather than something hidden beside it, so a logo that fails to
+load cannot leave the hero nameless. PNG is preferred over SVG: TMDB serves SVG
+logos through the same size-prefixed CDN path unrasterised, and an `<img>`
+pointed at one has no intrinsic size.
+
+Cast is capped at ten — each one is another face in the artwork cache — and is
+deliberately **not focusable**: nothing here is actionable, and ten dead landing
+spots between the Play button and the episode list would be ten presses in the
+way.
+
+`people` is denormalised and keyed by title on purpose. Cast is a property of a
+title here; nothing asks "what else were they in", and a shared table plus a
+join table would buy that at the cost of orphan cleanup on every re-match.
+
+The trailer backfill was generalised into `backfillTitleDetails`, since one
+request returns all of it. **`NULL` means never asked; empty string means asked
+and there is none** — without that distinction a title genuinely lacking a logo
+would be re-fetched on every scan forever.
+
+**Found while testing:** `Art` could loop indefinitely. It tracked a single
+failed source, so when both the cached copy and the remote URL failed it flipped
+between them — offline with a half-built cache, precisely when it mattered. It
+now tracks a set, so each source fails once and then the fallback renders.
+
+### Intro detection from inside the app ✅
+
+Skip intro needed a `.skiptro.json` beside each episode and nothing produced
+one, so a headline feature only worked on content processed by hand in another
+window.
+
+The app now runs a Skiptro the **user installed themselves**, at a path they
+chose. Nothing is bundled, downloaded or required: with no path set, intro
+skipping behaves exactly as before. See the settled-decisions note in CLAUDE.md
+for why that is compatible with the rule rather than an exception to it.
+
+Two commands, because that is what Skiptro's CLI does — `scan <dir>` fills its
+own database, `export <dir>` writes the sidecars this app reads — and both are
+**editable text fields**. A change to Skiptro's command line should be an edit,
+not a rebuild; the same reasoning that keeps anything needing upkeep out.
+
+Arguments never go through a shell. `{dir}` is substituted into a single token
+and passed to the process directly, so a path with spaces needs no quoting
+anywhere. Offered on TV roots only.
+
+The first implementation drained stderr after stdout and could deadlock on a
+full pipe buffer. GOTCHAS.md carries the general form.
+
+---
+
+## Open items
+
+**They live in [HANDOVER.md](HANDOVER.md), and only there.** They used to be
+listed here twice — a "Backlog" and a "Still unverified" — as well as in
+HANDOVER, which is exactly the drift this file keeps warning about. This
+document is for decisions and the reasons behind them; what is left to do is a
+different question with a different shelf life.
 
 ## Verification
 
-- **Matching:** the number that matters is *wrongly* matched, not unmatched. Target zero
-  silent wrong matches; unmatched is acceptable work. Keep ugly real filenames as
-  regression fixtures.
-- **Playback:** H.264, HEVC 10-bit, AV1, HDR10, DV P5, DV P7, PGS + ASS subs, TrueHD/Atmos.
-- **NAS:** full scan timed over SMB; verify no full-file reads and no UI blocking.
-- **TV mode:** navigate every screen with arrow keys + Enter + Back only, **without
-  touching the mouse at all**. Anything unreachable by D-pad is a bug, and every
-  one of them found so far was invisible in mouse testing — a stray hover repairs
-  focus and hides the failure.
-
-## Still unverified
-
-- **HDR passthrough** — untestable on this 2560×1600 SDR panel. HDR *decode* and
-  tone-mapping to SDR are now confirmed **on real content by the stats panel**,
-  not merely by the picture looking right: a 4K HDR10 remux reads pq /
-  bt.2020-ncl / 1000 nits in, tone mapped with bt.2390 off a measured peak.
-- **Per-show track memory across episodes** — implemented, but a bug in reading `sid`
-  was aborting the apply path until late in Phase 4; worth re-confirming.
-- **Movies at scale** — only one film in the library so far.
-- **`vo-passes`** — returns nothing on this gpu-next build, so the stats panel's
-  render-pass list is empty and every rendering row is a *requested* setting
-  rather than an observed one. The panel carries the error; worth revisiting if
-  mpv is ever updated.
-- **The four stats fixes** (video rectangle, `hw-pixelformat`, SDR peak, cadence
-  after deinterlacing) are written and built but not yet eyeballed against the
-  three test files that exposed them.
+- **Matching:** the number that matters is *wrongly* matched, not unmatched.
+  Target zero silent wrong matches; unmatched is acceptable work. Keep ugly real
+  filenames as regression fixtures.
+- **Playback:** H.264, HEVC 10-bit, AV1, HDR10, DV P5, DV P7, PGS + ASS subs,
+  TrueHD/Atmos.
+- **NAS:** full scan timed over SMB; verify no full-file reads and no UI
+  blocking.
+- **TV mode:** navigate every screen with arrow keys + Enter + Back only,
+  **without touching the mouse at all**. Anything unreachable by D-pad is a bug,
+  and every one of them found so far was invisible in mouse testing — a stray
+  hover repairs focus and hides the failure.

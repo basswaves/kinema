@@ -39,6 +39,13 @@ src-tauri/mpv.log
 app.log
 src-tauri/app.log
 
-# Local secrets (TMDB / fanart.tv API keys)
+# Local secrets (TMDB / OMDb API keys)
 .env
 .env.local
+
+# Test media. Clips kept around to exercise a specific decode path — the
+# interlaced one proves `deinterlace=auto` engages — but they are megabytes of
+# binary that nothing builds from, so they stay out of history.
+/*.mp4
+/*.mkv
+/*.m2ts

@@ -19,7 +19,10 @@ interface Props {
 }
 
 function remainingLabel(item: ContinueItem): string {
-  if (!item.duration_secs) return '';
+  // A next-up episode has never been played, so there is no "remaining" to
+  // report — its duration is unknown and its position is zero. Saying "45 min
+  // left" about something not started would be a guess dressed as a measurement.
+  if (item.is_next_up || !item.duration_secs) return '';
   const left = Math.max(0, item.duration_secs - item.position_secs);
   const mins = Math.round(left / 60);
   return mins > 0 ? `${mins} min left` : 'nearly done';
@@ -133,13 +136,19 @@ function ContinueCardBody({
           fallback={<div className="continue-art-empty" />}
         />
         <div className="continue-play">▶</div>
-        <div className="continue-progress">
-          <div className="continue-progress-fill" style={{ width: `${percent}%` }} />
-        </div>
+        {/* Drawn only where there is progress to draw. An empty bar under a
+            next-up card looks like a card that failed to load its position. */}
+        {!item.is_next_up && (
+          <div className="continue-progress">
+            <div className="continue-progress-fill" style={{ width: `${percent}%` }} />
+          </div>
+        )}
       </div>
       <div className="continue-title">{item.title}</div>
       <div className="continue-meta">{subtitle}</div>
-      <div className="continue-remaining">{remainingLabel(item)}</div>
+      <div className="continue-remaining">
+        {item.is_next_up ? 'Next episode' : remainingLabel(item)}
+      </div>
     </div>
   );
 }

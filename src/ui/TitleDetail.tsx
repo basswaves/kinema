@@ -11,7 +11,12 @@ import { openUrl } from '@tauri-apps/plugin-opener';
 import Art from './Art';
 import FocusButton from './FocusButton';
 import { useClaimFocus } from './focus';
-import { setWatched } from '../player/api';
+import {
+  episodeLabel,
+  firstUnwatchedEpisode,
+  setWatched,
+  type EpisodeRef,
+} from '../player/api';
 import {
   findLocalTrailer,
   getTitleDetail,
@@ -76,15 +81,22 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [season, setSeason] = useState<number | null>(null);
   const [trailerPath, setTrailerPath] = useState<string | null>(null);
+  /** For a series: the episode the Play button will actually start. */
+  const [nextUp, setNextUp] = useState<EpisodeRef | null>(null);
 
-  // A movie opens on its Play button, a series on the first episode it actually
-  // holds. Landing on Back instead — the first control in the markup — would be
-  // technically navigable and useless.
+  // Land on the primary action. That is Play for a film, and Play for a series
+  // too now that it names the episode it will start; only a series with nothing
+  // to continue falls back to the episode list. Landing on Back instead — the
+  // first control in the markup — would be technically navigable and useless.
+  //
+  // The old test was `detail?.movie_path`, which is set for a *series* as well
+  // (it is the largest file), so the series branch was unreachable.
   const { ref, focusKey } = useFocusable({
     focusKey: DETAIL_FOCUS_KEY,
     trackChildren: true,
     saveLastFocusedChild: true,
-    preferredChildFocusKey: detail?.movie_path ? DETAIL_PLAY_KEY : DETAIL_FIRST_EPISODE_KEY,
+    preferredChildFocusKey:
+      title.kind === 'series' && !nextUp ? DETAIL_FIRST_EPISODE_KEY : DETAIL_PLAY_KEY,
   });
 
   // Waits for the load: claiming earlier would land on Back, the only control
@@ -106,6 +118,26 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
       cancelled = true;
     };
   }, [title.id]);
+
+  /**
+   * Which episode Play means, for a series.
+   *
+   * Asked of the database rather than derived from `detail.episodes`, because
+   * that list comes from the metadata provider: a title matched with no episode
+   * data would leave it empty while the files sit on disk perfectly playable.
+   * Re-read after a watched toggle, since marking an episode seen changes the
+   * answer.
+   */
+  useEffect(() => {
+    if (title.kind !== 'series') return;
+    let cancelled = false;
+    firstUnwatchedEpisode(title.id)
+      .then((found) => !cancelled && setNextUp(found))
+      .catch((e) => console.warn('next episode lookup failed', e));
+    return () => {
+      cancelled = true;
+    };
+  }, [title.id, title.kind, detail]);
 
   const seasons = useMemo(() => {
     if (!detail) return [];
@@ -148,6 +180,8 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
         await setWatched(fileId, watched);
         const fresh = await getTitleDetail(title.id);
         setDetail(fresh);
+        // Home re-reads Continue Watching whenever it is shown, so there is
+        // nothing to notify here — see the effect in Browse.tsx.
       } catch (e) {
         setError(String(e));
       }
@@ -208,18 +242,47 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
               {title.overview && <p className="detail-overview">{title.overview}</p>}
 
               <div className="detail-actions">
-                {detail?.movie_path && (
-                  <FocusButton
-                    focusKey={DETAIL_PLAY_KEY}
-                    className="btn-primary"
-                    keepInView="page-top"
-                    onSelect={() =>
-                      onPlayFile(detail.movie_path as string, title.title, detail.movie_file_id)
-                    }
-                  >
-                    ▶ Play
-                  </FocusButton>
-                )}
+                {/* A series and a film need different questions asked.
+                    `detail.movie_path` is the largest file by size, which for a
+                    series is whichever episode happens to be biggest — often a
+                    feature-length finale. Play has to mean "carry on with this
+                    show", and it says which episode so a press is never a
+                    surprise. */}
+                {title.kind === 'series'
+                  ? nextUp && (
+                      <FocusButton
+                        focusKey={DETAIL_PLAY_KEY}
+                        className="btn-primary"
+                        keepInView="page-top"
+                        onSelect={() =>
+                          onPlayFile(
+                            nextUp.path,
+                            episodeLabel(title.title, nextUp.season, nextUp.episode),
+                            nextUp.file_id
+                          )
+                        }
+                      >
+                        {`▶ Play S${String(nextUp.season).padStart(2, '0')}E${String(
+                          nextUp.episode
+                        ).padStart(2, '0')}`}
+                      </FocusButton>
+                    )
+                  : detail?.movie_path && (
+                      <FocusButton
+                        focusKey={DETAIL_PLAY_KEY}
+                        className="btn-primary"
+                        keepInView="page-top"
+                        onSelect={() =>
+                          onPlayFile(
+                            detail.movie_path as string,
+                            title.title,
+                            detail.movie_file_id
+                          )
+                        }
+                      >
+                        ▶ Play
+                      </FocusButton>
+                    )}
 
                 {/* Series get their watched toggle per episode, on the rows.
                     A film is a single file, so this is the only place it can

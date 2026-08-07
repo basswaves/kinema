@@ -61,6 +61,7 @@ pub fn run() {
             playback::continue_watching,
             playback::next_episode,
             playback::previous_episode,
+            playback::first_unwatched_episode,
             playback::get_title_prefs,
             playback::set_title_prefs,
             skip::get_skip_markers,

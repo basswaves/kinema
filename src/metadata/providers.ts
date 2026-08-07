@@ -28,15 +28,90 @@ export interface TitleMetadata {
   rating: number | null;
   poster_url: string | null;
   backdrop_url: string | null;
+  /**
+   * The title treatment — the film's name as designed, on transparency. What a
+   * streaming service puts over its hero image instead of setting the title in
+   * the UI font. Null for providers that have none, which is all but TMDB.
+   */
+  logo_url: string | null;
   /** YouTube video id for the trailer, when the provider knows one. */
   trailer_key: string | null;
   trailer_site: string | null;
+  /** Billed cast, in order, capped by the provider client. */
+  cast: CastMember[];
 }
+
+export interface CastMember {
+  name: string;
+  character: string | null;
+  profile_url: string | null;
+}
+
+/**
+ * How many cast members to keep.
+ *
+ * TMDB returns the full billed cast, which runs to dozens on a big film. Each
+ * one is another face in the artwork cache, so an unbounded list would grow the
+ * cache by an order of magnitude for names nobody scrolls to. The first ten are
+ * the ones anyone recognises.
+ */
+const CAST_LIMIT = 10;
 
 export interface Trailer {
   /** The site's own video id — a YouTube key, not a URL. */
   key: string;
   site: string;
+}
+
+/** One entry from TMDB's `/images` lists. */
+interface TmdbImage {
+  file_path: string;
+  iso_639_1?: string | null;
+  vote_average?: number;
+  width?: number;
+}
+
+/** One entry from TMDB's `/credits` cast list. */
+interface TmdbCastMember {
+  name?: string;
+  character?: string;
+  profile_path?: string | null;
+  order?: number;
+}
+
+/**
+ * Pick the logo to draw over the hero.
+ *
+ * PNG over SVG deliberately. TMDB serves `.svg` logos through the same image
+ * host, but the size-prefixed CDN path (`/t/p/original/…`) returns them
+ * unrasterised, and an `<img>` pointed at one inherits no intrinsic size — it
+ * collapses or fills its container depending on the CSS, neither of which is
+ * the logo's real aspect ratio.
+ *
+ * English before language-neutral before anything else: a neutral logo is
+ * usually the original-language one, which is right when there is no English
+ * treatment and wrong when there is.
+ */
+function pickLogo(logos: TmdbImage[] | undefined): string | null {
+  if (!logos?.length) return null;
+
+  const rank = (logo: TmdbImage): number => {
+    const isPng = !logo.file_path.toLowerCase().endsWith('.svg');
+    if (!isPng) return 3;
+    if (logo.iso_639_1 === 'en') return 0;
+    if (!logo.iso_639_1) return 1;
+    return 2;
+  };
+
+  const best = [...logos].sort((a, b) => {
+    const byRank = rank(a) - rank(b);
+    if (byRank !== 0) return byRank;
+    return (b.vote_average ?? 0) - (a.vote_average ?? 0);
+  })[0];
+
+  // Every candidate was an SVG. Better none than one that renders at the wrong
+  // size over the hero image.
+  return rank(best) === 3 ? null : `${TMDB_IMAGE}${best.file_path}`;
 }
 
 /** One entry from TMDB's `/videos` list. */
@@ -191,9 +266,13 @@ export async function tvmazeGetShow(id: string): Promise<TitleMetadata> {
       rating: show.rating?.average ?? null,
       poster_url: show.image?.original ?? null,
       backdrop_url: backdrop,
-      // TVmaze carries no video links at all.
+      // TVmaze carries no logos and no video links at all. Cast is available
+      // from a separate endpoint, but a second request per title for the one
+      // provider that is the keyless fallback is the wrong trade.
+      logo_url: null,
       trailer_key: null,
       trailer_site: null,
+      cast: [],
     };
   });
 }
@@ -304,10 +383,15 @@ export async function tmdbGetTitle(
     backdrop_path: string | null;
     external_ids?: { imdb_id: string | null };
     videos?: { results: TmdbVideo[] };
-    // Appending videos to the detail request keeps a new match at one round
-    // trip instead of two — the trailer key arrives with everything else.
+    images?: { logos?: TmdbImage[] };
+    credits?: { cast?: TmdbCastMember[] };
+    // Everything is appended to the one detail request, so a new match stays a
+    // single round trip however much of it we use. `include_image_language`
+    // is what makes `images` useful: without it TMDB returns only images
+    // tagged with the request language, which for logos is usually none.
   }>(key, kind === 'movie' ? `/movie/${id}` : `/tv/${id}`, {
-    append_to_response: 'external_ids,videos',
+    append_to_response: 'external_ids,videos,images,credits',
+    include_image_language: 'en,null',
   });
 
   const trailer = pickTrailer(detail.videos?.results);
@@ -326,8 +410,23 @@ export async function tmdbGetTitle(
     rating: detail.vote_average || null,
     poster_url: detail.poster_path ? `${TMDB_IMAGE}${detail.poster_path}` : null,
     backdrop_url: detail.backdrop_path ? `${TMDB_IMAGE}${detail.backdrop_path}` : null,
+    // Empty string, not null, when TMDB has no logo for this title. Null means
+    // "never asked" and is what the other providers send, so `save_title` can
+    // COALESCE theirs away without also re-asking TMDB forever about a title
+    // that genuinely has none. Same convention as `trailer_key`.
+    logo_url: pickLogo(detail.images?.logos) ?? '',
     trailer_key: trailer?.key ?? null,
     trailer_site: trailer?.site ?? null,
+    cast: (detail.credits?.cast ?? [])
+      .filter((c) => c.name?.trim())
+      .slice(0, CAST_LIMIT)
+      .map((c) => ({
+        name: (c.name as string).trim(),
+        character: c.character?.trim() || null,
+        // A smaller size than posters use: these are drawn at about 5rem, and
+        // originals would be several megabytes each for a face on a card.
+        profile_url: c.profile_path ? `https://image.tmdb.org/t/p/w185${c.profile_path}` : null,
+      })),
   };
 }
 
@@ -450,10 +549,14 @@ export async function omdbGetMovie(key: string, imdbId: string): Promise<TitleMe
     runtime_mins: Number.isFinite(runtime) && runtime > 0 ? runtime : null,
     rating: Number.isFinite(rating) ? rating : null,
     poster_url: d.Poster && d.Poster !== 'N/A' ? d.Poster : null,
-    // OMDb has no backdrop/fanart of any kind, and no video links either.
+    // OMDb has no backdrop/fanart of any kind, no logos and no video links.
+    // Its `Actors` field is a comma-joined string with no photos or roles,
+    // which is not enough to build a cast row worth showing.
     backdrop_url: null,
+    logo_url: null,
     trailer_key: null,
     trailer_site: null,
+    cast: [],
   };
 }
 

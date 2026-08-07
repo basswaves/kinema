@@ -27,12 +27,12 @@ import {
 } from './api';
 import { clearParseError, initParser, lastParseError, parseMediaFile, toPayload } from './parse';
 import { cacheArtwork, listUnmatched } from '../metadata/api';
-import { backfillTrailers, loadProviderKeys, matchFiles } from '../metadata/match';
+import { backfillTitleDetails, loadProviderKeys, matchFiles } from '../metadata/match';
 
 /** Batched so a large library reports progress and never builds one huge IPC payload. */
 const PARSE_BATCH = 500;
 
-export type ScanStage = 'scanning' | 'parsing' | 'matching' | 'artwork' | 'trailers';
+export type ScanStage = 'scanning' | 'parsing' | 'matching' | 'artwork' | 'details';
 
 export interface ScanStatus {
   stage: ScanStage;
@@ -46,7 +46,8 @@ export interface ScanSummary {
   matched: number;
   unmatched: number;
   artworkStored: number;
-  trailersFound: number;
+  /** Titles that gained a trailer key, logo or cast on this pass. */
+  detailsFilled: number;
   /** Non-fatal problems: an unreachable root, a provider error on one title. */
   errors: string[];
   /** The parser throwing is its own category — it means every file failed. */
@@ -172,9 +173,9 @@ export async function runScanPipeline(): Promise<ScanOutcome> {
     const art = await cacheArtwork();
     if (art.failed > 0) errors.push(`${art.failed} artwork download(s) failed`);
 
-    setStatus({ stage: 'trailers', detail: '' });
-    const trailers = await backfillTrailers();
-    errors.push(...trailers.errors);
+    setStatus({ stage: 'details', detail: '' });
+    const details = await backfillTitleDetails();
+    errors.push(...details.errors);
 
     lastSummary = {
       filesAdded: report.files_added,
@@ -182,7 +183,7 @@ export async function runScanPipeline(): Promise<ScanOutcome> {
       matched,
       unmatched,
       artworkStored: art.stored,
-      trailersFound: trailers.found,
+      detailsFilled: details.found,
       errors,
       parseError: lastParseError,
       finishedAt: Date.now(),

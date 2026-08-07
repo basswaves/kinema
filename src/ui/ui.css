@@ -165,6 +165,28 @@ html {
   text-shadow: 0 2px 20px rgba(0, 0, 0, 0.6);
 }
 
+/*
+ * The title treatment. Constrained by *height* with `width: auto`, because a
+ * logo's aspect ratio is part of the design — a wide wordmark and a stacked
+ * one are both correct and must not be stretched towards each other. The width
+ * cap is the second constraint, for the rare very wide one.
+ *
+ * Sized to sit roughly where `.hero-title` would, so the hero does not jump
+ * when a title has no logo and falls back to text.
+ */
+.hero-logo {
+  display: block;
+  max-height: clamp(4rem, 9vw, 7.5rem);
+  max-width: min(28rem, 60%);
+  width: auto;
+  margin: 0 0 0.75rem;
+  object-fit: contain;
+  object-position: left bottom;
+  /* Logos are usually white on transparency, and the scrim behind the hero is
+     not always dark enough on its own. */
+  filter: drop-shadow(0 2px 14px rgba(0, 0, 0, 0.75));
+}
+
 .hero-meta {
   font-size: 0.8125rem;
   opacity: 0.75;
@@ -637,6 +659,83 @@ html {
 .season-tabs button.focused {
   outline: var(--focus-ring) solid #fff;
   outline-offset: 2px;
+}
+
+/* ---- cast ----------------------------------------------------------------
+ *
+ * Scrolls horizontally like a rail but is deliberately *not* a focusable one:
+ * there is nothing here to activate, and ten dead landing spots between the
+ * Play button and the episode list would be ten presses in the way.
+ */
+.cast {
+  margin: 2rem 0 0.5rem;
+}
+
+.cast-heading {
+  margin: 0 0 0.875rem;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  opacity: 0.85;
+}
+
+.cast-track {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+  scrollbar-width: none;
+}
+
+.cast-track::-webkit-scrollbar {
+  display: none;
+}
+
+.cast-member {
+  flex: 0 0 5.5rem;
+  width: 5.5rem;
+  text-align: center;
+}
+
+.cast-photo {
+  width: 5.5rem;
+  height: 5.5rem;
+  margin-bottom: 0.5rem;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #17171b;
+}
+
+.cast-photo img {
+  width: 100%;
+  height: 100%;
+  /* `top` rather than centre: a portrait crop to a circle cuts the forehead
+     off otherwise, which is what makes stock cast rows look wrong. */
+  object-fit: cover;
+  object-position: center top;
+}
+
+.cast-photo-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 1.5rem;
+  font-weight: 700;
+  opacity: 0.35;
+}
+
+.cast-name {
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.cast-role {
+  margin-top: 0.125rem;
+  font-size: 0.6875rem;
+  line-height: 1.25;
+  opacity: 0.55;
 }
 
 .episode-list {

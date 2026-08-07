@@ -44,7 +44,7 @@ import {
   type StoredTitle,
 } from '../metadata/api';
 import {
-  backfillTrailers,
+  backfillTitleDetails,
   loadProviderKeys,
   matchFiles,
   returnFilesToReview,
@@ -144,16 +144,17 @@ export default function LibraryView() {
       setBusy('Caching artwork…');
       const art = await cacheArtwork();
 
-      // Newly matched TMDB titles already carry their trailer key from the
-      // detail fetch; this only picks up anything that predates that.
-      setBusy('Fetching trailers…');
-      const trailers = await backfillTrailers();
+      // Newly matched TMDB titles already carry their trailer key, logo and
+      // cast from the detail fetch; this only picks up anything that predates
+      // each of those.
+      setBusy('Fetching title details…');
+      const details = await backfillTitleDetails();
 
       await refresh();
       setDiagnosis(
         `Matched ${outcome.matched} file(s), ${outcome.unmatched} left for review. ` +
           `Cached ${art.stored} image(s)${art.failed ? `, ${art.failed} failed` : ''}. ` +
-          `${trailers.found} trailer(s).` +
+          `${details.found} title(s) enriched.` +
           (outcome.errors.length ? ` Errors: ${outcome.errors.slice(0, 3).join('; ')}` : '')
       );
     } catch (e) {
@@ -192,15 +193,15 @@ export default function LibraryView() {
   );
 
   const runTrailers = useCallback(async () => {
-    setBusy('Fetching trailers…');
+    setBusy('Fetching title details…');
     setError(null);
     try {
-      const result = await backfillTrailers();
+      const result = await backfillTitleDetails();
       await refresh();
       setDiagnosis(
         result.found === 0 && result.none === 0
-          ? 'Every TMDB title already has its trailer looked up.'
-          : `Found ${result.found} trailer(s); ${result.none} title(s) have none.` +
+          ? 'Every TMDB title already has its trailer, logo and cast looked up.'
+          : `Enriched ${result.found} title(s); ${result.none} had nothing to add.` +
               (result.errors.length ? ` Errors: ${result.errors.slice(0, 3).join('; ')}` : '')
       );
     } catch (e) {
@@ -365,12 +366,16 @@ export default function LibraryView() {
           </button>
           <button
             disabled={!!busy || titles.length === 0}
-            title="Look up TMDB trailer keys for titles matched before they were stored"
+            title="Re-fetch TMDB trailer keys, logos and cast for titles matched before they were stored"
             onClick={() => void runTrailers()}
           >
-            {busy === 'Fetching trailers…' ? busy : 'Fetch trailers'}
+            {busy === 'Fetching title details…' ? busy : 'Fetch title details'}
           </button>
-          <button onClick={() => setDiagnosis(`Self-test: ${selfTest()}`)}>Self-test parser</button>
+          <button
+            onClick={() => void selfTest().then((r) => setDiagnosis(`Self-test: ${r}`))}
+          >
+            Self-test parser
+          </button>
         </div>
       </header>
 

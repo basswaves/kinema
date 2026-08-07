@@ -92,8 +92,9 @@ export const artworkStats = () => invoke<ArtworkStats>('artwork_stats');
 
 export const clearArtworkCache = () => invoke<number>('clear_artwork_cache');
 
-export const listTitlesWithoutTrailer = () =>
-  invoke<TrailerTarget[]>('list_titles_without_trailer');
+/** Titles matched before trailers, logos or cast were being stored. */
+export const listTitlesNeedingDetail = () =>
+  invoke<TrailerTarget[]>('list_titles_needing_detail');
 
 export const setTitleTrailer = (
   titleId: number,

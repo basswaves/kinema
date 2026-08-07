@@ -144,7 +144,18 @@ function Hero({
         />
         <div className="hero-scrim" />
         <div className="hero-content">
-          <h1 className="hero-title">{title.title}</h1>
+          {/* The title as designed, where every streaming service puts it. The
+              heading is the fallback rather than something hidden alongside:
+              `Art` renders it when there is no logo *and* when one exists but
+              fails to load, so a broken image can never leave the hero
+              nameless. `alt` carries the name for anything not looking at it. */}
+          <Art
+            className="hero-logo"
+            local={title.logo_path}
+            remote={title.logo_url}
+            alt={title.title}
+            fallback={<h1 className="hero-title">{title.title}</h1>}
+          />
           <div className="hero-meta">
             {title.year ?? ''}
             {title.rating ? ` · ★ ${title.rating.toFixed(1)}` : ''}

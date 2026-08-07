@@ -88,13 +88,20 @@ fn extension(url: &str) -> String {
 }
 
 /// Every artwork URL the library knows about, in one list.
+///
+/// Keying the cache by URL is what makes adding a kind a one-line change here
+/// rather than a new table and a new download path each time.
 fn all_urls(conn: &rusqlite::Connection) -> rusqlite::Result<Vec<String>> {
     let mut stmt = conn.prepare(
         "SELECT poster_url   FROM titles   WHERE poster_url   IS NOT NULL AND poster_url   <> ''
          UNION
          SELECT backdrop_url FROM titles   WHERE backdrop_url IS NOT NULL AND backdrop_url <> ''
          UNION
-         SELECT still_url    FROM episodes WHERE still_url    IS NOT NULL AND still_url    <> ''",
+         SELECT logo_url     FROM titles   WHERE logo_url     IS NOT NULL AND logo_url     <> ''
+         UNION
+         SELECT still_url    FROM episodes WHERE still_url    IS NOT NULL AND still_url    <> ''
+         UNION
+         SELECT profile_url  FROM people   WHERE profile_url  IS NOT NULL AND profile_url  <> ''",
     )?;
     let rows = stmt.query_map([], |r| r.get::<_, String>(0))?;
     rows.collect()

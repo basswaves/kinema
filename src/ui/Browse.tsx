@@ -18,6 +18,7 @@ import TitleDetailView from './TitleDetail';
 import Card from './Card';
 import FocusButton from './FocusButton';
 import Settings from './Settings';
+import { useClaimFocus } from './focus';
 import Player, { type PlaybackTarget } from '../player/Player';
 import {
   continueWatching,
@@ -46,10 +47,14 @@ type NavTarget = 'home' | 'search' | 'settings';
 type View =
   | { name: NavTarget }
   | { name: 'detail'; title: Title }
+  // Ids rather than the titles themselves, so the grid keeps showing current
+  // rows after a reload rather than a snapshot taken when it was opened.
+  | { name: 'grid'; heading: string; titleIds: number[] }
   | { name: 'player'; target: PlaybackTarget };
 
 
 const NAV_FOCUS_KEY = 'top-nav';
+const GRID_FOCUS_KEY = 'grid-view';
 
 /**
  * Move focus between the nav bar and the content beneath it.
@@ -272,6 +277,13 @@ export default function Browse() {
     return titles.filter((t) => t.title.toLowerCase().includes(needle));
   }, [titles, query]);
 
+  /** Resolve a grid's stored ids, keeping the order the rail had them in. */
+  const gridTitles = useMemo(() => {
+    if (view.name !== 'grid') return [];
+    const byId = new Map(titles.map((t) => [t.id, t]));
+    return view.titleIds.map((id) => byId.get(id)).filter((t): t is Title => t !== undefined);
+  }, [view, titles]);
+
   // Back navigation, the way a remote expects it.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -321,6 +333,9 @@ export default function Browse() {
             onSelect={(title) => setView({ name: 'detail', title })}
             onPlay={(title) => void playTitle(title)}
             onRemoveResumable={(item) => void removeResumable(item)}
+            onSeeAll={(heading, list) =>
+              setView({ name: 'grid', heading, titleIds: list.map((t) => t.id) })
+            }
             onResume={(item) =>
               setView({
                 name: 'player',
@@ -341,6 +356,15 @@ export default function Browse() {
             onQueryChange={setQuery}
             results={results}
             onSelect={(title) => setView({ name: 'detail', title })}
+          />
+        )}
+
+        {view.name === 'grid' && (
+          <GridView
+            heading={view.heading}
+            titles={gridTitles}
+            onSelect={(title) => setView({ name: 'detail', title })}
+            onBack={() => setView({ name: 'home' })}
           />
         )}
 
@@ -414,6 +438,57 @@ function TopNav({
           {scan ? `${scan.stage}…` : `${titleCount} titles`}
         </span>
       </nav>
+    </FocusContext.Provider>
+  );
+}
+
+/**
+ * One rail's full contents.
+ *
+ * A container of its own for the same reason `SearchView` is one — the shell's
+ * nav resolver treats its non-nav child as "the content", and cards parented
+ * directly to the shell would make it fire on every vertical move inside the
+ * grid.
+ *
+ * It claims focus rather than relying on the shell, because arriving here
+ * always follows pressing "See all" on a card that is now unmounted, which is
+ * the silent dead end in GOTCHAS.md.
+ */
+function GridView({
+  heading,
+  titles,
+  onSelect,
+  onBack,
+}: {
+  heading: string;
+  titles: Title[];
+  onSelect: (title: Title) => void;
+  onBack: () => void;
+}) {
+  const { ref, focusKey } = useFocusable({
+    focusKey: GRID_FOCUS_KEY,
+    trackChildren: true,
+    saveLastFocusedChild: true,
+  });
+  useClaimFocus(GRID_FOCUS_KEY, true);
+
+  return (
+    <FocusContext.Provider value={focusKey}>
+      <div className="search" ref={ref}>
+        <div className="grid-head">
+          <FocusButton className="back-button" keepInView="page-top" onSelect={onBack}>
+            ← Back
+          </FocusButton>
+          <h2 className="grid-heading">
+            {heading} <span className="muted">{titles.length}</span>
+          </h2>
+        </div>
+        <div className="search-grid">
+          {titles.map((title) => (
+            <Card key={title.id} title={title} onSelect={onSelect} />
+          ))}
+        </div>
+      </div>
     </FocusContext.Provider>
   );
 }

@@ -54,6 +54,8 @@ pub fn run() {
             metadata::list_titles,
             metadata::get_title_detail,
             metadata::list_unmatched,
+            metadata::list_needs_review,
+            metadata::count_needs_review,
             metadata::reset_matches,
             metadata::list_titles_without_trailer,
             metadata::set_title_trailer,

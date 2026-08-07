@@ -1,5 +1,6 @@
 mod artwork;
 mod db;
+mod detect;
 mod library;
 mod metadata;
 mod nfo;
@@ -72,6 +73,7 @@ pub fn run() {
             playback::get_title_prefs,
             playback::set_title_prefs,
             skip::get_skip_markers,
+            detect::detect_intros,
             trailer::find_local_trailer,
             nfo::read_nfo,
             nfo::read_show_nfo,

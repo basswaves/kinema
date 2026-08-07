@@ -1228,6 +1228,23 @@ html {
 }
 
 /*
+ * The pointer goes away with the controls, and comes back with them.
+ *
+ * `onMouseMove` on the player already calls `showOsd()`, so the class is
+ * dropped by the first movement and the cursor reappears before the mouse has
+ * travelled anywhere — no extra timer, and nothing else to keep in step.
+ *
+ * The descendant selector is the point rather than an afterthought. A Skip
+ * prompt, the Up next card and the stats panel all deliberately outlive the
+ * idle timeout, and each carries `cursor: pointer`, which would otherwise win
+ * on specificity and leave a lone arrow floating over the video.
+ */
+.player.osd-hidden,
+.player.osd-hidden * {
+  cursor: none;
+}
+
+/*
  * The focus ring means one specific thing: "the arrow keys move between these".
  *
  * In the player that is only true once the OSD has been given focus with Up —

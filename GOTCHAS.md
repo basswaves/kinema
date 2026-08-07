@@ -260,6 +260,24 @@ the real file.
 the `-shm` file to be present and readable; when it is not, the open *fails
 loudly*, which is the right failure.
 
+### A graceful fallback with nothing to show for it is a silent bug
+
+Adding season 2 of a show made the Up next card arrive eighteen seconds into the
+credits. Nothing had broken: the new season had never been analysed, so the
+credits marker fell through the whole ladder to `duration − 60s`, and the real
+credits start about eighty seconds before the end.
+
+Every layer behaved exactly as designed. The failure was that **the degradation
+was invisible** — no badge, no count, no log line the user would ever look at,
+and content that looked identical to content that worked. It was reported as a
+regression in the player, which is where the several hours would have gone.
+
+**Do:** when a source can be absent, show that it is. Each TV folder's Detect
+button now carries "N episode(s) not analysed yet", from the same query Detect
+uses so the number cannot drift from the work. The general rule already exists
+in this codebase for matching — a visible refusal beats a silent wrong answer —
+and it applies to every fallback, not only to metadata.
+
 ### A season is not a folder
 
 `analyse.rs` compares every episode of a season against every other, so how the

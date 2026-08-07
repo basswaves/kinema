@@ -311,6 +311,48 @@ fn step(name: &str, exit_code: Option<i32>, mut tail: Vec<String>) -> StepReport
     }
 }
 
+/// How many episodes are waiting to be analysed, per library root.
+///
+/// This exists because of a real report: a season added after the last Detect
+/// run silently fell back to the *last-resort* credits guess — `duration − 60s`,
+/// firing eighteen seconds into the credits — and nothing anywhere said why.
+/// Every other refusal in this app is surfaced and correctable; this one was
+/// invisible, which is precisely the failure mode the Needs attention queue
+/// exists to prevent elsewhere.
+///
+/// Deliberately **not** an automatic re-run after a scan. Analysis is minutes of
+/// ffmpeg per season, and spending that without being asked is exactly what a
+/// media library should not do. Saying so and offering the button is enough.
+///
+/// The count comes from `seasons_in_root`, the same query Detect itself uses, so
+/// the number shown is precisely the work the button would do.
+#[tauri::command]
+pub fn analysis_backlog(app: tauri::AppHandle) -> Result<Vec<(i64, usize)>, String> {
+    let db = app.state::<Db>();
+    let conn = db.0.lock().map_err(to_string_err)?;
+
+    let mut statement = conn
+        .prepare("SELECT id FROM library_roots WHERE kind = 'tv'")
+        .map_err(to_string_err)?;
+    let roots: Vec<i64> = statement
+        .query_map([], |r| r.get(0))
+        .map_err(to_string_err)?
+        .flatten()
+        .collect();
+
+    let mut backlog = Vec::new();
+    for root_id in roots {
+        let pending: usize = crate::analyse::seasons_in_root(&conn, root_id)
+            .map_err(to_string_err)?
+            .iter()
+            .map(|season| season.episodes.len())
+            .sum();
+        backlog.push((root_id, pending));
+    }
+
+    Ok(backlog)
+}
+
 fn now_secs() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

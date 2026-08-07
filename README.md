@@ -129,7 +129,9 @@ src-tauri/src/
   introdb.rs     TheIntroDB lookups, keyed on TMDB id. Where end credits come
                  from; per-episode, on play, cached with a TTL
   detect.rs      One Detect button per TV folder: runs the user's own Skiptro
-                 if configured, then analyse.rs. Nothing is bundled; the
+                 if configured, then analyse.rs. Also reports how many episodes
+                 are still unanalysed, so a season added later cannot quietly
+                 fall back to the credits guess. Nothing is bundled; the
                  command lines and both tool paths are settings
   trailer.rs     Finds local trailer files by Jellyfin/Kodi convention; the
                  scanner shares its test so trailers never become titles

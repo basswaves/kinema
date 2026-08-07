@@ -78,6 +78,7 @@ pub fn run() {
             playback::set_title_prefs,
             skip::get_skip_markers,
             detect::detect_intros,
+            detect::analysis_backlog,
             trailer::find_local_trailer,
             nfo::read_nfo,
             nfo::read_show_nfo,

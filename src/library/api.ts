@@ -126,6 +126,15 @@ export interface DetectProgress {
 export const detectIntros = (rootPath: string) =>
   invoke<DetectReport>('detect_intros', { rootPath });
 
+/**
+ * How many episodes per TV root are waiting to be analysed, as `[rootId, n]`.
+ *
+ * Surfaced because a season added after the last Detect run falls back to the
+ * last-resort credits guess — and silently, until someone notices the Up next
+ * card arriving late and goes looking for a reason.
+ */
+export const analysisBacklog = () => invoke<[number, number][]>('analysis_backlog');
+
 export const listMediaFiles = (limit: number) => invoke<MediaFile[]>('list_media_files', { limit });
 
 export const saveParseResults = (results: ParseResultPayload[]) =>

@@ -24,6 +24,7 @@ import { useClaimFocus } from './focus';
 import { setTvMode, useTvMode } from './tv';
 import {
   addLibraryRoot,
+  analysisBacklog,
   detectIntros,
   listLibraryRoots,
   removeLibraryRoot,
@@ -121,6 +122,14 @@ export default function Settings() {
   const [scanArgs, setScanArgs] = useState(DEFAULT_SKIPTRO_SCAN_ARGS);
   const [exportArgs, setExportArgs] = useState(DEFAULT_SKIPTRO_EXPORT_ARGS);
   const [detecting, setDetecting] = useState<string | null>(null);
+  /**
+   * Episodes per TV root with no analysis yet, keyed by root id.
+   *
+   * Shown beside Detect because the failure it prevents is invisible: a season
+   * added later falls back to the last-resort credits guess, and the only clue
+   * is an Up next card arriving late.
+   */
+  const [backlog, setBacklog] = useState<Record<number, number>>({});
   const [detectLine, setDetectLine] = useState('');
   /**
    * Whether the Skiptro fields have finished loading from the database.
@@ -141,14 +150,16 @@ export default function Settings() {
       // A count, not the file table. This used to pull 2,000 rows of eighteen
       // columns across the IPC boundary so it could call `.length` on a filter
       // of them — and silently under-reported on any library larger than that.
-      const [r, n, a] = await Promise.all([
+      const [r, n, a, pending] = await Promise.all([
         listLibraryRoots(),
         countNeedsReview(),
         artworkStats(),
+        analysisBacklog(),
       ]);
       setRoots(r);
       setNeedsReview(n);
       setArt(a);
+      setBacklog(Object.fromEntries(pending));
     } catch (e) {
       setError(String(e));
     }
@@ -258,9 +269,12 @@ export default function Settings() {
       } finally {
         setDetecting(null);
         setDetectLine('');
+        // The backlog is why the button was pressed; it has to be re-read, or
+        // it would still claim the work is outstanding.
+        void refresh();
       }
     },
-    [saveSkiptroFields]
+    [saveSkiptroFields, refresh]
   );
 
   const scanNow = useCallback(async () => {
@@ -714,6 +728,16 @@ export default function Settings() {
                 </FocusButton>
                 <span className="muted">
                   <code>{root.path}</code>
+                  {/* The whole point of the count. Without it, a season added
+                      after the last run quietly falls back to the tail guess
+                      and the only symptom is an Up next card arriving late. */}
+                  {detecting !== root.path && (backlog[root.id] ?? 0) > 0 && (
+                    <>
+                      {' · '}
+                      <strong>{backlog[root.id]} episode(s) not analysed yet</strong>
+                    </>
+                  )}
+                  {detecting !== root.path && backlog[root.id] === 0 && ' · all analysed'}
                   {detecting === root.path && detectLine && (
                     <>
                       <br />

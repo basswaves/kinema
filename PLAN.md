@@ -998,6 +998,30 @@ observed property in React does not clear it**, and **one-way UI state turns a
 one-tick glitch into a permanent one**. Any `setX` in an effect is worth asking
 where its matching `setX(null)` lives.
 
+### Found by adding a season: the silent fallback
+
+Season 2 was added and the Up next card started arriving eighteen seconds into
+the credits. Nothing was broken — the season had simply never been analysed, so
+the credits fell all the way through to the last resort, `duration − 60s`. The
+real credits start about eighty seconds before the end, hence the twenty-second
+error, and the eighteen that was actually observed.
+
+The fallback behaved exactly as designed. **The problem was that it was
+invisible.** Every other refusal in this app is surfaced and correctable — the
+Needs attention queue exists precisely because a silent wrong answer is worse
+than a visible refusal — and this one had no queue, no badge and no line
+anywhere. The only symptom was a card arriving late, on content the user had no
+reason to think was different.
+
+So each TV folder's Detect button now carries the count of episodes with no
+analysis yet, from the same query Detect itself uses, so the number is exactly
+the work the button would do.
+
+**Deliberately not an automatic re-run after a scan.** Analysis is minutes of
+ffmpeg per season, and a media library should not spend that without being
+asked. Saying so and offering the button is enough — the same reasoning that
+keeps NFO export an explicit action.
+
 ### One button
 
 Detect now runs Skiptro (if configured) and then the analysis, per TV folder,

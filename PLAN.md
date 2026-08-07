@@ -881,10 +881,54 @@ Twelve episodes, one season, ~13 s each:
   `0.19 → 45.5–46.7`; TheIntroDB says `46.0`. Three methods, one answer.
 - **Credits** ~69.3 s long, starting ~80 s before the end, on eleven of twelve —
   consistent to a tenth of a second.
-- **The pilot is the exception**, and instructively so: it shares only the final
-  27.7 s with the others because its credit music differs, so its marker fires
-  *late* rather than early. That is the failure direction to have — a late offer
-  costs a few seconds of credits, an early one costs the end of the episode.
+- **The pilot was the exception**, and instructively so: it shares only the
+  final 27.7 s with the others because its credit music differs, so its marker
+  fired 32 s *late*. Fixed by the black-frame pass below.
+
+### The picture gets the last word on the credits boundary ✅
+
+The audio answer says where the closing *theme* starts. What a viewer sees as
+the start of the credits is the fade to black just before it. A second ffmpeg
+pass — `blackdetect` over about a minute of video around the marker, not the
+eight minutes the audio pass read — moves the boundary onto that fade.
+
+Two steps: snap onto the black period the marker lands in or just after, then
+walk *backwards* through the run of short fades that separate credit cards.
+
+**Two rules decide whether the walk is kept, and the second one is the whole
+lesson of this change.**
+
+The first is the obvious one: the reclaimed region must be at least half black,
+so what is skipped is black frames rather than a scene fading out.
+
+It is not enough, and measuring showed why. The pilot's *correct* 32-second walk
+crosses **15 seconds of visible picture**; five other episodes' *wrong*
+6-second walks cross only 2 seconds each. No threshold on blackness separates
+them — the right answer looks worse than the wrong ones by that measure.
+
+What separates them is the season. Every episode agrees its credits run about
+69 seconds, established by the audio consensus across the whole folder, and that
+is the strongest evidence available anywhere in this feature. So: **a refinement
+that makes one episode's credits materially longer than its season's is not
+finding a boundary, it is reaching back into the episode.** The median is used
+rather than the mean, so the one outlier this exists to correct cannot move the
+standard it is judged against.
+
+Verified on all twelve:
+
+- **The pilot: 1572.8 s → 1540.7 s.** Exactly 70.0 s before the end, against the
+  69.3 s every other episode agrees on. Its refinement *shortens* the segment,
+  so the length rule waves it through.
+- **Six episodes move by under a second**, snapping onto the fade the music
+  starts a tenth of a second inside.
+- **Five are refused** and keep their audio answer, each logging why: the
+  picture would have stretched their credits to 72–76 s. Inspecting those files
+  shows the same structure every time — a short fade, ~2 s of visible picture,
+  then the long black credits run. In automatic mode, taking that walk would
+  have cut those two seconds.
+
+The spread across the season is now 78.3–82.2 s before the end, plus the pilot
+at 70.0 s.
 
 ### Ordering: Skiptro first, by decision not by measurement
 

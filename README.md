@@ -47,6 +47,7 @@ thin client that does nothing without a Jellyfin server running.
 | Intro detection in-app | **Done.** Runs a Skiptro you installed yourself, at a path you chose. Nothing bundled |
 | Markers without sidecars | **Done.** Reads Skiptro's own database; TheIntroDB supplies the credits it cannot detect. No files beside the videos |
 | Own intro/credits detection | **Done.** Fingerprints a season's audio and finds what the episodes share. Finds credits, and works on unmatched files |
+| Credits boundary from the picture | **Done.** Snaps the marker to the fade to black, bounded by the season's own credits length |
 
 ## Setup
 
@@ -121,8 +122,10 @@ src-tauri/src/
                  .skiptro.json files were only ever an export of
   analyse.rs     This app's own detector: fingerprints each episode of a
                  season and finds the audio they share. Intro near the start,
-                 closing theme near the end
-  ffmpeg.rs      Finding ffmpeg, and decoding short windows of audio with it
+                 closing theme near the end; a second pass moves the credits
+                 boundary onto the fade to black the picture actually has
+  ffmpeg.rs      Finding ffmpeg; decoding short windows of audio, and finding
+                 black frames, with it
   introdb.rs     TheIntroDB lookups, keyed on TMDB id. Where end credits come
                  from; per-episode, on play, cached with a TTL
   detect.rs      One Detect button per TV folder: runs the user's own Skiptro
@@ -294,6 +297,22 @@ Nothing is believed from a single comparison. A segment must appear between an
 episode and at least two *others* before it becomes a marker, and the reported
 time is the median of that cluster — one episode that happens to open on a
 similar chord cannot produce a marker on its own.
+
+**The picture gets the last word on where the credits start.** Audio finds where
+the closing theme begins; a viewer sees the credits begin at the fade to black
+just before it. A second ffmpeg pass moves the marker onto that fade, and where
+credits roll over black it can walk back through the run of card transitions —
+which is what corrects an episode whose credit music differs from the rest of
+its season and so matched only its final bars.
+
+That walk is bounded by **the season's own credits length**, and the reason is
+worth keeping. Requiring the reclaimed region to be mostly black is the obvious
+guard and it is not sufficient: measured here, the one *correct* long walk
+crosses more visible picture than the wrong short ones do, so no threshold on
+blackness separates them. What does is that every episode agrees how long its
+credits run. A refinement that makes one episode's credits materially longer
+than its season's is not finding a boundary — it is reaching back into the
+episode, and it is refused with the reason logged.
 
 **Skiptro is ranked above it for intros by decision, not by measurement.** Both
 read the same bytes and agree within a second on real content; putting the older,

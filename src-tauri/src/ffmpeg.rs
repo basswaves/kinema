@@ -162,9 +162,104 @@ pub fn decode_window(
         .collect())
 }
 
+/// The shortest run of black frames worth reporting, in seconds.
+///
+/// ffmpeg's own default is two seconds, which is useless here: the fade between
+/// two credit cards is a fraction of a second, and those transitions are most
+/// of what identifies a credits sequence at all.
+const BLACK_MIN_SECS: f64 = 0.05;
+
+/// Periods of black picture in one window of a file, as `(start, end)` in
+/// seconds from the **start of the file**.
+///
+/// `blackdetect` reports times relative to the seek point, so the window offset
+/// is added back here — every caller wants file time, and a relative time that
+/// looks absolute is the kind of thing that produces a marker in the wrong
+/// place with nothing to show for it.
+///
+/// An empty result is ordinary: it means the picture never went black, which is
+/// true of plenty of files.
+pub fn black_periods(
+    ffmpeg: &Path,
+    video: &Path,
+    start_secs: f64,
+    length_secs: f64,
+) -> Vec<(f64, f64)> {
+    let mut command = Command::new(ffmpeg);
+    command
+        // `blackdetect` reports at info level, so `-v error` — which every other
+        // call here uses — would return nothing at all, successfully.
+        // `-nostats` drops the progress spam that comes with it.
+        .args(["-v", "info", "-nostats", "-nostdin"])
+        .args(["-ss", &format!("{start_secs:.3}")])
+        .args(["-t", &format!("{length_secs:.3}")])
+        .arg("-i")
+        .arg(video)
+        .args(["-an", "-sn"])
+        .args(["-vf", &format!("blackdetect=d={BLACK_MIN_SECS}:pix_th=0.10")])
+        .args(["-f", "null", "-"])
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped());
+    no_window(&mut command);
+
+    let Ok(output) = command.output() else {
+        return Vec::new();
+    };
+
+    String::from_utf8_lossy(&output.stderr)
+        .lines()
+        .filter_map(|line| parse_black_line(line, start_secs))
+        .collect()
+}
+
+/// Pull `black_start:… black_end:…` out of one log line.
+fn parse_black_line(line: &str, offset: f64) -> Option<(f64, f64)> {
+    let field = |name: &str| -> Option<f64> {
+        let rest = line.split_once(name)?.1;
+        let value: String = rest
+            .chars()
+            .take_while(|c| c.is_ascii_digit() || *c == '.')
+            .collect();
+        value.parse::<f64>().ok()
+    };
+
+    let start = field("black_start:")?;
+    let end = field("black_end:")?;
+    (end > start).then_some((offset + start, offset + end))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A real line, copied from ffmpeg 8.1.2 running over this library.
+    #[test]
+    fn reads_a_black_period_from_a_real_log_line() {
+        let line = "[Parsed_blackdetect_0 @ 000001dd7ce39600] black_start:110.008833 \
+                    black_end:111.760583 black_duration:1.75175";
+        assert_eq!(parse_black_line(line, 0.0), Some((110.008833, 111.760583)));
+    }
+
+    /// Times are relative to the seek point, and every caller wants file time.
+    #[test]
+    fn the_window_offset_is_added_back() {
+        let line = "[Parsed_blackdetect_0 @ x] black_start:110.008833 black_end:111.760583";
+        let (start, end) = parse_black_line(line, 1430.697).unwrap();
+        assert!((start - 1540.705833).abs() < 1e-6, "got {start}");
+        assert!((end - 1542.457583).abs() < 1e-6, "got {end}");
+    }
+
+    #[test]
+    fn ordinary_ffmpeg_output_is_not_a_black_period() {
+        assert_eq!(parse_black_line("frame= 2849 fps=368 q=-0.0 size=N/A", 0.0), None);
+        assert_eq!(parse_black_line("  Stream #0:0: Video: hevc, yuv420p", 0.0), None);
+        assert_eq!(parse_black_line("", 0.0), None);
+    }
+
+    #[test]
+    fn a_line_missing_its_end_is_dropped_rather_than_guessed_at() {
+        assert_eq!(parse_black_line("black_start:110.0 black_duration:1.7", 0.0), None);
+    }
 
     #[test]
     fn an_unset_path_falls_back_to_the_one_on_path() {

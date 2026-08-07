@@ -123,6 +123,29 @@ pub fn scan_all(conn: &mut Connection) -> rusqlite::Result<ScanReport> {
     Ok(report)
 }
 
+/// One file the walk found, with everything the database needs about it.
+///
+/// Collected outside any transaction on purpose. Stat calls are the slow part
+/// of a scan over SMB, and the whole walk used to happen *inside* a transaction
+/// — so the write lock was held for the network round trips as well as for the
+/// writes. Now the lock is only taken to flush a batch of already-gathered rows.
+struct SeenFile {
+    path: String,
+    parent_dir: String,
+    file_name: String,
+    extension: String,
+    size: i64,
+    modified: i64,
+}
+
+/// Rows written per transaction.
+///
+/// Bounds how long the scanner can hold the single writer lock, which is what
+/// decides whether `save_progress` — firing every five seconds while something
+/// is playing — has to wait or sails through. Large enough that a big library
+/// is not thousands of transactions.
+const WRITE_BATCH: usize = 500;
+
 fn scan_root(
     conn: &mut Connection,
     root_id: i64,
@@ -141,23 +164,109 @@ fn scan_root(
 
     let now = now_secs();
     let mut seen_paths: HashSet<String> = HashSet::new();
+    let mut pending: Vec<SeenFile> = Vec::with_capacity(WRITE_BATCH);
 
-    // One transaction per root keeps a large scan fast without holding a
-    // single lock across every share.
+    let walker = WalkDir::new(root)
+        .follow_links(false)
+        .into_iter()
+        .filter_entry(|e| {
+            if e.depth() == 0 {
+                return true;
+            }
+            if e.file_type().is_dir() {
+                return !e
+                    .file_name()
+                    .to_str()
+                    .map(is_skipped_dir)
+                    .unwrap_or(false);
+            }
+            true
+        });
+
+    for entry in walker {
+        let entry = match entry {
+            Ok(e) => e,
+            Err(e) => {
+                report.errors.push(e.to_string());
+                continue;
+            }
+        };
+
+        if !entry.file_type().is_file() || !is_video(entry.path()) {
+            continue;
+        }
+
+        let meta = match entry.metadata() {
+            Ok(m) => m,
+            Err(e) => {
+                report.errors.push(format!("{}: {e}", entry.path().display()));
+                continue;
+            }
+        };
+
+        let path = entry.path().to_string_lossy().to_string();
+
+        report.files_seen += 1;
+        seen_paths.insert(path.clone());
+
+        pending.push(SeenFile {
+            parent_dir: entry
+                .path()
+                .parent()
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_default(),
+            file_name: entry.file_name().to_string_lossy().to_string(),
+            extension: entry
+                .path()
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("")
+                .to_lowercase(),
+            path,
+            size: meta.len() as i64,
+            modified: mtime_secs(&meta),
+        });
+
+        if pending.len() >= WRITE_BATCH {
+            write_batch(conn, root_id, now, &pending, report)?;
+            pending.clear();
+        }
+    }
+
+    if !pending.is_empty() {
+        write_batch(conn, root_id, now, &pending, report)?;
+    }
+
+    mark_missing(conn, root_id, &seen_paths, report)?;
+    Ok(())
+}
+
+/// Write one batch of gathered files. Their contents are already known, so this
+/// touches nothing but the database and returns quickly.
+///
+/// A scan interrupted between batches leaves the rows it had already written,
+/// which is fine: every statement here is keyed on the path and re-running the
+/// scan converges. Losing a whole root's worth of work to keep one transaction
+/// atomic would be the worse trade.
+fn write_batch(
+    conn: &mut Connection,
+    root_id: i64,
+    now: i64,
+    batch: &[SeenFile],
+    report: &mut ScanReport,
+) -> rusqlite::Result<()> {
     let tx = conn.transaction()?;
     {
-        let mut select = tx.prepare(
-            "SELECT id, size_bytes, modified_at FROM media_files WHERE path = ?1",
-        )?;
+        let mut select =
+            tx.prepare("SELECT id, size_bytes, modified_at FROM media_files WHERE path = ?1")?;
         let mut insert = tx.prepare(
             "INSERT INTO media_files
                 (root_id, path, parent_dir, file_name, extension, size_bytes,
                  modified_at, first_seen_at, last_seen_at, missing, match_status)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8, 0, 'unparsed')",
         )?;
-        let mut touch = tx.prepare(
-            "UPDATE media_files SET last_seen_at = ?2, missing = 0 WHERE id = ?1",
-        )?;
+        let mut touch =
+            tx.prepare("UPDATE media_files SET last_seen_at = ?2, missing = 0 WHERE id = ?1")?;
         // Content changed: reset the parse so it gets re-evaluated.
         let mut update = tx.prepare(
             "UPDATE media_files
@@ -168,105 +277,68 @@ fn scan_root(
               WHERE id = ?1",
         )?;
 
-        let walker = WalkDir::new(root)
-            .follow_links(false)
-            .into_iter()
-            .filter_entry(|e| {
-                if e.depth() == 0 {
-                    return true;
-                }
-                if e.file_type().is_dir() {
-                    return !e
-                        .file_name()
-                        .to_str()
-                        .map(is_skipped_dir)
-                        .unwrap_or(false);
-                }
-                true
-            });
-
-        for entry in walker {
-            let entry = match entry {
-                Ok(e) => e,
-                Err(e) => {
-                    report.errors.push(e.to_string());
-                    continue;
-                }
-            };
-
-            if !entry.file_type().is_file() || !is_video(entry.path()) {
-                continue;
-            }
-
-            let meta = match entry.metadata() {
-                Ok(m) => m,
-                Err(e) => {
-                    report.errors.push(format!("{}: {e}", entry.path().display()));
-                    continue;
-                }
-            };
-
-            let path = entry.path().to_string_lossy().to_string();
-            let size = meta.len() as i64;
-            let modified = mtime_secs(&meta);
-
-            report.files_seen += 1;
-            seen_paths.insert(path.clone());
-
+        for file in batch {
             let existing: Option<(i64, i64, i64)> = select
-                .query_row(params![&path], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+                .query_row(params![&file.path], |r| {
+                    Ok((r.get(0)?, r.get(1)?, r.get(2)?))
+                })
                 .ok();
 
             match existing {
-                Some((id, old_size, old_mtime)) if old_size == size && old_mtime == modified => {
+                Some((id, old_size, old_mtime))
+                    if old_size == file.size && old_mtime == file.modified =>
+                {
                     touch.execute(params![id, now])?;
                     report.files_unchanged += 1;
                 }
                 Some((id, _, _)) => {
-                    update.execute(params![id, size, modified, now])?;
+                    update.execute(params![id, file.size, file.modified, now])?;
                     report.files_updated += 1;
                 }
                 None => {
-                    let parent_dir = entry
-                        .path()
-                        .parent()
-                        .map(|p| p.to_string_lossy().to_string())
-                        .unwrap_or_default();
-                    let file_name = entry.file_name().to_string_lossy().to_string();
-                    let extension = entry
-                        .path()
-                        .extension()
-                        .and_then(|e| e.to_str())
-                        .unwrap_or("")
-                        .to_lowercase();
-
                     insert.execute(params![
-                        root_id, &path, &parent_dir, &file_name, &extension, size, modified, now
+                        root_id,
+                        &file.path,
+                        &file.parent_dir,
+                        &file.file_name,
+                        &file.extension,
+                        file.size,
+                        file.modified,
+                        now
                     ])?;
                     report.files_added += 1;
                 }
             }
         }
+    }
+    tx.commit()
+}
 
-        // Anything under this root we did not see this pass is flagged, not
-        // deleted — the user may have unplugged a drive, and their watch
-        // history should survive that.
-        let mut stale = tx.prepare(
-            "SELECT id, path FROM media_files WHERE root_id = ?1 AND missing = 0",
-        )?;
+/// Flag anything under this root the walk did not see.
+///
+/// Flagged, never deleted — the user may have unplugged a drive, and their
+/// watch history should survive that.
+fn mark_missing(
+    conn: &mut Connection,
+    root_id: i64,
+    seen_paths: &HashSet<String>,
+    report: &mut ScanReport,
+) -> rusqlite::Result<()> {
+    let tx = conn.transaction()?;
+    {
+        let mut stale =
+            tx.prepare("SELECT id, path FROM media_files WHERE root_id = ?1 AND missing = 0")?;
         let candidates: Vec<(i64, String)> = stale
             .query_map(params![root_id], |r| Ok((r.get(0)?, r.get(1)?)))?
             .collect::<rusqlite::Result<Vec<_>>>()?;
 
-        let mut mark_missing = tx.prepare("UPDATE media_files SET missing = 1 WHERE id = ?1")?;
+        let mut mark = tx.prepare("UPDATE media_files SET missing = 1 WHERE id = ?1")?;
         for (id, path) in candidates {
             if !seen_paths.contains(&path) {
-                mark_missing.execute(params![id])?;
+                mark.execute(params![id])?;
                 report.files_missing += 1;
             }
         }
     }
-    tx.commit()?;
-
-    Ok(())
+    tx.commit()
 }

@@ -156,6 +156,37 @@ forward slashes is correct on Windows.
 
 ---
 
+## SQLite
+
+### WAL does nothing with only one connection
+
+`db.rs` has enabled `journal_mode=WAL` since the beginning, with a comment
+saying it "keeps reads from blocking the scan writer". It did not, because
+there was a single `Mutex<Connection>` for the whole app and the scanner held
+it for the entire walk. WAL lets *separate connections* read while one writes;
+a mutex around one connection serialises everything regardless.
+
+**Do:** give the scanner its own connection (`ScanDb`). The mutex then only
+serialises access to each connection, and SQLite does the rest.
+
+### `busy_timeout` is load-bearing the moment there is a second connection
+
+SQLite allows one writer at a time. With two connections, a write that arrives
+while another is committing fails **immediately** with `database is locked` —
+it does not queue. `save_progress` fires every five seconds during playback, so
+watching something during a scan would silently lose resume points.
+
+**Do:** `conn.busy_timeout(…)` on every connection. Use the rusqlite method
+rather than `PRAGMA busy_timeout`, which returns a row and so cannot go in an
+`execute_batch` (the same trap `journal_mode` already documents above).
+
+**And:** bound how long any one transaction holds the write lock. The scanner
+commits every 500 files rather than once per root, and — more importantly —
+gathers file metadata *outside* the transaction. Stat calls over SMB are the
+slow part of a scan, and they were all happening with the write lock held.
+
+---
+
 ## Spatial navigation (D-pad)
 
 Both entries below are invisible with a mouse. Hovering re-establishes focus and

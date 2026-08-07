@@ -193,15 +193,41 @@ ALTER TABLE titles ADD COLUMN trailer_key  TEXT;
 ALTER TABLE titles ADD COLUMN trailer_site TEXT;
 "#;
 
-pub fn open(path: &Path) -> rusqlite::Result<Connection> {
-    let conn = Connection::open(path)?;
+/// How long a statement waits for the write lock before giving up.
+///
+/// Load-bearing from the moment there is more than one connection. SQLite
+/// allows a single writer at a time, so while the scanner is committing a batch
+/// any other write — `save_progress` fires every five seconds during playback —
+/// fails *immediately* with `database is locked` unless it is willing to wait.
+/// Five seconds is far longer than a batch takes and far shorter than a user
+/// would tolerate as a hang.
+const BUSY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
-    // WAL keeps reads from blocking the scan writer. PRAGMA journal_mode
-    // returns a row, so it must be queried rather than executed.
+fn configure(conn: &Connection) -> rusqlite::Result<()> {
+    // WAL is what lets the UI keep reading while the scanner writes. PRAGMA
+    // journal_mode returns a row, so it must be queried rather than executed.
     let _: String = conn.query_row("PRAGMA journal_mode=WAL", [], |r| r.get(0))?;
     conn.execute_batch("PRAGMA foreign_keys=ON; PRAGMA synchronous=NORMAL;")?;
+    conn.busy_timeout(BUSY_TIMEOUT)?;
+    Ok(())
+}
 
+pub fn open(path: &Path) -> rusqlite::Result<Connection> {
+    let conn = Connection::open(path)?;
+    configure(&conn)?;
     migrate(&conn)?;
+    Ok(conn)
+}
+
+/// A second connection to a database `open` has already migrated.
+///
+/// The scanner gets one of these so that walking a NAS share does not hold the
+/// single lock every other command needs. It deliberately does **not** migrate:
+/// the schema has one owner, and a second migrator racing the first is a
+/// problem worth not having.
+pub fn open_secondary(path: &Path) -> rusqlite::Result<Connection> {
+    let conn = Connection::open(path)?;
+    configure(&conn)?;
     Ok(conn)
 }
 

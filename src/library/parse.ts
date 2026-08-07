@@ -16,8 +16,30 @@
  * (Phase 2), and keeping them separate means matching can be re-run and
  * improved without touching the filesystem again.
  */
-import { guessit } from 'guessit-js';
 import type { LibraryKind, MediaFile, ParseResultPayload } from './api';
+
+/**
+ * guessit-js, loaded on demand.
+ *
+ * It is ~390 kB of the bundle — the largest single thing in it — and it runs
+ * only during a scan. Imported at module scope it was parsed at every launch,
+ * on the startup path, for code that a browsing session may never touch.
+ *
+ * `parseMediaFile` stays **synchronous** so the batch `.map()` in `pipeline.ts`
+ * does not have to become a sequence of awaits; callers load the module once up
+ * front with `initParser`.
+ */
+type GuessitFn = typeof import('guessit-js').guessit;
+let guessit: GuessitFn | null = null;
+
+/**
+ * Load the parser. Idempotent, and cheap after the first call — call it before
+ * any batch rather than guarding every file.
+ */
+export async function initParser(): Promise<void> {
+  if (guessit) return;
+  guessit = (await import('guessit-js')).guessit;
+}
 
 /** Tokens that mean a "title" is really just release metadata. */
 const TECHNICAL_TOKENS = new Set([
@@ -80,6 +102,14 @@ export function clearParseError() {
 }
 
 function runGuessit(input: string, kind: LibraryKind): Guess {
+  // A programming error, not a bad filename: some caller started parsing
+  // without loading the parser. Thrown rather than folded into `lastParseError`
+  // so it stops the run loudly instead of quietly recording every file as
+  // unparseable, which looks identical to a library of unrecognisable names.
+  if (!guessit) {
+    throw new Error('parser not loaded — call initParser() before parseMediaFile()');
+  }
+
   let raw: Record<string, unknown>;
   try {
     // The type hint matters: without it "Show 2019" is ambiguous between a
@@ -180,10 +210,13 @@ export function parseMediaFile(file: MediaFile, kind: LibraryKind): ParsedFile {
  * Runs the parser against a known-good string in the *browser* environment.
  * guessit-js behaving correctly under Node proves nothing about WebView2.
  */
-export function selfTest(): string {
+export async function selfTest(): Promise<string> {
   const sample = 'Example Show S01 - S01E01 - E01 GROUP.mp4';
   try {
-    const raw = guessit(sample, { type: 'episode' }) as Record<string, unknown>;
+    // Loading it is now part of what this tests: a dynamic import that fails in
+    // WebView2 would look exactly like a parser that throws.
+    await initParser();
+    const raw = (guessit as GuessitFn)(sample, { type: 'episode' }) as Record<string, unknown>;
     return `OK — ${JSON.stringify(raw)}`;
   } catch (e) {
     return `THREW — ${e instanceof Error ? `${e.name}: ${e.message}` : String(e)}`;

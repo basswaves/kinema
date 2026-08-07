@@ -73,6 +73,13 @@ export const listTitles = () => invoke<StoredTitle[]>('list_titles');
 
 export const listUnmatched = (limit: number) => invoke<MediaFile[]>('list_unmatched', { limit });
 
+/** Everything the review queue works on — refused matches plus ignored files. */
+export const listNeedsReview = (limit: number) =>
+  invoke<MediaFile[]>('list_needs_review', { limit });
+
+/** Just the number, for the button that opens the queue. */
+export const countNeedsReview = () => invoke<number>('count_needs_review');
+
 export const resetMatches = () => invoke<number>('reset_matches');
 
 /**

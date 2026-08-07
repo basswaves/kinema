@@ -17,6 +17,7 @@ import { useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import FocusButton from '../ui/FocusButton';
 import FocusInput from '../ui/FocusInput';
+import { listNeedsReview } from '../metadata/api';
 import type { MediaFile } from './api';
 import {
   applyMatch,
@@ -33,8 +34,6 @@ import type { Candidate } from '../metadata/score';
 import './fixmatch.css';
 
 interface Props {
-  /** Every file in the library; this component picks out what needs review. */
-  files: MediaFile[];
   /**
    * Reload library data after anything is written, and report what happened.
    * Reporting upward rather than keeping a status line here means there is
@@ -47,11 +46,37 @@ interface Props {
 /** Statuses that mean "the matcher did not resolve this". */
 const NEEDS_REVIEW = new Set(['parsed', 'unmatched']);
 
-export default function FixMatch({ files, onChanged }: Props) {
+/**
+ * Upper bound on the queue.
+ *
+ * A cap is unavoidable — the alternative is an unbounded IPC payload — but it
+ * now applies to *review candidates* rather than to the file table as a whole,
+ * so a library of any size has to have this many unresolved files before
+ * anything is hidden.
+ */
+const QUEUE_LIMIT = 2000;
+
+export default function FixMatch({ onChanged }: Props) {
+  const [files, setFiles] = useState<MediaFile[]>([]);
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [showIgnored, setShowIgnored] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Loaded here rather than handed down, because this is the only screen that
+  // wants these rows and it wants exactly them.
+  const reload = useCallback(async () => {
+    try {
+      setFiles(await listNeedsReview(QUEUE_LIMIT));
+    } catch (e) {
+      setError(String(e));
+    }
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void reload();
+  }, [reload]);
 
   const pending = useMemo(
     () => groupFiles(files.filter((f) => NEEDS_REVIEW.has(f.match_status) && !f.missing)),
@@ -69,6 +94,10 @@ export default function FixMatch({ files, onChanged }: Props) {
       setError(null);
       try {
         const message = await work();
+        // Re-read the queue here, then let Settings update the count and show
+        // the message. Both have to happen: this component owns the list and
+        // Settings owns the number beside the button that opens it.
+        await reload();
         await onChanged(message);
         setOpenKey(null);
       } catch (e) {
@@ -77,7 +106,7 @@ export default function FixMatch({ files, onChanged }: Props) {
         setBusy(false);
       }
     },
-    [onChanged]
+    [onChanged, reload]
   );
 
   if (pending.length === 0 && ignored.length === 0) {

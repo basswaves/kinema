@@ -22,6 +22,8 @@ interface Props {
   onPlay: (title: Title) => void;
   onResume: (item: ContinueItem) => void;
   onRemoveResumable: (item: ContinueItem) => void;
+  /** Open a rail's full contents as a grid. */
+  onSeeAll: (heading: string, titles: Title[]) => void;
 }
 
 /** Minimum titles before a genre earns its own rail. */
@@ -41,6 +43,7 @@ export default function Home({
   onPlay,
   onResume,
   onRemoveResumable,
+  onSeeAll,
 }: Props) {
   const { ref, focusKey } = useFocusable({ trackChildren: true, saveLastFocusedChild: true });
 
@@ -50,8 +53,10 @@ export default function Home({
     return [...pool].sort((a, b) => (b.added_at ?? 0) - (a.added_at ?? 0))[0] ?? null;
   }, [titles]);
 
+  // Not sliced here: `Rail` applies the cap, so there is one number governing
+  // how long a rail gets rather than one per rail.
   const recentlyAdded = useMemo(
-    () => [...titles].sort((a, b) => (b.added_at ?? 0) - (a.added_at ?? 0)).slice(0, 20),
+    () => [...titles].sort((a, b) => (b.added_at ?? 0) - (a.added_at ?? 0)),
     [titles]
   );
 
@@ -96,11 +101,22 @@ export default function Home({
             recently in the middle of is what you probably want. */}
         <ContinueRail items={resumable} onResume={onResume} onRemove={onRemoveResumable} />
 
-        <Rail heading="Recently added" titles={recentlyAdded} onSelect={onSelect} />
-        <Rail heading="TV shows" titles={series} onSelect={onSelect} />
-        <Rail heading="Movies" titles={movies} onSelect={onSelect} />
+        <Rail
+          heading="Recently added"
+          titles={recentlyAdded}
+          onSelect={onSelect}
+          onSeeAll={onSeeAll}
+        />
+        <Rail heading="TV shows" titles={series} onSelect={onSelect} onSeeAll={onSeeAll} />
+        <Rail heading="Movies" titles={movies} onSelect={onSelect} onSeeAll={onSeeAll} />
         {genreRails.map(([genre, list]) => (
-          <Rail key={genre} heading={genre} titles={list} onSelect={onSelect} />
+          <Rail
+            key={genre}
+            heading={genre}
+            titles={list}
+            onSelect={onSelect}
+            onSeeAll={onSeeAll}
+          />
         ))}
       </div>
     </FocusContext.Provider>

@@ -25,7 +25,7 @@ import {
   type LibraryKind,
   type LibraryRoot,
 } from './api';
-import { clearParseError, lastParseError, parseMediaFile, toPayload } from './parse';
+import { clearParseError, initParser, lastParseError, parseMediaFile, toPayload } from './parse';
 import { cacheArtwork, listUnmatched } from '../metadata/api';
 import { backfillTrailers, loadProviderKeys, matchFiles } from '../metadata/match';
 
@@ -136,6 +136,9 @@ export async function runScanPipeline(): Promise<ScanOutcome> {
 
     setStatus({ stage: 'parsing', detail: '' });
     clearParseError();
+    // guessit-js is fetched here rather than at startup — it is only needed for
+    // this stage, and it is the largest thing in the bundle.
+    await initParser();
     for (;;) {
       const batch = await listUnparsed(PARSE_BATCH);
       if (batch.length === 0) break;

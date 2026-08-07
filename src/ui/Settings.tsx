@@ -24,11 +24,9 @@ import { setTvMode, useTvMode } from './tv';
 import {
   addLibraryRoot,
   listLibraryRoots,
-  listMediaFiles,
   removeLibraryRoot,
   type LibraryKind,
   type LibraryRoot,
-  type MediaFile,
 } from '../library/api';
 import {
   getLastScanSummary,
@@ -40,6 +38,7 @@ import {
   artworkStats,
   cacheArtwork,
   clearArtworkCache,
+  countNeedsReview,
   getSetting,
   setSetting,
   type ArtworkStats,
@@ -55,9 +54,6 @@ import FixMatch from '../library/FixMatch';
 import LibraryView from '../library/LibraryView';
 
 const SETTINGS_FOCUS_KEY = 'settings-root';
-
-/** Statuses that mean the matcher did not resolve a file. Matches FixMatch. */
-const NEEDS_REVIEW = new Set(['parsed', 'unmatched']);
 
 function formatBytes(bytes: number): string {
   if (!bytes) return '0 B';
@@ -86,7 +82,7 @@ export default function Settings() {
   useClaimFocus(SETTINGS_FOCUS_KEY, true);
 
   const [roots, setRoots] = useState<LibraryRoot[]>([]);
-  const [files, setFiles] = useState<MediaFile[]>([]);
+  const [needsReview, setNeedsReview] = useState(0);
   const [art, setArt] = useState<ArtworkStats | null>(null);
   const [tmdbKey, setTmdbKey] = useState('');
   const [omdbKey, setOmdbKey] = useState('');
@@ -104,9 +100,16 @@ export default function Settings() {
 
   const refresh = useCallback(async () => {
     try {
-      const [r, f, a] = await Promise.all([listLibraryRoots(), listMediaFiles(2000), artworkStats()]);
+      // A count, not the file table. This used to pull 2,000 rows of eighteen
+      // columns across the IPC boundary so it could call `.length` on a filter
+      // of them — and silently under-reported on any library larger than that.
+      const [r, n, a] = await Promise.all([
+        listLibraryRoots(),
+        countNeedsReview(),
+        artworkStats(),
+      ]);
       setRoots(r);
-      setFiles(f);
+      setNeedsReview(n);
       setArt(a);
     } catch (e) {
       setError(String(e));
@@ -135,10 +138,6 @@ export default function Settings() {
       setDisplaySync((await getSetting(VIDEO_SYNC_KEY)) === 'display');
     })();
   }, []);
-
-  const needsReview = files.filter(
-    (f) => NEEDS_REVIEW.has(f.match_status) && !f.missing && f.parsed_title
-  ).length;
 
   const scanNow = useCallback(async () => {
     setError(null);
@@ -293,7 +292,6 @@ export default function Settings() {
           </FocusButton>
           {panel === 'review' && (
             <FixMatch
-              files={files}
               onChanged={async (message) => {
                 try {
                   await cacheArtwork();

@@ -436,6 +436,47 @@ pub fn set_title_trailer(
     Ok(())
 }
 
+/// Which files the review queue works on: everything the matcher declined, plus
+/// everything taken out of the queue by hand so it can be put back.
+///
+/// Its own query rather than a filter over the whole file table. Settings used
+/// to fetch 2,000 rows of eighteen columns and count them in the webview, which
+/// was both the largest payload in the app and quietly wrong past 2,000 files —
+/// the count and the queue would silently stop growing.
+const NEEDS_REVIEW_WHERE: &str = "
+    WHERE (m.match_status IN ('parsed', 'unmatched')
+           AND m.missing = 0
+           AND m.parsed_title IS NOT NULL)
+       OR m.match_status = 'ignored'
+     ORDER BY m.parsed_title, m.parsed_season, m.parsed_episode
+     LIMIT ?1";
+
+#[tauri::command]
+pub fn list_needs_review(
+    db: tauri::State<Db>,
+    limit: i64,
+) -> Result<Vec<crate::library::MediaFile>, String> {
+    crate::library::query_files_public(db, NEEDS_REVIEW_WHERE, limit)
+}
+
+/// How many files are waiting, for the button that opens the queue.
+///
+/// Counts files rather than groups, which is what the label has always said.
+/// Ignored files are excluded here — they are not work.
+#[tauri::command]
+pub fn count_needs_review(db: tauri::State<Db>) -> Result<i64, String> {
+    let conn = db.0.lock().map_err(to_string_err)?;
+    conn.query_row(
+        "SELECT COUNT(*) FROM media_files
+          WHERE match_status IN ('parsed', 'unmatched')
+            AND missing = 0
+            AND parsed_title IS NOT NULL",
+        [],
+        |r| r.get(0),
+    )
+    .map_err(to_string_err)
+}
+
 /// Files that have been parsed but not yet matched to a title.
 #[tauri::command]
 pub fn list_unmatched(

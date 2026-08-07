@@ -922,15 +922,37 @@ thirty seconds into a fresh episode. It then never came down, because the offer
 effect only ever sets `upNext` — and nothing cleared it on a change of file
 either, only the countdown path that normally causes one.
 
-Fixed with a `fileReady` flag: false on a new target, true on `file-loaded`, and
-`active` is null until then. One gate covering the Skip button, automatic mode
-and the offer. The end-of-file handlers take the same gate through a ref — an
-`eof` arriving before the new file is open belongs to the old one, and acting on
-it would mark the incoming episode finished and roll straight past it.
+The first fix was a `fileReady` flag — false on a new target, true on
+`file-loaded` — with `active` null until then. **It was not enough, and the
+second round is the one worth remembering.** `file-loaded` and the property
+observer are two different Tauri channels with no guaranteed order between them,
+so the flag flipped true while the last `time-pos` push still described the
+outgoing file. A one-tick window, which fired on every single episode change.
 
-The lesson is in GOTCHAS and generalises past this feature: **clearing an
-observed property in React does not clear it**, and derived UI must be reset on
-the state change itself rather than on the path that usually produces it.
+Three changes made it hold:
+
+1. **Ask, do not wait.** `file-loaded` reads `time-pos` and `duration` with
+   `getProperty` instead of waiting to be told, and the observer is ignored
+   entirely until the flag is true. Dropping the pushes alone would not do —
+   `duration` may be emitted once per file, and a dropped one never returns.
+2. **Set the flag early in that handler.** It had been placed after
+   `applyPrefs`, the `video-sync` write and `readChapters`, so any one of those
+   throwing left the file permanently unable to raise a Skip button.
+3. **Let the offer come down again.** The effect only ever *raised* the card,
+   which made every transient raise permanent — and because the Skip prompt is
+   suppressed while a card is up, it hid the Skip intro button behind it too.
+   The offer is tied to being inside the credits, so it is withdrawn when they
+   are no longer where we are. A card with a countdown is exempt: that one means
+   the file has genuinely ended.
+
+The end-of-file handlers take the same gate through a ref — an `eof` arriving
+before the new file is open belongs to the old one, and acting on it would mark
+the incoming episode finished and roll straight past it.
+
+Two lessons, both in GOTCHAS and both larger than this feature: **clearing an
+observed property in React does not clear it**, and **one-way UI state turns a
+one-tick glitch into a permanent one**. Any `setX` in an effect is worth asking
+where its matching `setX(null)` lives.
 
 ### One button
 

@@ -126,6 +126,26 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   const [aid, setAid] = useState<number | null>(null);
   const [subVisible, setSubVisible] = useState(true);
   const [upNext, setUpNext] = useState<EpisodeRef | null>(null);
+  /**
+   * Whether the file mpv has open is the one `target` names.
+   *
+   * False from the moment a new target arrives until mpv reports `file-loaded`.
+   * Nothing derived from the playback position may be acted on in that window:
+   * `loadfile` is asynchronous, and `time-pos` is an observed property that
+   * keeps reporting the *outgoing* file until it completes. Comparing the new
+   * episode's markers against the old episode's position is how an Up next card
+   * appeared thirty seconds into a fresh episode and never went away.
+   */
+  const [fileReady, setFileReady] = useState(false);
+  /**
+   * The same flag, for the mpv event handlers.
+   *
+   * They are registered once and must not be re-registered whenever this
+   * changes — see GOTCHAS on observed properties. An end-of-file that arrives
+   * before the new file is open belongs to the *outgoing* one, and acting on it
+   * would mark the incoming episode finished and roll straight past it.
+   */
+  const fileReadyRef = useRef(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [resumedFrom, setResumedFrom] = useState<number | null>(null);
   const [markers, setMarkers] = useState<SkipMarkers | null>(null);
@@ -237,8 +257,14 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
      * a window in which the position is near the end, the duration is the old
      * file's, and the credits logic concludes that a file which has not started
      * yet is finishing — flashing the Up next card seconds into the new
-     * episode. Nulling both closes it: `activeSkip` refuses a null position and
-     * `withResolvedCredits` refuses a null duration.
+     * episode.
+     *
+     * Nulling these is **not sufficient on its own**, and it took a real
+     * credits marker to expose that: `time-pos` is an *observed property*, so
+     * mpv pushes the outgoing file's position back in within milliseconds,
+     * before `loadfile` has taken effect. `fileReady` is the actual fix — see
+     * where it is set — and these stay because they are still what stops the
+     * seek bar and the clock showing the previous episode's numbers.
      *
      * Runs after the progress-save cleanup, which is declared later and has
      * already written the outgoing file's position by this point.
@@ -247,6 +273,13 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     setTimePos(null);
     setDuration(null);
     setMarkers(null);
+    setFileReady(false);
+    fileReadyRef.current = false;
+    // A card offering the *previous* file's next episode has no business
+    // surviving into this one. Nothing else clears these: the countdown path
+    // clears them when it advances, and every other route out left them set.
+    setUpNext(null);
+    setCountdown(null);
     /* eslint-enable react-hooks/set-state-in-effect */
     latest.current = { position: 0, duration: null };
 
@@ -381,8 +414,13 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           );
 
           // Chapters only exist once a file is open, and they are one of the
-          // three sources a credits marker can come from.
+          // sources a credits marker can come from.
           setChapters(await readChapters());
+
+          // Last, and only now: from here the position mpv reports belongs to
+          // the file `target` names, so skip decisions may act on it.
+          fileReadyRef.current = true;
+          setFileReady(true);
         })();
       }
 
@@ -391,7 +429,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       // user leaving, which must not roll on to the next episode.
       if (event.event === 'end-file') {
         const reason = (event as { reason?: string }).reason;
-        if (reason === 'eof' && !endHandled.current) {
+        if (reason === 'eof' && fileReadyRef.current && !endHandled.current) {
           endHandled.current = true;
           void handlePlaybackEnded();
         }
@@ -422,8 +460,10 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           break;
         case 'eof-reached':
           // The real end-of-playback signal while keep-open holds the last
-          // frame. Guarded because the property can report true more than once.
-          if (data === true && !endHandled.current) {
+          // frame. Guarded because the property can report true more than once,
+          // and against the outgoing file — during a change of episode this is
+          // still reporting the previous one, which has genuinely ended.
+          if (data === true && fileReadyRef.current && !endHandled.current) {
             endHandled.current = true;
             void handlePlaybackEnded();
           }
@@ -581,9 +621,12 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     }
   }, [resolved.creditsSource, target.path]);
 
+  // Gated on `fileReady`, which is the whole defence against acting on the
+  // outgoing file's position. One check here covers everything downstream: the
+  // Skip button, automatic mode, and the Up next offer all derive from `active`.
   const active = useMemo(
-    () => activeSkip(resolved.markers, timePos),
-    [resolved.markers, timePos]
+    () => (fileReady ? activeSkip(resolved.markers, timePos) : null),
+    [fileReady, resolved.markers, timePos]
   );
   const activeKey = active?.key ?? null;
   const activeKind = active?.kind ?? null;

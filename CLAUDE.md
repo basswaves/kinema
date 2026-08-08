@@ -84,7 +84,7 @@ breaking one, say so rather than quietly working around it.
 ## Verification
 
 ```bash
-npm run check    # tsc --noEmit && eslint .
+npm run check    # tsc --noEmit && eslint . && vitest run
 npm run build    # tsc && vite build — check does NOT run the bundler
 ```
 
@@ -146,6 +146,13 @@ by reflex:
    focus tree. Use `FocusButton` / `FocusInput` in `src/ui/`. **Test D-pad work
    with the mouse physically untouched** — one stray hover repairs focus and
    hides the failure completely.
+
+   **Scope:** this applies to *watching* — browsing, choosing something,
+   playing it, subtitles, resume, skipping an intro. That path must work end to
+   end from a sofa with nothing but a D-pad. It is **not** a rule that every
+   control in the app must be reachable that way. **Developer tools in Settings
+   are mouse-only on purpose** and should stay that way; converting that panel
+   is not a fix, and its description says so to the user.
 
 ## How the user works
 

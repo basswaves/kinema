@@ -786,6 +786,16 @@ export default function Settings() {
           <FocusButton className="btn-primary" onSelect={() => void saveKeys()}>
             Save keys
           </FocusButton>
+          {/* Attribution. Unlike TheIntroDB's, this one is *required* rather
+              than requested: TMDB's terms of use ask for this exact disclaimer
+              wherever their data is shown, and TVmaze's licence asks for credit.
+              This is the page a user looks at to find out where the data came
+              from, so it belongs here rather than in a separate About screen. */}
+          <p className="muted">
+            Film and TV data from <strong>TMDB</strong> — <code>https://www.themoviedb.org</code>.
+            This product uses the TMDB API but is not endorsed or certified by TMDB. TV data
+            also from <strong>TVmaze</strong> — <code>https://www.tvmaze.com</code>.
+          </p>
         </section>
 
         {/* ---- storage ---- */}

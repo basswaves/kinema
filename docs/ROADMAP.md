@@ -1,14 +1,21 @@
-# Handover — what is left
+# Roadmap — what is left
 
-**This file is the only place open items live.** PLAN.md records decisions and
-why they went the way they did; GOTCHAS.md records traps. What remains to be
-done is a different question with a different shelf life, and keeping it in
-three places is how three copies drift apart.
+**This file is the only place open items live.** [PLAN.md](PLAN.md) records
+decisions and why they went the way they did; [GOTCHAS.md](GOTCHAS.md) records
+traps. What remains to be done is a different question with a different shelf
+life, and keeping it in three places is how three copies drift apart.
 
-In Claude Code, **CLAUDE.md is loaded automatically** and carries the working
-rules, the settled decisions and the verification commands. Nothing needs
-pasting; just say what you want next. The block under *Starting a fresh chat
-elsewhere* is for a tool without that.
+Two kinds of thing are listed below, and the distinction matters more than the
+usual roadmap/backlog split:
+
+- **Worth doing** — features and cleanups that are simply not built yet.
+- **Unverified** — things that *are* built, and have only ever been exercised on
+  one machine, one display and one television series. These are not known to be
+  broken. They are known not to have been tested, which for a project asking
+  other people to run it is the more useful thing to say out loud.
+
+If you are looking for somewhere to start, the unverified list is worth more
+than the backlog: most of it needs hardware the author does not have.
 
 ---
 

@@ -2,13 +2,21 @@
 
 A local, serverless media library. **Tauri 2 + React 19 + libmpv**, Windows 11.
 
+> **If you are a person rather than a coding assistant:** this file is context
+> for AI tools, which load it automatically. It is checked in because the rules
+> in it are real rules — the settled decisions, the verification commands and
+> the two failure modes are the same whoever is writing the code. Everything
+> here is said again, aimed at you, in [CONTRIBUTING.md](CONTRIBUTING.md); read
+> that one instead.
+
 ## Read before writing code
 
 | File | Why |
 |---|---|
-| **PLAN.md** | What is done, what is next, and *why each decision went the way it did*. The reasoning matters more than the status — it is what stops a later session re-opening a settled question. |
-| **GOTCHAS.md** | Traps in libmpv, Tauri, spatial navigation and quick-xml. **Read before touching the player or D-pad navigation.** Nearly every entry describes a failure that produces *no error at all*. |
-| **README.md** | Architecture, data flow, and the design decisions to preserve. |
+| **docs/PLAN.md** | What is done, what is next, and *why each decision went the way it did*. The reasoning matters more than the status — it is what stops a later session re-opening a settled question. |
+| **docs/GOTCHAS.md** | Traps in libmpv, Tauri, spatial navigation and quick-xml. **Read before touching the player or D-pad navigation.** Nearly every entry describes a failure that produces *no error at all*. |
+| **docs/DESIGN.md** | Architecture, data flow, and the design decisions to preserve. |
+| **docs/ROADMAP.md** | What is left, and what each remaining item is blocked on. The only place open items live. |
 
 Add to these as you go. A trap that cost a debugging round belongs in GOTCHAS
 the same day; a decision with a reason belongs in PLAN. They are the only thing

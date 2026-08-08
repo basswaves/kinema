@@ -56,7 +56,7 @@ export default function ContinueRail({ items, onResume, onRemove }: Props) {
  * One card: the artwork and text, plus a Remove control beneath it.
  *
  * The card is a focus container with two children rather than one focusable,
- * for the reason in GOTCHAS.md — a focusable drawn *inside* another focusable
+ * for the reason in docs/GOTCHAS.md — a focusable drawn *inside* another focusable
  * cannot be reached by D-pad at all.
  *
  * Remove sits **below** the card rather than overlaid on the corner, and that

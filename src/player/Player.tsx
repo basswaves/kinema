@@ -206,7 +206,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     // Never time out while focus is inside the OSD. Hiding the thing the focus
     // ring is on leaves a remote pressing arrows at an invisible control, which
     // is indistinguishable from a hang — the same silent dead end as focus
-    // parked on an unmounted component (GOTCHAS.md).
+    // parked on an unmounted component (docs/GOTCHAS.md).
     if (osdFocusRef.current) return;
     hideTimer.current = window.setTimeout(() => setOsdVisible(false), OSD_HIDE_MS);
   }, []);
@@ -1093,7 +1093,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
    * absent at the ends of a run and are cleared on every file change. Focus left
    * on any of them points at a component that no longer exists — no ring
    * anywhere and no arrow press doing anything, which is indistinguishable from
-   * a hang (GOTCHAS.md).
+   * a hang (docs/GOTCHAS.md).
    *
    * Keyed on whether each thing is present rather than on the values, because
    * `skipPrompt` is rebuilt on every position tick and would fire this once a
@@ -1351,7 +1351,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
  * component it is *called in*: declaring this container up in `Player` would
  * read `Player`'s own context — the root — and make the panel a **sibling** of
  * the player shell rather than a child of it. The markup would look nested and
- * the focus tree would be flat, which is the trap in GOTCHAS.md that cost a
+ * the focus tree would be flat, which is the trap in docs/GOTCHAS.md that cost a
  * debugging round in the browsing UI.
  *
  * This is the panel that most justifies the whole focus mode: on a library with

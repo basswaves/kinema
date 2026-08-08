@@ -5,17 +5,17 @@ This file is what you need before writing code.
 
 ## Read this first
 
-**[GOTCHAS.md](GOTCHAS.md) is required reading before touching the player or
-D-pad navigation.** Every entry in it cost a real debugging round, and nearly
-all of them describe a failure that produces *no error at all*. It is the
+**[docs/GOTCHAS.md](docs/GOTCHAS.md) is required reading before touching the
+player or D-pad navigation.** Every entry in it cost a real debugging round, and
+nearly all of them describe a failure that produces *no error at all*. It is the
 single most useful file in this repository.
 
 | File | What it is |
 |---|---|
-| [GOTCHAS.md](GOTCHAS.md) | Traps in libmpv, Tauri, SQLite, spatial navigation and quick-xml |
-| [README.md](README.md) | Architecture, data flow, and the design decisions worth preserving |
-| [PLAN.md](PLAN.md) | What is done, and *why each decision went the way it did* |
-| [HANDOVER.md](HANDOVER.md) | What is left, and what each remaining item is blocked on |
+| [docs/GOTCHAS.md](docs/GOTCHAS.md) | Traps in libmpv, Tauri, SQLite, spatial navigation and quick-xml |
+| [docs/DESIGN.md](docs/DESIGN.md) | Architecture, data flow, and the design decisions worth preserving |
+| [docs/PLAN.md](docs/PLAN.md) | What is done, and *why each decision went the way it did* |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | What is left, and what each remaining item is blocked on |
 | [CLAUDE.md](CLAUDE.md) | The working rules, in short form |
 
 ## Building
@@ -107,7 +107,7 @@ the pipeline. `F12` opens WebView2 DevTools in the app window.
 
 These are conclusions, not open questions. If a change seems to require breaking
 one, say so in the issue rather than working around it quietly. The full
-reasoning is in [README.md](README.md) and [PLAN.md](PLAN.md).
+reasoning is in [docs/DESIGN.md](docs/DESIGN.md) and [docs/PLAN.md](docs/PLAN.md).
 
 - **No machine-learning upscaling.** No FSRCNNX, RAVU, Anime4K, RTX VSR, Intel
   VSR. They synthesise detail that was never in the master. Classical resampling

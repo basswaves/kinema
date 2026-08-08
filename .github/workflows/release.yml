@@ -41,8 +41,11 @@ jobs:
       - name: Fetch the native playback libraries
         run: npx tauri-plugin-libmpv-api setup-lib
 
+      # Explicit switch as well as the CI guard inside the script: a runner has
+      # no desktop, and a COM call for a shortcut nobody will ever click is a
+      # failure point in exchange for nothing.
       - name: Build the portable app
-        run: npm run app:build
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-app.ps1 -NoShortcut
 
       - name: Package
         shell: pwsh

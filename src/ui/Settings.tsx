@@ -75,6 +75,13 @@ const SETTINGS_FOCUS_KEY = 'settings-root';
 const TMDB_KEY_URL = 'https://www.themoviedb.org/settings/api';
 
 /**
+ * Skiptro's releases. The UI named this program in three places and never once
+ * said what it was or where to get it, which is a fair description of how the
+ * whole settings screen used to read.
+ */
+const SKIPTRO_URL = 'https://github.com/MikeSiLVO/skiptro-releases';
+
+/**
  * How long the Skiptro command fields wait after the last keystroke before
  * saving themselves. Long enough not to write on every character, short enough
  * that reaching for Detect immediately afterwards is still safe — and Detect
@@ -470,9 +477,10 @@ export default function Settings() {
           )}
           {!scan && last && <p className="muted">Last scan: {summaryLine(last)}</p>}
           <p className="muted">
-            Scanning runs automatically once at every start. It never reads file contents — a file
-            is identified by its path, size and modification time — so a scan over SMB stays cheap
-            and an unreachable folder is skipped rather than emptied.
+            Kinema checks these folders once every time it starts, so you rarely need the button.
+            It only looks at file names, sizes and dates rather than reading the videos
+            themselves, which keeps it quick even over a network. A folder that is switched off
+            or unplugged is left alone until it comes back, not forgotten.
           </p>
         </section>
 
@@ -554,8 +562,9 @@ export default function Settings() {
         <section className="settings-section">
           <h2>Needs attention</h2>
           <p className="muted">
-            Everything the matcher refused to guess at, with the reason it gave. Refusing is only
-            defensible because correcting it is easy — a wrong match is worse than no match.
+            Films and episodes Kinema could not identify with confidence. Rather than attach the
+            wrong film to your file, it puts them here for you to pick from a list — which takes
+            a few seconds each. If this is empty, everything found a match.
           </p>
           <FocusButton
             className={needsReview > 0 ? 'btn-primary' : 'btn-secondary'}
@@ -589,8 +598,10 @@ export default function Settings() {
               TV mode: {tvMode ? 'on' : 'off'}
             </FocusButton>
             <span className="muted">
-              The 10-foot layout — larger type and artwork, wider margins to clear TV overscan.
-              Also on <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>. Leave it off at a desk.
+              Bigger text and artwork, for reading from across a room. Also leaves a wider margin
+              around the edges, because many televisions crop a little off every side. Turn it on
+              if this is on a TV, off if it is on a desk. Also on{' '}
+              <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>.
             </span>
           </div>
           <div className="settings-toggle-row">
@@ -604,11 +615,13 @@ export default function Settings() {
                 );
               }}
             >
-              Skip intros: {autoSkip ? 'automatically' : 'ask'}
+              Skip intros and credits: {autoSkip ? 'automatically' : 'ask first'}
             </FocusButton>
             <span className="muted">
-              Applies to the credits too. Needs a marker from somewhere — Skiptro, TheIntroDB or
-              a sidecar; without one, nothing changes either way.
+              Whether to jump the intro and the closing credits on its own, or show a Skip button
+              and wait for you. Either way it needs to know where they are — see{' '}
+              <strong>Intro and credits markers</strong> below. Until something has found them,
+              this setting changes nothing.
             </span>
           </div>
           <div className="settings-toggle-row">
@@ -623,14 +636,17 @@ export default function Settings() {
                 void setSetting(CREDITS_TAIL_KEY, String(next)).catch((e) => setError(String(e)));
               }}
             >
-              Assume credits: {creditsTail > 0 ? `last ${creditsTail}s` : 'off'}
+              Offer the next episode: {creditsTail > 0 ? `${creditsTail}s early` : 'at the end'}
             </FocusButton>
             <span className="muted">
-              The last resort, when nothing knows where the credits are: no marker from
-              TheIntroDB, and no chapter named for them. Offer the next episode this far before
-              the end. A real marker and a named end-credits chapter both win, and
-              this never applies to a film or to the last episode of a run — there is nothing to
-              move on to. Off means the offer waits for the file to finish.
+              For episodes where nothing has found the credits, guess that they are the last{' '}
+              {creditsTail > 0 ? `${creditsTail} seconds` : 'stretch'} and offer the next episode
+              then. Anything that actually knows better — a real marker, or a chapter named for
+              the credits — is used instead. Never applies to films, or to the last episode you
+              have.{' '}
+              <span className="muted">
+                Press it to cycle: {CREDITS_TAIL_CHOICES.map((n) => (n === 0 ? 'off' : `${n}s`)).join(', ')}.
+              </span>
             </span>
           </div>
           {/* The one rendering switch in the app, and it exists only because
@@ -649,21 +665,19 @@ export default function Settings() {
                 );
               }}
             >
-              Frame timing: {displaySync ? 'display clock' : 'audio clock'}
+              Frame timing: {displaySync ? 'match the screen' : 'match the sound'}
             </FocusButton>
             <span className="muted">
-              Times frames to the display's real refresh rate instead of the audio clock,
-              removing drift and the odd dropped frame. It does <strong>not</strong> fix 24p
-              judder on a 60&nbsp;Hz screen — that is an uneven 3:2 cadence no timing strategy
-              can even out, and only a 24, 48 or 120&nbsp;Hz display mode removes it.{' '}
-              <strong>
-                It works by resampling audio slightly, so it is incompatible with bitstream
-                passthrough
-              </strong>{' '}
-              — a TrueHD or DTS:X stream sent untouched to an AVR cannot be resampled, because
-              nothing has decoded it. This app does not currently do passthrough (it decodes to
-              PCM), so nothing breaks today; turn this off first if passthrough is ever added.
-              Press <kbd>i</kbd> during playback to see the cadence you are actually getting.
+              If playback stutters slightly every few seconds, try switching this. It is a
+              choice between two ways of deciding when to show each frame, and which one is
+              smoother depends on your screen — so it is worth trying both and keeping whichever
+              looks better. Nothing else changes.{' '}
+              <span className="muted">
+                It will not fix the regular, rhythmic stutter that films show on most computer
+                monitors — that comes from the screen&rsquo;s refresh rate not dividing evenly
+                into 24 frames a second, and only changing the screen&rsquo;s refresh rate helps.
+                Press <kbd>i</kbd> while something is playing to see what you are getting.
+              </span>
             </span>
           </div>
         </section>
@@ -679,23 +693,35 @@ export default function Settings() {
         <section className="settings-section">
           <h2>Intro and credits markers</h2>
           <p className="muted">
-            One <strong>Detect</strong> button at the bottom of this section runs everything that
-            is configured, per TV folder. Markers found by more than one source are ranked, and{' '}
-            <code>app.log</code> names the winner for every file played.
+            Where Kinema looks to find out when an intro or the closing credits start, so it can
+            offer to skip them. There is more than one source and they are good at different
+            things; if several find the same episode, the most reliable one wins. Nothing here
+            needs setting up to get started — leave it all alone and you still get markers from
+            TheIntroDB.
+          </p>
+          <p className="muted">
+            The <strong>Detect</strong> button at the bottom runs everything you have configured,
+            one TV folder at a time.
           </p>
 
-          <h3>This app&rsquo;s own detection</h3>
+          <h3>Built in</h3>
           <p className="muted">
-            Fingerprints the audio of every episode in a season and finds the stretch they have
-            in common — near the start that is the intro, near the end it is the closing theme.{' '}
-            <strong>The only source here that finds credits by measuring them</strong>, and the
-            only one that works on files with no metadata match at all. Needs{' '}
-            <strong>ffmpeg</strong>, which is not bundled: it reads about six minutes of audio
-            per episode, so a season takes a few minutes.
+            Listens to every episode of a season and finds the stretch of audio they all share —
+            near the beginning that is the theme tune, near the end the closing music. It is the
+            only source that finds <em>credits</em> by actually measuring them, and the only one
+            that works on episodes Kinema could not identify. It reads about six minutes of audio
+            per episode, so a season takes a few minutes the first time.
+          </p>
+          <p className="muted">
+            This one needs <strong>ffmpeg</strong> — a free tool for reading video and audio
+            files. Kinema does not include it: install it yourself and it will be found
+            automatically, or type where it is below. Without it, this source is skipped and the
+            others carry on.
           </p>
           <label className="settings-field">
             <span>
-              ffmpeg <span className="muted">leave empty to use the one on PATH</span>
+              Where ffmpeg is{' '}
+              <span className="muted">leave this empty unless Kinema cannot find it</span>
             </span>
             <FocusInput
               className="settings-input"
@@ -711,22 +737,18 @@ export default function Settings() {
             <p className={ffmpeg.available ? 'settings-ok' : 'settings-warn'}>
               {ffmpeg.available
                 ? `Found ffmpeg at ${ffmpeg.resolved}.`
-                : `No ffmpeg at ${ffmpeg.resolved}. Install it and put it on PATH, or type the ` +
-                  `full path to ffmpeg.exe here. Without it, intro and credits detection is ` +
-                  `skipped and everything else carries on.`}
+                : `Could not find ffmpeg (looked for "${ffmpeg.resolved}"). Install it, or type ` +
+                  `the full path to ffmpeg.exe here. Without it, Kinema cannot find intros and ` +
+                  `credits itself — everything else works normally.`}
             </p>
           )}
-          <p className="muted">
-            ffprobe is taken from the same folder.
-          </p>
 
           <h3>TheIntroDB</h3>
           <p className="muted">
-            A free community database of intro and credits times, looked up by the same TMDB id
-            used to match the title. It answers instantly and without reading the file, which is
-            why it is worth having even alongside the detection above — but coverage is patchy on
-            less-watched shows. Nothing is sent but the id, season and episode; no account and no
-            key.
+            A free database of intro and credits times, contributed by other people watching the
+            same shows. It answers straight away without reading your files, which is why it is
+            worth having even alongside the detection above — but popular shows are covered far
+            better than obscure ones. No account and no key needed.
           </p>
           <div className="settings-toggle-row">
             <FocusButton
@@ -742,8 +764,10 @@ export default function Settings() {
               TheIntroDB: {introDb ? 'on' : 'off'}
             </FocusButton>
             <span className="muted">
-              Asked once per episode when you play it, never for the library in bulk, and the
-              answer is kept for a month. Off means markers come only from what is detected here.
+              Asked once per episode, when you play it — never for your whole library at once —
+              and the answer is kept for a month. All that is sent is which episode it is:
+              nothing about you, and nothing about your files. Off means markers come only from
+              what is detected on this machine.
             </span>
           </div>
           {/* Attribution. They request it rather than require it, and it costs
@@ -757,13 +781,26 @@ export default function Settings() {
 
           <h3>Skiptro</h3>
           <p className="muted">
-            Optional, and detects intros only. It ranks <em>above</em> this app&rsquo;s own
-            detection for the intro — both measure the same file, and Skiptro has years of tuning
-            behind it, so putting it first means adding the detection above cannot spoil an intro
-            skip that already works. <strong>Skiptro is not bundled and never will be</strong> —
-            no third-party binary goes into this app. Point this at a copy you have installed
-            yourself and it can be run from here instead of in another window.
+            <strong>Optional, and most people will not need it.</strong> Skiptro is a separate
+            free program that finds TV intros — not credits — and it does that one job very well
+            after years of tuning, so where it and the built-in detection disagree about an
+            intro, Skiptro wins. If you already use it with Kodi, Kinema can run it for you and
+            read its results. If you have never heard of it, skip this whole section: the
+            built-in detection covers the same ground.
           </p>
+          <p className="muted">
+            Kinema does not include Skiptro and never will — no other program&rsquo;s software
+            ships inside this one. You install it yourself, from{' '}
+            <code>github.com/MikeSiLVO/skiptro-releases</code>, and point Kinema at it below.
+          </p>
+          <div className="settings-row">
+            <FocusButton
+              className="btn-secondary"
+              onSelect={() => void openUrl(SKIPTRO_URL)}
+            >
+              Open the Skiptro page ↗
+            </FocusButton>
+          </div>
           <div className="settings-row">
             <FocusButton
               className="btn-secondary"
@@ -805,7 +842,10 @@ export default function Settings() {
               button. */}
           <label className="settings-field">
             <span>
-              Detect command <span className="muted">{'{dir}'} is the folder</span>
+              How to run it{' '}
+              <span className="muted">
+                leave as it is unless Skiptro changes; {'{dir}'} stands for the folder
+              </span>
             </span>
             <FocusInput
               className="settings-input"
@@ -816,7 +856,7 @@ export default function Settings() {
           </label>
           <label className="settings-field">
             <span>
-              Export command <span className="muted">leave empty — see below</span>
+              How to export <span className="muted">leave empty — see below</span>
             </span>
             <FocusInput
               className="settings-input"
@@ -826,11 +866,11 @@ export default function Settings() {
             />
           </label>
           <p className="muted">
-            The app reads Skiptro&rsquo;s own database directly, so exporting is off. It used to
-            write a <code>.skiptro.json</code> next to every episode for information that was
-            already in the database — one extra file per episode, forever. Type{' '}
-            <code>export {'{dir}'}</code> here if you want them anyway, to feed another player
-            from the same scan.
+            Exporting is off, and normally should stay off: Kinema reads Skiptro&rsquo;s results
+            from its database directly. Turning it on writes one small extra file beside every
+            episode, forever, holding what the database already knows — worth it only if you
+            want another player to read the same results. Type <code>export {'{dir}'}</code> to
+            switch it on.
           </p>
           <label className="settings-field">
             <span>
@@ -857,9 +897,8 @@ export default function Settings() {
             <p className="muted">Add a TV folder above to detect intros and credits in it.</p>
           ) : (
             <p className="muted">
-              Runs Skiptro if it is configured, then this app&rsquo;s own analysis of anything
-              not already done. Minutes per season the first time; afterwards only new or
-              changed episodes are read again.
+              Go through a TV folder and work out where the intros and credits are. You only
+              need to do this once per folder; new episodes are picked up next time.
             </p>
           )}
           {roots
@@ -894,10 +933,17 @@ export default function Settings() {
                 </span>
               </div>
             ))}
+          {/* This paragraph used to end "everything it finds is written next
+              to your video files". That stopped being true when sidecar export
+              was turned off — the results go in Kinema's own database — and it
+              is exactly the wrong thing to be wrong about, since the people
+              most likely to read it are the ones watching what lands on their
+              NAS. */}
           <p className="muted">
-            This takes minutes per season — it decodes audio and runs a model over it. Everything
-            it finds is written next to your video files, so the results stay readable by Kodi and
-            anything else that understands the format, and they survive this app entirely.
+            Minutes per season the first time, because it has to listen to every episode.
+            Afterwards only new or changed episodes are read again. Results are kept inside
+            Kinema; <strong>nothing is written next to your video files</strong> unless you
+            asked for it above.
           </p>
         </section>
 
@@ -905,9 +951,10 @@ export default function Settings() {
         <section className="settings-section">
           <h2>Storage</h2>
           <p className="muted">
-            Artwork cache: {art ? `${art.files} image(s), ${formatBytes(art.bytes)}` : '—'}. Cached
-            images are served from app data, so browsing works with no connection. Clearing it is
-            safe — the provider URLs stay in the database and the cache refills on the next scan.
+            Posters and artwork are kept on this machine —{' '}
+            {art ? `${art.files} image(s), ${formatBytes(art.bytes)}` : '—'} — so browsing works
+            with the internet off. Clearing them is safe: nothing is lost from your library, and
+            they download again on the next scan.
           </p>
           <FocusButton
             className="btn-secondary"
@@ -929,19 +976,22 @@ export default function Settings() {
 
         {/* ---- nfo ---- */}
         <section className="settings-section">
-          <h2>NFO files</h2>
+          <h2>Sharing with other media apps</h2>
           <p className="muted">
-            The interop format MediaElch, tinyMediaManager and Kodi all read. An NFO found beside
-            a video is treated as <strong>authoritative</strong> during matching: when it carries a
-            provider id there is nothing left to guess at, and when it only carries a title, that
-            title is what gets searched instead of the one taken off the filename. Nothing needs
-            enabling — this happens on every scan.
+            <strong>.nfo files</strong> are small text files that sit next to a video and say
+            what it is. Kodi, MediaElch and tinyMediaManager all read and write them, so they are
+            how these programs agree with each other.
           </p>
           <p className="muted">
-            Exporting writes what this library knows back out, so another tool can read it.
-            Existing NFO files are left alone: they were almost certainly written by one of those
-            tools and carry fields this app does not model, so replacing them would throw away
-            someone else&rsquo;s work. Media folders on read-only shares are reported and skipped.
+            <strong>Reading them needs no setting up.</strong> If one is already next to a video,
+            Kinema believes it over its own guess — which is usually the fastest way to fix a
+            stubborn mismatch: identify it in another program, and Kinema will agree next scan.
+          </p>
+          <p className="muted">
+            Writing them is the other direction, so another program can use what Kinema knows.
+            Files that already exist are left alone, because they were probably written by one of
+            those other programs and contain more than Kinema tracks. Folders you cannot write to
+            are skipped and reported.
           </p>
           <div className="settings-row">
             <FocusButton
@@ -949,7 +999,7 @@ export default function Settings() {
               disabled={writingNfo}
               onSelect={() => void exportNfo(false)}
             >
-              {writingNfo ? 'Writing…' : 'Write missing NFO files'}
+              {writingNfo ? 'Writing…' : 'Write the missing ones'}
             </FocusButton>
             <ConfirmButton
               className="btn-secondary"
@@ -957,7 +1007,7 @@ export default function Settings() {
               confirmLabel="Yes, replace them all"
               onConfirm={() => void exportNfo(true)}
             >
-              Overwrite all NFO files
+              Replace every one
             </ConfirmButton>
           </div>
         </section>
@@ -966,9 +1016,10 @@ export default function Settings() {
         <section className="settings-section">
           <h2>Developer tools</h2>
           <p className="muted">
-            The stages on their own — scan, parse, re-parse, match, re-match — plus the raw file
-            table with what the parser made of each name. Useful when changing parsing or scoring
-            rules, since re-matching this way costs no filesystem walk.
+            <strong>Not needed to use Kinema.</strong> Runs each stage of the library scan by
+            hand and shows the raw table of every file with what was made of its name. It exists
+            for working on Kinema itself, and it is the one part of this screen a remote cannot
+            drive — use a mouse.
           </p>
           <FocusButton
             className="btn-secondary"

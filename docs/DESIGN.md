@@ -78,7 +78,6 @@ src/
                  keeps library.css in fixed px; FixMatch, the user-facing review
                  queue, has its own fixmatch.css in rem so it scales
   metadata/      Providers, match scoring, orchestration
-  spike/         Phase 0 diagnostic harness — deletable once trusted
   devlog.ts      Forwards console + unhandled errors to src-tauri/app.log
 ```
 

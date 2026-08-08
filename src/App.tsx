@@ -8,10 +8,6 @@ import './App.css';
 /**
  * Browse is the whole app now. Library management lives in its Settings screen,
  * with the stage-by-stage developer tools folded in behind a disclosure there.
- *
- * `src/spike/PlayerSpike.tsx` is deliberately still on disk but no longer
- * reachable: it is the diagnostic harness for HDR passthrough, which remains
- * unverified for want of an HDR display. It goes when that is confirmed.
  */
 export default function App() {
   const tv = useTvMode();

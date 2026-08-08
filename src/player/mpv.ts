@@ -8,7 +8,7 @@
  * scope is not enough of a guard — Vite replaces the module on HMR — so the
  * promise is parked on `window`, which survives both.
  *
- * Both the real player and the diagnostic spike go through here, so they can
+ * Every caller goes through here, so they can
  * never race each other into a second init.
  */
 import { init, setProperty, type MpvConfig } from 'tauri-plugin-libmpv-api';

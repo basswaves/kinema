@@ -18,6 +18,7 @@ import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-naviga
 import { useCallback, useEffect, useState } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import FocusButton from './FocusButton';
 import FocusInput from './FocusInput';
 import { useClaimFocus } from './focus';
@@ -66,6 +67,9 @@ import FixMatch from '../library/FixMatch';
 import LibraryView from '../library/LibraryView';
 
 const SETTINGS_FOCUS_KEY = 'settings-root';
+
+/** Where TMDB hands out a free key. Linked rather than described. */
+const TMDB_KEY_URL = 'https://www.themoviedb.org/settings/api';
 
 /**
  * How long the Skiptro command fields wait after the last keystroke before
@@ -139,6 +143,9 @@ export default function Settings() {
    * values before the read that loads them had returned.
    */
   const [skiptroLoaded, setSkiptroLoaded] = useState(false);
+  /** The same guard for the provider keys, which now save themselves too. */
+  const [keysLoaded, setKeysLoaded] = useState(false);
+  const [keysSaved, setKeysSaved] = useState(false);
   // Unset means on. Only an explicit 'off' stops the lookups.
   const [introDb, setIntroDb] = useState(true);
 
@@ -175,6 +182,7 @@ export default function Settings() {
     void (async () => {
       setTmdbKey((await getSetting('tmdb_api_key')) ?? '');
       setOmdbKey((await getSetting('omdb_api_key')) ?? '');
+      setKeysLoaded(true);
       setAutoSkip((await getSetting('skip_mode')) === 'auto');
 
       // Unset keeps the default; 0 is a real value meaning "never guess", so it
@@ -224,6 +232,30 @@ export default function Settings() {
     }, SKIPTRO_SAVE_DEBOUNCE_MS);
     return () => window.clearTimeout(id);
   }, [skiptroLoaded, saveSkiptroFields]);
+
+  /**
+   * The provider keys, on the same terms as the fields above.
+   *
+   * These used to be the one place on this page with a **Save keys** button,
+   * which meant typing a key and walking away lost it — and losing an API key
+   * silently looks exactly like the key being wrong. Now they behave like every
+   * other control here: change it and it is stored.
+   */
+  useEffect(() => {
+    if (!keysLoaded) return;
+    const id = window.setTimeout(() => {
+      void (async () => {
+        try {
+          await setSetting('tmdb_api_key', tmdbKey.trim());
+          await setSetting('omdb_api_key', omdbKey.trim());
+          setKeysSaved(true);
+        } catch (e) {
+          setError(String(e));
+        }
+      })();
+    }, SKIPTRO_SAVE_DEBOUNCE_MS);
+    return () => window.clearTimeout(id);
+  }, [keysLoaded, tmdbKey, omdbKey]);
 
   /**
    * Skiptro's output, streamed a line at a time.
@@ -310,16 +342,6 @@ export default function Settings() {
     },
     [refresh]
   );
-
-  const saveKeys = useCallback(async () => {
-    try {
-      await setSetting('tmdb_api_key', tmdbKey.trim());
-      await setSetting('omdb_api_key', omdbKey.trim());
-      setNote('Keys saved. They apply to matches run from now on — re-match to redo existing ones.');
-    } catch (e) {
-      setError(String(e));
-    }
-  }, [tmdbKey, omdbKey]);
 
   const exportNfo = useCallback(async (overwrite: boolean) => {
     setError(null);
@@ -412,6 +434,80 @@ export default function Settings() {
             is identified by its path, size and modification time — so a scan over SMB stays cheap
             and an unreachable folder is skipped rather than emptied.
           </p>
+        </section>
+
+        {/* ---- providers ----
+            Second, directly under Library, because these two sections are the
+            whole of what a new library needs. This used to be sixth of eight,
+            below three sections of intro-detection detail, which put the one
+            thing standing between a user and a shelf of posters behind the one
+            thing they would never look for. */}
+        <section className="settings-section">
+          <h2>Posters and descriptions</h2>
+          <p className="muted">
+            TV shows work with no key at all, through TVmaze. Films need a key from TMDB —
+            it is free, and it is what fetches posters, backdrops, cast and episode stills.
+            Keys are stored in the local database in app data, never in the project folder,
+            and they save themselves as you type.
+          </p>
+          <div className="settings-row">
+            <FocusButton className="btn-secondary" onSelect={() => void openUrl(TMDB_KEY_URL)}>
+              Get a free TMDB key ↗
+            </FocusButton>
+            {keysSaved && <span className="muted">Saved.</span>}
+          </div>
+          <label className="settings-field">
+            <span>
+              TMDB <span className="muted">posters, backdrops, cast, episode stills</span>
+            </span>
+            {/* Masked. This screen is routinely on a television, and a key on a
+                60-inch panel in a living room is not a private thing. */}
+            <FocusInput
+              className="settings-input"
+              value={tmdbKey}
+              onChange={(v) => {
+                setTmdbKey(v);
+                setKeysSaved(false);
+              }}
+              type="password"
+              placeholder="Paste your TMDB key"
+            />
+          </label>
+          <label className="settings-field">
+            <span>
+              OMDb <span className="muted">optional — a fallback for films, poster only</span>
+            </span>
+            <FocusInput
+              className="settings-input"
+              value={omdbKey}
+              onChange={(v) => {
+                setOmdbKey(v);
+                setKeysSaved(false);
+              }}
+              type="password"
+              placeholder="Paste your OMDb key"
+            />
+          </label>
+          <p className="muted">
+            A new key applies to matches made from now on. Titles already in the library keep
+            whatever they matched against until they are matched again.
+          </p>
+          {/* Attribution. Unlike TheIntroDB's, this one is *required* rather
+              than requested: TMDB ask for their logo and this disclaimer
+              wherever their data is shown, and TVmaze's licence asks for credit.
+              This is the page a user looks at to find out where the data came
+              from, so it belongs here rather than in a separate About screen.
+
+              The logo is TMDB's own unmodified SVG, served from the app rather
+              than hotlinked — attribution that disappears when the network does
+              is not attribution. */}
+          <div className="settings-attribution">
+            <img src="/tmdb.svg" alt="TMDB" className="tmdb-logo" />
+            <p className="muted">
+              Film and TV data from TMDB. This product uses the TMDB API but is not endorsed or
+              certified by TMDB. TV data also from <strong>TVmaze</strong>.
+            </p>
+          </div>
         </section>
 
         {/* ---- review queue ---- */}
@@ -751,50 +847,6 @@ export default function Settings() {
             This takes minutes per season — it decodes audio and runs a model over it. Everything
             it finds is written next to your video files, so the results stay readable by Kodi and
             anything else that understands the format, and they survive this app entirely.
-          </p>
-        </section>
-
-        {/* ---- providers ---- */}
-        <section className="settings-section">
-          <h2>Metadata providers</h2>
-          <p className="muted">
-            Stored in the local database in app data, never in the project folder. TV metadata via
-            TVmaze needs no key at all, so the library works without any of these.
-          </p>
-          <label className="settings-field">
-            <span>
-              TMDB <span className="muted">preferred — posters, backdrops, episode stills</span>
-            </span>
-            <FocusInput
-              className="settings-input"
-              value={tmdbKey}
-              onChange={setTmdbKey}
-              placeholder="TMDB API key (v3)"
-            />
-          </label>
-          <label className="settings-field">
-            <span>
-              OMDb <span className="muted">movie fallback — poster only</span>
-            </span>
-            <FocusInput
-              className="settings-input"
-              value={omdbKey}
-              onChange={setOmdbKey}
-              placeholder="OMDb API key"
-            />
-          </label>
-          <FocusButton className="btn-primary" onSelect={() => void saveKeys()}>
-            Save keys
-          </FocusButton>
-          {/* Attribution. Unlike TheIntroDB's, this one is *required* rather
-              than requested: TMDB's terms of use ask for this exact disclaimer
-              wherever their data is shown, and TVmaze's licence asks for credit.
-              This is the page a user looks at to find out where the data came
-              from, so it belongs here rather than in a separate About screen. */}
-          <p className="muted">
-            Film and TV data from <strong>TMDB</strong> — <code>https://www.themoviedb.org</code>.
-            This product uses the TMDB API but is not endorsed or certified by TMDB. TV data
-            also from <strong>TVmaze</strong> — <code>https://www.tvmaze.com</code>.
           </p>
         </section>
 

@@ -11,6 +11,7 @@ import Art from './Art';
 import Rail from './Rail';
 import ContinueRail from './ContinueRail';
 import FocusButton from './FocusButton';
+import FirstRun from './FirstRun';
 import { useClaimFocus } from './focus';
 import type { ContinueItem } from '../player/api';
 import { parseGenres, type Title } from './api';
@@ -24,6 +25,8 @@ interface Props {
   onRemoveResumable: (item: ContinueItem) => void;
   /** Open a rail's full contents as a grid. */
   onSeeAll: (heading: string, titles: Title[]) => void;
+  /** Re-read the library, after the first-run panel has changed it. */
+  onLibraryChanged: () => void;
 }
 
 /** Minimum titles before a genre earns its own rail. */
@@ -44,6 +47,7 @@ export default function Home({
   onResume,
   onRemoveResumable,
   onSeeAll,
+  onLibraryChanged,
 }: Props) {
   const { ref, focusKey } = useFocusable({ trackChildren: true, saveLastFocusedChild: true });
 
@@ -80,16 +84,12 @@ export default function Home({
 
   useClaimFocus(HERO_PLAY_FOCUS_KEY, Boolean(hero));
 
+  // An empty library is a first run far more often than it is a mistake, so it
+  // gets the setup panel rather than a sentence pointing at Settings. It also
+  // covers the other way to arrive here — every root removed — where the same
+  // two controls are exactly what is needed.
   if (titles.length === 0) {
-    return (
-      <div className="empty-state">
-        <h1>Nothing here yet</h1>
-        {/* The scan runs itself, so the only thing being asked for is a
-            folder. Naming the stages here would describe the machinery
-            rather than the one action that is needed. */}
-        <p>Add a folder in Settings — scanning and matching happen on their own.</p>
-      </div>
-    );
+    return <FirstRun onDone={onLibraryChanged} />;
   }
 
   return (

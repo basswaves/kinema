@@ -19,6 +19,7 @@ import Card from './Card';
 import FocusButton from './FocusButton';
 import Settings from './Settings';
 import { useClaimFocus } from './focus';
+import { setShortcutsOpen } from './shortcutsState';
 import Player, { type PlaybackTarget } from '../player/Player';
 import {
   continueWatching,
@@ -333,6 +334,7 @@ export default function Browse() {
             onSelect={(title) => setView({ name: 'detail', title })}
             onPlay={(title) => void playTitle(title)}
             onRemoveResumable={(item) => void removeResumable(item)}
+            onLibraryChanged={() => void load()}
             onSeeAll={(heading, list) =>
               setView({ name: 'grid', heading, titleIds: list.map((t) => t.id) })
             }
@@ -434,6 +436,18 @@ function TopNav({
             {name === 'home' ? 'Home' : name === 'search' ? 'Search' : 'Settings'}
           </FocusButton>
         ))}
+        {/* The key list needs a control, not just the `?` key that opens it.
+            A remote has no `?` to press, and a remote is the input this app is
+            shaped around — so the one screen explaining how to drive it would
+            otherwise be reachable only from the keyboard it is not about. */}
+        <FocusButton
+          className="nav-help"
+          title="Keyboard and remote controls (?)"
+          keepInView="page-top"
+          onSelect={() => setShortcutsOpen(true)}
+        >
+          ?
+        </FocusButton>
         <span className="nav-count">
           {scan ? `${scan.stage}…` : `${titleCount} titles`}
         </span>

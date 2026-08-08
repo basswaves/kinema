@@ -11,8 +11,28 @@ Kinema is one program: close it and nothing is left running.
 
 **Windows 11 only.** See [Platform support](#platform-support).
 
-<!-- TODO: screenshots — home, a detail page, the player controls, the stats
-     panel. A media app with no picture of itself is asking a lot of a visitor. -->
+![Kinema's home screen: a full-width backdrop for the most recently added title, with rails of posters beneath it](docs/images/home.png)
+
+<table>
+<tr>
+<td width="50%">
+
+![A film's detail page, showing the poster, description and a row of cast portraits](docs/images/detail.png)
+
+**Detail pages** carry the cast, the description and — for a series — every
+season and episode, with progress on the ones you have started.
+
+</td>
+<td width="50%">
+
+![The playback statistics panel, listing resolution, codec, cadence, scaling and colour information](docs/images/stats.png)
+
+**Press `i` while watching** for what is actually happening: real refresh rate,
+frame cadence, which scaler ran and why, and the colour pipeline end to end.
+
+</td>
+</tr>
+</table>
 
 ## What it does
 

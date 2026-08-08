@@ -1,0 +1,54 @@
+# `npm run check` is `tsc + eslint` and never runs the bundler. A tree that
+# type-checks and lints cleanly while `vite build` is broken is a real state
+# this project has been in for months, which is the whole reason the build step
+# below is separate rather than folded into `check`.
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+# A new push to the same branch makes the previous run irrelevant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # Windows only, deliberately. The player hard-codes the d3d11 mpv backend
+    # and the app targets WebView2; a green Linux job would prove nothing about
+    # what actually ships.
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check and lint
+        run: npm run check
+
+      # Must run before cargo: tauri-build reads tauri.conf.json and expects
+      # `frontendDist` (../dist) to exist. It also catches bundler-only breakage
+      # that `check` cannot see.
+      - name: Build the frontend
+        run: npm run build
+
+      # No libmpv needed. It is loaded dynamically at runtime rather than
+      # linked, so the 95 MB download is not a test dependency.
+      - name: Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml

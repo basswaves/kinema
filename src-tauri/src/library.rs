@@ -83,6 +83,28 @@ fn to_string_err<E: std::fmt::Display>(e: E) -> String {
     e.to_string()
 }
 
+/// A path in the one form this app compares against, for overlap tests only.
+///
+/// Lower-cased, backslashes normalised, trailing separator removed. Windows
+/// paths are case-insensitive and `library_roots.path` is a case-*sensitive*
+/// `UNIQUE` column, so `D:\Media` and `D:\media` were two different roots as
+/// far as SQLite was concerned and one library as far as the disk was: every
+/// file got scanned twice, under two ids, and appeared twice on every shelf.
+///
+/// Deliberately not what gets stored. The path the user picked is the path they
+/// see in Settings, and lower-casing a display string to win an argument with
+/// SQLite is the wrong trade.
+fn comparable(path: &str) -> String {
+    path.replace('\\', "/")
+        .trim_end_matches('/')
+        .to_lowercase()
+}
+
+/// Whether `inner` is `outer` or sits beneath it.
+fn is_within(inner: &str, outer: &str) -> bool {
+    inner == outer || inner.starts_with(&format!("{outer}/"))
+}
+
 #[tauri::command]
 pub fn add_library_root(db: tauri::State<Db>, path: String, kind: String) -> Result<i64, String> {
     if kind != "movies" && kind != "tv" {
@@ -93,6 +115,45 @@ pub fn add_library_root(db: tauri::State<Db>, path: String, kind: String) -> Res
     }
 
     let conn = db.0.lock().map_err(to_string_err)?;
+
+    // Reject a root that overlaps one already here, in either direction. A
+    // folder inside an existing root scans the same files a second time; a
+    // folder *containing* one does the same from the other end. Neither fails
+    // loudly — you just get every title twice — so it has to be refused here.
+    let existing: Vec<(i64, String)> = {
+        let mut stmt = conn
+            .prepare("SELECT id, path FROM library_roots")
+            .map_err(to_string_err)?;
+        let rows = stmt
+            .query_map([], |r| Ok((r.get(0)?, r.get::<_, String>(1)?)))
+            .map_err(to_string_err)?;
+        rows.collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(to_string_err)?
+    };
+
+    let candidate = comparable(&path);
+    for (id, other) in &existing {
+        let known = comparable(other);
+        if known == candidate {
+            // Already here, possibly spelled differently. Hand back the
+            // existing row rather than erroring: pressing Add twice on the same
+            // folder is not a mistake worth a message.
+            return Ok(*id);
+        }
+        if is_within(&candidate, &known) {
+            return Err(format!(
+                "That folder is already inside a library folder:\n{other}\n\n\
+                 Adding it again would scan everything in it twice."
+            ));
+        }
+        if is_within(&known, &candidate) {
+            return Err(format!(
+                "That folder contains a library folder you have already added:\n{other}\n\n\
+                 Remove that one first, or pick a folder that does not contain it."
+            ));
+        }
+    }
+
     conn.execute(
         "INSERT OR IGNORE INTO library_roots (path, kind, added_at) VALUES (?1, ?2, ?3)",
         params![&path, &kind, now_secs()],
@@ -314,4 +375,45 @@ pub fn library_stats(db: tauri::State<Db>) -> Result<LibraryStats, String> {
         },
     )
     .map_err(to_string_err)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{comparable, is_within};
+
+    #[test]
+    fn windows_paths_compare_case_insensitively() {
+        assert_eq!(comparable(r"D:\Media"), comparable(r"d:\media"));
+        assert_eq!(comparable(r"D:\Media\"), comparable(r"D:\Media"));
+        assert_eq!(comparable(r"D:\Media"), comparable("D:/Media"));
+    }
+
+    #[test]
+    fn a_trailing_separator_does_not_make_a_different_root() {
+        assert_eq!(comparable(r"\nas\share\tv\"), comparable(r"\nas\share\tv"));
+    }
+
+    #[test]
+    fn nesting_is_detected_in_both_directions() {
+        let outer = comparable(r"D:\Media");
+        let inner = comparable(r"D:\Media\TV Shows");
+        assert!(is_within(&inner, &outer));
+        assert!(!is_within(&outer, &inner));
+    }
+
+    #[test]
+    fn a_root_is_within_itself() {
+        let one = comparable(r"D:\Media");
+        assert!(is_within(&one, &one));
+    }
+
+    /// The bug a naive `starts_with` would introduce: these are siblings, and
+    /// refusing the second would be worse than the duplicate it is preventing.
+    #[test]
+    fn a_sibling_with_a_shared_prefix_is_not_nested() {
+        let media = comparable(r"D:\Media");
+        let media2 = comparable(r"D:\Media2");
+        assert!(!is_within(&media2, &media));
+        assert!(!is_within(&media, &media2));
+    }
 }

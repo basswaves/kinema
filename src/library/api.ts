@@ -100,6 +100,22 @@ export const INTRODB_ENABLED_KEY = 'introdb_enabled';
  */
 export const FFMPEG_PATH_KEY = 'ffmpeg_path';
 
+export interface FfmpegStatus {
+  /** The path actually being used, resolved from the setting or PATH. */
+  resolved: string;
+  available: boolean;
+}
+
+/**
+ * Whether the configured ffmpeg actually runs.
+ *
+ * Asked while the user is still looking at the field. Before this, a mistyped
+ * path stayed silent until a detection run minutes later reported it — and
+ * reported it, wrongly, as a Skiptro failure.
+ */
+export const ffmpegStatus = (configured: string) =>
+  invoke<FfmpegStatus>('ffmpeg_status', { configured });
+
 export interface DetectStepReport {
   step: string;
   exit_code: number | null;

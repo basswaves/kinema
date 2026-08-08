@@ -195,21 +195,65 @@ interface TvmazeShow {
 }
 
 /**
- * TVmaze asks for at least 10 seconds between every 20 calls. Serialising
- * requests with a small gap keeps us well under that without needing a proper
- * token bucket — matching is not latency sensitive.
+ * Serialise requests to one provider, with a minimum gap between them.
+ *
+ * Not a token bucket: matching is not latency sensitive, and a chain of
+ * promises with a delay is both obviously correct and impossible to get subtly
+ * wrong. Each provider gets its own chain, so a slow TVmaze cannot hold up TMDB.
  */
-const TVMAZE_GAP_MS = 120;
-let tvmazeChain: Promise<unknown> = Promise.resolve();
+function makeQueue(gapMs: number) {
+  let chain: Promise<unknown> = Promise.resolve();
+  return function queued<T>(work: () => Promise<T>): Promise<T> {
+    const result = chain.then(async () => {
+      const value = await work();
+      await new Promise((r) => setTimeout(r, gapMs));
+      return value;
+    });
+    // Swallowed so one failed request does not poison every request behind it.
+    chain = result.catch(() => undefined);
+    return result;
+  };
+}
 
-function tvmazeQueued<T>(work: () => Promise<T>): Promise<T> {
-  const result = tvmazeChain.then(async () => {
-    const value = await work();
-    await new Promise((r) => setTimeout(r, TVMAZE_GAP_MS));
-    return value;
-  });
-  tvmazeChain = result.catch(() => undefined);
-  return result;
+/** TVmaze asks for at least 10 seconds between every 20 calls. */
+const TVMAZE_GAP_MS = 120;
+const tvmazeQueued = makeQueue(TVMAZE_GAP_MS);
+
+/**
+ * TMDB and OMDb had no throttle at all, which mattered most on exactly the run
+ * a new user makes first: a full library, matched as fast as the pipeline could
+ * drive it. There is no retry in the matcher — a failed request leaves the file
+ * `unmatched` for later, deliberately — so a burst of 429s did not break
+ * anything, it just quietly left a pile of unmatched files behind and looked
+ * like the app not recognising your films.
+ */
+const TMDB_GAP_MS = 30;
+const tmdbQueued = makeQueue(TMDB_GAP_MS);
+
+/** OMDb's free tier is 1,000 requests a day, so pace it rather than sprint. */
+const OMDB_GAP_MS = 120;
+const omdbQueued = makeQueue(OMDB_GAP_MS);
+
+/** How many times to wait out a 429 before giving up and letting it throw. */
+const RATE_LIMIT_RETRIES = 2;
+
+/**
+ * `fetch`, but a 429 is waited out rather than treated as a failure.
+ *
+ * Honours `Retry-After` when the server sends one, and backs off exponentially
+ * when it does not. Everything else — 404, 401, a dead network — is handed
+ * straight back to the caller, which already knows what to do with it.
+ */
+async function fetchPolitely(url: string, label: string): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    const response = await fetch(url, { method: 'GET' });
+    if (response.status !== 429 || attempt >= RATE_LIMIT_RETRIES) return response;
+
+    const header = Number(response.headers.get('retry-after'));
+    const waitMs = Number.isFinite(header) && header > 0 ? header * 1000 : 1000 * 2 ** attempt;
+    console.warn(`${label}: rate limited, waiting ${waitMs}ms`);
+    await new Promise((r) => setTimeout(r, waitMs));
+  }
 }
 
 export async function tvmazeSearch(title: string): Promise<Candidate[]> {
@@ -320,10 +364,13 @@ function tmdbUrl(key: string, path: string, params: Record<string, string> = {})
   return `https://api.themoviedb.org/3${path}?${query.toString()}`;
 }
 
+/** Every TMDB request goes through here, which is what makes one queue enough. */
 async function tmdbGet<T>(key: string, path: string, params?: Record<string, string>): Promise<T> {
-  const response = await fetch(tmdbUrl(key, path, params), { method: 'GET' });
-  if (!response.ok) throw new Error(`TMDB ${path} failed: HTTP ${response.status}`);
-  return (await response.json()) as T;
+  return tmdbQueued(async () => {
+    const response = await fetchPolitely(tmdbUrl(key, path, params), `TMDB ${path}`);
+    if (!response.ok) throw new Error(`TMDB ${path} failed: HTTP ${response.status}`);
+    return (await response.json()) as T;
+  });
 }
 
 interface TmdbSearchResult {
@@ -509,7 +556,7 @@ export async function omdbSearch(
   const params: Record<string, string> = { s: title, type: 'movie' };
   if (year) params.y = String(year);
 
-  const response = await fetch(omdbUrl(key, params), { method: 'GET' });
+  const response = await omdbQueued(() => fetchPolitely(omdbUrl(key, params), 'OMDb search'));
   if (!response.ok) throw new Error(`OMDb search failed: HTTP ${response.status}`);
 
   const data = (await response.json()) as { Response: string; Error?: string; Search?: OmdbSearchItem[] };
@@ -530,7 +577,9 @@ export async function omdbSearch(
 }
 
 export async function omdbGetMovie(key: string, imdbId: string): Promise<TitleMetadata> {
-  const response = await fetch(omdbUrl(key, { i: imdbId, plot: 'full' }), { method: 'GET' });
+  const response = await omdbQueued(() =>
+    fetchPolitely(omdbUrl(key, { i: imdbId, plot: 'full' }), 'OMDb lookup')
+  );
   if (!response.ok) throw new Error(`OMDb lookup failed: HTTP ${response.status}`);
 
   const d = (await response.json()) as Record<string, string>;

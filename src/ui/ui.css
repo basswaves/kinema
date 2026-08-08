@@ -127,6 +127,19 @@ html {
   cursor: pointer;
 }
 
+/* Amber, not red. A folder that did not answer is a fact about the network,
+   not a failure of the app, and the shelves behind this are working fine —
+   dressing it as an error would teach people to ignore the red one. */
+.browse-notice {
+  margin: 0 var(--gutter) 0.75rem;
+  padding: 0.625rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(232, 168, 56, 0.5);
+  background: rgba(232, 168, 56, 0.14);
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
 /* ---- hero --------------------------------------------------------------- */
 .hero {
   position: relative;
@@ -247,6 +260,29 @@ html {
 
 /* Focus ring for D-pad navigation. Must be clearly visible from three metres
    away, so it is a solid outline rather than a subtle tint. */
+/* An armed confirmation. Red, because the next press is the one that does the
+   thing — the whole point is that it should not look like the button that was
+   there a moment ago. */
+.btn-danger {
+  padding: 0.5625rem 1.125rem;
+  border: none;
+  border-radius: 0.5rem;
+  background: rgba(218, 54, 51, 0.95);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-danger:hover {
+  background: rgb(218, 54, 51);
+}
+
+.btn-danger.focused {
+  outline: var(--focus-ring) solid #fff;
+  outline-offset: 2px;
+}
+
 .btn-primary.focused,
 .btn-secondary.focused {
   outline: var(--focus-ring) solid #fff;
@@ -1285,6 +1321,22 @@ html {
   display: block;
   width: 8rem;
   height: auto;
+}
+
+/* Inline answers to "is this path right", beside the field that asks. Not the
+   banner at the top of the page: this screen is many screens long, and an
+   answer about a field you are looking at has to be next to it. */
+.settings-ok,
+.settings-warn {
+  font-size: 0.8125rem;
+}
+
+.settings-ok {
+  color: #6cc47f;
+}
+
+.settings-warn {
+  color: #e8a838;
 }
 
 .settings-note,

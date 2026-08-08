@@ -11,28 +11,18 @@ Kinema is one program: close it and nothing is left running.
 
 **Windows 11 only.** See [Platform support](#platform-support).
 
-![Kinema's home screen: a full-width backdrop for the most recently added title, with rails of posters beneath it](docs/images/home.png)
+![Kinema's home screen: a full-width backdrop for the most recently added title, with rails of posters beneath it](docs/images/home.jpg)
 
-<table>
-<tr>
-<td width="50%">
+![A film's detail page, showing the poster, description and a row of cast portraits](docs/images/detail.jpg)
 
-![A film's detail page, showing the poster, description and a row of cast portraits](docs/images/detail.png)
+Detail pages carry the cast, the description and — for a series — every season
+and episode, with progress on the ones you have started.
 
-**Detail pages** carry the cast, the description and — for a series — every
-season and episode, with progress on the ones you have started.
+![The player's on-screen controls: seek bar, transport buttons, and an audio and subtitle panel](docs/images/player.png)
 
-</td>
-<td width="50%">
-
-![The playback statistics panel, listing resolution, codec, cadence, scaling and colour information](docs/images/stats.png)
-
-**Press `i` while watching** for what is actually happening: real refresh rate,
-frame cadence, which scaler ran and why, and the colour pipeline end to end.
-
-</td>
-</tr>
-</table>
+The controls appear on any key or mouse move and hide themselves again. **Press
+`↑`** to hand the arrow keys to them, which is how a remote reaches subtitles,
+audio tracks and fullscreen.
 
 ## What it does
 
@@ -47,8 +37,15 @@ frame cadence, which scaler ran and why, and the colour pipeline end to end.
 - **Remembers where you were**, per file, and offers the next episode.
 - **Skips intros and credits**, from a community database, from chapter markers,
   or by fingerprinting a season's audio and finding what the episodes share.
-- **Works from a sofa.** Every control is reachable with a D-pad, and there is a
-  10-foot layout for a television.
+- **Works from a sofa.** Browsing, playing, subtitles and resume are all
+  reachable with a D-pad, and there is a larger layout for a television.
+
+![The playback statistics panel, listing resolution, codec, cadence, scaling and colour information](docs/images/stats.png)
+
+Press `i` while watching for what is actually happening: the display's real
+refresh rate, the frame cadence, which scaler ran and why, and the colour
+pipeline end to end. It reports rather than flatters — the cadence line above is
+telling the truth about 24p on a 60 Hz panel.
 
 It reads [NFO sidecar files](docs/DESIGN.md) if you have them, from MediaElch,
 tinyMediaManager or Kodi, and treats them as authoritative.

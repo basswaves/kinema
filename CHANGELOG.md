@@ -34,6 +34,17 @@ makes no stability promises.
 
 ### Changed
 
+- **Settings is written for the person using it**, not the person who built it.
+  The frame-timing help was one paragraph containing *24p judder, 3:2 cadence,
+  resampling, bitstream passthrough, TrueHD, DTS:X, AVR* and *PCM*, and
+  documented a feature that does not exist; it is now two sentences saying what
+  to try. `SMB`, `overscan`, `10-foot`, `sidecar`, `PATH`, `ffprobe` and `NFO`
+  are gone or explained. **Skip intros** is now **Skip intros and credits**,
+  which is what it always did.
+- **Skiptro is explained and linked.** It was named in three places and never
+  once described, and the section now opens by saying most people can skip it.
+- Items in **Needs attention** lead with a plain sentence about what to do; the
+  scorer's own wording is kept underneath for anyone who wants it.
 - **Provider keys moved from sixth of eight sections in Settings to second**,
   and they now save themselves as you type. The old **Save keys** button was
   the only control on the page that did not apply on change, so typing a key
@@ -45,8 +56,17 @@ makes no stability promises.
   tests on every push.
 - A release workflow producing a portable ZIP with a published SHA-256.
 
+### Removed
+
+- `src/spike/PlayerSpike.tsx`, the Phase 0 mpv harness, and its styles. It had
+  been unreachable from the UI for a long time. `docs/ROADMAP.md` says how to
+  get it back from git history if you have an HDR display and want it.
+
 ### Fixed
 
+- **Settings claimed detection results were "written next to your video
+  files".** That stopped being true when sidecar export was turned off, and it
+  is the wrong thing to be wrong about for anyone watching what lands on a NAS.
 - The Tauri bundler is switched off. It had been configured to install the
   native playback libraries into a `lib/` subfolder, which produces an app that
   installs and launches normally and then fails the moment you press Play, with

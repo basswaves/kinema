@@ -117,12 +117,22 @@
   font-weight: 600;
 }
 
+/* What to do about it, in plain words. Reads first and largest, because it is
+   the line that gets the queue emptied. */
+.fixmatch-advice {
+  margin-top: 0.25rem;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+/* The scorer's own words, kept underneath. Smaller and dimmer: genuinely
+   useful once you know what it means, noise until then. */
 .fixmatch-reason {
   margin-top: 0.1875rem;
   font-size: 0.6875rem;
   line-height: 1.4;
   color: #f0883e;
-  opacity: 0.85;
+  opacity: 0.7;
   word-break: break-word;
 }
 

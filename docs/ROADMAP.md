@@ -77,11 +77,24 @@ template arrangement.
 **Do not do this on one season's evidence.** The comparison it needs is a
 library with several shows in it.
 
-### Delete `src/spike/`
+### The Phase 0 mpv harness is gone, if you need it back
 
-The Phase 0 mpv harness. Off the UI and unreachable, but still the diagnostic
-tool for HDR passthrough, which is unverified for want of an HDR display. Delete
-it, its styles in `App.css`, and this note once that is confirmed.
+`src/spike/PlayerSpike.tsx` was the diagnostic tool for HDR passthrough — a
+standalone window that loaded one file and dumped every mpv property that
+matters to the render pipeline. It was unreachable from the UI and was deleted
+before publishing, along with its styles in `App.css`: 629 lines of dead code is
+a lot to ask a first-time reader to walk past.
+
+**If you have an HDR display and want to verify passthrough, it is worth
+resurrecting rather than rewriting:**
+
+```bash
+git log --oneline --diff-filter=D -- src/spike/PlayerSpike.tsx
+git checkout <that commit>~1 -- src/spike/ src/App.css
+```
+
+It renders through the same `ensureMpvInitialised` as the real player, so what
+it reports is what the player gets.
 
 ### Back from a detail page always goes Home
 

@@ -1,4 +1,4 @@
-# Personal Netflix
+# Kinema
 
 A local, serverless media library for movies and TV shows. **Tauri 2 + React 19 + libmpv.**
 No server, no daemon — the app scans your files, matches metadata, and plays directly.
@@ -78,7 +78,7 @@ npm run app:build
 ```
 
 That builds the release binary, assembles `dist-app/` (exe plus the two native
-libraries) and refreshes a **Personal Netflix** shortcut on the desktop. It is a
+libraries) and refreshes a **Kinema** shortcut on the desktop. It is a
 portable folder rather than an installer on purpose — nothing to reinstall after
 a rebuild. The identifier is unchanged, so it reads the same library database as
 the dev build.

@@ -423,7 +423,7 @@ function TopNav({
   return (
     <FocusContext.Provider value={focusKey}>
       <nav className="top-nav" ref={ref}>
-        <span className="brand">Personal Netflix</span>
+        <span className="brand">Kinema</span>
         {(['home', 'search', 'settings'] as const).map((name) => (
           <FocusButton
             key={name}

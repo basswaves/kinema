@@ -580,7 +580,7 @@ not put there.
 **Found while checking, not yet acted on:** audio is decoded to PCM and
 **downmixed 5.1 → 2.0**, because there is no `audio-spdif` configuration at all
 and the default Windows device is onboard stereo. That is a larger loss of
-intent than any scaler question. See HANDOVER.md.
+intent than any scaler question. See ROADMAP.md.
 
 ---
 
@@ -1110,7 +1110,7 @@ Whether it should is one question about the idle timer, not two.
 
 ## Open items
 
-**They live in [HANDOVER.md](HANDOVER.md), and only there.** They used to be
+**They live in [ROADMAP.md](ROADMAP.md), and only there.** They used to be
 listed here twice — a "Backlog" and a "Still unverified" — as well as in
 HANDOVER, which is exactly the drift this file keeps warning about. This
 document is for decisions and the reasons behind them; what is left to do is a

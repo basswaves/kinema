@@ -448,7 +448,7 @@ function EpisodeRow(props: EpisodeRowProps) {
  * still moves between rows. A focusable nested inside another focusable cannot
  * be reached geometrically — going right requires the candidate's left edge to
  * be past the current element's right edge, which nothing drawn *inside* it can
- * ever satisfy. Same shape as the overlay-nav problem in GOTCHAS.md.
+ * ever satisfy. Same shape as the overlay-nav problem in docs/GOTCHAS.md.
  *
  * Both children are declared in components of their own, because `useFocusable`
  * reads the focus context of the component it is called in: calling them here

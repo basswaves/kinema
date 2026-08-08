@@ -466,7 +466,7 @@ function TopNav({
  *
  * It claims focus rather than relying on the shell, because arriving here
  * always follows pressing "See all" on a card that is now unmounted, which is
- * the silent dead end in GOTCHAS.md.
+ * the silent dead end in docs/GOTCHAS.md.
  */
 function GridView({
   heading,

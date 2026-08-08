@@ -1,6 +1,6 @@
 <!--
 Thanks for the patch. Please read CONTRIBUTING.md if you have not — in
-particular GOTCHAS.md, which is required reading before touching the
+particular docs/GOTCHAS.md, which is required reading before touching the
 player or D-pad navigation. Nearly every entry in it describes a failure that
 produces no error at all.
 -->

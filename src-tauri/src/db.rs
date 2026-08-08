@@ -6,6 +6,43 @@
 use rusqlite::Connection;
 use std::path::Path;
 
+/// The schema this build understands. Bump it with every new `SCHEMA_V*`.
+pub const SCHEMA_VERSION: i64 = 9;
+
+/// What can go wrong opening the library.
+///
+/// A type of its own only because of the second variant: a database from a
+/// newer build is not a SQLite error, it is a situation SQLite is perfectly
+/// happy with and this program is not.
+#[derive(Debug)]
+pub enum DbError {
+    Sqlite(rusqlite::Error),
+    /// The file was written by a newer build than this one.
+    TooNew { found: i64, supported: i64 },
+}
+
+impl std::fmt::Display for DbError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DbError::Sqlite(e) => write!(f, "{e}"),
+            DbError::TooNew { found, supported } => write!(
+                f,
+                "This library was created by a newer version of Kinema \
+                 (database version {found}; this build understands {supported}). \
+                 Update Kinema, or point it at a different library."
+            ),
+        }
+    }
+}
+
+impl std::error::Error for DbError {}
+
+impl From<rusqlite::Error> for DbError {
+    fn from(e: rusqlite::Error) -> Self {
+        DbError::Sqlite(e)
+    }
+}
+
 /// Schema version 1. Kept as one batch so a fresh install and a migrated one
 /// end up byte-identical.
 const SCHEMA_V1: &str = r#"
@@ -318,7 +355,7 @@ fn configure(conn: &Connection) -> rusqlite::Result<()> {
     Ok(())
 }
 
-pub fn open(path: &Path) -> rusqlite::Result<Connection> {
+pub fn open(path: &Path) -> Result<Connection, DbError> {
     let conn = Connection::open(path)?;
     configure(&conn)?;
     migrate(&conn)?;
@@ -337,53 +374,185 @@ pub fn open_secondary(path: &Path) -> rusqlite::Result<Connection> {
     Ok(conn)
 }
 
-fn migrate(conn: &Connection) -> rusqlite::Result<()> {
+/// Every migration, in order. The index is the version it produces.
+const MIGRATIONS: [&str; SCHEMA_VERSION as usize] = [
+    SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6, SCHEMA_V7, SCHEMA_V8,
+    SCHEMA_V9,
+];
+
+/// Bring the database up to [`SCHEMA_VERSION`].
+///
+/// **Each step and its version bump are one transaction.** They used to be two
+/// statements, and the gap between them was a real hazard: a crash or a power
+/// cut in between left the schema changed and the version still saying it was
+/// not, so the next launch re-ran the step. V1 and V8 happen to be re-runnable;
+/// V2, V6 and V7 are bare `ALTER TABLE ADD COLUMN`, which fails with "duplicate
+/// column name" — and since this runs in `setup`, that failure took the whole
+/// app down before a window existed. A migration that half-applies must undo
+/// itself instead.
+///
+/// `PRAGMA user_version` lives in the database header and is written inside the
+/// transaction like anything else, so a rollback takes it with the schema.
+fn migrate(conn: &Connection) -> Result<(), DbError> {
     let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
 
-    if version < 1 {
-        conn.execute_batch(SCHEMA_V1)?;
-        conn.execute_batch("PRAGMA user_version=1;")?;
+    // Refuse a database from a newer build rather than limping on. Without this
+    // the mismatch surfaces later as "no such column" from whichever query
+    // happens to run first, which says nothing about the actual problem.
+    if version > SCHEMA_VERSION {
+        return Err(DbError::TooNew {
+            found: version,
+            supported: SCHEMA_VERSION,
+        });
     }
 
-    if version < 2 {
-        conn.execute_batch(SCHEMA_V2)?;
-        conn.execute_batch("PRAGMA user_version=2;")?;
-    }
-
-    if version < 3 {
-        conn.execute_batch(SCHEMA_V3)?;
-        conn.execute_batch("PRAGMA user_version=3;")?;
-    }
-
-    if version < 4 {
-        conn.execute_batch(SCHEMA_V4)?;
-        conn.execute_batch("PRAGMA user_version=4;")?;
-    }
-
-    if version < 5 {
-        conn.execute_batch(SCHEMA_V5)?;
-        conn.execute_batch("PRAGMA user_version=5;")?;
-    }
-
-    if version < 6 {
-        conn.execute_batch(SCHEMA_V6)?;
-        conn.execute_batch("PRAGMA user_version=6;")?;
-    }
-
-    if version < 7 {
-        conn.execute_batch(SCHEMA_V7)?;
-        conn.execute_batch("PRAGMA user_version=7;")?;
-    }
-
-    if version < 8 {
-        conn.execute_batch(SCHEMA_V8)?;
-        conn.execute_batch("PRAGMA user_version=8;")?;
-    }
-
-    if version < 9 {
-        conn.execute_batch(SCHEMA_V9)?;
-        conn.execute_batch("PRAGMA user_version=9;")?;
+    for (index, sql) in MIGRATIONS.iter().enumerate() {
+        let target = index as i64 + 1;
+        if version >= target {
+            continue;
+        }
+        // `unchecked_transaction` because the connection is behind a shared
+        // reference here; nothing else can be using it during setup.
+        let tx = conn.unchecked_transaction()?;
+        tx.execute_batch(sql)?;
+        tx.execute_batch(&format!("PRAGMA user_version={target};"))?;
+        tx.commit()?;
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A database migrated only as far as `version`, the way an older build
+    /// would have left it.
+    fn at_version(version: i64) -> Connection {
+        let conn = Connection::open_in_memory().expect("in-memory database");
+        configure(&conn).expect("configure");
+        for (index, sql) in MIGRATIONS.iter().enumerate().take(version as usize) {
+            conn.execute_batch(sql).expect("schema step");
+            conn.execute_batch(&format!("PRAGMA user_version={};", index + 1))
+                .expect("version bump");
+        }
+        conn
+    }
+
+    fn version_of(conn: &Connection) -> i64 {
+        conn.query_row("PRAGMA user_version", [], |r| r.get(0))
+            .expect("user_version")
+    }
+
+    #[test]
+    fn the_migration_list_matches_the_declared_version() {
+        assert_eq!(MIGRATIONS.len() as i64, SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn a_fresh_database_lands_on_the_current_version() {
+        let conn = at_version(0);
+        migrate(&conn).expect("fresh migrate");
+        assert_eq!(version_of(&conn), SCHEMA_VERSION);
+    }
+
+    /// The upgrade path every existing install will actually take. Each older
+    /// version is walked all the way forward, which is the case that had no
+    /// coverage at all while the schema grew to nine steps.
+    #[test]
+    fn every_older_version_reaches_the_current_one() {
+        for start in 0..=SCHEMA_VERSION {
+            let conn = at_version(start);
+            migrate(&conn).unwrap_or_else(|e| panic!("migrating from v{start}: {e}"));
+            assert_eq!(
+                version_of(&conn),
+                SCHEMA_VERSION,
+                "starting from v{start}"
+            );
+        }
+    }
+
+    /// Whatever the starting point, the schema ends up the same. A fresh
+    /// install and a migrated one being byte-identical is the property the
+    /// one-batch-per-version arrangement exists to preserve.
+    #[test]
+    fn a_migrated_database_matches_a_fresh_one() {
+        fn shape(conn: &Connection) -> Vec<String> {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT type || ' ' || name || ' ' || COALESCE(sql, '')
+                     FROM sqlite_master
+                     WHERE name NOT LIKE 'sqlite_%'
+                     ORDER BY type, name",
+                )
+                .expect("prepare");
+            let rows = stmt
+                .query_map([], |r| r.get::<_, String>(0))
+                .expect("query")
+                .collect::<rusqlite::Result<Vec<_>>>()
+                .expect("collect");
+            rows
+        }
+
+        let fresh = at_version(0);
+        migrate(&fresh).expect("fresh");
+
+        for start in 1..SCHEMA_VERSION {
+            let stepped = at_version(start);
+            migrate(&stepped).expect("stepped");
+            assert_eq!(shape(&stepped), shape(&fresh), "migrated from v{start}");
+        }
+    }
+
+    #[test]
+    fn migrating_twice_changes_nothing() {
+        let conn = at_version(0);
+        migrate(&conn).expect("first");
+        migrate(&conn).expect("second");
+        assert_eq!(version_of(&conn), SCHEMA_VERSION);
+    }
+
+    /// A library written by a newer build is refused with something a user can
+    /// act on, rather than failing later on an unknown column.
+    #[test]
+    fn a_database_from_a_newer_build_is_refused() {
+        let conn = at_version(0);
+        migrate(&conn).expect("migrate");
+        conn.execute_batch(&format!("PRAGMA user_version={};", SCHEMA_VERSION + 1))
+            .expect("bump past");
+
+        match migrate(&conn) {
+            Err(DbError::TooNew { found, supported }) => {
+                assert_eq!(found, SCHEMA_VERSION + 1);
+                assert_eq!(supported, SCHEMA_VERSION);
+            }
+            other => panic!("expected TooNew, got {other:?}"),
+        }
+    }
+
+    /// The reason each step is a transaction: a step that fails part-way must
+    /// leave the version where it was, so the next launch retries cleanly
+    /// rather than tripping over half its own work.
+    #[test]
+    fn a_failed_step_rolls_back_and_leaves_the_version_alone() {
+        let conn = at_version(0);
+        configure(&conn).expect("configure");
+
+        let tx = conn.unchecked_transaction().expect("begin");
+        tx.execute_batch("CREATE TABLE half_applied (id INTEGER PRIMARY KEY);")
+            .expect("first statement");
+        tx.execute_batch("PRAGMA user_version=1;").expect("bump");
+        // Whatever goes wrong next, neither the table nor the version survives.
+        drop(tx);
+
+        assert_eq!(version_of(&conn), 0);
+        let exists: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE name = 'half_applied'",
+                [],
+                |r| r.get(0),
+            )
+            .expect("count");
+        assert_eq!(exists, 0);
+    }
 }

@@ -21,12 +21,14 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import FocusButton from './FocusButton';
 import FocusInput from './FocusInput';
+import ConfirmButton from './ConfirmButton';
 import { useClaimFocus } from './focus';
 import { setTvMode, useTvMode } from './tv';
 import {
   addLibraryRoot,
   analysisBacklog,
   detectIntros,
+  ffmpegStatus,
   listLibraryRoots,
   removeLibraryRoot,
   DEFAULT_SKIPTRO_EXPORT_ARGS,
@@ -38,6 +40,7 @@ import {
   SKIPTRO_PATH_KEY,
   SKIPTRO_SCAN_ARGS_KEY,
   type DetectProgress,
+  type FfmpegStatus,
   type LibraryKind,
   type LibraryRoot,
 } from '../library/api';
@@ -94,7 +97,21 @@ function summaryLine(s: ScanSummary): string {
   ];
   if (s.artworkStored) parts.push(`${s.artworkStored} image(s) cached`);
   if (s.detailsFilled) parts.push(`${s.detailsFilled} title(s) enriched`);
+  // The scan collected these all along and nothing ever rendered them, so an
+  // unreachable share reported a perfectly cheerful "0 new files".
+  if (s.errors.length) parts.push(`${s.errors.length} problem(s)`);
   return parts.join(' · ');
+}
+
+/**
+ * The non-fatal problems from a scan, as one line.
+ *
+ * Capped, because one unreachable root fails once per file it should have had
+ * and a thousand identical lines say nothing the first three did not.
+ */
+function problemLine(errors: string[]): string {
+  const shown = errors.slice(0, 3).join(' · ');
+  return errors.length > 3 ? `${shown} · and ${errors.length - 3} more` : shown;
 }
 
 export default function Settings() {
@@ -143,6 +160,8 @@ export default function Settings() {
    * values before the read that loads them had returned.
    */
   const [skiptroLoaded, setSkiptroLoaded] = useState(false);
+  /** Whether the configured ffmpeg runs. Null until the first check answers. */
+  const [ffmpeg, setFfmpeg] = useState<FfmpegStatus | null>(null);
   /** The same guard for the provider keys, which now save themselves too. */
   const [keysLoaded, setKeysLoaded] = useState(false);
   const [keysSaved, setKeysSaved] = useState(false);
@@ -233,6 +252,18 @@ export default function Settings() {
     return () => window.clearTimeout(id);
   }, [skiptroLoaded, saveSkiptroFields]);
 
+  // Re-check ffmpeg whenever the field settles. One `-version` call, so the
+  // debounce is about not running it per keystroke rather than about cost.
+  useEffect(() => {
+    if (!skiptroLoaded) return;
+    const id = window.setTimeout(() => {
+      void ffmpegStatus(ffmpegPath.trim())
+        .then(setFfmpeg)
+        .catch(() => setFfmpeg(null));
+    }, SKIPTRO_SAVE_DEBOUNCE_MS);
+    return () => window.clearTimeout(id);
+  }, [skiptroLoaded, ffmpegPath]);
+
   /**
    * The provider keys, on the same terms as the fields above.
    *
@@ -290,11 +321,18 @@ export default function Settings() {
           // videos unless an export command has been typed back in.
           setNote(`Intro detection finished for ${root.path}.`);
         } else {
-          const failed = report.steps[report.steps.length - 1];
-          setError(
-            `Skiptro "${failed?.step}" exited with ${failed?.exit_code ?? 'no code'}: ` +
-              (failed?.tail.slice(-3).join(' · ') || 'no output')
-          );
+          // Name the step that actually failed, and name it *correctly*. This
+          // used to take the last step and call it Skiptro — but this app's own
+          // analysis is always pushed last, under the name `analyse`, so a
+          // missing ffmpeg was reported as a Skiptro failure to users who had
+          // never installed Skiptro. The Rust messages were fine all along;
+          // only this line was wrong.
+          const failed =
+            report.steps.find((s) => s.exit_code !== 0) ?? report.steps[report.steps.length - 1];
+          const owner = failed?.step === 'analyse' ? 'Detection' : `Skiptro "${failed?.step}"`;
+          const code = failed?.exit_code === null ? 'did not finish' : `exited with ${failed?.exit_code}`;
+          const detail = failed?.tail.slice(-3).join(' · ') || 'no output';
+          setError(`${owner} ${code}: ${detail}`);
         }
       } catch (e) {
         setError(String(e));
@@ -323,6 +361,7 @@ export default function Settings() {
     else {
       setNote(summaryLine(outcome.summary));
       if (outcome.summary.parseError) setError(`Parser threw — ${outcome.summary.parseError}`);
+      else if (outcome.summary.errors.length) setError(problemLine(outcome.summary.errors));
     }
     await refresh();
   }, [refresh]);
@@ -395,16 +434,17 @@ export default function Settings() {
                   <span className={`root-kind ${root.kind}`}>{root.kind}</span>
                   <span className="root-path">{root.path}</span>
                   <span className="muted">{root.file_count} file(s)</span>
-                  <FocusButton
+                  <ConfirmButton
                     className="settings-remove"
-                    onSelect={() =>
+                    confirmLabel="Remove it"
+                    onConfirm={() =>
                       void removeLibraryRoot(root.id)
                         .then(refresh)
                         .catch((e) => setError(String(e)))
                     }
                   >
                     Remove
-                  </FocusButton>
+                  </ConfirmButton>
                 </li>
               ))}
             </ul>
@@ -664,9 +704,20 @@ export default function Settings() {
               placeholder="ffmpeg"
             />
           </label>
+          {/* Answered here rather than discovered during a detection run. A
+              wrong path used to stay silent for minutes and then surface as
+              somebody else's failure. */}
+          {ffmpeg && (
+            <p className={ffmpeg.available ? 'settings-ok' : 'settings-warn'}>
+              {ffmpeg.available
+                ? `Found ffmpeg at ${ffmpeg.resolved}.`
+                : `No ffmpeg at ${ffmpeg.resolved}. Install it and put it on PATH, or type the ` +
+                  `full path to ffmpeg.exe here. Without it, intro and credits detection is ` +
+                  `skipped and everything else carries on.`}
+            </p>
+          )}
           <p className="muted">
-            ffprobe is taken from the same folder. Without a working ffmpeg this source is simply
-            skipped and the others carry on.
+            ffprobe is taken from the same folder.
           </p>
 
           <h3>TheIntroDB</h3>
@@ -900,13 +951,14 @@ export default function Settings() {
             >
               {writingNfo ? 'Writing…' : 'Write missing NFO files'}
             </FocusButton>
-            <FocusButton
+            <ConfirmButton
               className="btn-secondary"
               disabled={writingNfo}
-              onSelect={() => void exportNfo(true)}
+              confirmLabel="Yes, replace them all"
+              onConfirm={() => void exportNfo(true)}
             >
               Overwrite all NFO files
-            </FocusButton>
+            </ConfirmButton>
           </div>
         </section>
 

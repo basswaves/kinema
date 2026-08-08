@@ -79,6 +79,29 @@ pub fn is_available(ffmpeg: &Path) -> bool {
     command.status().map(|s| s.success()).unwrap_or(false)
 }
 
+/// What Settings shows next to the ffmpeg path field.
+#[derive(serde::Serialize)]
+pub struct FfmpegStatus {
+    /// The path actually being used, resolved from the setting or `PATH`.
+    pub resolved: String,
+    pub available: bool,
+}
+
+/// Whether the configured ffmpeg works, answered while the user is still
+/// looking at the field.
+///
+/// Before this, a mistyped path was silent until a detection run minutes later
+/// blamed it on Skiptro. The check is one `-version` call, so asking on every
+/// keystroke would be wasteful but asking when the field settles is free.
+#[tauri::command]
+pub fn ffmpeg_status(configured: Option<String>) -> FfmpegStatus {
+    let path = resolve(configured.as_deref());
+    FfmpegStatus {
+        resolved: path.display().to_string(),
+        available: is_available(&path),
+    }
+}
+
 /// How long a video is, in seconds.
 ///
 /// `None` when ffprobe is missing or the file has no readable duration. The

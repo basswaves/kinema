@@ -93,6 +93,8 @@ export default function Browse() {
   const [view, setView] = useState<View>({ name: 'home' });
   const [query, setQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
+  /** A root that could not be read at startup. Not an error — see below. */
+  const [scanTrouble, setScanTrouble] = useState<string | null>(null);
 
   // The shell owns the nav↔content rule, because it is the only component that
   // is a parent of both. The nav and the search view get their containers in
@@ -164,17 +166,38 @@ export default function Browse() {
    * is visible, and an empty screen that fills itself is a better answer than a
    * spinner in front of nothing.
    *
-   * Failures are logged, not surfaced. An unreachable NAS at startup is normal
-   * and the scanner already skips that root; an error banner over a library
-   * that is browsing perfectly well from cache would be noise.
+   * Problems are reported quietly rather than not at all. They used to be
+   * logged and nothing else, on the reasoning that an unreachable share is
+   * normal and the scanner skips that root anyway — which is true, and misses
+   * what it looks like from the sofa. Every browsing query hides files marked
+   * missing, so a share that did not come back reads as a library that has
+   * silently lost half its contents, with no way to tell that from real data
+   * loss. A quiet line naming the folder is the difference between "this app
+   * ate my library" and "the NAS is asleep".
+   *
+   * Deliberately not the red error banner: nothing is broken, the shelves are
+   * browsing perfectly well from cache, and this must not look like a failure.
    */
   useEffect(() => {
     let cancelled = false;
     runScanPipeline()
       .then((outcome) => {
-        if (outcome.status === 'failed') console.warn('startup scan failed:', outcome.error);
-        if (cancelled || outcome.status !== 'done') return;
-        const { filesAdded, matched } = outcome.summary;
+        if (cancelled) return;
+        if (outcome.status === 'failed') {
+          console.warn('startup scan failed:', outcome.error);
+          setScanTrouble(`Could not check your library folders — ${outcome.error}`);
+          return;
+        }
+        if (outcome.status !== 'done') return;
+        const { filesAdded, matched, errors } = outcome.summary;
+        if (errors.length > 0) {
+          console.warn('startup scan problems:', errors);
+          setScanTrouble(
+            errors.length === 1
+              ? errors[0]
+              : `${errors[0]} · and ${errors.length - 1} more`
+          );
+        }
         if (filesAdded > 0 || matched > 0) void load();
       })
       .catch((e) => console.warn('startup scan:', e));
@@ -324,6 +347,13 @@ export default function Browse() {
         {error && (
           <div className="browse-error" onClick={() => setError(null)}>
             {error}
+          </div>
+        )}
+
+        {scanTrouble && (
+          <div className="browse-notice" onClick={() => setScanTrouble(null)}>
+            {scanTrouble}
+            <span className="muted"> — anything from that folder is hidden until it is back.</span>
           </div>
         )}
 

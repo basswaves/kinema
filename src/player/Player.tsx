@@ -477,6 +477,28 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           endHandled.current = true;
           void handlePlaybackEnded();
         }
+        // `error` was dropped along with everything that was not `eof`, and it
+        // is the one that matters most: `loadfile` resolves as soon as mpv
+        // *accepts* the command, so a file that has been deleted, renamed or
+        // sits on a share that went away fails here and nowhere else. The
+        // result was a black screen reading `--:-- / --:--`, indistinguishable
+        // from a hang, with the explanation sitting in mpv.log.
+        if (reason === 'error') {
+          const detail = (event as { file_error?: string }).file_error;
+          setError(
+            detail
+              ? `Could not play this file: ${detail}`
+              : 'Could not play this file. It may have been moved or deleted, ' +
+                'or the drive it is on may be unavailable.'
+          );
+          // Reveal the controls and leave them up. Nothing is playing, so there
+          // is nothing for them to cover, and the Back button is the only way
+          // out that does not require knowing which key to press. Set directly
+          // rather than through `showOsd` so this effect's dependencies stay as
+          // they are — the mpv listener is registered once, and re-registering
+          // it is the trap in docs/GOTCHAS.md.
+          setOsdVisible(true);
+        }
       }
     }).then((fn) => {
       unlisten = fn;

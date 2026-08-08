@@ -1,4 +1,4 @@
-# Personal Netflix — working rules
+# Kinema — working rules
 
 A local, serverless media library. **Tauri 2 + React 19 + libmpv**, Windows 11.
 

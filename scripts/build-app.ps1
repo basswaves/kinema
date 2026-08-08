@@ -43,10 +43,10 @@ $dlls   = @('libmpv-2.dll', 'libmpv-wrapper.dll')
 
 # cargo cannot overwrite an exe Windows still has open, and the failure surfaces
 # as a confusing linker error rather than a clear one.
-$running = Get-Process personal-netflix -ErrorAction SilentlyContinue
+$running = Get-Process kinema -ErrorAction SilentlyContinue
 if ($running) {
     $pids = $running.Id -join ', '
-    throw "Personal Netflix is running (PID $pids). Close it first: the release exe cannot be written while Windows holds it open."
+    throw "Kinema is running (PID $pids). Close it first: the release exe cannot be written while Windows holds it open."
 }
 
 foreach ($dll in $dlls) {
@@ -65,22 +65,30 @@ finally {
     Pop-Location
 }
 
-$exe = Join-Path $relDir 'personal-netflix.exe'
+$exe = Join-Path $relDir 'kinema.exe'
 if (-not (Test-Path $exe)) { throw "Build reported success but $exe is not there." }
 
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 Copy-Item $exe $outDir -Force
 foreach ($dll in $dlls) { Copy-Item (Join-Path $libDir $dll) $outDir -Force }
 
-$target   = Join-Path $outDir 'personal-netflix.exe'
-$linkPath = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Personal Netflix.lnk'
+$target   = Join-Path $outDir 'kinema.exe'
+$linkPath = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Kinema.lnk'
+
+# The app was called Personal Netflix until the rename. A stale shortcut beside
+# the new one still launches the old exe, which reads the old app-data folder -
+# so it looks like the library is empty or has reverted. Remove it once.
+$oldLink = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Personal Netflix.lnk'
+if (Test-Path $oldLink) { Remove-Item $oldLink -Force }
+$oldExe = Join-Path $outDir 'personal-netflix.exe'
+if (Test-Path $oldExe) { Remove-Item $oldExe -Force }
 
 $shell = New-Object -ComObject WScript.Shell
 $link  = $shell.CreateShortcut($linkPath)
 $link.TargetPath       = $target
 $link.WorkingDirectory = $outDir
 $link.IconLocation     = $target
-$link.Description      = 'Personal Netflix'
+$link.Description      = 'Kinema'
 $link.Save()
 
 $megabytes = [math]::Round((Get-ChildItem $outDir | Measure-Object -Property Length -Sum).Sum / 1MB)

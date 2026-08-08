@@ -55,9 +55,22 @@ npm run check
 npm run build
 ```
 
-`check` is `tsc --noEmit && eslint .` and **never runs the bundler**. A tree that
-passes `check` while `build` is broken is a real state this project has been in
-for months, which is why they are separate.
+`check` is `tsc --noEmit`, `eslint .` and `vitest run`. It **never runs the
+bundler** — a tree that passes `check` while `build` is broken is a real state
+this project has been in for months, which is why they are separate.
+
+Run the tests alone, or watch them while you work:
+
+```bash
+npm test
+```
+
+The frontend tests cover pure logic only: match scoring, skip-marker
+resolution, log redaction. There are no component or rendering tests, and the
+reason is worth knowing before you add one — the failures this codebase
+actually produces are focus-tree and mpv-lifecycle problems, and a jsdom test
+cannot see either. **Testing D-pad navigation means using a D-pad**, not
+mounting a component. See the two failure modes below.
 
 For Rust changes:
 
@@ -88,6 +101,12 @@ never ran, or ran and silently did nothing. Check for both by reflex:
    focus tree. Use `FocusButton` / `FocusInput` from `src/ui/`. **Test D-pad work
    with the mouse physically untouched** — one stray hover repairs focus and
    hides the failure completely.
+
+   This covers **watching**: browsing, picking something, playing it, subtitles,
+   resume, skipping an intro. That whole path has to work from a sofa with a
+   D-pad and nothing else. It is not a requirement that *every* control in the
+   app be reachable that way — **Developer tools in Settings is mouse-only by
+   design**, and says so on screen. Please do not "fix" it.
 
 ## Debugging
 

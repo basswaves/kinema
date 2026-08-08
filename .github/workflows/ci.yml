@@ -39,7 +39,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Type-check and lint
+      # `check` is tsc + eslint + vitest. Kept as one step because that is the
+      # command contributors are told to run, and CI should fail on exactly
+      # what their machine fails on.
+      - name: Type-check, lint and test
         run: npm run check
 
       # Must run before cargo: tauri-build reads tauri.conf.json and expects

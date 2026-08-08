@@ -27,13 +27,26 @@
   three lines away - which is exactly as confusing as it sounds.
 #>
 [CmdletBinding()]
-param()
+param(
+    # Skip the desktop shortcut. Set automatically on CI, where there is no
+    # desktop to put one on and the build only wants the portable folder.
+    [switch]$NoShortcut
+)
 
 $ErrorActionPreference = 'Stop'
 
-# Spawned shells inherit whatever PATH they were started with, which on this
+$onCI = [bool]$env:CI
+
+# Spawned shells inherit whatever PATH they were started with, which on a dev
 # machine is routinely missing node. Rebuild it from the registry. See GOTCHAS.
-$env:Path = "$([Environment]::GetEnvironmentVariable('Path','Machine'));$([Environment]::GetEnvironmentVariable('Path','User'))"
+#
+# NOT on CI. A GitHub runner puts node and cargo on the PATH of the *process*,
+# via setup-node and rust-toolchain; neither is in the registry. Rebuilding from
+# the registry there throws both away, and the build fails on "npm not found"
+# several steps after the actual mistake.
+if (-not $onCI) {
+    $env:Path = "$([Environment]::GetEnvironmentVariable('Path','Machine'));$([Environment]::GetEnvironmentVariable('Path','User'))"
+}
 
 $root   = Split-Path -Parent $PSScriptRoot
 $libDir = Join-Path $root 'src-tauri\lib'
@@ -72,24 +85,34 @@ New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 Copy-Item $exe $outDir -Force
 foreach ($dll in $dlls) { Copy-Item (Join-Path $libDir $dll) $outDir -Force }
 
-$target   = Join-Path $outDir 'kinema.exe'
-$linkPath = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Kinema.lnk'
+$target = Join-Path $outDir 'kinema.exe'
 
-# The app was called Personal Netflix until the rename. A stale shortcut beside
-# the new one still launches the old exe, which reads the old app-data folder -
-# so it looks like the library is empty or has reverted. Remove it once.
-$oldLink = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Personal Netflix.lnk'
-if (Test-Path $oldLink) { Remove-Item $oldLink -Force }
+# The app was called Personal Netflix until the rename. A stale exe beside the
+# new one is confusing at best; a stale shortcut is worse, because it still
+# launches the old binary against the old app-data folder and looks like the
+# library has emptied itself.
 $oldExe = Join-Path $outDir 'personal-netflix.exe'
 if (Test-Path $oldExe) { Remove-Item $oldExe -Force }
 
-$shell = New-Object -ComObject WScript.Shell
-$link  = $shell.CreateShortcut($linkPath)
-$link.TargetPath       = $target
-$link.WorkingDirectory = $outDir
-$link.IconLocation     = $target
-$link.Description      = 'Kinema'
-$link.Save()
+if ($NoShortcut -or $onCI) {
+    Write-Host 'Skipping the desktop shortcut.'
+    $linkPath = '(not created)'
+}
+else {
+    $desktop  = [Environment]::GetFolderPath('Desktop')
+    $linkPath = Join-Path $desktop 'Kinema.lnk'
+
+    $oldLink = Join-Path $desktop 'Personal Netflix.lnk'
+    if (Test-Path $oldLink) { Remove-Item $oldLink -Force }
+
+    $shell = New-Object -ComObject WScript.Shell
+    $link  = $shell.CreateShortcut($linkPath)
+    $link.TargetPath       = $target
+    $link.WorkingDirectory = $outDir
+    $link.IconLocation     = $target
+    $link.Description      = 'Kinema'
+    $link.Save()
+}
 
 $megabytes = [math]::Round((Get-ChildItem $outDir | Measure-Object -Property Length -Sum).Sum / 1MB)
 

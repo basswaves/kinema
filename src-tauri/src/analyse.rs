@@ -845,12 +845,18 @@ mod tests {
     /// This is how MAX_SCORE and CLUSTER_TOLERANCE_SECS were set, and how to
     /// re-check them. Point it at a season and compare the intro it reports
     /// against one already known — Skiptro's, or a stopwatch.
+    ///
+    /// The season is yours to choose: set `KINEMA_SEASON_DIR` to a folder
+    /// holding at least two episodes. There is no default, because the
+    /// thresholds above were calibrated against one programme and the whole
+    /// value of running this is to try them against a different one.
     #[test]
     #[ignore = "needs a real season on disk"]
     fn calibrate_against_a_real_season() {
-        let dir = std::env::var("PN_SEASON_DIR").unwrap_or_else(|_| {
-            r"D:\Media\TV Shows\Example Show\Season 1".into()
-        });
+        let Ok(dir) = std::env::var("KINEMA_SEASON_DIR") else {
+            println!("set KINEMA_SEASON_DIR to a season folder to run this");
+            return;
+        };
 
         let mut episodes: Vec<Episode> = std::fs::read_dir(&dir)
             .expect("season folder should exist")

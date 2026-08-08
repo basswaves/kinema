@@ -67,9 +67,9 @@ pub struct DetectReport {
 /// Split a template into arguments, respecting double quotes.
 ///
 /// Deliberately **not** handed to a shell. Arguments go to the process
-/// individually, so a path containing spaces — `…\Media\TV Shows` on this
-/// machine — needs no quoting or escaping at any point, and there is no shell
-/// to interpret anything the path happens to contain.
+/// individually, so a path containing spaces — `…\Media Library\TV Shows`, which
+/// is the ordinary case — needs no quoting or escaping at any point, and there
+/// is no shell to interpret anything else the path happens to contain.
 fn tokenise(template: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut current = String::new();
@@ -450,15 +450,12 @@ mod tests {
         );
     }
 
-    /// The whole point: this machine's TV root is `…\Media\TV Shows`, and a
-    /// path substituted into a token can never be re-split on its spaces.
+    /// The whole point: a library root routinely has spaces in it, and a path
+    /// substituted into a token can never be re-split on its spaces.
     #[test]
     fn a_directory_with_spaces_stays_one_argument() {
-        let args = build_args("scan {dir}", r"D:\Media\TV Shows");
-        assert_eq!(
-            args,
-            vec!["scan", r"D:\Media\TV Shows"]
-        );
+        let args = build_args("scan {dir}", r"D:\Media Library\TV Shows");
+        assert_eq!(args, vec!["scan", r"D:\Media Library\TV Shows"]);
     }
 
     #[test]

@@ -17,7 +17,6 @@
       "allow": [
         { "url": "https://api.tvmaze.com/*" },
         { "url": "https://www.omdbapi.com/*" },
-        { "url": "https://api.mdblist.com/*" },
         { "url": "https://api.themoviedb.org/*" }
       ]
     }

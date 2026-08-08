@@ -118,7 +118,7 @@ the current behaviour annoys them.
   What that still cannot tell you is whether `MAX_SCORE = 8.0` holds for a show
   with a quiet intro, a spoken cold open, or no closing theme — every threshold
   remains calibrated against one programme. `calibrate_against_a_real_season` is
-  the tool: point `PN_SEASON_DIR` at a folder and run it with `--ignored`.
+  the tool: point `KINEMA_SEASON_DIR` at a folder and run it with `--ignored`.
 - **Black-frame refinement on credits that do *not* roll over black.** Every
   constant in it was set against one show whose credits are cards on a black
   background, which is the case it handles best. A show that cuts straight from
@@ -137,38 +137,3 @@ the current behaviour annoys them.
 - **The four stats fixes** (video rectangle, `hw-pixelformat`, SDR peak, cadence
   after deinterlacing) are written and built but not eyeballed against the three
   test files that exposed them.
-
----
-
-## Starting a fresh chat elsewhere
-
-I'm continuing work on **Personal Netflix**, a local serverless media library
-(Tauri 2 + React 19 + libmpv) at:
-
-`C:\Projects\kinema`
-
-**Read these before writing any code:**
-
-1. `CLAUDE.md` — working rules, settled decisions that must not be re-opened,
-   and how to verify. Start here.
-2. `PLAN.md` — what is done and why each decision went the way it did.
-3. `GOTCHAS.md` — traps in libmpv, Tauri, SQLite, child processes, spatial
-   navigation and XML parsing. **Read before touching the player or D-pad
-   navigation.** Nearly every entry describes a failure that produces no error
-   at all.
-4. `README.md` — architecture and data flow.
-
-The app works end to end and the roadmap is complete: scanning, matching,
-browsing, playback with resume and next-episode autoplay, cached artwork, the
-manual fix-match queue, intro skipping with detection runnable from Settings,
-local-file trailers, a 10-foot TV layout, NFO read/write, watched tracking,
-previous/next episode stepping, end-credit skipping, title logos and cast, and a
-madVR-style "stats for nerds" panel.
-
-It launches from a desktop shortcut rather than a terminal: `npm run app:build`
-assembles `dist-app/` and refreshes the shortcut. Logs land beside the exe when
-launched that way.
-
-**How I work:** I test in the real app and report back — tell me exactly what to
-click, what a pass looks like, and what a failure would look like. Confirm the
-order with me before starting a multi-item request.

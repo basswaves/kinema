@@ -654,21 +654,3 @@ file* — an installer that starts the app proves nothing.
 `cargo build` output is easy to misread when filtered. Compare the binary's mtime
 against the source file you just edited.
 
-### A screenshot of the player shows black where the video should be
-
-`Win`+`Shift`+`S`, PrintScreen and every ordinary capture tool photograph the
-**webview**. mpv renders into a native child surface *underneath* it, and that
-surface is not part of what gets captured — so the OSD, the seek bar and every
-control appear perfectly over a black rectangle.
-
-Nothing is wrong when this happens. It is the same compositing arrangement that
-makes the whole app work, seen from the other side.
-
-Consequences worth knowing:
-
-- **Screenshots for a bug report about the picture are useless.** Ask for
-  `mpv.log` instead; it records what libplacebo actually did.
-- **A screenshot for documentation needs a camera**, pointed at the screen. There
-  is no software route to a still of the video from inside the app.
-- Everything that is *not* the video — Home, detail pages, Settings, the stats
-  panel — captures normally, because all of it is DOM.

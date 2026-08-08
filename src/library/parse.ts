@@ -211,6 +211,9 @@ export function parseMediaFile(file: MediaFile, kind: LibraryKind): ParsedFile {
  * guessit-js behaving correctly under Node proves nothing about WebView2.
  */
 export async function selfTest(): Promise<string> {
+  // Deliberately an awkward name: the season and episode appear twice, in two
+  // different notations, with a release-group suffix on the end. A tidy
+  // filename would pass even if guessit had not loaded at all.
   const sample = 'Example Show S01 - S01E01 - E01 GROUP.mp4';
   try {
     // Loading it is now part of what this tests: a dynamic import that fails in

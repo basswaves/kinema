@@ -208,11 +208,12 @@ mod tests {
         dir
     }
 
-    /// The shape of a real row, taken from this machine's database.
+    /// The shape of a real row: the timings are Skiptro's own output, kept to
+    /// the digit because the point is that they survive the round trip.
     #[test]
     fn reads_an_intro_for_the_matching_path() {
         let dir = temp_dir("reads");
-        let video = r"C:\media\Sex.And.The.City.S01E08.mp4";
+        let video = r"C:\media\Example.Show.S01E08.mp4";
         let db = fixture(&dir, &[(video, 0, 0.1857764, 46.6617627, 1.0)]);
 
         let found = detection_for(&db, Path::new(video)).expect("row should be found");

@@ -106,8 +106,15 @@ html {
   outline-offset: 2px;
 }
 
-.nav-count {
+/* The `?` carries the auto margin, so it and the count sit together at the far
+   end rather than the count floating off alone. */
+.nav-help {
   margin-left: auto;
+  min-width: 2rem;
+}
+
+.nav-count {
+  margin-left: 0.75rem;
   font-size: 0.75rem;
   opacity: 0.4;
 }
@@ -1008,6 +1015,92 @@ html {
   opacity: 0.55;
 }
 
+/* ---- first run -----------------------------------------------------------
+ * Reuses the settings tokens (.settings-row, .settings-field, .settings-input,
+ * .root-kind) on purpose: this panel and the Library section of Settings are
+ * the same two controls, and a user who meets them here should recognise them
+ * there. Only the framing — numbered steps and a wider measure — is new.
+ */
+.first-run {
+  max-width: 46rem;
+  padding: 3.5rem var(--gutter) 3.75rem;
+}
+
+.first-run h1 {
+  margin: 0 0 0.5rem;
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.first-run-lede {
+  margin: 0 0 2.5rem;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  opacity: 0.7;
+}
+
+.first-run-step {
+  margin-bottom: 2.25rem;
+}
+
+.first-run-step h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin: 0 0 0.5rem;
+  font-size: 1.0625rem;
+  font-weight: 700;
+}
+
+.first-run-step p {
+  margin: 0 0 0.875rem;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  max-width: 38rem;
+}
+
+/* The step number. A circle rather than "1." so the eye can count the steps
+   without reading them, which is the whole job of numbering them at all. */
+.first-run-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 1.625rem;
+  height: 1.625rem;
+  border-radius: 999px;
+  background: rgba(229, 9, 20, 0.9);
+  font-size: 0.8125rem;
+  font-weight: 800;
+}
+
+.first-run-optional {
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.75;
+}
+
+.first-run-roots {
+  list-style: none;
+  margin: 0.25rem 0 0;
+  padding: 0;
+}
+
+.first-run-roots li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 0.8125rem;
+}
+
 .center {
   text-align: center;
 }
@@ -1174,6 +1267,24 @@ html {
 .settings-progress {
   font-variant-numeric: tabular-nums;
   opacity: 0.8;
+}
+
+/* Provider attribution. The logo sits above the text rather than inline with
+   it: TMDB's wordmark is nearly 14:1, so at a height that matches body text it
+   would be unreadably small, and at a readable size it would tower over the
+   line it sits in. */
+.settings-attribution {
+  margin-top: 1rem;
+}
+
+.settings-attribution p {
+  margin: 0.5rem 0 0;
+}
+
+.tmdb-logo {
+  display: block;
+  width: 8rem;
+  height: auto;
 }
 
 .settings-note,
@@ -1713,4 +1824,105 @@ html {
 :root[data-tv='on'] .hero-overview {
   -webkit-line-clamp: 2;
   line-clamp: 2;
+}
+
+/* ---- keyboard and remote controls overlay --------------------------------
+ * Opaque, unlike everything else that floats over the player. This is the one
+ * panel that is read rather than glanced at, and video moving behind a key list
+ * makes it unreadable at exactly the moment someone is lost.
+ */
+kbd {
+  display: inline-block;
+  min-width: 1.5rem;
+  padding: 0.1875rem 0.4375rem;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-bottom-width: 2px;
+  border-radius: 0.3125rem;
+  background: rgba(255, 255, 255, 0.1);
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.shortcuts-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.shortcuts {
+  width: 100%;
+  max-width: 34rem;
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 1.75rem 2rem 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.875rem;
+  background: #14141a;
+  box-shadow: 0 1.5rem 4rem rgba(0, 0, 0, 0.6);
+}
+
+.shortcuts h2 {
+  margin: 0 0 1.25rem;
+  font-size: 1.375rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.shortcuts-group {
+  margin-bottom: 1.5rem;
+}
+
+.shortcuts-group h3 {
+  margin: 0 0 0.625rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+.shortcuts-group dl {
+  margin: 0;
+}
+
+.shortcuts-group p {
+  margin: 0.625rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.shortcuts-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.3125rem 0;
+}
+
+/* Fixed column so the descriptions line up. A ragged left edge on a key list
+   is read as a jumble rather than a table. */
+.shortcuts-row dt {
+  flex: 0 0 8.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.shortcuts-row dd {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  opacity: 0.85;
+}
+
+.shortcuts-plus {
+  margin: 0 0.1875rem;
+  font-size: 0.6875rem;
+  opacity: 0.5;
 }

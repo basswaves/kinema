@@ -88,6 +88,12 @@ does not ship an API key; each user supplies their own in Settings, and it is
 stored only in the local database in app data. Use of the API is subject to
 [TMDB's terms of use](https://www.themoviedb.org/api-terms-of-use).
 
+`public/tmdb.svg` is TMDB's own logo, unmodified, taken from their
+[logo and attribution page](https://www.themoviedb.org/about/logos-attribution)
+and included so the required attribution renders without a network request. The
+logo is TMDB's property and is used solely to attribute them, not as a mark of
+this project.
+
 ### TVmaze
 
 TV metadata from [TVmaze](https://www.tvmaze.com), used through their free

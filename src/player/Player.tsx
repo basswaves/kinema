@@ -28,6 +28,7 @@ import {
 } from 'tauri-plugin-libmpv-api';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import FocusButton from '../ui/FocusButton';
+import { setShortcutsOpen } from '../ui/shortcutsState';
 import { ensureMpvInitialised, OBSERVED_PROPERTIES } from './mpv';
 import {
   describeTrack,
@@ -1326,6 +1327,16 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
             Stats
           </FocusButton>
           <FocusButton onSelect={() => void toggleFullscreen()}>Fullscreen</FocusButton>
+          {/* Here as well as in the nav, because this is where the controls are
+              least obvious: the OSD hides itself while you watch, so a remote
+              user who does not already know that Up brings it back has nothing
+              on screen to tell them. */}
+          <FocusButton
+            title="Keyboard and remote controls (?)"
+            onSelect={() => setShortcutsOpen(true)}
+          >
+            ?
+          </FocusButton>
         </div>
       </div>
     </div>

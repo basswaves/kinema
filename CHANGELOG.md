@@ -17,10 +17,30 @@ makes no stability promises.
 
 ### Added
 
+- **A first-run panel.** An empty library now offers the two things it needs —
+  a folder and a TMDB key — as controls, with a link to where a free key comes
+  from, instead of a sentence pointing at Settings.
+- **A controls overlay**, on `?`, on a button in the top bar and on one in the
+  player. It documents the control scheme for the first time inside the app,
+  including that **Up** is what lets a remote reach subtitles, audio tracks,
+  the stats panel and fullscreen at all.
 - MIT licence, and a `NOTICE.md` covering libmpv (LGPL), guessit-js (LGPL-3),
   TMDB and TVmaze attribution, TheIntroDB's terms, and the provenance of the
   intro-detection method.
-- TMDB and TVmaze attribution in Settings, as their terms require.
+- TMDB and TVmaze attribution in Settings, with TMDB's logo, as their terms
+  require.
+- A README written for someone who has never seen the project, plus
+  `CONTRIBUTING.md`, `SECURITY.md` and a code of conduct.
+
+### Changed
+
+- **Provider keys moved from sixth of eight sections in Settings to second**,
+  and they now save themselves as you type. The old **Save keys** button was
+  the only control on the page that did not apply on change, so typing a key
+  and navigating away lost it.
+- Both key fields are masked. This screen is routinely on a television.
+- The design documents moved to `docs/`, and `HANDOVER.md` became
+  `docs/ROADMAP.md`.
 - Continuous integration on Windows: type-check, lint, frontend build and Rust
   tests on every push.
 - A release workflow producing a portable ZIP with a published SHA-256.

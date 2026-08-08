@@ -210,7 +210,7 @@ normalises `/` to the platform separator itself, so writing the pattern with
 forward slashes is correct on Windows.
 
 `$APPDATA` here means the *app's* data directory
-(`…\Roaming\com.personalnetflix.app`), not the OS `%APPDATA%`.
+(`…\Roaming\com.kinema.app`), not the OS `%APPDATA%`.
 
 ---
 
@@ -619,7 +619,7 @@ Get-NetTCPConnection -LocalPort 1420 -State Listen -ErrorAction SilentlyContinue
 
 ### `cargo build` fails while the app is running
 
-The running `.exe` is locked. Stop `personal-netflix` first. `npm run app:build`
+The running `.exe` is locked. Stop `kinema` first. `npm run app:build`
 checks for the process and says so, rather than letting it surface as a linker
 error.
 
@@ -636,6 +636,18 @@ The failure is at load, before any of this app's code runs, so there is nothing
 in `app.log` — and `mpv.log` does not exist yet either.
 
 **Do:** copy both DLLs next to the exe. `scripts/build-app.ps1` does.
+
+**And this is why the Tauri bundler is switched off.** `bundle.active` is
+`false` in `tauri.conf.json`, and it used to be `true` with
+`"resources": ["lib/**/*"]` — which installs the pair into `<install>/lib/`,
+exactly the layout described above. An MSI or NSIS build from `tauri build`
+therefore produced an app that installed cleanly, launched cleanly, and then
+failed the moment you pressed Play, with nothing in either log. Nobody had ever
+run it, because `build-app.ps1` passes `--no-bundle`.
+
+If you ever want a real installer, the DLLs have to reach the install directory
+itself rather than a subfolder, and the result must be tested by *playing a
+file* — an installer that starts the app proves nothing.
 
 ### Verify a Rust rebuild by timestamp
 

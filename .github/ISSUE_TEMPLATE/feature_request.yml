@@ -1,0 +1,45 @@
+name: Feature request
+description: Suggest something
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before writing, please read the settled decisions listed in
+        [CONTRIBUTING.md](https://github.com/Basswaves/kinema/blob/master/CONTRIBUTING.md)
+        — some things here are conclusions rather than open questions, and the
+        reasoning is written down. The main ones:
+
+        - **No machine-learning upscaling** and **no frame interpolation.**
+          Nothing invents detail or time that was not in the master.
+        - **No quality-preset UI.** The right settings depend on the frame and
+          the display, both of which mpv already knows. The app decides.
+        - **Nothing that needs periodic maintenance.** This has to run untended
+          for years. Anything that breaks when a website changes its HTML is out.
+        - **No third-party binaries shipped or downloaded.** Kinema can invoke a
+          tool you installed yourself, at a path you chose. It ships nothing.
+
+        A request that runs into one of these is still worth filing if you think
+        the reasoning is wrong — just say which one and why.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do
+      description: >
+        The situation, not the solution. What were you doing when you wanted
+        this?
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you have in mind
+      description: Optional. A rough idea is fine.
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: How you work around it today
+      description: Optional, but it says a lot about how much the gap costs.

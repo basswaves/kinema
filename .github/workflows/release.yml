@@ -1,0 +1,96 @@
+# Builds the portable ZIP attached to a GitHub release.
+#
+# Deliberately not an installer. `scripts/build-app.ps1` copies both native DLLs
+# *beside* the exe, because `libmpv-2.dll` is resolved by Windows' own search
+# order, which begins at the executable's directory and never looks in the
+# directory the wrapper was loaded from. The Tauri bundler puts them in `lib/`,
+# which loads the wrapper and then fails to find mpv — so the bundler is turned
+# off in tauri.conf.json and this is the only supported way to produce the app.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install dependencies
+        run: npm ci
+
+      # ~95 MB of LGPL native libraries, never committed. See NOTICE.md.
+      - name: Fetch the native playback libraries
+        run: npx tauri-plugin-libmpv-api setup-lib
+
+      - name: Build the portable app
+        run: npm run app:build
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+          $zip = "kinema-$version-windows-x64.zip"
+          Compress-Archive -Path dist-app\* -DestinationPath $zip
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  $zip" | Out-File -Encoding ascii "$zip.sha256"
+          "ZIP=$zip"       | Out-File -Append -Encoding ascii $env:GITHUB_ENV
+          "SHA256=$hash"   | Out-File -Append -Encoding ascii $env:GITHUB_ENV
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: |
+            ${{ env.ZIP }}
+            ${{ env.ZIP }}.sha256
+          body: |
+            ## Install
+
+            Download the ZIP, extract it anywhere, and run `kinema.exe`.
+            No installer, nothing written outside the folder and your app data.
+
+            **Windows 11 only.** Needs the WebView2 runtime, which ships with
+            Windows 11 — nothing to install separately.
+
+            ### Windows will warn you
+
+            The executable is not code-signed, so SmartScreen shows
+            *"Windows protected your PC"* on first run. Click **More info**,
+            then **Run anyway**. To check you got the file this workflow built:
+
+            ```powershell
+            Get-FileHash .\${{ env.ZIP }} -Algorithm SHA256
+            ```
+
+            Expected: `${{ env.SHA256 }}`
+
+            ### First run
+
+            The library is empty until you add a folder. Open **Settings**, add
+            a movies or TV folder, and optionally paste a free
+            [TMDB API key](https://www.themoviedb.org/settings/api) for posters
+            and artwork. TV metadata works without any key.
+
+            ---
+
+            Bundles an unmodified LGPL build of libmpv, which you may replace —
+            see [NOTICE.md](NOTICE.md).

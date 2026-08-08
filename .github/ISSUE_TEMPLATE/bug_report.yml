@@ -1,0 +1,100 @@
+name: Bug report
+description: Something does not work
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **The two logs are the most useful thing you can attach.** Kinema
+        forwards its own console to a file, because the WebView2 console is
+        otherwise invisible from outside the app — most bugs here produce no
+        visible error at all, only a log line.
+
+        Find them next to `kinema.exe` in the folder you extracted (or in
+        `src-tauri/` if you are running from source):
+
+        - `app.log` — the app's own messages
+        - `mpv.log` — the player's, and the authority on anything about video
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you got instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: >
+        Paste the relevant part of `app.log`, and `mpv.log` too if this is about
+        playback. If you are not sure what is relevant, attach both files.
+      render: text
+
+  - type: input
+    id: version
+    attributes:
+      label: Kinema version
+      description: From the release you downloaded, or the commit if built from source.
+    validations:
+      required: true
+
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      description: 'Run `winver`. For example: Windows 11 Pro 24H2 (26100.2314)'
+    validations:
+      required: true
+
+  - type: input
+    id: gpu
+    attributes:
+      label: GPU and driver version
+      description: >
+        Task Manager → Performance → GPU, or `dxdiag`. Playback behaviour
+        differs between AMD, Intel and NVIDIA, and driver version matters more
+        than you would think.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: storage
+    attributes:
+      label: Where is the media
+      description: >
+        Scanning, seeking and buffering all behave differently over a network
+        share, and a share that has gone away looks exactly like a library that
+        shrank.
+      options:
+        - Local disk
+        - Network share (SMB / NAS)
+        - Both
+        - External / USB drive
+    validations:
+      required: true
+
+  - type: textarea
+    id: file
+    attributes:
+      label: The file, if this is about playback
+      description: >
+        Container, video codec, resolution, HDR or SDR, and audio codec —
+        `mpv.log` has all of it, or MediaInfo if you have it. "4K HDR remux,
+        HEVC 10-bit, TrueHD Atmos" is plenty.
+
+  - type: dropdown
+    id: input
+    attributes:
+      label: What were you using to navigate
+      description: >
+        A control that a mouse can reach and a remote cannot is a whole class of
+        bug here, and it hides completely if you touch the mouse once.
+      options:
+        - Mouse and keyboard
+        - Keyboard only
+        - Remote / D-pad / gamepad
+    validations:
+      required: true

@@ -15,6 +15,8 @@ dist-ssr
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
+# Local assistant config: absolute paths and command history, machine-specific.
+.claude/
 .idea
 .DS_Store
 *.suo

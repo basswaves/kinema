@@ -130,6 +130,7 @@ pub fn run() {
             playback::set_title_prefs,
             skip::get_skip_markers,
             detect::detect_intros,
+            detect::auto_detect,
             detect::analysis_backlog,
             ffmpeg::ffmpeg_status,
             trailer::find_local_trailer,

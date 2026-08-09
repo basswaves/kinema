@@ -30,12 +30,22 @@ pub const PATH_KEY: &str = "ffmpeg_path";
 pub const SAMPLE_RATE: u32 = 11_025;
 
 /// Suppress the console window that would otherwise flash over the app for
-/// every one of these — and there is one per window per episode.
+/// every one of these — and there is one per window per episode — and keep the
+/// decode off the back of whatever is playing.
+///
+/// **The priority half matters more than it used to.** Analysis was once
+/// something a user chose to start, from Settings, while not watching anything.
+/// It now runs by itself at the end of a scan, so it can overlap with playback
+/// of an episode from the season *before* the one being analysed — and a
+/// dropped frame during an intro is a far worse trade than an analysis that
+/// finishes a minute later. Below-normal only yields when something else wants
+/// the CPU; on an idle machine it still runs flat out.
 #[cfg(windows)]
 fn no_window(command: &mut Command) {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    command.creation_flags(CREATE_NO_WINDOW);
+    const BELOW_NORMAL_PRIORITY_CLASS: u32 = 0x0000_4000;
+    command.creation_flags(CREATE_NO_WINDOW | BELOW_NORMAL_PRIORITY_CLASS);
 }
 
 #[cfg(not(windows))]

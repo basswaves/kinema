@@ -27,6 +27,7 @@ import { setTvMode, useTvMode } from './tv';
 import {
   addLibraryRoot,
   analysisBacklog,
+  AUTO_ANALYSE_KEY,
   detectIntros,
   ffmpegStatus,
   listLibraryRoots,
@@ -39,6 +40,7 @@ import {
   SKIPTRO_EXPORT_ARGS_KEY,
   SKIPTRO_PATH_KEY,
   SKIPTRO_SCAN_ARGS_KEY,
+  type AutoStep,
   type DetectProgress,
   type FfmpegStatus,
   type LibraryKind,
@@ -121,6 +123,21 @@ function problemLine(errors: string[]): string {
   return errors.length > 3 ? `${shown} · and ${errors.length - 3} more` : shown;
 }
 
+/**
+ * What the automatic intro/credits pass had to say, if anything.
+ *
+ * Shown next to the scan summary rather than in the markers section below,
+ * because it is a report on something that has already happened and this is
+ * where a user looks after a scan. The section below is where it is configured.
+ *
+ * Steps that ran and steps that did not are both worth showing: "Skiptro is not
+ * where you said it was" is the whole reason this is here, and it is invisible
+ * in a display that only reports successes.
+ */
+function detectLines(steps: AutoStep[]): string[] {
+  return steps.map((s) => `${s.ran ? '' : 'skipped — '}${s.note}`);
+}
+
 export default function Settings() {
   const { ref, focusKey } = useFocusable({
     focusKey: SETTINGS_FOCUS_KEY,
@@ -174,6 +191,8 @@ export default function Settings() {
   const [keysSaved, setKeysSaved] = useState(false);
   // Unset means on. Only an explicit 'off' stops the lookups.
   const [introDb, setIntroDb] = useState(true);
+  // Likewise: the built-in analysis runs after a scan unless it is switched off.
+  const [autoAnalyse, setAutoAnalyse] = useState(true);
 
   const tvMode = useTvMode();
   const scan = useScanStatus();
@@ -229,6 +248,7 @@ export default function Settings() {
       setSkiptroLoaded(true);
 
       setIntroDb((await getSetting(INTRODB_ENABLED_KEY)) !== 'off');
+      setAutoAnalyse((await getSetting(AUTO_ANALYSE_KEY)) !== 'off');
     })();
   }, []);
 
@@ -476,11 +496,24 @@ export default function Settings() {
             </p>
           )}
           {!scan && last && <p className="muted">Last scan: {summaryLine(last)}</p>}
+          {/* The report from the intro/credits pass at the end of the scan.
+              Deliberately rendered even when every line is a "skipped": a
+              Skiptro that is no longer where it was configured is exactly the
+              failure this whole display exists to stop being silent. */}
+          {!scan &&
+            last &&
+            detectLines(last.detectNotes).map((line) => (
+              <p className="muted" key={line}>
+                Markers: {line}
+              </p>
+            ))}
           <p className="muted">
             Kinema checks these folders once every time it starts, so you rarely need the button.
             It only looks at file names, sizes and dates rather than reading the videos
             themselves, which keeps it quick even over a network. A folder that is switched off
-            or unplugged is left alone until it comes back, not forgotten.
+            or unplugged is left alone until it comes back, not forgotten. When it finds new
+            episodes it goes on to look for their intros and credits, so a season you drop in is
+            ready to watch without pressing anything.
           </p>
         </section>
 
@@ -700,8 +733,11 @@ export default function Settings() {
             TheIntroDB.
           </p>
           <p className="muted">
-            The <strong>Detect</strong> button at the bottom runs everything you have configured,
-            one TV folder at a time.
+            Kinema does this by itself. Every time it finds new episodes it goes looking for
+            their intros and credits straight afterwards, so a season you drop into a watched
+            folder is ready before you sit down. The <strong>Detect</strong> button at the bottom
+            does the same thing on demand, one TV folder at a time — useful after changing
+            something here, and otherwise not needed.
           </p>
 
           <h3>Built in</h3>
@@ -712,6 +748,30 @@ export default function Settings() {
             that works on episodes Kinema could not identify. It reads about six minutes of audio
             per episode, so a season takes a few minutes the first time.
           </p>
+          {/* The one part of the automatic pass that is a switch, and the reason
+              is the cost rather than the quality: this is minutes of ffmpeg per
+              season. Skiptro is quick and simply always runs. */}
+          <div className="settings-toggle-row">
+            <FocusButton
+              className={autoAnalyse ? 'btn-primary' : 'btn-secondary'}
+              onSelect={() => {
+                const next = !autoAnalyse;
+                setAutoAnalyse(next);
+                void setSetting(AUTO_ANALYSE_KEY, next ? 'on' : 'off').catch((e) =>
+                  setError(String(e))
+                );
+              }}
+            >
+              Run this automatically: {autoAnalyse ? 'on' : 'off'}
+            </FocusButton>
+            <span className="muted">
+              Whether it runs by itself after a scan finds new episodes, or waits for the
+              Detect button. It is the slow one — a few minutes per season, once — so turn it
+              off if you would rather choose when that happens. Turning it off does not lose
+              anything already found, and Kinema will tell you here how many episodes are
+              waiting.
+            </span>
+          </div>
           <p className="muted">
             This one needs <strong>ffmpeg</strong> — a free tool for reading video and audio
             files. Kinema does not include it: install it yourself and it will be found
@@ -763,11 +823,16 @@ export default function Settings() {
             >
               TheIntroDB: {introDb ? 'on' : 'off'}
             </FocusButton>
+            {/* This used to say "asked once per episode", which a user
+                reasonably read as Kinema asking *them* something and then
+                waited for a box that was never going to appear. It is a
+                background lookup and nothing about it is ever visible. */}
             <span className="muted">
-              Asked once per episode, when you play it — never for your whole library at once —
-              and the answer is kept for a month. All that is sent is which episode it is:
-              nothing about you, and nothing about your files. Off means markers come only from
-              what is detected on this machine.
+              Kinema looks this up quietly in the background the first time you play an episode,
+              and keeps the answer for a month. It never asks you anything and never looks up
+              your whole library at once. All that is sent is which episode it is: nothing about
+              you, and nothing about your files. Off means markers come only from what is
+              detected on this machine.
             </span>
           </div>
           {/* Attribution. They request it rather than require it, and it costs
@@ -792,6 +857,16 @@ export default function Settings() {
             Kinema does not include Skiptro and never will — no other program&rsquo;s software
             ships inside this one. You install it yourself, from{' '}
             <code>github.com/MikeSiLVO/skiptro-releases</code>, and point Kinema at it below.
+          </p>
+          {/* No switch for this one, unlike the built-in analysis above: it is
+              quick, it keeps its own record of what it has already looked at,
+              and its intro beats every other source — so there is no version of
+              "later" that produces a better answer than now. */}
+          <p className="muted">
+            Once it is set up here, Kinema runs it by itself whenever a scan finds new episodes,
+            and only then. There is nothing to switch on and no button to remember. If Skiptro
+            is not installed, or the path below stops being right, Kinema says so after the scan
+            and carries on with everything else.
           </p>
           <div className="settings-row">
             <FocusButton

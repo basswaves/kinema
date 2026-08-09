@@ -9,6 +9,22 @@ makes no stability promises.
 
 ### Changed
 
+- **Intros and credits are now detected automatically.** A season dropped into a
+  watched folder used to appear in the library immediately and then play with no
+  Skip button, because both local detectors only ever ran from a button in
+  Settings — the one screen you do not visit before you know something is wrong.
+  Every scan that finds new episodes now goes on to detect their markers.
+  Skiptro runs whenever it is installed and something new arrived; the built-in
+  ffmpeg analysis runs unless it is switched off, under **Settings → Intro and
+  credits markers → Built in**, since it is the slow one. Neither can fail a
+  scan: a Skiptro that is not installed says nothing, one that has gone missing
+  says so under the scan summary, and everything else carries on.
+- ffmpeg now runs at below-normal priority, so an analysis triggered by a scan
+  cannot compete with an episode being played at the same time.
+- Settings no longer describes TheIntroDB as "asked once per episode", which
+  read as though the app would ask *you* something and left at least one user
+  waiting for a dialog that does not exist. It is a background lookup and always
+  was.
 - **Renamed from "Personal Netflix" to Kinema.** The bundle identifier changed
   with it, so the app now stores its library in
   `%APPDATA%\com.kinema.app\`. Anyone upgrading from a pre-release build must

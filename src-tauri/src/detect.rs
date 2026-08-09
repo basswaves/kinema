@@ -37,6 +37,21 @@ pub const PATH_KEY: &str = "skiptro_path";
 pub const SCAN_ARGS_KEY: &str = "skiptro_scan_args";
 pub const EXPORT_ARGS_KEY: &str = "skiptro_export_args";
 
+/// Setting key: whether the built-in audio analysis runs by itself after a scan.
+///
+/// `'off'` disables it; anything else, **including unset**, leaves it on. The
+/// default is on because the failure it prevents is invisible — see
+/// [`auto_detect`] — and the cost of it being wrong is some ffmpeg time, not a
+/// wrong marker.
+pub const AUTO_ANALYSE_KEY: &str = "auto_analyse_enabled";
+
+/// Setting key: what a TV root looked like when Skiptro last scanned it.
+///
+/// Per root, so adding a season to one library does not re-scan the other.
+fn skiptro_stamp_key(root_id: i64) -> String {
+    format!("skiptro_auto_stamp_{root_id}")
+}
+
 pub const DEFAULT_SCAN_ARGS: &str = "scan {dir}";
 
 /// Empty: no export, no sidecars. See the module note — the app reads Skiptro's
@@ -176,6 +191,41 @@ fn run_step(
 
 /// How many trailing output lines a step keeps for its report.
 const TAIL_LINES: usize = 40;
+
+/// Run Skiptro's scan, and its export when one is configured, over a directory.
+///
+/// Returns the reports and whether everything that ran succeeded. Shared by the
+/// Detect button and the automatic pass so the two cannot drift — they differ
+/// only in what they do about a failure, which is the caller's business.
+fn run_skiptro(
+    app: &tauri::AppHandle,
+    exe: &str,
+    scan_args: &str,
+    export_args: &str,
+    root_path: &str,
+) -> Result<(Vec<StepReport>, bool), String> {
+    let mut steps = Vec::new();
+
+    for (name, template) in [("scan", scan_args), ("export", export_args)] {
+        let args = build_args(template, root_path);
+        // An empty template is "skip this step", which is how exporting is
+        // switched off. Running the executable with no arguments at all would
+        // print its help and exit 1, reporting a failure that never happened.
+        if args.is_empty() {
+            continue;
+        }
+        let report = run_step(app, exe, name, &args)?;
+        let failed = report.exit_code != Some(0);
+        steps.push(report);
+        // Exporting after a failed scan would write sidecars from stale
+        // detections, or none at all while reporting success.
+        if failed {
+            return Ok((steps, false));
+        }
+    }
+
+    Ok((steps, true))
+}
 
 /// Emit every line of a stream as it arrives, and return them.
 fn drain<R: std::io::Read>(app: &tauri::AppHandle, step: &str, stream: R) -> Vec<String> {
@@ -360,6 +410,261 @@ fn now_secs() -> i64 {
         .unwrap_or(0)
 }
 
+// ---- the automatic pass ----------------------------------------------------
+
+/// What the automatic pass did, or declined to do, for one library root.
+#[derive(Serialize, Clone)]
+pub struct AutoStep {
+    pub root_path: String,
+    /// `"skiptro"`, `"analyse"`, or `"root"` when the folder itself was the
+    /// problem and neither step could be attempted.
+    pub step: String,
+    pub ran: bool,
+    /// One sentence written for the user rather than for a log: what it did, or
+    /// why it did not. Shown in Settings after a scan.
+    pub note: String,
+}
+
+#[derive(Serialize, Default)]
+pub struct AutoDetectReport {
+    pub steps: Vec<AutoStep>,
+}
+
+/// A fingerprint of what is under a root, which moves only when material is
+/// **added or replaced**.
+///
+/// The newest `first_seen_at` covers an episode that arrived; the newest
+/// `modified_at` covers one that was replaced in place. A *deleted* episode
+/// moves neither, on purpose — there is nothing new for Skiptro to look at, and
+/// re-scanning a library because a file was tidied away is minutes spent for
+/// nothing.
+///
+/// `None` when the question could not be answered, which is treated as "run it".
+/// Guessing "nothing changed" from a failed query is the one wrong answer here:
+/// it is indistinguishable from success and skips the work silently.
+fn root_stamp(conn: &rusqlite::Connection, root_id: i64) -> Option<String> {
+    conn.query_row(
+        "SELECT COALESCE(MAX(first_seen_at), 0), COALESCE(MAX(modified_at), 0)
+           FROM media_files
+          WHERE root_id = ?1 AND missing = 0",
+        rusqlite::params![root_id],
+        |r| Ok(format!("{}:{}", r.get::<_, i64>(0)?, r.get::<_, i64>(1)?)),
+    )
+    .ok()
+}
+
+/// Record that Skiptro has now seen everything under this root.
+fn remember_stamp(app: &tauri::AppHandle, root_id: i64, stamp: &str) {
+    let db = app.state::<Db>();
+    let Ok(conn) = db.0.lock() else { return };
+    store_setting(&conn, &skiptro_stamp_key(root_id), stamp);
+}
+
+/// The same stamp, for the Detect button — which knows the root by its path.
+fn remember_skiptro_stamp(app: &tauri::AppHandle, root_path: &str) {
+    let db = app.state::<Db>();
+    let Ok(conn) = db.0.lock() else { return };
+
+    let root_id: Option<i64> = conn
+        .query_row(
+            "SELECT id FROM library_roots WHERE path = ?1",
+            rusqlite::params![root_path],
+            |r| r.get(0),
+        )
+        .ok();
+
+    if let Some(root_id) = root_id {
+        if let Some(stamp) = root_stamp(&conn, root_id) {
+            store_setting(&conn, &skiptro_stamp_key(root_id), &stamp);
+        }
+    }
+}
+
+/// How many episodes under one root the built-in analysis would look at.
+///
+/// The same query Detect itself uses, so the number reported is precisely the
+/// work that would be done — and zero means there is genuinely nothing to say.
+fn pending_episodes(app: &tauri::AppHandle, root_id: i64) -> usize {
+    let db = app.state::<Db>();
+    let Ok(conn) = db.0.lock() else { return 0 };
+
+    crate::analyse::seasons_in_root(&conn, root_id)
+        .map(|seasons| seasons.iter().map(|s| s.episodes.len()).sum())
+        .unwrap_or(0)
+}
+
+fn store_setting(conn: &rusqlite::Connection, key: &str, value: &str) {
+    if let Err(e) = conn.execute(
+        "INSERT INTO settings (key, value) VALUES (?1, ?2)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        rusqlite::params![key, value],
+    ) {
+        eprintln!("detect: could not remember {key}: {e}");
+    }
+}
+
+/// What the automatic pass needs to know before it starts doing anything.
+struct AutoPlan {
+    exe: Option<String>,
+    scan_args: String,
+    export_args: String,
+    auto_analyse: bool,
+    /// TV roots only, with the stamp each was left at by the last Skiptro run.
+    roots: Vec<(i64, String, Option<String>, Option<String>)>,
+}
+
+/// Detect intros and credits for anything new, without being asked.
+///
+/// Run at the end of every scan. It exists because of the failure that started
+/// all this: a season added to a watched folder appeared in the library
+/// immediately, had **no marker from any source**, and said nothing about why.
+/// The two local detectors only ever ran from a button in Settings, which is the
+/// one screen you do not visit when you do not yet know anything is wrong.
+///
+/// The two steps are deliberately governed differently:
+///
+/// * **Skiptro always runs**, when it is installed and there is new material.
+///   It is fast, it has its own idea of what it has already seen, and its intro
+///   outranks everything else — so there is no version of "later" that is better
+///   than now.
+/// * **The built-in analysis is a setting** ([`AUTO_ANALYSE_KEY`], on by
+///   default). It is minutes of ffmpeg per season, which is a real cost to spend
+///   unasked, and it is the one step a user might reasonably want to keep on a
+///   button.
+///
+/// **Nothing here is an error.** No Skiptro, no ffmpeg, an unreachable share:
+/// each is a step that did not run, reported as a sentence, with every other
+/// step carrying on. A media library that refuses to finish scanning because an
+/// optional detector is missing would be a worse bug than the one this fixes.
+#[tauri::command]
+pub async fn auto_detect(app: tauri::AppHandle) -> Result<AutoDetectReport, String> {
+    // Everything the plan needs, in one lock. What follows is minutes of
+    // subprocess work and must not hold the database against playback.
+    let plan = {
+        let db = app.state::<Db>();
+        let conn = db.0.lock().map_err(to_string_err)?;
+
+        let mut statement = conn
+            .prepare("SELECT id, path FROM library_roots WHERE kind = 'tv' ORDER BY id")
+            .map_err(to_string_err)?;
+        let roots: Vec<(i64, String, Option<String>, Option<String>)> = statement
+            .query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)))
+            .map_err(to_string_err)?
+            .flatten()
+            .map(|(id, path)| {
+                let stamp = root_stamp(&conn, id);
+                let last = setting(&conn, &skiptro_stamp_key(id));
+                (id, path, stamp, last)
+            })
+            .collect();
+
+        AutoPlan {
+            exe: setting(&conn, PATH_KEY),
+            scan_args: setting(&conn, SCAN_ARGS_KEY)
+                .unwrap_or_else(|| DEFAULT_SCAN_ARGS.to_string()),
+            export_args: setting(&conn, EXPORT_ARGS_KEY)
+                .unwrap_or_else(|| DEFAULT_EXPORT_ARGS.to_string()),
+            auto_analyse: setting(&conn, AUTO_ANALYSE_KEY).as_deref() != Some("off"),
+            roots,
+        }
+    };
+
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut steps: Vec<AutoStep> = Vec::new();
+
+        for (root_id, root_path, stamp, last_stamp) in &plan.roots {
+            let mut say = |step: &str, ran: bool, note: String| {
+                steps.push(AutoStep {
+                    root_path: root_path.clone(),
+                    step: step.to_string(),
+                    ran,
+                    note,
+                });
+            };
+
+            // An offline NAS is not a detection problem and must not be reported
+            // as one. The scanner has already left this root's files alone.
+            if !std::path::Path::new(root_path).is_dir() {
+                say("root", false, "folder not reachable, so nothing was detected".into());
+                continue;
+            }
+
+            // ---- Skiptro ----
+            //
+            // Silence when it was never set up: nothing was expected to happen,
+            // so there is nothing to report. A *configured* Skiptro that is not
+            // where it was left is the opposite case and says so.
+            match &plan.exe {
+                None => {}
+                Some(exe) if !std::path::Path::new(exe).is_file() => say(
+                    "skiptro",
+                    false,
+                    format!("Skiptro is set to {exe}, which is not there — skipped"),
+                ),
+                Some(exe) => {
+                    if stamp.is_some() && stamp == last_stamp {
+                        say("skiptro", false, "no new episodes since its last run".into());
+                    } else {
+                        match run_skiptro(&app, exe, &plan.scan_args, &plan.export_args, root_path)
+                        {
+                            Ok((reports, true)) => {
+                                // Only a clean run may move the stamp. Storing it
+                                // after a failure would mean one bad run made the
+                                // new episodes permanently invisible to Skiptro.
+                                if let Some(stamp) = stamp {
+                                    remember_stamp(&app, *root_id, stamp);
+                                }
+                                let ran = reports.len();
+                                say("skiptro", true, format!("Skiptro finished ({ran} step(s))"));
+                            }
+                            Ok((reports, false)) => {
+                                let why = reports
+                                    .last()
+                                    .and_then(|r| r.tail.last().cloned())
+                                    .unwrap_or_else(|| "no output".into());
+                                say("skiptro", false, format!("Skiptro failed: {why}"));
+                            }
+                            Err(e) => say("skiptro", false, format!("Skiptro could not run: {e}")),
+                        }
+                    }
+                }
+            }
+
+            // ---- the built-in analysis ----
+            //
+            // The backlog is checked first so the "it is turned off" note only
+            // appears when there is actually work being left undone. Saying it
+            // after every scan of an up-to-date library would be noise, and noise
+            // is how the Settings warning got ignored in the first place.
+            let pending = pending_episodes(&app, *root_id);
+
+            if pending == 0 {
+                continue;
+            }
+            if !plan.auto_analyse {
+                say(
+                    "analyse",
+                    false,
+                    format!("{pending} episode(s) not analysed — automatic detection is off in Settings"),
+                );
+                continue;
+            }
+
+            let report = run_analysis(&app, root_path);
+            let note = report
+                .tail
+                .last()
+                .cloned()
+                .unwrap_or_else(|| "nothing to analyse".into());
+            say("analyse", report.exit_code == Some(0), note);
+        }
+
+        AutoDetectReport { steps }
+    })
+    .await
+    .map_err(to_string_err)
+}
+
 /// Detect intros and credits for one library root.
 ///
 /// Two producers behind one button. Skiptro finds intros by fingerprinting
@@ -400,24 +705,15 @@ pub async fn detect_intros(
         // below, so running it first means the better answer is already in
         // place by the time anything reads either.
         if let Some(exe) = exe {
-            for (name, template) in [("scan", &scan_args), ("export", &export_args)] {
-                let args = build_args(template, &root_path);
-                // An empty template is "skip this step", which is how exporting
-                // is switched off. Running the executable with no arguments at
-                // all would print its help and exit 1, reporting a failure that
-                // never happened.
-                if args.is_empty() {
-                    continue;
-                }
-                let report = run_step(&app, &exe, name, &args)?;
-                let failed = report.exit_code != Some(0);
-                steps.push(report);
-                // Exporting after a failed scan would write sidecars from stale
-                // detections, or none at all while reporting success.
-                if failed {
-                    return Ok(DetectReport { ok: false, steps });
-                }
+            let (reports, ok) = run_skiptro(&app, &exe, &scan_args, &export_args, &root_path)?;
+            steps.extend(reports);
+            if !ok {
+                return Ok(DetectReport { ok: false, steps });
             }
+            // The automatic pass keys off this stamp, so a manual run has to
+            // move it too. Without this, pressing Detect by hand would leave the
+            // next scan running the whole thing again for nothing.
+            remember_skiptro_stamp(&app, &root_path);
         }
 
         steps.push(run_analysis(&app, &root_path));
@@ -431,7 +727,82 @@ pub async fn detect_intros(
 
 #[cfg(test)]
 mod tests {
-    use super::{build_args, tokenise};
+    use super::{build_args, root_stamp, skiptro_stamp_key, tokenise};
+
+    /// Just enough of `media_files` for the stamp, which is all it reads.
+    fn library(rows: &[(i64, i64)]) -> rusqlite::Connection {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE media_files (
+                 id INTEGER PRIMARY KEY, root_id INTEGER NOT NULL,
+                 first_seen_at INTEGER NOT NULL, modified_at INTEGER NOT NULL,
+                 missing INTEGER NOT NULL DEFAULT 0)",
+        )
+        .unwrap();
+        for (first_seen, modified) in rows {
+            conn.execute(
+                "INSERT INTO media_files (root_id, first_seen_at, modified_at) VALUES (1, ?1, ?2)",
+                rusqlite::params![first_seen, modified],
+            )
+            .unwrap();
+        }
+        conn
+    }
+
+    /// The case that started this: a season dropped into a watched folder has
+    /// to move the stamp, or the automatic pass decides there is nothing to do
+    /// and the new episodes never get a marker from anything.
+    #[test]
+    fn a_new_episode_moves_the_stamp() {
+        let conn = library(&[(100, 50), (100, 50)]);
+        let before = root_stamp(&conn, 1).unwrap();
+
+        conn.execute(
+            "INSERT INTO media_files (root_id, first_seen_at, modified_at) VALUES (1, 200, 60)",
+            [],
+        )
+        .unwrap();
+        assert_ne!(root_stamp(&conn, 1).unwrap(), before);
+    }
+
+    /// A file replaced in place keeps its `first_seen_at`, so the stamp has to
+    /// watch `modified_at` as well — a re-encoded episode is new material even
+    /// though the row is not.
+    #[test]
+    fn a_replaced_episode_moves_the_stamp_too() {
+        let conn = library(&[(100, 50)]);
+        let before = root_stamp(&conn, 1).unwrap();
+
+        conn.execute("UPDATE media_files SET modified_at = 900", []).unwrap();
+        assert_ne!(root_stamp(&conn, 1).unwrap(), before);
+    }
+
+    /// And a *deleted* episode must not, or tidying one file away would spend
+    /// minutes re-scanning a library that has nothing new in it.
+    #[test]
+    fn removing_an_episode_leaves_the_stamp_alone() {
+        let conn = library(&[(100, 50), (200, 60)]);
+        let before = root_stamp(&conn, 1).unwrap();
+
+        // How the scanner records a deletion: flagged, never removed.
+        conn.execute("UPDATE media_files SET missing = 1 WHERE first_seen_at = 100", [])
+            .unwrap();
+        assert_eq!(root_stamp(&conn, 1).unwrap(), before);
+    }
+
+    /// An empty root still answers. `None` means "could not tell", which is
+    /// treated as "run it", and a root with nothing in it is not that.
+    #[test]
+    fn an_empty_root_has_a_stamp_rather_than_no_answer() {
+        assert_eq!(root_stamp(&library(&[]), 1).as_deref(), Some("0:0"));
+    }
+
+    /// Two libraries must not share one stamp, or adding a season to one would
+    /// mark the other as already scanned.
+    #[test]
+    fn each_root_remembers_separately() {
+        assert_ne!(skiptro_stamp_key(1), skiptro_stamp_key(2));
+    }
 
     #[test]
     fn splits_on_whitespace() {

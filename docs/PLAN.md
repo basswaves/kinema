@@ -1022,6 +1022,11 @@ ffmpeg per season, and a media library should not spend that without being
 asked. Saying so and offering the button is enough — the same reasoning that
 keeps NFO export an explicit action.
 
+> **Reversed.** See *[The count was in the one place nobody
+> looks](#the-count-was-in-the-one-place-nobody-looks)* below: the count above
+> was the right idea put somewhere it could not work, and the reasoning in this
+> paragraph turned out to be answering the wrong question.
+
 ### One button
 
 Detect now runs Skiptro (if configured) and then the analysis, per TV folder,
@@ -1107,6 +1112,73 @@ an arrow hovering over the video in exactly the cases the feature exists for.
 
 Pausing does not pin the pointer, because pausing does not pin the OSD either.
 Whether it should is one question about the idle timer, not two.
+
+## The count was in the one place nobody looks
+
+Season 3 of a show already in the library was dropped into the watched folder.
+Kinema found it at the next launch, matched it, and showed it. The first episode
+played with **no Skip button at all** — and the user, reasonably, went looking
+for the popup that Settings appeared to promise. There is no popup; there never
+was. That wording is fixed, but it was the smaller half of the problem.
+
+The database recorded the whole evening, which is worth keeping because it is
+the clearest evidence this project has produced of a design failing while every
+component works:
+
+| | |
+|---|---|
+| 22:31:31 | scan finds the ten new files, matches them to TMDB 105 |
+| 22:32:01 | plays S03E10 → no markers |
+| 22:32:11 | plays S03E01 → no markers |
+| 22:33:40 | **Detect pressed by hand** → Skiptro scans, analysis runs |
+| 22:34:02 | plays S03E01 again → intro from Skiptro, credits from the analysis |
+
+Every source did exactly what it was designed to do:
+
+- **TheIntroDB** was asked, on schedule, and answered. Verified against the live
+  API afterwards: seasons 1 and 2 of this show are timed, season 3 returns
+  `media not found`. It is ranked last precisely because it is thin, and a new
+  season is where it is thinnest.
+- **Skiptro** and the **analysis** had nothing because neither had ever looked
+  at the files. Both only ran from a button.
+
+And the warning existed. "10 episode(s) not analysed yet" was on screen, in
+bold — **in Settings**, next to the Detect button. Which is the one screen a
+user does not visit, because visiting it requires already suspecting that
+something is wrong. A count that is only legible to someone who has diagnosed
+the problem is not a warning; it is a confirmation.
+
+So the pass now runs itself at the end of every scan, and the two halves are
+governed differently on purpose:
+
+- **Skiptro always runs**, when it is installed and something new arrived. It is
+  quick, and its intro outranks every other source, so there is no version of
+  "later" that yields a better answer.
+- **The analysis is a switch, on by default.** It is minutes of ffmpeg per
+  season — a real cost, and the one part a user might genuinely want to schedule
+  themselves. This is where the reversed paragraph above was half right: the
+  cost reasoning was sound, the conclusion that the cost should be paid by *the
+  user noticing* was not.
+
+**A per-root stamp decides whether Skiptro runs**, not a backlog query — Kinema
+cannot know what Skiptro has already seen without reading a schema it does not
+own. The stamp is the newest `first_seen_at` and `modified_at` under the root,
+so an episode arriving or being replaced moves it and an episode being deleted
+does not. Only a clean run stores it, or one failure would make the new episodes
+permanently invisible. The analysis needs no such trick: `seasons_in_root` is
+already an exact backlog.
+
+**Nothing in the pass is an error.** A missing Skiptro, a missing ffmpeg, an
+offline share: each is a step that did not run, reported as a sentence under the
+scan summary, with everything else carrying on. An absent optional detector must
+never be able to fail a scan. The one distinction worth keeping is between
+*never configured* — silence, since nothing was expected — and *configured and
+now missing*, which says so, because that is a thing the user believes is
+working.
+
+ffmpeg also dropped to below-normal priority here. Analysis used to be something
+a user started while not watching anything; it can now overlap with playback,
+and a dropped frame is a worse trade than an analysis finishing a minute later.
 
 ## Open items
 

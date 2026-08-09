@@ -278,6 +278,35 @@ uses so the number cannot drift from the work. The general rule already exists
 in this codebase for matching — a visible refusal beats a silent wrong answer —
 and it applies to every fallback, not only to metadata.
 
+### …and a warning only counts where the user already is
+
+The fix above was correct and did not work. Season 3 of the same show was added
+some months later and produced the same silent result — an episode with no Skip
+button at all — with "10 episode(s) not analysed yet" sitting on screen in bold
+the whole time, **in Settings**, next to the button that would have fixed it.
+
+That is the trap, and it generalises past this feature: a warning is only a
+warning where the user will be *before* they know something is wrong. Settings
+is where you go once you already suspect a problem and have guessed which
+subsystem owns it. Putting the diagnosis there means it is only readable by
+someone who no longer needs it.
+
+Worse, it made the failure look self-inflicted. Nothing in the app connected
+"the season I just added" to "a button in a screen about detectors", so the
+honest reading from the sofa was that intro skipping had simply broken.
+
+**Do:** prefer doing the work to reporting that it needs doing. The pass now
+runs at the end of the scan that created the need for it. Where a report is
+genuinely all that is possible — the analysis switched off, a configured Skiptro
+that has gone missing — it now appears under the scan summary, which is what a
+user reads after adding something, rather than beside the control that would act
+on it.
+
+**Also:** distinguish *never configured* from *configured and now broken*. The
+first deserves silence — nothing was expected to happen. The second must speak,
+every time, because the user believes it is working. Reporting both identically
+is how a real failure gets filed as normal background noise.
+
 ### A season is not a folder
 
 `analyse.rs` compares every episode of a season against every other, so how the

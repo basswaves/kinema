@@ -151,6 +151,39 @@ export const detectIntros = (rootPath: string) =>
  */
 export const analysisBacklog = () => invoke<[number, number][]>('analysis_backlog');
 
+/**
+ * Setting key: `'off'` stops the built-in analysis running by itself after a
+ * scan. Anything else, including unset, leaves it on.
+ *
+ * Only the *automatic* run is governed by this. The Detect button always runs
+ * everything — pressing it is already saying yes.
+ */
+export const AUTO_ANALYSE_KEY = 'auto_analyse_enabled';
+
+/** One thing the automatic pass did, or declined to do, and why. */
+export interface AutoStep {
+  root_path: string;
+  /** `'skiptro'`, `'analyse'`, or `'root'` when the folder was unreachable. */
+  step: string;
+  ran: boolean;
+  /** One sentence, written for the user. */
+  note: string;
+}
+
+export interface AutoDetectReport {
+  steps: AutoStep[];
+}
+
+/**
+ * Detect intros and credits for anything the scan just brought in.
+ *
+ * Decides for itself whether there is anything to do, so it is safe to call at
+ * the end of every scan: Skiptro runs when new episodes appeared, the built-in
+ * analysis runs when a season is unanalysed and the setting allows it, and an
+ * absent Skiptro or ffmpeg is a sentence in the report rather than a failure.
+ */
+export const autoDetect = () => invoke<AutoDetectReport>('auto_detect');
+
 export const listMediaFiles = (limit: number) => invoke<MediaFile[]>('list_media_files', { limit });
 
 export const saveParseResults = (results: ParseResultPayload[]) =>

@@ -1,5 +1,5 @@
 /**
- * The library scan pipeline: scan → parse → match → artwork → trailers.
+ * The library scan pipeline: scan → parse → match → artwork → details → detect.
  *
  * One sequence with two callers — the automatic scan at startup and the manual
  * "Scan now" button — because two copies of an ordering this fiddly would drift,
@@ -16,12 +16,16 @@
  * happening, and the settings screen, which shows what.
  */
 import { useSyncExternalStore } from 'react';
+import { listen } from '@tauri-apps/api/event';
 import {
+  autoDetect,
   libraryStats,
   listLibraryRoots,
   listUnparsed,
   saveParseResults,
   scanLibrary,
+  type AutoStep,
+  type DetectProgress,
   type LibraryKind,
   type LibraryRoot,
 } from './api';
@@ -32,7 +36,7 @@ import { backfillTitleDetails, loadProviderKeys, matchFiles } from '../metadata/
 /** Batched so a large library reports progress and never builds one huge IPC payload. */
 const PARSE_BATCH = 500;
 
-export type ScanStage = 'scanning' | 'parsing' | 'matching' | 'artwork' | 'details';
+export type ScanStage = 'scanning' | 'parsing' | 'matching' | 'artwork' | 'details' | 'detecting';
 
 export interface ScanStatus {
   stage: ScanStage;
@@ -48,6 +52,14 @@ export interface ScanSummary {
   artworkStored: number;
   /** Titles that gained a trailer key, logo or cast on this pass. */
   detailsFilled: number;
+  /**
+   * What the automatic intro/credits pass did, or declined to do.
+   *
+   * Kept separate from `errors` on purpose: "Skiptro is not installed" and
+   * "3 episode(s) are waiting because you turned this off" are both things
+   * worth saying and neither is a problem with the scan.
+   */
+  detectNotes: AutoStep[];
   /** Non-fatal problems: an unreachable root, a provider error on one title. */
   errors: string[];
   /** The parser throwing is its own category — it means every file failed. */
@@ -102,6 +114,34 @@ function kindForPath(roots: LibraryRoot[], path: string): LibraryKind {
     }
   }
   return best?.kind ?? 'movies';
+}
+
+/**
+ * The detection stage: Skiptro, then this app's own analysis.
+ *
+ * Minutes of subprocess work, so its output is streamed into the scan status —
+ * the nav bar is the only thing on screen during a startup scan, and "detecting"
+ * with nothing after it for four minutes looks exactly like a hang.
+ *
+ * Never throws. A failure here means some episodes have no markers yet, which
+ * is the state the library was already in a moment ago; letting it fail the
+ * whole scan would turn a missing Skip button into a missing library.
+ */
+async function runAutoDetect(errors: string[]): Promise<AutoStep[]> {
+  setStatus({ stage: 'detecting', detail: '' });
+
+  const off = listen<DetectProgress>('skiptro-progress', (event) =>
+    setStatus({ stage: 'detecting', detail: event.payload.line })
+  );
+
+  try {
+    return (await autoDetect()).steps;
+  } catch (e) {
+    errors.push(`intro detection: ${String(e)}`);
+    return [];
+  } finally {
+    void off.then((stop) => stop());
+  }
 }
 
 /**
@@ -177,6 +217,13 @@ export async function runScanPipeline(): Promise<ScanOutcome> {
     const details = await backfillTitleDetails();
     errors.push(...details.errors);
 
+    // Last, and deliberately part of the same sequence rather than something the
+    // user has to go and press afterwards. Everything before this decides *what*
+    // is in the library; this decides whether the Skip button will be there when
+    // one of the new episodes is played. It works out for itself whether there
+    // is anything to do, so calling it unconditionally costs two queries.
+    const detectNotes = await runAutoDetect(errors);
+
     lastSummary = {
       filesAdded: report.files_added,
       filesParsed,
@@ -184,6 +231,7 @@ export async function runScanPipeline(): Promise<ScanOutcome> {
       unmatched,
       artworkStored: art.stored,
       detailsFilled: details.found,
+      detectNotes,
       errors,
       parseError: lastParseError,
       finishedAt: Date.now(),

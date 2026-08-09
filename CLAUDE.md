@@ -160,5 +160,11 @@ by reflex:
   what to click and what a pass looks like — and what a *failure* would look
   like, so an ambiguous result is still informative.
 - Confirm the order of work before starting a multi-item request.
-- Commit only when asked. History is linear on `master`, one feature per commit,
-  no remote.
+- Commit only when asked, and push only when asked. History is linear on
+  `master`, one feature per commit.
+- **There is a remote:** `origin`, `github.com/basswaves/kinema`. This file used
+  to say there was not. Work has gone both ways and the request says which —
+  "commit this" means onto `master`; "PR it" means a branch, a push and a pull
+  request, with `master` left matching `origin/master`.
+- `gh` is installed but is **not on the PATH** the tools get. Call it as
+  `C:\Program Files\GitHub CLI\gh.exe`.

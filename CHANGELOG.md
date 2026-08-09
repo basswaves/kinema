@@ -7,6 +7,25 @@ makes no stability promises.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A part-downloaded episode no longer stays "watched" once it finishes.** An
+  incomplete MKV plays — the container streams happily from a partial file —
+  reports a wrong duration, reaches its short end and was marked complete. That
+  flag survived the rest of the file arriving, so the episode silently dropped
+  out of Continue Watching and was never offered again. Watch state is now
+  cleared when a file's **size** changes, never merely its timestamp: an mtime
+  moves when files are copied between drives or a NAS touches them, and
+  clearing on that would let moving a library wipe every tick in it.
+- **A file replaced since the last scan no longer keeps the old file's intro and
+  credits markers.** The cache key covered every source but not the video.
+- **A season that is still downloading is no longer re-analysed on every
+  launch.** One growing file made the whole season stale, and analysis has to
+  compare episodes against each other — so it re-read the lot each time, for an
+  answer about to be discarded. The automatic pass now waits for files to stop
+  changing and says how many it is waiting for; the Detect button still runs
+  immediately.
+
 ### Changed
 
 - **Intros and credits are now detected automatically.** A season dropped into a

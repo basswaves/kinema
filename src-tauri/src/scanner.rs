@@ -276,6 +276,13 @@ fn write_batch(
                     parsed_from = NULL, parsed_json = NULL, match_status = 'unparsed'
               WHERE id = ?1",
         )?;
+        // …and forget that the old bytes were watched. See `resize_forgets_progress`
+        // below for why this is keyed on the size alone.
+        let mut resize = tx.prepare(
+            "UPDATE playback_state
+                SET completed = 0, duration_secs = NULL
+              WHERE file_id = ?1",
+        )?;
 
         for file in batch {
             let existing: Option<(i64, i64, i64)> = select
@@ -291,8 +298,24 @@ fn write_batch(
                     touch.execute(params![id, now])?;
                     report.files_unchanged += 1;
                 }
-                Some((id, _, _)) => {
+                Some((id, old_size, _)) => {
                     update.execute(params![id, file.size, file.modified, now])?;
+                    // A file that changed *size* is different content, and
+                    // "watched" is a claim about content. The commonest way this
+                    // happens is a download or a copy that was scanned before it
+                    // finished: the partial file plays — MKV streams happily from
+                    // an incomplete file — reaches its short end, and
+                    // `save_progress` marks it complete at 94% of a duration that
+                    // was never the real one. The flag then survives the full file
+                    // arriving, and the episode is silently never offered again.
+                    //
+                    // **Size only, never mtime.** An mtime moves for reasons that
+                    // are not content: another tool writing metadata, a copy
+                    // between drives, a NAS touching a file. Clearing watch state
+                    // on mtime would let moving a library wipe every tick in it.
+                    if old_size != file.size {
+                        resize.execute(params![id])?;
+                    }
                     report.files_updated += 1;
                 }
                 None => {
@@ -312,6 +335,127 @@ fn write_batch(
         }
     }
     tx.commit()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A real database rather than a hand-written schema: the point of these
+    /// tests is what happens to `playback_state` when `media_files` is updated,
+    /// which is a question about the actual tables.
+    fn database(name: &str) -> Connection {
+        let dir = std::env::temp_dir().join(format!("pn-scanner-{name}"));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let conn = crate::db::open(&dir.join("library.db")).unwrap();
+        conn.execute(
+            "INSERT INTO library_roots (id, path, kind, added_at) VALUES (1, ?1, 'tv', 0)",
+            params![dir.to_string_lossy()],
+        )
+        .unwrap();
+        conn
+    }
+
+    fn seen(size: i64, modified: i64) -> SeenFile {
+        SeenFile {
+            path: r"C:\media\Show S01E01.mkv".into(),
+            parent_dir: r"C:\media".into(),
+            file_name: "Show S01E01.mkv".into(),
+            extension: "mkv".into(),
+            size,
+            modified,
+        }
+    }
+
+    /// Record the file, then say it was watched to the end.
+    fn watched_file(conn: &mut Connection, size: i64, modified: i64) -> i64 {
+        let mut report = ScanReport::default();
+        write_batch(conn, 1, 0, &[seen(size, modified)], &mut report).unwrap();
+
+        let id: i64 = conn
+            .query_row("SELECT id FROM media_files", [], |r| r.get(0))
+            .unwrap();
+        conn.execute(
+            "INSERT INTO playback_state (file_id, position_secs, duration_secs, completed, updated_at)
+             VALUES (?1, 1400.0, 1450.0, 1, 0)",
+            params![id],
+        )
+        .unwrap();
+        id
+    }
+
+    fn completion(conn: &Connection, id: i64) -> (i64, Option<f64>) {
+        conn.query_row(
+            "SELECT completed, duration_secs FROM playback_state WHERE file_id = ?1",
+            params![id],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap()
+    }
+
+    /// The bug this exists for: a partial download plays, reaches its short
+    /// end, and is marked complete against a duration that was never real. When
+    /// the rest of the file arrives the episode must not still count as watched.
+    #[test]
+    fn a_file_that_grows_forgets_it_was_watched() {
+        let mut conn = database("grew");
+        let id = watched_file(&mut conn, 60_000_000, 100);
+
+        let mut report = ScanReport::default();
+        write_batch(&mut conn, 1, 1, &[seen(500_000_000, 200)], &mut report).unwrap();
+
+        assert_eq!(report.files_updated, 1);
+        // The duration goes with it: it is what gets sent to TheIntroDB to tell
+        // releases apart, and a truncated one fetches the wrong release.
+        assert_eq!(completion(&conn, id), (0, None));
+    }
+
+    /// **The other half, and the more dangerous one to get wrong.** An mtime
+    /// moves for reasons that are not content — another tool writing metadata,
+    /// a copy between drives, a NAS touching a file. If this cleared watch
+    /// state, moving a library would wipe every tick in it.
+    #[test]
+    fn a_new_timestamp_alone_does_not() {
+        let mut conn = database("touched");
+        let id = watched_file(&mut conn, 500_000_000, 100);
+
+        let mut report = ScanReport::default();
+        write_batch(&mut conn, 1, 1, &[seen(500_000_000, 999)], &mut report).unwrap();
+
+        assert_eq!(report.files_updated, 1, "the row should still be updated");
+        assert_eq!(completion(&conn, id), (1, Some(1450.0)));
+    }
+
+    /// A file nothing has touched must not be rewritten at all — this is the
+    /// path every unchanged file in the library takes on every scan.
+    #[test]
+    fn an_unchanged_file_is_left_alone() {
+        let mut conn = database("same");
+        let id = watched_file(&mut conn, 500_000_000, 100);
+
+        let mut report = ScanReport::default();
+        write_batch(&mut conn, 1, 1, &[seen(500_000_000, 100)], &mut report).unwrap();
+
+        assert_eq!(report.files_unchanged, 1);
+        assert_eq!(report.files_updated, 0);
+        assert_eq!(completion(&conn, id), (1, Some(1450.0)));
+    }
+
+    /// A file with no history is ordinary, not an error.
+    #[test]
+    fn growing_a_file_that_was_never_played_is_harmless() {
+        let mut conn = database("unplayed");
+        let mut report = ScanReport::default();
+        write_batch(&mut conn, 1, 0, &[seen(60_000_000, 100)], &mut report).unwrap();
+        write_batch(&mut conn, 1, 1, &[seen(500_000_000, 200)], &mut report).unwrap();
+
+        let rows: i64 = conn
+            .query_row("SELECT COUNT(*) FROM playback_state", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(rows, 0);
+    }
 }
 
 /// Flag anything under this root the walk did not see.

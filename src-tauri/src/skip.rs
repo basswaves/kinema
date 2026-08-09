@@ -204,11 +204,31 @@ fn find_sidecar(video: &Path) -> Option<Sidecar> {
 /// It covers both local sources at once, deliberately. They are cheap to read
 /// and re-reading one needlessly costs nothing, while *missing* a change costs
 /// a marker that never appears.
+///
+/// **The video's own bytes are in here too**, and they are the one input that
+/// is not a source. Every other guard against a replaced file goes through the
+/// scanner: `read_analysis` compares against `media_files`, and the scanner
+/// clears what it must when a size changes. None of that has happened yet for a
+/// file replaced *since the last scan* — and if nothing else moved, the key was
+/// identical and this served markers measured against bytes that are gone. It
+/// costs one `stat`, next to the one `find_sidecar` already does.
 fn local_key(
+    video: &Path,
     skiptro_db: Option<&Path>,
     sidecar: Option<&Sidecar>,
     analysed_at: Option<i64>,
 ) -> String {
+    let file = std::fs::metadata(video)
+        .map(|m| {
+            let mtime = m
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            format!("{}:{}", m.len(), mtime)
+        })
+        .unwrap_or_default();
     let db = skiptro_db.map(skiptro::version_stamp).unwrap_or_default();
     let side = sidecar
         .map(|s| format!("{}:{}:{}", s.path.display(), s.size, s.mtime))
@@ -216,7 +236,7 @@ fn local_key(
     // A fresh analysis has to invalidate the cache too, or running Detect would
     // leave the file playing with whatever it was given before.
     let analysed = analysed_at.map(|t| t.to_string()).unwrap_or_default();
-    format!("{db}|{side}|{analysed}")
+    format!("{file}|{db}|{side}|{analysed}")
 }
 
 /// This app's own analysis for one file, if it is still valid for these bytes.
@@ -469,6 +489,7 @@ pub async fn get_skip_markers(
 
     let sidecar = find_sidecar(&video);
     let key = local_key(
+        &video,
         skiptro_db.as_deref(),
         sidecar.as_ref(),
         analysis.as_ref().map(|(_, _, at)| *at),
@@ -786,19 +807,52 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
 
+        let video = dir.join("Show S01E01.mkv");
         let db = dir.join("skiptro.db");
         std::fs::write(&db, b"x").unwrap();
-        let before = local_key(Some(&db), None, None);
+        let before = local_key(&video, Some(&db), None, None);
 
         std::fs::write(db.with_extension("db-wal"), b"a scan happened").unwrap();
-        assert_ne!(local_key(Some(&db), None, None), before);
+        assert_ne!(local_key(&video, Some(&db), None, None), before);
     }
 
     /// …and when Detect produces a fresh analysis, or the cached answer from
     /// before it would stay on screen.
     #[test]
     fn the_local_key_changes_when_the_analysis_is_rerun() {
-        assert_ne!(local_key(None, None, Some(200)), local_key(None, None, Some(100)));
-        assert_ne!(local_key(None, None, Some(100)), local_key(None, None, None));
+        let video = Path::new(r"C:\media\x.mkv");
+        assert_ne!(
+            local_key(video, None, None, Some(200)),
+            local_key(video, None, None, Some(100))
+        );
+        assert_ne!(
+            local_key(video, None, None, Some(100)),
+            local_key(video, None, None, None)
+        );
+    }
+
+    /// A file replaced on disk must lose its markers even when no scan has run
+    /// and nothing else moved — the case every other guard misses, because they
+    /// all read `media_files` and that is what has not been updated yet.
+    #[test]
+    fn the_local_key_changes_when_the_video_itself_does() {
+        let dir = std::env::temp_dir().join("pn-skip-video-key");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let video = dir.join("Show S01E01.mkv");
+        std::fs::write(&video, b"half a download").unwrap();
+        let before = local_key(&video, None, None, None);
+
+        std::fs::write(&video, b"the whole thing, which is longer").unwrap();
+        assert_ne!(local_key(&video, None, None, None), before);
+    }
+
+    /// A file that is not there yields a key rather than a panic: an offline
+    /// share must degrade to "no markers", not take the player down.
+    #[test]
+    fn a_missing_video_still_produces_a_key() {
+        let key = local_key(Path::new(r"Z:\offline\Show.mkv"), None, None, None);
+        assert!(key.starts_with('|'), "got {key}");
     }
 }

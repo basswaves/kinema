@@ -307,6 +307,46 @@ first deserves silence — nothing was expected to happen. The second must speak
 every time, because the user believes it is working. Reporting both identically
 is how a real failure gets filed as normal background noise.
 
+### A file that is still arriving is a file, as far as everything is concerned
+
+Four episodes of a new season produced no analysis at all. They turned out to be
+partial — a torrent that had not finished, or a copy the scan caught mid-flight.
+`ffprobe` cannot read a duration from them, so `analyse_season` skips them, which
+is correct and self-healing: `analysed_segments` stores each file's size and
+mtime, so the file completing invalidates the row by itself.
+
+**Most of this area self-heals. Three things did not**, and they are worth
+knowing because they are all the same mistake — treating a path as an identity
+when the identity is the bytes:
+
+1. **Watch state survived the file changing.** A partial MKV *plays* — the
+   container streams — reports a plausible-but-wrong duration, reaches its short
+   end, and `save_progress` marks it complete at 94% of a length that was never
+   real. The scanner's "content changed" branch reset the parse and left
+   `playback_state` alone, so the finished download stayed marked watched:
+   invisible, and it drops the episode out of Continue Watching for good. MP4
+   hides this — a truncated MP4 usually will not open at all, so nothing is
+   recorded and the bug looks absent.
+2. **The marker cache key did not include the video.** `local_key` covered
+   Skiptro's database, the sidecar and the analysis timestamp, all of which go
+   through `media_files` — which has not been updated yet for a file replaced
+   *since the last scan*. Nothing moved, so markers measured against bytes that
+   no longer exist were served.
+3. **A growing file re-analysed its whole season on every scan.** Analysis
+   compares episodes against each other, so one changed file makes all of them
+   stale. Harmless when Detect was a button nobody pressed mid-download; minutes
+   of ffmpeg per launch once the pass became automatic.
+
+**Do:** clear derived state on **size**, never on mtime. An mtime moves for
+reasons that are not content — a metadata write, a copy between drives, a NAS
+touching a file — and clearing watch state on it would let *moving a library*
+wipe every tick in it. Size changing is a real content change. `scanner.rs` has
+both cases as tests, and the mtime one matters more.
+
+**Do:** when a cache key claims to cover "everything that could change", check
+whether the file itself is in it. Two of the three above were the same omission
+at different layers.
+
 ### A season is not a folder
 
 `analyse.rs` compares every episode of a season against every other, so how the

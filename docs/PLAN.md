@@ -1180,6 +1180,36 @@ ffmpeg also dropped to below-normal priority here. Analysis used to be something
 a user started while not watching anything; it can now overlap with playback,
 and a dropped frame is a worse trade than an analysis finishing a minute later.
 
+### Partial files, and what a path is not
+
+The four episodes in that season that got no markers at all were **incomplete
+files** — a torrent still downloading, or a copy the scan caught mid-flight.
+`ffprobe` cannot read them, so the analysis skips them and picks them up when
+they finish. That much was already right.
+
+Looking at the rest of it found three places that treated a path as an identity
+when the identity is really the bytes. All three are in GOTCHAS; the decisions
+worth keeping here are the two judgement calls:
+
+**Watch state is cleared on a size change, not an mtime change.** Clearing on
+mtime is the obvious implementation and it is wrong: an mtime moves when another
+tool writes metadata, when files are copied between drives, when a NAS touches
+something. That version would let *moving a library* wipe every watched flag in
+it — a far larger failure than the one being fixed, and equally silent. Size
+changing is a genuine content change. The position is kept and only `completed`
+and `duration_secs` are reset; the duration goes because it is what identifies a
+release to TheIntroDB, and a truncated one fetches the wrong answer and caches
+it for a month.
+
+**The settling rule defers, it never refuses.** A season with a file written in
+the last five minutes is skipped by the *automatic* pass only, and the report
+says how many files it is waiting for. The manual Detect button ignores it
+entirely — pressing a button is saying "now", and a button that quietly declined
+would be indistinguishable from a broken one. Whole seasons are held back rather
+than the individual file, because analysis compares episodes against each other:
+fingerprinting the finished nine only means fingerprinting them again when the
+tenth lands.
+
 ## Open items
 
 **They live in [ROADMAP.md](ROADMAP.md), and only there.** They used to be

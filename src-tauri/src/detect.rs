@@ -249,7 +249,52 @@ fn drain<R: std::io::Read>(app: &tauri::AppHandle, step: &str, stream: R) -> Vec
 /// progress display. It is deliberately **not** fatal: a missing ffmpeg or an
 /// unreadable season leaves whatever Skiptro found intact, which is the same
 /// arrangement every other source has.
-fn run_analysis(app: &tauri::AppHandle, root_path: &str) -> StepReport {
+/// How long a file must have sat unchanged before the automatic pass will
+/// fingerprint the season it is in.
+///
+/// A download or a large copy into a watched folder is scanned repeatedly while
+/// it grows, and each new size makes the whole season stale — analysis compares
+/// episodes against each other, so one changed file costs a re-fingerprint of
+/// all of them. Left alone, a season being downloaded is analysed once per
+/// launch until it finishes, which is minutes of ffmpeg each time for an answer
+/// that is about to be thrown away.
+///
+/// Five minutes is long enough that anything still arriving is still arriving,
+/// and short enough that a season copied and left alone is ready by the time it
+/// is watched. It defers, never refuses: the next scan picks the season up, and
+/// the report says what it is waiting for.
+///
+/// **The Detect button ignores this entirely.** Pressing it is saying "now".
+const SETTLING_SECS: i64 = 5 * 60;
+
+/// Split seasons into those ready to analyse and those still settling.
+///
+/// A season is held back whole, because that is the unit the analysis works in:
+/// there is nothing useful to do with the nine finished episodes of a season
+/// whose tenth is still arriving, since the tenth will make all of them stale
+/// again the moment it lands.
+fn split_settled(
+    seasons: Vec<crate::analyse::Season>,
+    settling_secs: Option<i64>,
+) -> (Vec<crate::analyse::Season>, Vec<crate::analyse::Season>) {
+    let Some(secs) = settling_secs else {
+        return (seasons, Vec::new());
+    };
+    let cutoff = now_secs() - secs;
+    seasons
+        .into_iter()
+        .partition(|season| season.episodes.iter().all(|e| e.mtime <= cutoff))
+}
+
+/// Run this app's own audio analysis over a library root.
+///
+/// `settling_secs` defers seasons containing a file written that recently; the
+/// manual path passes `None` and analyses whatever it finds.
+fn run_analysis(
+    app: &tauri::AppHandle,
+    root_path: &str,
+    settling_secs: Option<i64>,
+) -> StepReport {
     let mut tail: Vec<String> = Vec::new();
     let mut say = |line: String| {
         let _ = app.emit(
@@ -310,8 +355,22 @@ fn run_analysis(app: &tauri::AppHandle, root_path: &str) -> StepReport {
         }
     };
 
+    let (seasons, settling) = split_settled(seasons, settling_secs);
+
+    if !settling.is_empty() {
+        // Named, not silent. A season that is skipped for a reason the user
+        // cannot see is the exact failure this whole area has already produced
+        // once — and "still copying" is a state they can check for themselves.
+        say(format!(
+            "waiting for {} file(s) still being written",
+            settling.iter().map(|s| s.episodes.len()).sum::<usize>()
+        ));
+    }
+
     if seasons.is_empty() {
-        say("nothing new to analyse".into());
+        if settling.is_empty() {
+            say("nothing new to analyse".into());
+        }
         return step("analyse", Some(0), tail);
     }
 
@@ -480,17 +539,23 @@ fn remember_skiptro_stamp(app: &tauri::AppHandle, root_path: &str) {
     }
 }
 
-/// How many episodes under one root the built-in analysis would look at.
+/// How many episodes under one root the automatic analysis would look at now.
 ///
-/// The same query Detect itself uses, so the number reported is precisely the
-/// work that would be done — and zero means there is genuinely nothing to say.
+/// The same query Detect itself uses, **and the same settling rule the
+/// automatic run applies**, so the number reported is precisely the work that
+/// would be done. Counting a season that is still downloading would put "12
+/// episode(s) not analysed" in front of a user whose only available action is
+/// to wait.
 fn pending_episodes(app: &tauri::AppHandle, root_id: i64) -> usize {
     let db = app.state::<Db>();
     let Ok(conn) = db.0.lock() else { return 0 };
 
-    crate::analyse::seasons_in_root(&conn, root_id)
-        .map(|seasons| seasons.iter().map(|s| s.episodes.len()).sum())
-        .unwrap_or(0)
+    let seasons = crate::analyse::seasons_in_root(&conn, root_id).unwrap_or_default();
+    split_settled(seasons, Some(SETTLING_SECS))
+        .0
+        .iter()
+        .map(|s| s.episodes.len())
+        .sum()
 }
 
 fn store_setting(conn: &rusqlite::Connection, key: &str, value: &str) {
@@ -650,7 +715,7 @@ pub async fn auto_detect(app: tauri::AppHandle) -> Result<AutoDetectReport, Stri
                 continue;
             }
 
-            let report = run_analysis(&app, root_path);
+            let report = run_analysis(&app, root_path, Some(SETTLING_SECS));
             let note = report
                 .tail
                 .last()
@@ -716,7 +781,9 @@ pub async fn detect_intros(
             remember_skiptro_stamp(&app, &root_path);
         }
 
-        steps.push(run_analysis(&app, &root_path));
+        // No settling rule on this path: pressing Detect is saying "now", and
+        // second-guessing that would look exactly like the button not working.
+        steps.push(run_analysis(&app, &root_path, None));
 
         let ok = steps.iter().all(|s| s.exit_code == Some(0));
         Ok(DetectReport { ok, steps })
@@ -802,6 +869,74 @@ mod tests {
     #[test]
     fn each_root_remembers_separately() {
         assert_ne!(skiptro_stamp_key(1), skiptro_stamp_key(2));
+    }
+
+    // ---- the settling rule ----
+
+    use crate::analyse::{Episode, Season};
+
+    fn season(label: &str, mtimes: &[i64]) -> Season {
+        Season {
+            label: label.into(),
+            episodes: mtimes
+                .iter()
+                .map(|mtime| Episode {
+                    file_id: 0,
+                    path: String::new(),
+                    size: 1,
+                    mtime: *mtime,
+                })
+                .collect(),
+        }
+    }
+
+    /// A season nobody has touched for a while is ready.
+    #[test]
+    fn a_settled_season_is_analysed() {
+        let old = super::now_secs() - 3600;
+        let (ready, settling) =
+            super::split_settled(vec![season("s1", &[old, old])], Some(super::SETTLING_SECS));
+        assert_eq!(ready.len(), 1);
+        assert!(settling.is_empty());
+    }
+
+    /// One file still arriving holds back the **whole** season, because the
+    /// analysis compares episodes against each other — fingerprinting the other
+    /// nine now only means fingerprinting them again when the tenth lands.
+    #[test]
+    fn one_file_still_being_written_holds_back_its_season() {
+        let old = super::now_secs() - 3600;
+        let just_now = super::now_secs();
+        let (ready, settling) = super::split_settled(
+            vec![season("s1", &[old, old, just_now])],
+            Some(super::SETTLING_SECS),
+        );
+        assert!(ready.is_empty());
+        assert_eq!(settling.len(), 1);
+    }
+
+    /// …and only its own season. A download in one show must not stop every
+    /// other show in the library being analysed.
+    #[test]
+    fn a_download_does_not_hold_back_other_seasons() {
+        let old = super::now_secs() - 3600;
+        let (ready, settling) = super::split_settled(
+            vec![season("busy", &[super::now_secs()]), season("quiet", &[old])],
+            Some(super::SETTLING_SECS),
+        );
+        assert_eq!(ready.len(), 1);
+        assert_eq!(ready[0].label, "quiet");
+        assert_eq!(settling.len(), 1);
+    }
+
+    /// The Detect button waits for nothing. Pressing it is saying "now", and a
+    /// button that quietly declined would look exactly like a broken one.
+    #[test]
+    fn the_manual_path_ignores_settling_entirely() {
+        let (ready, settling) =
+            super::split_settled(vec![season("s1", &[super::now_secs()])], None);
+        assert_eq!(ready.len(), 1);
+        assert!(settling.is_empty());
     }
 
     #[test]

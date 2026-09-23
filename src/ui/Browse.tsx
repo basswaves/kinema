@@ -92,6 +92,13 @@ function resolveNavHop(
 
 export default function Browse() {
   const [titles, setTitles] = useState<Title[]>([]);
+  /**
+   * Whether the library has been read at least once. Until it has, "no
+   * titles" means "not asked yet", not "empty" — and Home must not show the
+   * first-run panel for it. It did, for about a second at every launch, and
+   * that panel's focus claim was what left the remote dead afterwards.
+   */
+  const [loaded, setLoaded] = useState(false);
   const [resumable, setResumable] = useState<ContinueItem[]>([]);
   const [view, setView] = useState<View>({ name: 'home' });
   const [query, setQuery] = useState('');
@@ -122,6 +129,8 @@ export default function Browse() {
       setResumable(resume);
     } catch (e) {
       setError(String(e));
+    } finally {
+      setLoaded(true);
     }
   }, []);
 
@@ -412,6 +421,7 @@ export default function Browse() {
         {view.name === 'home' && (
           <Home
             titles={titles}
+            loaded={loaded}
             resumable={resumable}
             onSelect={(title) => setView({ name: 'detail', title })}
             onPlay={(title) => void playTitle(title)}

@@ -18,6 +18,8 @@ import { parseGenres, type Title } from './api';
 
 interface Props {
   titles: Title[];
+  /** False until the library has been read once — see `loaded` in Browse. */
+  loaded: boolean;
   resumable: ContinueItem[];
   onSelect: (title: Title) => void;
   onPlay: (title: Title) => void;
@@ -41,6 +43,7 @@ const HERO_PLAY_FOCUS_KEY = 'hero-play';
 
 export default function Home({
   titles,
+  loaded,
   resumable,
   onSelect,
   onPlay,
@@ -89,7 +92,10 @@ export default function Home({
   // covers the other way to arrive here — every root removed — where the same
   // two controls are exactly what is needed.
   if (titles.length === 0) {
-    return <FirstRun onDone={onLibraryChanged} />;
+    // Nothing rather than the setup panel while the first read is in flight:
+    // the view behind is already opaque, and a blank moment is better than a
+    // panel that flashes up at every launch and takes focus with it.
+    return loaded ? <FirstRun onDone={onLibraryChanged} /> : null;
   }
 
   return (

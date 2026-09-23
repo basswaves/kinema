@@ -300,6 +300,26 @@ export function listenerCounts(): Record<string, number> {
   return Object.fromEntries([...eventListeners].map(([event, list]) => [event, list.length]));
 }
 
+// ---- switches for a check -------------------------------------------------
+
+/**
+ * Read once at load from `localStorage`, so they survive the reload a check
+ * needs: `kinemaMockSlowMs` delays the library read (a real first read is not
+ * instant), `kinemaMockEmpty` presents an empty library (a first run).
+ */
+function flag(name: string): string | null {
+  try {
+    return localStorage.getItem(name);
+  } catch {
+    return null;
+  }
+}
+const SLOW_MS = Number(flag('kinemaMockSlowMs') ?? 0) || 0;
+const EMPTY = flag('kinemaMockEmpty') === '1';
+
+const later = <T,>(value: T): Promise<T> =>
+  new Promise((resolve) => window.setTimeout(() => resolve(value), SLOW_MS));
+
 // ---- the command table ----------------------------------------------------
 
 type Args = Record<string, unknown>;
@@ -322,7 +342,7 @@ const handlers: Record<string, Handler> = {
   list_media_files: () => [],
 
   // metadata
-  list_titles: () => titles,
+  list_titles: () => later(EMPTY ? [] : titles),
   get_title_detail: (a) => titleDetail(num(a, 'titleId')),
   list_unmatched: () => [],
   list_needs_review: () => [],

@@ -43,7 +43,7 @@ const titles: Title[] = [
     provider: 'tmdb',
     title: 'Example Show',
     year: 2001,
-    overview: 'A fixture series: four episodes, each with a different kind of intro.',
+    overview: 'A fixture series: five episodes, each with a different kind of intro.',
     genres: JSON.stringify(['Comedy']),
     runtime_mins: 25,
     poster_url: null,
@@ -55,7 +55,7 @@ const titles: Title[] = [
     trailer_key: null,
     trailer_site: null,
     rating: 7.9,
-    file_count: 4,
+    file_count: 5,
     added_at: 2,
   },
   {
@@ -119,13 +119,24 @@ const files: FixtureFile[] = [
     duration: 1440,
     markers: { ...intro(0, 44, 'analysis'), credits: { start: 1330, end: null }, credits_source: 'analysis' },
   },
-  // No markers from any source. Last in the season, so nothing follows it.
+  // No markers from any source, with a next episode: the credits here can only
+  // be the tail guess, which may offer but never decide.
   {
     id: 104,
     titleId: SERIES_ID,
     path: 'C:\\fixture\\Example Show\\Season 1\\Example.Show.S01E04.mkv',
     season: 1,
     episode: 4,
+    duration: 1500,
+    markers: null,
+  },
+  // Last in the season, so nothing follows it and no guess is made.
+  {
+    id: 105,
+    titleId: SERIES_ID,
+    path: 'C:\\fixture\\Example Show\\Season 1\\Example.Show.S01E05.mkv',
+    season: 1,
+    episode: 5,
     duration: 1500,
     markers: null,
   },

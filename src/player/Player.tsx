@@ -804,6 +804,8 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     [fileReady, resolved.markers, timePos]
   );
   const activeKey = active?.key ?? null;
+  /** The credits segment is the tail guess, not a marker or a chapter. */
+  const guessedCredits = resolved.creditsSource === 'tail';
   const activeKind = active?.kind ?? null;
 
   const performSkip = useCallback(async () => {
@@ -833,6 +835,10 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     // path has always refused this; automatic mode did not, and the two new
     // credits sources make it reachable in a way a measured sidecar never was.
     if (active.kind === 'credits' && !neighbours.next) return;
+    // A guessed credits start (`duration − N`) may offer, never decide — in
+    // automatic mode too. It raises the Up next card below instead of ending
+    // the file, so a wrong guess costs a card, not the end of the episode.
+    if (active.kind === 'credits' && guessedCredits) return;
     // The intro is offered from 0:00, through any cold open. Pressing the
     // button there skips the cold open too, which is a person's choice to
     // make; automatic mode waits until the intro itself has begun.
@@ -840,7 +846,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     if (autoHandled.current.has(active.key)) return;
     autoHandled.current.add(active.key);
     void performSkip();
-  }, [autoSkip, active, performSkip, neighbours.next]);
+  }, [autoSkip, active, performSkip, neighbours.next, guessedCredits]);
 
   /**
    * Offer the next episode as soon as the credits start, without ending the
@@ -852,7 +858,9 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
    */
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
-    if (autoSkip) return;
+    // Automatic mode acts on measured credits by itself; a guess still only
+    // gets to offer, so it falls through to the card.
+    if (autoSkip && !guessedCredits) return;
 
     // An offer with no countdown is tied to *being in the credits*. When the
     // credits are no longer where we are — the file changed, the user seeked
@@ -873,7 +881,16 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     }
     if (!upNext) setUpNext(neighbours.next);
     /* eslint-enable react-hooks/set-state-in-effect */
-  }, [autoSkip, activeKind, activeKey, countdown, dismissed, neighbours.next, upNext]);
+  }, [
+    autoSkip,
+    guessedCredits,
+    activeKind,
+    activeKey,
+    countdown,
+    dismissed,
+    neighbours.next,
+    upNext,
+  ]);
 
   // There is deliberately no timer taking the Skip intro button away. It used
   // to leave after ten seconds, which on an intro offered from 0:00 would

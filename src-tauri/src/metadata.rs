@@ -364,50 +364,7 @@ pub fn get_title_detail(
         )
         .map_err(to_string_err)?;
 
-    // LEFT JOIN: episodes the provider knows about but we do not own still
-    // appear, greyed out. Hiding them would misrepresent the season.
-    let mut stmt = conn
-        .prepare(
-            "SELECT e.id, e.season, e.episode, e.name, e.overview, e.air_date,
-                    e.runtime_mins, e.still_url, m.path, m.id,
-                    (SELECT :art || a.local_path FROM artwork_cache a
-                      WHERE a.url = e.still_url AND a.local_path <> ''),
-                    COALESCE(p.completed, 0), p.position_secs, p.duration_secs
-               FROM episodes e
-               LEFT JOIN media_files m ON m.title_id = e.title_id
-                                      AND m.parsed_season = e.season
-                                      AND m.parsed_episode = e.episode
-                                      AND m.missing = 0
-               -- Joined through the file, so an episode the library does not
-               -- hold can never inherit another file's progress.
-               LEFT JOIN playback_state p ON p.file_id = m.id
-              WHERE e.title_id = :id
-              ORDER BY e.season, e.episode",
-        )
-        .map_err(to_string_err)?;
-
-    let episodes = stmt
-        .query_map(named_params! { ":art": &art, ":id": title_id }, |r| {
-            Ok(Episode {
-                id: r.get(0)?,
-                season: r.get(1)?,
-                episode: r.get(2)?,
-                name: r.get(3)?,
-                overview: r.get(4)?,
-                air_date: r.get(5)?,
-                runtime_mins: r.get(6)?,
-                still_url: r.get(7)?,
-                file_path: r.get(8)?,
-                file_id: r.get(9)?,
-                still_path: r.get(10)?,
-                watched: r.get::<_, i64>(11)? != 0,
-                position_secs: r.get(12)?,
-                duration_secs: r.get(13)?,
-            })
-        })
-        .map_err(to_string_err)?
-        .collect::<rusqlite::Result<Vec<_>>>()
-        .map_err(to_string_err)?;
+    let episodes = episodes_for(&conn, &art, title_id)?;
 
     let movie: Option<(String, i64, bool)> = conn
         .query_row(
@@ -458,6 +415,91 @@ pub fn get_title_detail(
         movie_file_id: movie.as_ref().map(|m| m.1),
         movie_watched: movie.map(|m| m.2).unwrap_or(false),
     })
+}
+
+/// One row per episode for the detail page.
+///
+/// Three rules, each fixing a way the list used to be wrong:
+///
+/// * **One file per episode.** Joining files straight onto episodes gave a row
+///   per *file*, so a season holding a 1080p and a 2160p copy of an episode
+///   listed it twice — the same key twice, the same focus key twice, and a
+///   D-pad that could not tell the rows apart. The copy that has been watched
+///   most recently wins, since its resume point and tick are what the row
+///   should show; otherwise the largest, the same choice a film makes.
+/// * **Episodes the library lacks still appear**, greyed out: a season with
+///   gaps should look like one.
+/// * **Files the provider does not list appear too.** A file whose numbering
+///   is not in the fetched episode list — a special the provider numbers
+///   differently, a list that is incomplete — was silently left off the page
+///   while being perfectly playable. It gets a row of its own, with a
+///   negative id so it can never collide with a real episode's.
+///
+/// Progress is joined through the chosen file, so an episode the library does
+/// not hold can never inherit another file's progress.
+pub(crate) fn episodes_for(
+    conn: &rusqlite::Connection,
+    art: &str,
+    title_id: i64,
+) -> Result<Vec<Episode>, String> {
+    let mut stmt = conn
+        .prepare(
+            "WITH owned AS (
+                 SELECT m.id, m.path, m.parsed_season AS season, m.parsed_episode AS episode,
+                        COALESCE(p.completed, 0) AS completed, p.position_secs, p.duration_secs,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY m.parsed_season, m.parsed_episode
+                            ORDER BY p.updated_at IS NULL, p.updated_at DESC, m.size_bytes DESC, m.id
+                        ) AS pick
+                   FROM media_files m
+                   LEFT JOIN playback_state p ON p.file_id = m.id
+                  WHERE m.title_id = :id AND m.missing = 0
+                    AND m.parsed_season IS NOT NULL AND m.parsed_episode IS NOT NULL
+             ),
+             chosen AS (SELECT * FROM owned WHERE pick = 1)
+             SELECT e.id, e.season, e.episode, e.name, e.overview, e.air_date,
+                    e.runtime_mins, e.still_url, c.path, c.id,
+                    (SELECT :art || a.local_path FROM artwork_cache a
+                      WHERE a.url = e.still_url AND a.local_path <> ''),
+                    COALESCE(c.completed, 0), c.position_secs, c.duration_secs
+               FROM episodes e
+               LEFT JOIN chosen c ON c.season = e.season AND c.episode = e.episode
+              WHERE e.title_id = :id
+             UNION ALL
+             SELECT -c.id, c.season, c.episode, NULL, NULL, NULL,
+                    NULL, NULL, c.path, c.id, NULL,
+                    c.completed, c.position_secs, c.duration_secs
+               FROM chosen c
+              WHERE NOT EXISTS (SELECT 1 FROM episodes e
+                                 WHERE e.title_id = :id
+                                   AND e.season = c.season AND e.episode = c.episode)
+              ORDER BY 2, 3",
+        )
+        .map_err(to_string_err)?;
+
+    let rows = stmt
+        .query_map(named_params! { ":art": art, ":id": title_id }, |r| {
+            Ok(Episode {
+                id: r.get(0)?,
+                season: r.get(1)?,
+                episode: r.get(2)?,
+                name: r.get(3)?,
+                overview: r.get(4)?,
+                air_date: r.get(5)?,
+                runtime_mins: r.get(6)?,
+                still_url: r.get(7)?,
+                file_path: r.get(8)?,
+                file_id: r.get(9)?,
+                still_path: r.get(10)?,
+                watched: r.get::<_, i64>(11)? != 0,
+                position_secs: r.get(12)?,
+                duration_secs: r.get(13)?,
+            })
+        })
+        .map_err(to_string_err)?
+        .collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(to_string_err)?;
+    Ok(rows)
 }
 
 #[tauri::command]
@@ -588,4 +630,99 @@ pub fn list_unmatched(
          ORDER BY m.parsed_title, m.parsed_season, m.parsed_episode LIMIT ?1",
         limit,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::episodes_for;
+    use rusqlite::params;
+
+    /// A real library: one series, three provider episodes, and files that
+    /// cover every case the detail list has to get right.
+    fn library(name: &str) -> rusqlite::Connection {
+        let dir = std::env::temp_dir().join(format!("pn-metadata-{name}"));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let conn = crate::db::open(&dir.join("library.db")).unwrap();
+        conn.execute_batch(
+            "INSERT INTO library_roots (id, path, kind, added_at) VALUES (1, 'C:/tv', 'tv', 0);
+             INSERT INTO titles (id, kind, provider, provider_id, title, fetched_at)
+                  VALUES (1, 'series', 'tmdb', '1', 'Show', 0);
+             INSERT INTO episodes (id, title_id, season, episode, name) VALUES
+                  (11, 1, 1, 1, 'Pilot'), (12, 1, 1, 2, 'Two'), (13, 1, 1, 3, 'Three');",
+        )
+        .unwrap();
+        let file = |id: i64, episode: i64, size: i64| {
+            conn.execute(
+                "INSERT INTO media_files (id, root_id, path, parent_dir, file_name, extension,
+                     size_bytes, modified_at, first_seen_at, last_seen_at, match_status,
+                     title_id, parsed_season, parsed_episode)
+                 VALUES (?1, 1, ?2, 'C:/tv', ?2, 'mkv', ?3, 0, 0, 0, 'matched', 1, 1, ?4)",
+                params![id, format!("C:/tv/e{episode}-{id}.mkv"), size, episode],
+            )
+            .unwrap();
+        };
+        file(101, 1, 1_000); // E01, small copy — the one that was watched
+        file(102, 1, 9_000); // E01, large copy — never played
+        file(103, 2, 5_000); // E02, the only copy
+        file(104, 4, 5_000); // E04 — not in the provider's list at all
+        conn.execute(
+            "INSERT INTO playback_state (file_id, position_secs, duration_secs, completed, updated_at)
+             VALUES (101, 1400, 1450, 1, 50)",
+            [],
+        )
+        .unwrap();
+        conn
+    }
+
+    #[test]
+    fn two_copies_of_an_episode_make_one_row() {
+        let conn = library("dupes");
+        let rows = episodes_for(&conn, "", 1).unwrap();
+        let e01: Vec<_> = rows.iter().filter(|e| e.season == 1 && e.episode == 1).collect();
+        assert_eq!(e01.len(), 1, "one row for S01E01");
+        // The watched copy is the one shown, so the tick is right.
+        assert_eq!(e01[0].file_id, Some(101));
+        assert!(e01[0].watched);
+    }
+
+    /// Without any history, the larger copy — the same rule a film uses.
+    #[test]
+    fn with_no_history_the_larger_copy_is_chosen() {
+        let conn = library("larger");
+        conn.execute("DELETE FROM playback_state", []).unwrap();
+        let rows = episodes_for(&conn, "", 1).unwrap();
+        let e01 = rows.iter().find(|e| e.season == 1 && e.episode == 1).unwrap();
+        assert_eq!(e01.file_id, Some(102));
+    }
+
+    #[test]
+    fn a_missing_episode_still_has_a_row_without_a_file() {
+        let conn = library("missing");
+        let rows = episodes_for(&conn, "", 1).unwrap();
+        let e03 = rows.iter().find(|e| e.episode == 3).unwrap();
+        assert_eq!(e03.file_id, None);
+        assert_eq!(e03.name.as_deref(), Some("Three"));
+    }
+
+    /// The file was playable and invisible: its number is not in the list.
+    #[test]
+    fn a_file_the_provider_does_not_list_gets_its_own_row() {
+        let conn = library("unlisted");
+        let rows = episodes_for(&conn, "", 1).unwrap();
+        let e04 = rows.iter().find(|e| e.episode == 4).expect("E04 must appear");
+        assert_eq!(e04.file_id, Some(104));
+        assert!(e04.id < 0, "an id that cannot collide with a real episode's");
+    }
+
+    #[test]
+    fn rows_come_in_order_and_keys_are_unique() {
+        let conn = library("order");
+        let rows = episodes_for(&conn, "", 1).unwrap();
+        let order: Vec<_> = rows.iter().map(|e| (e.season, e.episode)).collect();
+        assert_eq!(order, vec![(1, 1), (1, 2), (1, 3), (1, 4)]);
+        let mut ids: Vec<_> = rows.iter().map(|e| e.id).collect();
+        ids.dedup();
+        assert_eq!(ids.len(), rows.len());
+    }
 }

@@ -100,6 +100,11 @@ const MARKER_LOG_SETTLE_MS = 3000;
  * hidden: after this the cover goes regardless.
  */
 const COVER_MAX_MS = 8000;
+/**
+ * How far a remote's fast-forward and rewind keys jump. Longer than the
+ * arrows' 10 s: those are the fine control, these are for getting somewhere.
+ */
+const TRANSPORT_SKIP_SECS = 30;
 
 /**
  * Focus keys for the two places focus is aimed at explicitly: the control the
@@ -1115,8 +1120,11 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         // Backspace is deliberately still the same key as Escape here: it is
         // what a remote's Back button sends, and two Back keys that stop at
         // different layers is the sort of split nobody remembers later.
+        //
+        // `BrowserBack` is what many remotes' Back button sends instead.
         case 'Escape':
         case 'Backspace':
+        case 'BrowserBack':
           e.preventDefault();
           if (showTracks) {
             setShowTracks(false);
@@ -1168,6 +1176,35 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
             playNeighbour(neighbours.prev);
           }
           break;
+        // The transport keys on a remote or a keyboard's media row. Handled in
+        // both modes: they never move focus, so they cannot collide with the
+        // spatial system the way the arrows would.
+        case 'MediaPlayPause':
+          e.preventDefault();
+          void togglePause();
+          break;
+        case 'MediaPlay':
+          e.preventDefault();
+          void setProperty('pause', false).then(showOsd);
+          break;
+        case 'MediaPause':
+          e.preventDefault();
+          void setProperty('pause', true).then(showOsd);
+          break;
+        // Stop means leave the player, the same way out as Back takes from
+        // the top of its ladder — including out of fullscreen.
+        case 'MediaStop':
+          e.preventDefault();
+          void exit();
+          break;
+        case 'MediaFastForward':
+          e.preventDefault();
+          void seekRelative(TRANSPORT_SKIP_SECS);
+          break;
+        case 'MediaRewind':
+          e.preventDefault();
+          void seekRelative(-TRANSPORT_SKIP_SECS);
+          break;
         // mpv's own key for its stats overlay, so the reflex transfers.
         case 'i':
           e.preventDefault();
@@ -1203,6 +1240,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     togglePause,
     toggleFullscreen,
     backOut,
+    exit,
     seekRelative,
     showOsd,
     skipPrompt,

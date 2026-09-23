@@ -375,7 +375,7 @@ export default function Browse() {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (view.name === 'player') return; // the player owns its own keys
-      if (e.key === 'Escape' || e.key === 'Backspace') {
+      if (e.key === 'Escape' || e.key === 'Backspace' || e.key === 'BrowserBack') {
         const target = e.target as HTMLElement;
         if (target.tagName === 'INPUT') return;
         e.preventDefault();

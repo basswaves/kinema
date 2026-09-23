@@ -74,7 +74,10 @@ export default function App() {
         e.preventDefault();
         e.stopPropagation();
         setShortcutsOpen(true);
-      } else if (showShortcuts && (e.key === 'Escape' || e.key === 'Backspace' || e.key === '?')) {
+      } else if (
+        showShortcuts &&
+        (e.key === 'Escape' || e.key === 'Backspace' || e.key === 'BrowserBack' || e.key === '?')
+      ) {
         e.preventDefault();
         e.stopPropagation();
         setShortcutsOpen(false);

@@ -239,13 +239,24 @@ pub fn parse_nfo(raw: &str, source: &str) -> Option<Nfo> {
                         "tvdbid" => ids.set("tvdb", text),
                         "imdbid" | "imdb_id" => ids.set("imdb", text),
                         // Bare <id> is ambiguous by design — Kodi wrote
-                        // whatever the active scraper used. Route it by what it
-                        // looks like rather than guessing a provider.
+                        // whatever the active scraper used. An IMDb id says
+                        // what it is. A bare number does not, and it used to
+                        // be taken as a TMDB id — with the NFO's full authority,
+                        // so no score and no second look. But Kodi's TV
+                        // scraper was TheTVDB for most of its life, so on an
+                        // old <tvshow> that number is a TVDB id, and read as
+                        // TMDB it named an unrelated show outright.
+                        //
+                        // So: on a show, TVDB — which resolves exactly or not
+                        // at all through TVmaze. On a film, nothing: the
+                        // number could be either, and a guessed id is the one
+                        // thing an NFO must not supply. The film's <title>
+                        // still gets searched and scored normally.
                         "id" => {
                             if plausible_imdb(text) {
                                 ids.set("imdb", text);
-                            } else if plausible_numeric(text) {
-                                ids.set("tmdb", text);
+                            } else if plausible_numeric(text) && kind == Some(NfoKind::Tvshow) {
+                                ids.set("tvdb", text);
                             }
                         }
                         "title" if title.is_none() => title = Some(text.to_string()),
@@ -725,6 +736,35 @@ mod tests {
         let nfo = parse_nfo(raw, "x.nfo").expect("should parse");
         assert!(nfo.ids.is_empty());
         assert_eq!(nfo.title.as_deref(), Some("Something"));
+    }
+
+    /// Kodi's TV scraper was TheTVDB for years: a bare number on an old
+    /// tvshow.nfo is a TVDB id. Read as TMDB it named an unrelated show with
+    /// full authority.
+    #[test]
+    fn a_bare_numeric_id_on_a_show_is_tvdb() {
+        let raw = "<tvshow><title>Severance</title><id>371980</id></tvshow>";
+        let nfo = parse_nfo(raw, "tvshow.nfo").expect("should parse");
+        assert_eq!(nfo.ids.tvdb.as_deref(), Some("371980"));
+        assert_eq!(nfo.ids.tmdb, None);
+    }
+
+    /// On a film the number could be either provider's, so it is not used as
+    /// an id at all — the title is still searched and scored normally.
+    #[test]
+    fn a_bare_numeric_id_on_a_film_is_not_trusted() {
+        let raw = "<movie><title>Blade Runner 2049</title><id>335984</id></movie>";
+        let nfo = parse_nfo(raw, "x.nfo").expect("should parse");
+        assert!(nfo.ids.is_empty());
+        assert_eq!(nfo.title.as_deref(), Some("Blade Runner 2049"));
+    }
+
+    /// An IMDb id says what it is, wherever it appears.
+    #[test]
+    fn a_bare_imdb_id_is_still_read() {
+        let raw = "<movie><title>X</title><id>tt1856101</id></movie>";
+        let nfo = parse_nfo(raw, "x.nfo").expect("should parse");
+        assert_eq!(nfo.ids.imdb.as_deref(), Some("tt1856101"));
     }
 
     #[test]

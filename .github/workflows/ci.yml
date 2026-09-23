@@ -31,6 +31,8 @@ jobs:
           cache: npm
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -55,3 +57,9 @@ jobs:
       # linked, so the 95 MB download is not a test dependency.
       - name: Rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      # Warnings fail the build. Clippy's warnings here have been the cheap
+      # kind — a sort that could be simpler, an item after the tests — and
+      # the only way they stay cheap is by never being allowed to pile up.
+      - name: Rust lints
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings

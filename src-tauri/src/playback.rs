@@ -337,7 +337,7 @@ pub fn continue_watching(
         items.push(item);
     }
 
-    items.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+    items.sort_by_key(|item| std::cmp::Reverse(item.updated_at));
     items.truncate(limit.max(0) as usize);
     Ok(items)
 }

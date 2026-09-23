@@ -93,6 +93,7 @@ is a real state this project has been in for months — see GOTCHAS.
 
 ```bash
 cargo test --manifest-path src-tauri/Cargo.toml
+cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 ```
 
 Rust changes only. `cargo build` fails while the app is running; stop it first.

@@ -337,6 +337,35 @@ fn write_batch(
     tx.commit()
 }
 
+/// Flag anything under this root the walk did not see.
+///
+/// Flagged, never deleted — the user may have unplugged a drive, and their
+/// watch history should survive that.
+fn mark_missing(
+    conn: &mut Connection,
+    root_id: i64,
+    seen_paths: &HashSet<String>,
+    report: &mut ScanReport,
+) -> rusqlite::Result<()> {
+    let tx = conn.transaction()?;
+    {
+        let mut stale =
+            tx.prepare("SELECT id, path FROM media_files WHERE root_id = ?1 AND missing = 0")?;
+        let candidates: Vec<(i64, String)> = stale
+            .query_map(params![root_id], |r| Ok((r.get(0)?, r.get(1)?)))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+
+        let mut mark = tx.prepare("UPDATE media_files SET missing = 1 WHERE id = ?1")?;
+        for (id, path) in candidates {
+            if !seen_paths.contains(&path) {
+                mark.execute(params![id])?;
+                report.files_missing += 1;
+            }
+        }
+    }
+    tx.commit()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -456,33 +485,4 @@ mod tests {
             .unwrap();
         assert_eq!(rows, 0);
     }
-}
-
-/// Flag anything under this root the walk did not see.
-///
-/// Flagged, never deleted — the user may have unplugged a drive, and their
-/// watch history should survive that.
-fn mark_missing(
-    conn: &mut Connection,
-    root_id: i64,
-    seen_paths: &HashSet<String>,
-    report: &mut ScanReport,
-) -> rusqlite::Result<()> {
-    let tx = conn.transaction()?;
-    {
-        let mut stale =
-            tx.prepare("SELECT id, path FROM media_files WHERE root_id = ?1 AND missing = 0")?;
-        let candidates: Vec<(i64, String)> = stale
-            .query_map(params![root_id], |r| Ok((r.get(0)?, r.get(1)?)))?
-            .collect::<rusqlite::Result<Vec<_>>>()?;
-
-        let mut mark = tx.prepare("UPDATE media_files SET missing = 1 WHERE id = ?1")?;
-        for (id, path) in candidates {
-            if !seen_paths.contains(&path) {
-                mark.execute(params![id])?;
-                report.files_missing += 1;
-            }
-        }
-    }
-    tx.commit()
 }

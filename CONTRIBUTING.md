@@ -76,7 +76,10 @@ For Rust changes:
 
 ```bash
 cargo test --manifest-path src-tauri/Cargo.toml
+cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 ```
+
+CI runs clippy with warnings as errors, so a new warning fails the build.
 
 `cargo build` fails while the app is running — stop it first.
 

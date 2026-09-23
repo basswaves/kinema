@@ -1231,6 +1231,37 @@ back, because skipping no longer records a dismissal.
 between Skiptro and the analysis was a detection Skiptro scored 0.70 or less.
 Below 0.8 the analysis answers. See `MIN_SKIPTRO_CONFIDENCE` in `skip.rs`.
 
+**Watched means the story is over, not the file.** A file counts as watched
+at 94%, or once playback passes a credits start that sits in the second half
+of the file — long end credits no longer leave a finished episode in Continue
+watching. A file whose modification time is under two minutes old is never
+marked watched: it may still be arriving, and its length is not yet its real
+length. A double-episode file (`S01E01-E02`) is both of its episodes, on the
+detail page and for Up next. Removing something from Continue watching hides
+it rather than erasing its position.
+
+**A changed file keeps its match.** The scanner used to reset parse and match
+whenever a file's size or date changed, which undid every hand-made fix the
+next time a file was touched. Now only the size, date and presence are
+updated; watch state is still cleared on a size change, since a different
+file is a different position.
+
+**Hand-made decisions last.** Unlinking a file puts a hold on it
+(`media_files.match_hold`, schema v12) so the next launch does not match it
+straight back; linking by hand clears it. A group the matcher refused is not
+re-asked every launch — only when a TMDB or OMDb key is added or changed,
+which is the one event that can change the answer. The 0.75 threshold and the
+0.05 margin are untouched.
+
+**A file with no title is shown, not dropped.** The title comes from the show
+folder when neither the file nor its season folder has one, bounded by the
+library root; a file that still has none goes to Needs attention instead of
+disappearing from the library.
+
+**The analysis counts episodes, not matches.** "Found between this episode and
+at least two others" now means two distinct other episodes; one episode that
+matched twice used to supply both votes. Stored results were not recomputed.
+
 **Testing is done without the owner.** `npm run dev:mock` and
 `scripts/selftest.ps1` exist so every change can be checked — keyboard-only in
 a browser against a fake mpv, and in the real app against a copy of the real

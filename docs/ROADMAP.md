@@ -31,22 +31,15 @@ a receiver.
 
 Agreed with the owner on 2026-09-23 after a full review of the code, the logs and
 the library database. One commit per item on `master`. Phase 0 (the safety
-net and the test tools), Phase 1 (starting playback and the Skip button) and
-Phase 2 (watching correctness) are done — see PLAN.md for what they decided;
-what follows is what is left, in order.
+net and the test tools), Phase 1 (starting playback and the Skip button),
+Phase 2 (watching correctness) and Phase 3 (library and matching) are done —
+see PLAN.md for what they decided; what follows is what is left, in order.
 
 Decisions that shape it: the **Skip intro button shows from 0:00** whenever an
 intro is known and stays until the intro ends, and pressing it during a cold
 open jumps to the end of the intro (chosen knowingly — it skips the cold open
 too); **Skiptro stays first** for intros where its confidence is at least 0.8;
 nothing is tested by hand.
-
-**Phase 3 — library and matching.** Title from the show folder when the file
-and its season folder have none; untitled files go to Needs attention rather
-than vanishing. Unlink and manual links survive the next launch and a touched
-file. Refused groups re-asked only when keys change. The NFO bare-`<id>` trap.
-Trailer lookups not repeated every launch. TVmaze pacing. Artwork downloaded
-in the scan that found it. The analysis's two-other-episodes rule.
 
 **Phase 4 — responsiveness.** Slow commands off the main thread; one job
 runner for scan, detection and artwork (no double runs, cancellable).

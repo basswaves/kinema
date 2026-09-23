@@ -192,7 +192,16 @@ pub fn run() {
             nfo::read_show_nfo,
             nfo::write_nfo,
             nfo::nfo_targets,
+            jobs::stop_detection,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while running tauri application")
+        .run(|app, event| {
+            // Windows does not end a child with its parent: without this a
+            // Skiptro started by the scan goes on scanning after the window
+            // has closed, where nobody can see it or stop it.
+            if let tauri::RunEvent::Exit = event {
+                app.state::<jobs::Jobs>().stop_detection();
+            }
+        });
 }

@@ -29,6 +29,7 @@ import {
   analysisBacklog,
   AUTO_ANALYSE_KEY,
   detectIntros,
+  stopDetection,
   ffmpegStatus,
   listLibraryRoots,
   removeLibraryRoot,
@@ -177,6 +178,16 @@ export default function Settings() {
    */
   const [backlog, setBacklog] = useState<Record<number, number>>({});
   const [detectLine, setDetectLine] = useState('');
+  /**
+   * How the last Detect ended, shown in that folder's own row. It used to go
+   * to the banner under the page title, a screen and a half above the button —
+   * the trap GOTCHAS describes, where a working button reads as a dead one.
+   */
+  const [detectOutcome, setDetectOutcome] = useState<{
+    path: string;
+    text: string;
+    failed: boolean;
+  } | null>(null);
   /**
    * Whether the Skiptro fields have finished loading from the database.
    *
@@ -335,19 +346,24 @@ export default function Settings() {
     async (root: LibraryRoot) => {
       setError(null);
       setNote(null);
+      setDetectOutcome(null);
       setDetectLine('');
       setDetecting(root.path);
+      const outcome = (text: string, failed = false) =>
+        setDetectOutcome({ path: root.path, text, failed });
       try {
         // Flush the command fields before reading them in Rust. The debounce
         // above would almost always have fired by now, and "almost always" is
         // how you get a detect run that silently used the previous command.
         await saveSkiptroFields();
         const report = await detectIntros(root.path);
-        if (report.ok) {
+        if (report.stopped) {
+          outcome('Stopped. Seasons it had finished are kept; the rest is picked up next time.');
+        } else if (report.ok) {
           // No longer "sidecars written": the detections go into Skiptro's own
           // database and are read from there. Nothing is written beside the
           // videos unless an export command has been typed back in.
-          setNote(`Intro detection finished for ${root.path}.`);
+          outcome('Finished.');
         } else {
           // Name the step that actually failed, and name it *correctly*. This
           // used to take the last step and call it Skiptro — but this app's own
@@ -360,10 +376,10 @@ export default function Settings() {
           const owner = failed?.step === 'analyse' ? 'Detection' : `Skiptro "${failed?.step}"`;
           const code = failed?.exit_code === null ? 'did not finish' : `exited with ${failed?.exit_code}`;
           const detail = failed?.tail.slice(-3).join(' · ') || 'no output';
-          setError(`${owner} ${code}: ${detail}`);
+          outcome(`${owner} ${code}: ${detail}`, true);
         }
       } catch (e) {
-        setError(String(e));
+        outcome(String(e), true);
       } finally {
         setDetecting(null);
         setDetectLine('');
@@ -485,8 +501,15 @@ export default function Settings() {
             <FocusButton className="btn-secondary" onSelect={() => void pickFolder('tv')}>
               Add TV folder
             </FocusButton>
-            <FocusButton className="btn-primary" onSelect={() => void scanNow()}>
-              {scan ? `${scan.stage}…` : 'Scan now'}
+            {/* During the scan's detection pass — minutes of work nobody asked
+                for by name — this same button stops it. The same button, not
+                a second one: a Stop that vanishes when detection ends takes
+                the remote's focus with it. */}
+            <FocusButton
+              className="btn-primary"
+              onSelect={() => void (scan?.stage === 'detecting' ? stopDetection() : scanNow())}
+            >
+              {scan?.stage === 'detecting' ? 'Stop detection' : scan ? `${scan.stage}…` : 'Scan now'}
             </FocusButton>
           </div>
 
@@ -496,6 +519,7 @@ export default function Settings() {
               {scan.detail ? ` — ${scan.detail}` : ''}
             </p>
           )}
+
           {!scan && last && <p className="muted">Last scan: {summaryLine(last)}</p>}
           {/* The report from the intro/credits pass at the end of the scan.
               Deliberately rendered even when every line is a "skipped": a
@@ -981,15 +1005,21 @@ export default function Settings() {
             .filter((root) => root.kind === 'tv')
             .map((root) => (
               <div className="settings-toggle-row" key={root.id}>
+                {/* While this folder is detecting, the button stops it — the
+                    same button rather than a Stop beside it, so focus has
+                    nowhere to fall when detection ends. Disabled for the other
+                    folders and during the scan's own pass: only one detection
+                    runs at a time, and the backend would refuse. */}
                 <FocusButton
                   className="btn-secondary"
-                  // Also while the scan's own detection pass runs: only one
-                  // detection runs at a time, and the backend would refuse.
-                  disabled={detecting !== null || scan?.stage === 'detecting'}
-                  onSelect={() => void runDetect(root)}
+                  disabled={
+                    (detecting !== null && detecting !== root.path) || scan?.stage === 'detecting'
+                  }
+                  onSelect={() => void (detecting === root.path ? stopDetection() : runDetect(root))}
                 >
-                  {detecting === root.path ? 'Detecting…' : 'Detect'}
+                  {detecting === root.path ? 'Stop detecting' : 'Detect'}
                 </FocusButton>
+
                 <span className="muted">
                   <code>{root.path}</code>
                   {/* The whole point of the count. Without it, a season added
@@ -1006,6 +1036,16 @@ export default function Settings() {
                     <>
                       <br />
                       <span className="settings-progress">{detectLine}</span>
+                    </>
+                  )}
+                  {detecting === null && detectOutcome?.path === root.path && (
+                    <>
+                      <br />
+                      {detectOutcome.failed ? (
+                        <strong>{detectOutcome.text}</strong>
+                      ) : (
+                        <span className="settings-progress">{detectOutcome.text}</span>
+                      )}
                     </>
                   )}
                 </span>

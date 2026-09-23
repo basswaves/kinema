@@ -26,8 +26,9 @@ pub async fn off_main<T: Send + 'static>(
 
 // ---- one of each at a time ---------------------------------------------------
 
+use std::process::Child;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 /// The long jobs, and which of them are running.
 ///
@@ -49,11 +50,21 @@ use std::sync::Arc;
 ///   may know URLs the first did not (the details pass finds logos and cast
 ///   photos), and a refusal would leave those to the next launch. A run after
 ///   another finds almost nothing left to do, so waiting costs little.
+///
+/// **Detection can be stopped** ([`Jobs::stop_detection`]): it is minutes of
+/// subprocess work, started by itself after a scan. The analysis checks
+/// between files, and a running Skiptro is killed outright — which is also
+/// what happens when the app closes, because Windows does not end a child
+/// process with its parent and a Skiptro left scanning after the window has
+/// gone is invisible to everyone.
 #[derive(Default)]
 pub struct Jobs {
     scan: Arc<AtomicBool>,
     detect: Arc<AtomicBool>,
     pub artwork: tauri::async_runtime::Mutex<()>,
+    stop_detect: AtomicBool,
+    /// The Skiptro process running right now, so Stop can end it.
+    child: Mutex<Option<Arc<Mutex<Child>>>>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -86,9 +97,60 @@ impl Jobs {
     pub fn try_start(&self, job: Job) -> Option<Running> {
         let flag = self.flag(job);
         flag.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-            .ok()
-            .map(|_| Running(flag.clone()))
+            .ok()?;
+        if job == Job::Detect {
+            // A Stop pressed for the previous run must not end this one.
+            self.stop_detect.store(false, Ordering::SeqCst);
+        }
+        Some(Running(flag.clone()))
     }
+
+    /// Ask the running detection to stop: the analysis at its next file, and a
+    /// running Skiptro now. Does nothing when no detection is running, so a
+    /// late press cannot stop the next one before it starts.
+    pub fn stop_detection(&self) {
+        if !self.detect.load(Ordering::SeqCst) {
+            return;
+        }
+        self.stop_detect.store(true, Ordering::SeqCst);
+        self.kill_child();
+    }
+
+    /// Whether the running detection has been asked to stop.
+    pub fn detection_stopped(&self) -> bool {
+        self.stop_detect.load(Ordering::SeqCst)
+    }
+
+    /// The flag itself, for work that checks it without knowing about jobs.
+    pub fn detection_stop_flag(&self) -> &AtomicBool {
+        &self.stop_detect
+    }
+
+    /// Register the Skiptro process now running, so Stop can end it. A Stop
+    /// that arrived just before this is honoured here.
+    pub fn watch_child(&self, child: Arc<Mutex<Child>>) {
+        *self.child.lock().unwrap_or_else(|e| e.into_inner()) = Some(child);
+        if self.detection_stopped() {
+            self.kill_child();
+        }
+    }
+
+    pub fn forget_child(&self) {
+        *self.child.lock().unwrap_or_else(|e| e.into_inner()) = None;
+    }
+
+    fn kill_child(&self) {
+        let slot = self.child.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(child) = slot.as_ref() {
+            let _ = child.lock().unwrap_or_else(|e| e.into_inner()).kill();
+        }
+    }
+}
+
+/// Tauri command: stop the detection that is running, if any.
+#[tauri::command]
+pub fn stop_detection(jobs: tauri::State<Jobs>) {
+    jobs.stop_detection();
 }
 
 #[cfg(test)]
@@ -115,6 +177,45 @@ mod tests {
         let jobs = Jobs::default();
         let _scan = jobs.try_start(Job::Scan);
         assert!(jobs.try_start(Job::Detect).is_some());
+    }
+
+    #[test]
+    fn stop_reaches_the_running_detection_only() {
+        let jobs = Jobs::default();
+        // Nothing running: a press is ignored...
+        jobs.stop_detection();
+        assert!(!jobs.detection_stopped());
+
+        let running = jobs.try_start(Job::Detect);
+        jobs.stop_detection();
+        assert!(jobs.detection_stopped());
+        drop(running);
+
+        // ...and a stopped run does not stop the next one.
+        let _next = jobs.try_start(Job::Detect);
+        assert!(!jobs.detection_stopped());
+    }
+
+    /// The whole point for Skiptro: a process that is killed, not waited for.
+    #[cfg(windows)]
+    #[test]
+    fn stop_kills_the_watched_process() {
+        use std::sync::{Arc, Mutex};
+        let jobs = Jobs::default();
+        let _running = jobs.try_start(Job::Detect);
+        let child = std::process::Command::new("ping")
+            .args(["-n", "30", "127.0.0.1"])
+            .stdout(std::process::Stdio::null())
+            .spawn()
+            .expect("ping");
+        let child = Arc::new(Mutex::new(child));
+        jobs.watch_child(child.clone());
+
+        let started = std::time::Instant::now();
+        jobs.stop_detection();
+        let status = child.lock().unwrap().wait().expect("wait");
+        assert!(!status.success());
+        assert!(started.elapsed() < std::time::Duration::from_secs(5));
     }
 
     /// A job that fails part-way must not stay busy until the next launch.

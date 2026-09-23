@@ -76,6 +76,8 @@ pub struct StepReport {
 #[derive(Serialize)]
 pub struct DetectReport {
     pub ok: bool,
+    /// Stop was pressed. Not a failure, and the UI says so differently.
+    pub stopped: bool,
     pub steps: Vec<StepReport>,
 }
 
@@ -152,6 +154,12 @@ fn run_step(
     let stdout = child.stdout.take();
     let stderr = child.stderr.take();
 
+    // Shared with the job registry so Stop — or closing the app — can kill it.
+    // Killing closes its pipes, which ends the reads below on their own.
+    let child = std::sync::Arc::new(std::sync::Mutex::new(child));
+    let jobs = app.state::<crate::jobs::Jobs>();
+    jobs.watch_child(child.clone());
+
     // stderr is drained on its **own thread**, not after stdout closes. The
     // pipe buffers are finite: a child that fills stderr while this side is
     // blocked reading stdout stops writing, so stdout never closes either and
@@ -174,7 +182,12 @@ fn run_step(
         }
     }
 
-    let status = child.wait().map_err(to_string_err)?;
+    jobs.forget_child();
+    let status = child
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .wait()
+        .map_err(to_string_err)?;
 
     // Keep only the end. A failure is explained by its last few lines, and a
     // full season's output is thousands of them.
@@ -376,6 +389,8 @@ fn run_analysis(
 
     let mut found = 0usize;
 
+    let jobs = app.state::<crate::jobs::Jobs>();
+
     for season in &seasons {
         say(format!(
             "{}: {} episodes",
@@ -383,15 +398,29 @@ fn run_analysis(
             season.episodes.len()
         ));
 
-        let results = crate::analyse::analyse_season(&ffmpeg_path, &season.episodes, |line| {
-            let _ = app.emit(
-                PROGRESS_EVENT,
-                DetectProgress {
-                    step: "analyse".into(),
-                    line,
-                },
-            );
-        });
+        let results = crate::analyse::analyse_season(
+            &ffmpeg_path,
+            &season.episodes,
+            jobs.detection_stop_flag(),
+            |line| {
+                let _ = app.emit(
+                    PROGRESS_EVENT,
+                    DetectProgress {
+                        step: "analyse".into(),
+                        line,
+                    },
+                );
+            },
+        );
+
+        // Seasons already stored stay stored; this one and the rest are
+        // picked up by the next run, because nothing was written for them.
+        let Some(results) = results else {
+            say(format!(
+                "analysis stopped part-way; {found} episode(s) with markers kept, the rest waits for the next run"
+            ));
+            return step("analyse", None, tail);
+        };
 
         found += results.iter().filter(|a| !a.is_empty()).count();
 
@@ -658,7 +687,18 @@ pub async fn auto_detect(app: tauri::AppHandle) -> Result<AutoDetectReport, Stri
         let _running = running;
         let mut steps: Vec<AutoStep> = Vec::new();
 
+        let jobs = app.state::<crate::jobs::Jobs>();
+
         for (root_id, root_path, stamp, last_stamp) in &plan.roots {
+            if jobs.detection_stopped() {
+                steps.push(AutoStep {
+                    root_path: root_path.clone(),
+                    step: "detect".into(),
+                    ran: false,
+                    note: "you stopped detection; the rest is picked up by the next scan".into(),
+                });
+                break;
+            }
             let mut say = |step: &str, ran: bool, note: String| {
                 steps.push(AutoStep {
                     root_path: root_path.clone(),
@@ -702,6 +742,10 @@ pub async fn auto_detect(app: tauri::AppHandle) -> Result<AutoDetectReport, Stri
                                 }
                                 let ran = reports.len();
                                 say("skiptro", true, format!("Skiptro finished ({ran} step(s))"));
+                            }
+                            Ok(_) if jobs.detection_stopped() => {
+                                say("skiptro", false, "Skiptro was stopped".into());
+                                continue;
                             }
                             Ok((reports, false)) => {
                                 let why = reports
@@ -796,6 +840,8 @@ pub async fn detect_intros(
         let _running = running;
         let mut steps = Vec::new();
 
+        let jobs = app.state::<crate::jobs::Jobs>();
+
         // Skiptro first, when there is one. Its intro outranks the analysis
         // below, so running it first means the better answer is already in
         // place by the time anything reads either.
@@ -803,7 +849,11 @@ pub async fn detect_intros(
             let (reports, ok) = run_skiptro(&app, &exe, &scan_args, &export_args, &root_path)?;
             steps.extend(reports);
             if !ok {
-                return Ok(DetectReport { ok: false, steps });
+                return Ok(DetectReport {
+                    ok: false,
+                    stopped: jobs.detection_stopped(),
+                    steps,
+                });
             }
             // The automatic pass keys off this stamp, so a manual run has to
             // move it too. Without this, pressing Detect by hand would leave the
@@ -816,7 +866,11 @@ pub async fn detect_intros(
         steps.push(run_analysis(&app, &root_path, None));
 
         let ok = steps.iter().all(|s| s.exit_code == Some(0));
-        Ok(DetectReport { ok, steps })
+        Ok(DetectReport {
+            ok,
+            stopped: jobs.detection_stopped(),
+            steps,
+        })
     })
     .await
     .map_err(to_string_err)?

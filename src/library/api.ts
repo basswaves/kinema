@@ -126,6 +126,8 @@ export interface DetectStepReport {
 
 export interface DetectReport {
   ok: boolean;
+  /** Stop was pressed — not a failure. */
+  stopped: boolean;
   steps: DetectStepReport[];
 }
 
@@ -143,6 +145,12 @@ export interface DetectProgress {
  */
 export const detectIntros = (rootPath: string) =>
   invoke<DetectReport>('detect_intros', { rootPath });
+
+/**
+ * Stop the detection that is running — the Detect button's or the scan's own.
+ * Seasons already finished are kept; the rest waits for the next run.
+ */
+export const stopDetection = () => invoke<void>('stop_detection');
 
 /**
  * How many episodes per TV root are waiting to be analysed, as `[rootId, n]`.

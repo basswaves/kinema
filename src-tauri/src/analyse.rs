@@ -36,6 +36,7 @@
 use crate::ffmpeg;
 use rusty_chromaprint::{match_fingerprints, Configuration, Fingerprinter};
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 /// Fraction of an episode an intro is looked for in.
 ///
@@ -391,11 +392,17 @@ fn consensus(
 ///
 /// `progress` is called with a human-readable line per file, because a season
 /// takes minutes and silence for minutes is indistinguishable from a hang.
+///
+/// `stop` is checked before every file. A stopped season returns `None`, never
+/// a partial answer: episodes compared against fewer others than the season
+/// has would be stored as analysed, and so never looked at again.
 pub fn analyse_season(
     ffmpeg_path: &Path,
     episodes: &[Episode],
+    stop: &AtomicBool,
     mut progress: impl FnMut(String),
-) -> Vec<Analysis> {
+) -> Option<Vec<Analysis>> {
+    let stopped = || stop.load(Ordering::SeqCst);
     let config = Configuration::preset_test1();
     let count = episodes.len();
     let mut results = vec![Analysis::default(); count];
@@ -403,7 +410,7 @@ pub fn analyse_season(
     if count < 2 {
         // Nothing to compare against. This is not a failure — a season with one
         // episode simply has no repeated audio to find.
-        return results;
+        return Some(results);
     }
 
     let mut head_prints: Vec<Vec<u32>> = vec![Vec::new(); count];
@@ -415,6 +422,9 @@ pub fn analyse_season(
     let mut tail_starts: Vec<Option<f64>> = vec![None; count];
 
     for (i, episode) in episodes.iter().enumerate() {
+        if stopped() {
+            return None;
+        }
         let video = Path::new(&episode.path);
         let name = video
             .file_name()
@@ -494,6 +504,9 @@ pub fn analyse_season(
         let Some(tail_start) = tail_starts[i] else {
             continue;
         };
+        if stopped() {
+            return None;
+        }
 
         let video = Path::new(&episode.path);
         let name = video
@@ -522,7 +535,7 @@ pub fn analyse_season(
         }
     }
 
-    results
+    Some(results)
 }
 
 // ---- grouping a library root into seasons -----------------------------------
@@ -759,6 +772,23 @@ mod tests {
         assert_eq!(consensus(too_long, 1, INTRO_MIN_SECS, INTRO_MAX_SECS), None);
     }
 
+    /// Stopped means no answer at all, not episodes marked as analysed with
+    /// nothing found — those would never be looked at again.
+    #[test]
+    fn a_stopped_season_returns_nothing_to_store() {
+        let episodes: Vec<Episode> = (1..=3)
+            .map(|n| Episode {
+                file_id: n,
+                path: format!("episode{n}.mkv"),
+                size: 1,
+                mtime: 1,
+            })
+            .collect();
+        let stop = AtomicBool::new(true);
+        let never_run = Path::new("no-ffmpeg-here");
+        assert!(analyse_season(never_run, &episodes, &stop, |_| {}).is_none());
+    }
+
     #[test]
     fn nothing_found_is_not_an_error() {
         assert_eq!(consensus(Vec::new(), 1, INTRO_MIN_SECS, INTRO_MAX_SECS), None);
@@ -935,7 +965,9 @@ mod tests {
         let ffmpeg_path = ffmpeg::resolve(None);
         assert!(ffmpeg::is_available(&ffmpeg_path), "ffmpeg must be on PATH");
 
-        let results = analyse_season(&ffmpeg_path, &episodes, |line| println!("  {line}"));
+        let never = std::sync::atomic::AtomicBool::new(false);
+        let results = analyse_season(&ffmpeg_path, &episodes, &never, |line| println!("  {line}"))
+            .expect("not stopped");
 
         for (episode, analysis) in episodes.iter().zip(&results) {
             let name = Path::new(&episode.path).file_name().unwrap().to_string_lossy();

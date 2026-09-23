@@ -331,7 +331,8 @@ export function listenerCounts(): Record<string, number> {
 /**
  * Read once at load from `localStorage`, so they survive the reload a check
  * needs: `kinemaMockSlowMs` delays the library read (a real first read is not
- * instant), `kinemaMockEmpty` presents an empty library (a first run).
+ * instant), `kinemaMockEmpty` presents an empty library (a first run),
+ * `kinemaMockSlowDetect` makes the scan's detection pass take 20 seconds.
  */
 function flag(name: string): string | null {
   try {
@@ -342,9 +343,39 @@ function flag(name: string): string | null {
 }
 const SLOW_MS = Number(flag('kinemaMockSlowMs') ?? 0) || 0;
 const EMPTY = flag('kinemaMockEmpty') === '1';
+const SLOW_DETECT = flag('kinemaMockSlowDetect') === '1';
 
 const later = <T,>(value: T): Promise<T> =>
   new Promise((resolve) => window.setTimeout(() => resolve(value), SLOW_MS));
+
+/**
+ * A detection that takes a while and can be stopped, so the Detect and Stop
+ * buttons can be driven: one progress line a second for eight seconds.
+ */
+const mockDetection = (() => {
+  let finish: ((stopped: boolean) => void) | null = null;
+  return {
+    run(seconds = 8): Promise<{ ok: boolean; stopped: boolean; steps: [] }> {
+      return new Promise((resolve) => {
+        let n = 0;
+        const timer = window.setInterval(() => {
+          n += 1;
+          emitEvent('skiptro-progress', { step: 'analyse', line: `reading ${n} of ${seconds}` });
+          if (n >= seconds) finish?.(false);
+        }, 1000);
+        finish = (stopped) => {
+          window.clearInterval(timer);
+          finish = null;
+          resolve({ ok: !stopped, stopped, steps: [] });
+        };
+      });
+    },
+    stop(): null {
+      finish?.(true);
+      return null;
+    },
+  };
+})();
 
 // ---- the command table ----------------------------------------------------
 
@@ -416,9 +447,19 @@ const handlers: Record<string, Handler> = {
   get_skip_markers: (a) => files.find((f) => f.path === a.path)?.markers ?? null,
 
   // detection
-  auto_detect: () => ({ steps: [] }),
+  // Instant unless `kinemaMockSlowDetect` is set, so the scan's own pass can
+  // be caught running and stopped from the Scan button.
+  auto_detect: () =>
+    SLOW_DETECT
+      ? mockDetection.run(20).then((r) =>
+          r.stopped
+            ? { steps: [{ root_path: '', step: 'detect', ran: false, note: 'you stopped detection; the rest is picked up by the next scan' }] }
+            : { steps: [] }
+        )
+      : { steps: [] },
   analysis_backlog: () => [[1, 0]],
-  detect_intros: () => ({ ok: true, steps: [] }),
+  detect_intros: () => mockDetection.run(),
+  stop_detection: () => mockDetection.stop(),
   ffmpeg_status: () => ({ resolved: 'ffmpeg', available: false }),
 
   // settings and logs

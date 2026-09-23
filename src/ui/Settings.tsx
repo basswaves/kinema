@@ -56,6 +56,7 @@ import {
   artworkStats,
   cacheArtwork,
   clearArtworkCache,
+  openLogFolder,
   countNeedsReview,
   getSetting,
   setSetting,
@@ -1096,12 +1097,24 @@ export default function Settings() {
             for working on Kinema itself, and it is the one part of this screen a remote cannot
             drive — use a mouse.
           </p>
-          <FocusButton
-            className="btn-secondary"
-            onSelect={() => setPanel((p) => (p === 'developer' ? 'none' : 'developer'))}
-          >
-            {panel === 'developer' ? 'Hide developer tools' : 'Show developer tools'}
-          </FocusButton>
+          <p className="muted">
+            If something goes wrong, the two log files in the log folder — <code>app.log</code>{' '}
+            and <code>mpv.log</code> — are what a bug report needs.
+          </p>
+          <div className="settings-row">
+            <FocusButton
+              className="btn-secondary"
+              onSelect={() => setPanel((p) => (p === 'developer' ? 'none' : 'developer'))}
+            >
+              {panel === 'developer' ? 'Hide developer tools' : 'Show developer tools'}
+            </FocusButton>
+            <FocusButton
+              className="btn-secondary"
+              onSelect={() => void openLogFolder().catch((e) => setError(String(e)))}
+            >
+              Open log folder
+            </FocusButton>
+          </div>
         </section>
 
         {panel === 'developer' && (

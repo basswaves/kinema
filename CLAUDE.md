@@ -115,14 +115,19 @@ check `git diff -w` afterwards to confirm you have not reformatted the file.
 
 ## Debugging
 
-Two logs, both gitignored, both readable without a debugger. **Read them instead
-of guessing** — the webview console is otherwise invisible from outside the app.
+Two logs, both readable without a debugger. **Read them instead of guessing**
+— the webview console is otherwise invisible from outside the app. Both live in
+`%APPDATA%\com.kinema.app\logs\`, beside the library, however the app was
+launched (dev or release). Settings → Developer tools → **Open log folder**.
 
-- `src-tauri/app.log` — frontend `console.*`, uncaught errors, rejections.
-- `src-tauri/mpv.log` — mpv's own verbose log.
+- `app.log` — frontend `console.*`, uncaught errors, rejections, **and** the
+  Rust side's `crate::log!` lines. Use `log!`, never `eprintln!`: a release
+  build has no console, so `eprintln!` goes nowhere.
+- `mpv.log` — mpv's own verbose log.
 
-Running from the desktop shortcut instead, both land in `dist-app/` — they are
-opened relative to the working directory.
+Each launch starts both fresh and keeps the previous session as
+`app.previous.log` / `mpv.previous.log`. A failed upgrade's safety copies are
+in `…\com.kinema.appackups\`.
 
 `mpv.log` is the authority on anything about rendering. It records what
 libplacebo *did*, not what it was asked to do: which shader passes ran, what

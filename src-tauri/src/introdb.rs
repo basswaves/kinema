@@ -165,7 +165,7 @@ pub async fn lookup(query: &Query) -> Option<Lookup> {
     let response = match client.get(&url).send().await {
         Ok(r) => r,
         Err(e) => {
-            eprintln!("introdb: request failed: {e}");
+            crate::log!("introdb: request failed: {e}");
             return None;
         }
     };
@@ -182,7 +182,7 @@ pub async fn lookup(query: &Query) -> Option<Lookup> {
         // Anything else — a 429 above all — is a question that failed to get
         // asked. Logged, because a rate limit that nothing reports looks exactly
         // like a library where no show has credits.
-        eprintln!("introdb: {url} returned {status}");
+        crate::log!("introdb: {url} returned {status}");
         return None;
     }
 
@@ -191,7 +191,7 @@ pub async fn lookup(query: &Query) -> Option<Lookup> {
     let body = match response.text().await {
         Ok(body) => body,
         Err(e) => {
-            eprintln!("introdb: could not read the response: {e}");
+            crate::log!("introdb: could not read the response: {e}");
             return None;
         }
     };
@@ -199,7 +199,7 @@ pub async fn lookup(query: &Query) -> Option<Lookup> {
     match serde_json::from_str::<Response>(&body) {
         Ok(parsed) => Some(interpret(&parsed)),
         Err(e) => {
-            eprintln!("introdb: unexpected response shape ({e}): {body}");
+            crate::log!("introdb: unexpected response shape ({e}): {body}");
             None
         }
     }

@@ -607,7 +607,9 @@ rather than from component state.
 ### The webview console is invisible from outside
 
 `src/devlog.ts` forwards `console.*`, uncaught errors and unhandled rejections to
-`src-tauri/app.log`. Without it, frontend failures leave no external trace at all.
+`app.log` (in `%APPDATA%\com.kinema.app\logs\`). Without it, frontend failures
+leave no external trace at all. The Rust side writes there too, through
+`crate::log!` — `eprintln!` reaches no console in a release build.
 
 ### Confirmation at the top of a long page makes a working button look dead
 

@@ -18,9 +18,9 @@
   never looks in the directory the wrapper was loaded from. Splitting them loads
   the wrapper and then fails to find mpv.
 
-  The shortcut sets its working directory to the app folder, because `app.log`
-  and `mpv.log` are both opened relative to the current directory. Without it
-  they would land wherever Explorer happened to start the process.
+  The shortcut still sets its working directory to the app folder. The logs no
+  longer depend on it - they go to app data\logs - but a predictable working
+  directory costs nothing and keeps anything else relative well behaved.
 
   This file is deliberately ASCII only. `powershell.exe` reads a .ps1 with no
   BOM as ANSI, so a stray em dash in a comment becomes a parse error in code

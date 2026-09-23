@@ -167,8 +167,8 @@ player or D-pad navigation.
 
 ## When something goes wrong
 
-Kinema writes two logs, next to `kinema.exe` in the folder you extracted (or in
-`src-tauri/` when running from source):
+Kinema writes two logs to `%APPDATA%\com.kinema.app\logs\`. The quickest way
+there is **Settings → Developer tools → Open log folder**:
 
 - **`app.log`** — the app's own messages. The WebView2 console is invisible from
   outside the app, so this is where its errors go.

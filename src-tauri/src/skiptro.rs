@@ -109,7 +109,7 @@ pub fn detection_for(db_path: &Path, video: &Path) -> Option<Detection> {
     let conn = match open_read_only(db_path) {
         Ok(conn) => conn,
         Err(e) => {
-            eprintln!("skiptro: could not open {}: {e}", db_path.display());
+            crate::log!("skiptro: could not open {}: {e}", db_path.display());
             return None;
         }
     };
@@ -124,7 +124,7 @@ pub fn detection_for(db_path: &Path, video: &Path) -> Option<Detection> {
         Ok(s) => s,
         Err(e) => {
             // The schema moved under us. Loud here, harmless in the app.
-            eprintln!("skiptro: DetectedSegments is not readable ({e}) — falling back to sidecars");
+            crate::log!("skiptro: DetectedSegments is not readable ({e}) — falling back to sidecars");
             return None;
         }
     };
@@ -148,7 +148,7 @@ pub fn detection_for(db_path: &Path, video: &Path) -> Option<Detection> {
         if kind != TYPE_INTRO {
             // A version that started detecting something else. Worth knowing
             // about; not worth guessing at.
-            eprintln!("skiptro: ignoring unknown segment type {kind} for {path}");
+            crate::log!("skiptro: ignoring unknown segment type {kind} for {path}");
             continue;
         }
         if !start.is_finite() || !end.is_finite() || start < 0.0 || end <= start {

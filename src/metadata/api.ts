@@ -44,6 +44,17 @@ export const getSetting = (key: string) => invoke<string | null>('get_setting', 
 export const setSetting = (key: string, value: string) =>
   invoke<void>('set_setting', { key, value });
 
+/** Where the logs live: `<app data>/logs`, with mpv's log beside `app.log`. */
+export interface LogPaths {
+  dir: string;
+  mpv_log: string;
+}
+
+export const logPaths = () => invoke<LogPaths>('log_paths');
+
+/** Show the log folder in Explorer, for attaching logs to a bug report. */
+export const openLogFolder = () => invoke<void>('open_log_folder');
+
 export const providerStatus = () => invoke<Array<[string, boolean]>>('provider_status');
 
 export const saveTitle = (title: TitleMetadata) => invoke<number>('save_title', { title });

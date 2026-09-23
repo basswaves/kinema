@@ -53,28 +53,46 @@ pub fn set_setting(db: tauri::State<Db>, key: String, value: String) -> Result<(
     Ok(())
 }
 
-/// Append a line from the frontend to `app.log` in the project's src-tauri
-/// directory. This is the only way UI-side errors become readable from outside
-/// the webview.
+/// Append a line from the frontend to `app.log`. This is the only way UI-side
+/// errors become readable from outside the webview. See `applog` for where
+/// the file lives and how it is kept from growing.
 #[tauri::command]
-pub fn append_log(level: String, message: String) -> Result<(), String> {
-    use std::io::Write;
+pub fn append_log(level: String, message: String) {
+    crate::applog::write(&level, &message);
+}
 
-    let stamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
+#[derive(serde::Serialize)]
+pub struct LogPaths {
+    /// The folder both logs live in.
+    pub dir: String,
+    /// Absolute path for mpv's `log-file` option.
+    pub mpv_log: String,
+}
 
-    let line = format!("[{stamp}][{}] {}\n", level.to_uppercase(), message);
+/// Where the logs are. The player needs the absolute mpv log path before it
+/// initialises mpv; a relative one lands in whatever the current directory is.
+#[tauri::command]
+pub fn log_paths(app: tauri::AppHandle) -> Result<LogPaths, String> {
+    let dir = log_dir(&app)?;
+    Ok(LogPaths {
+        mpv_log: dir.join(crate::applog::MPV_LOG).to_string_lossy().into_owned(),
+        dir: dir.to_string_lossy().into_owned(),
+    })
+}
 
-    let mut file = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("app.log")
-        .map_err(to_string_err)?;
+fn log_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    use tauri::Manager;
+    Ok(app.path().app_data_dir().map_err(to_string_err)?.join(crate::applog::DIR))
+}
 
-    file.write_all(line.as_bytes()).map_err(to_string_err)?;
-    Ok(())
+/// Open the log folder in Explorer, for attaching logs to a bug report.
+#[tauri::command]
+pub fn open_log_folder(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    let dir = log_dir(&app)?;
+    app.opener()
+        .open_path(dir.to_string_lossy(), None::<&str>)
+        .map_err(to_string_err)
 }
 
 /// Which providers are usable right now. The UI uses this to explain what is

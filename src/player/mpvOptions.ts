@@ -26,6 +26,8 @@ export const BASE_MPV_OPTIONS: Record<string, string | boolean | number> = {
   // Options are applied in order. If a later option is rejected, mpv init
   // fails — and if logging were configured after it, there would be no log
   // explaining why. Keep these at the top so failures are always recorded.
+  // Replaced with an absolute path in app data by `mpv.ts` before init; this
+  // relative fallback is used only if that path cannot be resolved.
   'log-file': 'mpv.log',
   'msg-level': 'all=v',
 

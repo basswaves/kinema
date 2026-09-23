@@ -1,4 +1,5 @@
 mod analyse;
+mod applog;
 mod artwork;
 mod db;
 mod detect;
@@ -40,6 +41,13 @@ fn open_library(app: &tauri::AppHandle) -> Result<(), String> {
             dir.display()
         )
     })?;
+
+    // Before the database, so a failure opening it is itself logged.
+    if let Err(e) = applog::init(&dir.join(applog::DIR)) {
+        // Not fatal: the app works without a log, it is just harder to help.
+        eprintln!("could not start the log in {}: {e}", dir.display());
+    }
+    log!("--- Kinema {} started ---", env!("CARGO_PKG_VERSION"));
 
     let path = dir.join("library.db");
 
@@ -105,6 +113,8 @@ pub fn run() {
             settings::set_setting,
             settings::provider_status,
             settings::append_log,
+            settings::log_paths,
+            settings::open_log_folder,
             metadata::save_title,
             metadata::save_episodes,
             metadata::link_files_to_title,

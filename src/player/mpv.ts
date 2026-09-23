@@ -13,6 +13,26 @@
  */
 import { init, setProperty, type MpvConfig } from 'tauri-plugin-libmpv-api';
 import { BASE_MPV_OPTIONS, TONE_MAPPING_OPTIONS } from './mpvOptions';
+import { logPaths } from '../metadata/api';
+
+/**
+ * The init options, with `log-file` made absolute.
+ *
+ * mpv opens a relative `log-file` against the current directory, which is
+ * wherever the exe happened to be launched from — so the log was only where
+ * the docs said when the app was started from its shortcut. The key already
+ * exists in `BASE_MPV_OPTIONS`, so overriding it keeps it **first**, which is
+ * load-bearing: a later rejected option must still be logged.
+ */
+async function initialOptions(): Promise<MpvConfig['initialOptions']> {
+  try {
+    const { mpv_log } = await logPaths();
+    return { ...BASE_MPV_OPTIONS, 'log-file': mpv_log };
+  } catch (e) {
+    console.warn('mpv: could not resolve the log folder, logging beside the exe', e);
+    return BASE_MPV_OPTIONS;
+  }
+}
 
 const OBSERVED = [
   ['pause', 'flag'],
@@ -31,26 +51,23 @@ export function ensureMpvInitialised(): Promise<string> {
   const host = window as unknown as { __mpvInit?: Promise<string> };
 
   if (!host.__mpvInit) {
-    const config: MpvConfig = {
-      initialOptions: BASE_MPV_OPTIONS,
-      observedProperties: OBSERVED,
-    };
-
-    host.__mpvInit = init(config).then(async (label) => {
-      // Applied individually and after startup: if a build rejects one of these
-      // option names, we lose that refinement rather than the whole player.
-      // `tone-mapping-mode` is exactly such a case — this libplacebo build
-      // returns M_PROPERTY_UNKNOWN for it, and as an init option it aborted
-      // startup entirely.
-      for (const [key, value] of Object.entries(TONE_MAPPING_OPTIONS)) {
-        try {
-          await setProperty(key, value);
-        } catch {
-          console.warn(`mpv rejected optional setting ${key}=${value}`);
+    host.__mpvInit = initialOptions()
+      .then((options) => init({ initialOptions: options, observedProperties: OBSERVED }))
+      .then(async (label) => {
+        // Applied individually and after startup: if a build rejects one of these
+        // option names, we lose that refinement rather than the whole player.
+        // `tone-mapping-mode` is exactly such a case — this libplacebo build
+        // returns M_PROPERTY_UNKNOWN for it, and as an init option it aborted
+        // startup entirely.
+        for (const [key, value] of Object.entries(TONE_MAPPING_OPTIONS)) {
+          try {
+            await setProperty(key, value);
+          } catch {
+            console.warn(`mpv rejected optional setting ${key}=${value}`);
+          }
         }
-      }
-      return label;
-    });
+        return label;
+      });
   }
 
   return host.__mpvInit;

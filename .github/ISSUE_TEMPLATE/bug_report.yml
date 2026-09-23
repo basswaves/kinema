@@ -10,8 +10,8 @@ body:
         otherwise invisible from outside the app — most bugs here produce no
         visible error at all, only a log line.
 
-        Find them next to `kinema.exe` in the folder you extracted (or in
-        `src-tauri/` if you are running from source):
+        Open them from **Settings → Developer tools → Open log folder**, or go
+        to `%APPDATA%\com.kinema.app\logs\`:
 
         - `app.log` — the app's own messages
         - `mpv.log` — the player's, and the authority on anything about video

@@ -139,7 +139,7 @@ fn parse_sidecar(raw: &str, path: &Path) -> (Option<Segment>, Option<Segment>) {
     let parsed: serde_json::Value = match serde_json::from_str(raw) {
         Ok(v) => v,
         Err(e) => {
-            eprintln!("skip: {} is not valid JSON: {e}", path.display());
+            crate::log!("skip: {} is not valid JSON: {e}", path.display());
             return (None, None);
         }
     };
@@ -156,7 +156,7 @@ fn parse_sidecar(raw: &str, path: &Path) -> (Option<Segment>, Option<Segment>) {
             .as_object()
             .map(|o| o.keys().map(|k| k.as_str()).collect())
             .unwrap_or_default();
-        eprintln!(
+        crate::log!(
             "skip: no usable segments in {} — top-level keys: {:?}",
             path.display(),
             keys
@@ -401,7 +401,7 @@ fn local_markers(
             if found.confidence < 1.0 {
                 // The one sample nobody has yet. See HANDOVER: a minimum
                 // confidence cannot be calibrated without one of these.
-                eprintln!(
+                crate::log!(
                     "skiptro: confidence {:.2} for {}",
                     found.confidence,
                     video.display()
@@ -425,7 +425,7 @@ fn local_markers(
                     markers.credits_source = Some(FROM_SIDECAR.into());
                 }
             }
-            Err(e) => eprintln!("skip: could not read {}: {e}", sidecar.path.display()),
+            Err(e) => crate::log!("skip: could not read {}: {e}", sidecar.path.display()),
         }
     }
 

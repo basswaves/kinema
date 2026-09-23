@@ -564,7 +564,7 @@ fn store_setting(conn: &rusqlite::Connection, key: &str, value: &str) {
          ON CONFLICT(key) DO UPDATE SET value = excluded.value",
         rusqlite::params![key, value],
     ) {
-        eprintln!("detect: could not remember {key}: {e}");
+        crate::log!("detect: could not remember {key}: {e}");
     }
 }
 

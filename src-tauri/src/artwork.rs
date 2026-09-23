@@ -243,7 +243,7 @@ pub async fn cache_artwork(app: tauri::AppHandle) -> Result<CacheResult, String>
 
             let name = format!("{id}.{}", extension(&url));
             if let Err(e) = std::fs::write(dir.join(&name), &body) {
-                eprintln!("artwork: writing {name} failed: {e}");
+                crate::log!("artwork: writing {name} failed: {e}");
                 result.failed += 1;
                 continue;
             }

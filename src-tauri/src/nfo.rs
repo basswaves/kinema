@@ -413,14 +413,14 @@ fn first_parsed(paths: Vec<PathBuf>) -> Option<Nfo> {
         }
         let source = path.display().to_string();
         let Some(raw) = read_text(&path) else {
-            eprintln!("nfo: could not read {source}");
+            crate::log!("nfo: could not read {source}");
             continue;
         };
         match parse_nfo(&raw, &source) {
             Some(nfo) => return Some(nfo),
             // Present but unusable is worth saying out loud. Silently treating
             // it as absent is how an unsupported dialect stays unnoticed.
-            None => eprintln!("nfo: nothing usable in {source}"),
+            None => crate::log!("nfo: nothing usable in {source}"),
         }
     }
     None

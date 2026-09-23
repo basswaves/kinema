@@ -110,13 +110,18 @@ never ran, or ran and silently did nothing. Check for both by reflex:
 
 ## Debugging
 
-Two logs, both gitignored, both readable without a debugger. Read them instead
-of guessing; the WebView2 console is otherwise invisible from outside the app.
+Two logs, both readable without a debugger. Read them instead of guessing; the
+WebView2 console is otherwise invisible from outside the app. Both are in
+`%APPDATA%\com.kinema.app\logs\` whichever way the app was started, and
+Settings → Developer tools → **Open log folder** opens it.
 
-- `src-tauri/app.log` — the frontend's `console.*`, uncaught errors, rejections
-- `src-tauri/mpv.log` — mpv's own verbose log
+- `app.log` — the frontend's `console.*`, uncaught errors, rejections, and
+  Rust's `crate::log!` lines (use it rather than `eprintln!`, which a release
+  build has no console for)
+- `mpv.log` — mpv's own verbose log
 
-Launched from the desktop shortcut instead, both land in `dist-app/`.
+Each launch starts both fresh; the session before is kept as
+`app.previous.log` and `mpv.previous.log`.
 
 `mpv.log` is the authority on anything about rendering: it records what
 libplacebo *did*, not what it was asked to do. Read it before theorising about

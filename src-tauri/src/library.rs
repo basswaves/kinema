@@ -366,17 +366,7 @@ pub fn reset_parse(db: tauri::State<Db>) -> Result<usize, String> {
     // Match links must go too. Leaving title_id set while the file claims to
     // be unparsed is an inconsistent state, and it strands titles that nothing
     // points at any more.
-    let n = conn
-        .execute(
-            "UPDATE media_files
-                SET match_status = 'unparsed', parsed_at = NULL, parsed_title = NULL,
-                    parsed_year = NULL, parsed_season = NULL, parsed_episode = NULL,
-                    parsed_kind = NULL, parsed_from = NULL, parsed_json = NULL,
-                    parsed_episode_last = NULL,
-                    title_id = NULL, match_confidence = NULL, match_reason = NULL",
-            [],
-        )
-        .map_err(to_string_err)?;
+    let n = crate::lifecycle::reset_parses(&conn).map_err(to_string_err)?;
 
     conn.execute(
         "DELETE FROM titles

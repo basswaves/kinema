@@ -43,9 +43,6 @@ interface Props {
   onChanged: (message: string) => Promise<void>;
 }
 
-/** Statuses that mean "the matcher did not resolve this". */
-const NEEDS_REVIEW = new Set(['parsed', 'unmatched', 'failed']);
-
 /**
  * Upper bound on the queue.
  *
@@ -81,7 +78,10 @@ export default function FixMatch({ onChanged }: Props) {
   const pending = useMemo(
     () =>
       groupFiles(
-        files.filter((f) => NEEDS_REVIEW.has(f.match_status) && !f.missing),
+        // The queue's rows are exactly the work plus the ignored files — the
+        // backend decides what counts as work (lifecycle::NEEDS_ATTENTION),
+        // so this only separates the two.
+        files.filter((f) => f.match_status !== 'ignored'),
         { includeUntitled: true }
       ),
     [files]

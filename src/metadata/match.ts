@@ -11,8 +11,12 @@
 import type { MediaFile } from '../library/api';
 import {
   getSetting,
-  linkFilesToTitle,
+  ignoreFileIds,
   listTitlesNeedingDetail,
+  recordMatch,
+  recordProviderFailure,
+  recordRefusal,
+  returnToReview,
   saveEpisodes,
   saveTitle,
   type StoredTitle,
@@ -222,12 +226,11 @@ export async function applyMatch(
     if (episodes.length > 0) await saveEpisodes(titleId, episodes);
   }
 
-  await linkFilesToTitle(
+  await recordMatch(
     files.map((f) => f.id),
     titleId,
     confidence,
-    reason,
-    'matched'
+    reason
   );
 
   return titleId;
@@ -281,28 +284,16 @@ export async function backfillTitleDetails(): Promise<DetailBackfill> {
  * "needs attention" meaningless. Reversible: the files keep their parse data.
  */
 export async function ignoreFiles(files: MediaFile[]): Promise<void> {
-  await linkFilesToTitle(
-    files.map((f) => f.id),
-    null,
-    null,
-    'ignored by hand',
-    'ignored'
-  );
+  await ignoreFileIds(files.map((f) => f.id));
 }
 
 /**
- * Put files back into the review queue: un-ignoring, and undoing a match that
- * turned out to be wrong. Both are the same operation — drop the link and the
- * verdict, keep the parse data — so they share one implementation.
+ * Put ignored files back into the review queue. A wrong *match* is not undone
+ * this way — that is an unlink (`unlinkFiles`), which holds the files so the
+ * matcher cannot make the same choice again.
  */
 export async function returnFilesToReview(files: MediaFile[]): Promise<void> {
-  await linkFilesToTitle(
-    files.map((f) => f.id),
-    null,
-    null,
-    null,
-    'parsed'
-  );
+  await returnToReview(files.map((f) => f.id));
 }
 
 /**
@@ -440,12 +431,10 @@ export async function matchFiles(
         );
         outcome.matched += group.files.length;
       } else {
-        await linkFilesToTitle(
+        await recordRefusal(
           group.files.map((f) => f.id),
-          null,
           result.confidence,
-          result.reason,
-          'unmatched'
+          result.reason ?? 'no confident match'
         );
         outcome.unmatched += group.files.length;
       }
@@ -453,16 +442,12 @@ export async function matchFiles(
       const message = `${group.title}: ${e instanceof Error ? e.message : String(e)}`;
       outcome.errors.push(message);
 
-      // A provider failure must not leave files in limbo — mark them for
-      // review with the reason attached. `failed`, not `unmatched`: nothing
-      // was decided, the provider simply did not answer, so the next scan asks
-      // again. A refusal (`unmatched`) is not re-asked until a key changes.
-      await linkFilesToTitle(
+      // A provider failure must not leave files in limbo — record it with the
+      // reason attached. Not a refusal: nothing was decided, so the next scan
+      // asks again, where a refusal waits until a key changes.
+      await recordProviderFailure(
         group.files.map((f) => f.id),
-        null,
-        0,
-        message,
-        'failed'
+        message
       ).catch(() => undefined);
       outcome.unmatched += group.files.length;
     }

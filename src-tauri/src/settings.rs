@@ -66,13 +66,7 @@ fn store(conn: &rusqlite::Connection, key: &str, value: &str) -> Result<(), Stri
     // them for the next scan. Files held by hand stay held.
     let after = setting(conn, key);
     if PROVIDER_KEYS.contains(&key) && after.is_some() && after != before {
-        let reopened = conn
-            .execute(
-                "UPDATE media_files SET match_status = 'parsed'
-                  WHERE match_status = 'unmatched' AND match_hold = 0",
-                [],
-            )
-            .map_err(to_string_err)?;
+        let reopened = crate::lifecycle::reopen_refusals(conn).map_err(to_string_err)?;
         crate::log!("settings: {key} changed; {reopened} refused file(s) will be matched again");
     }
     Ok(())

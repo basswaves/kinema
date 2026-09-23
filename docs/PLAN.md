@@ -655,8 +655,9 @@ fires every five seconds during playback), and the walk gathers file metadata
 **outside** any transaction — the stat calls over SMB were the slow part and
 they were all happening with the write lock held.
 
-Matching writes are batched: `link_files_to_title` takes a list in one
-transaction. Every call site was already a loop over a group's files, so the
+Matching writes are batched: each status command (`record_match` and its
+siblings in `lifecycle.rs`, which replaced `link_files_to_title`) takes a list
+in one transaction. Every call site was already a loop over a group's files, so the
 single-file command had no remaining users and was removed rather than left as
 dead API.
 
@@ -1279,6 +1280,16 @@ same way, because Windows does not end a child with its parent — verified with
 a self-test that pointed Skiptro at `ping -n 60` and quit mid-run. The Stop
 control is the Detect (or Scan now) button itself while it runs: a separate
 Stop button vanished when detection ended and took the remote's focus with it.
+
+**A file's status is decided in one place.** The webview used to pick the
+status word and hand it to a generic "link these files" command; the hold was
+a side rule in that SQL, re-opening refusals lived in the settings code, and
+"needs attention" was spelled out three times across the seam. The Phase 3
+matching bugs all lived in those gaps. `lifecycle.rs` now owns every
+transition, and the webview reports what happened — `record_match`,
+`record_refusal`, `record_provider_failure`, `ignore_files`, `return_to_review`,
+`unlink_files` — never which status that means. One behaviour moved with it:
+resetting matches from the developer tools no longer touches a held file.
 
 **Testing is done without the owner.** `npm run dev:mock` and
 `scripts/selftest.ps1` exist so every change can be checked — keyboard-only in

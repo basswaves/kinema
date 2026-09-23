@@ -62,23 +62,35 @@ export const saveTitle = (title: TitleMetadata) => invoke<number>('save_title', 
 export const saveEpisodes = (titleId: number, episodes: EpisodeMetadata[]) =>
   invoke<number>('save_episodes', { titleId, episodes });
 
-/**
- * Point a whole group of files at one title, in a single transaction.
- *
- * `status` mirrors the `match_status` lifecycle: 'parsed' puts files back in
- * the review queue, 'ignored' takes them out without pretending they matched.
- *
- * Takes a list because every caller has one — matching resolves a group at a
- * time, and so do ignoring, un-ignoring and unlinking. One file per call meant
- * one IPC round trip and one transaction each.
+/*
+ * What happened to a group of files — never which status that means. The
+ * backend owns the file's lifecycle (`src-tauri/src/lifecycle.rs`): what a
+ * match, a refusal or an unlink does to the hold and to the queues is decided
+ * there, in one place. Each takes a list, because every caller has a group.
  */
-export const linkFilesToTitle = (
+
+/** The matcher, or a person in Fix match, chose this title. Ends any hold. */
+export const recordMatch = (
   fileIds: number[],
-  titleId: number | null,
+  titleId: number,
   confidence: number | null,
-  reason: string | null,
-  status: 'matched' | 'unmatched' | 'failed' | 'ignored' | 'parsed'
-) => invoke<number>('link_files_to_title', { fileIds, titleId, confidence, reason, status });
+  reason: string | null
+) => invoke<number>('record_match', { fileIds, titleId, confidence, reason });
+
+/** The scorer refused. Waits in Needs attention until a provider key changes. */
+export const recordRefusal = (fileIds: number[], confidence: number | null, reason: string) =>
+  invoke<number>('record_refusal', { fileIds, confidence, reason });
+
+/** The provider did not answer. Nothing was decided; the next scan asks again. */
+export const recordProviderFailure = (fileIds: number[], reason: string) =>
+  invoke<number>('record_provider_failure', { fileIds, reason });
+
+/** Out of the queue by hand — trailers, samples, extras. Reversible. */
+export const ignoreFileIds = (fileIds: number[]) => invoke<number>('ignore_files', { fileIds });
+
+/** Back into the queue: un-ignoring. */
+export const returnToReview = (fileIds: number[]) =>
+  invoke<number>('return_to_review', { fileIds });
 
 /**
  * Take a wrong match off some files and hold them for a decision by hand.

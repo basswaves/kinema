@@ -7,6 +7,7 @@ mod ffmpeg;
 mod introdb;
 mod jobs;
 mod library;
+mod lifecycle;
 mod metadata;
 mod nfo;
 mod playback;
@@ -159,8 +160,12 @@ pub fn run() {
             selftest::selftest_finish,
             metadata::save_title,
             metadata::save_episodes,
-            metadata::link_files_to_title,
-            metadata::unlink_files,
+            lifecycle::record_match,
+            lifecycle::record_refusal,
+            lifecycle::record_provider_failure,
+            lifecycle::ignore_files,
+            lifecycle::return_to_review,
+            lifecycle::unlink_files,
             metadata::list_titles,
             metadata::get_title_detail,
             metadata::list_unmatched,

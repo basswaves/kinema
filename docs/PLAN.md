@@ -1291,6 +1291,17 @@ transition, and the webview reports what happened — `record_match`,
 `unlink_files` — never which status that means. One behaviour moved with it:
 resetting matches from the developer tools no longer touches a held file.
 
+**The scan pipeline stays in the webview — decided with the owner, 2026-09-24.**
+The plan said "library rules and the pipeline into Rust". The rules moved; the
+pipeline did not, on purpose. Parsing is guessit-js and matching is the
+TypeScript scorer and provider clients; moving them means a Rust port of both,
+and guessit has no Rust equivalent. Any difference in how a name is read moves
+which titles clear the 0.75 threshold — a wrong match is the one outcome this
+app ranks below no match. What the move would have bought is already had: the
+decisions about a file are made in `lifecycle.rs`, and `jobs.rs` stops a job
+running twice. Revisit only if the webview stops being able to run the
+pipeline, not for tidiness.
+
 **Testing is done without the owner.** `npm run dev:mock` and
 `scripts/selftest.ps1` exist so every change can be checked — keyboard-only in
 a browser against a fake mpv, and in the real app against a copy of the real

@@ -460,13 +460,18 @@ export async function tmdbGetTitle(
     rating: detail.vote_average || null,
     poster_url: detail.poster_path ? `${TMDB_IMAGE}${detail.poster_path}` : null,
     backdrop_url: detail.backdrop_path ? `${TMDB_IMAGE}${detail.backdrop_path}` : null,
-    // Empty string, not null, when TMDB has no logo for this title. Null means
-    // "never asked" and is what the other providers send, so `save_title` can
-    // COALESCE theirs away without also re-asking TMDB forever about a title
-    // that genuinely has none. Same convention as `trailer_key`.
+    // Empty string, not null, when TMDB has none. Null means "never asked"
+    // and is what the other providers send, so `save_title` can COALESCE
+    // theirs away without also re-asking TMDB forever about a title that
+    // genuinely has none.
+    //
+    // The comment here used to say the trailer followed the same convention;
+    // it did not — `trailer_key` was null for a title with no trailer, so
+    // `list_titles_needing_detail` offered it again and every scan re-fetched
+    // its whole TMDB detail. On this library that was one title, every launch.
     logo_url: pickLogo(detail.images?.logos) ?? '',
-    trailer_key: trailer?.key ?? null,
-    trailer_site: trailer?.site ?? null,
+    trailer_key: trailer?.key ?? '',
+    trailer_site: trailer?.site ?? '',
     cast: (detail.credits?.cast ?? [])
       .filter((c) => c.name?.trim())
       .slice(0, CAST_LIMIT)

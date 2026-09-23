@@ -1302,6 +1302,19 @@ decisions about a file are made in `lifecycle.rs`, and `jobs.rs` stops a job
 running twice. Revisit only if the webview stops being able to run the
 pipeline, not for tidiness.
 
+**Watch history belongs to the episode (schema v13).** `watch_history` names
+what was watched by IMDb, TMDB and provider ids plus season and episode, and
+references no file or title row — so moving, renaming, upgrading or re-adding
+a file, removing a folder, and resetting matches no longer erase it. Any id in
+common identifies the same show, so a switch from TVmaze to TMDB is not a new
+show. `playback_state` was kept as the per-copy state every screen reads,
+rather than rewriting a dozen queries around the new table: saving writes the
+history and every other copy, matching restores a copy from the history when
+the history is newer, and a file that grows forgets "watched" in both. One
+thing is never copied between copies: `duration_secs`, which TheIntroDB is
+asked with to tell releases apart. Rehearsed on a copy of the real library:
+all 84 matched records carried over.
+
 **Testing is done without the owner.** `npm run dev:mock` and
 `scripts/selftest.ps1` exist so every change can be checked — keyboard-only in
 a browser against a fake mpv, and in the real app against a copy of the real

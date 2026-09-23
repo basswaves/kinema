@@ -4,6 +4,7 @@ mod artwork;
 mod db;
 mod detect;
 mod ffmpeg;
+mod history;
 mod introdb;
 mod jobs;
 mod library;

@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use std::path::Path;
 
 /// The schema this build understands. Bump it with every new `SCHEMA_V*`.
-pub const SCHEMA_VERSION: i64 = 12;
+pub const SCHEMA_VERSION: i64 = 13;
 
 /// What can go wrong opening the library.
 ///
@@ -394,6 +394,83 @@ const SCHEMA_V12: &str = r#"
 ALTER TABLE media_files ADD COLUMN match_hold INTEGER NOT NULL DEFAULT 0;
 "#;
 
+/// Schema version 13: watch history that belongs to the episode.
+///
+/// `playback_state` is keyed by file row, and a file row is a path — so a
+/// moved, renamed, upgraded or re-added file started with no history, and a
+/// removed folder took its history with it. `watch_history` names what was
+/// watched by the providers' ids and season/episode, and references no row
+/// that the library ever deletes. See `history.rs` for how the two tables are
+/// kept in step.
+///
+/// Filled from the existing `playback_state` of every matched file: one row
+/// per episode a file covers (a double-episode file covers two), and where two
+/// copies of one episode both have state, the most recently touched wins.
+const SCHEMA_V13: &str = r#"
+CREATE TABLE watch_history (
+    id            INTEGER PRIMARY KEY,
+    kind          TEXT    NOT NULL,          -- 'movie' | 'series'
+    provider      TEXT    NOT NULL,
+    provider_id   TEXT    NOT NULL,
+    imdb_id       TEXT,
+    tmdb_id       TEXT,
+    season        INTEGER,                   -- NULL for a film
+    episode       INTEGER,
+    -- "Example Show S04E05": for a person reading the table, never parsed.
+    label         TEXT,
+    position_secs REAL    NOT NULL,
+    duration_secs REAL,
+    completed     INTEGER NOT NULL DEFAULT 0,
+    updated_at    INTEGER NOT NULL
+);
+CREATE INDEX idx_history_provider ON watch_history(provider, provider_id, season, episode);
+CREATE INDEX idx_history_imdb ON watch_history(imdb_id, season, episode) WHERE imdb_id IS NOT NULL;
+CREATE INDEX idx_history_tmdb ON watch_history(tmdb_id, season, episode) WHERE tmdb_id IS NOT NULL;
+
+WITH RECURSIVE covered(file_id, season, episode, last) AS (
+    SELECT m.id, m.parsed_season, m.parsed_episode,
+           MAX(COALESCE(m.parsed_episode_last, m.parsed_episode), m.parsed_episode)
+      FROM media_files m
+      JOIN titles t ON t.id = m.title_id
+     WHERE t.kind = 'series'
+       AND m.parsed_season IS NOT NULL
+       AND m.parsed_episode IS NOT NULL
+    UNION ALL
+    SELECT file_id, season, episode + 1, last FROM covered WHERE episode < last
+),
+items AS (
+    SELECT t.kind, t.provider, t.provider_id, NULLIF(t.imdb_id, '') AS imdb_id,
+           NULLIF(t.tmdb_id, '') AS tmdb_id, c.season, c.episode,
+           t.title || printf(' S%02dE%02d', c.season, c.episode) AS label,
+           p.position_secs, p.duration_secs, p.completed, p.updated_at
+      FROM playback_state p
+      JOIN covered c ON c.file_id = p.file_id
+      JOIN media_files m ON m.id = p.file_id
+      JOIN titles t ON t.id = m.title_id
+    UNION ALL
+    SELECT t.kind, t.provider, t.provider_id, NULLIF(t.imdb_id, ''), NULLIF(t.tmdb_id, ''),
+           NULL, NULL, t.title,
+           p.position_secs, p.duration_secs, p.completed, p.updated_at
+      FROM playback_state p
+      JOIN media_files m ON m.id = p.file_id
+      JOIN titles t ON t.id = m.title_id
+     WHERE t.kind <> 'series'
+),
+ranked AS (
+    SELECT *, ROW_NUMBER() OVER (
+                  PARTITION BY provider, provider_id, season, episode
+                  ORDER BY updated_at DESC, completed DESC) AS n
+      FROM items
+)
+INSERT INTO watch_history
+    (kind, provider, provider_id, imdb_id, tmdb_id, season, episode, label,
+     position_secs, duration_secs, completed, updated_at)
+SELECT kind, provider, provider_id, imdb_id, tmdb_id, season, episode, label,
+       position_secs, duration_secs, completed, updated_at
+  FROM ranked
+ WHERE n = 1;
+"#;
+
 /// How long a statement waits for the write lock before giving up.
 ///
 /// Load-bearing from the moment there is more than one connection. SQLite
@@ -505,7 +582,7 @@ pub fn open_secondary(path: &Path) -> rusqlite::Result<Connection> {
 /// Every migration, in order. The index is the version it produces.
 const MIGRATIONS: [&str; SCHEMA_VERSION as usize] = [
     SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6, SCHEMA_V7, SCHEMA_V8,
-    SCHEMA_V9, SCHEMA_V10, SCHEMA_V11, SCHEMA_V12,
+    SCHEMA_V9, SCHEMA_V10, SCHEMA_V11, SCHEMA_V12, SCHEMA_V13,
 ];
 
 /// Bring the database up to [`SCHEMA_VERSION`].
@@ -786,6 +863,56 @@ mod tests {
         assert_eq!(last(1), Some(2));
         assert_eq!(last(2), None);
         assert_eq!(last(3), None, "an unparsable parsed_json must not fail the upgrade");
+    }
+
+    /// Existing watch state becomes episode history: one row per episode a
+    /// file covers, the most recent copy winning, films included, and nothing
+    /// for a file that was never identified.
+    #[test]
+    fn the_v13_upgrade_fills_the_history_from_existing_watch_state() {
+        let conn = at_version(12);
+        conn.execute_batch(
+            r#"INSERT INTO library_roots (id, path, kind, added_at) VALUES (1, 'C:/tv', 'tv', 0);
+               INSERT INTO titles (id, kind, provider, provider_id, imdb_id, tmdb_id, title, fetched_at)
+               VALUES (4, 'series', 'tmdb', '105', 'tt9000001', '105', 'Example Show', 0),
+                      (1, 'movie',  'tmdb', '1271', 'tt0416449', '', '300', 0);
+               INSERT INTO media_files (id, root_id, path, parent_dir, file_name, extension,
+                   size_bytes, modified_at, first_seen_at, last_seen_at, title_id,
+                   parsed_season, parsed_episode, parsed_episode_last)
+               VALUES (1, 1, 'a', 'C:/tv', 'a', 'mkv', 1, 0, 0, 0, 4, 1, 1, 2),     -- S01E01E02
+                      (2, 1, 'b', 'C:/tv', 'b', 'mkv', 1, 0, 0, 0, 4, 1, 3, NULL),  -- S01E03, old copy
+                      (3, 1, 'c', 'C:/tv', 'c', 'mkv', 1, 0, 0, 0, 4, 1, 3, NULL),  -- S01E03, newer copy
+                      (4, 1, 'd', 'C:/tv', 'd', 'mkv', 1, 0, 0, 0, 1, NULL, NULL, NULL), -- the film
+                      (5, 1, 'e', 'C:/tv', 'e', 'mkv', 1, 0, 0, 0, NULL, 1, 9, NULL); -- unidentified
+               INSERT INTO playback_state (file_id, position_secs, duration_secs, completed, updated_at)
+               VALUES (1, 2900, 2950, 1, 10), (2, 1700, 1750, 1, 20), (3, 300, 1760, 0, 30),
+                      (4, 3000, 7000, 0, 40), (5, 100, 1000, 0, 50);"#,
+        )
+        .unwrap();
+        migrate(&conn).unwrap();
+
+        type Row = (Option<i64>, Option<i64>, f64, i64, String, Option<String>);
+        let rows: Vec<Row> = {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT season, episode, position_secs, completed, label, tmdb_id
+                       FROM watch_history ORDER BY kind DESC, season, episode",
+                )
+                .unwrap();
+            stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?)))
+                .unwrap()
+                .flatten()
+                .collect()
+        };
+        assert_eq!(
+            rows,
+            vec![
+                (Some(1), Some(1), 2900.0, 1, "Example Show S01E01".into(), Some("105".into())),
+                (Some(1), Some(2), 2900.0, 1, "Example Show S01E02".into(), Some("105".into())),
+                (Some(1), Some(3), 300.0, 0, "Example Show S01E03".into(), Some("105".into())),
+                (None, None, 3000.0, 0, "300".into(), None),
+            ]
+        );
     }
 
     /// The reason each step is a transaction: a step that fails part-way must

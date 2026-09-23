@@ -166,6 +166,8 @@ pub fn save_progress(
         ],
     )
     .map_err(to_string_err)?;
+    // The episode's, and every other copy's — see `history`.
+    crate::history::remember(&conn, file_id).map_err(to_string_err)?;
     Ok(())
 }
 
@@ -202,6 +204,8 @@ pub fn set_watched(db: tauri::State<Db>, file_id: i64, watched: bool) -> Result<
     }
     .map_err(to_string_err)?;
 
+    // Watched or not is a fact about the episode, not the copy.
+    crate::history::remember(&conn, file_id).map_err(to_string_err)?;
     Ok(())
 }
 
@@ -349,7 +353,9 @@ pub fn continue_watching(
               WHERE p.completed = 0
                 AND p.position_secs >= :min
                 AND m.missing = 0
-              ORDER BY p.updated_at DESC"
+              -- Copies of one episode share a timestamp (see `history`); the
+              -- one that was actually played knows its length, so it wins.
+              ORDER BY p.updated_at DESC, (p.duration_secs IS NULL)"
         );
         let mut stmt = conn.prepare(&sql).map_err(to_string_err)?;
         let rows = stmt

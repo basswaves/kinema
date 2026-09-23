@@ -234,7 +234,12 @@ pub fn record_match(
     reason: Option<String>,
 ) -> Result<usize, String> {
     let mut conn = db.0.lock().map_err(to_string_err)?;
-    matched(&mut conn, &file_ids, title_id, confidence, reason.as_deref()).map_err(to_string_err)
+    let n = matched(&mut conn, &file_ids, title_id, confidence, reason.as_deref())
+        .map_err(to_string_err)?;
+    // Now that they are known, a moved, renamed, upgraded or re-added copy
+    // picks up what was watched on the old one. See `history`.
+    crate::history::restore(&conn, &file_ids).map_err(to_string_err)?;
+    Ok(n)
 }
 
 #[tauri::command]

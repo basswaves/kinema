@@ -320,6 +320,7 @@ fn write_batch(
                     // on mtime would let moving a library wipe every tick in it.
                     if old_size != file.size {
                         resize.execute(params![id])?;
+                        crate::history::forget_completion(&tx, id)?;
                     }
                     report.files_updated += 1;
                 }

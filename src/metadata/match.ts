@@ -454,13 +454,15 @@ export async function matchFiles(
       outcome.errors.push(message);
 
       // A provider failure must not leave files in limbo — mark them for
-      // review with the reason attached.
+      // review with the reason attached. `failed`, not `unmatched`: nothing
+      // was decided, the provider simply did not answer, so the next scan asks
+      // again. A refusal (`unmatched`) is not re-asked until a key changes.
       await linkFilesToTitle(
         group.files.map((f) => f.id),
         null,
         0,
         message,
-        'unmatched'
+        'failed'
       ).catch(() => undefined);
       outcome.unmatched += group.files.length;
     }

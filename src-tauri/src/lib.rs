@@ -158,6 +158,7 @@ pub fn run() {
             metadata::save_title,
             metadata::save_episodes,
             metadata::link_files_to_title,
+            metadata::unlink_files,
             metadata::list_titles,
             metadata::get_title_detail,
             metadata::list_unmatched,

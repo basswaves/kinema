@@ -267,14 +267,18 @@ fn write_batch(
         )?;
         let mut touch =
             tx.prepare("UPDATE media_files SET last_seen_at = ?2, missing = 0 WHERE id = ?1")?;
-        // Content changed: reset the parse so it gets re-evaluated.
+        // Content changed. Only the facts about the bytes are updated.
+        //
+        // This used to reset the parse, so the file was re-read and matched
+        // afresh — which achieved nothing, since the parse comes from the
+        // file's *name and folders* and neither has changed, and undid real
+        // work: a match picked by hand went back through the automatic
+        // matcher, which had refused it, and landed in Needs attention again.
+        // An mtime moves for reasons that are not content at all (a tag
+        // editor, a NAS), so that could happen to a whole library.
         let mut update = tx.prepare(
             "UPDATE media_files
-                SET size_bytes = ?2, modified_at = ?3, last_seen_at = ?4, missing = 0,
-                    parsed_at = NULL, parsed_title = NULL, parsed_year = NULL,
-                    parsed_season = NULL, parsed_episode = NULL, parsed_kind = NULL,
-                    parsed_episode_last = NULL,
-                    parsed_from = NULL, parsed_json = NULL, match_status = 'unparsed'
+                SET size_bytes = ?2, modified_at = ?3, last_seen_at = ?4, missing = 0
               WHERE id = ?1",
         )?;
         // …and forget that the old bytes were watched. See `resize_forgets_progress`
@@ -471,6 +475,43 @@ mod tests {
         assert_eq!(report.files_unchanged, 1);
         assert_eq!(report.files_updated, 0);
         assert_eq!(completion(&conn, id), (1, Some(1450.0)));
+    }
+
+    /// A match picked by hand survives the file being touched — size or date.
+    /// Re-parsing on a content change used to send it back through the
+    /// automatic matcher, which had refused it in the first place.
+    #[test]
+    fn a_changed_file_keeps_its_match() {
+        let mut conn = database("keeps-match");
+        let mut report = ScanReport::default();
+        write_batch(&mut conn, 1, 0, &[seen(500_000_000, 100)], &mut report).unwrap();
+        conn.execute_batch(
+            "INSERT INTO titles (id, kind, provider, provider_id, title, fetched_at)
+                  VALUES (7, 'series', 'tmdb', '7', 'Show', 0);
+             UPDATE media_files SET title_id = 7, match_status = 'matched',
+                    match_reason = 'manual: Show via tmdb', parsed_title = 'Show',
+                    parsed_season = 1, parsed_episode = 1;",
+        )
+        .unwrap();
+
+        write_batch(&mut conn, 1, 1, &[seen(500_000_000, 999)], &mut report).unwrap();
+        write_batch(&mut conn, 1, 2, &[seen(600_000_000, 999)], &mut report).unwrap();
+
+        let (status, title, reason, parsed): (String, Option<i64>, String, Option<String>) = conn
+            .query_row(
+                "SELECT match_status, title_id, match_reason, parsed_title FROM media_files",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+            )
+            .unwrap();
+        assert_eq!(status, "matched");
+        assert_eq!(title, Some(7));
+        assert!(reason.starts_with("manual:"));
+        assert_eq!(
+            parsed.as_deref(),
+            Some("Show"),
+            "the parse comes from the name, which did not change"
+        );
     }
 
     /// A file with no history is ordinary, not an error.

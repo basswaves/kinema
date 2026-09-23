@@ -44,7 +44,7 @@ interface Props {
 }
 
 /** Statuses that mean "the matcher did not resolve this". */
-const NEEDS_REVIEW = new Set(['parsed', 'unmatched']);
+const NEEDS_REVIEW = new Set(['parsed', 'unmatched', 'failed']);
 
 /**
  * Upper bound on the queue.
@@ -220,6 +220,9 @@ export default function FixMatch({ onChanged }: Props) {
  * first.
  */
 function adviceFor(reason: string): string {
+  if (/^unlinked by hand/.test(reason)) {
+    return 'You unlinked this from a wrong title. It waits here until you pick the right one below.';
+  }
   if (/no provider available/.test(reason)) {
     return 'No way to look this up yet — add a TMDB key under Posters and descriptions.';
   }

@@ -262,8 +262,10 @@ pub fn link_files_to_title(
     {
         let mut stmt = tx
             .prepare(
+                // Choosing a title — by hand or by the scorer — ends any hold.
                 "UPDATE media_files
-                    SET title_id = ?2, match_confidence = ?3, match_reason = ?4, match_status = ?5
+                    SET title_id = ?2, match_confidence = ?3, match_reason = ?4, match_status = ?5,
+                        match_hold = CASE WHEN ?5 = 'matched' THEN 0 ELSE match_hold END
                   WHERE id = ?1",
             )
             .map_err(to_string_err)?;
@@ -277,6 +279,58 @@ pub fn link_files_to_title(
     tx.commit().map_err(to_string_err)?;
     Ok(n)
 }
+
+/// Take a wrong match off some files and hold them for a decision by hand.
+///
+/// Held, not merely returned: they used to go back as `parsed`, which is what
+/// the automatic matcher picks up, so the next launch made the same wrong
+/// choice again and the unlink was undone without anyone noticing. Held files
+/// wait in Needs attention with the reason given; picking a title there clears
+/// the hold.
+#[tauri::command]
+pub fn unlink_files(
+    db: tauri::State<Db>,
+    file_ids: Vec<i64>,
+    reason: String,
+) -> Result<usize, String> {
+    let mut conn = db.0.lock().map_err(to_string_err)?;
+    unlink(&mut conn, &file_ids, &reason)
+}
+
+fn unlink(conn: &mut rusqlite::Connection, file_ids: &[i64], reason: &str) -> Result<usize, String> {
+    let tx = conn.transaction().map_err(to_string_err)?;
+    let mut n = 0;
+    {
+        let mut stmt = tx
+            .prepare(
+                "UPDATE media_files
+                    SET title_id = NULL, match_confidence = NULL, match_reason = ?2,
+                        match_status = 'unmatched', match_hold = 1
+                  WHERE id = ?1",
+            )
+            .map_err(to_string_err)?;
+        for id in file_ids {
+            n += stmt.execute(params![id, reason]).map_err(to_string_err)?;
+        }
+    }
+    tx.commit().map_err(to_string_err)?;
+    Ok(n)
+}
+
+/// What the automatic matcher works on.
+///
+/// Freshly parsed files, and files whose last attempt `failed` — a provider
+/// that was unreachable, which may well answer next time. **Not** files the
+/// scorer refused (`unmatched`): the same question gets the same answer, and
+/// asking it again at every launch cost a provider search per refused group
+/// per start-up for nothing. Refusals are re-opened when a provider key
+/// changes (`settings::set_setting`), which is the one thing that can change
+/// the answer. Never files held by hand.
+pub const MATCHABLE_WHERE: &str = "
+    WHERE m.match_status IN ('parsed', 'failed')
+      AND m.missing = 0
+      AND m.parsed_title IS NOT NULL
+      AND m.match_hold = 0";
 
 /// Unlink every file and drop cached titles so matching runs again from
 /// scratch — needed when a provider key is added, since the provider choice is
@@ -585,7 +639,8 @@ pub fn set_title_trailer(
     Ok(())
 }
 
-/// Which files the review queue works on: everything the matcher declined, plus
+/// Which files the review queue works on: everything the matcher declined or
+/// could not reach a provider for, everything held by hand, plus
 /// everything taken out of the queue by hand so it can be put back.
 ///
 /// Its own query rather than a filter over the whole file table. Settings used
@@ -597,7 +652,7 @@ pub fn set_title_trailer(
 /// excluded here *and* by the matcher, so such a file was in the library and
 /// on no screen anywhere; this queue is where it can be named by hand.
 const NEEDS_REVIEW_WHERE: &str = "
-    WHERE (m.match_status IN ('parsed', 'unmatched')
+    WHERE (m.match_status IN ('parsed', 'unmatched', 'failed')
            AND m.missing = 0)
        OR m.match_status = 'ignored'
      ORDER BY m.parsed_title, m.parsed_season, m.parsed_episode
@@ -620,7 +675,7 @@ pub fn count_needs_review(db: tauri::State<Db>) -> Result<i64, String> {
     let conn = db.0.lock().map_err(to_string_err)?;
     conn.query_row(
         "SELECT COUNT(*) FROM media_files
-          WHERE match_status IN ('parsed', 'unmatched')
+          WHERE match_status IN ('parsed', 'unmatched', 'failed')
             AND missing = 0",
         [],
         |r| r.get(0),
@@ -636,11 +691,10 @@ pub fn list_unmatched(
 ) -> Result<Vec<crate::library::MediaFile>, String> {
     crate::library::query_files_public(
         db,
-        // 'unmatched' is included so a failed run can simply be retried — a
-        // provider outage or a fixed key should not require re-parsing.
-        "WHERE m.match_status IN ('parsed', 'unmatched') AND m.missing = 0
-           AND m.parsed_title IS NOT NULL
-         ORDER BY m.parsed_title, m.parsed_season, m.parsed_episode LIMIT ?1",
+        &format!(
+            "{MATCHABLE_WHERE}
+              ORDER BY m.parsed_title, m.parsed_season, m.parsed_episode LIMIT ?1"
+        ),
         limit,
     )
 }
@@ -755,6 +809,50 @@ mod tests {
         let e02: Vec<_> = rows.iter().filter(|e| e.episode == 2).collect();
         assert_eq!(e02.len(), 1);
         assert_eq!(e02[0].file_id, Some(103));
+    }
+
+    fn matchable_ids(conn: &rusqlite::Connection) -> Vec<i64> {
+        let sql = format!("SELECT m.id FROM media_files m {} ORDER BY m.id", super::MATCHABLE_WHERE);
+        let mut stmt = conn.prepare(&sql).unwrap();
+        let ids = stmt
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .collect::<Result<Vec<i64>, _>>()
+            .unwrap();
+        ids
+    }
+
+    /// Unlinking used to return files as `parsed`, which the next launch's
+    /// matcher took straight back — to the same wrong title.
+    #[test]
+    fn an_unlinked_file_is_held_away_from_the_matcher() {
+        let mut conn = library("unlink");
+        conn.execute("UPDATE media_files SET parsed_title = 'Show', match_status = 'parsed'", [])
+            .unwrap();
+        super::unlink(&mut conn, &[101], "unlinked by hand from Other Show").unwrap();
+
+        assert!(!matchable_ids(&conn).contains(&101), "held files are not re-matched");
+        let (status, hold): (String, i64) = conn
+            .query_row("SELECT match_status, match_hold FROM media_files WHERE id = 101", [], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })
+            .unwrap();
+        assert_eq!((status.as_str(), hold), ("unmatched", 1));
+    }
+
+    /// A refusal is not re-asked; a provider failure is; a held file is not.
+    #[test]
+    fn refusals_wait_and_failures_are_retried() {
+        let conn = library("refusals");
+        conn.execute_batch(
+            "UPDATE media_files SET parsed_title = 'Show';
+             UPDATE media_files SET match_status = 'unmatched' WHERE id = 101;
+             UPDATE media_files SET match_status = 'failed' WHERE id = 102;
+             UPDATE media_files SET match_status = 'parsed' WHERE id = 103;
+             UPDATE media_files SET match_status = 'parsed', match_hold = 1 WHERE id = 104;",
+        )
+        .unwrap();
+        assert_eq!(matchable_ids(&conn), vec![102, 103]);
     }
 
     #[test]

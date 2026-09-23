@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use std::path::Path;
 
 /// The schema this build understands. Bump it with every new `SCHEMA_V*`.
-pub const SCHEMA_VERSION: i64 = 11;
+pub const SCHEMA_VERSION: i64 = 12;
 
 /// What can go wrong opening the library.
 ///
@@ -382,6 +382,18 @@ UPDATE media_files
    AND json_type(parsed_json, '$.episode') = 'array';
 "#;
 
+/// Schema version 12: files the automatic matcher must leave alone.
+///
+/// "Wrong? Unlink" put a wrongly matched file back into the review queue as
+/// `parsed` — and the next launch's matcher took every `parsed` file, made the
+/// same choice again, and quietly re-linked it. A hand-made decision lasted
+/// until the app was restarted. `match_hold = 1` is that decision: the file
+/// waits in Needs attention until someone picks the right title, and choosing
+/// one clears it.
+const SCHEMA_V12: &str = r#"
+ALTER TABLE media_files ADD COLUMN match_hold INTEGER NOT NULL DEFAULT 0;
+"#;
+
 /// How long a statement waits for the write lock before giving up.
 ///
 /// Load-bearing from the moment there is more than one connection. SQLite
@@ -493,7 +505,7 @@ pub fn open_secondary(path: &Path) -> rusqlite::Result<Connection> {
 /// Every migration, in order. The index is the version it produces.
 const MIGRATIONS: [&str; SCHEMA_VERSION as usize] = [
     SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6, SCHEMA_V7, SCHEMA_V8,
-    SCHEMA_V9, SCHEMA_V10, SCHEMA_V11,
+    SCHEMA_V9, SCHEMA_V10, SCHEMA_V11, SCHEMA_V12,
 ];
 
 /// Bring the database up to [`SCHEMA_VERSION`].

@@ -34,6 +34,7 @@ import {
   listTitles,
   listUnmatched,
   resetMatches,
+  unlinkFiles,
   type ArtworkStats,
   type StoredTitle,
 } from '../metadata/api';
@@ -41,7 +42,6 @@ import {
   backfillTitleDetails,
   loadProviderKeys,
   matchFiles,
-  returnFilesToReview,
   type MatchProgress,
 } from '../metadata/match';
 import Art from '../ui/Art';
@@ -167,7 +167,11 @@ export default function LibraryView() {
       setBusy('Unlinking…');
       setError(null);
       try {
-        await returnFilesToReview(owned);
+        // Held, so the next launch's matcher does not simply put it back.
+        await unlinkFiles(
+          owned.map((f) => f.id),
+          `unlinked by hand from “${title.title}”`
+        );
         await refresh();
         setDiagnosis(
           `Unlinked ${owned.length} file(s) from “${title.title}” — they are back under Needs attention.`

@@ -77,8 +77,18 @@ export const linkFilesToTitle = (
   titleId: number | null,
   confidence: number | null,
   reason: string | null,
-  status: 'matched' | 'unmatched' | 'ignored' | 'parsed'
+  status: 'matched' | 'unmatched' | 'failed' | 'ignored' | 'parsed'
 ) => invoke<number>('link_files_to_title', { fileIds, titleId, confidence, reason, status });
+
+/**
+ * Take a wrong match off some files and hold them for a decision by hand.
+ *
+ * Not the same as returning them to review: those go back as `parsed`, which
+ * the automatic matcher takes up again — and it made the same wrong choice at
+ * the next launch, undoing the unlink. Held files wait in Needs attention.
+ */
+export const unlinkFiles = (fileIds: number[], reason: string) =>
+  invoke<number>('unlink_files', { fileIds, reason });
 
 export const listTitles = () => invoke<StoredTitle[]>('list_titles');
 

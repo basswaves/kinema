@@ -30,25 +30,16 @@ a receiver.
 ## The improvement plan (from the September 2026 review)
 
 Agreed with the owner on 2026-09-23 after a full review of the code, the logs and
-the library database. One commit per item on `master`. Phase 0 — the safety
-net and the test tools — is done; what follows is what is left, in order.
+the library database. One commit per item on `master`. Phase 0 (the safety
+net and the test tools) and Phase 1 (starting playback and the Skip button)
+are done — see PLAN.md for what they decided; what follows is what is left,
+in order.
 
 Decisions that shape it: the **Skip intro button shows from 0:00** whenever an
 intro is known and stays until the intro ends, and pressing it during a cold
 open jumps to the end of the intro (chosen knowingly — it skips the cold open
-too); **Skiptro stays first** for intros; nothing is tested by hand.
-
-**Phase 1 — starting playback and the Skip button.** No see-through window
-before the first frame (mpv's idle surface is drawn with alpha: an opaque
-idle background, a black cover in the player until the first frame, mpv
-started with the app). Resume opens at the position instead of playing 0:00
-and seeking. Playback does not wait on the startup scan. Skip intro from 0:00
-to the end of the intro, no ten-second auto-hide, back after seeking into the
-intro. mpv listeners registered once, so `file-loaded` cannot be missed.
-Skiptro reads with a busy timeout and logged failures. **Found by the new
-harness:** after launch, focus is left on the first-run panel's unmounted
-button (norigin removes focusables on a delay, so `useClaimFocus`'s liveness
-check passes), and a remote's first presses do nothing.
+too); **Skiptro stays first** for intros where its confidence is at least 0.8;
+nothing is tested by hand.
 
 **Phase 2 — watching correctness.** Leaving or skipping in the credits counts
 as watched (reproduced in the mock: "Play next" at 92.7% leaves the episode

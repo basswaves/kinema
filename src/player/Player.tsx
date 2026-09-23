@@ -87,6 +87,13 @@ const SKIP_PROMPT_MS = 10000;
 const STATS_REFRESH_MS = 1000;
 /** Setting key: 'auto' skips without asking, anything else shows the button. */
 const SKIP_MODE_KEY = 'skip_mode';
+/**
+ * How long the resolved marker sources must hold still before they are
+ * logged. Chapters are read a moment after the file opens and can move the
+ * credits source from `tail` to `chapter`; one line with the final answer is
+ * worth more than two where the first is already wrong.
+ */
+const MARKER_LOG_SETTLE_MS = 3000;
 
 /**
  * Focus keys for the two places focus is aimed at explicitly: the control the
@@ -150,6 +157,12 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [resumedFrom, setResumedFrom] = useState<number | null>(null);
   const [markers, setMarkers] = useState<SkipMarkers | null>(null);
+  /**
+   * The path the current `markers` were fetched for, once the fetch has
+   * finished — including when it found nothing or failed. Until it equals
+   * `target.path`, `markers` describe the previous file (or nothing yet).
+   */
+  const [markersFor, setMarkersFor] = useState<string | null>(null);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [autoSkip, setAutoSkip] = useState(false);
   const [creditsTailSecs, setCreditsTailSecs] = useState(DEFAULT_CREDITS_TAIL_SECS);
@@ -600,6 +613,8 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       } catch (e) {
         // Never fatal — no markers simply means no skip button.
         console.warn('skip markers unavailable', e);
+      } finally {
+        if (!cancelled) setMarkersFor(target.path);
       }
     })();
 
@@ -680,21 +695,30 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     [markers, chapters, duration, creditsTailSecs, neighbours.next]
   );
 
-  // One line per file in app.log. Which source won is the first thing worth
-  // knowing when a skip fires somewhere surprising — and with three of them
-  // now, the intro needs saying as much as the credits do.
+  /*
+   * One line per file in app.log saying which source won each segment — the
+   * first thing worth knowing when a skip fires somewhere surprising.
+   *
+   * Written only once this file is open *and* its own markers have arrived,
+   * and only after the answer has held still for a moment. It used to log on
+   * every change, keyed on the path: on an episode change the path moved
+   * first, so the outgoing episode's markers were logged under the incoming
+   * episode's name, followed by a `tail` line from the instant before the real
+   * markers landed. The log then contradicted the database, which is the one
+   * thing a diagnostic must never do.
+   */
   const introSource = resolved.markers?.intro_source ?? null;
+  const creditsSource = resolved.creditsSource;
   useEffect(() => {
-    if (introSource) {
-      console.log(`intro marker from ${introSource} for ${target.path}`);
-    }
-  }, [introSource, target.path]);
-
-  useEffect(() => {
-    if (resolved.creditsSource) {
-      console.log(`credits marker from ${resolved.creditsSource} for ${target.path}`);
-    }
-  }, [resolved.creditsSource, target.path]);
+    if (!fileReady || markersFor !== target.path) return;
+    const id = window.setTimeout(() => {
+      console.log(
+        `markers for ${target.path}: intro from ${introSource ?? 'none'}, ` +
+          `credits from ${creditsSource ?? 'none'}`
+      );
+    }, MARKER_LOG_SETTLE_MS);
+    return () => window.clearTimeout(id);
+  }, [fileReady, markersFor, target.path, introSource, creditsSource]);
 
   // Gated on `fileReady`, which is the whole defence against acting on the
   // outgoing file's position. One check here covers everything downstream: the

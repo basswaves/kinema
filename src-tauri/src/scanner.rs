@@ -273,6 +273,7 @@ fn write_batch(
                 SET size_bytes = ?2, modified_at = ?3, last_seen_at = ?4, missing = 0,
                     parsed_at = NULL, parsed_title = NULL, parsed_year = NULL,
                     parsed_season = NULL, parsed_episode = NULL, parsed_kind = NULL,
+                    parsed_episode_last = NULL,
                     parsed_from = NULL, parsed_json = NULL, match_status = 'unparsed'
               WHERE id = ?1",
         )?;

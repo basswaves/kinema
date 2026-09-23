@@ -58,6 +58,10 @@ pub struct ParseResult {
     pub year: Option<i64>,
     pub season: Option<i64>,
     pub episode: Option<i64>,
+    /// The last episode a multi-episode file covers (`S01E01E02` → 2), or
+    /// `None` for a file holding one. Defaults so an older frontend still works.
+    #[serde(default)]
+    pub episode_last: Option<i64>,
     pub kind: Option<String>,
     pub from: Option<String>,
     pub raw_json: Option<String>,
@@ -319,14 +323,16 @@ pub fn save_parse_results(
                 "UPDATE media_files
                     SET parsed_at = ?2, parsed_title = ?3, parsed_year = ?4,
                         parsed_season = ?5, parsed_episode = ?6, parsed_kind = ?7,
-                        parsed_from = ?8, parsed_json = ?9, match_status = 'parsed'
+                        parsed_from = ?8, parsed_json = ?9, parsed_episode_last = ?10,
+                        match_status = 'parsed'
                   WHERE id = ?1",
             )
             .map_err(to_string_err)?;
 
         for r in results {
             stmt.execute(params![
-                r.id, now, r.title, r.year, r.season, r.episode, r.kind, r.from, r.raw_json
+                r.id, now, r.title, r.year, r.season, r.episode, r.kind, r.from, r.raw_json,
+                r.episode_last
             ])
             .map_err(to_string_err)?;
             written += 1;
@@ -351,6 +357,7 @@ pub fn reset_parse(db: tauri::State<Db>) -> Result<usize, String> {
                 SET match_status = 'unparsed', parsed_at = NULL, parsed_title = NULL,
                     parsed_year = NULL, parsed_season = NULL, parsed_episode = NULL,
                     parsed_kind = NULL, parsed_from = NULL, parsed_json = NULL,
+                    parsed_episode_last = NULL,
                     title_id = NULL, match_confidence = NULL, match_reason = NULL",
             [],
         )

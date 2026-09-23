@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use std::path::Path;
 
 /// The schema this build understands. Bump it with every new `SCHEMA_V*`.
-pub const SCHEMA_VERSION: i64 = 10;
+pub const SCHEMA_VERSION: i64 = 11;
 
 /// What can go wrong opening the library.
 ///
@@ -363,6 +363,25 @@ CREATE TABLE continue_dismissed (
 );
 "#;
 
+/// Schema version 11: the last episode a file covers.
+///
+/// `Show.S01E01E02.mkv` parses to episodes 1 *and* 2, and only the first was
+/// kept: E02 showed as "not in library", could not be marked watched, and
+/// "next episode" from E01 went nowhere useful. NULL means the file holds one
+/// episode — every existing single-episode row needs no change.
+///
+/// Backfilled from `parsed_json`, which already holds guessit's raw output, so
+/// files parsed before this version gain their range without a re-parse.
+const SCHEMA_V11: &str = r#"
+ALTER TABLE media_files ADD COLUMN parsed_episode_last INTEGER;
+
+UPDATE media_files
+   SET parsed_episode_last =
+       (SELECT MAX(CAST(value AS INTEGER)) FROM json_each(media_files.parsed_json, '$.episode'))
+ WHERE json_valid(parsed_json)
+   AND json_type(parsed_json, '$.episode') = 'array';
+"#;
+
 /// How long a statement waits for the write lock before giving up.
 ///
 /// Load-bearing from the moment there is more than one connection. SQLite
@@ -474,7 +493,7 @@ pub fn open_secondary(path: &Path) -> rusqlite::Result<Connection> {
 /// Every migration, in order. The index is the version it produces.
 const MIGRATIONS: [&str; SCHEMA_VERSION as usize] = [
     SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6, SCHEMA_V7, SCHEMA_V8,
-    SCHEMA_V9, SCHEMA_V10,
+    SCHEMA_V9, SCHEMA_V10, SCHEMA_V11,
 ];
 
 /// Bring the database up to [`SCHEMA_VERSION`].
@@ -730,6 +749,31 @@ mod tests {
             left,
             vec!["library-v2-2.db", "library-v3-3.db", "library-v4-4.db", "unrelated.txt"]
         );
+    }
+
+    /// Files parsed before v11 gain their episode range from the guessit output
+    /// already stored beside them, so an existing S01E01E02 is fixed without a
+    /// re-parse — and a single-episode file is left alone.
+    #[test]
+    fn the_v11_upgrade_backfills_multi_episode_files() {
+        let conn = at_version(10);
+        conn.execute_batch(
+            r#"INSERT INTO library_roots (id, path, kind, added_at) VALUES (1, 'C:/tv', 'tv', 0);
+               INSERT INTO media_files (id, root_id, path, parent_dir, file_name, extension,
+                   size_bytes, modified_at, first_seen_at, last_seen_at, parsed_episode, parsed_json)
+               VALUES (1, 1, 'a', 'C:/tv', 'a', 'mkv', 1, 0, 0, 0, 1, '{"season":1,"episode":[1,2]}'),
+                      (2, 1, 'b', 'C:/tv', 'b', 'mkv', 1, 0, 0, 0, 3, '{"season":1,"episode":3}'),
+                      (3, 1, 'c', 'C:/tv', 'c', 'mkv', 1, 0, 0, 0, NULL, 'not json');"#,
+        )
+        .unwrap();
+        migrate(&conn).unwrap();
+        let last = |id: i64| -> Option<i64> {
+            conn.query_row("SELECT parsed_episode_last FROM media_files WHERE id = ?1", [id], |r| r.get(0))
+                .unwrap()
+        };
+        assert_eq!(last(1), Some(2));
+        assert_eq!(last(2), None);
+        assert_eq!(last(3), None, "an unparsable parsed_json must not fail the upgrade");
     }
 
     /// The reason each step is a transaction: a step that fails part-way must

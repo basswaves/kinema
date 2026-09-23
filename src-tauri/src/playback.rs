@@ -257,7 +257,9 @@ fn last_watched_per_series(conn: &rusqlite::Connection) -> Result<Vec<(i64, i64,
     let mut stmt = conn
         .prepare(
             "SELECT m.title_id,
-                    MAX(m.parsed_season * :base + m.parsed_episode),
+                    -- The last episode a file covers: after finishing S01E01E02,
+                    -- the next episode is E03, not E02 again.
+                    MAX(m.parsed_season * :base + COALESCE(m.parsed_episode_last, m.parsed_episode)),
                     MAX(p.updated_at)
                FROM playback_state p
                JOIN media_files m ON m.id = p.file_id
@@ -493,18 +495,23 @@ fn adjacent_episode(
     file_id: i64,
     forward: bool,
 ) -> Result<Option<EpisodeRef>, String> {
-    let current: Option<(i64, i64, i64)> = conn
+    let current: Option<(i64, i64, i64, i64)> = conn
         .query_row(
-            "SELECT title_id, parsed_season, parsed_episode FROM media_files WHERE id = ?1",
+            "SELECT title_id, parsed_season, parsed_episode,
+                    COALESCE(parsed_episode_last, parsed_episode)
+               FROM media_files WHERE id = ?1",
             params![file_id],
-            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
         )
         .ok();
 
-    let Some((title_id, season, episode)) = current else {
+    let Some((title_id, season, first, last)) = current else {
         return Ok(None);
     };
 
+    // A file holding E01–E02 is followed by E03 and preceded by E00: step from
+    // the end of its range going forward, from the start going back.
+    let episode = if forward { last } else { first };
     adjacent_from(conn, title_id, season, episode, forward, false)
 }
 
@@ -628,6 +635,31 @@ mod tests {
         )
         .unwrap();
         conn
+    }
+
+    /// After a file holding E01–E02 comes E03, not E02 again; before E03 comes
+    /// that same file.
+    #[test]
+    fn next_and_previous_step_over_a_double_episode_file() {
+        let dir = std::env::temp_dir().join("pn-playback-double");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let conn = crate::db::open(&dir.join("library.db")).unwrap();
+        conn.execute_batch(
+            "INSERT INTO library_roots (id, path, kind, added_at) VALUES (1, 'C:/tv', 'tv', 0);
+             INSERT INTO titles (id, kind, provider, provider_id, title, fetched_at)
+                  VALUES (1, 'series', 'tmdb', '1', 'Show', 0);
+             INSERT INTO media_files (id, root_id, path, parent_dir, file_name, extension,
+                 size_bytes, modified_at, first_seen_at, last_seen_at, match_status, title_id,
+                 parsed_season, parsed_episode, parsed_episode_last)
+             VALUES (1, 1, 'e1e2', 'C:/tv', 'e1e2', 'mkv', 1, 0, 0, 0, 'matched', 1, 1, 1, 2),
+                    (3, 1, 'e3',   'C:/tv', 'e3',   'mkv', 1, 0, 0, 0, 'matched', 1, 1, 3, NULL);",
+        )
+        .unwrap();
+        let next = super::adjacent_episode(&conn, 1, true).unwrap().unwrap();
+        assert_eq!(next.episode, 3);
+        let prev = super::adjacent_episode(&conn, 3, false).unwrap().unwrap();
+        assert_eq!(prev.file_id, 1);
     }
 
     /// The bug: Remove on a "Next episode" card came straight back, because

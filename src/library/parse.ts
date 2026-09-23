@@ -85,8 +85,21 @@ export interface Guess {
   year: number | null;
   season: number | null;
   episode: number | null;
+  /**
+   * The last episode a multi-episode file covers — `S01E01E02` is episodes 1
+   * and 2 — or null for a file holding one. Only the first used to be kept,
+   * so E02 showed as missing from a season that had it.
+   */
+  episodeLast: number | null;
   kind: 'movie' | 'episode' | null;
   raw: Record<string, unknown>;
+}
+
+/** The highest of several episode numbers, or null when there are not several. */
+function lastOf(value: unknown): number | null {
+  if (!Array.isArray(value)) return null;
+  const numbers = value.filter((n): n is number => typeof n === 'number');
+  return numbers.length > 1 ? Math.max(...numbers) : null;
 }
 
 function firstOf<T>(value: T | T[] | undefined | null): T | null {
@@ -122,7 +135,15 @@ function runGuessit(input: string, kind: LibraryKind): Guess {
     // Never swallow this silently — a parser that throws on every file looks
     // exactly like a parser that works and finds nothing.
     lastParseError = `${input}: ${e instanceof Error ? e.message : String(e)}`;
-    return { title: null, year: null, season: null, episode: null, kind: null, raw: {} };
+    return {
+      title: null,
+      year: null,
+      season: null,
+      episode: null,
+      episodeLast: null,
+      kind: null,
+      raw: {},
+    };
   }
 
   const title = firstOf(raw.title as string | string[] | undefined);
@@ -133,6 +154,7 @@ function runGuessit(input: string, kind: LibraryKind): Guess {
     year: typeof raw.year === 'number' ? raw.year : null,
     season: typeof firstOf(raw.season) === 'number' ? (firstOf(raw.season) as number) : null,
     episode: typeof firstOf(raw.episode) === 'number' ? (firstOf(raw.episode) as number) : null,
+    episodeLast: lastOf(raw.episode),
     kind: type === 'movie' || type === 'episode' ? type : null,
     raw,
   };
@@ -196,6 +218,14 @@ export function parseMediaFile(file: MediaFile, kind: LibraryKind): ParsedFile {
     ...chosen,
     season: chosen.season ?? fromFile.season ?? fromParent.season,
     episode: chosen.episode ?? fromFile.episode ?? fromParent.episode,
+    // From whichever side supplied the episode number, so the range and its
+    // start never come from two different guesses.
+    episodeLast:
+      chosen.episode !== null
+        ? chosen.episodeLast
+        : fromFile.episode !== null
+          ? fromFile.episodeLast
+          : fromParent.episodeLast,
     year: chosen.year ?? fromFile.year ?? fromParent.year,
   };
 
@@ -233,6 +263,7 @@ export function toPayload(file: MediaFile, parsed: ParsedFile): ParseResultPaylo
     year: parsed.year,
     season: parsed.season,
     episode: parsed.episode,
+    episode_last: parsed.episodeLast,
     kind: parsed.kind,
     from: parsed.from,
     raw_json: JSON.stringify(parsed.raw),

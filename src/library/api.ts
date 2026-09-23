@@ -56,6 +56,8 @@ export interface ParseResultPayload {
   year: number | null;
   season: number | null;
   episode: number | null;
+  /** Last episode of a multi-episode file, else null. */
+  episode_last: number | null;
   kind: string | null;
   from: string | null;
   raw_json: string | null;

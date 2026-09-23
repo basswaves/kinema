@@ -446,6 +446,7 @@ pub(crate) fn episodes_for(
         .prepare(
             "WITH owned AS (
                  SELECT m.id, m.path, m.parsed_season AS season, m.parsed_episode AS episode,
+                        COALESCE(m.parsed_episode_last, m.parsed_episode) AS last,
                         COALESCE(p.completed, 0) AS completed, p.position_secs, p.duration_secs,
                         ROW_NUMBER() OVER (
                             PARTITION BY m.parsed_season, m.parsed_episode
@@ -463,7 +464,16 @@ pub(crate) fn episodes_for(
                       WHERE a.url = e.still_url AND a.local_path <> ''),
                     COALESCE(c.completed, 0), c.position_secs, c.duration_secs
                FROM episodes e
-               LEFT JOIN chosen c ON c.season = e.season AND c.episode = e.episode
+               -- A file covering E01–E02 is the file for both episodes — but
+               -- exactly one file per row, preferring a file for this episode
+               -- alone over a range that happens to include it, or a season
+               -- holding both an E01E02 and an E02 would list E02 twice.
+               LEFT JOIN chosen c ON c.id = (
+                   SELECT c2.id FROM chosen c2
+                    WHERE c2.season = e.season
+                      AND e.episode BETWEEN c2.episode AND c2.last
+                    ORDER BY c2.episode = e.episode AND c2.last = e.episode DESC, c2.id
+                    LIMIT 1)
               WHERE e.title_id = :id
              UNION ALL
              SELECT -c.id, c.season, c.episode, NULL, NULL, NULL,
@@ -472,7 +482,8 @@ pub(crate) fn episodes_for(
                FROM chosen c
               WHERE NOT EXISTS (SELECT 1 FROM episodes e
                                  WHERE e.title_id = :id
-                                   AND e.season = c.season AND e.episode = c.episode)
+                                   AND e.season = c.season
+                                   AND e.episode BETWEEN c.episode AND c.last)
               ORDER BY 2, 3",
         )
         .map_err(to_string_err)?;
@@ -713,6 +724,35 @@ mod tests {
         let e04 = rows.iter().find(|e| e.episode == 4).expect("E04 must appear");
         assert_eq!(e04.file_id, Some(104));
         assert!(e04.id < 0, "an id that cannot collide with a real episode's");
+    }
+
+    /// S01E01E02 in one file is the file for *both* rows.
+    #[test]
+    fn a_double_episode_file_backs_both_of_its_episodes() {
+        let conn = library("double");
+        conn.execute("UPDATE media_files SET parsed_episode_last = 2 WHERE id = 101", [])
+            .unwrap();
+        conn.execute("DELETE FROM media_files WHERE id IN (102, 103)", []).unwrap();
+        let rows = episodes_for(&conn, "", 1).unwrap();
+        let e01 = rows.iter().find(|e| e.episode == 1).unwrap();
+        let e02 = rows.iter().find(|e| e.episode == 2).unwrap();
+        assert_eq!(e01.file_id, Some(101));
+        assert_eq!(e02.file_id, Some(101));
+        assert!(e02.watched, "watching the file watched both episodes");
+    }
+
+    /// An E01E02 file and a separate E02 file: still one E02 row, and it is
+    /// the file that holds E02 alone.
+    #[test]
+    fn a_range_and_a_single_file_for_one_episode_still_make_one_row() {
+        let conn = library("range-and-single");
+        conn.execute("UPDATE media_files SET parsed_episode_last = 2 WHERE id = 101", [])
+            .unwrap();
+        conn.execute("DELETE FROM media_files WHERE id = 102", []).unwrap();
+        let rows = episodes_for(&conn, "", 1).unwrap();
+        let e02: Vec<_> = rows.iter().filter(|e| e.episode == 2).collect();
+        assert_eq!(e02.len(), 1);
+        assert_eq!(e02[0].file_id, Some(103));
     }
 
     #[test]

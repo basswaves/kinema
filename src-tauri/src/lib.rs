@@ -94,6 +94,9 @@ fn open_library(app: &tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// How long the page gets to show the window itself before the backend does.
+const REVEAL_FALLBACK: std::time::Duration = std::time::Duration::from_secs(4);
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -117,6 +120,20 @@ pub fn run() {
                 // panicking after we have already explained ourselves would
                 // only add an invisible second failure.
                 std::process::exit(1);
+            }
+
+            // The window starts hidden and the page shows it once it has
+            // something to paint (App.tsx). If that never happens — a script
+            // error before the first render — an app that never appears is a
+            // far worse failure than a white flash, so show it anyway.
+            if let Some(window) = app.get_webview_window("main") {
+                std::thread::spawn(move || {
+                    std::thread::sleep(REVEAL_FALLBACK);
+                    if !window.is_visible().unwrap_or(true) {
+                        log!("window: the page never showed it; showing it anyway");
+                        let _ = window.show();
+                    }
+                });
             }
             Ok(())
         })

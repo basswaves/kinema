@@ -173,6 +173,23 @@ export const TONE_MAPPING_OPTIONS: Record<string, string | boolean | number> = {
 };
 
 /**
+ * What mpv draws when no video frame is up: before the first file, and between
+ * files.
+ *
+ * mpv's idle surface is an **RGBA** image (`mpv.log`: "reconfig to 960x540
+ * rgba" at init and after every stop), and this window is transparent so the
+ * webview can sit on top of mpv — so the transparent parts of that image let
+ * the desktop show straight through the app until a video frame arrives.
+ * An opaque black background closes that gap at the source. Applied after
+ * init like the options above: option names in this area have moved between
+ * mpv versions, and a rejected one must cost this refinement, not the player.
+ */
+export const IDLE_SURFACE_OPTIONS: Record<string, string | boolean | number> = {
+  background: 'color',
+  'background-color': '#000000',
+};
+
+/**
  * "Potato PC" fallback — the one escape hatch.
  *
  * Not a quality preference, an emergency valve for hardware that cannot keep

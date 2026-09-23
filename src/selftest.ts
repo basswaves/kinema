@@ -18,6 +18,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { command, getProperty, listenEvents } from 'tauri-plugin-libmpv-api';
 import { ensureMpvInitialised } from './player/mpv';
+import { scanLibrary } from './library/api';
 
 export interface SelfTestAction {
   /** Seconds after the test started. */
@@ -38,6 +39,19 @@ export interface SelfTestPlan {
   seconds: number;
   /** Defaults to true: a test run should not play sound through the speakers. */
   mute?: boolean;
+  /**
+   * Start a library scan at the same moment as playback, and record when it
+   * finishes. Proves playback does not wait behind a scan. The scan writes
+   * only to the copied library, and walks the media folders read-only.
+   */
+  scan?: boolean;
+  /**
+   * Seconds to stay on Home before opening the player. Zero (the default)
+   * opens it at once — which conflates the app starting with a video
+   * starting. A few seconds measures what a viewer does: press Play on a Home
+   * that is already up.
+   */
+  openAfter?: number;
   actions?: SelfTestAction[];
 }
 
@@ -78,7 +92,7 @@ export async function runSelfTest(plan: SelfTestPlan): Promise<void> {
   const timeline: Entry[] = [];
   const note = (kind: string, detail?: unknown) => timeline.push({ t: now(), kind, detail });
 
-  note('start', { path: plan.path });
+  note('start', { path: plan.path, openAfter: plan.openAfter ?? 0 });
 
   const unlisten = await listenEvents((event) => {
     const e = event as { event: string; name?: string; data?: unknown; reason?: string };
@@ -90,6 +104,15 @@ export async function runSelfTest(plan: SelfTestPlan): Promise<void> {
       note(`mpv:${e.event}`, e.reason ? { reason: e.reason } : undefined);
     }
   });
+
+  if (plan.scan) {
+    note('scan:start');
+    void scanLibrary()
+      .then((report) =>
+        note('scan:done', { ms: report.duration_ms, files: report.files_seen, errors: report.errors.length })
+      )
+      .catch((e) => note('scan:failed', String(e)));
+  }
 
   if (plan.mute !== false) {
     void ensureMpvInitialised()

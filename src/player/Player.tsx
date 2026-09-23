@@ -7,7 +7,9 @@
  *  - offer the next episode when one finishes
  *
  * The window is transparent and mpv renders behind the webview, so nothing here
- * may paint an opaque background.
+ * may paint an opaque background **over a video frame**. The one opaque thing
+ * is the cover shown *before* a file's first frame, which exists precisely
+ * because a transparent window with no frame up shows the desktop.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -92,6 +94,12 @@ const SKIP_MODE_KEY = 'skip_mode';
  * worth more than two where the first is already wrong.
  */
 const MARKER_LOG_SETTLE_MS = 3000;
+/**
+ * The longest the black cover may stay up waiting for a first frame. A file
+ * with no video, or an mpv event that never comes, must not leave the picture
+ * hidden: after this the cover goes regardless.
+ */
+const COVER_MAX_MS = 8000;
 
 /**
  * Focus keys for the two places focus is aimed at explicitly: the control the
@@ -152,6 +160,16 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
    * would mark the incoming episode finished and roll straight past it.
    */
   const fileReadyRef = useRef(false);
+  /**
+   * Whether this file's first frame is on screen. Until it is, the player
+   * draws a black cover — see `.player-cover` — because the window is
+   * transparent and, with no frame up yet, would show the desktop through the
+   * app. Set on mpv's `playback-restart` for this file; never left up for
+   * longer than `COVER_MAX_MS`.
+   */
+  const [frameShown, setFrameShown] = useState(false);
+  /** `file-loaded` has arrived for the current target — set synchronously. */
+  const sawFileLoaded = useRef(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [resumedFrom, setResumedFrom] = useState<number | null>(null);
   const [markers, setMarkers] = useState<SkipMarkers | null>(null);
@@ -287,6 +305,8 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     setMarkers(null);
     setFileReady(false);
     fileReadyRef.current = false;
+    setFrameShown(false);
+    sawFileLoaded.current = false;
     // A card offering the *previous* file's next episode has no business
     // surviving into this one. Nothing else clears these: the countdown path
     // clears them when it advances, and every other route out left them set.
@@ -449,7 +469,15 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     let unlisten: (() => void) | undefined;
 
     listenEvents((event) => {
+      // The first frame of this file is up: the cover can come off. Only after
+      // `file-loaded`, so a restart belonging to the outgoing file cannot
+      // uncover the gap before the new one.
+      if (event.event === 'playback-restart' && sawFileLoaded.current) {
+        setFrameShown(true);
+      }
+
       if (event.event === 'file-loaded') {
+        sawFileLoaded.current = true;
         void (async () => {
           // The resume point went to mpv with the load; say so on screen.
           const resumed = pendingSeek.current;
@@ -888,6 +916,14 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     };
   }, [target.fileId]);
 
+  // The cover never outstays its purpose: if no first frame is reported in
+  // time — a file with no video, an event that never comes — it goes anyway.
+  useEffect(() => {
+    if (frameShown) return;
+    const id = window.setTimeout(() => setFrameShown(true), COVER_MAX_MS);
+    return () => window.clearTimeout(id);
+  }, [frameShown, target.path]);
+
   // Stop playback when leaving, so audio does not continue behind the UI.
   useEffect(() => {
     return () => {
@@ -1224,6 +1260,8 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         void toggleFullscreen();
       }}
     >
+      {!frameShown && <div className="player-cover" aria-hidden="true" />}
+
       {error && <div className="player-error">{error}</div>}
 
       {resumedFrom !== null && (

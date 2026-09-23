@@ -389,6 +389,7 @@ const handlers: Record<string, Handler> = {
   'plugin:libmpv|set_property': (a) => fakeMpv.setProperty(String(a.name), a.value),
   'plugin:window|is_fullscreen': () => false,
   'plugin:window|set_fullscreen': () => null,
+  'plugin:window|show': () => null,
   'plugin:opener|open_url': () => null,
 };
 

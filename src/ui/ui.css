@@ -1377,11 +1377,29 @@ html {
 .player {
   position: absolute;
   inset: 0;
+  /* Its own stacking context, so the cover below can sit under the controls
+     (in normal flow) while still being above the video behind the webview. */
+  z-index: 0;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   background: transparent;
   cursor: default;
+}
+
+/*
+ * Black until the file's first frame is up — the one opaque surface the
+ * player is allowed. The window is transparent so mpv can render behind the
+ * webview; with no frame there yet, it showed the desktop through the app.
+ * Removed on mpv's `playback-restart`, or after COVER_MAX_MS regardless, so it
+ * can never hide a picture that is actually playing.
+ */
+.player-cover {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: #000;
+  pointer-events: none;
 }
 
 .player.osd-hidden .player-top,

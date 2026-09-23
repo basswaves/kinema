@@ -32,6 +32,7 @@ import { cacheArtwork } from '../metadata/api';
 import { runScanPipeline, useScanStatus } from '../library/pipeline';
 import { getTitleDetail, listTitles, type Title } from './api';
 import { runSelfTest, selfTestPlan } from '../selftest';
+import { ensureMpvInitialised } from '../player/mpv';
 import './ui.css';
 
 // Enable native-like arrow-key navigation. `useGetBoundingClientRect` makes
@@ -215,6 +216,22 @@ export default function Browse() {
   }, [load]);
 
   /**
+   * Start mpv now, while Home is on screen, rather than when Play is pressed.
+   *
+   * Starting it takes most of a second — loading the library, creating the
+   * d3d11 device, making its window — and for all of that time the player
+   * showed nothing, and a transparent window shows whatever is behind it.
+   * Done here, its surface already exists behind this opaque view by the time
+   * anything is played. Deferred a tick so it never delays the first paint.
+   */
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      void ensureMpvInitialised().catch((e) => console.warn('mpv: early start failed', e));
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, []);
+
+  /**
    * Under a self-test, go straight to the player on the plan's file and let
    * the recorder take it from there. Outside one, this does nothing at all.
    */
@@ -222,15 +239,18 @@ export default function Browse() {
     let cancelled = false;
     void selfTestPlan().then((plan) => {
       if (!plan || cancelled) return;
-      setView({
-        name: 'player',
-        target: {
-          path: plan.path,
-          label: plan.label ?? 'Self-test',
-          fileId: plan.fileId,
-          titleId: plan.titleId,
-        },
-      });
+      const open = () =>
+        setView({
+          name: 'player',
+          target: {
+            path: plan.path,
+            label: plan.label ?? 'Self-test',
+            fileId: plan.fileId,
+            titleId: plan.titleId,
+          },
+        });
+      if (plan.openAfter) window.setTimeout(open, plan.openAfter * 1000);
+      else open();
       void runSelfTest(plan).catch((e) => console.error('selftest failed', e));
     });
     return () => {

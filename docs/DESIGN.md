@@ -19,7 +19,10 @@ Single window. mpv renders into a **native child surface beneath the WebView2
 control**; the window and the entire CSS chain are transparent so React composites on
 top. This is the whole architectural bet, and it works — but it means `html`, `body`
 and `#root` must never get an opaque background, or the video disappears completely.
-Full-screen browsing views paint their own background; the player must not.
+Full-screen browsing views paint their own background; the player must never
+paint over a video frame. Its one opaque surface is the black cover shown
+*before* a file's first frame (`.player-cover`), because a transparent window
+with no frame up shows the desktop.
 
 ```
 src-tauri/src/

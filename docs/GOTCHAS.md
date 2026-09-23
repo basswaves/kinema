@@ -171,6 +171,29 @@ the matching `setX(null)` exists.
 causes it. `upNext` was cleared when a countdown advanced and by nothing else,
 so every other route into a new file carried the old card in.
 
+### A transparent window shows the desktop whenever nothing is drawn
+
+The window is transparent so mpv can render behind the webview. The flip side:
+**any moment with no opaque pixel in it shows whatever is behind the app**, and
+there were three such moments, each one reported only as "the player goes see-
+through for a second". Screenshots of the screen during a scripted run
+(`scripts/selftest.ps1`) are how they were found; no log says any of this.
+
+- **Before the page has painted.** WebView2 starts white, then transparent
+  until the first paint. The window is now created hidden and shown by
+  `App.tsx` after React's first commit (with a fallback show in `lib.rs`).
+- **Before mpv's surface exists.** Initialising mpv — loading the library,
+  creating the d3d11 device — takes most of a second, and it used to start
+  when Play was pressed. It now starts behind Home, at launch.
+- **Before a file's first frame.** mpv's idle surface is an **RGBA** image
+  (`reconfig to 960x540 rgba` in `mpv.log`), so its transparent parts are
+  transparent all the way through the window. `background=color` makes it
+  opaque black, and `.player-cover` covers the player until `playback-restart`.
+
+**Do:** when adding any view or transition, ask what is opaque at every instant
+of it — and check with a screenshot, not by reasoning, since a white or
+see-through frame lasting a few hundred milliseconds is invisible in any log.
+
 ### `loadfile` is asynchronous
 
 Seeking immediately after it fails — there is nothing loaded yet. The first fix

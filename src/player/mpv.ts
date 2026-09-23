@@ -12,7 +12,7 @@
  * never race each other into a second init.
  */
 import { init, setProperty, type MpvConfig } from 'tauri-plugin-libmpv-api';
-import { BASE_MPV_OPTIONS, TONE_MAPPING_OPTIONS } from './mpvOptions';
+import { BASE_MPV_OPTIONS, IDLE_SURFACE_OPTIONS, TONE_MAPPING_OPTIONS } from './mpvOptions';
 import { logPaths } from '../metadata/api';
 
 /**
@@ -59,7 +59,8 @@ export function ensureMpvInitialised(): Promise<string> {
         // `tone-mapping-mode` is exactly such a case — this libplacebo build
         // returns M_PROPERTY_UNKNOWN for it, and as an init option it aborted
         // startup entirely.
-        for (const [key, value] of Object.entries(TONE_MAPPING_OPTIONS)) {
+        const optional = { ...TONE_MAPPING_OPTIONS, ...IDLE_SURFACE_OPTIONS };
+        for (const [key, value] of Object.entries(optional)) {
           try {
             await setProperty(key, value);
           } catch {

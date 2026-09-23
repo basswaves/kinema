@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import Browse from './ui/Browse';
 import Shortcuts from './ui/Shortcuts';
 import { setShortcutsOpen, useShortcutsOpen } from './ui/shortcutsState';
@@ -12,6 +13,25 @@ import './App.css';
 export default function App() {
   const tv = useTvMode();
   const showShortcuts = useShortcutsOpen();
+
+  /**
+   * Show the window once there is something to show.
+   *
+   * It is created hidden (`"visible": false` in tauri.conf.json). Shown at
+   * once, a transparent window displayed WebView2's white and then — before
+   * the page's first paint — whatever was behind the app, for about the first
+   * second of every launch. By the time this effect runs React has committed
+   * the first view, which paints an opaque background of its own.
+   *
+   * Not an animation frame: a hidden window may never get one. And `lib.rs`
+   * shows the window by itself after a few seconds if this never runs, so a
+   * failure here costs a slower start, never an invisible app.
+   */
+  useEffect(() => {
+    void getCurrentWindow()
+      .show()
+      .catch((e) => console.warn('could not show the window', e));
+  }, []);
 
   // Applied at the root so the scale reaches the player OSD too, not just the
   // browsing views — the controls are exactly what you need to read from the

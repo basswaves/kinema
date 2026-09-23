@@ -196,7 +196,10 @@ reasoning is in [docs/DESIGN.md](docs/DESIGN.md) and [docs/PLAN.md](docs/PLAN.md
   producers of the format keep working.
 - **The window is transparent so mpv can render behind the webview.** Never give
   `html`, `body` or `#root` an opaque background — it hides the video entirely.
-  Full-screen browsing views paint their own background; the player must not.
+  Full-screen browsing views paint their own background; the player must never
+  paint over a video frame. Its one opaque surface is the black cover shown
+  *before* a file's first frame (`.player-cover`), because a transparent window
+  with no frame up shows the desktop.
 
 ## Pull requests
 

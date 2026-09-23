@@ -757,6 +757,20 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     [markers, chapters, duration, creditsTailSecs, neighbours.next]
   );
 
+  /**
+   * Where the credits start, for deciding what counts as watched — or null
+   * when that is only the tail guess. A ref, because the progress save runs on
+   * an interval and in an unmount cleanup, neither of which should be rebuilt
+   * every time the markers settle.
+   */
+  const countedCreditsStart = useRef<number | null>(null);
+  useEffect(() => {
+    countedCreditsStart.current =
+      resolved.creditsSource && resolved.creditsSource !== 'tail'
+        ? (resolved.markers?.credits?.start ?? null)
+        : null;
+  }, [resolved]);
+
   /*
    * One line per file in app.log saying which source won each segment — the
    * first thing worth knowing when a skip fires somewhere surprising.
@@ -898,7 +912,12 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
 
     const id = window.setInterval(() => {
       if (latest.current.position > 0) {
-        void saveProgress(fileId, latest.current.position, latest.current.duration).catch(
+        void saveProgress(
+          fileId,
+          latest.current.position,
+          latest.current.duration,
+          countedCreditsStart.current
+        ).catch(
           () => undefined
         );
       }
@@ -911,7 +930,9 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       // node. Copying it into the effect would save a stale position.
       const { position, duration: total } = latest.current;
       if (position > 0) {
-        void saveProgress(fileId, position, total).catch(() => undefined);
+        void saveProgress(fileId, position, total, countedCreditsStart.current).catch(
+          () => undefined
+        );
       }
     };
   }, [target.fileId]);

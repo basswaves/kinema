@@ -91,8 +91,17 @@ export function episodeLabel(
   return `${showTitle} — S${s}E${e}`;
 }
 
-export const saveProgress = (fileId: number, positionSecs: number, durationSecs: number | null) =>
-  invoke<void>('save_progress', { fileId, positionSecs, durationSecs });
+/**
+ * Store a resume point. `creditsStart` is where the credits begin when that is
+ * known from a marker or a named chapter — never from the tail guess — so a
+ * position inside them counts as watched even short of 94%.
+ */
+export const saveProgress = (
+  fileId: number,
+  positionSecs: number,
+  durationSecs: number | null,
+  creditsStart: number | null = null
+) => invoke<void>('save_progress', { fileId, positionSecs, durationSecs, creditsStart });
 
 export const getProgress = (fileId: number) => invoke<Progress | null>('get_progress', { fileId });
 

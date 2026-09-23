@@ -70,19 +70,43 @@ pub struct TitlePrefs {
     pub sub_enabled: bool,
 }
 
+/// Whether a position counts as having finished the file.
+///
+/// Past [`COMPLETE_FRACTION`], or past the start of the credits when the player
+/// knows where they are. The second half is the one that matters: on an
+/// episode whose credits run longer than 6% of it — anime, most half-hour
+/// comedy — skipping them or pressing "Play next" in them left the position
+/// short of 94%, and the episode sat in Continue Watching as "2 min left".
+///
+/// A credits start in the first half of the file is not believed: that is a
+/// marker problem, and trusting it would mark an episode watched halfway in.
+pub fn is_complete(position: f64, duration: Option<f64>, credits_start: Option<f64>) -> bool {
+    let Some(duration) = duration.filter(|d| *d > 0.0) else {
+        return false;
+    };
+    if position / duration >= COMPLETE_FRACTION {
+        return true;
+    }
+    credits_start
+        .filter(|start| start.is_finite() && *start >= duration * 0.5 && *start < duration)
+        .is_some_and(|start| position >= start)
+}
+
 /// Store a resume point. Completion is decided here rather than by the caller
 /// so the rule stays in one place.
+///
+/// `credits_start` is where the player believes the credits begin, from a
+/// measured marker or a named chapter — never from the `duration − N` guess,
+/// which is inference and must not decide what counts as seen.
 #[tauri::command]
 pub fn save_progress(
     db: tauri::State<Db>,
     file_id: i64,
     position_secs: f64,
     duration_secs: Option<f64>,
+    credits_start: Option<f64>,
 ) -> Result<(), String> {
-    let completed = match duration_secs {
-        Some(d) if d > 0.0 => position_secs / d >= COMPLETE_FRACTION,
-        _ => false,
-    };
+    let completed = is_complete(position_secs, duration_secs, credits_start);
 
     let conn = db.0.lock().map_err(to_string_err)?;
     conn.execute(
@@ -522,7 +546,38 @@ pub fn set_title_prefs(
 
 #[cfg(test)]
 mod tests {
-    use super::{decode_episode_key, encode_episode_key};
+    use super::{decode_episode_key, encode_episode_key, is_complete};
+
+    /// The case that was broken, with the mock fixture's numbers: a 24-minute
+    /// episode whose credits start at 22:10 (92.4%). "Play next" at 22:15 used
+    /// to leave it unwatched.
+    #[test]
+    fn inside_the_credits_counts_as_finished() {
+        assert!(is_complete(1335.0, Some(1440.0), Some(1330.0)));
+        assert!(!is_complete(1335.0, Some(1440.0), None), "without credits, 94% still rules");
+    }
+
+    #[test]
+    fn before_the_credits_does_not() {
+        assert!(!is_complete(1300.0, Some(1440.0), Some(1330.0)));
+    }
+
+    #[test]
+    fn ninety_four_percent_still_counts_on_its_own() {
+        assert!(is_complete(1360.0, Some(1440.0), None));
+    }
+
+    /// A credits marker in the first half is a bad marker, not a short episode.
+    #[test]
+    fn an_implausibly_early_credits_start_is_ignored() {
+        assert!(!is_complete(500.0, Some(1440.0), Some(400.0)));
+    }
+
+    #[test]
+    fn nothing_counts_without_a_duration() {
+        assert!(!is_complete(1335.0, None, Some(1330.0)));
+        assert!(!is_complete(1335.0, Some(0.0), Some(1330.0)));
+    }
 
     /// The encoder lives in SQL and the decoder in Rust, so the multiplier is
     /// written down twice and nothing but this test would notice them diverging.

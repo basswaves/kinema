@@ -174,9 +174,21 @@ function adjacent(fileId: number, forward: boolean): EpisodeRef | null {
   return next ? episodeRef(next) : null;
 }
 
-/** Same rule as `save_progress`: 94% counts as finished. */
-function saveProgress(fileId: number, position: number, duration: number | null): null {
-  const completed = duration !== null && duration > 0 && position / duration >= 0.94;
+/** Same rule as `is_complete` in playback.rs: 94%, or inside known credits. */
+function saveProgress(
+  fileId: number,
+  position: number,
+  duration: number | null,
+  creditsStart: number | null
+): null {
+  const inCredits =
+    duration !== null &&
+    creditsStart !== null &&
+    creditsStart >= duration * 0.5 &&
+    creditsStart < duration &&
+    position >= creditsStart;
+  const completed =
+    duration !== null && duration > 0 && (position / duration >= 0.94 || inCredits);
   playback.set(fileId, { position, duration, completed, updated: ++clock });
   return null;
 }
@@ -357,7 +369,13 @@ const handlers: Record<string, Handler> = {
     const row = playback.get(num(a, 'fileId'));
     return row ? { position_secs: row.position, duration_secs: row.duration, completed: row.completed } : null;
   },
-  save_progress: (a) => saveProgress(num(a, 'fileId'), num(a, 'positionSecs'), (a.durationSecs as number | null) ?? null),
+  save_progress: (a) =>
+    saveProgress(
+      num(a, 'fileId'),
+      num(a, 'positionSecs'),
+      (a.durationSecs as number | null) ?? null,
+      (a.creditsStart as number | null) ?? null
+    ),
   set_watched: (a) => {
     const id = num(a, 'fileId');
     if (a.watched) playback.set(id, { position: 0, duration: null, completed: true, updated: ++clock });

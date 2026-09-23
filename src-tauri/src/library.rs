@@ -223,8 +223,16 @@ pub fn list_library_roots(db: tauri::State<Db>) -> Result<Vec<LibraryRoot>, Stri
 /// anything, with the window see-through the whole time.
 #[tauri::command]
 pub async fn scan_library(app: tauri::AppHandle) -> Result<ScanReport, String> {
+    use tauri::Manager;
+    // A second walk would wait for the first on `ScanDb` and then find the
+    // same thing again. See `jobs::Jobs`.
+    let running = app
+        .state::<crate::jobs::Jobs>()
+        .try_start(crate::jobs::Job::Scan)
+        .ok_or("A scan is already running.")?;
+
     tauri::async_runtime::spawn_blocking(move || {
-        use tauri::Manager;
+        let _running = running;
         let db = app.state::<ScanDb>();
         let mut conn = db.0.lock().map_err(to_string_err)?;
         scanner::scan_all(&mut conn).map_err(to_string_err)

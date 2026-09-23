@@ -196,6 +196,11 @@ async fn download(client: &tauri_plugin_http::reqwest::Client, url: &str) -> Opt
 /// call after matching and one on startup keep the cache complete.
 #[tauri::command]
 pub async fn cache_artwork(app: tauri::AppHandle) -> Result<CacheResult, String> {
+    // One run at a time, the second after the first rather than refused — see
+    // `jobs::Jobs`. Two at once used to reserve and download the same files.
+    let jobs = app.state::<crate::jobs::Jobs>();
+    let _turn = jobs.artwork.lock().await;
+
     let base = app_data(&app)?;
     let dir = base.join(DIR);
     std::fs::create_dir_all(&dir).map_err(to_string_err)?;

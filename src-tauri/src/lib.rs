@@ -92,6 +92,7 @@ fn open_library(app: &tauri::AppHandle) -> Result<(), String> {
 
     app.manage(Db(Mutex::new(primary)));
     app.manage(ScanDb(Mutex::new(scanner)));
+    app.manage(jobs::Jobs::default());
     Ok(())
 }
 

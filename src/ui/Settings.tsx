@@ -983,7 +983,9 @@ export default function Settings() {
               <div className="settings-toggle-row" key={root.id}>
                 <FocusButton
                   className="btn-secondary"
-                  disabled={detecting !== null}
+                  // Also while the scan's own detection pass runs: only one
+                  // detection runs at a time, and the backend would refuse.
+                  disabled={detecting !== null || scan?.stage === 'detecting'}
                   onSelect={() => void runDetect(root)}
                 >
                   {detecting === root.path ? 'Detecting…' : 'Detect'}

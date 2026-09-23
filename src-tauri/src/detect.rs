@@ -607,6 +607,22 @@ struct AutoPlan {
 /// optional detector is missing would be a worse bug than the one this fixes.
 #[tauri::command]
 pub async fn auto_detect(app: tauri::AppHandle) -> Result<AutoDetectReport, String> {
+    // Detect pressed in Settings is already doing this work — or more of it,
+    // since the button ignores the settling rule. Said, not silent.
+    let Some(running) = app
+        .state::<crate::jobs::Jobs>()
+        .try_start(crate::jobs::Job::Detect)
+    else {
+        return Ok(AutoDetectReport {
+            steps: vec![AutoStep {
+                root_path: String::new(),
+                step: "detect".into(),
+                ran: false,
+                note: "detection was already running, so it was left to finish".into(),
+            }],
+        });
+    };
+
     // Everything the plan needs, in one lock. What follows is minutes of
     // subprocess work and must not hold the database against playback.
     let plan = {
@@ -639,6 +655,7 @@ pub async fn auto_detect(app: tauri::AppHandle) -> Result<AutoDetectReport, Stri
     };
 
     tauri::async_runtime::spawn_blocking(move || {
+        let _running = running;
         let mut steps: Vec<AutoStep> = Vec::new();
 
         for (root_id, root_path, stamp, last_stamp) in &plan.roots {
@@ -748,6 +765,14 @@ pub async fn detect_intros(
     app: tauri::AppHandle,
     root_path: String,
 ) -> Result<DetectReport, String> {
+    let running = app
+        .state::<crate::jobs::Jobs>()
+        .try_start(crate::jobs::Job::Detect)
+        .ok_or(
+            "Detection is already running — the library scan starts it by itself. \
+             Wait for it to finish, then try again.",
+        )?;
+
     let (exe, scan_args, export_args) = {
         let db = app.state::<Db>();
         let conn = db.0.lock().map_err(to_string_err)?;
@@ -768,6 +793,7 @@ pub async fn detect_intros(
     }
 
     tauri::async_runtime::spawn_blocking(move || {
+        let _running = running;
         let mut steps = Vec::new();
 
         // Skiptro first, when there is one. Its intro outranks the analysis

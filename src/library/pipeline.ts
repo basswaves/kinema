@@ -220,15 +220,19 @@ export async function runScanPipeline(): Promise<ScanOutcome> {
       errors.push(...outcome.errors);
     }
 
-    // Straight after matching: that is the moment the artwork URLs become
-    // known, and browsing should not need the network afterwards.
-    setStatus({ stage: 'artwork', detail: '' });
-    const art = await cacheArtwork();
-    if (art.failed > 0) errors.push(`${art.failed} artwork download(s) failed`);
-
+    // Details before artwork. The details pass is what finds logos and cast
+    // photos for titles matched before those were stored, and it used to run
+    // *after* the artwork download — so everything it found waited for the
+    // next launch to be cached, and the UI fetched it from TMDB meanwhile.
     setStatus({ stage: 'details', detail: '' });
     const details = await backfillTitleDetails();
     errors.push(...details.errors);
+
+    // After matching and details: every artwork URL is known now, and
+    // browsing should not need the network afterwards.
+    setStatus({ stage: 'artwork', detail: '' });
+    const art = await cacheArtwork();
+    if (art.failed > 0) errors.push(`${art.failed} artwork download(s) failed`);
 
     // Last, and deliberately part of the same sequence rather than something the
     // user has to go and press afterwards. Everything before this decides *what*

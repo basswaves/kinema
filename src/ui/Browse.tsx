@@ -207,7 +207,7 @@ export default function Browse() {
           return;
         }
         if (outcome.status !== 'done') return;
-        const { filesAdded, matched, errors } = outcome.summary;
+        const { filesAdded, matched, artworkStored, errors } = outcome.summary;
         if (errors.length > 0) {
           console.warn('startup scan problems:', errors);
           setScanTrouble(
@@ -216,7 +216,9 @@ export default function Browse() {
               : `${errors[0]} · and ${errors.length - 1} more`
           );
         }
-        if (filesAdded > 0 || matched > 0) void load();
+        // Newly cached artwork counts too: without a reload, the shelves go on
+        // showing the remote copies they loaded before the cache had them.
+        if (filesAdded > 0 || matched > 0 || artworkStored > 0) void load();
       })
       .catch((e) => console.warn('startup scan:', e));
     return () => {

@@ -32,17 +32,15 @@ a receiver.
 Agreed with the owner on 2026-09-23 after a full review of the code, the logs and
 the library database. One commit per item on `master`. Phase 0 (the safety
 net and the test tools), Phase 1 (starting playback and the Skip button),
-Phase 2 (watching correctness) and Phase 3 (library and matching) are done —
-see PLAN.md for what they decided; what follows is what is left, in order.
+Phase 2 (watching correctness), Phase 3 (library and matching) and Phase 4
+(responsiveness) are done — see PLAN.md for what they decided; what follows is
+what is left, in order.
 
 Decisions that shape it: the **Skip intro button shows from 0:00** whenever an
 intro is known and stays until the intro ends, and pressing it during a cold
 open jumps to the end of the intro (chosen knowingly — it skips the cold open
 too); **Skiptro stays first** for intros where its confidence is at least 0.8;
 nothing is tested by hand.
-
-**Phase 4 — responsiveness.** Slow commands off the main thread; one job
-runner for scan, detection and artwork (no double runs, cancellable).
 
 **Phase 5 — structure.** (a) Library rules and the pipeline into Rust.
 (b) Watch history per episode rather than per file path, surviving moves,
@@ -134,6 +132,24 @@ git checkout <that commit>~1 -- src/spike/ src/App.css
 
 It renders through the same `ensureMpvInitialised` as the real player, so what
 it reports is what the player gets.
+
+### Settings is awkward with a remote
+
+Found while driving the Stop button in the mock, keyboard-only. None of it is
+on the watching path, which is why it was left for its own change:
+
+- **Buttons do not scroll into view.** `FocusButton` only scrolls when given
+  `keepInView`, and no button in Settings has it — so arrowing down the page
+  moves the focus ring off the bottom of the screen and leaves it there.
+  `FocusInput` scrolls itself; the buttons between the inputs do not.
+- **An input keeps the typing focus after the remote leaves it.** `FocusInput`
+  takes DOM focus when it gets spatial focus and never gives it back, so the
+  last field visited keeps its caret while the ring sits on a button below.
+  Enter then reaches that input's own key handler as well as the button.
+- **Holding Down can bounce back up.** Pressing faster than the smooth scroll
+  settles sent focus from an input back to a control above it, repeatedly.
+  At one press per 0.6 s it walks the page correctly. A remote's key repeat is
+  far faster than that.
 
 ### Back from a detail page always goes Home
 

@@ -1262,6 +1262,24 @@ disappearing from the library.
 at least two others" now means two distinct other episodes; one episode that
 matched twice used to supply both votes. Stored results were not recomputed.
 
+**Only the slow commands left the main thread.** A synchronous Tauri command
+runs on the window's thread. Anything reading beside the media or starting a
+program now runs on the blocking pool (`jobs::off_main`); the quick database
+commands deliberately stay where they are, because the main thread also runs
+them in order, and a `save_progress` overtaken by the Home reload after it
+would be a stale Continue watching with no error anywhere.
+
+**One of each long job at a time, and detection can be stopped.** A second
+scan is refused, a second detection is refused with a sentence, and a second
+artwork run waits and then runs (it may know URLs the first did not). Stop
+kills Skiptro outright and the analysis checks before each file; a stopped
+season stores nothing rather than a partial answer, which would have been
+recorded as analysed and never revisited. Closing the app stops detection the
+same way, because Windows does not end a child with its parent — verified with
+a self-test that pointed Skiptro at `ping -n 60` and quit mid-run. The Stop
+control is the Detect (or Scan now) button itself while it runs: a separate
+Stop button vanished when detection ended and took the remote's focus with it.
+
 **Testing is done without the owner.** `npm run dev:mock` and
 `scripts/selftest.ps1` exist so every change can be checked — keyboard-only in
 a browser against a fake mpv, and in the real app against a copy of the real

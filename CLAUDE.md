@@ -162,9 +162,16 @@ by reflex:
 
 ## How the user works
 
-- They test in the real app and report back. When handing work over, say exactly
-  what to click and what a pass looks like — and what a *failure* would look
-  like, so an ambiguous result is still informative.
+- **They do not test by hand.** Verifying is the assistant's job, and handing
+  over a checklist to click through is not an acceptable way to finish. The
+  tools for it: automated tests; `npm run dev:mock` to drive the real UI
+  keyboard-only in the Claude browser pane against a fake library and a fake
+  mpv; `scripts/selftest.ps1` to run the real app and real mpv through a
+  scripted session on a copy of the library, with screenshots; and read-only
+  queries of `%APPDATA%\com.kinema.app\library.db` and the logs. When
+  something genuinely cannot be checked without a person — how a picture
+  looks on a TV across a room — say so, and say what evidence was used.
+  Build more test tooling when that is the better answer.
 - Confirm the order of work before starting a multi-item request.
 - Commit only when asked, and push only when asked. History is linear on
   `master`, one feature per commit.

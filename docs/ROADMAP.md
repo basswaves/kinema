@@ -27,6 +27,58 @@ a receiver.
 
 ---
 
+## The improvement plan (from the September 2026 review)
+
+Agreed with the owner on 2026-09-23 after a full review of the code, the logs and
+the library database. One commit per item on `master`. Phase 0 — the safety
+net and the test tools — is done; what follows is what is left, in order.
+
+Decisions that shape it: the **Skip intro button shows from 0:00** whenever an
+intro is known and stays until the intro ends, and pressing it during a cold
+open jumps to the end of the intro (chosen knowingly — it skips the cold open
+too); **Skiptro stays first** for intros; nothing is tested by hand.
+
+**Phase 1 — starting playback and the Skip button.** No see-through window
+before the first frame (mpv's idle surface is drawn with alpha: an opaque
+idle background, a black cover in the player until the first frame, mpv
+started with the app). Resume opens at the position instead of playing 0:00
+and seeking. Playback does not wait on the startup scan. Skip intro from 0:00
+to the end of the intro, no ten-second auto-hide, back after seeking into the
+intro. mpv listeners registered once, so `file-loaded` cannot be missed.
+Skiptro reads with a busy timeout and logged failures. **Found by the new
+harness:** after launch, focus is left on the first-run panel's unmounted
+button (norigin removes focusables on a delay, so `useClaimFocus`'s liveness
+check passes), and a remote's first presses do nothing.
+
+**Phase 2 — watching correctness.** Leaving or skipping in the credits counts
+as watched (reproduced in the mock: "Play next" at 92.7% leaves the episode
+unwatched). Continue Watching's Remove sticks. The `duration − 60s` guess only
+offers, in automatic mode too. Duplicate and provider-unlisted episodes on the
+detail page. Double-episode files. Media keys. A file still being written is
+not marked watched.
+
+**Phase 3 — library and matching.** Title from the show folder when the file
+and its season folder have none; untitled files go to Needs attention rather
+than vanishing. Unlink and manual links survive the next launch and a touched
+file. Refused groups re-asked only when keys change. The NFO bare-`<id>` trap.
+Trailer lookups not repeated every launch. TVmaze pacing. Artwork downloaded
+in the scan that found it. The analysis's two-other-episodes rule.
+
+**Phase 4 — responsiveness.** Slow commands off the main thread; one job
+runner for scan, detection and artwork (no double runs, cancellable).
+
+**Phase 5 — structure.** (a) Library rules and the pipeline into Rust.
+(b) Watch history per episode rather than per file path, surviving moves,
+renames, upgrades and re-added folders — a migration, rehearsed on a copy of
+the real library first. (c) The player split around one event stream and one
+state machine.
+
+**Phase 6 — cleanup and docs.** Dead code, duplicated helpers, fewer TMDB and
+track-list round trips, a CSP, and correcting the claims the review found
+false (listed in the review; GOTCHAS' "two different channels" is one).
+
+---
+
 ## Worth doing, in rough order of payoff
 
 ### Audio is decoded and downmixed, never passed through
@@ -58,24 +110,33 @@ it is a decision rather than an improvement. **Ask before enabling it.**
 
 Skiptro records a `Confidence` per detection and nothing acts on it. A skip fired
 on a bad detection jumps over real content — the same class of silent wrongness
-as a bad metadata match. Needs a low-confidence sample to calibrate against;
-every detection in the library so far reports `1`.
+as a bad metadata match.
 
-Half-done: `skip.rs` now logs `skiptro: confidence <n> for <file>` for anything
-below 1, which is how the missing sample gets found. Once there is one, the
-threshold goes in the same place.
+**The sample it was waiting for exists.** This section used to say every
+detection reported `1`; that was never true — the `skiptro: confidence` log
+line went through `eprintln!`, which a release build has no console for, so
+nobody saw it. Measured on 2026-09-23 against Skiptro's own database: **23 of
+79 intro detections are below 1**, lowest 0.48. And they are not random:
+
+| Skiptro confidence | What the analysis says |
+|---|---|
+| 0.9 – 1.0 (56 episodes) | agrees, mostly within a second |
+| 0.70 (S04E05–E11) | intro ends ~7 s later (37.6 s vs ~44.5 s) |
+| 0.48 – 0.70 (all of S06) | intro ends ~15 s later (29.1 s vs ~44 s) |
+
+So every large disagreement is one Skiptro itself was unsure of. A threshold
+somewhere around 0.8, below which the analysis's intro is used instead, would
+keep Skiptro first wherever it is confident. **Not done:** the owner has decided
+Skiptro stays first and has seen no bad skip endpoints; this table is the
+evidence to bring back if that changes.
 
 ### Retiring Skiptro
 
-Now genuinely on the table. `analyse.rs` does everything Skiptro does and finds
-credits as well, on the same files, agreeing within a second. Skiptro is ranked
-first for intros deliberately, so nothing regressed — but if a few months of use
-show no case where it wins, dropping it removes an external binary, a private
-schema read at `%APPDATA%\Skiptro\skiptro.db`, and the whole `detect.rs` command
-template arrangement.
-
-**Do not do this on one season's evidence.** The comparison it needs is a
-library with several shows in it.
+**Decided against, 2026-09-23.** the owner reports no bad intro endpoints and wants
+Skiptro kept as the first intro source. The earlier claim here, that the two
+detectors "agree within a second", did not survive measurement — see the table
+above — but the disagreements coincide with Skiptro's own low confidence, so
+they are a reason for a confidence threshold, not for removal.
 
 ### The Phase 0 mpv harness is gone, if you need it back
 

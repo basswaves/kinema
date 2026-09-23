@@ -23,10 +23,17 @@ import { scanLibrary } from './library/api';
 export interface SelfTestAction {
   /** Seconds after the test started. */
   at: number;
-  /** `key` presses a key on the window, `seek` jumps, `mark` just notes the time. */
-  do: 'key' | 'seek' | 'mark';
+  /**
+   * `key` presses a key on the window, `seek` jumps, `mark` just notes the
+   * time. `detect` starts Detect on the library folder `root` and records how
+   * it ended — for checking that a second one is refused, and that quitting
+   * mid-run ends what it started. Point the copied library's Skiptro setting
+   * at something harmless first: this runs whatever is configured there.
+   */
+  do: 'key' | 'seek' | 'mark' | 'detect';
   key?: string;
   to?: number;
+  root?: string;
   note?: string;
 }
 
@@ -147,6 +154,11 @@ export async function runSelfTest(plan: SelfTestPlan): Promise<void> {
         window.dispatchEvent(new KeyboardEvent('keydown', { key: action.key, bubbles: true }));
       } else if (action.do === 'seek' && action.to !== undefined) {
         void command('seek', [action.to, 'absolute']).catch((e) => note('seek-failed', String(e)));
+      } else if (action.do === 'detect' && action.root) {
+        invoke('detect_intros', { rootPath: action.root }).then(
+          (report) => note('detect:done', report),
+          (e) => note('detect:refused', String(e))
+        );
       }
     }, action.at * 1000)
   );

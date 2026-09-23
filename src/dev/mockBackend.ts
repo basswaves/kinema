@@ -333,6 +333,7 @@ const handlers: Record<string, Handler> = {
   append_log: () => null,
   log_paths: () => ({ dir: 'C:\\fixture\\logs', mpv_log: 'C:\\fixture\\logs\\mpv.log' }),
   open_log_folder: () => null,
+  selftest_plan: () => null,
 
   // plugins
   'plugin:libmpv|init': () => fakeMpv.init((path) => files.find((f) => f.path === path)?.duration ?? 1500),

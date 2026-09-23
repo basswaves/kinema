@@ -92,6 +92,22 @@ keyboard-only in an ordinary browser. From DevTools:
 It is a fixture, not a second backend: Rust's rules are tested in Rust. None
 of it is bundled into a production build.
 
+### Checking the real player without watching it
+
+```powershell
+.\scripts\selftest.ps1 -Plan C:\tmp\run1\plan.json
+```
+
+Runs the release build (`npx tauri build --no-bundle` first) with the real
+mpv through a scripted session: it plays the plan's file muted, presses keys
+or seeks at the times the plan gives, and writes `report.json` — a timeline
+of mpv's events and of what was on screen (Skip button, Up next, errors, the
+clock) — then exits. Screenshots of the first seconds are saved beside it.
+
+It never writes to the real library: the app runs on a snapshot copy in
+`<plan folder>\data`, and skips the startup scan and automatic detection.
+The plan format is documented at the top of the script.
+
 For Rust changes:
 
 ```bash

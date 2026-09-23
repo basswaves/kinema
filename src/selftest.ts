@@ -1,0 +1,152 @@
+/**
+ * The frontend half of the playback self-test — see `src-tauri/src/selftest.rs`.
+ *
+ * Dormant unless the app was started with `KINEMA_SELFTEST` pointing at a
+ * plan. Then Browse opens the player on the plan's file instead of Home, skips
+ * the startup scan, and this module follows the plan's script and records
+ * what the player did, with timestamps:
+ *
+ *  - every mpv event that matters for starting and ending a file,
+ *  - every change in what is on screen: the Skip button, Up next, an error,
+ *    the clock,
+ *  - the position mpv reports at the end.
+ *
+ * It observes from the outside — the DOM and the mpv event stream — rather
+ * than reaching into the player, so what it reports is what a viewer would
+ * have seen, and it keeps working whatever the player looks like inside.
+ */
+import { invoke } from '@tauri-apps/api/core';
+import { command, getProperty, listenEvents } from 'tauri-plugin-libmpv-api';
+import { ensureMpvInitialised } from './player/mpv';
+
+export interface SelfTestAction {
+  /** Seconds after the test started. */
+  at: number;
+  /** `key` presses a key on the window, `seek` jumps, `mark` just notes the time. */
+  do: 'key' | 'seek' | 'mark';
+  key?: string;
+  to?: number;
+  note?: string;
+}
+
+export interface SelfTestPlan {
+  path: string;
+  fileId: number | null;
+  titleId: number | null;
+  label?: string;
+  /** How long to run before writing the report and quitting. */
+  seconds: number;
+  /** Defaults to true: a test run should not play sound through the speakers. */
+  mute?: boolean;
+  actions?: SelfTestAction[];
+}
+
+interface Entry {
+  /** Seconds since the test started. */
+  t: number;
+  kind: string;
+  detail?: unknown;
+}
+
+let planPromise: Promise<SelfTestPlan | null> | null = null;
+
+/** The plan, or null outside self-test mode. Asked once and remembered. */
+export function selfTestPlan(): Promise<SelfTestPlan | null> {
+  planPromise ??= invoke<SelfTestPlan | null>('selftest_plan').catch((e) => {
+    console.warn('selftest: could not read the plan', e);
+    return null;
+  });
+  return planPromise;
+}
+
+/** What is on screen that the test cares about, as one comparable value. */
+function screen(): Record<string, string | null> {
+  const text = (selector: string) =>
+    document.querySelector(selector)?.textContent?.trim() ?? null;
+  return {
+    skip: text('.skip-button'),
+    upNext: text('.up-next'),
+    error: text('.player-error'),
+    label: text('.player-label'),
+  };
+}
+
+/** Carry out the plan, then hand the report to Rust, which writes it and quits. */
+export async function runSelfTest(plan: SelfTestPlan): Promise<void> {
+  const started = performance.now();
+  const now = () => Math.round((performance.now() - started) / 10) / 100;
+  const timeline: Entry[] = [];
+  const note = (kind: string, detail?: unknown) => timeline.push({ t: now(), kind, detail });
+
+  note('start', { path: plan.path });
+
+  const unlisten = await listenEvents((event) => {
+    const e = event as { event: string; name?: string; data?: unknown; reason?: string };
+    if (e.event === 'property-change') {
+      if (e.name === 'eof-reached' && e.data === true) note('mpv:eof-reached');
+      return;
+    }
+    if (['start-file', 'file-loaded', 'playback-restart', 'end-file', 'idle'].includes(e.event)) {
+      note(`mpv:${e.event}`, e.reason ? { reason: e.reason } : undefined);
+    }
+  });
+
+  if (plan.mute !== false) {
+    void ensureMpvInitialised()
+      .then(() => command('set', ['mute', 'yes']))
+      .then(() => note('muted'))
+      .catch((e) => note('mute-failed', String(e)));
+  }
+
+  // On-screen changes, sampled. Only changes are recorded; the clock at most
+  // once a second so the report stays readable.
+  let last = '';
+  let lastClock = -1;
+  const sampler = window.setInterval(() => {
+    const current = screen();
+    const serialised = JSON.stringify(current);
+    if (serialised !== last) {
+      last = serialised;
+      note('screen', current);
+    }
+    const second = Math.floor(now());
+    if (second !== lastClock) {
+      lastClock = second;
+      const clock = [...document.querySelectorAll('.player-time')].map((el) => el.textContent);
+      if (clock.length) note('clock', clock.join(' / '));
+    }
+  }, 100);
+
+  const timers = (plan.actions ?? []).map((action) =>
+    window.setTimeout(() => {
+      note(`action:${action.do}`, action);
+      if (action.do === 'key' && action.key) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: action.key, bubbles: true }));
+      } else if (action.do === 'seek' && action.to !== undefined) {
+        void command('seek', [action.to, 'absolute']).catch((e) => note('seek-failed', String(e)));
+      }
+    }, action.at * 1000)
+  );
+
+  await new Promise((resolve) => window.setTimeout(resolve, plan.seconds * 1000));
+
+  window.clearInterval(sampler);
+  timers.forEach((id) => window.clearTimeout(id));
+  unlisten();
+
+  const read = async (name: string) => {
+    try {
+      return await getProperty(name, 'double');
+    } catch {
+      return null;
+    }
+  };
+  const report = {
+    plan,
+    finishedAfter: now(),
+    final: { timePos: await read('time-pos'), duration: await read('duration') },
+    timeline,
+  };
+
+  await invoke('selftest_finish', { report });
+}

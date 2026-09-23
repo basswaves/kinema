@@ -59,7 +59,7 @@ pub struct ArtworkStats {
 /// Absolute prefix that turns a stored relative `local_path` into a real path.
 /// Ends with the platform separator so SQL can simply concatenate it.
 pub fn path_prefix(app: &tauri::AppHandle) -> Result<String, String> {
-    let dir = app.path().app_data_dir().map_err(to_string_err)?;
+    let dir = crate::data_dir(app)?;
     Ok(format!(
         "{}{}",
         dir.to_string_lossy(),
@@ -68,7 +68,7 @@ pub fn path_prefix(app: &tauri::AppHandle) -> Result<String, String> {
 }
 
 fn app_data(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    app.path().app_data_dir().map_err(to_string_err)
+    crate::data_dir(app)
 }
 
 /// Extension for the cached file, taken from the URL and restricted to formats

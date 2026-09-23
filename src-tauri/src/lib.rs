@@ -10,6 +10,7 @@ mod metadata;
 mod nfo;
 mod playback;
 mod scanner;
+mod selftest;
 mod settings;
 mod skip;
 mod skiptro;
@@ -19,6 +20,18 @@ use library::{Db, ScanDb};
 use std::sync::Mutex;
 use tauri::Manager;
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+
+/// Where the library, its backups, the artwork cache and the logs live.
+///
+/// App data, always — except under a self-test, which works on a copy in the
+/// plan's own folder so it can never write to the real library. Every caller
+/// goes through here; asking Tauri directly would quietly bypass that.
+pub fn data_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    match selftest::plan_path() {
+        Some(plan) => Ok(selftest::data_dir_for(&plan)),
+        None => app.path().app_data_dir().map_err(|e| e.to_string()),
+    }
+}
 
 /// Open the library, or say what went wrong in a sentence a user can act on.
 ///
@@ -30,10 +43,18 @@ use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 fn open_library(app: &tauri::AppHandle) -> Result<(), String> {
     // The library database lives in app data, never next to the media —
     // network shares stay read-only as far as this app is concerned.
-    let dir = app
-        .path()
-        .app_data_dir()
+    let dir = data_dir(app)
         .map_err(|e| format!("Kinema could not work out where to keep its library.\n\n{e}"))?;
+
+    if selftest::plan_path().is_some() {
+        let real = app
+            .path()
+            .app_data_dir()
+            .map_err(|e| e.to_string())?
+            .join("library.db");
+        selftest::seed(&real, &dir)
+            .map_err(|e| format!("Self-test could not copy the library.\n\n{e}"))?;
+    }
 
     std::fs::create_dir_all(&dir).map_err(|e| {
         format!(
@@ -115,6 +136,8 @@ pub fn run() {
             settings::append_log,
             settings::log_paths,
             settings::open_log_folder,
+            selftest::selftest_plan,
+            selftest::selftest_finish,
             metadata::save_title,
             metadata::save_episodes,
             metadata::link_files_to_title,

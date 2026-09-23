@@ -31,6 +31,7 @@ import {
 import { cacheArtwork } from '../metadata/api';
 import { runScanPipeline, useScanStatus } from '../library/pipeline';
 import { getTitleDetail, listTitles, type Title } from './api';
+import { runSelfTest, selfTestPlan } from '../selftest';
 import './ui.css';
 
 // Enable native-like arrow-key navigation. `useGetBoundingClientRect` makes
@@ -146,7 +147,10 @@ export default function Browse() {
   // and a fresh match adds more — so this runs on every mount rather than once.
   useEffect(() => {
     let cancelled = false;
-    cacheArtwork()
+    // A self-test works on a copy of the library and must not download
+    // anything into it or spend time on it — see src/selftest.ts.
+    selfTestPlan()
+      .then((plan) => (plan ? { stored: 0, failed: 0 } : cacheArtwork()))
       .then((result) => {
         if (result.failed > 0) console.warn(`artwork: ${result.failed} download(s) failed`);
         if (!cancelled && result.stored > 0) void load();
@@ -180,9 +184,12 @@ export default function Browse() {
    */
   useEffect(() => {
     let cancelled = false;
-    runScanPipeline()
+    // Never under a self-test: the scan would end by running Skiptro and
+    // ffmpeg over the real media, which is the opposite of a harmless test.
+    selfTestPlan()
+      .then((plan) => (plan ? null : runScanPipeline()))
       .then((outcome) => {
-        if (cancelled) return;
+        if (cancelled || outcome === null) return;
         if (outcome.status === 'failed') {
           console.warn('startup scan failed:', outcome.error);
           setScanTrouble(`Could not check your library folders — ${outcome.error}`);
@@ -205,6 +212,30 @@ export default function Browse() {
       cancelled = true;
     };
   }, [load]);
+
+  /**
+   * Under a self-test, go straight to the player on the plan's file and let
+   * the recorder take it from there. Outside one, this does nothing at all.
+   */
+  useEffect(() => {
+    let cancelled = false;
+    void selfTestPlan().then((plan) => {
+      if (!plan || cancelled) return;
+      setView({
+        name: 'player',
+        target: {
+          path: plan.path,
+          label: plan.label ?? 'Self-test',
+          fileId: plan.fileId,
+          titleId: plan.titleId,
+        },
+      });
+      void runSelfTest(plan).catch((e) => console.error('selftest failed', e));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   /**
    * Play the most sensible file for a title without making the user choose:

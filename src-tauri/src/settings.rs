@@ -81,8 +81,7 @@ pub fn log_paths(app: tauri::AppHandle) -> Result<LogPaths, String> {
 }
 
 fn log_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
-    use tauri::Manager;
-    Ok(app.path().app_data_dir().map_err(to_string_err)?.join(crate::applog::DIR))
+    Ok(crate::data_dir(app)?.join(crate::applog::DIR))
 }
 
 /// Open the log folder in Explorer, for attaching logs to a bug report.

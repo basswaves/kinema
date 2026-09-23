@@ -19,6 +19,9 @@ pub enum DbError {
     Sqlite(rusqlite::Error),
     /// The file was written by a newer build than this one.
     TooNew { found: i64, supported: i64 },
+    /// An upgrade was needed and the safety copy could not be made, so the
+    /// upgrade was not attempted.
+    Backup(String),
 }
 
 impl std::fmt::Display for DbError {
@@ -30,6 +33,12 @@ impl std::fmt::Display for DbError {
                 "This library was created by a newer version of Kinema \
                  (database version {found}; this build understands {supported}). \
                  Update Kinema, or point it at a different library."
+            ),
+            DbError::Backup(reason) => write!(
+                f,
+                "This version of Kinema needs to upgrade your library, and it \
+                 makes a safety copy first. The copy could not be made, so \
+                 nothing was changed.\n\n{reason}"
             ),
         }
     }
@@ -358,8 +367,78 @@ fn configure(conn: &Connection) -> rusqlite::Result<()> {
 pub fn open(path: &Path) -> Result<Connection, DbError> {
     let conn = Connection::open(path)?;
     configure(&conn)?;
+    if let Some(dir) = path.parent() {
+        backup_before_upgrade(&conn, &dir.join(BACKUP_DIR))?;
+    }
     migrate(&conn)?;
     Ok(conn)
+}
+
+/// Where the safety copies go, beside the database.
+const BACKUP_DIR: &str = "backups";
+
+/// How many safety copies to keep. Each is a whole library, so this is a
+/// balance: enough to step back past a bad upgrade and the one after it,
+/// few enough that years of updates do not quietly fill the disk.
+const BACKUPS_KEPT: usize = 3;
+
+/// Copy the library aside before an upgrade changes it.
+///
+/// Only when an upgrade is actually about to run, and only for a library that
+/// has something in it — a fresh install at version 0 has nothing to protect.
+/// The watch history, resume points and hand-made matches in this file exist
+/// nowhere else, and a schema step is the one moment the whole file is
+/// rewritten on purpose.
+///
+/// `VACUUM INTO` rather than copying the file. The database runs in WAL mode,
+/// so recent writes live in `library.db-wal`; a plain file copy would miss
+/// them and produce a backup that looks complete and is not. `VACUUM INTO`
+/// writes a single consistent snapshot, WAL included.
+///
+/// A failed copy stops the upgrade. Starting on the previous schema is
+/// impossible for this build, so the app refuses to start with a sentence that
+/// says why — better than an upgrade with no way back.
+fn backup_before_upgrade(conn: &Connection, dir: &Path) -> Result<Option<std::path::PathBuf>, DbError> {
+    let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
+    if version == 0 || version >= SCHEMA_VERSION {
+        return Ok(None);
+    }
+
+    std::fs::create_dir_all(dir)
+        .map_err(|e| DbError::Backup(format!("{}: {e}", dir.display())))?;
+
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let target = dir.join(format!("library-v{version}-{stamp}.db"));
+
+    conn.execute("VACUUM INTO ?1", [target.to_string_lossy()])
+        .map_err(|e| DbError::Backup(format!("{}: {e}", target.display())))?;
+
+    prune_backups(dir);
+    Ok(Some(target))
+}
+
+/// Keep the newest [`BACKUPS_KEPT`] copies. Best effort: a copy that cannot be
+/// deleted costs disk space, not correctness, so failures are ignored.
+fn prune_backups(dir: &Path) {
+    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    let mut copies: Vec<(std::time::SystemTime, std::path::PathBuf)> = entries
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| {
+            p.file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.starts_with("library-v") && n.ends_with(".db"))
+        })
+        .filter_map(|p| Some((std::fs::metadata(&p).ok()?.modified().ok()?, p)))
+        .collect();
+
+    copies.sort_by_key(|copy| std::cmp::Reverse(copy.0));
+    for (_, old) in copies.into_iter().skip(BACKUPS_KEPT) {
+        let _ = std::fs::remove_file(old);
+    }
 }
 
 /// A second connection to a database `open` has already migrated.
@@ -528,6 +607,111 @@ mod tests {
             }
             other => panic!("expected TooNew, got {other:?}"),
         }
+    }
+
+    // ---- safety copy before an upgrade ----------------------------------
+
+    /// A library on disk left at `version` by an older build, holding one
+    /// resume point, with its connection still open so the rows can sit in the
+    /// write-ahead log rather than the main file.
+    fn library_on_disk(name: &str, version: i64) -> (std::path::PathBuf, Connection) {
+        let dir = std::env::temp_dir().join(format!("pn-db-backup-{name}"));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("library.db");
+
+        let conn = Connection::open(&path).unwrap();
+        configure(&conn).unwrap();
+        // Keep everything in the WAL: the case a plain file copy gets wrong.
+        conn.execute_batch("PRAGMA wal_autocheckpoint=0;").unwrap();
+        for (index, sql) in MIGRATIONS.iter().enumerate().take(version as usize) {
+            conn.execute_batch(sql).unwrap();
+            conn.execute_batch(&format!("PRAGMA user_version={};", index + 1)).unwrap();
+        }
+        conn.execute_batch(
+            "INSERT INTO library_roots (id, path, kind, added_at) VALUES (1, 'C:\\m', 'tv', 0);
+             INSERT INTO media_files (id, root_id, path, parent_dir, file_name, extension,
+                 size_bytes, modified_at, first_seen_at, last_seen_at)
+                 VALUES (1, 1, 'C:\\m\\a.mkv', 'C:\\m', 'a.mkv', 'mkv', 1, 1, 1, 1);
+             INSERT INTO playback_state (file_id, position_secs, completed, updated_at)
+                 VALUES (1, 812.5, 0, 1);",
+        )
+        .unwrap();
+        (dir, conn)
+    }
+
+    fn backups_in(dir: &Path) -> Vec<std::path::PathBuf> {
+        std::fs::read_dir(dir.join(BACKUP_DIR))
+            .map(|entries| entries.flatten().map(|e| e.path()).collect())
+            .unwrap_or_default()
+    }
+
+    /// The point of the whole feature: an upgrade leaves a copy of what was
+    /// there before it, and that copy really contains the watch history —
+    /// including rows that had not yet left the write-ahead log.
+    #[test]
+    fn an_upgrade_leaves_a_complete_copy_behind() {
+        let (dir, writer) = library_on_disk("upgrade", 8);
+        let upgraded = open(&dir.join("library.db")).expect("upgrade");
+        assert_eq!(version_of(&upgraded), SCHEMA_VERSION);
+        drop(writer);
+
+        let copies = backups_in(&dir);
+        assert_eq!(copies.len(), 1, "one safety copy");
+        let copy = Connection::open(&copies[0]).unwrap();
+        assert_eq!(version_of(&copy), 8, "the copy is the library *before* the upgrade");
+        let position: f64 = copy
+            .query_row("SELECT position_secs FROM playback_state WHERE file_id = 1", [], |r| {
+                r.get(0)
+            })
+            .expect("the resume point survives in the copy");
+        assert_eq!(position, 812.5);
+    }
+
+    /// An ordinary launch changes nothing and copies nothing.
+    #[test]
+    fn a_current_library_is_not_copied() {
+        let (dir, writer) = library_on_disk("current", SCHEMA_VERSION);
+        drop(writer);
+        open(&dir.join("library.db")).expect("open");
+        assert!(backups_in(&dir).is_empty());
+    }
+
+    /// A first run has nothing to protect.
+    #[test]
+    fn a_fresh_install_is_not_copied() {
+        let dir = std::env::temp_dir().join("pn-db-backup-fresh");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        open(&dir.join("library.db")).expect("fresh");
+        assert!(backups_in(&dir).is_empty());
+    }
+
+    /// Years of updates must not fill the disk with whole-library copies.
+    #[test]
+    fn only_the_newest_copies_are_kept() {
+        let dir = std::env::temp_dir().join("pn-db-backup-prune");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        for n in 0..5 {
+            std::fs::write(dir.join(format!("library-v{n}-{n}.db")), b"x").unwrap();
+            // Distinct mtimes, so "newest" is well defined.
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        std::fs::write(dir.join("unrelated.txt"), b"keep me").unwrap();
+
+        prune_backups(&dir);
+
+        let mut left: Vec<String> = std::fs::read_dir(&dir)
+            .unwrap()
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect();
+        left.sort();
+        assert_eq!(
+            left,
+            vec!["library-v2-2.db", "library-v3-3.db", "library-v4-4.db", "unrelated.txt"]
+        );
     }
 
     /// The reason each step is a transaction: a step that fails part-way must

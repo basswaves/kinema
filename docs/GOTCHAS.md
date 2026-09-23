@@ -173,8 +173,15 @@ so every other route into a new file carried the old card in.
 
 ### `loadfile` is asynchronous
 
-Seeking immediately after it fails — there is nothing loaded yet. Decide the resume
-position before loading, apply it on the `file-loaded` event.
+Seeking immediately after it fails — there is nothing loaded yet. The first fix
+was to decide the resume position before loading and seek on `file-loaded`. That
+works, and `mpv.log` shows what it costs: every resumed file restarted at
+`0.000000` and then again at the resume point, so its first frame and sound were
+shown before the jump.
+
+**Do:** pass the position *with* the load — `loadfile <url> replace -1
+start=<secs>`. The `-1` is the playlist index, which mpv 0.38 put in front of the
+per-file options; without it the options are read as the index.
 
 ### Initialising mpv twice corrupts native state
 

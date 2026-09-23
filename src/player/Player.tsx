@@ -303,9 +303,12 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         endHandled.current = false;
         pendingSeek.current = null;
 
-        // Decide the resume point *before* loading, but apply it only once the
-        // file is open. Seeking straight after loadfile fails, because loadfile
-        // is asynchronous and there is nothing to seek in yet.
+        // Decide the resume point *before* loading, and hand it to mpv as part
+        // of the load. It used to be applied as a seek once `file-loaded`
+        // arrived — seeking straight after loadfile fails, since nothing is
+        // open yet — which meant every resumed episode first played its
+        // opening frame and sound, then jumped. `mpv.log` showed each one
+        // restarting at 0.000 and again at the resume point.
         if (target.fileId !== null) {
           const progress = await getProgress(target.fileId);
           if (
@@ -319,7 +322,15 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           }
         }
 
-        await command('loadfile', [target.path]);
+        // `loadfile <url> <flags> <index> <options>`: the per-file `start`
+        // option opens the file at the resume point. The index argument
+        // (-1, "no playlist position") is required before options since
+        // mpv 0.38.
+        const start = pendingSeek.current;
+        await command(
+          'loadfile',
+          start === null ? [target.path] : [target.path, 'replace', '-1', `start=${start}`]
+        );
         await setProperty('pause', false);
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
@@ -440,17 +451,10 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     listenEvents((event) => {
       if (event.event === 'file-loaded') {
         void (async () => {
-          // Apply the resume seek now that the file is genuinely open.
-          const seekTo = pendingSeek.current;
+          // The resume point went to mpv with the load; say so on screen.
+          const resumed = pendingSeek.current;
           pendingSeek.current = null;
-          if (seekTo !== null) {
-            try {
-              await command('seek', [seekTo, 'absolute']);
-              setResumedFrom(seekTo);
-            } catch (e) {
-              console.warn('resume seek failed', e);
-            }
-          }
+          if (resumed !== null) setResumedFrom(resumed);
           /*
            * Take the position and duration from mpv **by asking**, rather than
            * waiting to be told.

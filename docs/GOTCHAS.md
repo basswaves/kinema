@@ -373,6 +373,15 @@ touching a file — and clearing watch state on it would let *moving a library*
 wipe every tick in it. Size changing is a real content change. `scanner.rs` has
 both cases as tests, and the mtime one matters more.
 
+**…but a size check alone misses the commonest download.** Preallocating
+clients, and most torrent clients' sparse files, create the file at its final
+size and fill it in, so its size never changes and the rule above never fires.
+What does change is the mtime, *while* the data lands. So `save_progress`, at
+the moment a save would mark a file watched, stats it and declines if it was
+written to in the last two minutes. That is safe in the other direction: a
+finished file stops changing, so it would have to have been modified during
+the viewing to be held back.
+
 **Do:** when a cache key claims to cover "everything that could change", check
 whether the file itself is in it. Two of the three above were the same omission
 at different layers.

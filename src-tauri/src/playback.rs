@@ -92,6 +92,31 @@ pub fn is_complete(position: f64, duration: Option<f64>, credits_start: Option<f
         .is_some_and(|start| position >= start)
 }
 
+/// A file written to this recently is treated as still arriving.
+const STILL_ARRIVING_SECS: i64 = 120;
+
+/// Whether a file looks like it is still being written.
+///
+/// The scanner already forgets "watched" when a file's **size** changes — a
+/// partial download plays, ends early, and would otherwise stay marked
+/// watched. That misses the common case where the file is created at its full
+/// size and filled in (preallocation, and most torrent clients' sparse files):
+/// the size never moves. What does move is the modification time, while the
+/// data lands. A finished file stops changing, so asking "was this written in
+/// the last two minutes" at the moment of completion cannot hold back an
+/// episode that genuinely finished — it would have to have been modified
+/// while it was being watched.
+///
+/// Stat-ed only when a save would mark the file watched, so a NAS sees one
+/// extra metadata call per episode, not one every five seconds.
+fn still_being_written(path: &std::path::Path, now: i64) -> bool {
+    std::fs::metadata(path)
+        .and_then(|m| m.modified())
+        .ok()
+        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+        .is_some_and(|t| now - (t.as_secs() as i64) < STILL_ARRIVING_SECS)
+}
+
 /// Store a resume point. Completion is decided here rather than by the caller
 /// so the rule stays in one place.
 ///
@@ -106,9 +131,24 @@ pub fn save_progress(
     duration_secs: Option<f64>,
     credits_start: Option<f64>,
 ) -> Result<(), String> {
-    let completed = is_complete(position_secs, duration_secs, credits_start);
+    let mut completed = is_complete(position_secs, duration_secs, credits_start);
 
     let conn = db.0.lock().map_err(to_string_err)?;
+
+    if completed {
+        let path: Option<String> = conn
+            .query_row("SELECT path FROM media_files WHERE id = ?1", params![file_id], |r| {
+                r.get(0)
+            })
+            .ok();
+        if path.is_some_and(|p| still_being_written(std::path::Path::new(&p), now_secs())) {
+            crate::log!(
+                "playback: not marking file {file_id} watched — it was written to in the last \
+                 {STILL_ARRIVING_SECS} s, so it is probably still arriving"
+            );
+            completed = false;
+        }
+    }
     conn.execute(
         "INSERT INTO playback_state (file_id, position_secs, duration_secs, completed, updated_at)
          VALUES (?1, ?2, ?3, ?4, ?5)
@@ -708,6 +748,29 @@ mod tests {
     #[test]
     fn ninety_four_percent_still_counts_on_its_own() {
         assert!(is_complete(1360.0, Some(1440.0), None));
+    }
+
+    /// A preallocated download keeps its size and changes its mtime while it
+    /// fills in; a finished file does neither.
+    #[test]
+    fn a_recently_written_file_counts_as_still_arriving() {
+        let dir = std::env::temp_dir().join("pn-playback-arriving");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("episode.mkv");
+        std::fs::write(&path, b"data").unwrap();
+        let now = super::now_secs();
+        assert!(super::still_being_written(&path, now), "written a moment ago");
+
+        let old = std::time::SystemTime::now() - std::time::Duration::from_secs(3600);
+        std::fs::File::options().write(true).open(&path).unwrap().set_modified(old).unwrap();
+        assert!(!super::still_being_written(&path, now), "untouched for an hour");
+    }
+
+    /// Offline, or never there: nothing to hold back on.
+    #[test]
+    fn a_file_that_cannot_be_read_is_not_held_back() {
+        assert!(!super::still_being_written(std::path::Path::new(r"Z:\gone\x.mkv"), 0));
     }
 
     /// A credits marker in the first half is a bad marker, not a short episode.

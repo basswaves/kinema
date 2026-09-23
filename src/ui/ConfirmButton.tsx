@@ -16,7 +16,7 @@
  * the next person who walks past and presses OK on the remote.
  */
 import { useEffect, useState } from 'react';
-import FocusButton from './FocusButton';
+import FocusButton, { type KeepInView } from './FocusButton';
 
 /** How long the confirmation stays live before giving up. */
 const ARMED_MS = 6000;
@@ -28,6 +28,8 @@ interface Props {
   onConfirm: () => void;
   className?: string;
   disabled?: boolean;
+  /** Passed to each of the buttons this renders. */
+  keepInView?: KeepInView;
 }
 
 export default function ConfirmButton({
@@ -36,6 +38,7 @@ export default function ConfirmButton({
   onConfirm,
   className = '',
   disabled = false,
+  keepInView,
 }: Props) {
   const [armed, setArmed] = useState(false);
 
@@ -47,7 +50,12 @@ export default function ConfirmButton({
 
   if (!armed) {
     return (
-      <FocusButton className={className} disabled={disabled} onSelect={() => setArmed(true)}>
+      <FocusButton
+        className={className}
+        disabled={disabled}
+        keepInView={keepInView}
+        onSelect={() => setArmed(true)}
+      >
         {children}
       </FocusButton>
     );
@@ -58,6 +66,7 @@ export default function ConfirmButton({
       <FocusButton
         className="btn-danger"
         disabled={disabled}
+        keepInView={keepInView}
         onSelect={() => {
           setArmed(false);
           onConfirm();
@@ -65,7 +74,11 @@ export default function ConfirmButton({
       >
         {confirmLabel}
       </FocusButton>
-      <FocusButton className="btn-secondary" onSelect={() => setArmed(false)}>
+      <FocusButton
+        className="btn-secondary"
+        keepInView={keepInView}
+        onSelect={() => setArmed(false)}
+      >
         Cancel
       </FocusButton>
     </>

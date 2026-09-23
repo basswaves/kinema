@@ -37,10 +37,23 @@ import './ui.css';
 
 // Enable native-like arrow-key navigation. `useGetBoundingClientRect` makes
 // hit-testing accurate when rails scroll horizontally.
+//
+// `throttle` is not about speed. The library re-measures the focused control on
+// every press but reuses its neighbours' positions for 16 ms, and those
+// positions are viewport-relative — so under key repeat, while a scroll is
+// moving the page, one press compared fresh and stale positions and focus
+// jumped backwards or sideways. Presses at least 25 ms apart always find every
+// position stale, so all of them are measured at the same instant. A held key
+// on Windows repeats at most every ~33 ms, so nothing a person does is dropped.
+// `throttleKeypresses` because without it every key-up resets the throttle, and
+// a remote that repeats as separate presses rather than a held key is exactly
+// the case this is for. See GOTCHAS, "A scroll between two presses…".
 initSpatial({
   debug: false,
   visualDebug: false,
   useGetBoundingClientRect: true,
+  throttle: 25,
+  throttleKeypresses: true,
 });
 installFocusWatchdog();
 

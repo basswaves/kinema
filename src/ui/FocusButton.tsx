@@ -11,6 +11,8 @@ import { useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import { useEffect, type ReactNode } from 'react';
 import { scrollPageToTop } from './focus';
 
+export type KeepInView = 'nearest' | 'page-top';
+
 interface Props {
   children: ReactNode;
   onSelect: () => void;
@@ -26,7 +28,7 @@ interface Props {
    * is not enough — the page has to go back to the top or the hero stays
    * cropped where the rails left it.
    */
-  keepInView?: 'nearest' | 'page-top';
+  keepInView?: KeepInView;
   /**
    * Also removes the button from the focus tree. A control a remote can land on
    * but not activate is a dead end with no way to tell it apart from a bug —

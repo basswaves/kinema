@@ -556,6 +556,49 @@ image. The top row is the one place where the correct scroll position is
 absolute, not relative: see `scrollPageToTop` in `src/ui/focus.ts` and
 `keepInView="page-top"`.
 
+### A scroll between two presses sends focus backwards
+
+Holding Down in Settings bounced focus from a text field back up to a button
+above it, and at the bottom of the page flipped it sideways between the two
+buttons of the last row.
+
+norigin re-measures the **current** control on every press, but reuses a
+sibling's position if it was measured less than 16 ms ago
+(`LAYOUT_STALE_TIME`). With `useGetBoundingClientRect` those positions are
+relative to the viewport, so a scroll between two measurements moves them.
+Under key repeat, a press compared the current control's new position with
+its neighbours' old ones: a button *above* measured as *below*, or the one
+beside it did, and Down went there. The first case came from `input.focus()`,
+which jumps the page to the input at once — 746 px in the mock. Stopping that
+jump was **not enough**: a smooth scroll catching up with a held key moves the
+page 50+ px a frame, more than a button is tall.
+
+Found by logging every focus change with its time and scroll offset (a
+`MutationObserver` on the `focused` class) and holding a key at repeat speed.
+At one press every 150 ms or more it never happens, because every sibling is
+stale by then and gets re-measured.
+
+**Do:** keep `throttle` in the `initSpatial` call in `src/ui/Browse.tsx` above
+16 ms. Presses further apart than the cache lasts always re-measure every
+sibling at the same instant as the current control, whatever is scrolling.
+It is a correctness setting, not a feel setting — lowering it to "make
+holding a key snappier" brings this back.
+
+**And** keep `throttleKeypresses: true` beside it. Without it every key-up
+**cancels** the throttle, so it only ever spaces out a key held down in one
+unbroken press. The first attempt at this fix set `throttle` alone and changed
+nothing in the mock, whose key repeat — like many remotes' — is a stream of
+separate down/up presses.
+
+### A hidden Browser pane never scrolls smoothly
+
+When testing in the Claude Browser pane: while the pane is hidden,
+`requestAnimationFrame` never fires, so a `behavior: 'smooth'` scroll never
+starts. `document.visibilityState` still says `visible`, instant scrolls
+still work, and the result looks exactly like `keepInView` being broken — the
+focus ring walks off the screen and the page stays put. Check `tabs_context`
+("The Browser pane is currently hidden") before believing any scroll result.
+
 ### A focus zoom can swallow the gap to the control below it
 
 Continue Watching's **Remove** sits below its card precisely so Down reaches it

@@ -35,9 +35,18 @@ export default function FocusInput({
   const { ref, focused } = useFocusable<object, HTMLInputElement>({});
 
   useEffect(() => {
+    const input = ref.current;
+    if (!input) return;
     if (focused) {
-      ref.current?.focus();
-      ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      // `preventScroll`, because a plain focus() jumps the page to the input
+      // at once and the smooth scroll below then has nothing left to do — the
+      // inputs lurched while every button around them glided.
+      input.focus({ preventScroll: true });
+      input.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } else if (document.activeElement === input) {
+      // Give the caret back when the remote moves on, or this field keeps
+      // taking keystrokes — Enter included — while the ring is somewhere else.
+      input.blur();
     }
   }, [focused, ref]);
 

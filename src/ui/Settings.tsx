@@ -479,6 +479,7 @@ export default function Settings() {
                   <span className="root-path">{root.path}</span>
                   <span className="muted">{root.file_count} file(s)</span>
                   <ConfirmButton
+                    keepInView="nearest"
                     className="settings-remove"
                     confirmLabel="Remove it"
                     onConfirm={() =>
@@ -495,10 +496,18 @@ export default function Settings() {
           )}
 
           <div className="settings-row">
-            <FocusButton className="btn-secondary" onSelect={() => void pickFolder('movies')}>
+            <FocusButton
+              keepInView="nearest"
+              className="btn-secondary"
+              onSelect={() => void pickFolder('movies')}
+            >
               Add movies folder
             </FocusButton>
-            <FocusButton className="btn-secondary" onSelect={() => void pickFolder('tv')}>
+            <FocusButton
+              keepInView="nearest"
+              className="btn-secondary"
+              onSelect={() => void pickFolder('tv')}
+            >
               Add TV folder
             </FocusButton>
             {/* During the scan's detection pass — minutes of work nobody asked
@@ -506,6 +515,7 @@ export default function Settings() {
                 a second one: a Stop that vanishes when detection ends takes
                 the remote's focus with it. */}
             <FocusButton
+              keepInView="nearest"
               className="btn-primary"
               onSelect={() => void (scan?.stage === 'detecting' ? stopDetection() : scanNow())}
             >
@@ -557,7 +567,11 @@ export default function Settings() {
             and they save themselves as you type.
           </p>
           <div className="settings-row">
-            <FocusButton className="btn-secondary" onSelect={() => void openUrl(TMDB_KEY_URL)}>
+            <FocusButton
+              keepInView="nearest"
+              className="btn-secondary"
+              onSelect={() => void openUrl(TMDB_KEY_URL)}
+            >
               Get a free TMDB key ↗
             </FocusButton>
             {keysSaved && <span className="muted">Saved.</span>}
@@ -625,6 +639,7 @@ export default function Settings() {
             a few seconds each. If this is empty, everything found a match.
           </p>
           <FocusButton
+            keepInView="nearest"
             className={needsReview > 0 ? 'btn-primary' : 'btn-secondary'}
             onSelect={() => setPanel((p) => (p === 'review' ? 'none' : 'review'))}
           >
@@ -650,6 +665,7 @@ export default function Settings() {
           <h2>Playback</h2>
           <div className="settings-toggle-row">
             <FocusButton
+              keepInView="nearest"
               className={tvMode ? 'btn-primary' : 'btn-secondary'}
               onSelect={() => setTvMode(!tvMode)}
             >
@@ -664,6 +680,7 @@ export default function Settings() {
           </div>
           <div className="settings-toggle-row">
             <FocusButton
+              keepInView="nearest"
               className={autoSkip ? 'btn-primary' : 'btn-secondary'}
               onSelect={() => {
                 const next = !autoSkip;
@@ -684,6 +701,7 @@ export default function Settings() {
           </div>
           <div className="settings-toggle-row">
             <FocusButton
+              keepInView="nearest"
               className={creditsTail > 0 ? 'btn-primary' : 'btn-secondary'}
               onSelect={() => {
                 const index = CREDITS_TAIL_CHOICES.indexOf(creditsTail);
@@ -714,6 +732,7 @@ export default function Settings() {
               decides for itself. */}
           <div className="settings-toggle-row">
             <FocusButton
+              keepInView="nearest"
               className={displaySync ? 'btn-primary' : 'btn-secondary'}
               onSelect={() => {
                 const next = !displaySync;
@@ -778,6 +797,7 @@ export default function Settings() {
               season. Skiptro is quick and simply always runs. */}
           <div className="settings-toggle-row">
             <FocusButton
+              keepInView="nearest"
               className={autoAnalyse ? 'btn-primary' : 'btn-secondary'}
               onSelect={() => {
                 const next = !autoAnalyse;
@@ -837,6 +857,7 @@ export default function Settings() {
           </p>
           <div className="settings-toggle-row">
             <FocusButton
+              keepInView="nearest"
               className={introDb ? 'btn-primary' : 'btn-secondary'}
               onSelect={() => {
                 const next = !introDb;
@@ -895,6 +916,7 @@ export default function Settings() {
           </p>
           <div className="settings-row">
             <FocusButton
+              keepInView="nearest"
               className="btn-secondary"
               onSelect={() => void openUrl(SKIPTRO_URL)}
             >
@@ -903,6 +925,7 @@ export default function Settings() {
           </div>
           <div className="settings-row">
             <FocusButton
+              keepInView="nearest"
               className="btn-secondary"
               onSelect={() =>
                 void (async () => {
@@ -1011,6 +1034,7 @@ export default function Settings() {
                     folders and during the scan's own pass: only one detection
                     runs at a time, and the backend would refuse. */}
                 <FocusButton
+                  keepInView="nearest"
                   className="btn-secondary"
                   disabled={
                     (detecting !== null && detecting !== root.path) || scan?.stage === 'detecting'
@@ -1075,6 +1099,7 @@ export default function Settings() {
             they download again on the next scan.
           </p>
           <FocusButton
+            keepInView="nearest"
             className="btn-secondary"
             onSelect={() =>
               void (async () => {
@@ -1113,6 +1138,7 @@ export default function Settings() {
           </p>
           <div className="settings-row">
             <FocusButton
+              keepInView="nearest"
               className="btn-secondary"
               disabled={writingNfo}
               onSelect={() => void exportNfo(false)}
@@ -1120,6 +1146,7 @@ export default function Settings() {
               {writingNfo ? 'Writing…' : 'Write the missing ones'}
             </FocusButton>
             <ConfirmButton
+              keepInView="nearest"
               className="btn-secondary"
               disabled={writingNfo}
               confirmLabel="Yes, replace them all"
@@ -1145,12 +1172,14 @@ export default function Settings() {
           </p>
           <div className="settings-row">
             <FocusButton
+              keepInView="nearest"
               className="btn-secondary"
               onSelect={() => setPanel((p) => (p === 'developer' ? 'none' : 'developer'))}
             >
               {panel === 'developer' ? 'Hide developer tools' : 'Show developer tools'}
             </FocusButton>
             <FocusButton
+              keepInView="nearest"
               className="btn-secondary"
               onSelect={() => void openLogFolder().catch((e) => setError(String(e)))}
             >

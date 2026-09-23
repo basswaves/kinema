@@ -1159,6 +1159,14 @@ html {
   padding: 1.25rem var(--gutter) 3.75rem;
 }
 
+/* Where `keepInView="nearest"` stops. Without it a control scrolled to going up
+   lands under the sticky nav, which covers the top ~3.5rem of the page, and one
+   going down sits flush on the bottom edge with its focus zoom cut off. */
+.settings button,
+.settings input {
+  scroll-margin: calc(4.5rem + var(--safe-top)) 0 1.5rem;
+}
+
 .settings-title {
   margin: 0 0 1.25rem;
   font-size: 1.75rem;

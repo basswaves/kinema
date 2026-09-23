@@ -133,24 +133,6 @@ git checkout <that commit>~1 -- src/spike/ src/App.css
 It renders through the same `ensureMpvInitialised` as the real player, so what
 it reports is what the player gets.
 
-### Settings is awkward with a remote
-
-Found while driving the Stop button in the mock, keyboard-only. None of it is
-on the watching path, which is why it was left for its own change:
-
-- **Buttons do not scroll into view.** `FocusButton` only scrolls when given
-  `keepInView`, and no button in Settings has it — so arrowing down the page
-  moves the focus ring off the bottom of the screen and leaves it there.
-  `FocusInput` scrolls itself; the buttons between the inputs do not.
-- **An input keeps the typing focus after the remote leaves it.** `FocusInput`
-  takes DOM focus when it gets spatial focus and never gives it back, so the
-  last field visited keeps its caret while the ring sits on a button below.
-  Enter then reaches that input's own key handler as well as the button.
-- **Holding Down can bounce back up.** Pressing faster than the smooth scroll
-  settles sent focus from an input back to a control above it, repeatedly.
-  At one press per 0.6 s it walks the page correctly. A remote's key repeat is
-  far faster than that.
-
 ### Back from a detail page always goes Home
 
 Opening a title from a **See all** grid and pressing Back returns to Home rather

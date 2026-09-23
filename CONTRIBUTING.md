@@ -72,6 +72,26 @@ actually produces are focus-tree and mpv-lifecycle problems, and a jsdom test
 cannot see either. **Testing D-pad navigation means using a D-pad**, not
 mounting a component. See the two failure modes below.
 
+### Running the UI without the native app
+
+```bash
+npm run dev:mock
+```
+
+Serves the real UI at `http://localhost:1420` against a small fixed library
+(`src/dev/mockBackend.ts`) and a fake mpv (`src/dev/fakeMpv.ts`) that answers
+the same commands and sends the same events as the real one, with a clock
+instead of a picture. Use it to drive browsing and the player's controls
+keyboard-only in an ordinary browser. From DevTools:
+
+- `__fakeMpv.speed = 20` — play twenty times faster
+- `__fakeMpv.position = 1335` — jump somewhere, as a seek from outside would
+- `__fakeMpv.commands` — every command the player sent
+- `__kinemaMock.playback` — the resume and watched rows it has written
+
+It is a fixture, not a second backend: Rust's rules are tested in Rust. None
+of it is bundled into a production build.
+
 For Rust changes:
 
 ```bash

@@ -9,7 +9,7 @@
  * The window is transparent and mpv renders behind the webview, so nothing here
  * may paint an opaque background.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   doesFocusableExist,
   FocusContext,
@@ -415,8 +415,26 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     }
   }, [target.fileId, exit]);
 
+  /**
+   * The newest versions of the callbacks the mpv listeners call.
+   *
+   * The listeners are registered **once per player**, and read these through
+   * a ref. They used to list the callbacks as dependencies, so they were torn
+   * down and re-registered whenever those changed — which was whenever the
+   * screen behind the player re-rendered, since `onExit` arrives as a fresh
+   * inline function each time. Re-registering is an IPC round trip, and an
+   * event arriving in that gap is lost: a lost `file-loaded` left the episode
+   * with no Skip button, no Up next and a frozen clock. `app.log`'s "Couldn't
+   * find callback id" warnings were the same churn, seen from Tauri's side.
+   */
+  const latestHandlers = useRef({ applyPrefs, handlePlaybackEnded });
+  useLayoutEffect(() => {
+    latestHandlers.current = { applyPrefs, handlePlaybackEnded };
+  });
+
   // ---- react to mpv events ------------------------------------------------
   useEffect(() => {
+    let disposed = false;
     let unlisten: (() => void) | undefined;
 
     listenEvents((event) => {
@@ -437,8 +455,9 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
            * Take the position and duration from mpv **by asking**, rather than
            * waiting to be told.
            *
-           * `file-loaded` and the property observer are two different Tauri
-           * channels, so their order against each other is not guaranteed:
+           * `file-loaded` and the property pushes arrive on the same channel,
+           * in order — but this handler is asynchronous (it awaits the resume
+           * seek), and pushes keep arriving while it waits:
            * waiting for the next push can mean acting on the outgoing file's
            * position for a tick, and *dropping* the pushes risks missing a
            * `duration` that mpv only ever emits once per file. Reading both
@@ -464,7 +483,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           fileReadyRef.current = true;
           setFileReady(true);
 
-          await applyPrefs();
+          await latestHandlers.current.applyPrefs();
 
           // Applied per file rather than once at init, so changing it in
           // Settings takes effect on the next thing you play instead of on the
@@ -486,7 +505,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         const reason = (event as { reason?: string }).reason;
         if (reason === 'eof' && fileReadyRef.current && !endHandled.current) {
           endHandled.current = true;
-          void handlePlaybackEnded();
+          void latestHandlers.current.handlePlaybackEnded();
         }
         // `error` was dropped along with everything that was not `eof`, and it
         // is the one that matters most: `loadfile` resolves as soon as mpv
@@ -512,13 +531,20 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         }
       }
     }).then((fn) => {
-      unlisten = fn;
+      // Torn down before registration finished: remove it now, or it leaks
+      // and keeps receiving every event with a stale closure.
+      if (disposed) fn();
+      else unlisten = fn;
     });
 
-    return () => unlisten?.();
-  }, [applyPrefs, handlePlaybackEnded]);
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, []);
 
   useEffect(() => {
+    let disposed = false;
     let unlisten: (() => void) | undefined;
     observeProperties(OBSERVED_PROPERTIES, ({ name, data }) => {
       switch (name) {
@@ -551,15 +577,21 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           // still reporting the previous one, which has genuinely ended.
           if (data === true && fileReadyRef.current && !endHandled.current) {
             endHandled.current = true;
-            void handlePlaybackEnded();
+            void latestHandlers.current.handlePlaybackEnded();
           }
           break;
       }
     }).then((fn) => {
-      unlisten = fn;
+      // Torn down before registration finished: remove it now, or it leaks
+      // and keeps receiving every event with a stale closure.
+      if (disposed) fn();
+      else unlisten = fn;
     });
-    return () => unlisten?.();
-  }, [handlePlaybackEnded]);
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, []);
 
   /**
    * End-of-file detection by polling.
@@ -576,14 +608,14 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         const eof = await getProperty('eof-reached', 'flag');
         if (eof === true) {
           endHandled.current = true;
-          void handlePlaybackEnded();
+          void latestHandlers.current.handlePlaybackEnded();
         }
       } catch {
         /* property unavailable while idle — nothing to do */
       }
     }, 1000);
     return () => window.clearInterval(id);
-  }, [handlePlaybackEnded]);
+  }, []);
 
   // ---- intro / credits skip ------------------------------------------------
 

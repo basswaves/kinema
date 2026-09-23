@@ -31,22 +31,15 @@ a receiver.
 
 Agreed with the owner on 2026-09-23 after a full review of the code, the logs and
 the library database. One commit per item on `master`. Phase 0 (the safety
-net and the test tools) and Phase 1 (starting playback and the Skip button)
-are done — see PLAN.md for what they decided; what follows is what is left,
-in order.
+net and the test tools), Phase 1 (starting playback and the Skip button) and
+Phase 2 (watching correctness) are done — see PLAN.md for what they decided;
+what follows is what is left, in order.
 
 Decisions that shape it: the **Skip intro button shows from 0:00** whenever an
 intro is known and stays until the intro ends, and pressing it during a cold
 open jumps to the end of the intro (chosen knowingly — it skips the cold open
 too); **Skiptro stays first** for intros where its confidence is at least 0.8;
 nothing is tested by hand.
-
-**Phase 2 — watching correctness.** Leaving or skipping in the credits counts
-as watched (reproduced in the mock: "Play next" at 92.7% leaves the episode
-unwatched). Continue Watching's Remove sticks. The `duration − 60s` guess only
-offers, in automatic mode too. Duplicate and provider-unlisted episodes on the
-detail page. Double-episode files. Media keys. A file still being written is
-not marked watched.
 
 **Phase 3 — library and matching.** Title from the show folder when the file
 and its season folder have none; untitled files go to Needs attention rather
@@ -160,6 +153,15 @@ the current behaviour annoys them.
 
 ## Unverified
 
+- **A file whose container misreports its length.** Example Show S01E10
+  (`…S01 - S01E10 - E10.mp4`) is about 23 minutes, but mpv reports
+  7008 s, and the player trusts mpv's duration: its progress percentage and
+  "min left" are wrong, and its credits start (22:07) falls in the "first half"
+  of that bogus length, so the credits-count-as-watched rule rightly ignores
+  it — skipping its credits early will not mark it watched, though reaching
+  the end still does. One file, left alone; if more turn up, compare mpv's
+  duration against ffprobe's (which `analyse.rs` already reads) and prefer the
+  shorter.
 - **HDR passthrough** — untestable on this SDR panel. HDR *decode* and
   tone-mapping to SDR are confirmed on real content by the stats panel, not
   merely by the picture looking right: a 4K HDR10 remux reads pq / bt.2020-ncl /

@@ -275,13 +275,23 @@ fn fingerprint(
     Ok(printer.fingerprint().to_vec())
 }
 
+/// One place a segment of this episode matched another episode, in file
+/// seconds, and which episode that was — so agreement can be counted in
+/// episodes rather than in matches.
+#[derive(Debug, Clone, Copy)]
+struct Candidate {
+    start: f64,
+    end: f64,
+    other: usize,
+}
+
 /// Every segment that `index` shares with any other episode, in file seconds.
 fn candidates(
     index: usize,
     prints: &[Vec<u32>],
     offset: f64,
     config: &Configuration,
-) -> Vec<(f64, f64)> {
+) -> Vec<Candidate> {
     let mut found = Vec::new();
 
     for (other, print) in prints.iter().enumerate() {
@@ -300,10 +310,11 @@ fn candidates(
             }
             // start1/end1 are seconds into *this* episode's window, so the
             // window's own offset turns them into times in the file.
-            found.push((
-                offset + segment.start1(config) as f64,
-                offset + segment.end1(config) as f64,
-            ));
+            found.push(Candidate {
+                start: offset + segment.start1(config) as f64,
+                end: offset + segment.end1(config) as f64,
+                other,
+            });
         }
     }
 
@@ -321,39 +332,53 @@ fn median(values: &mut [f64]) -> f64 {
 /// answer is the median of that cluster, not its first or widest member: one
 /// pairing that matched a couple of seconds long should not stretch the marker
 /// for everybody.
+///
+/// **Support is counted in distinct episodes**, which is what the rule has
+/// always claimed: "between an episode and at least two *others*". It used to
+/// count matches, and one other episode can match twice in one place — a
+/// segment split by a short difference — which let a single pairing supply
+/// both votes.
 fn consensus(
-    mut found: Vec<(f64, f64)>,
+    mut found: Vec<Candidate>,
     support: usize,
     min_len: f64,
     max_len: f64,
 ) -> Option<(f64, f64)> {
-    found.retain(|(start, end)| {
-        let length = end - start;
-        length >= min_len && length <= max_len && *start >= 0.0
+    found.retain(|c| {
+        let length = c.end - c.start;
+        length >= min_len && length <= max_len && c.start >= 0.0
     });
     if found.is_empty() {
         return None;
     }
 
-    found.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+    found.sort_by(|a, b| a.start.partial_cmp(&b.start).unwrap_or(std::cmp::Ordering::Equal));
 
-    let mut best: &[(f64, f64)] = &[];
+    let distinct = |cluster: &[Candidate]| -> usize {
+        let mut others: Vec<usize> = cluster.iter().map(|c| c.other).collect();
+        others.sort_unstable();
+        others.dedup();
+        others.len()
+    };
+
+    let mut best: &[Candidate] = &[];
     let mut lower = 0;
     for upper in 0..found.len() {
-        while found[upper].0 - found[lower].0 > CLUSTER_TOLERANCE_SECS {
+        while found[upper].start - found[lower].start > CLUSTER_TOLERANCE_SECS {
             lower += 1;
         }
-        if upper + 1 - lower > best.len() {
-            best = &found[lower..=upper];
+        let cluster = &found[lower..=upper];
+        if distinct(cluster) > distinct(best) {
+            best = cluster;
         }
     }
 
-    if best.len() < support {
+    if distinct(best) < support {
         return None;
     }
 
-    let mut starts: Vec<f64> = best.iter().map(|c| c.0).collect();
-    let mut ends: Vec<f64> = best.iter().map(|c| c.1).collect();
+    let mut starts: Vec<f64> = best.iter().map(|c| c.start).collect();
+    let mut ends: Vec<f64> = best.iter().map(|c| c.end).collect();
     Some((median(&mut starts), median(&mut ends)))
 }
 
@@ -661,9 +686,36 @@ mod tests {
         assert_eq!(min_support(12), 2);
     }
 
+    /// Tuples as candidates from *different* episodes, one each — what every
+    /// test below meant before candidates carried their episode.
+    fn distinct(found: Vec<(f64, f64)>) -> Vec<Candidate> {
+        found
+            .into_iter()
+            .enumerate()
+            .map(|(other, (start, end))| Candidate { start, end, other })
+            .collect()
+    }
+
+    /// The loophole: one other episode matching twice at the same place is
+    /// one vote, not two.
+    #[test]
+    fn one_other_episode_cannot_supply_both_votes() {
+        let same = vec![
+            Candidate { start: 0.4, end: 45.0, other: 3 },
+            Candidate { start: 0.6, end: 45.2, other: 3 },
+        ];
+        assert_eq!(consensus(same, 2, INTRO_MIN_SECS, INTRO_MAX_SECS), None);
+
+        let two = vec![
+            Candidate { start: 0.4, end: 45.0, other: 3 },
+            Candidate { start: 0.6, end: 45.2, other: 5 },
+        ];
+        assert!(consensus(two, 2, INTRO_MIN_SECS, INTRO_MAX_SECS).is_some());
+    }
+
     #[test]
     fn a_segment_needs_enough_agreement() {
-        let one = vec![(0.5, 45.0)];
+        let one = distinct(vec![(0.5, 45.0)]);
         assert_eq!(consensus(one.clone(), 2, INTRO_MIN_SECS, INTRO_MAX_SECS), None);
         assert_eq!(
             consensus(one, 1, INTRO_MIN_SECS, INTRO_MAX_SECS),
@@ -675,7 +727,7 @@ mod tests {
     /// stretch the marker for everybody.
     #[test]
     fn the_cluster_median_wins_not_the_outlier() {
-        let found = vec![(0.4, 45.0), (0.5, 45.6), (0.6, 52.0)];
+        let found = distinct(vec![(0.4, 45.0), (0.5, 45.6), (0.6, 52.0)]);
         assert_eq!(
             consensus(found, 2, INTRO_MIN_SECS, INTRO_MAX_SECS),
             Some((0.5, 45.6))
@@ -686,13 +738,13 @@ mod tests {
     /// intro, and the stray pair must not drag it.
     #[test]
     fn the_largest_cluster_wins() {
-        let found = vec![
+        let found = distinct(vec![
             (0.4, 45.0),
             (0.5, 45.6),
             (0.6, 46.0),
             (400.0, 445.0),
             (401.0, 446.0),
-        ];
+        ]);
         let (start, _) = consensus(found, 2, INTRO_MIN_SECS, INTRO_MAX_SECS).unwrap();
         assert!(start < 1.0, "expected the opening cluster, got {start}");
     }
@@ -700,10 +752,10 @@ mod tests {
     #[test]
     fn segments_outside_the_duration_bounds_are_dropped() {
         // Five seconds is a sting, six minutes is most of the episode.
-        let too_short = vec![(1.0, 6.0), (1.1, 6.1)];
+        let too_short = distinct(vec![(1.0, 6.0), (1.1, 6.1)]);
         assert_eq!(consensus(too_short, 1, INTRO_MIN_SECS, INTRO_MAX_SECS), None);
 
-        let too_long = vec![(1.0, 400.0), (1.1, 400.1)];
+        let too_long = distinct(vec![(1.0, 400.0), (1.1, 400.1)]);
         assert_eq!(consensus(too_long, 1, INTRO_MIN_SECS, INTRO_MAX_SECS), None);
     }
 

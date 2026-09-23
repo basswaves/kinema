@@ -19,6 +19,28 @@ import { invoke } from '@tauri-apps/api/core';
 import { command, getProperty, listenEvents } from 'tauri-plugin-libmpv-api';
 import { ensureMpvInitialised } from './player/mpv';
 import { scanLibrary } from './library/api';
+import {
+  ignoreFileIds,
+  recordMatch,
+  recordProviderFailure,
+  recordRefusal,
+  returnToReview,
+  unlinkFiles,
+} from './metadata/api';
+
+/**
+ * The webview's own wrappers for the file lifecycle, callable from a plan —
+ * so a test proves the real argument names reach the real commands, which no
+ * mock can. Read the copied library afterwards to check what they did.
+ */
+const CALLABLE: Record<string, (...args: never[]) => Promise<unknown>> = {
+  ignoreFileIds,
+  recordMatch,
+  recordProviderFailure,
+  recordRefusal,
+  returnToReview,
+  unlinkFiles,
+};
 
 export interface SelfTestAction {
   /** Seconds after the test started. */
@@ -30,10 +52,13 @@ export interface SelfTestAction {
    * mid-run ends what it started. Point the copied library's Skiptro setting
    * at something harmless first: this runs whatever is configured there.
    */
-  do: 'key' | 'seek' | 'mark' | 'detect';
+  do: 'key' | 'seek' | 'mark' | 'detect' | 'call';
   key?: string;
   to?: number;
   root?: string;
+  /** For `call`: one of the lifecycle wrappers in `CALLABLE`, and its arguments. */
+  fn?: string;
+  args?: unknown[];
   note?: string;
 }
 
@@ -154,6 +179,14 @@ export async function runSelfTest(plan: SelfTestPlan): Promise<void> {
         window.dispatchEvent(new KeyboardEvent('keydown', { key: action.key, bubbles: true }));
       } else if (action.do === 'seek' && action.to !== undefined) {
         void command('seek', [action.to, 'absolute']).catch((e) => note('seek-failed', String(e)));
+      } else if (action.do === 'call' && action.fn) {
+        const target = CALLABLE[action.fn];
+        if (!target) note('call:unknown', action.fn);
+        else
+          (target as (...args: unknown[]) => Promise<unknown>)(...(action.args ?? [])).then(
+            (result) => note('call:done', { fn: action.fn, result }),
+            (e) => note('call:failed', { fn: action.fn, error: String(e) })
+          );
       } else if (action.do === 'detect' && action.root) {
         invoke('detect_intros', { rootPath: action.root }).then(
           (report) => note('detect:done', report),

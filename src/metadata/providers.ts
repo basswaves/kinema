@@ -215,8 +215,14 @@ function makeQueue(gapMs: number) {
   };
 }
 
-/** TVmaze asks for at least 10 seconds between every 20 calls. */
-const TVMAZE_GAP_MS = 120;
+/**
+ * TVmaze allows "at least 20 calls every 10 seconds per IP" — one every half
+ * second on average. This was 120 ms, four times that rate, with no retry on
+ * the 429 that follows: without a TMDB key a larger TV library filled Needs
+ * attention with "HTTP 429" instead of matches. Half a second is within the
+ * limit, and a 429 that still happens is now waited out by `fetchPolitely`.
+ */
+const TVMAZE_GAP_MS = 500;
 const tvmazeQueued = makeQueue(TVMAZE_GAP_MS);
 
 /**
@@ -259,7 +265,7 @@ async function fetchPolitely(url: string, label: string): Promise<Response> {
 export async function tvmazeSearch(title: string): Promise<Candidate[]> {
   return tvmazeQueued(async () => {
     const url = `https://api.tvmaze.com/search/shows?q=${encodeURIComponent(title)}`;
-    const response = await fetch(url, { method: 'GET' });
+    const response = await fetchPolitely(url, 'TVmaze search');
     if (!response.ok) throw new Error(`TVmaze search failed: HTTP ${response.status}`);
 
     const results = (await response.json()) as Array<{ show: TvmazeShow }>;
@@ -277,56 +283,63 @@ export async function tvmazeSearch(title: string): Promise<Candidate[]> {
 }
 
 export async function tvmazeGetShow(id: string): Promise<TitleMetadata> {
-  return tvmazeQueued(async () => {
-    const response = await fetch(`https://api.tvmaze.com/shows/${id}`, { method: 'GET' });
+  const show = await tvmazeQueued(async () => {
+    const response = await fetchPolitely(`https://api.tvmaze.com/shows/${id}`, 'TVmaze show');
     if (!response.ok) throw new Error(`TVmaze show failed: HTTP ${response.status}`);
-    const show = (await response.json()) as TvmazeShow;
-
-    // Backdrop art lives on a separate endpoint and is the reason TVmaze is
-    // worth using over OMDb for series.
-    let backdrop: string | null = null;
-    try {
-      const imagesRes = await fetch(`https://api.tvmaze.com/shows/${id}/images`, { method: 'GET' });
-      if (imagesRes.ok) {
-        const images = (await imagesRes.json()) as Array<{
-          type: string | null;
-          resolutions: { original: { url: string } };
-        }>;
-        const background = images.find((i) => i.type === 'background');
-        backdrop = background?.resolutions.original.url ?? null;
-      }
-    } catch {
-      /* artwork is optional — never fail a match over it */
-    }
-
-    return {
-      kind: 'series',
-      provider: 'tvmaze',
-      provider_id: String(show.id),
-      imdb_id: show.externals?.imdb ?? null,
-      tmdb_id: null,
-      title: show.name,
-      year: yearOf(show.premiered),
-      overview: stripHtml(show.summary),
-      genres: show.genres?.length ? JSON.stringify(show.genres) : null,
-      runtime_mins: show.averageRuntime ?? show.runtime ?? null,
-      rating: show.rating?.average ?? null,
-      poster_url: show.image?.original ?? null,
-      backdrop_url: backdrop,
-      // TVmaze carries no logos and no video links at all. Cast is available
-      // from a separate endpoint, but a second request per title for the one
-      // provider that is the keyless fallback is the wrong trade.
-      logo_url: null,
-      trailer_key: null,
-      trailer_site: null,
-      cast: [],
-    };
+    return (await response.json()) as TvmazeShow;
   });
+
+  // Backdrop art lives on a separate endpoint and is the reason TVmaze is
+  // worth using over OMDb for series. Its own slot in the queue: two requests
+  // inside one slot is exactly how the pacing used to be exceeded.
+  let backdrop: string | null = null;
+  try {
+    backdrop = await tvmazeQueued(async () => {
+      const response = await fetchPolitely(
+        `https://api.tvmaze.com/shows/${id}/images`,
+        'TVmaze images'
+      );
+      if (!response.ok) return null;
+      const images = (await response.json()) as Array<{
+        type: string | null;
+        resolutions: { original: { url: string } };
+      }>;
+      return images.find((i) => i.type === 'background')?.resolutions.original.url ?? null;
+    });
+  } catch {
+    /* artwork is optional — never fail a match over it */
+  }
+
+  return {
+    kind: 'series',
+    provider: 'tvmaze',
+    provider_id: String(show.id),
+    imdb_id: show.externals?.imdb ?? null,
+    tmdb_id: null,
+    title: show.name,
+    year: yearOf(show.premiered),
+    overview: stripHtml(show.summary),
+    genres: show.genres?.length ? JSON.stringify(show.genres) : null,
+    runtime_mins: show.averageRuntime ?? show.runtime ?? null,
+    rating: show.rating?.average ?? null,
+    poster_url: show.image?.original ?? null,
+    backdrop_url: backdrop,
+    // TVmaze carries no logos and no video links at all. Cast is available
+    // from a separate endpoint, but a second request per title for the one
+    // provider that is the keyless fallback is the wrong trade.
+    logo_url: null,
+    trailer_key: null,
+    trailer_site: null,
+    cast: [],
+  };
 }
 
 export async function tvmazeGetEpisodes(id: string): Promise<EpisodeMetadata[]> {
   return tvmazeQueued(async () => {
-    const response = await fetch(`https://api.tvmaze.com/shows/${id}/episodes`, { method: 'GET' });
+    const response = await fetchPolitely(
+      `https://api.tvmaze.com/shows/${id}/episodes`,
+      'TVmaze episodes'
+    );
     if (!response.ok) throw new Error(`TVmaze episodes failed: HTTP ${response.status}`);
 
     const episodes = (await response.json()) as Array<{
@@ -655,9 +668,9 @@ export async function tmdbFindByImdb(
  */
 export async function tvmazeLookupByTvdb(tvdbId: string): Promise<string | null> {
   return tvmazeQueued(async () => {
-    const response = await fetch(
+    const response = await fetchPolitely(
       `https://api.tvmaze.com/lookup/shows?thetvdb=${encodeURIComponent(tvdbId)}`,
-      { method: 'GET' }
+      'TVmaze lookup'
     );
     if (response.status === 404) return null;
     if (!response.ok) throw new Error(`TVmaze lookup failed: HTTP ${response.status}`);
@@ -669,9 +682,9 @@ export async function tvmazeLookupByTvdb(tvdbId: string): Promise<string | null>
 /** Same, for an IMDb id, when TMDB is unavailable but the show is on TVmaze. */
 export async function tvmazeLookupByImdb(imdbId: string): Promise<string | null> {
   return tvmazeQueued(async () => {
-    const response = await fetch(
+    const response = await fetchPolitely(
       `https://api.tvmaze.com/lookup/shows?imdb=${encodeURIComponent(imdbId)}`,
-      { method: 'GET' }
+      'TVmaze lookup'
     );
     if (response.status === 404) return null;
     if (!response.ok) throw new Error(`TVmaze lookup failed: HTTP ${response.status}`);

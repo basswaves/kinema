@@ -73,9 +73,8 @@ pub fn version_stamp(db_path: &Path) -> String {
 pub struct Detection {
     pub start: f64,
     pub end: f64,
-    /// Skiptro's own confidence, 0..1. Not acted on yet — see HANDOVER — but
-    /// carried so it can be logged, which is how a low-confidence sample gets
-    /// found in the first place.
+    /// Skiptro's own confidence, 0..1. Below `MIN_SKIPTRO_CONFIDENCE` in
+    /// `skip.rs` the app's own analysis is preferred for the intro.
     pub confidence: f64,
 }
 
@@ -88,11 +87,22 @@ pub struct Detection {
 /// nothing has ever been detected. Verified against the real file.
 fn open_read_only(db_path: &Path) -> rusqlite::Result<Connection> {
     let uri = format!("file:{}?mode=ro", db_path.to_string_lossy().replace('\\', "/"));
-    Connection::open_with_flags(
+    let conn = Connection::open_with_flags(
         &uri,
         OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_URI,
-    )
+    )?;
+    // Wait rather than fail while Skiptro is writing. The automatic pass runs
+    // Skiptro at the end of every startup scan, which is exactly when an
+    // episode is likely to be started — and without this the read failed at
+    // once, the episode fell back to a worse source, and that worse answer was
+    // cached.
+    conn.busy_timeout(BUSY_TIMEOUT)?;
+    Ok(conn)
 }
+
+/// How long a read waits for Skiptro to finish a write. Short: this runs while
+/// an episode is starting, and a missing marker costs less than a stall.
+const BUSY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
 
 /// The intro Skiptro detected for one video, if it has one.
 ///
@@ -139,11 +149,22 @@ pub fn detection_for(db_path: &Path, video: &Path) -> Option<Detection> {
         ))
     });
 
-    let Ok(found) = found else {
-        return None;
+    let found = match found {
+        Ok(found) => found,
+        Err(e) => {
+            crate::log!("skiptro: reading {} failed ({e})", db_path.display());
+            return None;
+        }
     };
 
-    for row in found.flatten() {
+    for row in found {
+        let row = match row {
+            Ok(row) => row,
+            Err(e) => {
+                crate::log!("skiptro: unreadable row for {path} ({e})");
+                continue;
+            }
+        };
         let (kind, start, end, confidence) = row;
         if kind != TYPE_INTRO {
             // A version that started detecting something else. Worth knowing

@@ -124,11 +124,11 @@ nobody saw it. Measured on 2026-09-23 against Skiptro's own database: **23 of
 | 0.70 (S04E05–E11) | intro ends ~7 s later (37.6 s vs ~44.5 s) |
 | 0.48 – 0.70 (all of S06) | intro ends ~15 s later (29.1 s vs ~44 s) |
 
-So every large disagreement is one Skiptro itself was unsure of. A threshold
-somewhere around 0.8, below which the analysis's intro is used instead, would
-keep Skiptro first wherever it is confident. **Not done:** the owner has decided
-Skiptro stays first and has seen no bad skip endpoints; this table is the
-evidence to bring back if that changes.
+So every large disagreement is one Skiptro itself was unsure of. **Done,
+2026-09-23:** below 0.8 the analysis's intro is used instead
+(`MIN_SKIPTRO_CONFIDENCE` in `skip.rs`), and Skiptro keeps first place wherever
+it is confident. With no analysis for the episode, the unsure Skiptro intro is
+still used, ahead of TheIntroDB.
 
 ### Retiring Skiptro
 
@@ -136,7 +136,8 @@ evidence to bring back if that changes.
 Skiptro kept as the first intro source. The earlier claim here, that the two
 detectors "agree within a second", did not survive measurement — see the table
 above — but the disagreements coincide with Skiptro's own low confidence, so
-they are a reason for a confidence threshold, not for removal.
+they are a reason for a confidence threshold, not for removal — and that
+threshold is now in place.
 
 ### The Phase 0 mpv harness is gone, if you need it back
 

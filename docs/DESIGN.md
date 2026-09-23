@@ -240,10 +240,13 @@ credits run. A refinement that makes one episode's credits materially longer
 than its season's is not finding a boundary — it is reaching back into the
 episode, and it is refused with the reason logged.
 
-**Skiptro is ranked above it for intros by decision, not by measurement.** Both
-read the same bytes and agree within a second on real content; putting the older,
-more-tuned one first means adding this cannot regress an intro skip that already
-works. When they disagree, `app.log` names which spoke.
+**Skiptro is ranked above it for intros by decision — where Skiptro is sure.**
+Putting the older, more-tuned one first means adding the analysis cannot regress
+an intro skip that already works. They do not always agree: measured on this
+library, 34 of 61 episodes differ by more than a second, but every large
+disagreement is one Skiptro itself scored at 0.70 or less. So below a
+confidence of 0.8 the analysis answers instead, and Skiptro keeps first place
+everywhere it said it was confident. `app.log` names which source spoke.
 
 **Trailers are local files, never a live stream in-app.** A trailer beside the media
 plays on the mpv surface: no ads, no network, no bundled binary, and the same

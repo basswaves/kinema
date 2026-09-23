@@ -68,6 +68,20 @@ const FROM_SIDECAR: &str = "sidecar";
 const FROM_ANALYSIS: &str = "analysis";
 const FROM_INTRODB: &str = "introdb";
 
+/// Below this, a Skiptro intro gives way to this app's own analysis.
+///
+/// Measured, not guessed (2026-09-23, docs/ROADMAP.md): across 79 detections,
+/// every one where the two detectors disagreed by more than a few seconds had a
+/// Skiptro confidence of 0.70 or less, and every confident one agreed. So
+/// Skiptro keeps first place wherever it is sure, which is the decision, and
+/// steps back only where it said itself that it was not.
+const MIN_SKIPTRO_CONFIDENCE: f64 = 0.8;
+
+/// Changes whenever the *ranking* changes, so rows cached under the old rules
+/// are recomputed. Without it `local_key` covers every input but the code, and
+/// a new rule would not reach an episode until one of its sources moved.
+const RANKING_VERSION: &str = "rank2";
+
 #[derive(Serialize, Clone, Copy, Debug, PartialEq)]
 pub struct Segment {
     pub start: f64,
@@ -236,7 +250,7 @@ fn local_key(
     // A fresh analysis has to invalidate the cache too, or running Detect would
     // leave the file playing with whatever it was given before.
     let analysed = analysed_at.map(|t| t.to_string()).unwrap_or_default();
-    format!("{file}|{db}|{side}|{analysed}")
+    format!("{file}|{db}|{side}|{analysed}|{RANKING_VERSION}")
 }
 
 /// This app's own analysis for one file, if it is still valid for these bytes.
@@ -390,22 +404,27 @@ fn local_markers(
     analysis: Option<(Option<Segment>, Option<Segment>)>,
 ) -> SkipMarkers {
     let mut markers = SkipMarkers::default();
+    // A Skiptro intro it was itself unsure of, held back until the other local
+    // sources have had their turn. See `MIN_SKIPTRO_CONFIDENCE`.
+    let mut unsure_skiptro: Option<Segment> = None;
 
     if let Some(db_path) = skiptro_db {
         if let Some(found) = skiptro::detection_for(db_path, video) {
-            markers.intro = Some(Segment {
+            let segment = Segment {
                 start: found.start,
                 end: Some(found.end),
-            });
-            markers.intro_source = Some(FROM_SKIPTRO_DB.into());
-            if found.confidence < 1.0 {
-                // The one sample nobody has yet. See HANDOVER: a minimum
-                // confidence cannot be calibrated without one of these.
+            };
+            if found.confidence >= MIN_SKIPTRO_CONFIDENCE {
+                markers.intro = Some(segment);
+                markers.intro_source = Some(FROM_SKIPTRO_DB.into());
+            } else {
                 crate::log!(
-                    "skiptro: confidence {:.2} for {}",
+                    "skiptro: confidence {:.2} for {} is below {MIN_SKIPTRO_CONFIDENCE} — \
+                     the analysis is asked first",
                     found.confidence,
                     video.display()
                 );
+                unsure_skiptro = Some(segment);
             }
         }
     }
@@ -444,6 +463,16 @@ fn local_markers(
                 markers.credits = Some(credits);
                 markers.credits_source = Some(FROM_ANALYSIS.into());
             }
+        }
+    }
+
+    // Still a measurement of this exact file, so still ahead of TheIntroDB —
+    // and in this library a low score has meant the intro was cut *short*,
+    // which leaves some theme playing rather than skipping story.
+    if markers.intro.is_none() {
+        if let Some(segment) = unsure_skiptro {
+            markers.intro = Some(segment);
+            markers.intro_source = Some(FROM_SKIPTRO_DB.into());
         }
     }
 
@@ -760,6 +789,95 @@ mod tests {
         assert_eq!(markers.intro.unwrap().end, Some(46.6));
         assert_eq!(markers.credits_source.as_deref(), Some(FROM_ANALYSIS));
         assert_eq!(markers.credits.unwrap().start, 1430.9);
+    }
+
+    /// A Skiptro database holding one intro for `video`.
+    fn skiptro_with(dir: &Path, video: &Path, confidence: f64, end: f64) -> PathBuf {
+        let db = dir.join("skiptro.db");
+        let conn = rusqlite::Connection::open(&db).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE DetectedSegments (
+                 Id INTEGER PRIMARY KEY AUTOINCREMENT, LibraryId INTEGER NOT NULL,
+                 FilePath TEXT NOT NULL, ShowName TEXT, Season INTEGER, Episode INTEGER,
+                 Type INTEGER NOT NULL, StartSeconds REAL NOT NULL, EndSeconds REAL NOT NULL,
+                 Confidence REAL NOT NULL, DetectedAt TEXT NOT NULL, FileModifiedAt TEXT NOT NULL,
+                 UserStatus INTEGER NOT NULL DEFAULT 0)",
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO DetectedSegments
+                (LibraryId, FilePath, Type, StartSeconds, EndSeconds, Confidence,
+                 DetectedAt, FileModifiedAt)
+             VALUES (1, ?1, 0, 0.19, ?2, ?3, '', '')",
+            rusqlite::params![video.to_string_lossy(), end, confidence],
+        )
+        .unwrap();
+        db
+    }
+
+    fn fresh_dir(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("pn-skip-{name}"));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn analysed_intro(end: f64) -> (Option<Segment>, Option<Segment>) {
+        (Some(Segment { start: 0.0, end: Some(end) }), None)
+    }
+
+    /// The case the threshold exists for, with this library's own numbers:
+    /// S04E05, where Skiptro said 37.6 s at confidence 0.70 and the analysis
+    /// said 44.6 s. Skiptro was unsure, so the analysis answers.
+    #[test]
+    fn an_unsure_skiptro_intro_gives_way_to_the_analysis() {
+        let dir = fresh_dir("unsure");
+        let video = dir.join("Show S04E05.mkv");
+        let db = skiptro_with(&dir, &video, 0.70, 37.6);
+
+        let markers = local_markers(Some(&db), &video, None, Some(analysed_intro(44.6)));
+        assert_eq!(markers.intro_source.as_deref(), Some(FROM_ANALYSIS));
+        assert_eq!(markers.intro.unwrap().end, Some(44.6));
+    }
+
+    /// Where Skiptro is sure it keeps first place — the decision this sits
+    /// inside. 0.8 itself counts as sure.
+    #[test]
+    fn a_confident_skiptro_intro_still_wins() {
+        for confidence in [1.0, 0.95, 0.8] {
+            let dir = fresh_dir(&format!("sure-{confidence}"));
+            let video = dir.join("Show S04E01.mkv");
+            let db = skiptro_with(&dir, &video, confidence, 44.9);
+
+            let markers = local_markers(Some(&db), &video, None, Some(analysed_intro(44.4)));
+            assert_eq!(
+                markers.intro_source.as_deref(),
+                Some(FROM_SKIPTRO_DB),
+                "confidence {confidence}"
+            );
+            assert_eq!(markers.intro.unwrap().end, Some(44.9));
+        }
+    }
+
+    /// With nothing else local to ask, an unsure Skiptro intro is still used:
+    /// it measured this file, which TheIntroDB did not.
+    #[test]
+    fn an_unsure_skiptro_intro_is_used_when_nothing_else_local_has_one() {
+        let dir = fresh_dir("unsure-alone");
+        let video = dir.join("Show S06E04.mkv");
+        let db = skiptro_with(&dir, &video, 0.48, 29.1);
+
+        let markers = local_markers(Some(&db), &video, None, None);
+        assert_eq!(markers.intro_source.as_deref(), Some(FROM_SKIPTRO_DB));
+        assert_eq!(markers.intro.unwrap().end, Some(29.1));
+    }
+
+    /// Rows cached under the old ranking must be recomputed, or the new rule
+    /// would not reach an episode until one of its sources happened to move.
+    #[test]
+    fn the_cache_key_carries_the_ranking_version() {
+        let key = local_key(Path::new(r"Z:\offline\Show.mkv"), None, None, None);
+        assert!(key.ends_with(RANKING_VERSION), "got {key}");
     }
 
     /// With no Skiptro at all, the analysis carries both segments on its own.

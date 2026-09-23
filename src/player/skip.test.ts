@@ -29,11 +29,28 @@ describe('activeSkip', () => {
     const m = markers({ intro: { start: 30, end: 90 } });
     expect(activeSkip(m, 45)?.kind).toBe('intro');
     expect(activeSkip(m, 45)?.seekTo).toBe(90);
+    expect(activeSkip(m, 45)?.inSegment).toBe(true);
   });
 
-  it('offers nothing before or after the intro', () => {
+  /**
+   * Decided: when an episode has an intro, the button is there from 0:00 —
+   * and pressed during a cold open it goes to the end of the intro, skipping
+   * the cold open as well. `inSegment` is false there, which is what keeps
+   * *automatic* mode from doing that on its own.
+   */
+  it('offers the intro skip from the first frame, cold open included', () => {
     const m = markers({ intro: { start: 30, end: 90 } });
-    expect(activeSkip(m, 10)).toBeNull();
+    for (const position of [0, 0.1, 10, 29.9]) {
+      const skip = activeSkip(m, position);
+      expect(skip?.kind, `at ${position}`).toBe('intro');
+      expect(skip?.seekTo).toBe(90);
+      expect(skip?.inSegment).toBe(false);
+    }
+  });
+
+  it('offers nothing once the intro is over', () => {
+    const m = markers({ intro: { start: 30, end: 90 } });
+    expect(activeSkip(m, 90)).toBeNull();
     expect(activeSkip(m, 120)).toBeNull();
   });
 
@@ -70,6 +87,14 @@ describe('activeSkip', () => {
   it('gives one stable key for the whole segment', () => {
     const m = markers({ intro: { start: 30, end: 90 } });
     expect(activeSkip(m, 40)?.key).toBe(activeSkip(m, 70)?.key);
+    // Including the stretch before the intro, where the button now also shows.
+    expect(activeSkip(m, 0)?.key).toBe(activeSkip(m, 70)?.key);
+  });
+
+  it('marks credits as in-segment, since they only ever start where they start', () => {
+    const m = markers({ credits: { start: 1300, end: null } });
+    expect(activeSkip(m, 1300)?.inSegment).toBe(true);
+    expect(activeSkip(m, 1299)).toBeNull();
   });
 });
 

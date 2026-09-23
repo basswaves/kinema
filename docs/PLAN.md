@@ -1210,6 +1210,32 @@ than the individual file, because analysis compares episodes against each other:
 fingerprinting the finished nine only means fingerprinting them again when the
 tenth lands.
 
+## The September 2026 review, and what it changed ✅ (in progress)
+
+A full review of the code, the logs and the library database, followed by a
+phased plan (in ROADMAP.md while it is open). Decisions taken along the way,
+with their reasons:
+
+**Skip intro is offered from 0:00.** When an episode has a known intro, the
+button is there from the first frame until the intro ends — not from where the
+intro begins — and pressing it during a cold open goes to the end of the intro,
+skipping the cold open too. The owner chose that knowingly over the alternative of
+waiting for the intro: a button that only appears ten seconds in looks like a
+button that is missing. Automatic mode is the exception: it still waits for the
+intro itself (`inSegment` in `skip.ts`), so nothing skips story unasked. The
+ten-second auto-hide is gone — on a button offered from 0:00 it would leave
+before the intro started — and seeking back into the intro brings the button
+back, because skipping no longer records a dismissal.
+
+**Skiptro first only where it is sure.** Measured: every large disagreement
+between Skiptro and the analysis was a detection Skiptro scored 0.70 or less.
+Below 0.8 the analysis answers. See `MIN_SKIPTRO_CONFIDENCE` in `skip.rs`.
+
+**Testing is done without the owner.** `npm run dev:mock` and
+`scripts/selftest.ps1` exist so every change can be checked — keyboard-only in
+a browser against a fake mpv, and in the real app against a copy of the real
+library — without anyone clicking through a checklist.
+
 ## Open items
 
 **They live in [ROADMAP.md](ROADMAP.md), and only there.** They used to be

@@ -81,8 +81,6 @@ const MIN_RESUME_SECS = 30;
 /** Or one that is effectively finished. */
 const RESUME_MAX_FRACTION = 0.94;
 const NEXT_EPISODE_COUNTDOWN = 12;
-/** How long a Skip prompt stays on screen before getting out of the way. */
-const SKIP_PROMPT_MS = 10000;
 /** Stats refresh. Fast enough to watch a drop counter, slow enough to be free. */
 const STATS_REFRESH_MS = 1000;
 /** Setting key: 'auto' skips without asking, anything else shows the button. */
@@ -732,11 +730,14 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
 
   const performSkip = useCallback(async () => {
     if (!active) return;
-    setDismissed(active.key);
     if (active.kind === 'intro') {
+      // Not dismissed: the seek itself takes the position past the intro, so
+      // the button goes by itself — and seeking back into the intro brings it
+      // back, which is what a remembered dismissal used to prevent.
       await command('seek', [active.seekTo, 'absolute']).catch((e) => setError(String(e)));
       showOsd();
     } else if (!endHandled.current) {
+      setDismissed(active.key);
       // Credits: end the episode early rather than seeking. That routes into
       // the same up-next flow as a natural end, so there is one path to the
       // next episode instead of two that can disagree.
@@ -754,6 +755,10 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     // path has always refused this; automatic mode did not, and the two new
     // credits sources make it reachable in a way a measured sidecar never was.
     if (active.kind === 'credits' && !neighbours.next) return;
+    // The intro is offered from 0:00, through any cold open. Pressing the
+    // button there skips the cold open too, which is a person's choice to
+    // make; automatic mode waits until the intro itself has begun.
+    if (!active.inSegment) return;
     if (autoHandled.current.has(active.key)) return;
     autoHandled.current.add(active.key);
     void performSkip();
@@ -792,25 +797,16 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [autoSkip, activeKind, activeKey, countdown, dismissed, neighbours.next, upNext]);
 
-  /**
-   * Get the prompt out of the way on its own.
-   *
-   * Keyed on the segment rather than on `active`, which changes identity every
-   * second — depending on the object would restart this timer continuously and
-   * the prompt would never dismiss.
-   */
-  useEffect(() => {
-    if (!activeKey || autoSkip) return;
-    // Only the intro prompt gets out of the way on its own. The credits offer
-    // is the route on to the next episode and runs to the end of the file, so
-    // timing it out would remove the control at exactly the moment it is for.
-    if (activeKind !== 'intro') return;
-    const id = window.setTimeout(() => setDismissed(activeKey), SKIP_PROMPT_MS);
-    return () => window.clearTimeout(id);
-  }, [activeKey, activeKind, autoSkip]);
+  // There is deliberately no timer taking the Skip intro button away. It used
+  // to leave after ten seconds, which on an intro offered from 0:00 would
+  // remove it before the intro had even begun; it now stays until the intro is
+  // over, and the seek that skipping performs is what removes it.
 
+  // In automatic mode the button still shows during a cold open, where
+  // nothing will happen by itself until the intro begins.
+  const promptAllowed = active !== null && (!autoSkip || !active.inSegment);
   const skipPrompt =
-    active && !autoSkip && !upNext && dismissed !== active.key
+    active && promptAllowed && !upNext && dismissed !== active.key
       ? // A credits prompt with nothing to move on to would be a button that
         // does nothing useful.
         active.kind === 'intro' || neighbours.next !== null
@@ -1134,8 +1130,8 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   /**
    * Catch the ring when a control disappears from under it.
    *
-   * Several of these controls come and go on their own: the Skip prompt times
-   * out after ten seconds, Up next is dismissed, the previous/next buttons are
+   * Several of these controls come and go on their own: the Skip prompt goes
+   * when the intro ends or is skipped, Up next is dismissed, the previous/next buttons are
    * absent at the ends of a run and are cleared on every file change. Focus left
    * on any of them points at a component that no longer exists — no ring
    * anywhere and no arrow press doing anything, which is indistinguishable from

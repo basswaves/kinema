@@ -103,13 +103,19 @@ pub struct FfmpegStatus {
 /// Before this, a mistyped path was silent until a detection run minutes later
 /// blamed it on Skiptro. The check is one `-version` call, so asking on every
 /// keystroke would be wasteful but asking when the field settles is free.
+///
+/// Off the main thread: it starts a process, and a first start of an ffmpeg on
+/// a network share or behind an antivirus scan can take seconds.
 #[tauri::command]
-pub fn ffmpeg_status(configured: Option<String>) -> FfmpegStatus {
-    let path = resolve(configured.as_deref());
-    FfmpegStatus {
-        resolved: path.display().to_string(),
-        available: is_available(&path),
-    }
+pub async fn ffmpeg_status(configured: Option<String>) -> Result<FfmpegStatus, String> {
+    crate::jobs::off_main(move || {
+        let path = resolve(configured.as_deref());
+        Ok(FfmpegStatus {
+            resolved: path.display().to_string(),
+            available: is_available(&path),
+        })
+    })
+    .await
 }
 
 /// How long a video is, in seconds.

@@ -438,9 +438,12 @@ fn first_parsed(paths: Vec<PathBuf>) -> Option<Nfo> {
 }
 
 /// The NFO for one video file — its own, not the show's.
+///
+/// Off the main thread, like every command here that reads beside the media:
+/// matching calls this once per group, against a NAS.
 #[tauri::command]
-pub fn read_nfo(path: String) -> Result<Option<Nfo>, String> {
-    Ok(first_parsed(video_nfo_paths(Path::new(&path))))
+pub async fn read_nfo(path: String) -> Result<Option<Nfo>, String> {
+    crate::jobs::off_main(move || Ok(first_parsed(video_nfo_paths(Path::new(&path))))).await
 }
 
 /// The show-level NFO for an episode file.
@@ -449,8 +452,8 @@ pub fn read_nfo(path: String) -> Result<Option<Nfo>, String> {
 /// resolves twelve episodes is the show's, and an `<episodedetails>` id would
 /// link all of them to a single episode entry.
 #[tauri::command]
-pub fn read_show_nfo(path: String) -> Result<Option<Nfo>, String> {
-    Ok(first_parsed(show_nfo_paths(Path::new(&path))))
+pub async fn read_show_nfo(path: String) -> Result<Option<Nfo>, String> {
+    crate::jobs::off_main(move || Ok(first_parsed(show_nfo_paths(Path::new(&path))))).await
 }
 
 // ---- writing ---------------------------------------------------------------
@@ -634,7 +637,11 @@ pub struct WriteReport {
 /// does not model. Replacing it wholesale would discard someone else's work,
 /// so an existing file is skipped unless replacing it is asked for explicitly.
 #[tauri::command]
-pub fn write_nfo(exports: Vec<NfoExport>, overwrite: bool) -> Result<WriteReport, String> {
+pub async fn write_nfo(exports: Vec<NfoExport>, overwrite: bool) -> Result<WriteReport, String> {
+    crate::jobs::off_main(move || Ok(write_all(exports, overwrite))).await
+}
+
+fn write_all(exports: Vec<NfoExport>, overwrite: bool) -> WriteReport {
     let mut report = WriteReport::default();
 
     for export in exports {
@@ -677,7 +684,7 @@ pub fn write_nfo(exports: Vec<NfoExport>, overwrite: bool) -> Result<WriteReport
         }
     }
 
-    Ok(report)
+    report
 }
 
 #[cfg(test)]

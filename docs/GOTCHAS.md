@@ -242,6 +242,17 @@ forward slashes is correct on Windows.
 `$APPDATA` here means the *app's* data directory
 (`…\Roaming\com.kinema.app`), not the OS `%APPDATA%`.
 
+### A command without `async` runs on the window's thread
+
+`#[tauri::command] pub fn …` executes on the **main thread**. While it runs
+the window cannot repaint or move and every other command queues behind it.
+Nothing errors; the app just freezes, and a NAS waking from sleep makes that
+freeze seconds long. Anything that reads beside the media or starts a program
+is `async` and goes through `jobs::off_main` (see `jobs.rs`). Quick database
+commands stay synchronous on purpose — the main thread serialises them, and
+that ordering is what keeps a `save_progress` ahead of the Home reload that
+follows it.
+
 ---
 
 ## SQLite

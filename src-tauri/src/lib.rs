@@ -5,6 +5,7 @@ mod db;
 mod detect;
 mod ffmpeg;
 mod introdb;
+mod jobs;
 mod library;
 mod metadata;
 mod nfo;

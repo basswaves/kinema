@@ -436,7 +436,11 @@ fn step(name: &str, exit_code: Option<i32>, mut tail: Vec<String>) -> StepReport
 /// The count comes from `seasons_in_root`, the same query Detect itself uses, so
 /// the number shown is precisely the work the button would do.
 #[tauri::command]
-pub fn analysis_backlog(app: tauri::AppHandle) -> Result<Vec<(i64, usize)>, String> {
+pub async fn analysis_backlog(app: tauri::AppHandle) -> Result<Vec<(i64, usize)>, String> {
+    crate::jobs::off_main(move || backlog(&app)).await
+}
+
+fn backlog(app: &tauri::AppHandle) -> Result<Vec<(i64, usize)>, String> {
     let db = app.state::<Db>();
     let conn = db.0.lock().map_err(to_string_err)?;
 

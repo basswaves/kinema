@@ -280,7 +280,10 @@ pub fn artwork_stats(db: tauri::State<Db>) -> Result<ArtworkStats, String> {
 /// Drop the cache entirely. Browsing keeps working from the remote URLs, and
 /// the next `cache_artwork` rebuilds it.
 #[tauri::command]
-pub fn clear_artwork_cache(app: tauri::AppHandle, db: tauri::State<Db>) -> Result<usize, String> {
+pub async fn clear_artwork_cache(
+    app: tauri::AppHandle,
+    db: tauri::State<'_, Db>,
+) -> Result<usize, String> {
     let dir = app_data(&app)?.join(DIR);
 
     {
@@ -289,16 +292,20 @@ pub fn clear_artwork_cache(app: tauri::AppHandle, db: tauri::State<Db>) -> Resul
             .map_err(to_string_err)?;
     }
 
-    let mut removed = 0;
-    if dir.exists() {
-        for entry in std::fs::read_dir(&dir).map_err(to_string_err)? {
-            let entry = entry.map_err(to_string_err)?;
-            if entry.path().is_file() && std::fs::remove_file(entry.path()).is_ok() {
-                removed += 1;
+    // Thousands of deletes, off the main thread.
+    crate::jobs::off_main(move || {
+        let mut removed = 0;
+        if dir.exists() {
+            for entry in std::fs::read_dir(&dir).map_err(to_string_err)? {
+                let entry = entry.map_err(to_string_err)?;
+                if entry.path().is_file() && std::fs::remove_file(entry.path()).is_ok() {
+                    removed += 1;
+                }
             }
         }
-    }
-    Ok(removed)
+        Ok(removed)
+    })
+    .await
 }
 
 #[cfg(test)]

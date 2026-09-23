@@ -109,12 +109,19 @@ fn is_within(inner: &str, outer: &str) -> bool {
     inner == outer || inner.starts_with(&format!("{outer}/"))
 }
 
+/// Async only for the folder check, which may be the first thing to wake a
+/// sleeping NAS; the database work after it is as quick as ever.
 #[tauri::command]
-pub fn add_library_root(db: tauri::State<Db>, path: String, kind: String) -> Result<i64, String> {
+pub async fn add_library_root(
+    db: tauri::State<'_, Db>,
+    path: String,
+    kind: String,
+) -> Result<i64, String> {
     if kind != "movies" && kind != "tv" {
         return Err(format!("unknown library kind: {kind}"));
     }
-    if !std::path::Path::new(&path).is_dir() {
+    let probe = path.clone();
+    if !crate::jobs::off_main(move || Ok(std::path::Path::new(&probe).is_dir())).await? {
         return Err(format!("not a directory: {path}"));
     }
 

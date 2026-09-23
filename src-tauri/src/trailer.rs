@@ -121,26 +121,28 @@ fn search_dir(dir: &Path) -> Option<PathBuf> {
 /// Searches the video's own directory, and — only for a season folder — the
 /// show directory above it, since a show's trailer usually sits at the top
 /// rather than inside Season 1.
+///
+/// Off the main thread: it lists folders on what is usually a NAS, and a share
+/// that has gone to sleep would otherwise freeze the window while it wakes.
 #[tauri::command]
-pub fn find_local_trailer(video_path: String) -> Result<Option<String>, String> {
-    let video = Path::new(&video_path);
-    let Some(dir) = video.parent() else {
-        return Ok(None);
-    };
+pub async fn find_local_trailer(video_path: String) -> Result<Option<String>, String> {
+    crate::jobs::off_main(move || Ok(local_trailer(Path::new(&video_path)))).await
+}
+
+fn local_trailer(video: &Path) -> Option<String> {
+    let dir = video.parent()?;
 
     if let Some(found) = search_dir(dir) {
-        return Ok(Some(found.display().to_string()));
+        return Some(found.display().to_string());
     }
 
     if looks_like_season_dir(dir) {
-        if let Some(parent) = dir.parent() {
-            if let Some(found) = search_dir(parent) {
-                return Ok(Some(found.display().to_string()));
-            }
+        if let Some(found) = dir.parent().and_then(search_dir) {
+            return Some(found.display().to_string());
         }
     }
 
-    Ok(None)
+    None
 }
 
 #[cfg(test)]

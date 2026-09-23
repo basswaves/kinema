@@ -18,7 +18,7 @@ import TitleDetailView from './TitleDetail';
 import Card from './Card';
 import FocusButton from './FocusButton';
 import Settings from './Settings';
-import { useClaimFocus } from './focus';
+import { installFocusWatchdog, useClaimFocus } from './focus';
 import { setShortcutsOpen } from './shortcutsState';
 import Player, { type PlaybackTarget } from '../player/Player';
 import {
@@ -41,6 +41,7 @@ initSpatial({
   visualDebug: false,
   useGetBoundingClientRect: true,
 });
+installFocusWatchdog();
 
 /** The nav entries, in order. Detail and player are reached, not navigated to. */
 type NavTarget = 'home' | 'search' | 'settings';

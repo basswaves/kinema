@@ -471,6 +471,31 @@ top-level view claims focus on arrival through `useClaimFocus` in
 The same applies at startup: nothing holds focus until something claims it, and
 a remote has no equivalent of a hover to bootstrap it.
 
+### …and a claim that succeeds can still be overwritten
+
+`useClaimFocus` did all of the above and a remote was *still* dead after every
+launch — found by `npm run dev:mock`, with the mouse untouched. Two library
+behaviours, neither visible in its API:
+
+- When a focused component unmounts, norigin restores focus to its **parent**,
+  **300 ms later** (`AUTO_RESTORE_FOCUS_DELAY`). When a whole view is replaced,
+  that parent has unmounted too. And `setFocus` is itself asynchronous, so a
+  claim started by a view about to disappear — the first-run panel, shown for
+  the instant before titles arrive — can finish after the next view's claim.
+  Either way the last word goes to a key that no longer exists.
+- A view that comes back re-registers its controls under the **same stable
+  keys** (`hero-play`). The dead key the system was left holding then "exists"
+  again, `doesFocusableExist` says yes, the view skips its claim — and no ring
+  is drawn, because the new component was never told it is focused. Coming
+  back from the player landed there.
+
+**Do:** judge liveness by what is on screen — no element has the `focused`
+class — not only by the key; look again after the restore window
+(`SECOND_LOOK_MS` in `src/ui/focus.ts`); and keep the watchdog there, which
+spends a navigation key pressed onto dead focus on putting focus back on the
+current view's landing spot. It logs `focus: recovered …` when it fires, so a
+new route into this state shows up in `app.log` instead of as a dead remote.
+
 ### `scrollIntoView({ block: 'nearest' })` is a no-op once on screen
 
 Which is what you want almost everywhere, and wrong for the top row. Arrowing

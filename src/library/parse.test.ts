@@ -47,3 +47,32 @@ describe('parseMediaFile', () => {
     expect(parsed.episodeLast).toBeNull();
   });
 });
+
+describe('a title from the show folder', () => {
+  /**
+   * The case that vanished: neither the file name nor its season folder has a
+   * title, so the file was saved untitled and appeared nowhere at all.
+   */
+  it('comes from the folder above a season folder', () => {
+    const parsed = parseMediaFile(file('S01E01.mkv', 'D:/TV/Show Name/Season 1'), 'tv', 'D:/TV');
+    expect(parsed.title).toBe('Show Name');
+    expect(parsed.season).toBe(1);
+    expect(parsed.episode).toBe(1);
+  });
+
+  /** Never from the library folder itself: "TV" is not a show. */
+  it('never climbs to the library folder', () => {
+    const parsed = parseMediaFile(file('S01E01.mkv', 'D:/TV/Season 1'), 'tv', 'D:/TV');
+    expect(parsed.title).toBeNull();
+    expect(parsed.needsAttention).toBe(true);
+  });
+
+  it('is not used when the file already names the show', () => {
+    const parsed = parseMediaFile(
+      file('Other.Show.S01E01.mkv', 'D:/TV/Show Name/Season 1'),
+      'tv',
+      'D:/TV'
+    );
+    expect(parsed.title).toBe('Other Show');
+  });
+});

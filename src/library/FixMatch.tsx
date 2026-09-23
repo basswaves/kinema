@@ -79,7 +79,11 @@ export default function FixMatch({ onChanged }: Props) {
   }, [reload]);
 
   const pending = useMemo(
-    () => groupFiles(files.filter((f) => NEEDS_REVIEW.has(f.match_status) && !f.missing)),
+    () =>
+      groupFiles(
+        files.filter((f) => NEEDS_REVIEW.has(f.match_status) && !f.missing),
+        { includeUntitled: true }
+      ),
     [files]
   );
 
@@ -277,8 +281,12 @@ function GroupRow({
   // not do is tell a first-time user what to *do*, and the queue only works if
   // people act on it. So each one gets a plain sentence in front of it, and
   // keeps its own wording underneath for anyone who wants it.
-  const reason = group.files.find((f) => f.match_reason)?.match_reason ?? 'not matched yet';
-  const advice = adviceFor(reason);
+  const reason = group.untitled
+    ? 'no title in the file name or its folders'
+    : (group.files.find((f) => f.match_reason)?.match_reason ?? 'not matched yet');
+  const advice = group.untitled
+    ? 'Kinema could not read a title from this file or the folders around it. Search for what it is below.'
+    : adviceFor(reason);
 
 
 

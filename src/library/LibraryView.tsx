@@ -25,14 +25,8 @@ import {
   type MediaFile,
   type ScanReport,
 } from './api';
-import {
-  clearParseError,
-  initParser,
-  lastParseError,
-  parseMediaFile,
-  selfTest,
-  toPayload,
-} from './parse';
+import { clearParseError, initParser, lastParseError, selfTest } from './parse';
+import { parseForLibrary } from './pipeline';
 import {
   artworkStats,
   cacheArtwork,
@@ -224,20 +218,6 @@ export default function LibraryView() {
     }
   }, [refresh]);
 
-  /** Longest matching root wins, so nested roots resolve predictably. */
-  const kindForPath = useCallback(
-    (path: string): LibraryKind => {
-      let best: LibraryRoot | null = null;
-      for (const root of roots) {
-        if (path.startsWith(root.path) && (!best || root.path.length > best.path.length)) {
-          best = root;
-        }
-      }
-      return best?.kind ?? 'movies';
-    },
-    [roots]
-  );
-
   const pickFolder = useCallback(
     async (kind: LibraryKind) => {
       setError(null);
@@ -279,7 +259,7 @@ export default function LibraryView() {
         const batch = await listUnparsed(PARSE_BATCH);
         if (batch.length === 0) break;
 
-        const payloads = batch.map((file) => toPayload(file, parseMediaFile(file, kindForPath(file.path))));
+        const payloads = batch.map((file) => parseForLibrary(file, roots));
         await saveParseResults(payloads);
 
         total += batch.length;
@@ -293,7 +273,7 @@ export default function LibraryView() {
     } finally {
       setBusy(null);
     }
-  }, [refresh, kindForPath]);
+  }, [refresh, roots]);
 
   const runReparse = useCallback(async () => {
     setBusy('Resetting…');

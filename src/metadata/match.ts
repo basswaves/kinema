@@ -51,14 +51,43 @@ export interface FileGroup {
   isSeries: boolean;
   files: MediaFile[];
   maxSeason: number | null;
+  /**
+   * No title could be read from the file name or any folder above it. Only
+   * the review queue asks for these (`includeUntitled`); there is nothing to
+   * search a provider for, so the matcher never sees them.
+   */
+  untitled?: boolean;
 }
 
-/** Group by parsed title so each distinct show/film is resolved once. */
-export function groupFiles(files: MediaFile[]): FileGroup[] {
+/**
+ * Group by parsed title so each distinct show/film is resolved once.
+ *
+ * `includeUntitled` makes a group of one for each file with no title at all,
+ * named after the file — for the review queue, which is the one place such a
+ * file can be seen and fixed by hand. They used to be skipped everywhere,
+ * so a file the parser could not name was in the library and on no screen.
+ */
+export function groupFiles(
+  files: MediaFile[],
+  { includeUntitled = false }: { includeUntitled?: boolean } = {}
+): FileGroup[] {
   const groups = new Map<string, FileGroup>();
 
   for (const file of files) {
-    if (!file.parsed_title) continue;
+    if (!file.parsed_title) {
+      if (includeUntitled) {
+        groups.set(`untitled::${file.id}`, {
+          key: `untitled::${file.id}`,
+          title: file.file_name.replace(/\.[^.]+$/, ''),
+          year: null,
+          isSeries: file.parsed_season !== null || file.parsed_episode !== null,
+          files: [file],
+          maxSeason: file.parsed_season,
+          untitled: true,
+        });
+      }
+      continue;
+    }
 
     // A series is identified by having episode numbering, not by which folder
     // it came from — a mislabelled root should not force the wrong provider.

@@ -193,13 +193,33 @@ function baseName(dir: string): string {
   return parts.length > 0 ? parts[parts.length - 1] : dir;
 }
 
+/** The directory above `dir`, or null at the top. */
+function parentOf(dir: string): string | null {
+  const parts = dir.split(/[\\/]/).filter(Boolean);
+  return parts.length > 1 ? parts.slice(0, -1).join('/') : null;
+}
+
+/** Comparable form of a path: separators unified, case folded, no trailing slash. */
+function comparablePath(path: string): string {
+  return path.replace(/[\\/]+/g, '/').replace(/\/$/, '').toLowerCase();
+}
+
 export interface ParsedFile extends Guess {
   from: 'file' | 'parent';
   /** True when neither source produced anything usable — needs attention. */
   needsAttention: boolean;
 }
 
-export function parseMediaFile(file: MediaFile, kind: LibraryKind): ParsedFile {
+/**
+ * `rootPath` is the library folder the file was found under. It bounds the
+ * climb to the show folder below: never to the library folder itself or above,
+ * because "TV" or "Serier" is not a show.
+ */
+export function parseMediaFile(
+  file: MediaFile,
+  kind: LibraryKind,
+  rootPath?: string
+): ParsedFile {
   const fromFile = runGuessit(file.file_name, kind);
   const fileScore = scoreGuess(fromFile, kind);
 
@@ -210,7 +230,27 @@ export function parseMediaFile(file: MediaFile, kind: LibraryKind): ParsedFile {
   // Prefer the filename on a tie: it is the more specific source, and for TV
   // it is usually the only thing carrying the episode number.
   const useParent = parentScore > fileScore;
-  const chosen = useParent ? fromParent : fromFile;
+  let chosen = useParent ? fromParent : fromFile;
+
+  // `Show/Season 1/S01E01.mkv`: the file name has only numbering and so has
+  // its folder, so neither yields a title — and an untitled file was saved,
+  // matched against nothing, and shown nowhere. The show is named one folder
+  // up. Only the title is taken from there; the numbering stays the file's.
+  let fromGrandparent = false;
+  if (!chosen.title) {
+    const grandparent = parentOf(file.parent_dir);
+    const insideRoot =
+      grandparent !== null &&
+      (rootPath === undefined ||
+        comparablePath(grandparent).startsWith(comparablePath(rootPath) + '/'));
+    if (grandparent !== null && insideRoot) {
+      const above = runGuessit(baseName(grandparent), kind);
+      if (scoreGuess(above, kind) > 0 && above.title) {
+        chosen = { ...chosen, title: above.title, year: chosen.year ?? above.year };
+        fromGrandparent = true;
+      }
+    }
+  }
 
   // Episode numbers live in the filename even when the title lives in the
   // folder, so merge rather than discarding one side entirely.
@@ -231,8 +271,8 @@ export function parseMediaFile(file: MediaFile, kind: LibraryKind): ParsedFile {
 
   return {
     ...merged,
-    from: useParent ? 'parent' : 'file',
-    needsAttention: Math.max(fileScore, parentScore) === 0,
+    from: useParent || fromGrandparent ? 'parent' : 'file',
+    needsAttention: !merged.title,
   };
 }
 

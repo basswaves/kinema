@@ -28,6 +28,8 @@ import {
   type DetectProgress,
   type LibraryKind,
   type LibraryRoot,
+  type MediaFile,
+  type ParseResultPayload,
 } from './api';
 import { clearParseError, initParser, lastParseError, parseMediaFile, toPayload } from './parse';
 import { cacheArtwork, listUnmatched } from '../metadata/api';
@@ -105,15 +107,26 @@ export function useScanStatus(): ScanStatus | null {
   return useSyncExternalStore(subscribeScan, getScanStatus);
 }
 
-/** Longest matching root wins, so nested roots resolve predictably. */
-function kindForPath(roots: LibraryRoot[], path: string): LibraryKind {
+/** The library folder a file was found under; the longest match wins. */
+function rootForPath(roots: LibraryRoot[], path: string): LibraryRoot | null {
   let best: LibraryRoot | null = null;
   for (const root of roots) {
     if (path.startsWith(root.path) && (!best || root.path.length > best.path.length)) {
       best = root;
     }
   }
-  return best?.kind ?? 'movies';
+  return best;
+}
+
+/**
+ * Parse one file as the library it lives in: that library's kind decides
+ * movie-or-episode, and its folder bounds how far up a title may be looked
+ * for. Shared by the scan and the developer tools so the two cannot differ.
+ */
+export function parseForLibrary(file: MediaFile, roots: LibraryRoot[]): ParseResultPayload {
+  const root = rootForPath(roots, file.path);
+  const kind: LibraryKind = root?.kind ?? 'movies';
+  return toPayload(file, parseMediaFile(file, kind, root?.path));
 }
 
 /**
@@ -184,7 +197,7 @@ export async function runScanPipeline(): Promise<ScanOutcome> {
       const batch = await listUnparsed(PARSE_BATCH);
       if (batch.length === 0) break;
       await saveParseResults(
-        batch.map((file) => toPayload(file, parseMediaFile(file, kindForPath(roots, file.path))))
+        batch.map((file) => parseForLibrary(file, roots))
       );
       filesParsed += batch.length;
       setStatus({ stage: 'parsing', detail: `${filesParsed} file(s)` });

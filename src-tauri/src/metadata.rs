@@ -592,10 +592,13 @@ pub fn set_title_trailer(
 /// to fetch 2,000 rows of eighteen columns and count them in the webview, which
 /// was both the largest payload in the app and quietly wrong past 2,000 files —
 /// the count and the queue would silently stop growing.
+///
+/// Files the parser could not name at all are included. They used to be
+/// excluded here *and* by the matcher, so such a file was in the library and
+/// on no screen anywhere; this queue is where it can be named by hand.
 const NEEDS_REVIEW_WHERE: &str = "
     WHERE (m.match_status IN ('parsed', 'unmatched')
-           AND m.missing = 0
-           AND m.parsed_title IS NOT NULL)
+           AND m.missing = 0)
        OR m.match_status = 'ignored'
      ORDER BY m.parsed_title, m.parsed_season, m.parsed_episode
      LIMIT ?1";
@@ -618,8 +621,7 @@ pub fn count_needs_review(db: tauri::State<Db>) -> Result<i64, String> {
     conn.query_row(
         "SELECT COUNT(*) FROM media_files
           WHERE match_status IN ('parsed', 'unmatched')
-            AND missing = 0
-            AND parsed_title IS NOT NULL",
+            AND missing = 0",
         [],
         |r| r.get(0),
     )

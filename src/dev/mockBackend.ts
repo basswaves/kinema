@@ -142,6 +142,7 @@ const files: FixtureFile[] = [
 
 const playback = new Map<number, { position: number; duration: number | null; completed: boolean; updated: number }>();
 const prefs = new Map<number, TitlePrefs>();
+const dismissed = new Map<number, number>();
 const settings = new Map<string, string>([['tmdb_api_key', 'fixture']]);
 let clock = 1000;
 
@@ -235,7 +236,9 @@ function continueWatching(): ContinueItem[] {
     seen.add(file.titleId);
     items.push(item(next, true, row.updated));
   }
-  return items.sort((a, b) => b.updated_at - a.updated_at);
+  return items
+    .filter((item) => !(dismissed.has(item.title_id) && item.updated_at <= dismissed.get(item.title_id)!))
+    .sort((a, b) => b.updated_at - a.updated_at);
 }
 
 function titleDetail(titleId: number): TitleDetail {
@@ -383,6 +386,10 @@ const handlers: Record<string, Handler> = {
     return null;
   },
   continue_watching: () => continueWatching(),
+  dismiss_continue: (a) => {
+    dismissed.set(num(a, 'titleId'), ++clock);
+    return null;
+  },
   next_episode: (a) => adjacent(num(a, 'fileId'), true),
   previous_episode: (a) => adjacent(num(a, 'fileId'), false),
   first_unwatched_episode: (a) => {

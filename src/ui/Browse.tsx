@@ -18,14 +18,14 @@ import TitleDetailView from './TitleDetail';
 import Card from './Card';
 import FocusButton from './FocusButton';
 import Settings from './Settings';
-import { installFocusWatchdog, useClaimFocus } from './focus';
+import { installFocusWatchdog, recoverFocusSoon, useClaimFocus } from './focus';
 import { setShortcutsOpen } from './shortcutsState';
 import Player, { type PlaybackTarget } from '../player/Player';
 import {
   continueWatching,
   episodeLabel,
   firstUnwatchedEpisode,
-  forgetProgress,
+  dismissContinue,
   type ContinueItem,
 } from '../player/api';
 import { cacheArtwork } from '../metadata/api';
@@ -345,13 +345,15 @@ export default function Browse() {
    */
   const removeResumable = useCallback(
     async (item: ContinueItem) => {
-      setResumable((current) => current.filter((i) => i.file_id !== item.file_id));
+      setResumable((current) => current.filter((i) => i.title_id !== item.title_id));
       try {
-        await forgetProgress(item.file_id);
+        await dismissContinue(item.title_id);
       } catch (e) {
         setError(String(e));
       }
       await load();
+      // The Remove button that was pressed has just gone with its card.
+      recoverFocusSoon();
     },
     [load]
   );

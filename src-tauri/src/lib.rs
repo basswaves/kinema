@@ -173,6 +173,7 @@ pub fn run() {
             playback::get_progress,
             playback::set_watched,
             playback::continue_watching,
+            playback::dismiss_continue,
             playback::next_episode,
             playback::previous_episode,
             playback::first_unwatched_episode,

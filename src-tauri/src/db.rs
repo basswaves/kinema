@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use std::path::Path;
 
 /// The schema this build understands. Bump it with every new `SCHEMA_V*`.
-pub const SCHEMA_VERSION: i64 = 9;
+pub const SCHEMA_VERSION: i64 = 10;
 
 /// What can go wrong opening the library.
 ///
@@ -345,6 +345,24 @@ CREATE TABLE analysed_segments (
 );
 "#;
 
+/// Schema version 10: titles taken out of Continue Watching by hand.
+///
+/// "Remove" used to delete the file's resume point. That did nothing at all
+/// for a "Next episode" card — there is no resume row to delete, it is derived
+/// from the last *finished* episode — and it turned a part-watched card into a
+/// "Next episode" card for the same show. A show you gave up on could never
+/// leave Home.
+///
+/// Recorded per title with a time, and honoured only against activity older
+/// than it: watching the show again brings it back, which is the one moment
+/// it should come back. The resume point itself is kept.
+const SCHEMA_V10: &str = r#"
+CREATE TABLE continue_dismissed (
+    title_id     INTEGER PRIMARY KEY REFERENCES titles(id) ON DELETE CASCADE,
+    dismissed_at INTEGER NOT NULL
+);
+"#;
+
 /// How long a statement waits for the write lock before giving up.
 ///
 /// Load-bearing from the moment there is more than one connection. SQLite
@@ -456,7 +474,7 @@ pub fn open_secondary(path: &Path) -> rusqlite::Result<Connection> {
 /// Every migration, in order. The index is the version it produces.
 const MIGRATIONS: [&str; SCHEMA_VERSION as usize] = [
     SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6, SCHEMA_V7, SCHEMA_V8,
-    SCHEMA_V9,
+    SCHEMA_V9, SCHEMA_V10,
 ];
 
 /// Bring the database up to [`SCHEMA_VERSION`].

@@ -115,14 +115,16 @@ export const setWatched = (fileId: number, watched: boolean) =>
   invoke<void>('set_watched', { fileId, watched });
 
 /**
- * Drop a file's resume point, taking it out of Continue Watching.
+ * Take a title out of Continue Watching until something of it is watched again.
  *
- * Deliberately the same operation as un-watching rather than a second command
- * beside it: the resume row *is* the history, so "stop offering me this" and
- * "forget where I was" cannot sensibly disagree. Naming it separately is only
- * so the call site reads as what the user asked for.
+ * This used to be "forget the resume point", on the reasoning that "stop
+ * offering me this" and "forget where I was" were the same thing. They are
+ * not: a "Next episode" card has no resume point to forget, so Remove did
+ * nothing to it, and forgetting a part-watched episode's position just turned
+ * its card into a "Next episode" card. The resume point is now kept.
  */
-export const forgetProgress = (fileId: number) => setWatched(fileId, false);
+export const dismissContinue = (titleId: number) =>
+  invoke<void>('dismiss_continue', { titleId });
 
 export const continueWatching = (limit: number) =>
   invoke<ContinueItem[]>('continue_watching', { limit });

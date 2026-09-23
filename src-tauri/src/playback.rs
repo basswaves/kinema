@@ -361,9 +361,62 @@ pub fn continue_watching(
         items.push(item);
     }
 
+    hide_dismissed(&conn, &mut items)?;
     items.sort_by_key(|item| std::cmp::Reverse(item.updated_at));
     items.truncate(limit.max(0) as usize);
     Ok(items)
+}
+
+/// Drop the cards for titles taken out of Continue Watching by hand, unless
+/// something has been watched since.
+///
+/// Compared against the card's own activity time, which for a "Next episode"
+/// card is the show's latest activity — so playing any episode of the show
+/// again brings it back, and nothing else does.
+fn hide_dismissed(
+    conn: &rusqlite::Connection,
+    items: &mut Vec<ContinueItem>,
+) -> Result<(), String> {
+    let mut stmt = conn
+        .prepare("SELECT dismissed_at FROM continue_dismissed WHERE title_id = ?1")
+        .map_err(to_string_err)?;
+    let mut keep = Vec::with_capacity(items.len());
+    for item in items.drain(..) {
+        let dismissed: Option<i64> = stmt
+            .query_row(params![item.title_id], |r| r.get(0))
+            .map(Some)
+            .or_else(|e| match e {
+                rusqlite::Error::QueryReturnedNoRows => Ok(None),
+                other => Err(to_string_err(other)),
+            })?;
+        if dismissed.is_none_or(|at| item.updated_at > at) {
+            keep.push(item);
+        }
+    }
+    *items = keep;
+    Ok(())
+}
+
+/// Take a title out of Continue Watching until it is watched again.
+///
+/// Deliberately not the same as forgetting progress, which is what "Remove"
+/// used to do: that could not remove a "Next episode" card at all, and turned a
+/// part-watched card into one. The resume point is kept, so opening the episode
+/// later still continues where it was.
+#[tauri::command]
+pub fn dismiss_continue(db: tauri::State<Db>, title_id: i64) -> Result<(), String> {
+    let conn = db.0.lock().map_err(to_string_err)?;
+    dismiss(&conn, title_id, now_secs())
+}
+
+fn dismiss(conn: &rusqlite::Connection, title_id: i64, at: i64) -> Result<(), String> {
+    conn.execute(
+        "INSERT INTO continue_dismissed (title_id, dismissed_at) VALUES (?1, ?2)
+         ON CONFLICT(title_id) DO UPDATE SET dismissed_at = excluded.dismissed_at",
+        params![title_id, at],
+    )
+    .map_err(to_string_err)?;
+    Ok(())
 }
 
 /// The episode either side of a given (season, episode) within one title.
@@ -546,7 +599,65 @@ pub fn set_title_prefs(
 
 #[cfg(test)]
 mod tests {
-    use super::{decode_episode_key, encode_episode_key, is_complete};
+    use super::{decode_episode_key, dismiss, encode_episode_key, hide_dismissed, is_complete};
+    use super::ContinueItem;
+
+    fn card(title_id: i64, updated_at: i64, next_up: bool) -> ContinueItem {
+        ContinueItem {
+            file_id: title_id * 10,
+            path: String::new(),
+            title_id,
+            title: String::new(),
+            kind: "series".into(),
+            season: Some(1),
+            episode: Some(1),
+            episode_name: None,
+            position_secs: 0.0,
+            duration_secs: None,
+            image_url: None,
+            image_path: None,
+            updated_at,
+            is_next_up: next_up,
+        }
+    }
+
+    fn library() -> rusqlite::Connection {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE continue_dismissed (title_id INTEGER PRIMARY KEY, dismissed_at INTEGER NOT NULL);",
+        )
+        .unwrap();
+        conn
+    }
+
+    /// The bug: Remove on a "Next episode" card came straight back, because
+    /// there was no resume row for it to delete.
+    #[test]
+    fn a_removed_next_episode_card_stays_removed() {
+        let conn = library();
+        dismiss(&conn, 1, 500).unwrap();
+        let mut items = vec![card(1, 400, true), card(2, 450, false)];
+        hide_dismissed(&conn, &mut items).unwrap();
+        assert_eq!(items.iter().map(|i| i.title_id).collect::<Vec<_>>(), vec![2]);
+    }
+
+    /// Watching the show again is what brings it back — and only that.
+    #[test]
+    fn watching_again_brings_it_back() {
+        let conn = library();
+        dismiss(&conn, 1, 500).unwrap();
+        let mut items = vec![card(1, 501, false)];
+        hide_dismissed(&conn, &mut items).unwrap();
+        assert_eq!(items.len(), 1);
+    }
+
+    #[test]
+    fn other_titles_are_untouched() {
+        let conn = library();
+        let mut items = vec![card(3, 10, false)];
+        hide_dismissed(&conn, &mut items).unwrap();
+        assert_eq!(items.len(), 1);
+    }
 
     /// The case that was broken, with the mock fixture's numbers: a 24-minute
     /// episode whose credits start at 22:10 (92.4%). "Play next" at 22:15 used

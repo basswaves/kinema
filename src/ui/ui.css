@@ -552,8 +552,16 @@ html {
  *
  * It keeps its space when invisible, so revealing it never shifts the rail.
  */
+/*
+ * The gap above Remove is load-bearing, not spacing. The body above it grows
+ * to 105% when focused, and the spatial library measures the *scaled* box: at
+ * 0.25rem the focused body's bottom edge sat 1px below Remove's top, so Down
+ * never counted Remove as "below" and jumped to the next rail — Remove was
+ * unreachable by remote. In rem so it keeps clear of the scaled body at TV
+ * scale too.
+ */
 .continue-remove {
-  margin-top: 0.25rem;
+  margin-top: 0.75rem;
   padding: 0.125rem 0.4375rem;
   border: none;
   border-radius: 999px;

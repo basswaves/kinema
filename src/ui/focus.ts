@@ -92,6 +92,23 @@ export function useClaimFocus(focusKey: string, ready: boolean): void {
   }, [focusKey, ready]);
 }
 
+/**
+ * Put focus back on the current view's landing spot if the control holding it
+ * has just gone away — after the library's own restore window, so it gets the
+ * first chance.
+ *
+ * For actions that remove the very control they were pressed on: Remove in
+ * Continue Watching takes its whole card with it, and the ring would otherwise
+ * be nowhere until the next key press woke the watchdog.
+ */
+export function recoverFocusSoon(): void {
+  window.setTimeout(() => {
+    if (!focusIsDead()) return;
+    const spot = [...landingSpots].reverse().find((key) => doesFocusableExist(key));
+    if (spot) void setFocus(spot);
+  }, SECOND_LOOK_MS);
+}
+
 const NAVIGATION_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter']);
 
 let watchdogInstalled = false;

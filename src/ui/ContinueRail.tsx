@@ -75,9 +75,12 @@ function ContinueCard({
   onResume: (i: ContinueItem) => void;
   onRemove: (i: ContinueItem) => void;
 }) {
+  // No `saveLastFocusedChild`: arriving at a card should always land on the
+  // card, never on the Remove button beneath it because that was the last
+  // thing touched there. Remembering it made Down from the hero go straight
+  // to Remove — one press from taking the show off Home by accident.
   const { ref, focusKey, hasFocusedChild } = useFocusable({
     trackChildren: true,
-    saveLastFocusedChild: true,
   });
 
   return (

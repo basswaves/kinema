@@ -536,6 +536,21 @@ image. The top row is the one place where the correct scroll position is
 absolute, not relative: see `scrollPageToTop` in `src/ui/focus.ts` and
 `keepInView="page-top"`.
 
+### A focus zoom can swallow the gap to the control below it
+
+Continue Watching's **Remove** sits below its card precisely so Down reaches it
+— and Down never did. The card grows to 105% when focused, and the spatial
+library measures the **scaled** box: the focused card's bottom edge ended 1 px
+below Remove's top, so Remove never counted as "below" and Down jumped to the
+next rail. The layout was right; the zoom ate a 4 px gap. Found by reading
+`focusableComponents[key].layout` in the mock, not by looking.
+
+**Do:** keep the gap to any neighbouring control larger than the zoom grows the
+focused element (half the scale excess of its size, per side), in `rem` so it
+holds at TV scale. And do not let a container of a card-plus-secondary-control
+`saveLastFocusedChild`: arriving should land on the card, not on Remove
+because it was touched last.
+
 ### A control overlaid on a card is unreachable, wherever you put it
 
 The corollary of the two entries above, and the one that decides layout. Spatial

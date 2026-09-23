@@ -256,6 +256,50 @@ function titleDetail(titleId: number): TitleDetail {
   };
 }
 
+// ---- events ---------------------------------------------------------------
+
+/**
+ * Event delivery, done here rather than by `mockIPC`'s `shouldMockEvents`.
+ *
+ * Tauri's own mock never removes a listener: `unlisten` sends `eventId`, and
+ * the mock's removal looks for `id` (@tauri-apps/api 2.11, mocks.js). Every
+ * listener ever registered therefore kept receiving events, each delivery to a
+ * callback the page had already discarded printed "Couldn't find callback id",
+ * and a test counting listeners or those warnings was measuring the mock.
+ */
+const eventListeners = new Map<string, number[]>();
+
+type Internals = { runCallback: (id: number, data: unknown) => void };
+
+function listen(event: string, handler: number): number {
+  const list = eventListeners.get(event) ?? [];
+  list.push(handler);
+  eventListeners.set(event, list);
+  return handler;
+}
+
+function unlisten(event: string, id: number): null {
+  const list = eventListeners.get(event) ?? [];
+  eventListeners.set(
+    event,
+    list.filter((handler) => handler !== id)
+  );
+  return null;
+}
+
+function emitEvent(event: string, payload: unknown): null {
+  const internals = (window as unknown as { __TAURI_INTERNALS__: Internals }).__TAURI_INTERNALS__;
+  for (const handler of [...(eventListeners.get(event) ?? [])]) {
+    internals.runCallback(handler, { event, id: handler, payload });
+  }
+  return null;
+}
+
+/** How many listeners each event has — for checking that nothing leaks. */
+export function listenerCounts(): Record<string, number> {
+  return Object.fromEntries([...eventListeners].map(([event, list]) => [event, list.length]));
+}
+
 // ---- the command table ----------------------------------------------------
 
 type Args = Record<string, unknown>;
@@ -336,6 +380,9 @@ const handlers: Record<string, Handler> = {
   selftest_plan: () => null,
 
   // plugins
+  'plugin:event|listen': (a) => listen(String(a.event), Number(a.handler)),
+  'plugin:event|unlisten': (a) => unlisten(String(a.event), Number(a.eventId)),
+  'plugin:event|emit': (a) => emitEvent(String(a.event), a.payload),
   'plugin:libmpv|init': () => fakeMpv.init((path) => files.find((f) => f.path === path)?.duration ?? 1500),
   'plugin:libmpv|command': (a) => fakeMpv.command(String(a.name), (a.args as unknown[]) ?? []),
   'plugin:libmpv|get_property': (a) => fakeMpv.getProperty(String(a.name)),
@@ -361,9 +408,13 @@ export function installMockBackend(): void {
       }
       return handler((payload ?? {}) as Args);
     },
-    { shouldMockEvents: true }
   );
   fakeMpv.exposeFakeMpv();
-  (window as unknown as { __kinemaMock: unknown }).__kinemaMock = { playback, settings, files };
+  (window as unknown as { __kinemaMock: unknown }).__kinemaMock = {
+    playback,
+    settings,
+    files,
+    listenerCounts,
+  };
   document.title = 'Kinema (mock backend)';
 }

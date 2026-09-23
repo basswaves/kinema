@@ -127,8 +127,8 @@ launched (dev or release). Settings → Developer tools → **Open log folder**.
 - `mpv.log` — mpv's own verbose log.
 
 Each launch starts both fresh and keeps the previous session as
-`app.previous.log` / `mpv.previous.log`. A failed upgrade's safety copies are
-in `…\com.kinema.appackups\`.
+`app.previous.log` / `mpv.previous.log`. The safety copies made before each
+database upgrade are in `%APPDATA%\com.kinema.app\backups\`.
 
 `mpv.log` is the authority on anything about rendering. It records what
 libplacebo *did*, not what it was asked to do: which shader passes ran, what

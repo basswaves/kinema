@@ -203,10 +203,23 @@ pub fn list_library_roots(db: tauri::State<Db>) -> Result<Vec<LibraryRoot>, Stri
 }
 
 /// Walk every configured root. Uses `ScanDb`, never `Db` — see the note there.
+///
+/// **Async, and the walk itself on a blocking thread.** A Tauri command that is
+/// not `async` runs on the main thread, the one that also serves every other
+/// request from the UI. This was such a command, and it runs at every launch:
+/// over a sleeping NAS the whole app waited behind it — the rails, a detail
+/// page, and the player, which asks for the resume point before it can load
+/// anything, with the window see-through the whole time.
 #[tauri::command]
-pub fn scan_library(db: tauri::State<ScanDb>) -> Result<ScanReport, String> {
-    let mut conn = db.0.lock().map_err(to_string_err)?;
-    scanner::scan_all(&mut conn).map_err(to_string_err)
+pub async fn scan_library(app: tauri::AppHandle) -> Result<ScanReport, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        use tauri::Manager;
+        let db = app.state::<ScanDb>();
+        let mut conn = db.0.lock().map_err(to_string_err)?;
+        scanner::scan_all(&mut conn).map_err(to_string_err)
+    })
+    .await
+    .map_err(to_string_err)?
 }
 
 /// Files awaiting a parse pass. The frontend runs guessit-js over these and

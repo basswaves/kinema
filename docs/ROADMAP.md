@@ -208,6 +208,24 @@ this order:
    link at 60 Hz, and does at 24 Hz — so step 4's refresh switching is also
    what makes 10-bit possible there, and this is where Kinema says so.
 
+   **Built (2026-09-25):** `outputCheck.ts` — five verdicts (picture size,
+   HDR, motion, colour depth, sound), each *native*, *info* (true, nothing to
+   change) or *limited* (with the fix), unit-tested — shown as "Output check"
+   at the top of the stats panel (`i`). The link's bits and encoding come from
+   the same vendor-neutral query as HDR (`link_of` → `screen_now`). "Even" uses
+   the mode switch's own `cadenceRank`, after a looser tolerance called a
+   monitor's 72 Hz mode at 800×600 a fit for 23.976 fps. Verified in the real
+   app on the second monitor (1:1, SDR, judder with "no mode that fits", then
+   "even — 25 fps on 50 Hz" after a switch). **Confirmed on the test TV
+   (automatic run, 2026-09-25):** with default settings it named the judder
+   (23.976 fps on 30 Hz), the 8-bit HDR link and the height sound lost through
+   Windows, each with its fix; with refresh, HDR and direct sound on, picture,
+   HDR, motion and sound all read native ("untouched DTS-HD → receiver"). The
+   link stayed 8-bit RGB even at 4K 23.976 Hz — the driver's colour-depth
+   setting, not bandwidth, which the check first blamed on the cable; it now
+   tells the two apart (above 30 Hz at 4K the cable, otherwise the driver).
+   **Step 5 is done.**
+
 Also in every step: the matching docs (GOTCHAS for traps, PLAN for decisions).
 
 ## Worth doing, in rough order of payoff

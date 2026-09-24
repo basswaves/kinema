@@ -287,6 +287,8 @@ export async function runSelfTest(plan: SelfTestPlan): Promise<void> {
   const report = {
     plan,
     probed,
+    // The stats panel as a viewer would read it, when a plan opened it (`i`).
+    stats: (document.querySelector('.stats-panel') as HTMLElement | null)?.innerText ?? null,
     finishedAfter: now(),
     final: { timePos: await read('time-pos'), duration: await read('duration') },
     // What the player itself reads, through the same code — so a report shows

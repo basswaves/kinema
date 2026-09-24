@@ -956,6 +956,42 @@ pub(crate) mod win {
         (state, Some(info.bitsPerColorChannel))
     }
 
+    /// The link to the screen as the driver set it up: colour encoding and
+    /// bits per channel. Vendor neutral — the same query as HDR. What says
+    /// "HDR at 8 bits", which at 4K 60 Hz over HDMI 2.0 is a bandwidth limit
+    /// rather than a setting anyone chose.
+    pub(crate) fn link_of(p: &DISPLAYCONFIG_PATH_INFO) -> (Option<u32>, Option<String>) {
+        let t = &p.targetInfo;
+        let mut info2 = AdvancedColorInfo2 {
+            header: header::<AdvancedColorInfo2>(GET_ADVANCED_COLOR_INFO_2, t.adapterId, t.id),
+            ..Default::default()
+        };
+        let (encoding, bits) = if unsafe { DisplayConfigGetDeviceInfo(&mut info2.header) } == 0 {
+            (info2.color_encoding, info2.bits_per_color_channel)
+        } else {
+            let mut info = DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO {
+                header: header::<DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO>(
+                    DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO,
+                    t.adapterId,
+                    t.id,
+                ),
+                ..Default::default()
+            };
+            if unsafe { DisplayConfigGetDeviceInfo(&mut info.header) } != 0 {
+                return (None, None);
+            }
+            (info.colorEncoding.0, info.bitsPerColorChannel)
+        };
+        let name = match encoding {
+            0 => "RGB",
+            1 => "YCbCr 4:4:4",
+            2 => "YCbCr 4:2:2",
+            3 => "YCbCr 4:2:0",
+            _ => "other",
+        };
+        (Some(bits).filter(|&b| b > 0), Some(name.to_string()))
+    }
+
     fn connection(tech: DISPLAYCONFIG_VIDEO_OUTPUT_TECHNOLOGY) -> String {
         match tech.0 {
             0 => "VGA",

@@ -35,8 +35,14 @@
  * The display half comes from the webview rather than from mpv: the panel can
  * measure the actual screen, which mpv only knows about indirectly.
  */
+import { invoke } from '@tauri-apps/api/core';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { getProperty } from 'tauri-plugin-libmpv-api';
 import { readProperty, type ScalarFormat } from './property';
+import { outputCheck, type OutputFacts } from './outputCheck';
+import { readSwitchSettings } from './displaySwitch';
+import { readAudioSettings, targetDevice } from './audioOutput';
+import { getEquipment, type DisplayMode } from './equipment';
 
 export interface StatRow {
   label: string;
@@ -301,6 +307,16 @@ export interface HdrFacts {
  * not exist, and treated no answer as tone mapping. The property is
  * `video-target-params`; no answer now says so rather than guessing.
  */
+/** What happened to the dynamic range, as one word — shared with the output check. */
+export function hdrOutcome(f: HdrFacts): OutputFacts['hdrOut'] {
+  if (!isHdr(f.sourceGamma)) return 'sdr';
+  if (!f.targetGamma) return 'unknown';
+  if (!isHdr(f.targetGamma)) return 'sdr';
+  const source = f.sourcePeak ?? 0;
+  const target = f.targetPeak ?? 0;
+  return source > 0 && target > 0 && target < source - 1 ? 'compressed' : 'passthrough';
+}
+
 export function describeHdr(f: HdrFacts): StatRow {
   if (!isHdr(f.sourceGamma)) {
     return {
@@ -451,6 +467,82 @@ function displayGroup(
   };
 }
 
+interface ScreenNowRaw {
+  width: number;
+  height: number;
+  hdr: 'unknown' | 'unsupported' | 'off' | 'on';
+  link_bits: number | null;
+  link_encoding: string | null;
+  modes: DisplayMode[];
+}
+
+/**
+ * The output check (step 5 of the native-output plan): a verdict per part of
+ * the chain, with the reason and the fix, at the top of the panel. The facts
+ * mpv knows come in from the caller; the rest — fullscreen, the screen and its
+ * link, the settings, the sound device — are gathered here. Any of them
+ * failing leaves that check out rather than the panel empty.
+ */
+async function readOutputCheck(from: {
+  source: OutputFacts['source'];
+  drawn: OutputFacts['drawn'];
+  fps: number | null;
+  displayHz: number | null;
+  hdrSource: boolean;
+  hdrOut: OutputFacts['hdrOut'];
+  codec: string | null;
+  outFormat: string | null;
+}): Promise<StatGroup | null> {
+  const [fullscreen, screen, switches, audioSettings, equipment, inCount, outCount] =
+    await Promise.all([
+      getCurrentWindow()
+        .isFullscreen()
+        .catch(() => false),
+      invoke<ScreenNowRaw>('screen_now').catch(() => null),
+      readSwitchSettings(),
+      readAudioSettings(),
+      getEquipment().catch(() => null),
+      readProperty<number>('audio-params/channel-count', 'int64'),
+      readProperty<number>('audio-out-params/channel-count', 'int64'),
+    ]);
+  const checks = outputCheck({
+    fullscreen,
+    source: from.source,
+    drawn: from.drawn,
+    screen: screen && {
+      width: screen.width,
+      height: screen.height,
+      hdr: screen.hdr,
+      linkBits: screen.link_bits,
+      linkEncoding: screen.link_encoding,
+      modes: screen.modes,
+    },
+    fps: from.fps,
+    displayHz: from.displayHz,
+    hdrSource: from.hdrSource,
+    hdrOut: from.hdrOut,
+    switches,
+    audio: {
+      codec: from.codec,
+      outFormat: from.outFormat,
+      inChannels: inCount,
+      outChannels: outCount,
+      direct: audioSettings.direct,
+      device: targetDevice(equipment, audioSettings.deviceId),
+    },
+  });
+  if (checks.length === 0) return null;
+  return {
+    heading: 'Output check',
+    rows: checks.map((c) => ({
+      label: c.label,
+      value: c.verdict === 'native' ? `✓ ${c.value}` : c.value,
+      note: [c.why, c.fix && `Fix: ${c.fix}`].filter(Boolean).join(' ') || undefined,
+      warn: c.verdict === 'limited',
+    })),
+  };
+}
+
 /**
  * One snapshot of the whole pipeline. Read sequentially rather than in
  * parallel: this crosses an FFI boundary that has already proved willing to
@@ -586,7 +678,26 @@ export async function readPlaybackStats(): Promise<StatGroup[]> {
 
   const downmixed = Boolean(inChannels && outChannels && inChannels !== outChannels);
 
+  const check = await readOutputCheck({
+    source: sourceW && sourceH ? { width: sourceW, height: sourceH } : null,
+    drawn: videoW && videoH ? { width: videoW, height: videoH } : null,
+    fps: displayedFps,
+    displayHz: displayFps,
+    hdrSource,
+    hdrOut: hdrOutcome({
+      sourceGamma: gamma,
+      targetGamma,
+      sourcePeak: maxLuma,
+      targetPeak,
+      toneMapping,
+      computePeak,
+    }),
+    codec: audioCodec,
+    outFormat,
+  });
+
   const groups: StatGroup[] = [
+    ...(check ? [check] : []),
     {
       heading: 'Source',
       rows: [

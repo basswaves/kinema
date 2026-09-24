@@ -46,6 +46,10 @@ pub struct ScreenNow {
     /// always the desktop mode (GPU scaling, or Windows confused; see
     /// `restore`).
     pub signal: Option<(u32, u32, f64)>,
+    /// Bits per colour channel on the link, and its encoding ("RGB",
+    /// "YCbCr 4:2:2", ...), as the driver set it up.
+    pub link_bits: Option<u32>,
+    pub link_encoding: Option<String>,
     pub hdr: HdrState,
     pub modes: Vec<Mode>,
 }
@@ -266,7 +270,7 @@ pub fn restore_after_crash(app: &tauri::AppHandle) {
 #[cfg(windows)]
 mod win {
     use super::ScreenNow;
-    use crate::equipment::win::{header, hdr_state, modes, path_for, signal_of};
+    use crate::equipment::win::{header, hdr_state, link_of, modes, path_for, signal_of};
     use crate::equipment::{rate_meaning, HdrState};
     use std::mem::size_of;
     use windows::core::PCWSTR;
@@ -302,6 +306,8 @@ mod win {
             rate: rate_meaning(dm.dmDisplayFrequency),
             exact_rate,
             signal: signal_of(gdi),
+            link_bits: path.as_ref().and_then(|p| link_of(p).0),
+            link_encoding: path.as_ref().and_then(|p| link_of(p).1),
             hdr,
             modes: list,
         })
@@ -432,20 +438,22 @@ mod signal_tests {
 mod tests {
     use super::win;
 
-    /// Switches the primary screen to 1080p at 23.976 Hz for four seconds and
-    /// back — the real thing, on real hardware. Ignored by default: it blanks
-    /// the screen twice. Run with `--ignored --nocapture` and the screen named
-    /// in `KINEMA_SWITCH_SCREEN` (default `\\.\DISPLAY1`).
+    /// Switches a real screen to 1080p at `KINEMA_SWITCH_HZ` (default 50) for
+    /// four seconds and back. Ignored by default: it blanks the screen twice.
+    /// Run with `--ignored --nocapture`; the screen is `KINEMA_SWITCH_SCREEN`,
+    /// by default `\\.\DISPLAY2` — the second screen, since the first is the
+    /// one somebody is usually using.
     #[test]
     #[ignore]
     fn switch_and_restore_a_real_screen() {
-        let gdi = std::env::var("KINEMA_SWITCH_SCREEN").unwrap_or_else(|_| r"\\.\DISPLAY1".into());
+        let gdi = std::env::var("KINEMA_SWITCH_SCREEN").unwrap_or_else(|_| r"\\.\DISPLAY2".into());
+        let hz: u32 = std::env::var("KINEMA_SWITCH_HZ").ok().and_then(|v| v.parse().ok()).unwrap_or(50);
         let before = win::screen_now(&gdi).unwrap();
         println!(
             "before: {}×{}@{} ({:?}), signal {:?}",
             before.width, before.height, before.hz, before.hdr, before.signal
         );
-        win::set_mode(&gdi, 1920, 1080, 23).unwrap();
+        win::set_mode(&gdi, 1920, 1080, hz).unwrap();
         std::thread::sleep(std::time::Duration::from_secs(4));
         let during = win::screen_now(&gdi).unwrap();
         println!(
@@ -460,7 +468,7 @@ mod tests {
         let after = win::screen_now(&gdi).unwrap();
         println!("after:  {}×{}@{}, signal {:?}", after.width, after.height, after.hz, after.signal);
         assert_eq!(after.signal.map(|s| (s.0, s.1)), before.signal.map(|s| (s.0, s.1)));
-        assert_eq!((during.width, during.height, during.hz), (1920, 1080, 23));
+        assert_eq!((during.width, during.height, during.hz), (1920, 1080, hz));
         assert_eq!((after.width, after.height, after.hz), (before.width, before.height, before.hz));
     }
 }

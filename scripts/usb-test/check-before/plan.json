@@ -1,0 +1,64 @@
+{
+  "titleId": null,
+  "path": "D:\\Media\\A 4K HDR10 film.mkv",
+  "openAfter": 4,
+  "probe": [
+    "display-fps",
+    "video-target-params/gamma",
+    "audio-out-params/format"
+  ],
+  "seconds": 20,
+  "actions": [
+    {
+      "at": 0.2,
+      "fn": "setSetting",
+      "do": "call",
+      "args": [
+        "display_switch_refresh",
+        "off"
+      ]
+    },
+    {
+      "at": 0.3,
+      "fn": "setSetting",
+      "do": "call",
+      "args": [
+        "display_switch_hdr",
+        "off"
+      ]
+    },
+    {
+      "at": 0.4,
+      "fn": "setSetting",
+      "do": "call",
+      "args": [
+        "display_switch_resolution",
+        "auto"
+      ]
+    },
+    {
+      "at": 0.5,
+      "fn": "setSetting",
+      "do": "call",
+      "args": [
+        "audio_direct",
+        "off"
+      ]
+    },
+    {
+      "at": 0.8,
+      "fn": "setFullscreen",
+      "do": "call",
+      "args": [
+        true
+      ]
+    },
+    {
+      "key": "i",
+      "at": 14,
+      "do": "key"
+    }
+  ],
+  "label": "Output check: check-before",
+  "fileId": null
+}

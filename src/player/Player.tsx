@@ -11,7 +11,15 @@
  * is the cover shown *before* a file's first frame, which exists precisely
  * because a transparent window with no frame up shows the desktop.
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react';
 import {
   doesFocusableExist,
   FocusContext,
@@ -30,10 +38,12 @@ import {
 } from 'tauri-plugin-libmpv-api';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import FocusButton from '../ui/FocusButton';
+import StatsPanel from './StatsPanel';
+import TrackPanel, { TRACK_PANEL_KEY } from './TrackPanel';
+import UpNextCard from './UpNextCard';
 import { setShortcutsOpen } from '../ui/shortcutsState';
 import { ensureMpvInitialised, OBSERVED_PROPERTIES } from './mpv';
 import {
-  describeTrack,
   findTrackByLang,
   readTracks,
   selectTrack,
@@ -62,6 +72,7 @@ import { readChapters, type Chapter } from './chapters';
 import { VIDEO_SYNC_KEY, VIDEO_SYNC_MODES } from './mpvOptions';
 import { readPlaybackStats, type StatGroup } from './stats';
 import { getSetting } from '../metadata/api';
+import { initialSession, reduce, samePath } from './session';
 
 export interface PlaybackTarget {
   path: string;
@@ -114,7 +125,6 @@ const TRANSPORT_SKIP_SECS = 30;
 const PLAYER_SHELL_KEY = 'player-shell';
 const PLAYER_PLAY_KEY = 'player-play';
 const PLAYER_TRACKS_KEY = 'player-tracks-button';
-const TRACK_PANEL_KEY = 'player-track-panel';
 
 /** The label an episode carries into the player, shared with the browsing UI. */
 function labelFor(episode: EpisodeRef): string {
@@ -132,10 +142,28 @@ function formatTime(seconds: number | null): string {
 }
 
 export default function Player({ target, onExit, onPlayTarget }: Props) {
-  const [paused, setPaused] = useState(false);
-  const [timePos, setTimePos] = useState<number | null>(null);
-  const [duration, setDuration] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  /**
+   * The life of the file mpv has open — loading, open, first frame, position,
+   * ended — as one state machine. See `session.ts`, and GOTCHAS for why the
+   * separate flags and ref mirrors it replaced kept disagreeing.
+   */
+  const [session, dispatch] = useReducer(reduce, target.path, initialSession);
+  const { timePos, duration, paused, error } = session;
+  /**
+   * The latest session, for the few places that cannot re-render to read it:
+   * the unmount save, the save interval, and the mpv listener's async work.
+   * Written in a layout effect, so it is current before any passive effect or
+   * cleanup reads it.
+   */
+  const sessionRef = useRef(session);
+  useLayoutEffect(() => {
+    sessionRef.current = session;
+  });
+  const fail = useCallback(
+    (e: unknown) =>
+      dispatch({ type: 'error', message: e instanceof Error ? e.message : String(e) }),
+    []
+  );
   const [osdVisible, setOsdVisible] = useState(true);
   const [tracks, setTracks] = useState<MpvTrack[]>([]);
   const [showTracks, setShowTracks] = useState(false);
@@ -145,38 +173,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   const [aid, setAid] = useState<number | null>(null);
   const [subVisible, setSubVisible] = useState(true);
   const [upNext, setUpNext] = useState<EpisodeRef | null>(null);
-  /**
-   * Whether the file mpv has open is the one `target` names.
-   *
-   * False from the moment a new target arrives until mpv reports `file-loaded`.
-   * Nothing derived from the playback position may be acted on in that window:
-   * `loadfile` is asynchronous, and `time-pos` is an observed property that
-   * keeps reporting the *outgoing* file until it completes. Comparing the new
-   * episode's markers against the old episode's position is how an Up next card
-   * appeared thirty seconds into a fresh episode and never went away.
-   */
-  const [fileReady, setFileReady] = useState(false);
-  /**
-   * The same flag, for the mpv event handlers.
-   *
-   * They are registered once and must not be re-registered whenever this
-   * changes — see GOTCHAS on observed properties. An end-of-file that arrives
-   * before the new file is open belongs to the *outgoing* one, and acting on it
-   * would mark the incoming episode finished and roll straight past it.
-   */
-  const fileReadyRef = useRef(false);
-  /**
-   * Whether this file's first frame is on screen. Until it is, the player
-   * draws a black cover — see `.player-cover` — because the window is
-   * transparent and, with no frame up yet, would show the desktop through the
-   * app. Set on mpv's `playback-restart` for this file; never left up for
-   * longer than `COVER_MAX_MS`.
-   */
-  const [frameShown, setFrameShown] = useState(false);
-  /** `file-loaded` has arrived for the current target — set synchronously. */
-  const sawFileLoaded = useRef(false);
   const [countdown, setCountdown] = useState<number | null>(null);
-  const [resumedFrom, setResumedFrom] = useState<number | null>(null);
   const [markers, setMarkers] = useState<SkipMarkers | null>(null);
   /**
    * The path the current `markers` were fetched for, once the fetch has
@@ -206,7 +203,6 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
    */
   const [osdFocus, setOsdFocus] = useState(false);
 
-  const seekingRef = useRef(false);
   const hideTimer = useRef<number | undefined>(undefined);
   /** Mirror of `osdFocus` for the callbacks that must not be rebuilt on it. */
   const osdFocusRef = useRef(false);
@@ -219,12 +215,8 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     saveLastFocusedChild: true,
     preferredChildFocusKey: PLAYER_PLAY_KEY,
   });
-  // Live values for the unmount save, which cannot read React state.
-  const latest = useRef({ position: 0, duration: null as number | null });
-  /** Resume position to apply once the file is actually open. */
+  /** The resume point handed to mpv with the load, for the toast once it opens. */
   const pendingSeek = useRef<number | null>(null);
-  /** Guards against handling the end of the same file twice. */
-  const endHandled = useRef(false);
   /** Segments already acted on automatically, so each is skipped once only. */
   const autoHandled = useRef(new Set<string>());
   /**
@@ -284,48 +276,30 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     let cancelled = false;
 
     /*
-     * Forget where the *previous* file was before loading this one.
-     *
-     * Everything that decides whether a skip fires is derived from `timePos`
-     * and `duration`, and mpv does not update either until the new file is
-     * genuinely open. Autoplaying from one episode to the next therefore leaves
-     * a window in which the position is near the end, the duration is the old
-     * file's, and the credits logic concludes that a file which has not started
-     * yet is finishing — flashing the Up next card seconds into the new
-     * episode.
-     *
-     * Nulling these is **not sufficient on its own**, and it took a real
-     * credits marker to expose that: `time-pos` is an *observed property*, so
-     * mpv pushes the outgoing file's position back in within milliseconds,
-     * before `loadfile` has taken effect. `fileReady` is the actual fix — see
-     * where it is set — and these stay because they are still what stops the
-     * seek bar and the clock showing the previous episode's numbers.
+     * A new session: forget everything about the previous file. Until this
+     * file is `open` (see session.ts), the position mpv keeps pushing is the
+     * outgoing file's and is ignored — that, not the reset, is what stops the
+     * credits logic concluding that an episode which has not started yet is
+     * finishing.
      *
      * Runs after the progress-save cleanup, which is declared later and has
      * already written the outgoing file's position by this point.
      */
+    dispatch({ type: 'load', path: target.path });
     /* eslint-disable react-hooks/set-state-in-effect */
-    setTimePos(null);
-    setDuration(null);
     setMarkers(null);
-    setFileReady(false);
-    fileReadyRef.current = false;
-    setFrameShown(false);
-    sawFileLoaded.current = false;
     // A card offering the *previous* file's next episode has no business
     // surviving into this one. Nothing else clears these: the countdown path
     // clears them when it advances, and every other route out left them set.
     setUpNext(null);
     setCountdown(null);
     /* eslint-enable react-hooks/set-state-in-effect */
-    latest.current = { position: 0, duration: null };
 
     (async () => {
       try {
         await ensureMpvInitialised();
         if (cancelled) return;
 
-        endHandled.current = false;
         pendingSeek.current = null;
 
         // Decide the resume point *before* loading, and hand it to mpv as part
@@ -358,14 +332,14 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         );
         await setProperty('pause', false);
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+        if (!cancelled) fail(e);
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [target.path, target.fileId]);
+  }, [target.path, target.fileId, fail]);
 
   /** Apply this title's remembered languages to the freshly loaded file. */
   const applyPrefs = useCallback(async () => {
@@ -435,7 +409,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
 
     // Mark it finished so it leaves Continue Watching rather than sitting
     // there at 99%.
-    const total = latest.current.duration;
+    const total = sessionRef.current.duration;
     if (total) await saveProgress(target.fileId, total, total).catch(() => undefined);
 
     try {
@@ -469,56 +443,53 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   });
 
   // ---- react to mpv events ------------------------------------------------
+  //
+  // One subscription for mpv's events, one for its observed properties, one
+  // poll — each registered once per player, each doing nothing but turning
+  // what mpv said into a session event. What that event *means* is decided in
+  // `session.ts`, which is where the rules about the outgoing file live.
   useEffect(() => {
     let disposed = false;
     let unlisten: (() => void) | undefined;
 
     listenEvents((event) => {
-      // The first frame of this file is up: the cover can come off. Only after
-      // `file-loaded`, so a restart belonging to the outgoing file cannot
-      // uncover the gap before the new one.
-      if (event.event === 'playback-restart' && sawFileLoaded.current) {
-        setFrameShown(true);
-      }
+      if (event.event === 'playback-restart') dispatch({ type: 'playback-restart' });
 
       if (event.event === 'file-loaded') {
-        sawFileLoaded.current = true;
+        dispatch({ type: 'file-loaded' });
         void (async () => {
-          // The resume point went to mpv with the load; say so on screen.
-          const resumed = pendingSeek.current;
-          pendingSeek.current = null;
-          if (resumed !== null) setResumedFrom(resumed);
+          const wanted = sessionRef.current.path;
           /*
            * Take the position and duration from mpv **by asking**, rather than
-           * waiting to be told.
-           *
-           * `file-loaded` and the property pushes arrive on the same channel,
-           * in order — but this handler is asynchronous (it awaits the resume
-           * seek), and pushes keep arriving while it waits:
-           * waiting for the next push can mean acting on the outgoing file's
-           * position for a tick, and *dropping* the pushes risks missing a
-           * `duration` that mpv only ever emits once per file. Reading both
-           * here is the only version that is neither a race nor a guess — this
-           * file is open, so these two values are its own.
+           * waiting to be told: pushes keep arriving while this runs, and
+           * `duration` may only be pushed once per file. And ask which file
+           * is open — a `file-loaded` from the outgoing episode can land just
+           * after the new one's reset, and taking its position as the new
+           * episode's is the bug GOTCHAS describes at length.
            */
+          let openPath: string | null = null;
+          let pos: number | null = null;
+          let len: number | null = null;
           try {
-            const [pos, len] = await Promise.all([
+            [openPath, pos, len] = await Promise.all([
+              (getProperty('path', 'string') as Promise<string | null>).catch(() => null),
               getProperty('time-pos', 'double') as Promise<number | null>,
               getProperty('duration', 'double') as Promise<number | null>,
             ]);
-            setTimePos(pos ?? 0);
-            setDuration(len);
-            latest.current = { position: pos ?? 0, duration: len };
           } catch (e) {
             console.warn('could not read position after load', e);
           }
-
-          // Ready *before* the rest, not after. Everything below is per-file
+          if (!samePath(openPath, wanted)) {
+            console.warn(`file-loaded for ${openPath}, not ${wanted}: left alone`);
+            return;
+          }
+          // The resume point went to mpv with the load; say so on screen.
+          const resumed = pendingSeek.current;
+          pendingSeek.current = null;
+          // Open *before* the rest, not after. Everything below is per-file
           // polish — track languages, frame timing, chapters — and any one of
-          // them throwing must not leave the file permanently unable to offer a
-          // Skip button. Placing this last is exactly how that happened.
-          fileReadyRef.current = true;
-          setFileReady(true);
+          // them throwing must not leave the file unable to offer a Skip button.
+          dispatch({ type: 'opened', path: openPath, timePos: pos, duration: len, resumedFrom: resumed });
 
           await latestHandlers.current.applyPrefs();
 
@@ -540,30 +511,22 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       // user leaving, which must not roll on to the next episode.
       if (event.event === 'end-file') {
         const reason = (event as { reason?: string }).reason;
-        if (reason === 'eof' && fileReadyRef.current && !endHandled.current) {
-          endHandled.current = true;
-          void latestHandlers.current.handlePlaybackEnded();
-        }
-        // `error` was dropped along with everything that was not `eof`, and it
-        // is the one that matters most: `loadfile` resolves as soon as mpv
-        // *accepts* the command, so a file that has been deleted, renamed or
-        // sits on a share that went away fails here and nowhere else. The
-        // result was a black screen reading `--:-- / --:--`, indistinguishable
-        // from a hang, with the explanation sitting in mpv.log.
+        if (reason === 'eof') dispatch({ type: 'eof' });
+        // `loadfile` resolves as soon as mpv *accepts* the command, so a file
+        // that has been deleted, renamed or sits on a share that went away
+        // fails here and nowhere else — without this, a black screen reading
+        // `--:-- / --:--`, indistinguishable from a hang.
         if (reason === 'error') {
           const detail = (event as { file_error?: string }).file_error;
-          setError(
-            detail
+          dispatch({
+            type: 'error',
+            message: detail
               ? `Could not play this file: ${detail}`
               : 'Could not play this file. It may have been moved or deleted, ' +
-                'or the drive it is on may be unavailable.'
-          );
-          // Reveal the controls and leave them up. Nothing is playing, so there
-          // is nothing for them to cover, and the Back button is the only way
-          // out that does not require knowing which key to press. Set directly
-          // rather than through `showOsd` so this effect's dependencies stay as
-          // they are — the mpv listener is registered once, and re-registering
-          // it is the trap in docs/GOTCHAS.md.
+                'or the drive it is on may be unavailable.',
+          });
+          // Reveal the controls and leave them up: nothing is playing, so there
+          // is nothing for them to cover, and Back is the way out.
           setOsdVisible(true);
         }
       }
@@ -586,41 +549,20 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     observeProperties(OBSERVED_PROPERTIES, ({ name, data }) => {
       switch (name) {
         case 'pause':
-          setPaused(data as boolean);
+          dispatch({ type: 'pause', value: data as boolean });
           break;
-        // Both are dropped until the new file is genuinely open, because until
-        // then they describe the *outgoing* one — mpv keeps reporting the file
-        // it still has loaded while `loadfile` is in flight. Nulling the state
-        // in the load effect cannot achieve this on its own: these pushes
-        // arrive milliseconds later and put the old values straight back.
-        // `file-loaded` reads both explicitly, so nothing is lost by ignoring
-        // them here.
         case 'time-pos':
-          if (fileReadyRef.current && !seekingRef.current) {
-            setTimePos(data as number | null);
-            latest.current.position = (data as number) ?? 0;
-          }
+          dispatch({ type: 'time-pos', value: data as number | null });
           break;
         case 'duration':
-          if (fileReadyRef.current) {
-            setDuration(data as number | null);
-            latest.current.duration = data as number | null;
-          }
+          dispatch({ type: 'duration', value: data as number | null });
           break;
+        // The real end-of-playback signal while keep-open holds the last frame.
         case 'eof-reached':
-          // The real end-of-playback signal while keep-open holds the last
-          // frame. Guarded because the property can report true more than once,
-          // and against the outgoing file — during a change of episode this is
-          // still reporting the previous one, which has genuinely ended.
-          if (data === true && fileReadyRef.current && !endHandled.current) {
-            endHandled.current = true;
-            void latestHandlers.current.handlePlaybackEnded();
-          }
+          if (data === true) dispatch({ type: 'eof' });
           break;
       }
     }).then((fn) => {
-      // Torn down before registration finished: remove it now, or it leaks
-      // and keeps receiving every event with a stale closure.
       if (disposed) fn();
       else unlisten = fn;
     });
@@ -631,28 +573,33 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   }, []);
 
   /**
-   * End-of-file detection by polling.
+   * End-of-file detection by polling as well.
    *
    * `eof-reached` is also observed, but observed properties are registered when
    * mpv initialises — which happens once per window. Adding one later has no
    * effect until the app restarts, and that silent dependency already cost a
-   * debugging round. Polling works regardless of when this code loads.
+   * debugging round. Polling works regardless of when this code loads; the
+   * session ignores the repeats.
    */
   useEffect(() => {
     const id = window.setInterval(async () => {
-      if (endHandled.current) return;
+      if (sessionRef.current.ended) return;
       try {
-        const eof = await getProperty('eof-reached', 'flag');
-        if (eof === true) {
-          endHandled.current = true;
-          void latestHandlers.current.handlePlaybackEnded();
-        }
+        if ((await getProperty('eof-reached', 'flag')) === true) dispatch({ type: 'eof' });
       } catch {
         /* property unavailable while idle — nothing to do */
       }
     }, 1000);
     return () => window.clearInterval(id);
   }, []);
+
+  /**
+   * The file ended — once per session, whichever of the three signals said so
+   * first, or because its credits were skipped.
+   */
+  useEffect(() => {
+    if (session.ended) void latestHandlers.current.handlePlaybackEnded();
+  }, [session.ended, session.seq]);
 
   // ---- intro / credits skip ------------------------------------------------
 
@@ -791,7 +738,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   const introSource = resolved.markers?.intro_source ?? null;
   const creditsSource = resolved.creditsSource;
   useEffect(() => {
-    if (!fileReady || markersFor !== target.path) return;
+    if (!session.open || markersFor !== target.path) return;
     const id = window.setTimeout(() => {
       console.log(
         `markers for ${target.path}: intro from ${introSource ?? 'none'}, ` +
@@ -799,14 +746,15 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       );
     }, MARKER_LOG_SETTLE_MS);
     return () => window.clearTimeout(id);
-  }, [fileReady, markersFor, target.path, introSource, creditsSource]);
+  }, [session.open, markersFor, target.path, introSource, creditsSource]);
 
-  // Gated on `fileReady`, which is the whole defence against acting on the
-  // outgoing file's position. One check here covers everything downstream: the
-  // Skip button, automatic mode, and the Up next offer all derive from `active`.
+  // Gated on the file being open, which is the whole defence against acting on
+  // the outgoing file's position. One check here covers everything downstream:
+  // the Skip button, automatic mode, and the Up next offer all derive from
+  // `active`.
   const active = useMemo(
-    () => (fileReady ? activeSkip(resolved.markers, timePos) : null),
-    [fileReady, resolved.markers, timePos]
+    () => (session.open ? activeSkip(resolved.markers, timePos) : null),
+    [session.open, resolved.markers, timePos]
   );
   const activeKey = active?.key ?? null;
   /** The credits segment is the tail guess, not a marker or a chapter. */
@@ -819,17 +767,16 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       // Not dismissed: the seek itself takes the position past the intro, so
       // the button goes by itself — and seeking back into the intro brings it
       // back, which is what a remembered dismissal used to prevent.
-      await command('seek', [active.seekTo, 'absolute']).catch((e) => setError(String(e)));
+      await command('seek', [active.seekTo, 'absolute']).catch(fail);
       showOsd();
-    } else if (!endHandled.current) {
+    } else {
       setDismissed(active.key);
       // Credits: end the episode early rather than seeking. That routes into
       // the same up-next flow as a natural end, so there is one path to the
       // next episode instead of two that can disagree.
-      endHandled.current = true;
-      await handlePlaybackEnded();
+      dispatch({ type: 'end-early' });
     }
-  }, [active, handlePlaybackEnded, showOsd]);
+  }, [active, showOsd, fail]);
 
   // Automatic mode. The guard set makes this idempotent, which matters because
   // `active` is a fresh object on every position tick.
@@ -932,14 +879,16 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     if (target.fileId === null) return;
     const fileId = target.fileId;
 
+    // Only a file that is open has a position of its own worth saving.
+    const current = () => {
+      const { open, timePos: position, duration: total } = sessionRef.current;
+      return { position: open ? (position ?? 0) : 0, total };
+    };
+
     const id = window.setInterval(() => {
-      if (latest.current.position > 0) {
-        void saveProgress(
-          fileId,
-          latest.current.position,
-          latest.current.duration,
-          countedCreditsStart.current
-        ).catch(
+      const { position, total } = current();
+      if (position > 0) {
+        void saveProgress(fileId, position, total, countedCreditsStart.current).catch(
           () => undefined
         );
       }
@@ -947,10 +896,10 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
 
     return () => {
       window.clearInterval(id);
-      // Reading the ref's *latest* value at cleanup is the point here: this is
-      // a mutable value holder for the current playback position, not a DOM
-      // node. Copying it into the effect would save a stale position.
-      const { position, duration: total } = latest.current;
+      // Reading the ref's *latest* value at cleanup is the point here: the
+      // session has not been reset for the next file yet, so this is still the
+      // outgoing file's position. Copying it into the effect would be stale.
+      const { position, total } = current();
       if (position > 0) {
         void saveProgress(fileId, position, total, countedCreditsStart.current).catch(
           () => undefined
@@ -962,10 +911,10 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   // The cover never outstays its purpose: if no first frame is reported in
   // time — a file with no video, an event that never comes — it goes anyway.
   useEffect(() => {
-    if (frameShown) return;
-    const id = window.setTimeout(() => setFrameShown(true), COVER_MAX_MS);
+    if (session.frameShown) return;
+    const id = window.setTimeout(() => dispatch({ type: 'cover-timeout' }), COVER_MAX_MS);
     return () => window.clearTimeout(id);
-  }, [frameShown, target.path]);
+  }, [session.frameShown, session.seq]);
 
   // Stop playback when leaving, so audio does not continue behind the UI.
   useEffect(() => {
@@ -1032,16 +981,16 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       await setProperty('pause', !current);
       showOsd();
     } catch (e) {
-      setError(String(e));
+      fail(e);
     }
-  }, [showOsd]);
+  }, [showOsd, fail]);
 
   const seekRelative = useCallback(
     async (delta: number) => {
-      await command('seek', [delta, 'relative']).catch((e) => setError(String(e)));
+      await command('seek', [delta, 'relative']).catch(fail);
       showOsd();
     },
-    [showOsd]
+    [showOsd, fail]
   );
 
   const toggleFullscreen = useCallback(async () => {
@@ -1096,10 +1045,10 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           });
         }
       } catch (e) {
-        setError(String(e));
+        fail(e);
       }
     },
-    [target.titleId]
+    [target.titleId, fail]
   );
 
   // ---- keyboard -----------------------------------------------------------
@@ -1336,13 +1285,13 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         void toggleFullscreen();
       }}
     >
-      {!frameShown && <div className="player-cover" aria-hidden="true" />}
+      {!session.frameShown && <div className="player-cover" aria-hidden="true" />}
 
       {error && <div className="player-error">{error}</div>}
 
-      {resumedFrom !== null && (
-        <div className="resume-toast" onAnimationEnd={() => setResumedFrom(null)}>
-          Resumed from {formatTime(resumedFrom)}
+      {session.resumedFrom !== null && (
+        <div className="resume-toast" onAnimationEnd={() => dispatch({ type: 'resume-shown' })}>
+          Resumed from {formatTime(session.resumedFrom)}
         </div>
       )}
 
@@ -1353,50 +1302,24 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         <span className="player-label">{target.label}</span>
       </div>
 
-      {/* Two states, one card. With a countdown the file has genuinely ended
-          and the next episode is coming either way; without one the credits
-          have merely started and the video is still running underneath, so the
-          card offers rather than announces. */}
       {upNext && (
-        <div className="up-next">
-          <div className="up-next-body">
-            <div className="up-next-label">Up next</div>
-            <div className="up-next-title">
-              S{String(upNext.season).padStart(2, '0')}E{String(upNext.episode).padStart(2, '0')}
-              {upNext.name ? ` · ${upNext.name}` : ''}
-            </div>
-            <div className="up-next-actions">
-              <FocusButton className="btn-primary" onSelect={() => setCountdown(0)}>
-                {countdown !== null ? `▶ Play now (${countdown})` : '▶ Play next'}
-              </FocusButton>
-              {countdown !== null ? (
-                <FocusButton
-                  className="btn-secondary"
-                  onSelect={() => {
-                    setCountdown(null);
-                    setUpNext(null);
-                    void exit();
-                  }}
-                >
-                  Back to library
-                </FocusButton>
-              ) : (
-                <FocusButton
-                  className="btn-secondary"
-                  onSelect={() => {
-                    // Refuse the offer for the rest of this file. Dismissing by
-                    // segment rather than by a flag also silences the small
-                    // credits prompt, which would otherwise take its place.
-                    setUpNext(null);
-                    if (activeKey) setDismissed(activeKey);
-                  }}
-                >
-                  Keep watching
-                </FocusButton>
-              )}
-            </div>
-          </div>
-        </div>
+        <UpNextCard
+          episode={upNext}
+          countdown={countdown}
+          onPlay={() => setCountdown(0)}
+          onLeave={() => {
+            setCountdown(null);
+            setUpNext(null);
+            void exit();
+          }}
+          onKeepWatching={() => {
+            // Refuse the offer for the rest of this file. Dismissing by
+            // segment rather than by a flag also silences the small credits
+            // prompt, which would otherwise take its place.
+            setUpNext(null);
+            if (activeKey) setDismissed(activeKey);
+          }}
+        />
       )}
 
       {skipPrompt && (
@@ -1408,32 +1331,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       {/* Deliberately outside the OSD: the panel is for watching numbers move
           while the video plays, so hiding it with the idle timer would defeat
           the one thing it is for. */}
-      {showStats && (
-        <aside className="stats-panel">
-          <div className="stats-head">
-            <span>Stats for nerds</span>
-            <FocusButton onSelect={() => setShowStats(false)}>close</FocusButton>
-          </div>
-          {stats.length === 0 && <div className="stats-empty">reading…</div>}
-          {stats.map((group) => (
-            <section
-              key={group.heading}
-              className={`stats-group ${group.wideLabels ? 'wide-labels' : ''}`}
-            >
-              <h3>{group.heading}</h3>
-              {group.rows.map((row) => (
-                <div key={row.label} className={`stats-row ${row.warn ? 'warn' : ''}`}>
-                  <span className="stats-label">{row.label}</span>
-                  <span className="stats-value">
-                    {row.value}
-                    {row.note && <em className="stats-note">{row.note}</em>}
-                  </span>
-                </div>
-              ))}
-            </section>
-          ))}
-        </aside>
-      )}
+      {showStats && <StatsPanel stats={stats} onClose={() => setShowStats(false)} />}
 
       {showTracks && (
         <TrackPanel
@@ -1457,13 +1355,13 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
             max={100}
             step={0.05}
             value={progress}
-            onMouseDown={() => (seekingRef.current = true)}
+            onMouseDown={() => dispatch({ type: 'scrub-start' })}
             onChange={(e) => {
               const pct = Number(e.target.value);
-              if (duration) setTimePos((pct / 100) * duration);
+              if (duration) dispatch({ type: 'scrub', timePos: (pct / 100) * duration });
             }}
             onMouseUp={(e) => {
-              seekingRef.current = false;
+              dispatch({ type: 'scrub-end' });
               const pct = Number((e.target as HTMLInputElement).value);
               if (duration) void command('seek', [(pct / 100) * duration, 'absolute']);
             }}
@@ -1532,88 +1430,6 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         </div>
       </div>
     </div>
-    </FocusContext.Provider>
-  );
-}
-
-/**
- * Audio and subtitle selection.
- *
- * A component of its own because `useFocusable` reads the focus context of the
- * component it is *called in*: declaring this container up in `Player` would
- * read `Player`'s own context — the root — and make the panel a **sibling** of
- * the player shell rather than a child of it. The markup would look nested and
- * the focus tree would be flat, which is the trap in docs/GOTCHAS.md that cost a
- * debugging round in the browsing UI.
- *
- * This is the panel that most justifies the whole focus mode: on a library with
- * mixed audio and subtitle languages it is the control reached most often, and
- * until now a remote could not reach it at all.
- */
-function TrackPanel({
-  audioTracks,
-  subTracks,
-  aid,
-  sid,
-  subVisible,
-  onChoose,
-  onClose,
-}: {
-  audioTracks: MpvTrack[];
-  subTracks: MpvTrack[];
-  aid: number | null;
-  sid: number | null;
-  subVisible: boolean;
-  onChoose: (kind: 'sid' | 'aid', track: MpvTrack | null) => void;
-  onClose: () => void;
-}) {
-  const { ref, focusKey } = useFocusable({
-    focusKey: TRACK_PANEL_KEY,
-    trackChildren: true,
-    saveLastFocusedChild: true,
-  });
-
-  return (
-    <FocusContext.Provider value={focusKey}>
-      <aside className="track-panel" ref={ref}>
-        <div className="track-panel-head">
-          <span>Audio</span>
-          <FocusButton onSelect={onClose}>close</FocusButton>
-        </div>
-        {audioTracks.length === 0 && <div className="track-empty">no audio tracks</div>}
-        {audioTracks.map((track) => (
-          <FocusButton
-            key={track.id}
-            className={`track-option ${aid === track.id ? 'active' : ''}`}
-            keepInView="nearest"
-            onSelect={() => onChoose('aid', track)}
-          >
-            {describeTrack(track)}
-          </FocusButton>
-        ))}
-
-        <div className="track-panel-head">
-          <span>Subtitles</span>
-        </div>
-        <FocusButton
-          className={`track-option ${!subVisible ? 'active' : ''}`}
-          keepInView="nearest"
-          onSelect={() => onChoose('sid', null)}
-        >
-          Off
-        </FocusButton>
-        {subTracks.map((track) => (
-          <FocusButton
-            key={track.id}
-            className={`track-option ${subVisible && sid === track.id ? 'active' : ''}`}
-            keepInView="nearest"
-            onSelect={() => onChoose('sid', track)}
-          >
-            {describeTrack(track)}
-          </FocusButton>
-        ))}
-        <p className="track-note">Remembered for this show.</p>
-      </aside>
     </FocusContext.Provider>
   );
 }

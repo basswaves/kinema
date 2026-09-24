@@ -157,6 +157,8 @@ export function setProperty(name: string, value: unknown): null {
  */
 export function getProperty(name: string): unknown {
   switch (name) {
+    case 'path':
+      return state.path;
     case 'time-pos':
       return state.path === null ? null : state.position;
     case 'duration':

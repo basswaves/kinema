@@ -1315,6 +1315,17 @@ thing is never copied between copies: `duration_secs`, which TheIntroDB is
 asked with to tell releases apart. Rehearsed on a copy of the real library:
 all 84 matched records carried over.
 
+**The player's per-file life is one state machine.** `session.ts` owns
+loading, open, first frame, position, pause, scrubbing and ended, and every mpv
+event or user action that touches them is an event it reduces. It replaced a
+dozen `useState`s and the refs that mirrored them for the mpv listeners —
+`fileReady`/`fileReadyRef`, `frameShown`/`sawFileLoaded`, `endHandled`,
+`seekingRef`, `latest` — whose tick-long disagreements were most of the player
+section of GOTCHAS. The rules are now unit tests (`session.test.ts`). Skip
+markers, the Up next offer and the countdown stay outside it: they are derived
+from the session, not part of the file's life, and moving them would have been
+churn without a failure behind it. The panels moved to their own files.
+
 **Testing is done without the owner.** `npm run dev:mock` and
 `scripts/selftest.ps1` exist so every change can be checked — keyboard-only in
 a browser against a fake mpv, and in the real app against a copy of the real

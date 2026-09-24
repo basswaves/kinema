@@ -130,25 +130,34 @@ segment read as active, and the Up next card was raised. Nothing ever lowered
 it, because the offer effect only ever *sets* — so the card sat on top of a
 freshly started episode for its entire duration.
 
-**Do:** gate on whether the file mpv has open is the one you think it is.
-`fileReady` goes false on a target change and true on `file-loaded`, and
-`active` returns null until then — one check covering the Skip button, automatic
-mode and the Up next offer. The event handlers use a **ref** of the same flag,
-because re-registering mpv listeners to pick up a state change is its own
-gotcha, three entries above.
+**Do:** gate on whether the file mpv has open is the one you think it is. In
+`session.ts` that is `open`: false on a new target, true only once this file's
+own position has been read — and `active` returns null until then, one check
+covering the Skip button, automatic mode and the Up next offer. It lives in a
+reducer, not in React state plus a ref mirror for the mpv handlers: the mirror
+is how the two used to disagree for a tick.
 
-**That flag is not enough on its own either**, and the second attempt is the
-instructive one. `file-loaded` and the property observer are **two different
-Tauri channels**, so their order against each other is not guaranteed: the flag
-flipped true while the last `time-pos` push still described the outgoing file,
-which is a one-tick window that fires reliably on every episode change.
+**The flag is not enough on its own either**, and the second attempt is the
+instructive one. `file-loaded` and the property pushes arrive **on one channel,
+in order** (an earlier version of this entry said two channels; the plugin's
+source says otherwise) — but the `file-loaded` handler is asynchronous, and
+pushes keep arriving while it awaits, so the flag flipped true while the last
+push still described the outgoing file.
 
 **Do:** on `file-loaded`, *ask* for `time-pos` and `duration` with `getProperty`
-rather than waiting to be told, and ignore the observer entirely until the flag
-is true. Dropping the pushes alone is not safe — `duration` may only be emitted
+rather than waiting to be told, and ignore the pushes entirely until the file
+is open. Dropping the pushes alone is not safe — `duration` may only be emitted
 once per file, and a dropped one never comes back.
 
-**And set the flag early in that handler, not late.** It was placed after
+**And ask for `path` as well.** A `file-loaded` from the *outgoing* file can
+land just after the new target's reset — press Next twice while an episode is
+loading — and taking its position as the new episode's is the original bug by
+another route. `session.ts` refuses an `opened` whose path is not the target's
+(compared case- and separator-blind; an unreadable path is let through, since
+refusing it would leave the file never able to open). Seen in the mock: the
+log says `file-loaded for …E03, not …E04: left alone`.
+
+**And open it early in that handler, not late.** It was placed after
 `applyPrefs`, the `video-sync` write and `readChapters`, so any one of them
 throwing left the file permanently unable to raise a Skip button — with no error
 visible anywhere except a missing button.

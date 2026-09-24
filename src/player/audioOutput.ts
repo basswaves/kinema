@@ -211,3 +211,46 @@ export async function silencedAudioTrack(preferred: number | null): Promise<numb
     audio[0]
   ).id;
 }
+
+// ---- the one-time offer ---------------------------------------------------------
+
+/** Set once the offer has been answered either way; it is never made again. */
+export const AUDIO_DIRECT_OFFERED_KEY = 'audio_direct_offered';
+
+export interface DirectSoundOffer {
+  device: string;
+  /** The lossless formats the device said yes to, by name. */
+  formats: string[];
+}
+
+/**
+ * Whether to offer "straight to the receiver" before this film — once, ever,
+ * and only where it would make a difference a person can hear: the device
+ * takes TrueHD or DTS-HD, which through Windows lose their Atmos and DTS:X.
+ * Never when it is already on (2026-09-24: no prompt on every film, and
+ * none at all for someone who has already chosen).
+ */
+export function offerFor(
+  settings: AudioSettings,
+  alreadyOffered: boolean,
+  device: AudioDevice | null
+): DirectSoundOffer | null {
+  if (settings.direct || alreadyOffered || !device) return null;
+  const lossless = device.bitstream.filter(
+    (b) => (b.codec === 'truehd' || b.codec === 'dts-hd') && b.result === 'yes'
+  );
+  if (lossless.length === 0) return null;
+  // "Dolby TrueHD", not "Dolby TrueHD (incl. Atmos)": the offer says what the
+  // formats carry in a sentence of its own.
+  const name = (label: string) => label.replace(/ \(incl\. [^)]*\)$/, '');
+  return { device: device.name, formats: lossless.map((b) => name(b.label)) };
+}
+
+export async function directSoundOffer(): Promise<DirectSoundOffer | null> {
+  const [settings, offered, equipment] = await Promise.all([
+    readAudioSettings(),
+    getSetting(AUDIO_DIRECT_OFFERED_KEY),
+    getEquipment().catch(() => null),
+  ]);
+  return offerFor(settings, Boolean(offered), targetDevice(equipment, settings.deviceId));
+}

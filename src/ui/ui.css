@@ -1372,6 +1372,50 @@ html {
   background: rgba(218, 54, 51, 0.92);
 }
 
+/* The one-time direct-sound offer, over the browsing view that pressed Play.
+   The browsing views paint their own background, so an opaque-ish backdrop is
+   fine here; it never appears over the player. */
+.offer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--gutter);
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.offer-card {
+  max-width: 40rem;
+  padding: 1.75rem 2rem;
+  border-radius: 0.75rem;
+  background: #16161a;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+
+.offer-card h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.25rem;
+}
+
+.offer-card p {
+  margin: 0 0 0.875rem;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+}
+
+.offer-card p.muted {
+  font-size: 0.8125rem;
+}
+
+.offer-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
 /* Settings → Your equipment. A plain list: it is read, not operated. */
 .equipment-item {
   margin: 0 0 1rem;

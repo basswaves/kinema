@@ -127,9 +127,12 @@ this order:
    a staged mid-film failure recovered in under two seconds. **Verified on
    the test receiver (USB round 3):** DTS-HD MA and TrueHD went out as
    `spdif-dtshd` / `spdif-truehd` in exclusive mode and the receiver's display
-   named each correctly. **Not built yet:**
-   the offer-once prompt — to sit before a film starts, where the remote works
-   normally, rather than inside the player's focus handling.
+   named each correctly. **The offer-once prompt** sits before a film starts
+   (`DirectSoundOffer.tsx`, from `startPlayback` in `Browse.tsx`), where the
+   remote works normally, rather than inside the player's focus handling: a
+   focus boundary that takes focus itself, Back cancels without answering,
+   either answer is final. Driven keyboard-only in `dev:mock`. **Step 3 is
+   done.**
 
    **Spatial sound, as of USB round 2:** confirmed that with Atmos for home
    theater on, every film plays silent (`0x887C0077` on `Initialize`, twice

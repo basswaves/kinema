@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { AudioDevice, Equipment, Probe } from './equipment';
-import { channelsFor, mpvDeviceName, planAudio, targetDevice, type AudioSettings } from './audioOutput';
+import {
+  channelsFor,
+  mpvDeviceName,
+  offerFor,
+  planAudio,
+  targetDevice,
+  type AudioSettings,
+} from './audioOutput';
 
 const CODECS = ['ac3', 'eac3', 'dts', 'dts-hd', 'truehd'];
 
@@ -116,5 +123,35 @@ describe('targetDevice', () => {
   it("falls back to Windows' default when the chosen one is unplugged", () => {
     expect(targetDevice(eq, 'c')?.id).toBe('b');
     expect(targetDevice(eq, null)?.id).toBe('b');
+  });
+});
+
+describe('offerFor', () => {
+  const yamaha = device(['yes', 'yes', 'yes', 'yes', 'yes']);
+
+  it("offers once for a receiver that takes the lossless formats", () => {
+    expect(offerFor(off, false, yamaha)).toEqual({
+      device: 'AV receiver',
+      formats: ['dts-hd', 'truehd'],
+    });
+  });
+
+  it('never again once answered, and never when already on', () => {
+    expect(offerFor(off, true, yamaha)).toBeNull();
+    expect(offerFor(on, false, yamaha)).toBeNull();
+  });
+
+  it('not for a device where it would change nothing you can hear', () => {
+    expect(offerFor(off, false, device(['yes', 'yes', 'no', 'no', 'no']))).toBeNull();
+    expect(offerFor(off, false, null)).toBeNull();
+  });
+});
+
+describe('offerFor wording', () => {
+  it('names the formats without their "incl." notes', () => {
+    const d = device(['no', 'no', 'no', 'yes', 'yes']);
+    d.bitstream[3].label = 'DTS-HD Master Audio (incl. DTS:X)';
+    d.bitstream[4].label = 'Dolby TrueHD (incl. Atmos)';
+    expect(offerFor(off, false, d)?.formats).toEqual(['DTS-HD Master Audio', 'Dolby TrueHD']);
   });
 });

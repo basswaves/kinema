@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   init as initSpatial,
+  getCurrentFocusKey,
   setFocus,
   useFocusable,
   FocusContext,
@@ -28,7 +29,14 @@ import {
   dismissContinue,
   type ContinueItem,
 } from '../player/api';
-import { cacheArtwork } from '../metadata/api';
+import { cacheArtwork, setSetting } from '../metadata/api';
+import DirectSoundOffer from './DirectSoundOffer';
+import {
+  AUDIO_DIRECT_KEY,
+  AUDIO_DIRECT_OFFERED_KEY,
+  directSoundOffer,
+  type DirectSoundOffer as Offer,
+} from '../player/audioOutput';
 import { runScanPipeline, useScanStatus } from '../library/pipeline';
 import { getTitleDetail, listTitles, type Title } from './api';
 import { runSelfTest, selfTestPlan } from '../selftest';
@@ -118,6 +126,46 @@ export default function Browse() {
   const [error, setError] = useState<string | null>(null);
   /** A root that could not be read at startup. Not an error — see below. */
   const [scanTrouble, setScanTrouble] = useState<string | null>(null);
+  /**
+   * The one-time offer of direct sound, with the film it is holding back.
+   * `returnTo` is the control that pressed Play, for when the offer is
+   * dismissed with Back rather than answered.
+   */
+  const [pending, setPending] = useState<{
+    target: PlaybackTarget;
+    offer: Offer;
+    returnTo: string;
+  } | null>(null);
+
+  /**
+   * Every Play from the browsing views comes through here: open the player,
+   * unless this is the moment for the one-time direct-sound offer. Trailers
+   * (no title) never trigger it, and anything that goes wrong asking falls
+   * through to playing — an offer is never a reason not to play.
+   */
+  const startPlayback = useCallback(async (target: PlaybackTarget) => {
+    const offer = target.titleId === null ? null : await directSoundOffer().catch(() => null);
+    if (offer) setPending({ target, offer, returnTo: getCurrentFocusKey() });
+    else setView({ name: 'player', target });
+  }, []);
+
+  const answerOffer = useCallback(
+    (accept: boolean) => {
+      if (!pending) return;
+      const { target } = pending;
+      setPending(null);
+      void (async () => {
+        try {
+          if (accept) await setSetting(AUDIO_DIRECT_KEY, 'on');
+          await setSetting(AUDIO_DIRECT_OFFERED_KEY, 'yes');
+        } catch (e) {
+          console.warn('audio: could not save the answer to the offer', e);
+        }
+        setView({ name: 'player', target });
+      })();
+    },
+    [pending]
+  );
 
   // The shell owns the nav↔content rule, because it is the only component that
   // is a parent of both. The nav and the search view get their containers in
@@ -299,14 +347,11 @@ export default function Browse() {
         // continue it, not restart from episode one.
         const inProgress = resumable.find((item) => item.title_id === title.id);
         if (inProgress) {
-          setView({
-            name: 'player',
-            target: {
-              path: inProgress.path,
-              label: episodeLabel(title.title, inProgress.season, inProgress.episode),
-              fileId: inProgress.file_id,
-              titleId: title.id,
-            },
+          await startPlayback({
+            path: inProgress.path,
+            label: episodeLabel(title.title, inProgress.season, inProgress.episode),
+            fileId: inProgress.file_id,
+            titleId: title.id,
           });
           return;
         }
@@ -314,14 +359,11 @@ export default function Browse() {
         if (title.kind === 'series') {
           const next = await firstUnwatchedEpisode(title.id);
           if (next) {
-            setView({
-              name: 'player',
-              target: {
-                path: next.path,
-                label: episodeLabel(title.title, next.season, next.episode),
-                fileId: next.file_id,
-                titleId: title.id,
-              },
+            await startPlayback({
+              path: next.path,
+              label: episodeLabel(title.title, next.season, next.episode),
+              fileId: next.file_id,
+              titleId: title.id,
             });
             return;
           }
@@ -331,14 +373,11 @@ export default function Browse() {
 
         const detail = await getTitleDetail(title.id);
         if (detail.movie_path) {
-          setView({
-            name: 'player',
-            target: {
-              path: detail.movie_path,
-              label: title.title,
-              fileId: detail.movie_file_id,
-              titleId: title.id,
-            },
+          await startPlayback({
+            path: detail.movie_path,
+            label: title.title,
+            fileId: detail.movie_file_id,
+            titleId: title.id,
           });
           return;
         }
@@ -348,7 +387,7 @@ export default function Browse() {
         setError(String(e));
       }
     },
-    [resumable]
+    [resumable, startPlayback]
   );
 
   /**
@@ -394,12 +433,20 @@ export default function Browse() {
         const target = e.target as HTMLElement;
         if (target.tagName === 'INPUT') return;
         e.preventDefault();
+        // Back on the offer is "not this film", not an answer: close it, put
+        // focus back on Play, and ask again next time.
+        if (pending) {
+          const returnTo = pending.returnTo;
+          setPending(null);
+          void setFocus(returnTo);
+          return;
+        }
         setView({ name: 'home' });
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [view.name]);
+  }, [view.name, pending]);
 
   useEffect(() => {
     if (view.name === 'search') setFocus('search-input');
@@ -448,14 +495,11 @@ export default function Browse() {
               setView({ name: 'grid', heading, titleIds: list.map((t) => t.id) })
             }
             onResume={(item) =>
-              setView({
-                name: 'player',
-                target: {
-                  path: item.path,
-                  label: episodeLabel(item.title, item.season, item.episode),
-                  fileId: item.file_id,
-                  titleId: item.title_id,
-                },
+              void startPlayback({
+                path: item.path,
+                label: episodeLabel(item.title, item.season, item.episode),
+                fileId: item.file_id,
+                titleId: item.title_id,
               })
             }
           />
@@ -486,18 +530,22 @@ export default function Browse() {
             title={view.title}
             onBack={() => setView({ name: 'home' })}
             onPlayFile={(path, label, fileId, titleId) =>
-              setView({
-                name: 'player',
-                target: {
-                  path,
-                  label,
-                  fileId,
-                  // Explicit null means "not on behalf of this title" — a trailer
-                  // must not adopt or overwrite the show's track preferences.
-                  titleId: titleId === undefined ? (view as { title: Title }).title.id : titleId,
-                },
+              void startPlayback({
+                path,
+                label,
+                fileId,
+                // Explicit null means "not on behalf of this title" — a trailer
+                // must not adopt or overwrite the show's track preferences.
+                titleId: titleId === undefined ? (view as { title: Title }).title.id : titleId,
               })
             }
+          />
+        )}
+        {pending && (
+          <DirectSoundOffer
+            offer={pending.offer}
+            onAccept={() => answerOffer(true)}
+            onDecline={() => answerOffer(false)}
           />
         )}
       </FocusContext.Provider>

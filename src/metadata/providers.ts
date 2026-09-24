@@ -498,34 +498,59 @@ export async function tmdbGetTitle(
   };
 }
 
+interface TmdbSeason {
+  episodes?: Array<{
+    season_number: number;
+    episode_number: number;
+    name: string;
+    overview: string;
+    air_date: string | null;
+    runtime: number | null;
+    still_path: string | null;
+  }>;
+}
+
+/** TMDB's limit on `append_to_response` entries in one request. */
+const TMDB_APPEND_MAX = 20;
+
+/**
+ * Every episode of a show.
+ *
+ * Seasons are fetched **twenty to a request** through `append_to_response`,
+ * which TMDB answers under keys named `season/N`. This was one request per
+ * season, all through the same rate-limited queue: a long-running show cost
+ * thirty-odd round trips to match, and a first scan of a library of them was
+ * minutes of waiting on TMDB's pacing for data it hands out in bulk.
+ */
 export async function tmdbGetEpisodes(key: string, id: string): Promise<EpisodeMetadata[]> {
-  const show = await tmdbGet<{ seasons: Array<{ season_number: number }> }>(key, `/tv/${id}`);
+  const show = await tmdbGet<{ seasons?: Array<{ season_number: number }> }>(key, `/tv/${id}`);
+  // Season 0 is specials; include it, since files often reference it.
+  const numbers = (show.seasons ?? []).map((season) => season.season_number);
   const episodes: EpisodeMetadata[] = [];
 
-  for (const season of show.seasons ?? []) {
-    // Season 0 is specials; include it, since files often reference it.
-    const data = await tmdbGet<{
-      episodes: Array<{
-        season_number: number;
-        episode_number: number;
-        name: string;
-        overview: string;
-        air_date: string | null;
-        runtime: number | null;
-        still_path: string | null;
-      }>;
-    }>(key, `/tv/${id}/season/${season.season_number}`);
+  for (let i = 0; i < numbers.length; i += TMDB_APPEND_MAX) {
+    const batch = numbers.slice(i, i + TMDB_APPEND_MAX);
+    const data = await tmdbGet<Record<string, TmdbSeason | undefined>>(key, `/tv/${id}`, {
+      append_to_response: batch.map((n) => `season/${n}`).join(','),
+    });
 
-    for (const e of data.episodes ?? []) {
-      episodes.push({
-        season: e.season_number,
-        episode: e.episode_number,
-        name: e.name || null,
-        overview: e.overview || null,
-        air_date: e.air_date || null,
-        runtime_mins: e.runtime ?? null,
-        still_url: e.still_path ? `${TMDB_IMAGE}${e.still_path}` : null,
-      });
+    for (const n of batch) {
+      // A reply without the season it was asked for is fetched the old way,
+      // one season at a time. Missing seasons would otherwise match the show
+      // with no episodes at all — silently, since that is a valid answer.
+      const season =
+        data[`season/${n}`] ?? (await tmdbGet<TmdbSeason>(key, `/tv/${id}/season/${n}`));
+      for (const e of season.episodes ?? []) {
+        episodes.push({
+          season: e.season_number,
+          episode: e.episode_number,
+          name: e.name || null,
+          overview: e.overview || null,
+          air_date: e.air_date || null,
+          runtime_mins: e.runtime ?? null,
+          still_url: e.still_path ? `${TMDB_IMAGE}${e.still_path}` : null,
+        });
+      }
     }
   }
 

@@ -159,8 +159,9 @@ Settings → Developer tools → **Open log folder** opens it.
   build has no console for)
 - `mpv.log` — mpv's own verbose log
 
-Each launch starts both fresh; the session before is kept as
-`app.previous.log` and `mpv.previous.log`.
+Each launch starts both fresh; the four sessions before are kept as
+`app.previous.log` and `mpv.previous.log` (the last one), then
+`.previous-2.log` back to `.previous-4.log`.
 
 `mpv.log` is the authority on anything about rendering: it records what
 libplacebo *did*, not what it was asked to do. Read it before theorising about
@@ -178,9 +179,11 @@ reasoning is in [docs/DESIGN.md](docs/DESIGN.md) and [docs/PLAN.md](docs/PLAN.md
 - **Nothing invents frames or detail.** No frame interpolation. 24p judder on a
   60 Hz panel is reported by the stats panel and deliberately not "fixed".
 - **No quality-preset UI.** The right settings depend on the frame and the
-  display, both of which mpv already knows. The app decides. The one deliberate
-  exception is frame timing, because the right answer depends on hardware the
-  code cannot see.
+  display, both of which mpv already knows. The app decides. **Settings describe
+  the hardware, never taste:** frame timing, which audio formats the receiver
+  takes, and whether the app may switch the screen's mode are allowed because
+  each depends on equipment the code cannot always see — and each is detected
+  where it can be, so the setting is an override rather than a question.
 - **Vendor-neutral.** Must behave identically on AMD, Intel and NVIDIA.
 - **A wrong metadata match is worse than no match.** The 0.75 threshold and the
   0.05 runner-up margin stay. Refusing and surfacing for review beats guessing —

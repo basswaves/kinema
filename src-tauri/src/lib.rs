@@ -3,6 +3,7 @@ mod applog;
 mod artwork;
 mod db;
 mod detect;
+mod equipment;
 mod ffmpeg;
 mod history;
 mod introdb;
@@ -103,6 +104,7 @@ fn open_library(app: &tauri::AppHandle) -> Result<(), String> {
     app.manage(Db(Mutex::new(primary)));
     app.manage(ScanDb(Mutex::new(scanner)));
     app.manage(jobs::Jobs::default());
+    app.manage(equipment::EquipmentState::default());
     Ok(())
 }
 
@@ -133,6 +135,11 @@ pub fn run() {
                 // only add an invisible second failure.
                 std::process::exit(1);
             }
+
+            // What this machine is connected to: checked, saved beside what
+            // was seen before, and written to app.log, so a log from any
+            // machine answers "what screen, what receiver" by itself.
+            equipment::check_at_startup(app.handle().clone());
 
             // The window starts hidden and the page shows it once it has
             // something to paint (App.tsx). If that never happens — a script
@@ -199,6 +206,9 @@ pub fn run() {
             detect::auto_detect,
             detect::analysis_backlog,
             ffmpeg::ffmpeg_status,
+            equipment::get_equipment,
+            equipment::check_equipment,
+            equipment::window_display,
             trailer::find_local_trailer,
             nfo::read_nfo,
             nfo::read_show_nfo,

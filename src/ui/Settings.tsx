@@ -23,6 +23,7 @@ import FocusButton from './FocusButton';
 import { formatBytes } from './format';
 import FocusInput from './FocusInput';
 import ConfirmButton from './ConfirmButton';
+import EquipmentSection from './EquipmentSection';
 import { useClaimFocus } from './focus';
 import { setTvMode, useTvMode } from './tv';
 import {
@@ -752,6 +753,8 @@ export default function Settings() {
             </span>
           </div>
         </section>
+
+        <EquipmentSection />
 
         {/* ---- where markers come from ----
 

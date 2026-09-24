@@ -42,3 +42,23 @@ tauri-plugin-http = "2"
 # Symphonia cannot read AC-3, E-AC-3, DTS or TrueHD, which is most of a remux.
 rusty-chromaprint = "0.3.0"
 
+# Microsoft's own bindings, already compiled in through Tauri at this version.
+# Used read-only by equipment.rs to ask Windows what the screens and audio
+# outputs can take — display modes, HDR, bitstream formats.
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_Devices_Display",
+  "Win32_Devices_FunctionDiscovery",
+  "Win32_Devices_Properties",
+  "Win32_Graphics_Gdi",
+  "Win32_Graphics_Dxgi",
+  "Win32_Graphics_Dxgi_Common",
+  "Win32_Media_Audio",
+  "Win32_Media_KernelStreaming",
+  "Win32_System_Com",
+  "Win32_System_Com_StructuredStorage",
+  "Win32_System_Variant",
+  "Win32_UI_Shell_PropertiesSystem",
+] }
+

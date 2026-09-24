@@ -47,7 +47,7 @@ pub fn set_setting(db: tauri::State<Db>, key: String, value: String) -> Result<(
 /// The settings whose change can change a match's answer.
 const PROVIDER_KEYS: [&str; 2] = ["tmdb_api_key", "omdb_api_key"];
 
-fn store(conn: &rusqlite::Connection, key: &str, value: &str) -> Result<(), String> {
+pub(crate) fn store(conn: &rusqlite::Connection, key: &str, value: &str) -> Result<(), String> {
     let before = setting(conn, key);
     conn.execute(
         "INSERT INTO settings (key, value) VALUES (?1, ?2)

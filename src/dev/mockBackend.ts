@@ -21,6 +21,135 @@ import * as fakeMpv from './fakeMpv';
 import type { ContinueItem, EpisodeRef, Progress, SkipMarkers, TitlePrefs } from '../player/api';
 import type { Episode, Title, TitleDetail } from '../ui/api';
 
+// The setup this is ultimately for: a 4K HDR TV behind a receiver that takes
+// everything, next to this dev machine's SDR monitor and onboard sound — plus a
+// TV seen once and unplugged since. The receiver's answers are remembered, as
+// they are when it is busy at launch; the monitor is new. Shaped exactly like
+// equipment.rs's EquipmentView.
+const SEEN_BEFORE = { connected: true, first_seen: 1789000000, last_seen: 1790270000, new: false };
+const SEEN_NOW = { connected: true, first_seen: 1790270000, last_seen: 1790270000 };
+
+function mockEquipment() {
+  return {
+    gpus: ['Mock GPU'],
+    displays: [
+      {
+        ...SEEN_BEFORE,
+        connected: false,
+        last_seen: 1789500000,
+        id: 'mock-old-tv',
+        name: 'Mock old TV',
+        gdi_name: '',
+        connection: 'HDMI',
+        width: 1920,
+        height: 1080,
+        refresh_num: 60,
+        refresh_den: 1,
+        hdr: 'unsupported',
+        peak_nits: null,
+        full_frame_nits: null,
+        min_nits: null,
+        bits_per_color: 8,
+        modes: [],
+        notes: [],
+      },
+      {
+        ...SEEN_BEFORE,
+        id: 'mock-tv',
+        name: 'Mock 4K HDR TV',
+        gdi_name: String.raw`\\.\DISPLAY1`,
+        connection: 'HDMI',
+        width: 3840,
+        height: 2160,
+        refresh_num: 60,
+        refresh_den: 1,
+        hdr: 'off',
+        peak_nits: 800,
+        full_frame_nits: 350,
+        min_nits: 0.05,
+        bits_per_color: 10,
+        modes: [
+          { width: 3840, height: 2160, hz: 60, rate: 60 },
+          { width: 3840, height: 2160, hz: 23, rate: 23.976 },
+          { width: 3840, height: 2160, hz: 24, rate: 24 },
+        ],
+        notes: [
+          'Supports HDR, but Windows has it switched off — HDR films are converted to SDR on this screen until it is on.',
+          'Can show films without judder: 23.976 / 24 Hz at 3840×2160.',
+        ],
+      },
+      {
+        ...SEEN_NOW,
+        new: true,
+        id: 'mock-monitor',
+        name: 'Mock SDR monitor',
+        gdi_name: String.raw`\\.\DISPLAY2`,
+        connection: 'DisplayPort',
+        width: 2560,
+        height: 1600,
+        refresh_num: 59972,
+        refresh_den: 1000,
+        hdr: 'unsupported',
+        peak_nits: null,
+        full_frame_nits: null,
+        min_nits: null,
+        bits_per_color: 10,
+        modes: [{ width: 2560, height: 1600, hz: 60, rate: 60 }],
+        notes: [
+          'SDR screen: HDR films are converted to SDR.',
+          'No 24 Hz mode: films play with 3:2 judder on this screen, whatever the setting.',
+        ],
+      },
+    ],
+    audio: [
+      {
+        ...SEEN_BEFORE,
+        name: 'Mock AV receiver (HDMI)',
+        id: 'mock-avr',
+        is_default: true,
+        connection: 'HDMI',
+        mix_channels: 2,
+        mix_layout: 'stereo',
+        mix_rate: 48000,
+        max_pcm_channels: 8,
+        spatial_objects: null,
+        bitstream: [
+          { codec: 'ac3', label: 'Dolby Digital', result: 'yes', detail: null, remembered: true },
+          { codec: 'eac3', label: 'Dolby Digital Plus (incl. Atmos)', result: 'yes', detail: null, remembered: true },
+          { codec: 'dts', label: 'DTS', result: 'yes', detail: null, remembered: true },
+          { codec: 'dts-hd', label: 'DTS-HD Master Audio (incl. DTS:X)', result: 'yes', detail: null, remembered: true },
+          { codec: 'truehd', label: 'Dolby TrueHD (incl. Atmos)', result: 'yes', detail: null, remembered: true },
+        ],
+        notes: [
+          'Windows is set to stereo for this device, though it takes 8 channels directly — anything mixed by Windows is folded down to stereo.',
+        ],
+      },
+      {
+        ...SEEN_BEFORE,
+        name: 'Mock onboard speakers',
+        id: 'mock-onboard',
+        is_default: false,
+        connection: 'speakers',
+        mix_channels: 2,
+        mix_layout: 'stereo',
+        mix_rate: 48000,
+        max_pcm_channels: 8,
+        spatial_objects: null,
+        bitstream: [
+          ['ac3', 'Dolby Digital'],
+          ['eac3', 'Dolby Digital Plus (incl. Atmos)'],
+          ['dts', 'DTS'],
+          ['dts-hd', 'DTS-HD Master Audio (incl. DTS:X)'],
+          ['truehd', 'Dolby TrueHD (incl. Atmos)'],
+        ].map(([codec, label]) => ({ codec, label, result: 'no', detail: null, remembered: false })),
+        notes: ['Takes no compressed surround formats: everything has to be decoded.'],
+      },
+    ],
+    problems: [],
+    checked_at: 1790270000,
+  };
+}
+
 // ---- the library -------------------------------------------------------
 
 interface FixtureFile {
@@ -461,6 +590,9 @@ const handlers: Record<string, Handler> = {
   detect_intros: () => mockDetection.run(),
   stop_detection: () => mockDetection.stop(),
   ffmpeg_status: () => ({ resolved: 'ffmpeg', available: false }),
+  get_equipment: () => mockEquipment(),
+  check_equipment: () => mockEquipment(),
+  window_display: () => ({ gdi_name: '', hdr: 'unknown' }),
 
   // settings and logs
   get_setting: (a) => settings.get(String(a.key)) ?? null,

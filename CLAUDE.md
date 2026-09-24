@@ -32,11 +32,16 @@ breaking one, say so rather than quietly working around it.
   only.
 - **No quality-preset UI.** The correct settings depend on the frame and the
   display, both of which mpv already knows. The app decides.
-  - **One deliberate exception: frame timing** (Settings → Playback). It is a
-    switch because the right answer depends on hardware the code cannot see —
-    the panel's true refresh rate, and whether audio is leaving as an untouched
-    bitstream. It is not a taste preference and must not become the first of
-    several. Anything mpv can determine for itself still gets decided, not asked.
+  - **Settings describe the hardware, never taste** (agreed 2026-09-24,
+    replacing "frame timing is the one exception"). Frame timing, which
+    bitstream formats the receiver takes, the audio output device, and whether
+    the app may switch the display's refresh rate, resolution or HDR are
+    allowed, because each depends on equipment the code cannot always see.
+    Each is **detected first** (`equipment.rs`) so the setting is an override
+    with an "Auto" default, not a question. Display switching is **off by
+    default**. Anything that is a matter of taste — sharpness, a scaler choice,
+    a "cinema mode" — is still out, and anything mpv can determine for itself
+    still gets decided, not asked.
 - **Nothing invents frames or detail.** The rule above covers pixels; this one
   covers time. No frame interpolation — 24p judder on a 60 Hz panel is reported
   by the stats panel and
@@ -129,8 +134,9 @@ launched (dev or release). Settings → Developer tools → **Open log folder**.
   build has no console, so `eprintln!` goes nowhere.
 - `mpv.log` — mpv's own verbose log.
 
-Each launch starts both fresh and keeps the previous session as
-`app.previous.log` / `mpv.previous.log`. The safety copies made before each
+Each launch starts both fresh and keeps the four sessions before it:
+`app.previous.log` / `mpv.previous.log` is the last, then `.previous-2.log`
+back to `.previous-4.log`. The safety copies made before each
 database upgrade are in `%APPDATA%\com.kinema.app\backups\`.
 
 `mpv.log` is the authority on anything about rendering. It records what

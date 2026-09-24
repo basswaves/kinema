@@ -2014,6 +2014,7 @@ dependencies = [
  "tauri-plugin-libmpv",
  "tauri-plugin-opener",
  "walkdir",
+ "windows",
 ]
 
 [[package]]

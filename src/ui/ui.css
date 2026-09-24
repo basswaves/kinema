@@ -1372,6 +1372,77 @@ html {
   background: rgba(218, 54, 51, 0.92);
 }
 
+/* Settings → Your equipment. A plain list: it is read, not operated. */
+.equipment-item {
+  margin: 0 0 1rem;
+}
+
+.equipment-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+  font-size: 0.875rem;
+}
+
+.equipment-head .muted {
+  font-size: 0.78125rem;
+}
+
+.equipment-new {
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: rgba(90, 150, 240, 0.25);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.equipment-notes,
+.equipment-formats {
+  margin: 0.35rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.78125rem;
+  line-height: 1.5;
+}
+
+.equipment-notes li {
+  max-width: 44rem;
+  opacity: 0.8;
+}
+
+.equipment-formats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.equipment-format {
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  opacity: 0.6;
+}
+
+.equipment-format-yes {
+  border-color: rgba(70, 190, 110, 0.7);
+  background: rgba(70, 190, 110, 0.14);
+  opacity: 1;
+}
+
+.equipment-format-busy,
+.equipment-format-not_allowed {
+  border-color: rgba(230, 170, 60, 0.7);
+  opacity: 1;
+}
+
+.equipment-problem {
+  color: rgb(240, 140, 130);
+  font-size: 0.8125rem;
+}
+
 /* The developer tools render the old Library harness, which paints its own
    full-screen background. Contain it so it sits in the page instead. */
 .settings-developer {
@@ -1487,6 +1558,18 @@ html {
   padding: 0.625rem 1rem;
   border-radius: 0.5rem;
   background: rgba(218, 54, 51, 0.92);
+}
+
+/* Something about the sound the viewer should know — not an error: the film
+   is playing. Its own colour so it is not read as one. */
+.player-notice {
+  align-self: center;
+  max-width: 40rem;
+  padding: 0.625rem 1rem;
+  border-radius: 0.5rem;
+  background: rgba(20, 20, 24, 0.9);
+  border: 1px solid rgba(230, 170, 60, 0.7);
+  line-height: 1.45;
 }
 
 .player-controls {

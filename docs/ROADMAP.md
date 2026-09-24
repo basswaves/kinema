@@ -32,9 +32,10 @@ a receiver.
 Agreed with the owner on 2026-09-23 after a full review of the code, the logs and
 the library database. One commit per item on `master`. Phase 0 (the safety
 net and the test tools), Phase 1 (starting playback and the Skip button),
-Phase 2 (watching correctness), Phase 3 (library and matching) and Phase 4
-(responsiveness) are done — see PLAN.md for what they decided; what follows is
-what is left, in order.
+Phase 2 (watching correctness), Phase 3 (library and matching), Phase 4
+(responsiveness) and Phase 5 (structure) are done — see PLAN.md for what they
+decided, including why the scan pipeline stayed in the webview; what follows
+is what is left.
 
 Decisions that shape it: the **Skip intro button shows from 0:00** whenever an
 intro is known and stays until the intro ends, and pressing it during a cold
@@ -42,15 +43,9 @@ open jumps to the end of the intro (chosen knowingly — it skips the cold open
 too); **Skiptro stays first** for intros where its confidence is at least 0.8;
 nothing is tested by hand.
 
-**Phase 5 — structure.** (a) Library rules and the pipeline into Rust.
-(b) Watch history per episode rather than per file path, surviving moves,
-renames, upgrades and re-added folders — a migration, rehearsed on a copy of
-the real library first. (c) The player split around one event stream and one
-state machine.
-
 **Phase 6 — cleanup and docs.** Dead code, duplicated helpers, fewer TMDB and
 track-list round trips, a CSP, and correcting the claims the review found
-false (listed in the review; GOTCHAS' "two different channels" is one).
+false (GOTCHAS' "two different channels" is already fixed).
 
 ---
 

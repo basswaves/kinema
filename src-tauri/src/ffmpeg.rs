@@ -194,11 +194,8 @@ pub fn decode_window(
     // s16le, little-endian, two bytes a sample. A trailing odd byte would mean
     // a truncated write; dropping it is right and silently reinterpreting the
     // stream is not.
-    Ok(output
-        .stdout
-        .chunks_exact(2)
-        .map(|pair| i16::from_le_bytes([pair[0], pair[1]]))
-        .collect())
+    let (pairs, _odd_byte) = output.stdout.as_chunks::<2>();
+    Ok(pairs.iter().map(|pair| i16::from_le_bytes(*pair)).collect())
 }
 
 /// The shortest run of black frames worth reporting, in seconds.

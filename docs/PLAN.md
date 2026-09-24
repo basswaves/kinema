@@ -1219,7 +1219,7 @@ than the individual file, because analysis compares episodes against each other:
 fingerprinting the finished nine only means fingerprinting them again when the
 tenth lands.
 
-## The September 2026 review, and what it changed ✅ (in progress)
+## The September 2026 review, and what it changed ✅
 
 A full review of the code, the logs and the library database, followed by a
 phased plan (in ROADMAP.md while it is open). Decisions taken along the way,
@@ -1333,6 +1333,14 @@ section of GOTCHAS. The rules are now unit tests (`session.test.ts`). Skip
 markers, the Up next offer and the countdown stay outside it: they are derived
 from the session, not part of the file's life, and moving them would have been
 churn without a failure behind it. The panels moved to their own files.
+
+**Cleanup, and a content security policy.** Phase 6 removed what nothing
+called (including the unused "potato mode" option sets, which would have been
+the quality preset the settled decisions rule out), kept one copy of each
+shared helper — the two season-folder rules had already drifted apart — cut
+TMDB episode fetching to one request per twenty seasons and read tracks and
+chapters in parallel, and gave the window a CSP whose refusals are written to
+`app.log`, because otherwise they are silent.
 
 **Testing is done without the owner.** `npm run dev:mock` and
 `scripts/selftest.ps1` exist so every change can be checked — keyboard-only in

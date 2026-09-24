@@ -33,19 +33,15 @@ Agreed with the owner on 2026-09-23 after a full review of the code, the logs an
 the library database. One commit per item on `master`. Phase 0 (the safety
 net and the test tools), Phase 1 (starting playback and the Skip button),
 Phase 2 (watching correctness), Phase 3 (library and matching), Phase 4
-(responsiveness) and Phase 5 (structure) are done — see PLAN.md for what they
-decided, including why the scan pipeline stayed in the webview; what follows
-is what is left.
+(responsiveness), Phase 5 (structure) and Phase 6 (cleanup and docs) are done,
+which completes the plan — see PLAN.md for what each decided, including why the
+scan pipeline stayed in the webview. What remains open is below, as before.
 
 Decisions that shape it: the **Skip intro button shows from 0:00** whenever an
 intro is known and stays until the intro ends, and pressing it during a cold
 open jumps to the end of the intro (chosen knowingly — it skips the cold open
 too); **Skiptro stays first** for intros where its confidence is at least 0.8;
 nothing is tested by hand.
-
-**Phase 6 — cleanup and docs.** Dead code, duplicated helpers, fewer TMDB and
-track-list round trips, a CSP, and correcting the claims the review found
-false (GOTCHAS' "two different channels" is already fixed).
 
 ---
 

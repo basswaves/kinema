@@ -25,6 +25,7 @@ import FocusInput from './FocusInput';
 import ConfirmButton from './ConfirmButton';
 import EquipmentSection from './EquipmentSection';
 import SoundSection from './SoundSection';
+import ScreenSection from './ScreenSection';
 import { useClaimFocus } from './focus';
 import { setTvMode, useTvMode } from './tv';
 import {
@@ -754,6 +755,8 @@ export default function Settings() {
             </span>
           </div>
         </section>
+
+        <ScreenSection onError={setError} />
 
         <SoundSection onError={setError} />
 

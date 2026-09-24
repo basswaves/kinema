@@ -73,6 +73,7 @@ import { VIDEO_SYNC_KEY, VIDEO_SYNC_MODES } from './mpvOptions';
 import { readPlaybackStats, type StatGroup } from './stats';
 import { matchHdrToDisplay } from './displayHdr';
 import { applyAudioPlan, applyFallback, FALLBACKS, silencedAudioTrack } from './audioOutput';
+import { filmNow, mayswitch, restoreScreen, switchForFilm } from './displaySwitch';
 import { getSetting } from '../metadata/api';
 import { initialSession, reduce, samePath } from './session';
 
@@ -182,11 +183,12 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   const [upNext, setUpNext] = useState<EpisodeRef | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   /**
-   * What happened to the sound, when it did not open the way it was asked to.
-   * The failure this exists for was silent: with Windows' "Atmos for home
-   * theater" on, mpv opened no audio at all and the film simply played mute.
+   * Something the viewer should know that is not an error: the screen being
+   * matched to the film, or the sound not opening the way it was asked to (the
+   * failure that started this was silent — with a half-configured Windows
+   * spatial sound, mpv opened no audio at all and the film played mute).
    */
-  const [audioNotice, setAudioNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   /** How many of FALLBACKS have been tried for the file that is open. */
   const audioFallback = useRef(0);
   /**
@@ -197,6 +199,23 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   useLayoutEffect(() => {
     if (aid !== null) lastAid.current = aid;
   }, [aid]);
+
+  /**
+   * Switch the screen for the file that is open, if the settings call for it,
+   * with a word on screen while it happens. Never throws: a screen that will not
+   * switch is a film that plays in the mode it is in.
+   */
+  const matchScreen = useCallback(async () => {
+    const film = await filmNow().catch(() => null);
+    if (!film) return;
+    setNotice('Matching the screen to the film…');
+    try {
+      if (await switchForFilm(film)) await matchHdrToDisplay();
+    } catch (e) {
+      console.warn('display: switch failed', e);
+    }
+    setNotice(null);
+  }, []);
   const [markers, setMarkers] = useState<SkipMarkers | null>(null);
   /**
    * The path the current `markers` were fetched for, once the fetch has
@@ -335,7 +354,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     // clears them when it advances, and every other route out left them set.
     setUpNext(null);
     setCountdown(null);
-    setAudioNotice(null);
+    setNotice(null);
     /* eslint-enable react-hooks/set-state-in-effect */
     audioFallback.current = 0;
 
@@ -380,10 +399,18 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         // (-1, "no playlist position") is required before options since
         // mpv 0.38.
         const start = pendingSeek.current;
+        // With display switching on and the window fullscreen, the film opens
+        // paused and waits for the screen — see displaySwitch.ts.
+        const hold = await mayswitch().catch(() => false);
+        if (hold) await setProperty('pause', true);
         await command(
           'loadfile',
           start === null ? [target.path] : [target.path, 'replace', '-1', `start=${start}`]
         );
+        if (hold) {
+          await matchScreen();
+          if (cancelled) return;
+        }
         await setProperty('pause', false);
       } catch (e) {
         if (!cancelled) fail(e);
@@ -393,7 +420,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [target.path, target.fileId, fail]);
+  }, [target.path, target.fileId, fail, matchScreen]);
 
   /** Apply this title's remembered languages to the freshly loaded file. */
   const applyPrefs = useCallback(async () => {
@@ -448,8 +475,10 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   const exit = useCallback(async () => {
     const win = getCurrentWindow();
     if (await win.isFullscreen()) await win.setFullscreen(false);
+    await restoreScreen();
     onExit();
   }, [onExit]);
+
 
   /**
    * End of file. Declared above the listener that calls it — defining it below
@@ -516,7 +545,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           if (track === null) return;
           const step = audioFallback.current++;
           if (await applyFallback(step, track).catch(() => false)) {
-            setAudioNotice(
+            setNotice(
               FALLBACKS[step]?.channels === 'stereo'
                 ? 'Windows would not take surround sound, so this is playing in stereo.'
                 : 'The sound could not be sent the chosen way, so it is going through Windows instead.'
@@ -524,7 +553,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
             checkAudioSoon();
           } else {
             console.error('audio: no output could be opened for this file');
-            setAudioNotice(
+            setNotice(
               'No sound: Windows would not open the audio device. If Windows spatial sound ' +
                 '(Atmos or DTS:X for home theater) is on, switch it off, or turn on ' +
                 '"Send sound straight to the receiver" in Settings.'
@@ -1002,15 +1031,17 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
 
   // A notice about the sound says its piece and goes; the film is playing.
   useEffect(() => {
-    if (!audioNotice) return;
-    const id = window.setTimeout(() => setAudioNotice(null), AUDIO_NOTICE_MS);
+    if (!notice) return;
+    const id = window.setTimeout(() => setNotice(null), AUDIO_NOTICE_MS);
     return () => window.clearTimeout(id);
-  }, [audioNotice]);
+  }, [notice]);
 
-  // Stop playback when leaving, so audio does not continue behind the UI.
+  // Stop playback when leaving, so audio does not continue behind the UI, and
+  // give the screen its own mode back however the player was left.
   useEffect(() => {
     return () => {
       void command('stop').catch(() => undefined);
+      void restoreScreen();
     };
   }, []);
 
@@ -1086,8 +1117,19 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
 
   const toggleFullscreen = useCallback(async () => {
     const win = getCurrentWindow();
-    await win.setFullscreen(!(await win.isFullscreen()));
-  }, []);
+    const entering = !(await win.isFullscreen());
+    await win.setFullscreen(entering);
+    if (!entering) {
+      await restoreScreen();
+      return;
+    }
+    // Going fullscreen mid-film: pause, switch, and carry on as it was.
+    if (!(await mayswitch().catch(() => false))) return;
+    const wasPaused = sessionRef.current.paused;
+    await setProperty('pause', true);
+    await matchScreen();
+    if (!wasPaused) await setProperty('pause', false);
+  }, [matchScreen]);
 
   /**
    * The last rung of the Back ladder. Fullscreen is a layer in exactly the way
@@ -1104,6 +1146,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     const win = getCurrentWindow();
     if (await win.isFullscreen()) {
       await win.setFullscreen(false);
+      await restoreScreen();
       return;
     }
     onExit();
@@ -1380,7 +1423,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       {!session.frameShown && <div className="player-cover" aria-hidden="true" />}
 
       {error && <div className="player-error">{error}</div>}
-      {audioNotice && <div className="player-notice">{audioNotice}</div>}
+      {notice && <div className="player-notice">{notice}</div>}
 
       {session.resumedFrom !== null && (
         <div className="resume-toast" onAnimationEnd={() => dispatch({ type: 'resume-shown' })}>

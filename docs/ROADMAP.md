@@ -160,6 +160,20 @@ this order:
    the first frame; going fullscreen mid-film **pauses**, switches, waits for
    the picture to come back, then resumes; leaving fullscreen or the player
    restores the desktop's mode.
+
+   **Built (2026-09-25), waiting on the test TV for HDR:** `display.rs` (switch,
+   HDR on/off, restore — the original saved to settings *before* the first
+   change, restored on player exit, app exit, and at the next launch after a
+   crash), `displayMode.ts` (the choice, unit-tested against the test TV's and the
+   development monitor's real mode lists), `displaySwitch.ts` (fullscreen only, pause, settle,
+   tell mpv the new rate), Settings → Screen. **Verified on the development monitor** with
+   `selftest.ps1`: a 1080p film opened fullscreen switched 2560×1600@60 →
+   1920×1080@23.976 before playing and mpv then reported 23.976; going
+   fullscreen mid-film paused (clock held at 0:04), switched, resumed; leaving
+   fullscreen, Back, and app exit each restored 2560×1600@60; after a forced
+   kill the next launch logged "put back a screen mode left by the last
+   session". **Not verifiable here:** the HDR switch (no HDR screen) and the
+   test TV's own re-sync time.
    Resolution is three-way, as agreed on 2026-09-24: **Off**;
    **Auto** — switch *up* when the desktop is below the film and the screen can
    show the film natively (a 1080p desktop on a 4K TV playing a 4K film, where

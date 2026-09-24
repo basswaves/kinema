@@ -593,6 +593,20 @@ const handlers: Record<string, Handler> = {
   get_equipment: () => mockEquipment(),
   check_equipment: () => mockEquipment(),
   window_display: () => ({ gdi_name: '', hdr: 'unknown' }),
+  screen_now: () => ({
+    gdi_name: 'mock',
+    width: 3840,
+    height: 2160,
+    hz: 60,
+    rate: 60,
+    hdr: 'off',
+    modes: [
+      { width: 3840, height: 2160, hz: 60, rate: 60 },
+      { width: 3840, height: 2160, hz: 23, rate: 23.976 },
+    ],
+  }),
+  switch_screen: () => null,
+  restore_screen: () => false,
 
   // settings and logs
   get_setting: (a) => settings.get(String(a.key)) ?? null,

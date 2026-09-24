@@ -961,6 +961,29 @@ not in `windows` 0.61, so `equipment.rs` lays it out by hand, from wingdi.h.
 Older Windows refuses type 15 and the code falls back to the old query, where
 advanced colour did mean HDR.
 
+### mpv does not notice the screen changing mode
+
+Switch the development monitor from 59.972 to 23.976 Hz under a playing file and mpv's
+`display-fps` stays at 59.972 — its window is a child of the app's, and the
+display-change message never reaches it. Everything that uses the number goes
+quietly wrong: display-resample timing, and the stats panel's cadence row,
+which would report 3:2 judder on a screen now running at an even 1:1.
+
+**Do:** after a switch, set `display-fps-override` to the rate Windows reports
+for the new mode (`QueryDisplayConfig`'s exact fraction, not the nominal
+23.976 — mpv warns that even slightly wrong values spoil display-sync), and set
+it back to 0 on restore, when mpv's own stale value is right again.
+
+### A temporary display mode dies with the process; HDR does not
+
+`ChangeDisplaySettingsEx(…, CDS_FULLSCREEN)` never writes the registry, and
+when the app was force-killed with the development monitor at 1080p@23.976, Windows put it
+back to 2560×1600@60 by itself within seconds. Turning HDR on
+(`DisplayConfigSetDeviceInfo`) is a persistent Windows setting and would stay
+on. That is what the restore record in `display_restore` and the restore at the
+next launch are for — the mode half is belt and braces, the HDR half is the
+belt.
+
 ### Windows lists 23.976 Hz as `23`
 
 `EnumDisplaySettings` gives whole numbers, and the NTSC rates are listed one

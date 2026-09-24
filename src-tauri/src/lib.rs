@@ -3,6 +3,7 @@ mod applog;
 mod artwork;
 mod db;
 mod detect;
+mod display;
 mod equipment;
 mod ffmpeg;
 mod history;
@@ -140,6 +141,8 @@ pub fn run() {
             // was seen before, and written to app.log, so a log from any
             // machine answers "what screen, what receiver" by itself.
             equipment::check_at_startup(app.handle().clone());
+            // A screen a crashed session switched and never put back.
+            display::restore_after_crash(app.handle());
 
             // The window starts hidden and the page shows it once it has
             // something to paint (App.tsx). If that never happens — a script
@@ -209,6 +212,9 @@ pub fn run() {
             equipment::get_equipment,
             equipment::check_equipment,
             equipment::window_display,
+            display::screen_now,
+            display::switch_screen,
+            display::restore_screen,
             trailer::find_local_trailer,
             nfo::read_nfo,
             nfo::read_show_nfo,
@@ -224,6 +230,11 @@ pub fn run() {
             // has closed, where nobody can see it or stop it.
             if let tauri::RunEvent::Exit = event {
                 app.state::<jobs::Jobs>().stop_detection();
+                // The screen goes back to the desktop's own mode however the
+                // app is closed; a crash is caught at the next launch instead.
+                if let Err(e) = display::restore(app) {
+                    log!("display: could not restore on exit: {e}");
+                }
             }
         });
 }

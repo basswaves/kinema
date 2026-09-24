@@ -16,6 +16,7 @@
  * have seen, and it keeps working whatever the player looks like inside.
  */
 import { invoke } from '@tauri-apps/api/core';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { command, getProperty, listenEvents } from 'tauri-plugin-libmpv-api';
 import { ensureMpvInitialised } from './player/mpv';
 import { readTracks } from './player/tracks';
@@ -46,6 +47,8 @@ const CALLABLE: Record<string, (...args: never[]) => Promise<unknown>> = {
   // Settings the player reads when a file opens — sound, display — so a plan
   // can set them on the copied library before opening the player (`openAfter`).
   setSetting,
+  // Display switching only happens fullscreen, and Browse has no key for it.
+  setFullscreen: (on: boolean) => getCurrentWindow().setFullscreen(on),
 };
 
 export interface SelfTestAction {

@@ -736,7 +736,7 @@ pub async fn check_equipment(app: tauri::AppHandle) -> Result<EquipmentView, Str
 // ---- Windows -----------------------------------------------------------------
 
 #[cfg(windows)]
-mod win {
+pub(crate) mod win {
     use super::*;
     use std::collections::HashMap;
     use std::mem::size_of;
@@ -772,7 +772,7 @@ mod win {
         e
     }
 
-    fn wide(buf: &[u16]) -> String {
+    pub(crate) fn wide(buf: &[u16]) -> String {
         let end = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
         String::from_utf16_lossy(&buf[..end])
     }
@@ -834,7 +834,7 @@ mod win {
         (gpus, outputs)
     }
 
-    fn active_paths() -> windows::core::Result<Vec<DISPLAYCONFIG_PATH_INFO>> {
+    pub(crate) fn active_paths() -> windows::core::Result<Vec<DISPLAYCONFIG_PATH_INFO>> {
         let (mut n_paths, mut n_modes) = (0u32, 0u32);
         unsafe { GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &mut n_paths, &mut n_modes) }
             .ok()?;
@@ -855,7 +855,7 @@ mod win {
         Ok(paths)
     }
 
-    fn header<T>(
+    pub(crate) fn header<T>(
         kind: DISPLAYCONFIG_DEVICE_INFO_TYPE,
         adapter: windows::Win32::Foundation::LUID,
         id: u32,
@@ -890,7 +890,7 @@ mod win {
     const GET_ADVANCED_COLOR_INFO_2: DISPLAYCONFIG_DEVICE_INFO_TYPE =
         DISPLAYCONFIG_DEVICE_INFO_TYPE(15);
 
-    fn hdr_state(p: &DISPLAYCONFIG_PATH_INFO) -> (HdrState, Option<u32>) {
+    pub(crate) fn hdr_state(p: &DISPLAYCONFIG_PATH_INFO) -> (HdrState, Option<u32>) {
         let t = &p.targetInfo;
         let mut info2 = AdvancedColorInfo2 {
             header: header::<AdvancedColorInfo2>(GET_ADVANCED_COLOR_INFO_2, t.adapterId, t.id),
@@ -944,7 +944,7 @@ mod win {
         .into()
     }
 
-    fn modes(gdi_name: &str) -> (Option<(u32, u32)>, Vec<Mode>) {
+    pub(crate) fn modes(gdi_name: &str) -> (Option<(u32, u32)>, Vec<Mode>) {
         let name: Vec<u16> = gdi_name.encode_utf16().chain(Some(0)).collect();
         let fresh = || DEVMODEW { dmSize: size_of::<DEVMODEW>() as u16, ..Default::default() };
         let mut current = fresh();
@@ -983,16 +983,32 @@ mod win {
     /// HDR state of the screen a window is on, asked fresh — it can be switched
     /// in Windows at any moment, so a value from the launch check will not do.
     pub fn hdr_for_window(hwnd: windows::Win32::Foundation::HWND) -> (String, HdrState) {
+        let gdi_name = monitor_of(hwnd);
+        let state = path_for(&gdi_name).map_or(HdrState::Unknown, |p| hdr_state(&p).0);
+        (gdi_name, state)
+    }
+
+    /// Windows' name (`\\.\DISPLAY1`) for the screen a window is mostly on.
+    pub(crate) fn monitor_of(hwnd: windows::Win32::Foundation::HWND) -> String {
         let monitor = unsafe { MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) };
         let mut info = MONITORINFOEXW::default();
         info.monitorInfo.cbSize = size_of::<MONITORINFOEXW>() as u32;
-        let ok = unsafe { GetMonitorInfoW(monitor, &mut info as *mut MONITORINFOEXW as *mut MONITORINFO) };
-        if !ok.as_bool() {
-            return (String::new(), HdrState::Unknown);
+        let ok = unsafe {
+            GetMonitorInfoW(monitor, &mut info as *mut MONITORINFOEXW as *mut MONITORINFO)
+        };
+        if ok.as_bool() {
+            wide(&info.szDevice)
+        } else {
+            String::new()
         }
-        let gdi_name = wide(&info.szDevice);
-        let Ok(paths) = active_paths() else { return (gdi_name, HdrState::Unknown) };
-        for p in &paths {
+    }
+
+    /// The active display path whose source is that screen.
+    pub(crate) fn path_for(gdi_name: &str) -> Option<DISPLAYCONFIG_PATH_INFO> {
+        if gdi_name.is_empty() {
+            return None;
+        }
+        active_paths().ok()?.into_iter().find(|p| {
             let s = &p.sourceInfo;
             let mut source = DISPLAYCONFIG_SOURCE_DEVICE_NAME {
                 header: header::<DISPLAYCONFIG_SOURCE_DEVICE_NAME>(
@@ -1002,13 +1018,9 @@ mod win {
                 ),
                 ..Default::default()
             };
-            if unsafe { DisplayConfigGetDeviceInfo(&mut source.header) } == 0
+            (unsafe { DisplayConfigGetDeviceInfo(&mut source.header) } == 0)
                 && wide(&source.viewGdiDeviceName) == gdi_name
-            {
-                return (gdi_name, hdr_state(p).0);
-            }
-        }
-        (gdi_name, HdrState::Unknown)
+        })
     }
 
     fn displays(outputs: &HashMap<String, OutputInfo>, problems: &mut Vec<String>) -> Vec<Display> {

@@ -16,7 +16,12 @@
  * have seen, and it keeps working whatever the player looks like inside.
  */
 import { invoke } from '@tauri-apps/api/core';
-import { getCurrentWindow } from '@tauri-apps/api/window';
+import {
+  availableMonitors,
+  getCurrentWindow,
+  PhysicalPosition,
+  primaryMonitor,
+} from '@tauri-apps/api/window';
 import { command, getProperty, listenEvents } from 'tauri-plugin-libmpv-api';
 import { ensureMpvInitialised } from './player/mpv';
 import { readTracks } from './player/tracks';
@@ -49,6 +54,21 @@ const CALLABLE: Record<string, (...args: never[]) => Promise<unknown>> = {
   setSetting,
   // Display switching only happens fullscreen, and Browse has no key for it.
   setFullscreen: (on: boolean) => getCurrentWindow().setFullscreen(on),
+  // Put the window on another screen before going fullscreen — so a test can
+  // switch a second monitor while the main one stays in use. -1 means the
+  // first screen that is not the primary; otherwise an index into Windows'
+  // own list.
+  moveToScreen: async (index: number) => {
+    const screens = await availableMonitors();
+    const primary = await primaryMonitor();
+    const screen =
+      index === -1 ? screens.find((m) => m.name !== primary?.name) : screens[index];
+    if (!screen) throw new Error(`no screen ${index}; there are ${screens.length}`);
+    await getCurrentWindow().setPosition(
+      new PhysicalPosition(screen.position.x + 50, screen.position.y + 50)
+    );
+    return screen.name;
+  },
 };
 
 export interface SelfTestAction {

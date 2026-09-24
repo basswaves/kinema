@@ -974,6 +974,22 @@ for the new mode (`QueryDisplayConfig`'s exact fraction, not the nominal
 23.976 — mpv warns that even slightly wrong values spoil display-sync), and set
 it back to 0 on restore, when mpv's own stale value is right again.
 
+### Turning HDR on puts back Windows' own HDR mode
+
+On the test TV, a switch that set 4K@23.976 and *then* turned HDR on ended at
+4K@**30** — the mode that screen had last used with HDR — and from a 1080p
+desktop at 1080p@30. Windows keeps a mode per HDR state and restores it when
+HDR changes. **Do:** change HDR first, then the mode, and check the mode
+afterwards (`switch_screen` sets it again if it moved, and logs "asked for …
+and Windows kept …" if it still did). Restore in the reverse order.
+
+The same round left the TV receiving 4K 60 Hz while Windows reported a 1080p
+desktop — the desktop scaled up to a signal nobody asked for — and only a full
+mode change in the NVIDIA panel cleared it. `ScreenNow.signal` reads the signal
+actually on the cable (`QueryDisplayConfig`'s target mode), the one before the
+first switch is saved, and `restore` forces a full mode change (`CDS_RESET`) if
+the signal did not come back with the desktop.
+
 ### A temporary display mode dies with the process; HDR does not
 
 `ChangeDisplaySettingsEx(…, CDS_FULLSCREEN)` never writes the registry, and

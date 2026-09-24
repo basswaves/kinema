@@ -1,0 +1,68 @@
+{
+  "fileId": null,
+  "seconds": 28,
+  "actions": [
+    {
+      "do": "call",
+      "at": 0.3,
+      "fn": "setSetting",
+      "args": [
+        "display_switch_refresh",
+        "on"
+      ]
+    },
+    {
+      "do": "call",
+      "at": 0.4,
+      "fn": "setSetting",
+      "args": [
+        "display_switch_hdr",
+        "on"
+      ]
+    },
+    {
+      "do": "call",
+      "at": 0.5,
+      "fn": "setSetting",
+      "args": [
+        "display_switch_resolution",
+        "auto"
+      ]
+    },
+    {
+      "do": "call",
+      "at": 0.8,
+      "fn": "setFullscreen",
+      "args": [
+        true
+      ]
+    },
+    {
+      "do": "mark",
+      "at": 18,
+      "note": "switched and playing: probe now"
+    },
+    {
+      "do": "key",
+      "at": 22,
+      "key": "Escape"
+    },
+    {
+      "do": "key",
+      "at": 23,
+      "key": "Escape"
+    }
+  ],
+  "probe": [
+    "display-fps",
+    "video-params/gamma",
+    "video-target-params/gamma",
+    "video-target-params/max-luma",
+    "target-colorspace-hint",
+    "container-fps"
+  ],
+  "path": "D:\\Media\\A 4K HDR10 film.mkv",
+  "openAfter": 4,
+  "label": "Automatic test: HDR",
+  "titleId": null
+}

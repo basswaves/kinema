@@ -12,6 +12,7 @@
     "core:window:allow-set-fullscreen",
     "core:window:allow-show",
     "core:window:allow-is-fullscreen",
+    "core:window:allow-set-position",
     "dialog:default",
     {
       "identifier": "http:default",

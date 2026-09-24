@@ -32,14 +32,12 @@ analogue (the default), onboard optical S/PDIF (takes AC3 and DTS only — all a
 optical link can carry), and the development monitor's HDMI audio (no bitstreams). So display
 *switching* can be tested for real here; HDR and bitstreaming cannot.
 
-The target setup — a **4K HDR10 TV and a receiver AVR with Atmos** — is on another
+The target setup — a **4K HDR10 TV and an AV receiver with Atmos** — is on another
 machine that only runs downloaded releases. Anything that needs it is verified
 from the `equipment:` lines in that machine's `app.log`.
 
-As read there (2026-09-24, first USB run): the test PC's GPU; the TV reports under the TV's own name
-over HDMI at 3840×2160 **@ 30 Hz, 8-bit**, HDR on, 1499 nits peak, with
-23.976/24 Hz offered at 3840×2160 and 4096×2160. Audio "<TV> (HDMI
-Definition Audio)" takes **all five bitstreams** (AC3, E-AC3, DTS, DTS-HD MA,
+As read there (2026-09-24, first USB run): the TV reports over HDMI at 3840×2160 **@ 30 Hz, 8-bit**, HDR on, 1499 nits peak, with
+23.976/24 Hz offered at 3840×2160 and 4096×2160. The TV's HDMI audio device takes **all five bitstreams** (AC3, E-AC3, DTS, DTS-HD MA,
 TrueHD) and 8-channel PCM — so the chain is PC → receiver → TV, and the receiver
 is answering under the TV's name. Windows was mixing to 7.1 at 44.1 kHz by the
 end of his tests.
@@ -149,7 +147,7 @@ this order:
    the IEC 61937 payload is bit-identical to the source, for every format, with
    clips made by ffmpeg; and on the onboard device that TrueHD falls back to PCM
    rather than silence. **Waiting on:** a second release run on the test machine.
-4. **Display switching — every switch off by default** : match
+4. **Display switching — every switch off by default**: match
    the refresh rate, match the resolution, turn HDR on for HDR content.
    Resolution is three-way, as agreed on 2026-09-24: **Off**;
    **Auto** — switch *up* when the desktop is below the film and the screen can
@@ -172,8 +170,17 @@ this order:
    fullscreen mid-film paused (clock held at 0:04), switched, resumed; leaving
    fullscreen, Back, and app exit each restored 2560×1600@60; after a forced
    kill the next launch logged "put back a screen mode left by the last
-   session". **Not verifiable here:** the HDR switch (no HDR screen) and the
-   test TV's own re-sync time.
+   session". **Confirmed on the test TV (2026-09-25, automatic run from the USB
+   stick):** 4K@60 HDR off → 4K@23.976 **HDR on**, signal 3840×2160@23.976,
+   mpv told 23.976 and switched to an HDR10 swap chain; restored to 4K@60 HDR
+   off with the signal back at 3840×2160@60. And 4K@60 → 1080p@23.976 for a
+   1080p film under Match content, restored with the signal back at 4K@60. The
+   first round had ended at 4K@30 whenever HDR was involved — see GOTCHAS →
+   "Turning HDR on puts back Windows' own HDR mode". **Step 4 is done.**
+
+   The stick's `3. Run automatic test.cmd` runs `selftest.ps1` plans on that
+   machine unattended and copies reports, screenshots and logs back — the tester sets
+   Windows up once and waits, rather than working through a checklist.
    Resolution is three-way, as agreed on 2026-09-24: **Off**;
    **Auto** — switch *up* when the desktop is below the film and the screen can
    show the film natively (a 1080p desktop on a 4K TV playing a 4K film, where
@@ -186,10 +193,10 @@ this order:
    once mpv reports the new rate and the TV has had time to re-sync. The
    original mode is restored on stop, on exit, and at the next launch after a
    crash. Refresh and resolution switching are tested for real on this
-   machine's two screens ; the HDR
+   machine's two screens; the HDR
    switch only on his.
 
-5. **Say what is not native, why, and what to do about it** (
+5. **Say what is not native, why, and what to do about it** (agreed
    2026-09-24: "when correct and native output can't be achieved, it should be
    informed about"). A plain verdict per film — resolution 1:1, HDR as
    mastered, frame rate matched, bit depth, sound untouched or decoded — each

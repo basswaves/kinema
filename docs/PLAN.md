@@ -1364,7 +1364,7 @@ itself. Anything it *can* answer, it answers: step 1 exists to detect as much
 as possible, and every audio format setting defaults to "Auto" (the detected
 answer). Picture-quality settings remain out.
 
-**Display switching exists, and is off by default.** a deliberate choice:
+**Display switching exists, and is off by default.** A deliberate choice:
 switching the refresh rate or HDR blanks the screen for a second or two, and
 some TVs take longer. It is three switches (refresh, resolution, HDR), not one.
 

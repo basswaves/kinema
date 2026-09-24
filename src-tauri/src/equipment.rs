@@ -835,6 +835,33 @@ pub(crate) mod win {
     }
 
     pub(crate) fn active_paths() -> windows::core::Result<Vec<DISPLAYCONFIG_PATH_INFO>> {
+        active_config().map(|(paths, _)| paths)
+    }
+
+    /// The HDMI/DisplayPort signal actually being sent to a screen: its size
+    /// and exact refresh — which is not always the desktop's. On the test TV,
+    /// after HDR was switched on and off around a mode change, Windows said
+    /// 1080p while the TV kept receiving 4K 60 Hz with the desktop scaled up
+    /// to it, and nothing short of a full mode change cleared it.
+    pub(crate) fn signal_of(gdi_name: &str) -> Option<(u32, u32, f64)> {
+        let path = path_for(gdi_name)?;
+        let (_, modes) = active_config().ok()?;
+        let index = unsafe { path.targetInfo.Anonymous.modeInfoIdx } as usize;
+        let mode = modes.get(index)?;
+        if mode.infoType != DISPLAYCONFIG_MODE_INFO_TYPE_TARGET {
+            return None;
+        }
+        let signal = unsafe { mode.Anonymous.targetMode.targetVideoSignalInfo };
+        let rate = if signal.vSyncFreq.Denominator > 0 {
+            f64::from(signal.vSyncFreq.Numerator) / f64::from(signal.vSyncFreq.Denominator)
+        } else {
+            0.0
+        };
+        Some((signal.activeSize.cx, signal.activeSize.cy, rate))
+    }
+
+    fn active_config(
+    ) -> windows::core::Result<(Vec<DISPLAYCONFIG_PATH_INFO>, Vec<DISPLAYCONFIG_MODE_INFO>)> {
         let (mut n_paths, mut n_modes) = (0u32, 0u32);
         unsafe { GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &mut n_paths, &mut n_modes) }
             .ok()?;
@@ -852,7 +879,8 @@ pub(crate) mod win {
         }
         .ok()?;
         paths.truncate(n_paths as usize);
-        Ok(paths)
+        modes.truncate(n_modes as usize);
+        Ok((paths, modes))
     }
 
     pub(crate) fn header<T>(

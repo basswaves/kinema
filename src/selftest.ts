@@ -27,6 +27,7 @@ import {
   recordProviderFailure,
   recordRefusal,
   returnToReview,
+  setSetting,
   unlinkFiles,
 } from './metadata/api';
 
@@ -42,6 +43,9 @@ const CALLABLE: Record<string, (...args: never[]) => Promise<unknown>> = {
   recordRefusal,
   returnToReview,
   unlinkFiles,
+  // Settings the player reads when a file opens — sound, display — so a plan
+  // can set them on the copied library before opening the player (`openAfter`).
+  setSetting,
 };
 
 export interface SelfTestAction {
@@ -54,12 +58,17 @@ export interface SelfTestAction {
    * mid-run ends what it started. Point the copied library's Skiptro setting
    * at something harmless first: this runs whatever is configured there.
    */
-  do: 'key' | 'seek' | 'mark' | 'detect' | 'call';
+  do: 'key' | 'seek' | 'mark' | 'detect' | 'call' | 'mpv';
   key?: string;
   to?: number;
   root?: string;
   /** For `call`: one of the lifecycle wrappers in `CALLABLE`, and its arguments. */
   fn?: string;
+  /**
+   * For `call`, the wrapper's arguments. For `mpv`, an mpv command and its
+   * arguments, e.g. `["set", "audio-device", "wasapi/{…}"]` then
+   * `["ao-reload"]` — how an audio output that fails mid-file is staged.
+   */
   args?: unknown[];
   note?: string;
 }
@@ -87,6 +96,19 @@ export interface SelfTestPlan {
    */
   openAfter?: number;
   actions?: SelfTestAction[];
+  /**
+   * mpv options set once mpv is up, before the file's first frame is likely
+   * to be drawn — for standing in for hardware this machine does not have.
+   * `{ "target-trc": "pq", "target-prim": "bt.2020" }` makes mpv render as if
+   * for an HDR10 screen, which is how the HDR path is checked on an SDR one.
+   */
+  mpv?: Record<string, string>;
+  /**
+   * mpv properties to read, as text, when the run ends — what mpv actually
+   * did rather than what it was asked: `video-target-params/gamma`,
+   * `current-ao`, `audio-out-params/channel-count` and so on.
+   */
+  probe?: string[];
 }
 
 interface Entry {
@@ -115,6 +137,7 @@ function screen(): Record<string, string | null> {
     skip: text('.skip-button'),
     upNext: text('.up-next'),
     error: text('.player-error'),
+    notice: text('.player-notice'),
     label: text('.player-label'),
   };
 }
@@ -146,6 +169,18 @@ export async function runSelfTest(plan: SelfTestPlan): Promise<void> {
         note('scan:done', { ms: report.duration_ms, files: report.files_seen, errors: report.errors.length })
       )
       .catch((e) => note('scan:failed', String(e)));
+  }
+
+  if (plan.mpv) {
+    const options = plan.mpv;
+    void ensureMpvInitialised().then(async () => {
+      for (const [key, value] of Object.entries(options)) {
+        await command('set', [key, value]).then(
+          () => note('mpv:set', { key, value }),
+          (e) => note('mpv:set-failed', { key, value, error: String(e) })
+        );
+      }
+    });
   }
 
   if (plan.mute !== false) {
@@ -189,6 +224,12 @@ export async function runSelfTest(plan: SelfTestPlan): Promise<void> {
             (result) => note('call:done', { fn: action.fn, result }),
             (e) => note('call:failed', { fn: action.fn, error: String(e) })
           );
+      } else if (action.do === 'mpv' && action.args?.length) {
+        const [name, ...rest] = action.args.map(String);
+        void command(name, rest).then(
+          () => note('mpv:done', action.args),
+          (e) => note('mpv:failed', { args: action.args, error: String(e) })
+        );
       } else if (action.do === 'detect' && action.root) {
         invoke('detect_intros', { rootPath: action.root }).then(
           (report) => note('detect:done', report),
@@ -211,8 +252,18 @@ export async function runSelfTest(plan: SelfTestPlan): Promise<void> {
       return null;
     }
   };
+  const probed: Record<string, string | null> = {};
+  for (const name of plan.probe ?? []) {
+    try {
+      probed[name] = await getProperty(name, 'string');
+    } catch {
+      probed[name] = null;
+    }
+  }
+
   const report = {
     plan,
+    probed,
     finishedAfter: now(),
     final: { timePos: await read('time-pos'), duration: await read('duration') },
     // What the player itself reads, through the same code — so a report shows

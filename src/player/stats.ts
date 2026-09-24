@@ -255,39 +255,94 @@ function describeScaling(
  * guessing from the picture is exactly how you end up believing something that
  * is not true.
  */
-function describeHdr(
-  sourceGamma: string | null,
-  targetGamma: string | null,
-  toneMapping: string | null,
-  computePeak: boolean | null,
-  hint: string | null
-): StatRow {
-  if (!isHdr(sourceGamma)) {
+/**
+ * Whether the sound reached the device as the film carries it. `spdif-*` is
+ * mpv's name for a bitstream wrapped for HDMI/S/PDIF and not decoded — the one
+ * case where the receiver gets exactly what is on the disc.
+ */
+export function describeAudioPath(format: string | null, exclusive: boolean | null): StatRow {
+  if (format?.startsWith('spdif-')) {
+    return {
+      label: 'Path',
+      value: `untouched bitstream (${format.slice('spdif-'.length)}) → receiver`,
+      note: 'passed through, not decoded: the receiver decodes it, Atmos and DTS:X included',
+    };
+  }
+  if (!format) return { label: 'Path', value: DASH };
+  return exclusive
+    ? {
+        label: 'Path',
+        value: 'decoded · straight to the device',
+        note: 'Windows mixer and spatial sound bypassed',
+      }
+    : {
+        label: 'Path',
+        value: 'decoded · through the Windows mixer',
+        note: "mixed to Windows' speaker setup; no Atmos or DTS:X",
+      };
+}
+
+export interface HdrFacts {
+  sourceGamma: string | null;
+  /** From `video-target-params` — what mpv actually rendered for. */
+  targetGamma: string | null;
+  /** Nits; 0 or null when not tagged. */
+  sourcePeak: number | null;
+  targetPeak: number | null;
+  toneMapping: string | null;
+  computePeak: boolean | null;
+}
+
+/**
+ * HDR out is not the same as HDR untouched. With the colour-space hint in
+ * `target` mode, mpv sends HDR10 but first compresses it to the peak Windows
+ * reports for the screen — the test TV received exactly that, and this row used to
+ * call it "tone mapping" only by accident: it read `target-params`, which does
+ * not exist, and treated no answer as tone mapping. The property is
+ * `video-target-params`; no answer now says so rather than guessing.
+ */
+export function describeHdr(f: HdrFacts): StatRow {
+  if (!isHdr(f.sourceGamma)) {
     return {
       label: 'HDR pipeline',
       value: 'SDR source — nothing to map',
-      note: `transfer ${text(sourceGamma)}`,
+      note: `transfer ${text(f.sourceGamma)}`,
     };
   }
 
-  if (targetGamma && isHdr(targetGamma)) {
+  if (!f.targetGamma) {
     return {
       label: 'HDR pipeline',
-      value: `passthrough — ${sourceGamma} in, ${targetGamma} out`,
-      note: 'the display takes the signal untouched; no tone mapping in the path',
+      value: `${DASH} — mpv did not report its output`,
+      note: 'video-target-params is empty until the first frame is drawn',
     };
   }
 
-  // A null target transfer means this build does not expose `target-params`,
-  // not that nothing is happening — say so rather than implying passthrough.
+  if (isHdr(f.targetGamma)) {
+    const source = f.sourcePeak ?? 0;
+    const target = f.targetPeak ?? 0;
+    // A nit either way is rounding in the metadata, not a tone curve.
+    if (source > 0 && target > 0 && target < source - 1) {
+      return {
+        label: 'HDR pipeline',
+        value: `HDR out, compressed · ${source.toFixed(0)} → ${target.toFixed(0)} nits`,
+        note: 'adapted to the peak Windows reports for the screen, not sent as mastered',
+        warn: true,
+      };
+    }
+    return {
+      label: 'HDR pipeline',
+      value: `passthrough — ${f.sourceGamma} in, ${f.targetGamma} out`,
+      note: "sent with the film's own HDR metadata; the display does its own tone mapping",
+    };
+  }
+
   return {
     label: 'HDR pipeline',
-    value: targetGamma
-      ? `tone mapped to ${targetGamma} · ${text(toneMapping)}`
-      : `tone mapping · ${text(toneMapping)}`,
-    note: computePeak
-      ? 'measured frame peak, not the static metadata in the file'
-      : `static metadata; target-colorspace-hint=${text(hint)}`,
+    value: `tone mapped to SDR (${f.targetGamma}) · ${text(f.toneMapping)}`,
+    note: f.computePeak
+      ? 'this screen is SDR, or Windows HDR is off; measured frame peak'
+      : 'this screen is SDR, or Windows HDR is off',
   };
 }
 
@@ -431,8 +486,11 @@ export async function readPlaybackStats(): Promise<StatGroup[]> {
   // is relative to SDR reference white. Neither exists on every build.
   const maxLuma = await readProperty<number>('video-params/max-luma', 'double');
   const sigPeak = await readProperty<number>('video-params/sig-peak', 'double');
-  const targetGamma = await readProperty<string>('target-params/gamma', 'string');
-  const targetPrimaries = await readProperty<string>('target-params/primaries', 'string');
+  // What mpv rendered *for*. The property is `video-target-params`; this read
+  // `target-params` for months, which does not exist — see describeHdr.
+  const targetGamma = await readProperty<string>('video-target-params/gamma', 'string');
+  const targetPrimaries = await readProperty<string>('video-target-params/primaries', 'string');
+  const targetPeak = await readProperty<number>('video-target-params/max-luma', 'double');
 
   // ---- rendering options, read live rather than assumed ----
   const vo = await readProperty<string>('current-vo', 'string');
@@ -447,6 +505,7 @@ export async function readPlaybackStats(): Promise<StatGroup[]> {
   const toneMapping = await readProperty<string>('tone-mapping', 'string');
   const computePeak = await readProperty<boolean>('hdr-compute-peak', 'flag');
   const colorspaceHint = await readProperty<string>('target-colorspace-hint', 'string');
+  const colorspaceHintMode = await readProperty<string>('target-colorspace-hint-mode', 'string');
   const videoSync = await readProperty<string>('video-sync', 'string');
 
   // ---- output ----
@@ -479,6 +538,7 @@ export async function readPlaybackStats(): Promise<StatGroup[]> {
   const outChannels = await readProperty<string>('audio-out-params/channels', 'string');
   const outRate = await readProperty<number>('audio-out-params/samplerate', 'int64');
   const outFormat = await readProperty<string>('audio-out-params/format', 'string');
+  const exclusive = await readProperty<boolean>('audio-exclusive', 'flag');
   const ao = await readProperty<string>('current-ao', 'string');
 
   // ---- health ----
@@ -620,7 +680,14 @@ export async function readPlaybackStats(): Promise<StatGroup[]> {
     {
       heading: 'Colour',
       rows: [
-        describeHdr(gamma, targetGamma, toneMapping, computePeak, colorspaceHint),
+        describeHdr({
+          sourceGamma: gamma,
+          targetGamma,
+          sourcePeak: maxLuma,
+          targetPeak,
+          toneMapping,
+          computePeak,
+        }),
         { label: 'Transfer', value: text(gamma) },
         {
           label: 'Primaries',
@@ -638,12 +705,21 @@ export async function readPlaybackStats(): Promise<StatGroup[]> {
           label: 'Target',
           value:
             targetGamma || targetPrimaries
-              ? `${text(targetPrimaries)} · ${text(targetGamma)}`
+              ? `${text(targetPrimaries)} · ${text(targetGamma)}${
+                  isHdr(targetGamma) && targetPeak ? ` · ${targetPeak.toFixed(0)} nits` : ''
+                }`
               : DASH,
+          note: targetGamma || targetPrimaries ? undefined : 'mpv has not reported its output yet',
+        },
+        {
+          label: 'Colour-space hint',
+          value: `${text(colorspaceHint)} · ${text(colorspaceHintMode)}`,
           note:
-            targetGamma || targetPrimaries
-              ? undefined
-              : 'this build does not expose target-params',
+            colorspaceHintMode === 'source'
+              ? "an HDR display gets the film's own metadata"
+              : colorspaceHintMode === 'target'
+                ? 'HDR is adapted to the peak Windows reports before it is sent'
+                : undefined,
         },
       ],
     },
@@ -664,6 +740,7 @@ export async function readPlaybackStats(): Promise<StatGroup[]> {
             : 'matches the source layout',
           warn: downmixed,
         },
+        describeAudioPath(outFormat, exclusive),
         { label: 'Output', value: text(ao) },
       ],
     },

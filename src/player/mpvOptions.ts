@@ -69,10 +69,11 @@ export const BASE_MPV_OPTIONS: Record<string, string | boolean | number> = {
   deband: false,
 
   // ---- HDR --------------------------------------------------------------
-  // One configuration covers both display types, because mpv only tone maps
-  // when the source exceeds what the target can show:
-  //   HDR display  -> colorspace hint lets Windows switch, signal passes
-  //                   through untouched. Creator's intent preserved exactly.
+  // One configuration covers both display types:
+  //   HDR display  -> the swap chain is tagged HDR10 and, with the hint mode
+  //                   `source` (TONE_MAPPING_OPTIONS below), carries the
+  //                   film's own metadata; the display tone maps, as it does
+  //                   for a disc player.
   //   SDR display  -> mpv tone maps using TONE_MAPPING_OPTIONS below.
   'target-colorspace-hint': 'yes',
 
@@ -135,6 +136,16 @@ export const VIDEO_SYNC_MODES = {
  * not in BASE_MPV_OPTIONS.
  */
 export const TONE_MAPPING_OPTIONS: Record<string, string | boolean | number> = {
+  // HDR to an HDR display as the disc carries it. mpv's default, `target`,
+  // first compresses the picture to the peak Windows reports for the screen —
+  // an EDID figure, often generic — and then sends *that* as HDR10: on the owner's
+  // test TV it ran a tone curve and a gamut map from the film's range to 1499 nits
+  // before the TV applied its own. `source` sends the film's own metadata and
+  // leaves the mapping to the display, which is what it is calibrated for.
+  // Has no effect on an SDR display, where tone mapping is the only option.
+  // Post-init because the option is newer than the rest of this block.
+  'target-colorspace-hint-mode': 'source',
+
   // BT.2390 is the ITU reference EETF — the standards-body answer to "map HDR
   // into a smaller volume without lying about the image". Correct for anyone
   // who cares about intent rather than punch.

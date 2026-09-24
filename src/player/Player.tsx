@@ -71,6 +71,7 @@ import {
 import { readChapters, type Chapter } from './chapters';
 import { VIDEO_SYNC_KEY, VIDEO_SYNC_MODES } from './mpvOptions';
 import { readPlaybackStats, type StatGroup } from './stats';
+import { matchHdrToDisplay } from './displayHdr';
 import { getSetting } from '../metadata/api';
 import { initialSession, reduce, samePath } from './session';
 
@@ -340,6 +341,12 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
             pendingSeek.current = progress.position_secs;
           }
         }
+
+        // Before the file, so its first frame is already rendered for the
+        // screen as it is now — see displayHdr.ts. A failure here must not
+        // stop playback; the hint just stays as it was.
+        await matchHdrToDisplay().catch((e) => console.warn('display: hint not applied', e));
+        if (cancelled) return;
 
         // `loadfile <url> <flags> <index> <options>`: the per-file `start`
         // option opens the file at the resume point. The index argument

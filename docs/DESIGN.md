@@ -135,9 +135,13 @@ resamples audio, which makes it incompatible with bitstream passthrough. It is
 the sole rendering preference in the app, and only because the right answer
 depends on hardware the code cannot see.
 
-**HDR: one config for both display types.** `target-colorspace-hint` lets an HDR display
-take the signal untouched; on SDR, mpv tone maps with BT.2390 (the ITU reference EETF)
-using a measured frame peak rather than the frequently wrong static metadata in remuxes.
+**HDR: decided per screen, per file.** Before each file the player asks whether the
+screen the window is on has HDR switched on. If so, the output is tagged HDR10 with the
+film's own metadata (`target-colorspace-hint-mode=source`) and the display tone maps, as
+it would for a disc player. If not, the hint is off and mpv tone maps with BT.2390 (the
+ITU reference EETF) using a measured frame peak rather than the frequently wrong static
+metadata in remuxes. Left to itself mpv tags HDR10 even for an SDR screen and Windows
+converts it — see GOTCHAS.
 Dolby Vision profiles 5/8/9 are metadata-aware; **profile 7 plays as its HDR10 base
 layer** — mpv is not a native DV output engine. Known limitation, not a bug to chase.
 

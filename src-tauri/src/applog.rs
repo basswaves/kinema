@@ -11,9 +11,13 @@
 //! launching the exe any way but the desktop shortcut wrote them somewhere
 //! else, or nowhere if that directory was not writable.
 //!
-//! Each launch starts fresh and keeps exactly one previous session, as
-//! `app.previous.log` and `mpv.previous.log`. The app is meant to run untended
-//! for years, and a log that only ever grows is a slow disk leak.
+//! Each launch starts fresh and keeps the four sessions before it:
+//! `app.previous.log` is the last one, then `app.previous-2.log` back to
+//! `app.previous-4.log`, and the same for mpv. It used to keep one, which lost
+//! most of a round of tests on a machine that is only visited with a USB stick
+//! — every launch pushed the interesting one out. Bounded all the same: the app
+//! is meant to run untended for years, and a log that only ever grows is a slow
+//! disk leak.
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -34,19 +38,34 @@ fn state() -> &'static Mutex<Option<PathBuf>> {
     STATE.get_or_init(|| Mutex::new(None))
 }
 
-/// `name.log` → `name.previous.log`.
-fn previous_of(path: &Path) -> PathBuf {
+/// Sessions kept besides the current one.
+const KEEP_PREVIOUS: usize = 4;
+
+/// `name.log` → `name.previous.log` for the last session, `name.previous-N.log`
+/// for older ones.
+fn previous_of(path: &Path, n: usize) -> PathBuf {
     let stem = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
-    path.with_file_name(format!("{stem}.previous.log"))
+    if n <= 1 {
+        path.with_file_name(format!("{stem}.previous.log"))
+    } else {
+        path.with_file_name(format!("{stem}.previous-{n}.log"))
+    }
 }
 
-/// Move `path` to its `.previous` name, replacing an older one.
+/// Move `path` to its `.previous` name, shifting older sessions back one and
+/// dropping the oldest.
 fn rotate(path: &Path) {
-    if path.exists() {
-        let previous = previous_of(path);
-        let _ = std::fs::remove_file(&previous);
-        let _ = std::fs::rename(path, previous);
+    if !path.exists() {
+        return;
     }
+    let _ = std::fs::remove_file(previous_of(path, KEEP_PREVIOUS));
+    for n in (1..KEEP_PREVIOUS).rev() {
+        let from = previous_of(path, n);
+        if from.exists() {
+            let _ = std::fs::rename(&from, previous_of(path, n + 1));
+        }
+    }
+    let _ = std::fs::rename(path, previous_of(path, 1));
 }
 
 /// Start a fresh session of both logs in `dir`. Called once, at startup,
@@ -108,7 +127,7 @@ mod tests {
     }
 
     #[test]
-    fn a_new_session_keeps_exactly_one_previous_one() {
+    fn a_new_session_moves_the_last_one_to_previous() {
         let dir = fresh("rotate");
         std::fs::write(dir.join(APP_LOG), "session 2").unwrap();
         std::fs::write(dir.join("app.previous.log"), "session 1").unwrap();
@@ -145,6 +164,27 @@ mod tests {
 
     #[test]
     fn the_previous_name_is_derived_from_the_log() {
-        assert_eq!(previous_of(Path::new(r"C:\x\mpv.log")), PathBuf::from(r"C:\x\mpv.previous.log"));
+        assert_eq!(previous_of(Path::new(r"C:\x\mpv.log"), 1), PathBuf::from(r"C:\x\mpv.previous.log"));
+        assert_eq!(
+            previous_of(Path::new(r"C:\x\mpv.log"), 3),
+            PathBuf::from(r"C:\x\mpv.previous-3.log")
+        );
+    }
+
+    #[test]
+    fn five_sessions_are_kept_and_older_ones_dropped() {
+        let dir = fresh("five");
+        let log = dir.join(APP_LOG);
+        for session in 1..=6 {
+            std::fs::write(&log, format!("session {session}")).unwrap();
+            rotate(&log);
+        }
+        let read = |name: &str| std::fs::read_to_string(dir.join(name)).ok();
+        assert_eq!(read("app.previous.log").as_deref(), Some("session 6"));
+        assert_eq!(read("app.previous-2.log").as_deref(), Some("session 5"));
+        assert_eq!(read("app.previous-4.log").as_deref(), Some("session 3"));
+        assert_eq!(read("app.previous-5.log"), None);
+        // With the current log that the next launch writes, that is five.
+        assert_eq!(std::fs::read_dir(&dir).unwrap().count(), KEEP_PREVIOUS);
     }
 }

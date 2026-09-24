@@ -759,7 +759,7 @@ against doing it first:
   open; it just swaps one invoked binary for another rather than removing one.
 - It is weeks of work whose failure mode is a threshold slightly wrong and a
   skip over real dialogue — the silent wrongness the matching rules exist to
-  prevent. It stays in HANDOVER as an upgrade, not a prerequisite.
+  prevent. It is an upgrade, not a prerequisite.
 
 **Skiptro's own database.** It was there all along: `%APPDATA%\Skiptro\skiptro.db`,
 table `DetectedSegments`, with `FilePath`, `Type`, `StartSeconds`, `EndSeconds`
@@ -933,11 +933,19 @@ at 70.0 s.
 
 ### Ordering: Skiptro first, by decision not by measurement
 
-Both fingerprint the same bytes on the same disk, and on real content they agree
-within a second. Skiptro is ranked above anyway, because it has years of tuning
-behind it and because ranking the newer thing second means **it cannot regress
-an intro skip that already works**. When they disagree, `app.log` names which
-spoke. For credits there is no contest: Skiptro has none.
+Both fingerprint the same bytes on the same disk. Skiptro is ranked above,
+because it has years of tuning behind it and because ranking the newer thing
+second means **it cannot regress an intro skip that already works**. When they
+disagree, `app.log` names which spoke. For credits there is no contest:
+Skiptro has none.
+
+**Measured, 2026-09-23** — this section used to say they "agree within a
+second on real content", and that was never checked. Against this library they
+disagreed on 34 of the 61 episodes both had an answer for, and every large
+disagreement was a detection Skiptro itself scored 0.70 or less (S04E05–E11 by
+~7 s, all of S06 by ~15 s). So Skiptro now keeps first place only where its
+confidence is at least 0.8 (`MIN_SKIPTRO_CONFIDENCE`); the table is in
+ROADMAP under "Minimum confidence for skip markers".
 
 ### ffmpeg, and why not pure Rust
 

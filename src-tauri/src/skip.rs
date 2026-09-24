@@ -19,9 +19,10 @@
 //! Skiptro sits above `analyse.rs` for the intro by decision rather than by
 //! measurement: both fingerprint this exact file, Skiptro has years of tuning
 //! behind it, and ranking the newer one second means it cannot regress an intro
-//! skip that already works. They agree to within a second on real content, so
-//! the order rarely matters — but when they disagree, the older one wins and
-//! `app.log` names which spoke.
+//! skip that already works. **Only where Skiptro is sure**, though: measured on
+//! this library they disagreed on 34 of 61 episodes, and every large
+//! disagreement was one Skiptro scored 0.70 or less — so below
+//! [`MIN_SKIPTRO_CONFIDENCE`] the analysis answers. `app.log` names which spoke.
 //!
 //! Below it, in `skip.ts`, everything is inference: a chapter name, then a
 //! fixed tail, each fenced accordingly.

@@ -253,12 +253,6 @@ fn drain<R: std::io::Read>(app: &tauri::AppHandle, step: &str, stream: R) -> Vec
     lines
 }
 
-/// Run this app's own audio analysis over a library root.
-///
-/// Reported as one more step so the UI needs no second button and no second
-/// progress display. It is deliberately **not** fatal: a missing ffmpeg or an
-/// unreadable season leaves whatever Skiptro found intact, which is the same
-/// arrangement every other source has.
 /// How long a file must have sat unchanged before the automatic pass will
 /// fingerprint the season it is in.
 ///
@@ -297,6 +291,11 @@ fn split_settled(
 }
 
 /// Run this app's own audio analysis over a library root.
+///
+/// Reported as one more step so the UI needs no second button and no second
+/// progress display. It is deliberately **not** fatal: a missing ffmpeg or an
+/// unreadable season leaves whatever Skiptro found intact, which is the same
+/// arrangement every other source has.
 ///
 /// `settling_secs` defers seasons containing a file written that recently; the
 /// manual path passes `None` and analyses whatever it finds.
@@ -455,9 +454,10 @@ fn step(name: &str, exit_code: Option<i32>, mut tail: Vec<String>) -> StepReport
 /// invisible, which is precisely the failure mode the Needs attention queue
 /// exists to prevent elsewhere.
 ///
-/// Deliberately **not** an automatic re-run after a scan. Analysis is minutes of
-/// ffmpeg per season, and spending that without being asked is exactly what a
-/// media library should not do. Saying so and offering the button is enough.
+/// Since then the scan runs the analysis by itself ([`auto_detect`], on unless
+/// switched off in Settings), so this count is mostly zero. It still matters in
+/// three cases: automatic analysis switched off, a season still settling, and
+/// the minutes between a scan finding a season and the analysis reaching it.
 ///
 /// The count comes from `seasons_in_root`, the same query Detect itself uses, so
 /// the number shown is precisely the work the button would do.

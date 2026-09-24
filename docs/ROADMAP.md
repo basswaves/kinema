@@ -196,9 +196,6 @@ the current behaviour annoys them.
   and keep its audio answer — that is the designed behaviour and it is untested.
   The `credits … → … from the picture` and `kept the audio credits at …` lines
   in the Detect output say which happened for every episode.
-- **A season where Skiptro and `analyse.rs` disagree** — they agree within a
-  second on everything here, so the ranking between them has never actually been
-  exercised. `intro marker from <source>` in `app.log` is what to watch.
 - **Real TV overscan**, and whether `--ui-scale: 1.45` is right at sofa
   distance. Both need a TV; the value is one constant in `ui.css`.
 - **Behaviour at scale** — the library is small. Rails cap at 30 with a "See

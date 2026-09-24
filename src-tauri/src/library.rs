@@ -1,10 +1,10 @@
 //! Tauri commands exposing the library to the frontend.
 
+use crate::util::{now_secs, to_string_err};
 use crate::scanner::{self, ScanReport};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 pub struct Db(pub Mutex<Connection>);
 
@@ -74,17 +74,6 @@ pub struct LibraryStats {
     pub parsed: i64,
     pub missing: i64,
     pub total_bytes: i64,
-}
-
-fn now_secs() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0)
-}
-
-fn to_string_err<E: std::fmt::Display>(e: E) -> String {
-    e.to_string()
 }
 
 /// A path in the one form this app compares against, for overlap tests only.

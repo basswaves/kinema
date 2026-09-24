@@ -35,6 +35,7 @@
 //! returns nothing and the player behaves exactly as it did before any of it
 //! existed.
 
+use crate::util::{now_secs, to_string_err};
 use crate::introdb;
 use crate::library::Db;
 use crate::settings::setting;
@@ -42,19 +43,8 @@ use crate::skiptro;
 use rusqlite::params;
 use serde::Serialize;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::UNIX_EPOCH;
 use tauri::Manager;
-
-fn to_string_err<E: std::fmt::Display>(e: E) -> String {
-    e.to_string()
-}
-
-fn now_secs() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0)
-}
 
 /// Segment names accepted for the closing segment in a sidecar. Skiptro's own
 /// naming is confirmed only for `intro`.

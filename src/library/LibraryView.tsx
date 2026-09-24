@@ -8,6 +8,7 @@
  * TMDB query in Phase 2, while an unparsed file is merely work to do.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { formatBytes } from '../ui/format';
 import { open } from '@tauri-apps/plugin-dialog';
 import {
   addLibraryRoot,
@@ -48,13 +49,6 @@ import Art from '../ui/Art';
 import './library.css';
 
 const PARSE_BATCH = 500;
-
-function formatBytes(bytes: number): string {
-  if (!bytes) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-  return `${(bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
-}
 
 function episodeLabel(file: MediaFile): string {
   if (file.parsed_season === null && file.parsed_episode === null) return '—';

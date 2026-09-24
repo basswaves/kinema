@@ -1,22 +1,12 @@
 //! Resume points, Continue Watching, next-episode lookup and track memory.
 
+use crate::util::{now_secs, to_string_err};
 use crate::artwork::path_prefix;
 use crate::library::Db;
 use rusqlite::{named_params, params};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use std::time::{SystemTime, UNIX_EPOCH};
-
-fn to_string_err<E: std::fmt::Display>(e: E) -> String {
-    e.to_string()
-}
-
-fn now_secs() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0)
-}
+use std::time::UNIX_EPOCH;
 
 /// Below this many seconds in, there is nothing worth resuming.
 const MIN_RESUME_SECS: f64 = 30.0;

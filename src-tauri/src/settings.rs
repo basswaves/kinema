@@ -4,12 +4,9 @@
 //! repository, never in a bundled file. Nothing secret is ever committed, and
 //! changing a key needs no rebuild.
 
+use crate::util::to_string_err;
 use crate::library::Db;
 use rusqlite::params;
-
-fn to_string_err<E: std::fmt::Display>(e: E) -> String {
-    e.to_string()
-}
 
 /// Read one setting from an already-held connection.
 ///

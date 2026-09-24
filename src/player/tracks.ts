@@ -6,7 +6,8 @@
  * crashed the process with STATUS_ACCESS_VIOLATION on file load. Every field is
  * available as an indexed scalar property, which is flat and safe.
  */
-import { command, getProperty } from 'tauri-plugin-libmpv-api';
+import { command } from 'tauri-plugin-libmpv-api';
+import { readProperty } from './property';
 
 export interface MpvTrack {
   id: number;
@@ -20,32 +21,24 @@ export interface MpvTrack {
   default: boolean;
 }
 
-async function safeGet<T>(name: string, format: 'string' | 'int64' | 'flag'): Promise<T | null> {
-  try {
-    return (await getProperty(name, format)) as T | null;
-  } catch {
-    return null;
-  }
-}
-
 export async function readTracks(): Promise<MpvTrack[]> {
-  const count = (await safeGet<number>('track-list/count', 'int64')) ?? 0;
+  const count = (await readProperty<number>('track-list/count', 'int64')) ?? 0;
   const tracks: MpvTrack[] = [];
 
   for (let i = 0; i < count; i++) {
-    const type = await safeGet<string>(`track-list/${i}/type`, 'string');
+    const type = await readProperty<string>(`track-list/${i}/type`, 'string');
     if (!type) continue;
 
     tracks.push({
-      id: (await safeGet<number>(`track-list/${i}/id`, 'int64')) ?? i,
+      id: (await readProperty<number>(`track-list/${i}/id`, 'int64')) ?? i,
       type,
-      title: (await safeGet<string>(`track-list/${i}/title`, 'string')) ?? undefined,
-      lang: (await safeGet<string>(`track-list/${i}/lang`, 'string')) ?? undefined,
-      codec: (await safeGet<string>(`track-list/${i}/codec`, 'string')) ?? undefined,
-      selected: (await safeGet<boolean>(`track-list/${i}/selected`, 'flag')) ?? false,
-      forced: (await safeGet<boolean>(`track-list/${i}/forced`, 'flag')) ?? false,
-      external: (await safeGet<boolean>(`track-list/${i}/external`, 'flag')) ?? false,
-      default: (await safeGet<boolean>(`track-list/${i}/default`, 'flag')) ?? false,
+      title: (await readProperty<string>(`track-list/${i}/title`, 'string')) ?? undefined,
+      lang: (await readProperty<string>(`track-list/${i}/lang`, 'string')) ?? undefined,
+      codec: (await readProperty<string>(`track-list/${i}/codec`, 'string')) ?? undefined,
+      selected: (await readProperty<boolean>(`track-list/${i}/selected`, 'flag')) ?? false,
+      forced: (await readProperty<boolean>(`track-list/${i}/forced`, 'flag')) ?? false,
+      external: (await readProperty<boolean>(`track-list/${i}/external`, 'flag')) ?? false,
+      default: (await readProperty<boolean>(`track-list/${i}/default`, 'flag')) ?? false,
     });
   }
 

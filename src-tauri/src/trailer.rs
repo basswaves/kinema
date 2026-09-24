@@ -60,18 +60,9 @@ pub fn is_trailer_file_name(file_name: &str) -> bool {
 /// would reach the library root, where a stray `trailers` directory would then
 /// be served as the trailer for every film in the library.
 fn looks_like_season_dir(dir: &Path) -> bool {
-    let Some(name) = dir.file_name().and_then(|n| n.to_str()) else {
-        return false;
-    };
-    let lower = name.to_lowercase();
-
-    lower.starts_with("season")
-        || lower.starts_with("staffel")
-        || lower.starts_with("specials")
-        || (lower.starts_with('s')
-            && lower.len() <= 4
-            && lower[1..].chars().all(|c| c.is_ascii_digit())
-            && lower.len() > 1)
+    dir.file_name()
+        .and_then(|n| n.to_str())
+        .is_some_and(crate::util::is_season_folder)
 }
 
 /// First video file inside `<dir>/trailers`, if that folder exists.

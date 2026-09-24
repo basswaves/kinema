@@ -36,6 +36,7 @@
  * measure the actual screen, which mpv only knows about indirectly.
  */
 import { getProperty } from 'tauri-plugin-libmpv-api';
+import { readProperty, type ScalarFormat } from './property';
 
 export interface StatRow {
   label: string;
@@ -56,17 +57,6 @@ export interface StatGroup {
   wideLabels?: boolean;
 }
 
-type Format = 'string' | 'int64' | 'double' | 'flag';
-
-async function safeGet<T>(name: string, format: Format): Promise<T | null> {
-  try {
-    const value = await getProperty(name, format);
-    return (value ?? null) as T | null;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Like `safeGet`, but keeps the failure. Only worth the extra plumbing where an
  * absent value is itself the finding — a property that never answers should say
@@ -74,7 +64,7 @@ async function safeGet<T>(name: string, format: Format): Promise<T | null> {
  */
 async function probe<T>(
   name: string,
-  format: Format
+  format: ScalarFormat
 ): Promise<{ value: T | null; error: string | null }> {
   try {
     const value = await getProperty(name, format);
@@ -85,9 +75,9 @@ async function probe<T>(
 }
 
 /** The first of these properties that exists, for names that moved upstream. */
-async function firstOf<T>(names: string[], format: Format): Promise<T | null> {
+async function firstOf<T>(names: string[], format: ScalarFormat): Promise<T | null> {
   for (const name of names) {
-    const value = await safeGet<T>(name, format);
+    const value = await readProperty<T>(name, format);
     if (value !== null) return value;
   }
   return null;
@@ -325,10 +315,10 @@ async function readRenderPasses(): Promise<{ rows: StatRow[]; unavailable: strin
 
     const rows: StatRow[] = [];
     for (let i = 0; i < Math.min(count, MAX_PASSES); i++) {
-      const desc = await safeGet<string>(`${root}/${i}/desc`, 'string');
+      const desc = await readProperty<string>(`${root}/${i}/desc`, 'string');
       if (!desc) continue;
-      const avg = await safeGet<number>(`${root}/${i}/avg`, 'double');
-      const peak = await safeGet<number>(`${root}/${i}/peak`, 'double');
+      const avg = await readProperty<number>(`${root}/${i}/avg`, 'double');
+      const peak = await readProperty<number>(`${root}/${i}/peak`, 'double');
       rows.push({
         label: desc,
         value: elapsed(avg),
@@ -414,50 +404,50 @@ function displayGroup(
  */
 export async function readPlaybackStats(): Promise<StatGroup[]> {
   // ---- source ----
-  const videoCodec = await safeGet<string>('video-codec', 'string');
-  const videoFormat = await safeGet<string>('video-format', 'string');
-  const sourceW = await safeGet<number>('video-params/w', 'int64');
-  const sourceH = await safeGet<number>('video-params/h', 'int64');
+  const videoCodec = await readProperty<string>('video-codec', 'string');
+  const videoFormat = await readProperty<string>('video-format', 'string');
+  const sourceW = await readProperty<number>('video-params/w', 'int64');
+  const sourceH = await readProperty<number>('video-params/h', 'int64');
   // Under hardware decode `pixelformat` reports the *surface* type — "d3d11" —
   // and the real format lives in `hw-pixelformat`. Reading only the first one
   // loses the bit depth and makes every subsampled source look like it is not.
-  const surfaceFormat = await safeGet<string>('video-params/pixelformat', 'string');
-  const hwFormat = await safeGet<string>('video-params/hw-pixelformat', 'string');
+  const surfaceFormat = await readProperty<string>('video-params/pixelformat', 'string');
+  const hwFormat = await readProperty<string>('video-params/hw-pixelformat', 'string');
   const pixelFormat = hwFormat ?? surfaceFormat;
-  const containerFps = await safeGet<number>('container-fps', 'double');
-  const actualFps = await safeGet<number>('estimated-vf-fps', 'double');
-  const videoBitrate = await safeGet<number>('video-bitrate', 'int64');
-  const interlaced = await safeGet<boolean>('video-frame-info/interlaced', 'flag');
-  const deinterlaceActive = await safeGet<boolean>('deinterlace-active', 'flag');
-  const deinterlace = await safeGet<string>('deinterlace', 'string');
+  const containerFps = await readProperty<number>('container-fps', 'double');
+  const actualFps = await readProperty<number>('estimated-vf-fps', 'double');
+  const videoBitrate = await readProperty<number>('video-bitrate', 'int64');
+  const interlaced = await readProperty<boolean>('video-frame-info/interlaced', 'flag');
+  const deinterlaceActive = await readProperty<boolean>('deinterlace-active', 'flag');
+  const deinterlace = await readProperty<string>('deinterlace', 'string');
 
   // ---- colour ----
-  const colormatrix = await safeGet<string>('video-params/colormatrix', 'string');
-  const primaries = await safeGet<string>('video-params/primaries', 'string');
-  const gamma = await safeGet<string>('video-params/gamma', 'string');
-  const levels = await safeGet<string>('video-params/colorlevels', 'string');
-  const chromaLocation = await safeGet<string>('video-params/chroma-location', 'string');
+  const colormatrix = await readProperty<string>('video-params/colormatrix', 'string');
+  const primaries = await readProperty<string>('video-params/primaries', 'string');
+  const gamma = await readProperty<string>('video-params/gamma', 'string');
+  const levels = await readProperty<string>('video-params/colorlevels', 'string');
+  const chromaLocation = await readProperty<string>('video-params/chroma-location', 'string');
   // `max-luma` is the newer name and is in nits; `sig-peak` is the older one and
   // is relative to SDR reference white. Neither exists on every build.
-  const maxLuma = await safeGet<number>('video-params/max-luma', 'double');
-  const sigPeak = await safeGet<number>('video-params/sig-peak', 'double');
-  const targetGamma = await safeGet<string>('target-params/gamma', 'string');
-  const targetPrimaries = await safeGet<string>('target-params/primaries', 'string');
+  const maxLuma = await readProperty<number>('video-params/max-luma', 'double');
+  const sigPeak = await readProperty<number>('video-params/sig-peak', 'double');
+  const targetGamma = await readProperty<string>('target-params/gamma', 'string');
+  const targetPrimaries = await readProperty<string>('target-params/primaries', 'string');
 
   // ---- rendering options, read live rather than assumed ----
-  const vo = await safeGet<string>('current-vo', 'string');
-  const gpuApi = await safeGet<string>('gpu-api', 'string');
-  const hwdec = await safeGet<string>('hwdec-current', 'string');
-  const scale = await safeGet<string>('scale', 'string');
-  const dscale = await safeGet<string>('dscale', 'string');
-  const cscale = await safeGet<string>('cscale', 'string');
-  const resizesOnly = await safeGet<boolean>('scaler-resizes-only', 'flag');
-  const deband = await safeGet<boolean>('deband', 'flag');
-  const dither = await safeGet<string>('dither-depth', 'string');
-  const toneMapping = await safeGet<string>('tone-mapping', 'string');
-  const computePeak = await safeGet<boolean>('hdr-compute-peak', 'flag');
-  const colorspaceHint = await safeGet<string>('target-colorspace-hint', 'string');
-  const videoSync = await safeGet<string>('video-sync', 'string');
+  const vo = await readProperty<string>('current-vo', 'string');
+  const gpuApi = await readProperty<string>('gpu-api', 'string');
+  const hwdec = await readProperty<string>('hwdec-current', 'string');
+  const scale = await readProperty<string>('scale', 'string');
+  const dscale = await readProperty<string>('dscale', 'string');
+  const cscale = await readProperty<string>('cscale', 'string');
+  const resizesOnly = await readProperty<boolean>('scaler-resizes-only', 'flag');
+  const deband = await readProperty<boolean>('deband', 'flag');
+  const dither = await readProperty<string>('dither-depth', 'string');
+  const toneMapping = await readProperty<string>('tone-mapping', 'string');
+  const computePeak = await readProperty<boolean>('hdr-compute-peak', 'flag');
+  const colorspaceHint = await readProperty<string>('target-colorspace-hint', 'string');
+  const videoSync = await readProperty<string>('video-sync', 'string');
 
   // ---- output ----
   // `osd-dimensions` is the whole output surface, margins included. A 2.40:1
@@ -465,12 +455,12 @@ export async function readPlaybackStats(): Promise<StatGroup[]> {
   // *window* reports a scale factor for an image that size was never drawn at —
   // a 3840×1600 scope master in a 2560×1600 window came out as "downscale
   // 1.000×", which is both wrong and self-contradictory. Subtract the margins.
-  const outW = await safeGet<number>('osd-dimensions/w', 'int64');
-  const outH = await safeGet<number>('osd-dimensions/h', 'int64');
-  const marginL = (await safeGet<number>('osd-dimensions/ml', 'int64')) ?? 0;
-  const marginR = (await safeGet<number>('osd-dimensions/mr', 'int64')) ?? 0;
-  const marginT = (await safeGet<number>('osd-dimensions/mt', 'int64')) ?? 0;
-  const marginB = (await safeGet<number>('osd-dimensions/mb', 'int64')) ?? 0;
+  const outW = await readProperty<number>('osd-dimensions/w', 'int64');
+  const outH = await readProperty<number>('osd-dimensions/h', 'int64');
+  const marginL = (await readProperty<number>('osd-dimensions/ml', 'int64')) ?? 0;
+  const marginR = (await readProperty<number>('osd-dimensions/mr', 'int64')) ?? 0;
+  const marginT = (await readProperty<number>('osd-dimensions/mt', 'int64')) ?? 0;
+  const marginB = (await readProperty<number>('osd-dimensions/mb', 'int64')) ?? 0;
   const videoW = outW === null ? null : outW - marginL - marginR;
   const videoH = outH === null ? null : outH - marginT - marginB;
   const letterboxed = marginL + marginR + marginT + marginB > 2;
@@ -481,21 +471,21 @@ export async function readPlaybackStats(): Promise<StatGroup[]> {
   );
 
   // ---- audio ----
-  const audioCodec = await safeGet<string>('audio-codec-name', 'string');
-  const audioBitrate = await safeGet<number>('audio-bitrate', 'int64');
-  const inChannels = await safeGet<string>('audio-params/channels', 'string');
-  const inRate = await safeGet<number>('audio-params/samplerate', 'int64');
-  const inFormat = await safeGet<string>('audio-params/format', 'string');
-  const outChannels = await safeGet<string>('audio-out-params/channels', 'string');
-  const outRate = await safeGet<number>('audio-out-params/samplerate', 'int64');
-  const outFormat = await safeGet<string>('audio-out-params/format', 'string');
-  const ao = await safeGet<string>('current-ao', 'string');
+  const audioCodec = await readProperty<string>('audio-codec-name', 'string');
+  const audioBitrate = await readProperty<number>('audio-bitrate', 'int64');
+  const inChannels = await readProperty<string>('audio-params/channels', 'string');
+  const inRate = await readProperty<number>('audio-params/samplerate', 'int64');
+  const inFormat = await readProperty<string>('audio-params/format', 'string');
+  const outChannels = await readProperty<string>('audio-out-params/channels', 'string');
+  const outRate = await readProperty<number>('audio-out-params/samplerate', 'int64');
+  const outFormat = await readProperty<string>('audio-out-params/format', 'string');
+  const ao = await readProperty<string>('current-ao', 'string');
 
   // ---- health ----
-  const dropped = await safeGet<number>('frame-drop-count', 'int64');
-  const decoderDropped = await safeGet<number>('decoder-frame-drop-count', 'int64');
-  const avsync = await safeGet<number>('avsync', 'double');
-  const cache = await safeGet<number>('demuxer-cache-duration', 'double');
+  const dropped = await readProperty<number>('frame-drop-count', 'int64');
+  const decoderDropped = await readProperty<number>('decoder-frame-drop-count', 'int64');
+  const avsync = await readProperty<number>('avsync', 'double');
+  const cache = await readProperty<number>('demuxer-cache-duration', 'double');
 
   const passes = await readRenderPasses();
 

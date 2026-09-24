@@ -33,6 +33,7 @@
 //! waits in Needs attention rather than going back to the matcher that got it
 //! wrong.
 
+use crate::util::to_string_err;
 use rusqlite::Connection;
 
 // The statuses, as stored:
@@ -220,10 +221,6 @@ pub fn reset_parses(conn: &Connection) -> rusqlite::Result<usize> {
 // status.
 
 use crate::library::Db;
-
-fn to_string_err<E: std::fmt::Display>(e: E) -> String {
-    e.to_string()
-}
 
 #[tauri::command]
 pub fn record_match(

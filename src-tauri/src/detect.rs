@@ -19,16 +19,13 @@
 //! rule that kept yt-dlp out applies here too: when a tool's command line
 //! changes, this should be a line of text in Settings, not a rebuild.
 
+use crate::util::{now_secs, to_string_err};
 use crate::library::Db;
 use crate::settings::setting;
 use serde::Serialize;
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 use tauri::{Emitter, Manager};
-
-fn to_string_err<E: std::fmt::Display>(e: E) -> String {
-    e.to_string()
-}
 
 /// Event name for streamed output. One line per emit.
 const PROGRESS_EVENT: &str = "skiptro-progress";
@@ -493,13 +490,6 @@ fn backlog(app: &tauri::AppHandle) -> Result<Vec<(i64, usize)>, String> {
     }
 
     Ok(backlog)
-}
-
-fn now_secs() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0)
 }
 
 // ---- the automatic pass ----------------------------------------------------

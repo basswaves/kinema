@@ -11,11 +11,12 @@
 //!  * Deletions are soft. A share that is offline should not wipe the library,
 //!    so vanished files are flagged `missing` rather than deleted.
 
+use crate::util::now_secs;
 use rusqlite::{params, Connection};
 use serde::Serialize;
 use std::collections::HashSet;
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::UNIX_EPOCH;
 use walkdir::WalkDir;
 
 /// Container formats worth indexing. Deliberately excludes subtitle and image
@@ -59,13 +60,6 @@ pub struct ScanReport {
     pub files_missing: usize,
     pub errors: Vec<String>,
     pub duration_ms: u128,
-}
-
-fn now_secs() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0)
 }
 
 fn mtime_secs(meta: &std::fs::Metadata) -> i64 {

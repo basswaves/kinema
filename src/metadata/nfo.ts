@@ -18,6 +18,7 @@
  */
 import { invoke } from '@tauri-apps/api/core';
 import type { MediaFile } from '../library/api';
+import { parseGenres } from '../ui/api';
 import {
   tmdbFindByImdb,
   tvmazeLookupByImdb,
@@ -178,16 +179,6 @@ export interface NfoTarget {
 }
 
 const nfoTargets = () => invoke<NfoTarget[]>('nfo_targets');
-
-function parseGenres(raw: string | null): string[] {
-  if (!raw) return [];
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter((g): g is string => typeof g === 'string') : [];
-  } catch {
-    return [];
-  }
-}
 
 /**
  * Build the export set for the whole library.

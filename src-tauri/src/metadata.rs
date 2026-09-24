@@ -4,22 +4,11 @@
 //! module only stores results. Keeping them separate means matching rules can
 //! be re-run against cached titles without re-hitting any API.
 
+use crate::util::{now_secs, to_string_err};
 use crate::artwork::path_prefix;
 use crate::library::Db;
 use rusqlite::{named_params, params};
 use serde::{Deserialize, Serialize};
-use std::time::{SystemTime, UNIX_EPOCH};
-
-fn to_string_err<E: std::fmt::Display>(e: E) -> String {
-    e.to_string()
-}
-
-fn now_secs() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0)
-}
 
 #[derive(Deserialize)]
 pub struct TitleInput {

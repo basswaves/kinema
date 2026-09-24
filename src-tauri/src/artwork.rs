@@ -10,24 +10,13 @@
 //! missing — so a half-populated cache degrades to exactly the old behaviour
 //! rather than to blank posters.
 
+use crate::util::{now_secs, to_string_err};
 use crate::library::Db;
 use rusqlite::params;
 use serde::Serialize;
 use std::collections::HashSet;
 use std::path::PathBuf;
-use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::Manager;
-
-fn to_string_err<E: std::fmt::Display>(e: E) -> String {
-    e.to_string()
-}
-
-fn now_secs() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0)
-}
 
 /// Sub-directory of app data holding the cached images.
 const DIR: &str = "artwork";

@@ -18,6 +18,7 @@ mod settings;
 mod skip;
 mod skiptro;
 mod trailer;
+mod util;
 
 use library::{Db, ScanDb};
 use std::sync::Mutex;

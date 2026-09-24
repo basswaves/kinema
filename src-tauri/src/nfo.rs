@@ -18,14 +18,11 @@
 //! live in the user's media folders, which are frequently read-only shares, and
 //! writing to them should never be a side effect of browsing.
 
+use crate::util::to_string_err;
 use quick_xml::events::Event;
 use quick_xml::Reader;
 use serde::Serialize;
 use std::path::{Path, PathBuf};
-
-fn to_string_err<E: std::fmt::Display>(e: E) -> String {
-    e.to_string()
-}
 
 /// Which root element the file had. The kind matters: an `<episodedetails>`
 /// id identifies an episode, not the show, and using one as the other would
@@ -375,18 +372,6 @@ fn show_nfo_paths(video: &Path) -> Vec<PathBuf> {
     paths
 }
 
-/// Does this folder name look like a season folder rather than the show's own?
-fn is_season_folder(name: &str) -> bool {
-    let lower = name.trim().to_ascii_lowercase();
-    if lower == "specials" || lower.starts_with("season") {
-        return true;
-    }
-    // `S01`, `s1` — but not `Severance`, so the rest must be all digits.
-    lower
-        .strip_prefix('s')
-        .is_some_and(|rest| !rest.is_empty() && rest.chars().all(|c| c.is_ascii_digit()))
-}
-
 /// Where `tvshow.nfo` should go for a given episode file.
 ///
 /// Placement matters more here than anywhere else in this module: episodes
@@ -406,7 +391,7 @@ fn show_nfo_target(video: &Path) -> Option<PathBuf> {
     let parent = video.parent()?;
     let looks_like_season = parent
         .file_name()
-        .map(|n| is_season_folder(&n.to_string_lossy()))
+        .map(|n| crate::util::is_season_folder(&n.to_string_lossy()))
         .unwrap_or(false);
 
     let folder = if looks_like_season {
@@ -820,18 +805,6 @@ mod tests {
             </movie>"#;
         let nfo = parse_nfo(raw, "x.nfo").expect("should parse");
         assert_eq!(nfo.title.as_deref(), Some("Fish & Chips & Peas"));
-    }
-
-    #[test]
-    fn season_folders_are_recognised_but_show_names_are_not() {
-        assert!(is_season_folder("Season 01"));
-        assert!(is_season_folder("season 1"));
-        assert!(is_season_folder("Specials"));
-        assert!(is_season_folder("S01"));
-        // The trap: a show whose name starts with "s".
-        assert!(!is_season_folder("Severance"));
-        assert!(!is_season_folder("Succession"));
-        assert!(!is_season_folder(""));
     }
 
     /// `Show/Season 01/Episode.mkv` must put tvshow.nfo in `Show/`, not in the

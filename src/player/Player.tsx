@@ -125,6 +125,7 @@ const TRANSPORT_SKIP_SECS = 30;
 const PLAYER_SHELL_KEY = 'player-shell';
 const PLAYER_PLAY_KEY = 'player-play';
 const PLAYER_TRACKS_KEY = 'player-tracks-button';
+const PLAYER_STATS_KEY = 'player-stats-button';
 
 /** The label an episode carries into the player, shared with the browsing UI. */
 function labelFor(episode: EpisodeRef): string {
@@ -251,6 +252,25 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     setOsdVisible(true);
     window.clearTimeout(hideTimer.current);
     void setFocus(PLAYER_PLAY_KEY);
+  }, []);
+
+  /**
+   * Close a panel with the focus ring landing on the button that opened it.
+   *
+   * Focus moves **first**, while the panel is still there. Closing it with the
+   * ring inside lets the spatial library restore focus by itself 300 ms after
+   * the unmount — to the shell's preferred child, Pause — which overrode
+   * anything set in the meantime (docs/GOTCHAS.md, "focus parked on an
+   * unmounted component"). With the ring already outside, there is nothing to
+   * restore.
+   */
+  const closeTracks = useCallback(() => {
+    if (osdFocusRef.current) void setFocus(PLAYER_TRACKS_KEY);
+    setShowTracks(false);
+  }, []);
+  const closeStats = useCallback(() => {
+    if (osdFocusRef.current) void setFocus(PLAYER_STATS_KEY);
+    setShowStats(false);
   }, []);
 
   /** Give them back to seeking, and let the OSD start timing out again. */
@@ -1076,9 +1096,9 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         case 'BrowserBack':
           e.preventDefault();
           if (showTracks) {
-            setShowTracks(false);
+            closeTracks();
           } else if (showStats) {
-            setShowStats(false);
+            closeStats();
           } else if (osdFocus) {
             leaveOsdFocus();
           } else {
@@ -1157,7 +1177,8 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         // mpv's own key for its stats overlay, so the reflex transfers.
         case 'i':
           e.preventDefault();
-          setShowStats((v) => !v);
+          if (showStats) closeStats();
+          else setShowStats(true);
           break;
         // OK on a remote. While the OSD holds focus this belongs entirely to
         // the spatial system, which activates whichever control the ring is on
@@ -1202,6 +1223,8 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     leaveOsdFocus,
     showTracks,
     showStats,
+    closeTracks,
+    closeStats,
   ]);
 
   useEffect(() => {
@@ -1211,17 +1234,15 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   }, [showOsd]);
 
   /**
-   * Follow the track panel with the focus ring.
+   * Follow the track panel with the focus ring when it opens.
    *
    * Opening a panel and leaving focus on the button that opened it means the
    * first thing a remote has to do is work out which direction the new panel is
-   * in. Closing it and leaving focus on a control that no longer exists is
-   * worse: the ring vanishes and no arrow does anything. Only applies once the
-   * OSD holds focus — with a mouse, nothing should move on its own.
+   * in. Only once the OSD holds focus — with a mouse, nothing should move on
+   * its own. Closing is `closeTracks`, which has to act *before* the panel goes.
    */
   useEffect(() => {
-    if (!osdFocus) return;
-    void setFocus(showTracks ? TRACK_PANEL_KEY : PLAYER_TRACKS_KEY);
+    if (osdFocus && showTracks) void setFocus(TRACK_PANEL_KEY);
   }, [showTracks, osdFocus]);
 
   /**
@@ -1331,7 +1352,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       {/* Deliberately outside the OSD: the panel is for watching numbers move
           while the video plays, so hiding it with the idle timer would defeat
           the one thing it is for. */}
-      {showStats && <StatsPanel stats={stats} onClose={() => setShowStats(false)} />}
+      {showStats && <StatsPanel stats={stats} onClose={closeStats} />}
 
       {showTracks && (
         <TrackPanel
@@ -1341,7 +1362,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           sid={sid}
           subVisible={subVisible}
           onChoose={(kind, track) => void chooseTrack(kind, track)}
-          onClose={() => setShowTracks(false)}
+          onClose={closeTracks}
         />
       )}
 
@@ -1403,16 +1424,21 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
             focusKey={PLAYER_TRACKS_KEY}
             className={showTracks ? 'active' : ''}
             onSelect={() => {
-              setShowTracks((v) => !v);
+              if (showTracks) {
+                closeTracks();
+                return;
+              }
+              setShowTracks(true);
               void readTracks().then(setTracks);
             }}
           >
             Audio &amp; subtitles
           </FocusButton>
           <FocusButton
+            focusKey={PLAYER_STATS_KEY}
             className={showStats ? 'active' : ''}
             title="Playback diagnostics (i)"
-            onSelect={() => setShowStats((v) => !v)}
+            onSelect={() => (showStats ? closeStats() : setShowStats(true))}
           >
             Stats
           </FocusButton>

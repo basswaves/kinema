@@ -546,6 +546,13 @@ top-level view claims focus on arrival through `useClaimFocus` in
 The same applies at startup: nothing holds focus until something claims it, and
 a remote has no equivalent of a hover to bootstrap it.
 
+**Closing a panel that holds focus: move focus out first.** Setting focus on
+the opener *after* the panel closes loses — the library's own restore fires
+300 ms after the unmount and lands on the parent's preferred child. The
+player's track panel sent the ring to Pause this way. `closeTracks` and
+`closeStats` in `Player.tsx` aim at the opener while the panel still exists,
+so there is nothing left for the library to restore.
+
 ### …and a claim that succeeds can still be overwritten
 
 `useClaimFocus` did all of the above and a remote was *still* dead after every

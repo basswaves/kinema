@@ -124,15 +124,6 @@ git checkout <that commit>~1 -- src/spike/ src/App.css
 It renders through the same `ensureMpvInitialised` as the real player, so what
 it reports is what the player gets.
 
-### Closing the track panel puts focus on Pause
-
-Closing Audio & subtitles with Back leaves the focus ring on Pause rather than
-on the button that opened the panel. Harmless — focus is visible and usable —
-and it predates the player restructure (checked against the old player in the
-mock). Two effects race on the same change: one aims at the tracks button, the
-other sees the panel's control gone and falls back to the shell's preferred
-child.
-
 ### Back from a detail page always goes Home
 
 Opening a title from a **See all** grid and pressing Back returns to Home rather

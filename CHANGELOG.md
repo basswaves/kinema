@@ -7,8 +7,115 @@ makes no stability promises.
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-09-24
+
+The result of a full review of the code, the logs and a real library — mostly
+things that looked right and quietly did not happen, and the structure that let
+them.
+
+### Upgrading
+
+- **Your library is upgraded automatically on first launch** (database version
+  9 → 13), and a copy is made first, in `%APPDATA%\com.kinema.app\backups\`.
+  The three most recent copies are kept.
+- **Your watch history carries over**, and now belongs to the episode rather
+  than to the file — see below.
+
+### Added
+
+- **Watch history follows the episode, not the file.** Moving or renaming a
+  file, replacing it with a better copy, removing a folder and adding it back,
+  or re-matching a show no longer loses what you have watched. Two copies of
+  one episode are watched — or un-watched — together.
+- **Detection can be stopped.** In Settings, **Detect** becomes **Stop
+  detecting** while it runs, and **Scan now** becomes **Stop detection** during
+  the scan's own detection. Seasons already finished are kept. Closing Kinema
+  now stops a running Skiptro too; Windows used to leave it scanning, unseen,
+  after the window had gone.
+- **A remote's transport keys work in the player:** Play/Pause, Play, Pause,
+  Stop (leaves the player), fast-forward and rewind (30 s), and the Back key
+  many remotes send.
+- **Settings → Developer tools → Open log folder.** Both logs now live in
+  `%APPDATA%\com.kinema.app\logs\`, and the previous session's are kept
+  beside them.
+
+### Changed
+
+- **Skip intro is offered from 0:00** whenever an intro is known, and stays
+  until the intro ends — through a cold open too, where pressing it jumps to
+  the end of the intro. It no longer disappears after ten seconds, and seeking
+  back into the intro brings it back. Automatic mode still waits for the intro
+  itself.
+- **Skiptro's intro is used where Skiptro is sure of it** (confidence 0.8 and
+  up). Measured on a real library, every large disagreement with Kinema's own
+  analysis was one Skiptro had scored 0.70 or less; there, the analysis answers.
+- **An episode counts as watched once its credits start**, not only at 94% —
+  long end credits no longer leave a finished episode in Continue Watching.
+- **A guessed credits start** (the last minute of a file) only ever offers Up
+  next. It never skips by itself, in automatic mode either.
+- **Remove in Continue Watching sticks** until you watch that show again, works
+  on "Next episode" cards, and can be reached with a remote.
+- **A match the matcher refused is not asked again at every launch** — only
+  when you add or change a TMDB or OMDb key, the one thing that can change the
+  answer.
+- **Unlinking a wrong match holds it for you** in Needs attention, instead of
+  the next scan matching it straight back.
+- **Episodes named only `S01E01.mkv`** take the show's name from the folder
+  above, and a file that still has no name goes to Needs attention instead of
+  vanishing from the library.
+- **Faster:** a show's episodes come from TMDB twenty seasons to a request, a
+  file's audio, subtitle and chapter lists are read at once rather than one
+  value at a time, and work that touches a network drive no longer freezes the
+  window while the drive wakes up.
+- **Nothing runs twice at once.** A second scan or detection is refused with a
+  sentence saying why; a second artwork download waits its turn.
+- **The player's controls open on Play**, and closing Audio & subtitles or
+  Stats returns the focus ring to the button that opened it.
+- **Settings works with a held remote key:** the focus ring scrolls into view,
+  text fields let go of the cursor when you move on, and holding a key no
+  longer sends focus the wrong way.
+- **Intros and credits are now detected automatically.** A season dropped into a
+  watched folder used to appear in the library immediately and then play with no
+  Skip button, because both local detectors only ever ran from a button in
+  Settings — the one screen you do not visit before you know something is wrong.
+  Every scan that finds new episodes now goes on to detect their markers.
+  Skiptro runs whenever it is installed and something new arrived; the built-in
+  ffmpeg analysis runs unless it is switched off, under **Settings → Intro and
+  credits markers → Built in**, since it is the slow one. Neither can fail a
+  scan: a Skiptro that is not installed says nothing, one that has gone missing
+  says so under the scan summary, and everything else carries on.
+- ffmpeg now runs at below-normal priority, so an analysis triggered by a scan
+  cannot compete with an episode being played at the same time.
+- Settings no longer describes TheIntroDB as "asked once per episode", which
+  read as though the app would ask *you* something and left at least one user
+  waiting for a dialog that does not exist. It is a background lookup and always
+  was.
+
 ### Fixed
 
+- **The window no longer shows the desktop through it** in the moment between
+  pressing Play and the picture arriving.
+- **A resumed episode opens at its position** instead of playing its opening
+  first and then jumping.
+- **The Skip button could be missing for a whole episode** if the episode
+  loaded at the wrong instant after launch.
+- **The remote could go dead** after launch and after leaving the player.
+- **The detail page lists each episode once**, shows files for episodes the
+  provider does not list, and treats a double-episode file (`S01E01E02`) as
+  both of its episodes — for Up next too.
+- **A download still being written is not marked watched.**
+- **Touching a file no longer undoes its match.** A changed date or size used
+  to send it back through the matcher, undoing matches made by hand.
+- **Pressing Next twice while an episode was loading** could take the wrong
+  episode's position for the new one.
+- An NFO file's bare `<id>` is no longer read as a TMDB id.
+- Titles with no trailer are no longer looked up again at every launch.
+- TVmaze's rate limit is respected, and a "too many requests" reply is waited
+  out instead of landing the show in Needs attention.
+- Logos and cast photos found during a scan are downloaded in that scan, not
+  the next.
+- The built-in analysis only believes an intro heard in at least two *other*
+  episodes; one episode matching twice used to count as both.
 - **A part-downloaded episode no longer stays "watched" once it finishes.** An
   incomplete MKV plays — the container streams happily from a partial file —
   reports a wrong duration, reaches its short end and was marked complete. That
@@ -26,29 +133,14 @@ makes no stability promises.
   changing and says how many it is waiting for; the Detect button still runs
   immediately.
 
-### Changed
+### Security
 
-- **Intros and credits are now detected automatically.** A season dropped into a
-  watched folder used to appear in the library immediately and then play with no
-  Skip button, because both local detectors only ever ran from a button in
-  Settings — the one screen you do not visit before you know something is wrong.
-  Every scan that finds new episodes now goes on to detect their markers.
-  Skiptro runs whenever it is installed and something new arrived; the built-in
-  ffmpeg analysis runs unless it is switched off, under **Settings → Intro and
-  credits markers → Built in**, since it is the slow one. Neither can fail a
-  scan: a Skiptro that is not installed says nothing, one that has gone missing
-  says so under the scan summary, and everything else carries on.
-- ffmpeg now runs at below-normal priority, so an analysis triggered by a scan
-  cannot compete with an episode being played at the same time.
-- Settings no longer describes TheIntroDB as "asked once per episode", which
-  read as though the app would ask *you* something and left at least one user
-  waiting for a dialog that does not exist. It is a background lookup and always
-  was.
-- **Renamed from "Personal Netflix" to Kinema.** The bundle identifier changed
-  with it, so the app now stores its library in
-  `%APPDATA%\com.kinema.app\`. Anyone upgrading from a pre-release build must
-  rename the old `com.personalnetflix.app` folder, or the library will look
-  empty.
+- **The window has a content security policy:** it runs only Kinema's own
+  code. Anything the policy refuses is written to `app.log`.
+
+## [0.1.0] — 2026-08-08
+
+First public release.
 
 ### Added
 
@@ -69,6 +161,11 @@ makes no stability promises.
 
 ### Changed
 
+- **Renamed from "Personal Netflix" to Kinema.** The bundle identifier changed
+  with it, so the app now stores its library in
+  `%APPDATA%\com.kinema.app\`. Anyone upgrading from a pre-release build must
+  rename the old `com.personalnetflix.app` folder, or the library will look
+  empty.
 - **Settings is written for the person using it**, not the person who built it.
   The frame-timing help was one paragraph containing *24p judder, 3:2 cadence,
   resampling, bitstream passthrough, TrueHD, DTS:X, AVR* and *PCM*, and
@@ -108,7 +205,3 @@ makes no stability promises.
   nothing written to either log. No installer was ever shipped from it.
 - Removed a dead entry allowing requests to `api.mdblist.com`, which nothing had
   called since that provider was dropped.
-
-## [0.1.0] — unreleased
-
-First public release.

@@ -24,6 +24,7 @@ import { formatBytes } from './format';
 import FocusInput from './FocusInput';
 import ConfirmButton from './ConfirmButton';
 import EquipmentSection from './EquipmentSection';
+import SoundSection from './SoundSection';
 import { useClaimFocus } from './focus';
 import { setTvMode, useTvMode } from './tv';
 import {
@@ -753,6 +754,8 @@ export default function Settings() {
             </span>
           </div>
         </section>
+
+        <SoundSection onError={setError} />
 
         <EquipmentSection />
 

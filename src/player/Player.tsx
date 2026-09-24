@@ -72,6 +72,7 @@ import { readChapters, type Chapter } from './chapters';
 import { VIDEO_SYNC_KEY, VIDEO_SYNC_MODES } from './mpvOptions';
 import { readPlaybackStats, type StatGroup } from './stats';
 import { matchHdrToDisplay } from './displayHdr';
+import { applyAudioPlan, applyFallback, FALLBACKS, silencedAudioTrack } from './audioOutput';
 import { getSetting } from '../metadata/api';
 import { initialSession, reduce, samePath } from './session';
 
@@ -117,6 +118,10 @@ const COVER_MAX_MS = 8000;
  * arrows' 10 s: those are the fine control, these are for getting somewhere.
  */
 const TRANSPORT_SKIP_SECS = 30;
+/** How long after playback starts to check that the sound actually opened. */
+const AUDIO_CHECK_MS = 1500;
+/** How long a notice about the sound stays on screen. */
+const AUDIO_NOTICE_MS = 12000;
 
 /**
  * Focus keys for the two places focus is aimed at explicitly: the control the
@@ -176,6 +181,22 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   const [subVisible, setSubVisible] = useState(true);
   const [upNext, setUpNext] = useState<EpisodeRef | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
+  /**
+   * What happened to the sound, when it did not open the way it was asked to.
+   * The failure this exists for was silent: with Windows' "Atmos for home
+   * theater" on, mpv opened no audio at all and the film simply played mute.
+   */
+  const [audioNotice, setAudioNotice] = useState<string | null>(null);
+  /** How many of FALLBACKS have been tried for the file that is open. */
+  const audioFallback = useRef(0);
+  /**
+   * The last audio track that was playing. mpv deselects the track when its
+   * output fails to open, so this is what the fallback puts back.
+   */
+  const lastAid = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    if (aid !== null) lastAid.current = aid;
+  }, [aid]);
   const [markers, setMarkers] = useState<SkipMarkers | null>(null);
   /**
    * The path the current `markers` were fetched for, once the fetch has
@@ -314,7 +335,9 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     // clears them when it advances, and every other route out left them set.
     setUpNext(null);
     setCountdown(null);
+    setAudioNotice(null);
     /* eslint-enable react-hooks/set-state-in-effect */
+    audioFallback.current = 0;
 
     (async () => {
       try {
@@ -346,6 +369,10 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         // screen as it is now — see displayHdr.ts. A failure here must not
         // stop playback; the hint just stays as it was.
         await matchHdrToDisplay().catch((e) => console.warn('display: hint not applied', e));
+        if (cancelled) return;
+        // Likewise the sound: through Windows, or straight to the receiver
+        // with whatever it takes passed through untouched. See audioOutput.ts.
+        await applyAudioPlan().catch((e) => console.warn('audio: plan not applied', e));
         if (cancelled) return;
 
         // `loadfile <url> <flags> <index> <options>`: the per-file `start`
@@ -479,8 +506,38 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     let disposed = false;
     let unlisten: (() => void) | undefined;
 
+    // A moment after playback (re)starts, make sure the sound opened; if it
+    // did not, step through the fallbacks, checking again after each.
+    const checkAudioSoon = () =>
+      window.setTimeout(() => {
+        void (async () => {
+          if (disposed) return;
+          const track = await silencedAudioTrack(lastAid.current);
+          if (track === null) return;
+          const step = audioFallback.current++;
+          if (await applyFallback(step, track).catch(() => false)) {
+            setAudioNotice(
+              FALLBACKS[step]?.channels === 'stereo'
+                ? 'Windows would not take surround sound, so this is playing in stereo.'
+                : 'The sound could not be sent the chosen way, so it is going through Windows instead.'
+            );
+            checkAudioSoon();
+          } else {
+            console.error('audio: no output could be opened for this file');
+            setAudioNotice(
+              'No sound: Windows would not open the audio device. If Windows spatial sound ' +
+                '(Atmos or DTS:X for home theater) is on, switch it off, or turn on ' +
+                '"Send sound straight to the receiver" in Settings.'
+            );
+          }
+        })();
+      }, AUDIO_CHECK_MS);
+
     listenEvents((event) => {
-      if (event.event === 'playback-restart') dispatch({ type: 'playback-restart' });
+      if (event.event === 'playback-restart') {
+        dispatch({ type: 'playback-restart' });
+        checkAudioSoon();
+      }
 
       if (event.event === 'file-loaded') {
         dispatch({ type: 'file-loaded' });
@@ -943,6 +1000,13 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     return () => window.clearTimeout(id);
   }, [session.frameShown, session.seq]);
 
+  // A notice about the sound says its piece and goes; the film is playing.
+  useEffect(() => {
+    if (!audioNotice) return;
+    const id = window.setTimeout(() => setAudioNotice(null), AUDIO_NOTICE_MS);
+    return () => window.clearTimeout(id);
+  }, [audioNotice]);
+
   // Stop playback when leaving, so audio does not continue behind the UI.
   useEffect(() => {
     return () => {
@@ -1316,6 +1380,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       {!session.frameShown && <div className="player-cover" aria-hidden="true" />}
 
       {error && <div className="player-error">{error}</div>}
+      {audioNotice && <div className="player-notice">{audioNotice}</div>}
 
       {session.resumedFrom !== null && (
         <div className="resume-toast" onAnimationEnd={() => dispatch({ type: 'resume-shown' })}>

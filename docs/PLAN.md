@@ -1347,6 +1347,93 @@ chapters in parallel, and gave the window a CSP whose refusals are written to
 a browser against a fake mpv, and in the real app against a copy of the real
 library — without anyone clicking through a checklist.
 
+## Native output (in progress)
+
+Agreed on 2026-09-24; the steps are in ROADMAP.md while they are open.
+The aim is the one a UHD disc player has: 4K at 1:1 on a 4K screen, HDR10 sent
+as the disc carries it, surround sent to the receiver untouched, and the screen
+at the film's own frame rate — decided by the app from what the hardware says,
+not by settings a person has to understand.
+
+**Settings describe the hardware, never taste.** This extends the old rule that
+frame timing was the one exception to "no quality presets". Passthrough and
+display switching need a handful of settings, and they are allowed because each
+one answers a question about the equipment — does the receiver take TrueHD, may
+the app change the screen's mode — that the code cannot always answer for
+itself. Anything it *can* answer, it answers: step 1 exists to detect as much
+as possible, and every audio format setting defaults to "Auto" (the detected
+answer). Picture-quality settings remain out.
+
+**Display switching exists, and is off by default.** a deliberate choice:
+switching the refresh rate or HDR blanks the screen for a second or two, and
+some TVs take longer. It is three switches (refresh, resolution, HDR), not one.
+
+**Resolution matching is offered, off.** The recommendation was to never switch
+resolution — keep the screen native and let the app upscale with spline36,
+which is neutral where a TV's scaler usually sharpens. The owner wanted it available
+anyway for people whose TV scales better; it only ever switches to the source's
+own resolution, never below it.
+
+**Detect first, read-only.** Step 1 (`equipment.rs`) changes nothing about
+playback. Kodi also asks the driver what an HDMI device takes, but still makes
+the user tick formats; MPC-HC, Plex and Jellyfin make them tick blind. Here the
+answer is asked format by format, in *exactly* the shape mpv would send, so a
+"yes" means mpv's own open will succeed — the only defence against mpv
+relabelling an unsupported bitstream as AC3 (see GOTCHAS → "Output hardware").
+
+**Check every launch; remember for when a device cannot answer.** The request was
+for new devices to be checked on their own and known ones remembered rather
+than re-checked. The first half is done as asked. For the second, re-checking
+costs nothing (a tenth of a second for everything here) and catches what
+changes *without* a device changing — HDR switched on in Windows, a new speaker
+setup — so every launch checks everything. What memory is for is the case a
+check cannot cover: a receiver on standby or held by another program at launch
+keeps its last real answers, marked "remembered", instead of looking like one
+that takes nothing. A fresh answer always wins over a remembered one — a
+recabling that loses TrueHD must show at once — and "exclusive control not
+allowed" is never papered over, because it is true *now*. Devices not connected
+stay listed with the date they were last seen. Stored as JSON in the settings
+table, so it needed no database upgrade and a build carrying it can open a
+0.2.0 library and hand it back.
+
+**Exclusive audio is a switch, off by default.** Decided after the first
+run on his TV: Kinema must not take the audio device to itself unasked — it
+silences every other program for as long as a film plays. The consequence,
+said to him plainly: bitstreaming *is* exclusive on Windows (mpv opens every
+passthrough stream exclusively whatever `--audio-exclusive` says), so with the
+switch off there is no passthrough and no Atmos — Windows' own "Dolby Atmos for
+home theater" needs an app to use its spatial audio API, which mpv does not. Off
+means the Windows mixer, with warnings where it is known to lose something.
+
+**…taken only while a film plays, and offered once.** Agreed later the same day,
+after it was pointed out that games on an HTPC need Windows' "Atmos / DTS:X for
+home theater" left on. Exclusive access for the length of a film is the
+official way to have both: the receiver gets the untouched bitstream during the
+film and Windows' spatial sound is back for everything else the moment it
+stops. Switching Windows' spatial sound or speaker setup from the app was
+rejected — Windows has no public API for either, and undocumented ones break
+with an update, against the maintenance rule. So: the switch stays off by
+default; when the equipment check sees a receiver that takes TrueHD/DTS-HD, or
+Windows spatial sound on, Settings says so, and the first film played on such a
+setup offers it **once** — never again after that, and never at all if the
+switch is already on. With it off, sound through Windows is explained, not
+fixed behind the user's back: what is lost and how to get it back, a stereo
+fallback if Windows refuses the stream, and never a film playing silent.
+
+**Dolby Vision is output as HDR10, and that is the ceiling.** Windows has no
+route for a Dolby Vision signal to a TV. Profile 7/8 play their HDR10 base
+layer; profile 5, which has none, is mapped by libplacebo using its own
+metadata. madVR and Kodi on Windows are in the same place. Atmos is the
+opposite case: it survives, but only as a bitstream — decoded to PCM it loses
+its height channels.
+
+**Verified without the hardware, then once with it.** The hardware this has to
+work on is on a machine that only runs releases. So each step is verified here
+as far as physics allows (unit tests, `--ao=pcm` dumps, the two screens that can
+switch mode), and the equipment report makes a single launch there enough to
+read what that hardware says. What that run cannot show — whether a picture
+looks right across a room — is said so, not claimed.
+
 ## Open items
 
 **They live in [ROADMAP.md](ROADMAP.md), and only there.** They used to be

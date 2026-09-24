@@ -834,6 +834,149 @@ for it. Only accept fields that are direct children of the root.
 
 ---
 
+## Output hardware (Windows)
+
+What the screens and the audio device can take. Every entry here is something
+that fails without an error — silence at the receiver, or a picture that is
+quietly not what the disc carries.
+
+### mpv relabels a refused bitstream as AC3
+
+When WASAPI refuses a passthrough format, `find_formats_exclusive` in mpv's
+`ao_wasapi_utils.c` retries it **with the sub-format set to AC3** ("Retrying as
+AC3"). A device that takes AC3 but not TrueHD then *accepts* the TrueHD stream,
+and the receiver gets data it cannot decode: silence or noise, no error
+anywhere. Only when every attempt fails does mpv fall back to PCM.
+
+**Do:** never put a codec in `--audio-spdif` that the device has not said yes
+to *in its own right*. `equipment.rs` asks per codec, in exactly mpv's shape:
+AC3/DTS 2 ch @ 48 kHz, E-AC3 2 ch @ 192 kHz, TrueHD/DTS-HD MA 8 ch @ 192 kHz,
+16-bit, IEC 61937 sub-format — and a test pins those shapes, because if they
+drift from mpv a "yes" stops meaning anything.
+
+### HDR "passthrough" is not the default
+
+`--target-colorspace-hint=yes` sends HDR, but with `--target-colorspace-hint-mode`
+at its default, **`target`**, mpv first adapts the picture to the peak Windows
+reports for the screen — which comes from the EDID and is often generic. `source`
+is what a disc player does: the film's own HDR10 metadata, and the TV tone maps.
+Until ROADMAP → Native output step 2, `mpvOptions.ts` says "passes through
+untouched" and it does not.
+
+### mpv sends HDR10 to an SDR screen, and Windows quietly converts it
+
+With `target-colorspace-hint` at `yes` **or `auto`**, playing an HDR file on
+the development monitor here (Windows HDR off, DXGI reporting `RGB_FULL_G22_NONE_P709`) still
+logged "New swap chain configuration received from hint: … G2084_NONE_P2020".
+Nothing looks broken — Windows converts the HDR swap chain to SDR itself — so
+for as long as the hint was `yes`, mpv's BT.2390 tone mapping, the one chosen
+deliberately in `mpvOptions.ts`, never ran on an SDR screen, and nobody could
+tell. `auto` did not help.
+
+**Do:** decide the hint from the display, not from mpv: `displayHdr.ts` sets it
+`no` unless Windows has HDR on for the screen the window is on. With `no`,
+`video-target-params` reads `gamma2.2 / bt.709 / 80 nits` and the swap chain
+stays SDR.
+
+### The stats panel's HDR row asked for a property that does not exist
+
+`stats.ts` reads `target-params/gamma`. mpv's property is
+**`video-target-params`**; the other name returns nothing, and `describeHdr`
+treats nothing as "tone mapping". So every HDR file said "tone mapped" — on an
+HDR TV that was receiving HDR10 — and the panel whose whole purpose is to
+answer "passthrough or not?" could never say passthrough. Found from the test TV
+log, where the swap chain plainly went to `RGB_FULL_G2084_NONE_P2020`.
+
+**How to tell what really happened:** in `mpv.log`, "New swap chain
+configuration received from hint" gives the output colour space, and a
+`pl_shader_color_map` block containing `tone_map(` in the shader dump means a
+tone curve ran — in `target` mode it does even HDR→HDR, adapting to the peak
+Windows reports.
+
+### A half-configured Windows spatial sound leaves mpv with no audio at all
+
+mpv's shared-mode 7.1 stream passed `IsFormatSupported` and then failed
+`Initialize` with `0x887C0077`, and mpv carried on with `Audio: no audio` — a
+film playing silent, no error in the UI. **Cause, found in USB round 3:**
+a half-configured spatial mode — the device's format dropdown switched to an
+Atmos option without Dolby Access installed and spatial sound enabled. Nothing
+could play in that state, not just Kinema. Once Dolby Access was set up and
+only the spatial-sound option switched on, mpv's 7.1 opened normally
+(`equipment:` then read `dynamic=20 static-mask=0xc1ffe`) and the fallback
+never ran. Keep the fallback: a misconfigured Windows is exactly the case it
+is for, and it now says so on screen.
+
+**And what "Atmos" means there:** mpv decodes the track (a DTS:X track went
+through the `dca` decoder) to 7.1 PCM, and Windows wraps that 7.1 as Dolby
+Atmos for the receiver. The receiver's display says Atmos for anything played
+this way; the film's own height and object sound is gone. Only "straight to the
+receiver" (bitstream) keeps it.
+
+### A failed audio open deselects the track
+
+When mpv cannot open the audio output it logs "Audio: no audio" and
+**deselects** the audio track, rather than leaving it selected with nowhere to
+go. So "is a track selected but not playing?" never fires. The sign is a file
+with audio tracks and none selected — which Kinema never asks for, having no
+"audio off". Putting the same track back (`set aid N`) is what reopens the
+output with new settings; `ao-reload` alone leaves it silent.
+`silencedAudioTrack` in `audioOutput.ts`; staged in `selftest.ps1` by setting
+`audio-device` to a GUID that does not exist and calling `ao-reload`.
+
+### Exclusive mode with the default `audio-channels` is stereo
+
+`auto-safe`, mpv's default, means "the system's preferred layout, and stereo if
+there is none" — and in exclusive mode there is no system mixer to ask. So
+"straight to the receiver" would have been a stereo downmix of every track not
+bitstreamed. The plan sets an explicit list from the device's own answer
+(`7.1,5.1(side),5.1,stereo` for an 8-channel receiver). With it, the onboard sound
+here opened as `7.1 s32 … (exclusive)` — **with Windows Sonic switched on**,
+which confirms exclusive output goes around Windows' spatial sound.
+
+### The spatial audio API says "available" whether spatial sound is on or not
+
+`IMMDevice::Activate` for `ISpatialAudioClient` succeeds on every device here
+with spatial sound *off*, `GetNativeStaticObjectTypeMask` returns `0xffffe` and
+`IsSpatialAudioStreamAvailable` returns S_OK — Windows provides a spatial
+renderer regardless. So none of those means "Atmos for home theater is on", and
+a first attempt that trusted them reported it on for all three devices. The
+dynamic object count is the only answer that cannot give a false "on", and it
+read 0 on the test TV with it on. Detection is open; see ROADMAP step 3.
+
+### Display-clock timing switches itself off while bitstreaming
+
+With `video-sync=display-resample` and a passthrough stream, `adjust_sync` in
+mpv's `player/video.c` just returns (`if (resample &&
+using_spdif_passthrough(mpctx)) return;`). Nothing breaks and nothing is
+logged — the frame-timing switch simply has no effect for that file. So the two
+are not "incompatible", but the switch is inert.
+
+### From Windows 11 24H2, "advanced colour" does not mean HDR
+
+`DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO` reports `advancedColorSupported` for an
+SDR screen with automatic colour management, too. Ask
+`DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO_2` (type 15) instead: bit 4 is
+`highDynamicRangeSupported`, and `activeColorMode == 2` means HDR is on. It is
+not in `windows` 0.61, so `equipment.rs` lays it out by hand, from wingdi.h.
+Older Windows refuses type 15 and the code falls back to the old query, where
+advanced colour did mean HDR.
+
+### Windows lists 23.976 Hz as `23`
+
+`EnumDisplaySettings` gives whole numbers, and the NTSC rates are listed one
+below the round figure: `23` is 23.976, `59` is 59.94, `119` is 119.88. That is
+the convention madVR and Kodi rely on. The *current* mode is exact —
+`QueryDisplayConfig` gives it as a fraction (`59972/1000` on the development monitor here) — so
+use that for anything already running.
+
+### Probing the device's formats needs nothing open
+
+`IAudioClient::IsFormatSupported` in exclusive mode answers without opening the
+device, so it is safe to ask at any time. It cannot answer while another program
+holds the device exclusively (`AUDCLNT_E_DEVICE_IN_USE`): report that as
+"busy", not as "no", or a receiver in use by something else looks like one that
+takes nothing.
+
 ## Environment (Windows)
 
 ### Spawned shells inherit a stale PATH

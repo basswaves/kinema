@@ -25,6 +25,25 @@ Several open questions are gated on it: a 2560×1600 **SDR** panel at 59.972 Hz,
 a desktop GPU, media on local disk and SMB. Audio goes to the onboard device, not
 a receiver.
 
+As `equipment.rs` reads it (2026-09-24): the 2560×1600 development monitor (DisplayPort) offers
+23.976/24 Hz only at 1920×1080 and below; a second screen, a 1080p monitor
+(HDMI), offers 50 Hz but no 24 Hz mode. Neither does HDR. Sound: onboard
+analogue (the default), onboard optical S/PDIF (takes AC3 and DTS only — all an
+optical link can carry), and the development monitor's HDMI audio (no bitstreams). So display
+*switching* can be tested for real here; HDR and bitstreaming cannot.
+
+The target setup — a **4K HDR10 TV and a receiver AVR with Atmos** — is on another
+machine that only runs downloaded releases. Anything that needs it is verified
+from the `equipment:` lines in that machine's `app.log`.
+
+As read there (2026-09-24, first USB run): the test PC's GPU; the TV reports under the TV's own name
+over HDMI at 3840×2160 **@ 30 Hz, 8-bit**, HDR on, 1499 nits peak, with
+23.976/24 Hz offered at 3840×2160 and 4096×2160. Audio "<TV> (HDMI
+Definition Audio)" takes **all five bitstreams** (AC3, E-AC3, DTS, DTS-HD MA,
+TrueHD) and 8-channel PCM — so the chain is PC → receiver → TV, and the receiver
+is answering under the TV's name. Windows was mixing to 7.1 at 44.1 kHz by the
+end of his tests.
+
 ---
 
 ## The improvement plan (from the September 2026 review)
@@ -45,22 +64,155 @@ nothing is tested by hand.
 
 ---
 
+## Native output (agreed 2026-09-24)
+
+The goal: whatever the PC is connected to, it gets the most native signal it
+can take — 4K at 1:1, HDR10 as the disc carries it, surround as an untouched
+bitstream — without anyone having to know which settings make that happen.
+Decisions and reasons are in PLAN.md → "Native output". One commit per step, in
+this order:
+
+1. **Detection and the equipment report — done.** `equipment.rs` reads every
+   screen (modes, exact refresh, HDR support and state, peak nits) and every
+   audio output (the Windows mix, direct PCM channels, and each bitstream format
+   probed exactly as mpv would send it). Checked at every launch, remembered
+   per device across launches (settings key `equipment_memory`), written to
+   `app.log` as `equipment:` lines, and shown read-only in Settings → Your
+   equipment, where "Check again" re-asks the connected devices. Changes no
+   playback. **Waiting on:** a run on the test machine, from the
+   "Kinema USB test" folder (the app, a readme, and a script that copies the
+   logs onto the stick); the logs come back in "Logs from the TV PC".
+2. **HDR the way a disc player does it — built, waiting on the test TV.**
+   `target-colorspace-hint-mode=source`, so the TV gets the film's own HDR10
+   metadata (1000 nits for the test film) instead of a version remapped to the 1499
+   nits Windows reports. And, found while testing it: mpv tagged its output
+   HDR10 **on SDR screens too** (hint `yes` and `auto` alike), leaving Windows
+   to convert it down, so mpv's own tone mapping never ran for SDR users. Now
+   the player asks before every file whether the screen the window is on has
+   HDR switched on (`window_display` → `displayHdr.ts`) and sends HDR only if
+   so. Verified here with `selftest.ps1`, which can now pass mpv options
+   (`"mpv"`) and read properties back (`"probe"`): with the hint off the swap
+   chain stays SDR and mpv tone maps 1000 → SDR; with an HDR display stood in
+   for, `source` renders at the film's own 1000 nits where `target` rendered at
+   1499. **Confirmed on the test TV (USB round 2):** HDR on → hint `yes`, HDR10
+   out, no tone curve in the shader at all; HDR off → hint `no`, SDR out,
+   mpv's own tone mapping ran. Still to do: name the Dolby Vision handling in
+   the stats panel.
+   **Also the stats panel's HDR row**, which reads `target-params/gamma` — a
+   property mpv does not have (it is `video-target-params`) — and so reports
+   "tone mapping" for *every* HDR file whatever happened. Found on the test TV.
+3. **Surround.** Behind one switch, **off by default** (2026-09-24: Kinema
+   must not take the audio device exclusively by itself): "send sound straight
+   to the receiver", which holds the device **only while a film plays** so
+   Windows' spatial sound stays on for games. Offered **once**, on the first
+   film on a setup that can use it (a receiver taking TrueHD/DTS-HD, or Windows
+   spatial sound on), and never if already on — see PLAN.md → Native output. On: `--audio-spdif` built from step 1's probe, per format
+   overridable (Auto / On / Off), and multichannel PCM straight to the device
+   at the source's rate for anything not bitstreamed. Off: the Windows mixer,
+   as today — Settings warns when it is set to Stereo for a device that takes
+   8 channels, and when Windows' own spatial sound (Atmos / DTS:X for home
+   theater) is on, which left mpv with **no audio at all** on the test TV. A file
+   whose audio fails to open must never play silent: fall back to stereo and
+   say why. Also an output device choice (default: Windows' default), and the
+   volume control says "on the receiver" while bitstreaming.
+
+   **Built (2026-09-24), waiting on the test receiver:** `audioOutput.ts` (the
+   plan, unit-tested), Settings → Sound (the switch, the device, a per-format
+   Auto/On/Off), the stats panel's "Path" row, and the never-silent fallback
+   (through Windows, then stereo, with a notice). Verified here: with the
+   output written to a file (`--ao=pcm`), **all 39 DTS-HD MA frames checked and
+   26 TrueHD chunks were byte-identical to the film's own track**, IEC 61937
+   data types 17 and 22, the Atmos substream present; exclusive 7.1 opened with
+   Windows Sonic on and was released when the player closed ("Uninit wasapi");
+   a staged mid-film failure recovered in under two seconds. **Verified on
+   the test receiver (USB round 3):** DTS-HD MA and TrueHD went out as
+   `spdif-dtshd` / `spdif-truehd` in exclusive mode and the receiver's display
+   named each correctly. **Not built yet:**
+   the offer-once prompt — to sit before a film starts, where the remote works
+   normally, rather than inside the player's focus handling.
+
+   **Spatial sound, as of USB round 2:** confirmed that with Atmos for home
+   theater on, every film plays silent (`0x887C0077` on `Initialize`, twice
+   more). Detecting it is not solved: the spatial audio API answers the same
+   with it off (static mask `0xffffe`, stream available) on the development monitor here, and
+   the dynamic object count read 0 on the test TV with it on. The log now carries
+   every raw answer; a run with it on and one with it off, on the same device,
+   will show which one moves. Whatever detection turns out to be possible, the
+   player must catch the failed open itself and fall back — that does not
+   depend on detection. Longer term, mpv PR #18389 (`--ao=wasapi-spatial`,
+   milestoned for 0.43, open as of Sept 2026) would let decoded PCM go through
+   Windows' spatial sound properly; worth adopting when a libmpv with it ships.
+   Verified here by writing mpv's output to a file (`--ao=pcm`) and checking
+   the IEC 61937 payload is bit-identical to the source, for every format, with
+   clips made by ffmpeg; and on the onboard device that TrueHD falls back to PCM
+   rather than silence. **Waiting on:** a second release run on the test machine.
+4. **Display switching — every switch off by default** : match
+   the refresh rate, match the resolution, turn HDR on for HDR content.
+   Resolution is three-way, as agreed on 2026-09-24: **Off**;
+   **Auto** — switch *up* when the desktop is below the film and the screen can
+   **Only in fullscreen** (2026-09-24, as MPC-HC and madVR do it): a
+   mode change is a whole-desktop change, and in a window the picture is
+   scaled to the window anyway, so 1:1 and refresh matching only mean anything
+   when the film fills the screen. Starting a film fullscreen switches before
+   the first frame; going fullscreen mid-film **pauses**, switches, waits for
+   the picture to come back, then resumes; leaving fullscreen or the player
+   restores the desktop's mode.
+   Resolution is three-way, as agreed on 2026-09-24: **Off**;
+   **Auto** — switch *up* when the desktop is below the film and the screen can
+   show the film natively (a 1080p desktop on a 4K TV playing a 4K film, where
+   staying put means Kinema shrinks the film and the TV blows it back up), never
+   down; **Match content** — always the film's own resolution, for a TV or a
+   video processor (a madVR Envy) that should do all the upscaling. **Auto is
+   the default** (2026-09-24) — the one exception to "switching off by
+   default", because it only ever acts where staying put loses picture. The
+   file loads paused behind the black cover, the mode switches, playback starts
+   once mpv reports the new rate and the TV has had time to re-sync. The
+   original mode is restored on stop, on exit, and at the next launch after a
+   crash. Refresh and resolution switching are tested for real on this
+   machine's two screens ; the HDR
+   switch only on his.
+
+5. **Say what is not native, why, and what to do about it** (
+   2026-09-24: "when correct and native output can't be achieved, it should be
+   informed about"). A plain verdict per film — resolution 1:1, HDR as
+   mastered, frame rate matched, bit depth, sound untouched or decoded — each
+   with the reason when it is not, and the fix: a Windows or driver setting, a
+   cable path, or a Kinema switch. Includes the HDMI link itself, read
+   vendor-neutrally from `DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO`'s colour
+   encoding and bits per channel: the test TV ran HDR at 4K **30 Hz, 8-bit**,
+   because 4K + HDR + 10-bit does not fit the test PC's GPU → receiver → TV HDMI
+   link at 60 Hz, and does at 24 Hz — so step 4's refresh switching is also
+   what makes 10-bit possible there, and this is where Kinema says so.
+
+Also in every step: the matching docs (GOTCHAS for traps, PLAN for decisions).
+
 ## Worth doing, in rough order of payoff
 
-### Audio is decoded and downmixed, never passed through
+### Tone mapping for the display's real brightness — later, maybe
 
-There is no `audio-spdif` configuration at all, so mpv decodes everything to PCM
-and hands it to the default Windows device — onboard stereo here, so a 5.1 AAC
-track arrives as 2.0. An AVR would receive that downmix rather than the original
-bitstream, and TrueHD/Atmos and DTS:X object metadata are lost entirely before
-they ever leave the app.
+Raised on 2026-09-24: could Kinema do what a madVR Envy or Lumagen does
+— fit HDR to what the particular display can really show? libplacebo can: it is
+exactly what `target-colorspace-hint-mode=target` did with the 1499 nits
+Windows reported for the test TV (see PLAN → Native output). Two reasons it is not
+the default, and one reason it may still be worth a switch:
 
-**This is a bigger departure from creator's intent than anything in the scaler
-path.** Not fixable blind: enabling passthrough on a device that does not
-support the codec produces silence or noise, so it needs the real AVR present to
-verify, plus a device selection (mpv's `--audio-device`) because the default
-device is the wrong one here. Note it is mutually exclusive with the
-display-clock frame timing switch.
+- The number from Windows comes from the EDID and is often a round figure
+  rather than a measurement — 1499 for an OLED is not what that panel
+  reaches. Mapping to a wrong peak is worse than not mapping.
+- A good TV's own tone mapping knows its panel; sending HDR10 as mastered and
+  letting it work is what a disc player does.
+- **Where it pays:** projectors (100–200 nits, often weak internal tone
+  mapping), and TVs set to HGIG, which turn their own mapping off and expect
+  the source to do it. A setting describing the display — "tone map for a
+  display that really reaches N nits", off by default, N entered by the owner
+  — fits the hardware-not-taste rule. Not before step 5.
+
+### A first-run setup for picture and sound — later
+
+A window the first time Kinema starts that walks through the picture and sound
+choices — direct sound, display switching — with what each gains and costs,
+built on what the equipment check found. Not before the native-output steps
+exist: it would be a tour of switches that do not do anything yet.
 
 ### Smooth motion (`tscale=oversample`) — deferred, not rejected
 

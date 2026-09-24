@@ -19,7 +19,6 @@ import { useSyncExternalStore } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import {
   autoDetect,
-  libraryStats,
   listLibraryRoots,
   listUnparsed,
   saveParseResults,
@@ -268,10 +267,4 @@ export async function hasRoots(): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-/** How many files are on disk but not yet matched, for the settings screen. */
-export async function pendingCounts(): Promise<{ total: number; unparsed: number }> {
-  const stats = await libraryStats();
-  return { total: stats.total, unparsed: stats.unparsed };
 }

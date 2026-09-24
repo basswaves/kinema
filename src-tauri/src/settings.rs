@@ -113,29 +113,6 @@ pub fn open_log_folder(app: tauri::AppHandle) -> Result<(), String> {
         .map_err(to_string_err)
 }
 
-/// Which providers are usable right now. The UI uses this to explain what is
-/// and is not available rather than failing opaquely mid-match.
-#[tauri::command]
-pub fn provider_status(db: tauri::State<Db>) -> Result<Vec<(String, bool)>, String> {
-    let conn = db.0.lock().map_err(to_string_err)?;
-    let has = |key: &str| -> bool {
-        conn.query_row(
-            "SELECT value FROM settings WHERE key = ?1",
-            params![key],
-            |r| r.get::<_, String>(0),
-        )
-        .map(|v| !v.trim().is_empty())
-        .unwrap_or(false)
-    };
-
-    Ok(vec![
-        // TVmaze needs no key at all — always available.
-        ("tvmaze".into(), true),
-        ("omdb".into(), has("omdb_api_key")),
-        ("tmdb".into(), has("tmdb_api_key")),
-    ])
-}
-
 #[cfg(test)]
 mod tests {
     use super::store;

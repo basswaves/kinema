@@ -55,7 +55,6 @@ export const logPaths = () => invoke<LogPaths>('log_paths');
 /** Show the log folder in Explorer, for attaching logs to a bug report. */
 export const openLogFolder = () => invoke<void>('open_log_folder');
 
-export const providerStatus = () => invoke<Array<[string, boolean]>>('provider_status');
 
 export const saveTitle = (title: TitleMetadata) => invoke<number>('save_title', { title });
 
@@ -129,8 +128,3 @@ export const clearArtworkCache = () => invoke<number>('clear_artwork_cache');
 export const listTitlesNeedingDetail = () =>
   invoke<TrailerTarget[]>('list_titles_needing_detail');
 
-export const setTitleTrailer = (
-  titleId: number,
-  trailerKey: string | null,
-  trailerSite: string | null
-) => invoke<void>('set_title_trailer', { titleId, trailerKey, trailerSite });

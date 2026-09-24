@@ -520,23 +520,6 @@ pub fn list_titles_needing_detail(db: tauri::State<Db>) -> Result<Vec<TrailerTar
         .map_err(to_string_err)
 }
 
-/// Record a trailer found by the backfill pass.
-#[tauri::command]
-pub fn set_title_trailer(
-    db: tauri::State<Db>,
-    title_id: i64,
-    trailer_key: Option<String>,
-    trailer_site: Option<String>,
-) -> Result<(), String> {
-    let conn = db.0.lock().map_err(to_string_err)?;
-    conn.execute(
-        "UPDATE titles SET trailer_key = ?2, trailer_site = ?3 WHERE id = ?1",
-        params![title_id, trailer_key, trailer_site],
-    )
-    .map_err(to_string_err)?;
-    Ok(())
-}
-
 /// Which files the review queue works on: everything the matcher declined or
 /// could not reach a provider for, everything held by hand, plus
 /// everything taken out of the queue by hand so it can be put back.

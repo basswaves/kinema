@@ -498,23 +498,6 @@ export async function tmdbGetTitle(
   };
 }
 
-/**
- * Trailer for a title already in the database. Used to backfill titles matched
- * before trailers were stored; a fresh match gets one from `tmdbGetTitle` for
- * free.
- */
-export async function tmdbGetTrailer(
-  key: string,
-  id: string,
-  kind: 'movie' | 'series'
-): Promise<Trailer | null> {
-  const data = await tmdbGet<{ results: TmdbVideo[] }>(
-    key,
-    kind === 'movie' ? `/movie/${id}/videos` : `/tv/${id}/videos`
-  );
-  return pickTrailer(data.results);
-}
-
 export async function tmdbGetEpisodes(key: string, id: string): Promise<EpisodeMetadata[]> {
   const show = await tmdbGet<{ seasons: Array<{ season_number: number }> }>(key, `/tv/${id}`);
   const episodes: EpisodeMetadata[] = [];

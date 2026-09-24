@@ -188,32 +188,3 @@ export const IDLE_SURFACE_OPTIONS: Record<string, string | boolean | number> = {
   background: 'color',
   'background-color': '#000000',
 };
-
-/**
- * "Potato PC" fallback — the one escape hatch.
- *
- * Not a quality preference, an emergency valve for hardware that cannot keep
- * up. Drops to bilinear and disables the correctness passes, which are the
- * expensive parts. Everything else, including HDR tone mapping, is untouched:
- * a slow machine should still not be shown a wrong image.
- */
-export const POTATO_MODE_OPTIONS: Record<string, string | boolean | number> = {
-  scale: 'bilinear',
-  cscale: 'bilinear',
-  dscale: 'bilinear',
-  'correct-downscaling': false,
-  'linear-downscaling': false,
-  'sigmoid-upscaling': false,
-  'hdr-compute-peak': false,
-};
-
-/** Restores the creator's-intent rendering settings after potato mode. */
-export const CREATOR_INTENT_OPTIONS: Record<string, string | boolean | number> = {
-  scale: 'spline36',
-  cscale: 'spline36',
-  dscale: 'mitchell',
-  'correct-downscaling': true,
-  'linear-downscaling': true,
-  'sigmoid-upscaling': true,
-  'hdr-compute-peak': true,
-};

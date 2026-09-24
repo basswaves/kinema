@@ -73,5 +73,15 @@ export function installDevLog() {
     forward('error', ['unhandled rejection:', event.reason]);
   });
 
+  // The content security policy (tauri.conf.json) refuses things silently:
+  // a blocked image is just a missing poster. This is the only place a
+  // refusal says what it was.
+  document.addEventListener('securitypolicyviolation', (event) => {
+    forward('error', [
+      `blocked by the content security policy: ${event.violatedDirective}`,
+      event.blockedURI || '(inline)',
+    ]);
+  });
+
   forward('log', ['--- devlog started ---', new Date().toISOString()]);
 }

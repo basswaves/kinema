@@ -58,6 +58,13 @@ fn open_library(app: &tauri::AppHandle) -> Result<(), String> {
             .join("library.db");
         selftest::seed(&real, &dir)
             .map_err(|e| format!("Self-test could not copy the library.\n\n{e}"))?;
+        // The asset scope in tauri.conf.json names the real app data folder,
+        // so a self-test's own artwork cache was refused and every poster fell
+        // back to the network. Allowing the copy's folder lets a run show the
+        // library the way the real app does.
+        let _ = app
+            .asset_protocol_scope()
+            .allow_directory(dir.join("artwork"), false);
     }
 
     std::fs::create_dir_all(&dir).map_err(|e| {

@@ -251,6 +251,22 @@ forward slashes is correct on Windows.
 `$APPDATA` here means the *app's* data directory
 (`…\Roaming\com.kinema.app`), not the OS `%APPDATA%`.
 
+### The content security policy refuses things without a word
+
+`tauri.conf.json` sets a CSP: scripts from the app only, images from the app,
+the artwork cache (`asset:` / `http://asset.localhost`) and any `https:` host,
+IPC through `ipc:` / `http://ipc.localhost`. Anything else is refused by the
+webview **with no error in the app** — a blocked poster is a missing poster, a
+blocked script is a feature that never ran. `devlog.ts` listens for
+`securitypolicyviolation` and writes each refusal to `app.log`, so the first
+place to look after adding a new kind of resource is there. `devCsp` is null:
+Vite's dev server needs inline scripts and a websocket, and `dev:mock` runs in
+an ordinary browser anyway.
+
+Images are allowed from any `https:` host on purpose. TMDB, TVmaze and OMDb
+each serve posters from hosts of their own choosing, and an image cannot run
+code — the policy's job is scripts.
+
 ### A command without `async` runs on the window's thread
 
 `#[tauri::command] pub fn …` executes on the **main thread**. While it runs

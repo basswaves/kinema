@@ -18,6 +18,8 @@
 import { invoke } from '@tauri-apps/api/core';
 import { command, getProperty, listenEvents } from 'tauri-plugin-libmpv-api';
 import { ensureMpvInitialised } from './player/mpv';
+import { readTracks } from './player/tracks';
+import { readChapters } from './player/chapters';
 import { scanLibrary } from './library/api';
 import {
   ignoreFileIds,
@@ -213,6 +215,10 @@ export async function runSelfTest(plan: SelfTestPlan): Promise<void> {
     plan,
     finishedAfter: now(),
     final: { timePos: await read('time-pos'), duration: await read('duration') },
+    // What the player itself reads, through the same code — so a report shows
+    // the tracks and chapters a viewer would have been offered.
+    tracks: await readTracks().catch((e) => String(e)),
+    chapters: await readChapters().catch((e) => String(e)),
     timeline,
   };
 

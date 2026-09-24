@@ -21,28 +21,46 @@ export interface MpvTrack {
   default: boolean;
 }
 
+/**
+ * Every track, read field by field as scalars — **all at once**. Each read is
+ * an IPC round trip, and they used to be awaited one after another: nine per
+ * track, so a release with twelve audio and subtitle tracks spent over a
+ * hundred sequential round trips on it, twice per file (before and after the
+ * remembered languages are applied). Order is kept by index.
+ */
 export async function readTracks(): Promise<MpvTrack[]> {
   const count = (await readProperty<number>('track-list/count', 'int64')) ?? 0;
-  const tracks: MpvTrack[] = [];
 
-  for (let i = 0; i < count; i++) {
-    const type = await readProperty<string>(`track-list/${i}/type`, 'string');
-    if (!type) continue;
-
-    tracks.push({
-      id: (await readProperty<number>(`track-list/${i}/id`, 'int64')) ?? i,
+  const read = async (i: number): Promise<MpvTrack | null> => {
+    const at = (field: string) => `track-list/${i}/${field}`;
+    const [type, id, title, lang, codec, selected, forced, external, isDefault] =
+      await Promise.all([
+        readProperty<string>(at('type'), 'string'),
+        readProperty<number>(at('id'), 'int64'),
+        readProperty<string>(at('title'), 'string'),
+        readProperty<string>(at('lang'), 'string'),
+        readProperty<string>(at('codec'), 'string'),
+        readProperty<boolean>(at('selected'), 'flag'),
+        readProperty<boolean>(at('forced'), 'flag'),
+        readProperty<boolean>(at('external'), 'flag'),
+        readProperty<boolean>(at('default'), 'flag'),
+      ]);
+    if (!type) return null;
+    return {
+      id: id ?? i,
       type,
-      title: (await readProperty<string>(`track-list/${i}/title`, 'string')) ?? undefined,
-      lang: (await readProperty<string>(`track-list/${i}/lang`, 'string')) ?? undefined,
-      codec: (await readProperty<string>(`track-list/${i}/codec`, 'string')) ?? undefined,
-      selected: (await readProperty<boolean>(`track-list/${i}/selected`, 'flag')) ?? false,
-      forced: (await readProperty<boolean>(`track-list/${i}/forced`, 'flag')) ?? false,
-      external: (await readProperty<boolean>(`track-list/${i}/external`, 'flag')) ?? false,
-      default: (await readProperty<boolean>(`track-list/${i}/default`, 'flag')) ?? false,
-    });
-  }
+      title: title ?? undefined,
+      lang: lang ?? undefined,
+      codec: codec ?? undefined,
+      selected: selected ?? false,
+      forced: forced ?? false,
+      external: external ?? false,
+      default: isDefault ?? false,
+    };
+  };
 
-  return tracks;
+  const tracks = await Promise.all(Array.from({ length: count }, (_, i) => read(i)));
+  return tracks.filter((t): t is MpvTrack => t !== null);
 }
 
 /**

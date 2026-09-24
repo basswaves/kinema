@@ -874,7 +874,7 @@ mod tests {
         conn.execute_batch(
             r#"INSERT INTO library_roots (id, path, kind, added_at) VALUES (1, 'C:/tv', 'tv', 0);
                INSERT INTO titles (id, kind, provider, provider_id, imdb_id, tmdb_id, title, fetched_at)
-               VALUES (4, 'series', 'tmdb', '105', 'tt9000001', '105', 'Example Show', 0),
+               VALUES (4, 'series', 'tmdb', '9001', 'tt9000001', '9001', 'Example Show', 0),
                       (1, 'movie',  'tmdb', '1271', 'tt0416449', '', '300', 0);
                INSERT INTO media_files (id, root_id, path, parent_dir, file_name, extension,
                    size_bytes, modified_at, first_seen_at, last_seen_at, title_id,
@@ -907,9 +907,9 @@ mod tests {
         assert_eq!(
             rows,
             vec![
-                (Some(1), Some(1), 2900.0, 1, "Example Show S01E01".into(), Some("105".into())),
-                (Some(1), Some(2), 2900.0, 1, "Example Show S01E02".into(), Some("105".into())),
-                (Some(1), Some(3), 300.0, 0, "Example Show S01E03".into(), Some("105".into())),
+                (Some(1), Some(1), 2900.0, 1, "Example Show S01E01".into(), Some("9001".into())),
+                (Some(1), Some(2), 2900.0, 1, "Example Show S01E02".into(), Some("9001".into())),
+                (Some(1), Some(3), 300.0, 0, "Example Show S01E03".into(), Some("9001".into())),
                 (None, None, 3000.0, 0, "300".into(), None),
             ]
         );

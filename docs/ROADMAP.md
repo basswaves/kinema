@@ -46,7 +46,7 @@ end of his tests.
 
 ## The improvement plan (from the September 2026 review)
 
-Agreed with the owner on 2026-09-23 after a full review of the code, the logs and
+Agreed on 2026-09-23 after a full review of the code, the logs and
 the library database. One commit per item on `master`. Phase 0 (the safety
 net and the test tools), Phase 1 (starting playback and the Skip button),
 Phase 2 (watching correctness), Phase 3 (library and matching), Phase 4
@@ -292,7 +292,7 @@ still used, ahead of TheIntroDB.
 
 ### Retiring Skiptro
 
-**Decided against, 2026-09-23.** the owner reports no bad intro endpoints and wants
+**Decided against, 2026-09-23.** The owner reports no bad intro endpoints and wants
 Skiptro kept as the first intro source. The earlier claim here, that the two
 detectors "agree within a second", did not survive measurement — see the table
 above — but the disagreements coincide with Skiptro's own low confidence, so
@@ -329,8 +329,8 @@ the current behaviour annoys them.
 
 ## Unverified
 
-- **A file whose container misreports its length.** Example Show S01E10
-  (`…S01 - S01E10 - E10.mp4`) is about 23 minutes, but mpv reports
+- **A file whose container misreports its length.** One test episode
+  (an `.mp4`) is about 23 minutes, but mpv reports
   7008 s, and the player trusts mpv's duration: its progress percentage and
   "min left" are wrong, and its credits start (22:07) falls in the "first half"
   of that bogus length, so the credits-count-as-watched rule rightly ignores
@@ -356,7 +356,7 @@ the current behaviour annoys them.
   its credits. `credits marker from <source>` in `app.log` says which won, and
   `intro marker from <source>` does the same for the intro.
 - **A credits marker from TheIntroDB, in this library** — the source is verified
-  against the live API (Breaking Bad S01E01 returns one) but **Example Show
+  against the live API (Breaking Bad S01E01 returns one) but **the one series in the test library
   has none**, and it is the only series here. The app's own analysis now supplies
   the credits instead, so the introdb credits path is still untested against a
   real playback. Any show with community credits data confirms it.

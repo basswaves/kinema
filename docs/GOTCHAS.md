@@ -429,7 +429,7 @@ episodes are grouped *is* the algorithm — a group of one finds nothing, in
 silence, and looks exactly like a show with no intro.
 
 The obvious grouping is the containing directory. It is wrong on real libraries:
-this machine's Example Show season has ten episodes in a `Season 1`
+one real library's season had ten episodes in a `Season 1`
 subfolder and two still loose in the show folder above it, because a renamer
 moved some and not others. Grouping by folder would have compared ten against
 each other, then two against each other, and quietly produced worse markers for

@@ -331,7 +331,7 @@ pub fn forget_completion(conn: &Connection, file_id: i64) -> rusqlite::Result<()
 mod tests {
     use super::*;
 
-    /// A migrated library with one TV root, and Example Show matched
+    /// A migrated library with one TV root, and one series matched
     /// through TMDB as title 4.
     fn library() -> Connection {
         static N: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
@@ -343,7 +343,7 @@ mod tests {
         conn.execute_batch(
             "INSERT INTO library_roots (id, path, kind, added_at) VALUES (1, 'C:/tv', 'tv', 0);
              INSERT INTO titles (id, kind, provider, provider_id, imdb_id, tmdb_id, title, fetched_at)
-                  VALUES (4, 'series', 'tmdb', '105', 'tt9000001', '105', 'Example Show', 0);",
+                  VALUES (4, 'series', 'tmdb', '9001', 'tt9000001', '9001', 'Example Show', 0);",
         )
         .unwrap();
         conn
@@ -446,7 +446,7 @@ mod tests {
         conn.execute("DELETE FROM titles", []).unwrap();
         conn.execute(
             "INSERT INTO titles (id, kind, provider, provider_id, imdb_id, tmdb_id, title, fetched_at)
-                  VALUES (40, 'series', 'tmdb', '105', 'tt9000001', '105', 'Example Show', 1)",
+                  VALUES (40, 'series', 'tmdb', '9001', 'tt9000001', '9001', 'Example Show', 1)",
             [],
         )
         .unwrap();
@@ -461,7 +461,7 @@ mod tests {
         let conn = library();
         conn.execute(
             "INSERT INTO titles (id, kind, provider, provider_id, imdb_id, title, fetched_at)
-                  VALUES (5, 'series', 'tvmaze', '316', 'tt9000001', 'Example Show', 0)",
+                  VALUES (5, 'series', 'tvmaze', '9002', 'tt9000001', 'Example Show', 0)",
             [],
         )
         .unwrap();

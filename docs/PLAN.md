@@ -775,7 +775,7 @@ paths that no longer exist. Sidecars had the same fragility plus the clutter.
 **TheIntroDB.** A free community database keyed on **TMDB id + season +
 episode**, which is precisely what `titles` already stores — so it needed no new
 matching, no key and no account. It is where credits actually come from. Tested
-against the real library before committing to it: Example Show returns an
+against the real library before committing to it: the one series there returns an
 intro for all twelve episodes agreeing with Skiptro to within a second, and
 Breaking Bad returns both segments.
 
@@ -846,7 +846,7 @@ source that finds credits by *measuring* them, and the only one that works on a
 file with no metadata match at all.
 
 **Why it stopped being deferred:** the other two left exactly the gap it fills.
-TheIntroDB has no credits for Example Show, which is the only series in this
+TheIntroDB has no credits for the one series in the test
 library, so the closing segment was still the fenced tail guess in practice.
 
 ### What was taken from intro-skipper, and what could not be
@@ -1228,7 +1228,7 @@ with their reasons:
 **Skip intro is offered from 0:00.** When an episode has a known intro, the
 button is there from the first frame until the intro ends — not from where the
 intro begins — and pressing it during a cold open goes to the end of the intro,
-skipping the cold open too. The owner chose that knowingly over the alternative of
+skipping the cold open too. That was chosen knowingly over the alternative of
 waiting for the intro: a button that only appears ten seconds in looks like a
 button that is missing. Automatic mode is the exception: it still waits for the
 intro itself (`inSegment` in `skip.ts`), so nothing skips story unasked. The
@@ -1299,7 +1299,7 @@ transition, and the webview reports what happened — `record_match`,
 `unlink_files` — never which status that means. One behaviour moved with it:
 resetting matches from the developer tools no longer touches a held file.
 
-**The scan pipeline stays in the webview — decided with the owner, 2026-09-24.**
+**The scan pipeline stays in the webview — decided 2026-09-24.**
 The plan said "library rules and the pipeline into Rust". The rules moved; the
 pipeline did not, on purpose. Parsing is guessit-js and matching is the
 TypeScript scorer and provider clients; moving them means a Rust port of both,

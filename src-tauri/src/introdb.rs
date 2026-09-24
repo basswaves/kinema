@@ -226,7 +226,7 @@ mod tests {
         assert_eq!(lookup.credits, Some((3431.0, None)));
     }
 
-    /// Recorded from the live API for Example Show S01E01 — an intro that
+    /// Recorded from the live API for a real episode — an intro that
     /// starts at the first frame, which the API states as a null rather than a
     /// zero. Read as "missing" it would drop the only marker the episode has.
     #[test]

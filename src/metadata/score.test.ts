@@ -37,7 +37,7 @@ function candidate(over: Partial<Candidate> & { title: string }): Candidate {
 
 describe('normaliseTitle', () => {
   it('ignores punctuation, case and separators', () => {
-    expect(normaliseTitle('Example Show')).toBe(normaliseTitle('example.show'));
+    expect(normaliseTitle('Pride and the Fall')).toBe(normaliseTitle('pride.and.the.fall'));
     expect(normaliseTitle('WALL·E')).toBe(normaliseTitle('wall e'));
     expect(normaliseTitle('Spider-Man: No Way Home')).toBe(
       normaliseTitle('spider man no way home')

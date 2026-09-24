@@ -549,8 +549,8 @@ pub struct Season {
 /// Group a library root's files into the sets that should be compared together.
 ///
 /// Keyed on the **title and season**, not on the folder. Those are usually the
-/// same thing and occasionally are not: this machine's Example Show season
-/// has ten episodes in a `Season 1` subfolder and two still loose in the show
+/// same thing and occasionally are not: one real library had a season with
+/// ten episodes in a `Season 1` subfolder and two still loose in the show
 /// folder above it. Grouping by directory would have compared two sets of one
 /// and found nothing, in complete silence.
 ///

@@ -1,6 +1,6 @@
 [package]
 name = "kinema"
-version = "0.3.0"
+version = "0.3.1"
 description = "A local, serverless media library for movies and TV shows"
 authors = ["Basswaves"]
 edition = "2021"

@@ -7,6 +7,24 @@ makes no stability promises.
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-09-25
+
+Small follow-ups to 0.3.0's native output.
+
+### Added
+
+- **Dolby Vision is named.** The stats panel (`i`) shows the profile and what
+  Kinema does with it — profile 5 converted to HDR10 with its own metadata,
+  profiles 7 and 8 shown as their HDR10 layer — and the Output check says why
+  Dolby Vision itself is not sent: Windows has no way to send it to a TV.
+
+### Changed
+
+- **Better advice for 8-bit HDR.** When the graphics driver is sending 8 bits
+  at a refresh rate the cable could carry more, the Output check now also says
+  to set the driver's output colour format to YCbCr 4:2:2 first if only 8 bits
+  are offered — some drivers offer 10 or 12 bits at 4K only then.
+
 ## [0.3.0] — 2026-09-25
 
 Native output: whatever the PC is connected to, the film reaches it the way it

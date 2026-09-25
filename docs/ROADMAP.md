@@ -224,7 +224,10 @@ this order:
    link stayed 8-bit RGB even at 4K 23.976 Hz — the driver's colour-depth
    setting, not bandwidth, which the check first blamed on the cable; it now
    tells the two apart (above 30 Hz at 4K the cable, otherwise the driver).
-   **Step 5 is done.**
+   **Step 5 is done.** Later the same day the 10-bit path was confirmed on the
+   same TV: with the driver's output colour format set to YCbCr 4:2:2 (it had
+   offered only 8 bpc at 4K while it was RGB), and every switch on, the check
+   read "HDR at 10-bit YCbCr 4:2:2". The fix text now says so.
 
 Also in every step: the matching docs (GOTCHAS for traps, PLAN for decisions).
 

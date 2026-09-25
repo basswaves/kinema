@@ -251,9 +251,14 @@ export function checkColourDepth(f: OutputFacts): Check | null {
     why:
       'HDR is made for 10 bits, and at this refresh rate the cable has room for it — the graphics ' +
       'driver is set to send 8 bits.',
+    // Seen on a test PC: at 4K the driver offered only 8 bpc while the output
+    // colour format was RGB, and 10/12 bpc once it was set to YCbCr 4:2:2 —
+    // after which this check read "HDR at 10-bit YCbCr 4:2:2".
     fix:
-      'In the graphics driver’s settings, set the output colour depth to 10 or 12 bpc. Kinema cannot ' +
-      'change it: there is no way to do that which works the same on every make of graphics card.',
+      'In the graphics driver’s settings, set the output colour depth to 10 or 12 bpc. If only 8 is ' +
+      'offered, set the output colour format to YCbCr 4:2:2 first — some drivers offer more than ' +
+      '8 bits at 4K only then. Kinema cannot change either: there is no way to do that which works ' +
+      'the same on every make of graphics card.',
   };
 }
 

@@ -235,5 +235,6 @@ describe('outputCheck colour depth', () => {
     expect(c['Colour depth']).toMatchObject({ verdict: 'limited', value: 'HDR squeezed to 8-bit RGB' });
     expect(c['Colour depth']?.why).toMatch(/driver is set to send 8 bits/);
     expect(c['Colour depth']?.fix).toMatch(/10 or 12 bpc/);
+    expect(c['Colour depth']?.fix).toMatch(/YCbCr 4:2:2 first/);
   });
 });

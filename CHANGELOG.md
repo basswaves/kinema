@@ -7,6 +7,84 @@ makes no stability promises.
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-09-25
+
+Native output: whatever the PC is connected to, the film reaches it the way it
+was mastered — HDR as mastered, surround untouched to the receiver, the screen
+at the film's own frame rate — and where that cannot happen, Kinema says why and
+what would fix it.
+
+### Upgrading
+
+- **No library upgrade this time.** Everything new is a setting, and every
+  setting starts where 0.2.0 behaved — except that HDR now reaches an HDR screen
+  as mastered, and an SDR screen now gets Kinema's own tone mapping (see below).
+- **Worth a look after updating:** Settings → **Screen** and **Sound**, and
+  **Your equipment** to see what Kinema found.
+
+### Added
+
+- **Settings → Your equipment.** What Windows reports about every screen and
+  sound device: resolution and refresh, HDR support, the modes a screen offers
+  for films, which surround formats a receiver takes untouched, how many
+  channels it takes directly, and whether Windows spatial sound is on. Checked
+  at every launch and remembered per device, so a receiver that is on standby at
+  launch keeps its last answers; the same account is written to `app.log`.
+- **Send sound straight to the receiver** (Settings → Sound, off by default).
+  While a film plays, Kinema takes the sound device for itself and passes Dolby
+  TrueHD and Atmos, DTS-HD Master Audio and DTS:X, Dolby Digital (Plus) and DTS
+  to the receiver untouched — only the formats the receiver said it takes, each
+  overridable. Everything else goes as multichannel PCM up to what the device
+  takes. Windows' speaker setup and spatial sound are bypassed while a film
+  plays and untouched otherwise, so games keep "Dolby Atmos for home theater".
+  The first film played on a setup that can use it offers this once.
+- **A choice of sound device** in Settings → Sound.
+- **Settings → Screen: match the screen to the film,** in fullscreen only.
+  *Match the refresh rate* (off by default) switches to 23.976 Hz, 24, 25, 50
+  or a clean multiple for each film, so pans stop juddering. *Resolution*
+  (Auto by default) switches up when the desktop is set lower than the film;
+  *Match content* hands the TV — or a video processor — the film at its own
+  size. *Turn HDR on for HDR films* (off by default) switches Windows HDR on and
+  back. The film waits, paused, until the picture is back, and the screen is
+  put back on leaving fullscreen, leaving the player, closing Kinema, and at the
+  next launch after a crash.
+- **Output check** at the top of the stats panel (`i`): picture size, HDR,
+  motion, colour depth and sound — each either native, or what is holding it
+  back and how to fix it, including the HDMI link's bit depth and whether the
+  cable or the graphics driver is the limit.
+
+### Changed
+
+- **HDR reaches an HDR screen as mastered.** mpv used to adapt the picture to
+  the peak brightness Windows reports for the screen — often a round figure —
+  and send that; the film's own HDR10 metadata now goes to the screen, which
+  tone maps it, as with a disc player.
+- **An SDR screen gets Kinema's tone mapping.** mpv used to send HDR even to a
+  screen with HDR off and let Windows convert it; before each film Kinema now
+  asks whether the screen showing it has HDR on, and sends HDR only if so.
+- **Logs keep five sessions** instead of two.
+
+### Fixed
+
+- **A film no longer plays silently when Windows refuses the sound** (for
+  example with a half-configured Windows spatial sound): Kinema falls back to
+  the Windows mixer, then to stereo, and says so on screen.
+- **The stats panel's HDR row reported tone mapping for every HDR file** — it
+  read a property mpv does not have. It now says passthrough, compressed, or
+  tone mapped to SDR, as it happened.
+
+### Known limitations
+
+- **Dolby Vision** is sent as HDR10: Windows has no way to send a Dolby Vision
+  signal to a TV. Profile 7/8 play their HDR10 layer; profile 5 is converted.
+- **With sound through Windows, Atmos and DTS:X height sound is lost,** even
+  when Windows' "Atmos for home theater" makes the receiver show Atmos — that is
+  Windows re-wrapping decoded 7.1. Only *Send sound straight to the receiver*
+  keeps it.
+- **Kinema cannot change the HDMI link's bit depth.** Where the Output check
+  says the graphics driver is sending 8 bits, the setting is in the driver's own
+  control panel.
+
 ## [0.2.0] — 2026-09-24
 
 The result of a full review of the code, the logs and a real library — mostly

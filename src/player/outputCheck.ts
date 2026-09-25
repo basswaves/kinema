@@ -56,6 +56,8 @@ export interface OutputFacts {
   hdrSource: boolean;
   /** From `describeHdr`: what happened to the dynamic range. */
   hdrOut: 'passthrough' | 'compressed' | 'sdr' | 'unknown';
+  /** The track's Dolby Vision profile, or null. Always shown as HDR10. */
+  dolbyVision?: number | null;
   switches: SwitchSettings;
   audio: {
     /** mpv's decoder name: truehd, dts, eac3, ac3, aac, … */
@@ -129,8 +131,20 @@ export function checkPicture(f: OutputFacts): Check | null {
 export function checkHdr(f: OutputFacts): Check {
   const label = 'HDR';
   if (!f.hdrSource) return { label, verdict: 'native', value: 'SDR film, shown as SDR' };
+  const dv = f.dolbyVision && f.dolbyVision > 0 ? f.dolbyVision : null;
   switch (f.hdrOut) {
     case 'passthrough':
+      if (dv) {
+        return {
+          label,
+          verdict: 'info',
+          value: `Dolby Vision profile ${dv}, sent as HDR10`,
+          why:
+            dv === 5
+              ? 'Windows cannot send a Dolby Vision signal, and this profile has no HDR10 layer — it is converted to HDR10 with its own metadata.'
+              : 'Windows cannot send a Dolby Vision signal, so the film’s HDR10 layer is sent as mastered.',
+        };
+      }
       return { label, verdict: 'native', value: 'HDR10 as mastered — the screen tone maps it' };
     case 'compressed':
       return {

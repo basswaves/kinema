@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeAudioPath, describeHdr, type HdrFacts } from './stats';
+import { describeAudioPath, describeDolbyVision, describeHdr, type HdrFacts } from './stats';
 
 const hdr10: HdrFacts = {
   sourceGamma: 'pq',
@@ -55,5 +55,17 @@ describe('describeAudioPath', () => {
   it('tells direct PCM from the Windows mixer', () => {
     expect(describeAudioPath('s32', true).value).toBe('decoded · straight to the device');
     expect(describeAudioPath('float', false).value).toBe('decoded · through the Windows mixer');
+  });
+});
+
+describe('describeDolbyVision', () => {
+  it('names what each profile becomes', () => {
+    expect(describeDolbyVision(5)?.value).toBe('profile 5 → converted to HDR10');
+    expect(describeDolbyVision(7)?.value).toBe('profile 7 → HDR10 base layer');
+    expect(describeDolbyVision(8)?.value).toBe('profile 8 → HDR10 base layer');
+  });
+  it('stays out of the way for everything else', () => {
+    expect(describeDolbyVision(null)).toBeNull();
+    expect(describeDolbyVision(0)).toBeNull();
   });
 });

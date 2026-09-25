@@ -939,9 +939,13 @@ which confirms exclusive output goes around Windows' spatial sound.
 with spatial sound *off*, `GetNativeStaticObjectTypeMask` returns `0xffffe` and
 `IsSpatialAudioStreamAvailable` returns S_OK — Windows provides a spatial
 renderer regardless. So none of those means "Atmos for home theater is on", and
-a first attempt that trusted them reported it on for all three devices. The
-dynamic object count is the only answer that cannot give a false "on", and it
-read 0 on the test TV with it on. Detection is open; see ROADMAP step 3.
+a first attempt that trusted them reported it on for all three devices.
+
+**Do:** use `GetMaxDynamicObjectCount` alone. It is 0 with spatial sound off
+and non-zero with it on — 128 for Windows Sonic, 20 for "Dolby Atmos for home
+theater" set up through Dolby Access. It read 0 once with Atmos apparently on,
+but that was the half-configured state (an Atmos format chosen in the device's
+dropdown, spatial sound itself never enabled), in which nothing plays at all.
 
 ### Display-clock timing switches itself off while bitstreaming
 

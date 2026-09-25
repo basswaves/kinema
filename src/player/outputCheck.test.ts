@@ -223,6 +223,17 @@ describe('outputCheck picture', () => {
   });
 });
 
+describe('outputCheck Dolby Vision', () => {
+  it('says a Dolby Vision film goes out as HDR10, and why, without calling it a fault', () => {
+    const p7 = byLabel(outputCheck({ ...base, dolbyVision: 7 })).HDR;
+    expect(p7).toMatchObject({ verdict: 'info', value: 'Dolby Vision profile 7, sent as HDR10' });
+    expect(p7?.why).toMatch(/HDR10 layer is sent as mastered/);
+    expect(p7?.fix).toBeUndefined();
+    expect(byLabel(outputCheck({ ...base, dolbyVision: 5 })).HDR?.why).toMatch(/no HDR10 layer/);
+    expect(byLabel(outputCheck({ ...base, dolbyVision: null })).HDR?.verdict).toBe('native');
+  });
+});
+
 describe('outputCheck colour depth', () => {
   it('blames the driver setting, not the cable, for 8-bit HDR at 4K 23.976 Hz', () => {
     const c = byLabel(

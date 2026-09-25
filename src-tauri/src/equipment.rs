@@ -1212,13 +1212,11 @@ pub(crate) mod win {
 
         // Activating the spatial client is only possible while a spatial
         // format is selected for the device; zero objects means the same.
-        // Not a reliable detector yet. The dynamic object count read 0 on
-        // the test TV with Atmos for home theater on (and playback silent); and
-        // with spatial sound OFF on the development monitor here, the static mask (0xffffe)
-        // and stream availability ("ok") answer exactly as if it were on. So
-        // only a non-zero object count — which cannot be a false "on" — sets
-        // it, and every answer is logged so a run with it on shows which one
-        // actually moves.
+        // The dynamic object count is the detector: 0 with spatial sound off,
+        // non-zero with it on (128 for Windows Sonic, 20 for Dolby Atmos for
+        // home theater). The static mask (0xffffe) and stream availability
+        // ("ok") answer the same with it off and mean nothing — see GOTCHAS.
+        // Every answer is still logged, for the next driver that differs.
         match unsafe { device.Activate::<ISpatialAudioClient>(CLSCTX_ALL, None) } {
             Ok(s) => {
                 let dynamic = unsafe { s.GetMaxDynamicObjectCount() };

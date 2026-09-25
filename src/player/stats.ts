@@ -266,6 +266,43 @@ function describeScaling(
  * mpv's name for a bitstream wrapped for HDMI/S/PDIF and not decoded — the one
  * case where the receiver gets exactly what is on the disc.
  */
+/**
+ * What happens to a Dolby Vision track. Windows has no way to send a Dolby
+ * Vision signal to a TV, so it is always shown as HDR10 — how depends on the
+ * profile. `null` for a file that is not Dolby Vision (or whose container does
+ * not say).
+ */
+export function describeDolbyVision(profile: number | null): StatRow | null {
+  if (profile === null || profile <= 0) return null;
+  const label = 'Dolby Vision';
+  switch (profile) {
+    case 5:
+      return {
+        label,
+        value: 'profile 5 → converted to HDR10',
+        note: 'no HDR10 layer in the file, so its own Dolby Vision metadata maps it; Windows cannot send Dolby Vision itself',
+      };
+    case 7:
+      return {
+        label,
+        value: 'profile 7 → HDR10 base layer',
+        note: 'the disc’s HDR10 layer is shown and the enhancement layer is not used; Windows cannot send Dolby Vision itself',
+      };
+    case 8:
+      return {
+        label,
+        value: 'profile 8 → HDR10 base layer',
+        note: 'made to fall back to HDR10 (or HLG), which is shown; Windows cannot send Dolby Vision itself',
+      };
+    default:
+      return {
+        label,
+        value: `profile ${profile} → HDR10`,
+        note: 'Windows cannot send Dolby Vision itself',
+      };
+  }
+}
+
 export function describeAudioPath(format: string | null, exclusive: boolean | null): StatRow {
   if (format?.startsWith('spdif-')) {
     return {
@@ -490,6 +527,7 @@ async function readOutputCheck(from: {
   displayHz: number | null;
   hdrSource: boolean;
   hdrOut: OutputFacts['hdrOut'];
+  dolbyVision: number | null;
   codec: string | null;
   outFormat: string | null;
 }): Promise<StatGroup | null> {
@@ -521,6 +559,7 @@ async function readOutputCheck(from: {
     displayHz: from.displayHz,
     hdrSource: from.hdrSource,
     hdrOut: from.hdrOut,
+    dolbyVision: from.dolbyVision,
     switches,
     audio: {
       codec: from.codec,
@@ -577,6 +616,10 @@ export async function readPlaybackStats(): Promise<StatGroup[]> {
   // `max-luma` is the newer name and is in nits; `sig-peak` is the older one and
   // is relative to SDR reference white. Neither exists on every build.
   const maxLuma = await readProperty<number>('video-params/max-luma', 'double');
+  const dolbyVision = await readProperty<number>(
+    'current-tracks/video/dolby-vision-profile',
+    'int64'
+  );
   const sigPeak = await readProperty<number>('video-params/sig-peak', 'double');
   // What mpv rendered *for*. The property is `video-target-params`; this read
   // `target-params` for months, which does not exist — see describeHdr.
@@ -684,6 +727,7 @@ export async function readPlaybackStats(): Promise<StatGroup[]> {
     fps: displayedFps,
     displayHz: displayFps,
     hdrSource,
+    dolbyVision,
     hdrOut: hdrOutcome({
       sourceGamma: gamma,
       targetGamma,
@@ -799,6 +843,7 @@ export async function readPlaybackStats(): Promise<StatGroup[]> {
           toneMapping,
           computePeak,
         }),
+        ...[describeDolbyVision(dolbyVision)].filter((r): r is StatRow => r !== null),
         { label: 'Transfer', value: text(gamma) },
         {
           label: 'Primaries',

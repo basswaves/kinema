@@ -94,8 +94,11 @@ this order:
    for, `source` renders at the film's own 1000 nits where `target` rendered at
    1499. **Confirmed on the test TV (USB round 2):** HDR on → hint `yes`, HDR10
    out, no tone curve in the shader at all; HDR off → hint `no`, SDR out,
-   mpv's own tone mapping ran. Still to do: name the Dolby Vision handling in
-   the stats panel.
+   mpv's own tone mapping ran. The Dolby Vision handling is named in the stats
+   panel (a "Dolby Vision" row from the track's `dolby-vision-profile`: 5
+   converted to HDR10, 7 and 8 shown as their HDR10 base layer) and in the
+   Output check's HDR verdict (0.3.1) — tested in code; no Dolby Vision file was
+   at hand to see it in the real app.
    **Also the stats panel's HDR row**, which reads `target-params/gamma` — a
    property mpv does not have (it is `video-target-params`) — and so reports
    "tone mapping" for *every* HDR file whatever happened. Found on the test TV.
@@ -134,13 +137,14 @@ this order:
 
    **Spatial sound, as of USB round 2:** confirmed that with Atmos for home
    theater on, every film plays silent (`0x887C0077` on `Initialize`, twice
-   more). Detecting it is not solved: the spatial audio API answers the same
-   with it off (static mask `0xffffe`, stream available) on the development monitor here, and
-   the dynamic object count read 0 on the test TV with it on. The log now carries
-   every raw answer; a run with it on and one with it off, on the same device,
-   will show which one moves. Whatever detection turns out to be possible, the
-   player must catch the failed open itself and fall back — that does not
-   depend on detection. Longer term, mpv PR #18389 (`--ao=wasapi-spatial`,
+   more) — which turned out to be a half-configured Windows setting, not a
+   property of spatial sound (see GOTCHAS). **Detection is solved:** the
+   dynamic object count is 0 with spatial sound off and non-zero with it on —
+   128 for Windows Sonic on the development PC, 20 for a properly set up "Dolby
+   Atmos for home theater" on the test TV. The earlier "0 with it on" was the
+   half-configured state. The static mask and stream availability answer the
+   same either way and mean nothing. The player still catches a failed open
+   itself and falls back, which does not depend on detection. Longer term, mpv PR #18389 (`--ao=wasapi-spatial`,
    milestoned for 0.43, open as of Sept 2026) would let decoded PCM go through
    Windows' spatial sound properly; worth adopting when a libmpv with it ships.
    Verified here by writing mpv's output to a file (`--ao=pcm`) and checking

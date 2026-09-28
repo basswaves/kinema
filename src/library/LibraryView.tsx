@@ -45,6 +45,7 @@ import {
   matchFiles,
   type MatchProgress,
 } from '../metadata/match';
+import { BUILTIN_TMDB_KEY } from '../metadata/builtinKey';
 import Art from '../ui/Art';
 import './library.css';
 
@@ -105,7 +106,7 @@ export default function LibraryView() {
         getSetting('tmdb_api_key'),
         getSetting('omdb_api_key'),
       ]);
-      setProviders({ tmdb: !!tmdb?.trim(), omdb: !!omdb?.trim() });
+      setProviders({ tmdb: !!tmdb?.trim() || !!BUILTIN_TMDB_KEY, omdb: !!omdb?.trim() });
     })();
   }, []);
 

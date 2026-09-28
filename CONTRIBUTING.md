@@ -42,6 +42,12 @@ npm run tauri dev
 `ffmpeg` on `PATH` is optional; without it the app's own intro/credits detection
 is skipped and everything else works.
 
+Released builds carry Kinema's own TMDB key, added at build time from a
+repository secret and never committed. A build from source has none, and
+behaves as if its user had not entered one: paste your own free
+[TMDB key](https://www.themoviedb.org/settings/api) in Settings, or put
+`VITE_TMDB_API_KEY=…` in a `.env.local` (ignored by git) to build one in.
+
 ## Verifying
 
 Both of these, before saying something is done:

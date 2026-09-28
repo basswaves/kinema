@@ -44,7 +44,20 @@ jobs:
       # Explicit switch as well as the CI guard inside the script: a runner has
       # no desktop, and a COM call for a shortcut nobody will ever click is a
       # failure point in exchange for nothing.
+      # Kinema's own TMDB key (src/metadata/builtinKey.ts), from a repository
+      # secret so it is never in the source. A release without it would still
+      # run, as a build from source does, but would leave movies unidentified
+      # for everyone who has no key of their own — so a missing secret stops
+      # the release instead.
+      - name: Check the TMDB key is set
+        shell: pwsh
+        env:
+          VITE_TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+        run: if (-not $env:VITE_TMDB_API_KEY) { throw 'The TMDB_API_KEY repository secret is not set.' }
+
       - name: Build the portable app
+        env:
+          VITE_TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
         run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-app.ps1 -NoShortcut
 
       - name: Package

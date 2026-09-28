@@ -72,6 +72,7 @@ import {
   setSetting,
   type ArtworkStats,
 } from '../metadata/api';
+import { BUILTIN_TMDB_KEY } from '../metadata/builtinKey';
 import {
   CREDITS_TAIL_CHOICES,
   CREDITS_TAIL_KEY,
@@ -655,8 +656,11 @@ export default function Settings({ openSection }: { openSection?: 'review' }) {
                 <section className="settings-section">
                   <h2>Posters and descriptions</h2>
                   <p className="muted">
-                    TV shows need no key. Movies need a free key from TMDB for posters,
-                    descriptions and artwork.
+                    {BUILTIN_TMDB_KEY
+                      ? 'Kinema looks up movies and TV shows on TMDB with a key of its own. ' +
+                        'Nothing to set up here — but you can use your own free key instead.'
+                      : 'TV shows need no key. Movies need a free key from TMDB for posters, ' +
+                        'descriptions and artwork.'}
                   </p>
                   <div className="settings-row">
                     <FocusButton
@@ -670,7 +674,12 @@ export default function Settings({ openSection }: { openSection?: 'review' }) {
                   </div>
                   <label className="settings-field">
                     <span>
-                      TMDB <span className="muted">posters, backdrops, cast, episode stills</span>
+                      {BUILTIN_TMDB_KEY ? 'Your own TMDB key ' : 'TMDB '}
+                      <span className="muted">
+                        {BUILTIN_TMDB_KEY
+                          ? 'optional — used instead of Kinema’s'
+                          : 'posters, backdrops, cast, episode stills'}
+                      </span>
                     </span>
                     {/* Masked. This screen is routinely on a television, and a
                         key on a 60-inch panel in a living room is not private. */}
@@ -682,7 +691,7 @@ export default function Settings({ openSection }: { openSection?: 'review' }) {
                         setKeysSaved(false);
                       }}
                       type="password"
-                      placeholder="Paste your TMDB key"
+                      placeholder={BUILTIN_TMDB_KEY ? 'Not needed' : 'Paste your TMDB key'}
                     />
                   </label>
                   <label className="settings-field">

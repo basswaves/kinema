@@ -7,6 +7,12 @@ makes no stability promises.
 
 ## [Unreleased]
 
+### Added
+
+- **Kinema has its own TMDB key.** Movies are identified, with posters and
+  descriptions, without registering for anything. A key of your own in
+  Settings is still used instead when there is one.
+
 ### Fixed
 
 - **The volume says "Receiver" from the first frame.** With the sound going

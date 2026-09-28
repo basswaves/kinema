@@ -31,6 +31,7 @@ import {
   tvmazeGetShow,
   tvmazeSearch,
 } from './providers';
+import { BUILTIN_TMDB_KEY, chooseTmdbKey, type TmdbKeySource } from './builtinKey';
 import { pickBest, type Candidate, type ScoreContext } from './score';
 import { nfoForGroup, resolveNfoIds, sourceName } from './nfo';
 
@@ -126,6 +127,8 @@ export function groupFiles(
 
 export interface ProviderKeys {
   tmdb: string | null;
+  /** Whose TMDB key that is: one entered in Settings, or the app's own. */
+  tmdbSource: TmdbKeySource | null;
   omdb: string | null;
 }
 
@@ -140,17 +143,19 @@ export type Provider = 'tmdb' | 'tvmaze' | 'omdb';
  * input boxes, and only what was saved should be used.
  */
 export async function loadProviderKeys(): Promise<ProviderKeys> {
-  const [tmdb, omdb] = await Promise.all([
+  const [own, omdb] = await Promise.all([
     getSetting('tmdb_api_key'),
     getSetting('omdb_api_key'),
   ]);
-  return { tmdb: tmdb?.trim() || null, omdb: omdb?.trim() || null };
+  const tmdb = chooseTmdbKey(own, BUILTIN_TMDB_KEY);
+  return { tmdb: tmdb?.key ?? null, tmdbSource: tmdb?.source ?? null, omdb: omdb?.trim() || null };
 }
 
 /**
  * Which provider handles a title of this kind.
  *
- * TMDB first when a key exists: it is the only source here with backdrops,
+ * TMDB first when a key exists — one from Settings, or the app's own
+ * (builtinKey.ts): it is the only source here with backdrops,
  * logos and episode stills, which is what a poster-and-hero UI needs. Without
  * it, TV still works fully via keyless TVmaze, and movies fall back to OMDb
  * (poster only, no fanart).

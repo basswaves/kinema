@@ -8,7 +8,7 @@
  * Why it exists: nearly every bug in this codebase's history was invisible
  * until someone sat in front of the real app — above all the D-pad ones, which
  * only show with the mouse untouched. With this, the browsing UI and the
- * player's controls can be driven keyboard-only in the Claude browser pane,
+ * player's controls can be driven keyboard-only in an ordinary browser,
  * against a small fixed library, with `fakeMpv.ts` standing in for the player.
  *
  * It is a **fixture**, not a second implementation. The rules it answers with

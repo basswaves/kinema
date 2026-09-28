@@ -16,7 +16,6 @@ single most useful file in this repository.
 | [docs/DESIGN.md](docs/DESIGN.md) | Architecture, data flow, and the design decisions worth preserving |
 | [docs/HISTORY.md](docs/HISTORY.md) | How it was built, and *why each decision went the way it did* |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | What is next, what is not planned, and where help is wanted — a good place to start |
-| [CLAUDE.md](CLAUDE.md) | The working rules, in short form |
 
 ## Building
 

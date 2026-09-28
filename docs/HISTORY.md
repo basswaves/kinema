@@ -632,7 +632,7 @@ remember to call.
 
 Eighteen bare `<button>`s and no `FocusButton` anywhere: audio and subtitle
 selection, stats and fullscreen were **mouse-only**, on the one screen where a
-remote is most likely to be the only input. CLAUDE.md, README and GOTCHAS all
+remote is most likely to be the only input. CONTRIBUTING, README and GOTCHAS all
 stated the rule this broke.
 
 Left/Right still seek. **Up** hands the arrow keys to the OSD, **Escape** hands
@@ -726,7 +726,7 @@ window.
 
 The app now runs a Skiptro the **user installed themselves**, at a path they
 chose. Nothing is bundled, downloaded or required: with no path set, intro
-skipping behaves exactly as before. See the settled-decisions note in CLAUDE.md
+skipping behaves exactly as before. See the settled decisions in CONTRIBUTING.md
 for why that is compatible with the rule rather than an exception to it.
 
 Two commands, because that is what Skiptro's CLI does — `scan <dir>` fills its

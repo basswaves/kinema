@@ -622,14 +622,14 @@ unbroken press. The first attempt at this fix set `throttle` alone and changed
 nothing in the mock, whose key repeat — like many remotes' — is a stream of
 separate down/up presses.
 
-### A hidden Browser pane never scrolls smoothly
+### A hidden browser pane never scrolls smoothly
 
-When testing in the Claude Browser pane: while the pane is hidden,
+When testing `dev:mock` in a browser pane embedded in another program: while the pane is hidden,
 `requestAnimationFrame` never fires, so a `behavior: 'smooth'` scroll never
 starts. `document.visibilityState` still says `visible`, instant scrolls
 still work, and the result looks exactly like `keepInView` being broken — the
-focus ring walks off the screen and the page stays put. Check `tabs_context`
-("The Browser pane is currently hidden") before believing any scroll result.
+focus ring walks off the screen and the page stays put. Make sure the pane is
+visible before believing any scroll result.
 
 ### A focus zoom can swallow the gap to the control below it
 

@@ -1,7 +1,7 @@
 /**
  * Settings → Sound: how the film's sound leaves the PC.
  *
- * Every control here describes the equipment, not a taste (CLAUDE.md → "Settings
+ * Every control here describes the equipment, not a taste (CONTRIBUTING.md → "Settings
  * describe the hardware, never taste"): whether the receiver should get the
  * sound directly, which device is the receiver, and — only as an override of
  * what the equipment check found — which formats it takes. Each format

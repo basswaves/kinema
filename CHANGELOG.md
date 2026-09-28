@@ -7,7 +7,12 @@ makes no stability promises.
 
 ## [Unreleased]
 
-A pass over everything a new user meets, after an outside-eye review.
+## [0.4.0] — 2026-09-28
+
+A pass over everything a new user meets, after an outside-eye review. No
+library upgrade: 0.3.x libraries open as they are. TV mode now fills the
+screen; switch to "At a desk" in Settings → Playback, or press
+Ctrl+Shift+T, for a window.
 
 ### Changed
 

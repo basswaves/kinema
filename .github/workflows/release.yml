@@ -74,11 +74,12 @@ jobs:
             **Windows 11 only.** Needs the WebView2 runtime, which ships with
             Windows 11 — nothing to install separately.
 
-            ### Windows will warn you
+            ### Windows will ask once whether to run it
 
-            The executable is not code-signed, so SmartScreen shows
-            *"Windows protected your PC"* on first run. Click **More info**,
-            then **Run anyway**. To check you got the file this workflow built:
+            Kinema is not code-signed, so the first time you open it Windows
+            shows *"Windows protected your PC"*. Click **More info**, then
+            **Run anyway**; Windows remembers. To check you got the file this
+            workflow built, run this in PowerShell where you downloaded it:
 
             ```powershell
             Get-FileHash .\${{ env.ZIP }} -Algorithm SHA256
@@ -88,10 +89,10 @@ jobs:
 
             ### First run
 
-            The library is empty until you add a folder. Open **Settings**, add
-            a movies or TV folder, and optionally paste a free
-            [TMDB API key](https://www.themoviedb.org/settings/api) for posters
-            and artwork. TV metadata works without any key.
+            Kinema opens on a setup panel: add a movies or TV folder, and paste
+            a free [TMDB API key](https://www.themoviedb.org/settings/api).
+            TV shows work without a key; **movies need one** to be identified
+            and appear.
 
             ---
 

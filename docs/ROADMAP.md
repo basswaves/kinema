@@ -235,6 +235,64 @@ this order:
 
 Also in every step: the matching docs (GOTCHAS for traps, PLAN for decisions).
 
+## Pre-launch UX pass (agreed 2026-09-28)
+
+An outside-eye review of the finished app, done by using it keyboard-only in
+`dev:mock` and reading every screen, found that the foundations hold and that
+the friction is in the first ten minutes and in the remote during playback.
+Every point was put to the owner with options; the choices below are theirs.
+Work happens on the `ux-pass` branch, one commit per step, folded into `master`
+linearly at the end. Each step is verified before the next.
+
+1. **Wording.** "Movies" everywhere (not "films"), real plurals instead of
+   "file(s)", readable error messages instead of raw `String(e)`, and no title
+   count in the top bar.
+2. **Back remembers.** A view history: Back returns to the previous screen with
+   focus on what was picked (search results, See-all grid, detail after a film).
+   Replaces "Back from a detail page always goes Home" below.
+3. **TV mode runs fullscreen.** The whole app, library and player — so display
+   switching, which only acts in fullscreen, is not silently off from the sofa.
+   Desk mode stays windowed.
+4. **The remote works like a streaming app.** OK pauses; Left/Right seek and
+   accelerate when held; Down reveals the controls; the seek bar is reachable
+   and scrubs. No "press Up first" mode to learn.
+5. **Player bar.** Icon transport group in the centre; Audio & subtitles,
+   volume, fullscreen at the right; Stats off the bar (still `i`). Episode name
+   and "Ends at" on screen. Volume and mute (M); "Volume on the receiver" while
+   bitstreaming.
+6. **Start over.** A button on the "Resumed from" notice while it shows, and
+   Resume / Play from start on the detail page.
+7. **Tracks.** Plain names ("English · 7.1 · Dolby TrueHD Atmos", "SDH",
+   "Forced"). A default audio and subtitle language in Settings, starting from
+   Windows' language; a choice made in a show still wins for that show. Agreed
+   as a *preference*, not taste, so it fits the settings rule.
+8. **Detail page.** Opens on the season Play will start; Specials last. Quiet
+   per-row tick instead of a bright button on every row, plus Mark season
+   watched / unwatched. The YouTube trailer button stays, labelled as opening
+   the web browser.
+9. **Home.** Watched tick and progress bar on posters, unwatched-count on
+   shows. The hero changes daily among things not finished, never the item
+   already first in Continue watching; genre rows only once they add something.
+10. **Home notices.** "N movies need your help — Review" (plus a badge on
+    Settings) for the review queue. And the one-time direct-sound dialog before
+    Play goes: in its place a dismissible notice, shown only when the connected
+    equipment could do better than the current settings (sound or screen), and
+    shown again if more capable equipment is connected later.
+11. **Search.** An on-screen keyboard a remote can drive, Back leaves the box,
+    and search matches cast, genre and year as well as titles.
+12. **Grids.** Sort (Recently added / A–Z / Year / Rating) and Unwatched only,
+    remembered per grid; Movies and TV shows as top-bar entries.
+13. **Settings.** A section list (Library · Playback · Picture & sound · Intro &
+    credits · Advanced). Every option shows its choices side by side; one-line
+    explanations with the rest behind "More about this".
+14. **New version notice.** Once per start, ask GitHub for the latest release
+    number; if newer, a line in Settings and a dot on Settings. Downloads
+    nothing, fails silent, can be switched off.
+15. **Docs.** A built-in TMDB key goes to the top of "Worth doing"; the first-run
+    picture-and-sound setup stays there; decisions to PLAN.
+16. **README for launch.** Stays unsigned, with a clearer SmartScreen section;
+    "Known limitations" in place of the testing paragraph; fresh screenshots.
+
 ## Worth doing, in rough order of payoff
 
 ### Tone mapping for the display's real brightness — later, maybe

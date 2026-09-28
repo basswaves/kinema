@@ -10,6 +10,16 @@ pub fn to_string_err<E: std::fmt::Display>(e: E) -> String {
     e.to_string()
 }
 
+/// A count with its noun, `1 file` / `3 files`, for messages the settings
+/// screen shows. The frontend's `count` in `ui/format.ts` does the same.
+pub fn count(n: usize, noun: &str) -> String {
+    if n == 1 {
+        format!("1 {noun}")
+    } else {
+        format!("{n} {noun}s")
+    }
+}
+
 /// Seconds since the Unix epoch — what every timestamp column stores.
 pub fn now_secs() -> i64 {
     std::time::SystemTime::now()
@@ -37,7 +47,14 @@ pub fn is_season_folder(name: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::is_season_folder;
+    use super::{count, is_season_folder};
+
+    #[test]
+    fn count_uses_the_singular_only_for_one() {
+        assert_eq!(count(1, "file"), "1 file");
+        assert_eq!(count(0, "file"), "0 files");
+        assert_eq!(count(12, "episode"), "12 episodes");
+    }
 
     /// Everything either of the two old rules accepted.
     #[test]

@@ -5,6 +5,7 @@
  * — not a taste. The rules are `player/displayMode.ts`; the timing, including
  * "only in fullscreen", is `player/displaySwitch.ts`.
  */
+import { userError } from './errors';
 import { useCallback, useEffect, useState } from 'react';
 import FocusButton from './FocusButton';
 import { setSetting } from '../metadata/api';
@@ -18,8 +19,8 @@ import {
 
 const RESOLUTION_ORDER: ResolutionMode[] = ['auto', 'match', 'off'];
 const RESOLUTION_LABEL: Record<ResolutionMode, string> = {
-  auto: 'Auto — up to the film when the desktop is lower',
-  match: "Match content — always the film's own",
+  auto: 'Auto — up to the video when the desktop is lower',
+  match: "Match content — always the video's own",
   off: 'Off — never change it',
 };
 
@@ -37,7 +38,7 @@ export default function ScreenSection({ onError }: { onError: (message: string) 
   const save = useCallback(
     (key: string, value: string, next: SwitchSettings) => {
       setSettings(next);
-      void setSetting(key, value).catch((e) => onError(String(e)));
+      void setSetting(key, value).catch((e) => onError(userError(e)));
     },
     [onError]
   );
@@ -48,8 +49,8 @@ export default function ScreenSection({ onError }: { onError: (message: string) 
     <section className="settings-section">
       <h2>Screen</h2>
       <p className="muted">
-        Kinema can change the screen&rsquo;s mode to suit each film &mdash; only while the player is
-        fullscreen, and back again when it closes. The film waits, paused, until the screen is
+        Kinema can change the screen&rsquo;s mode to suit each video &mdash; only while the player is
+        fullscreen, and back again when it closes. The video waits, paused, until the screen is
         showing a picture again; the screen goes blank for a second or two while it switches.
       </p>
 
@@ -67,9 +68,9 @@ export default function ScreenSection({ onError }: { onError: (message: string) 
           Match the refresh rate: {settings.refresh ? 'on' : 'off'}
         </FocusButton>
         <span className="muted">
-          Films are 24 frames a second, and most screens run at 60, which cannot divide evenly
+          Movies are 24 frames a second, and most screens run at 60, which cannot divide evenly
           &mdash; so pans judder. With this on, the screen switches to 23.976 Hz (or a clean
-          multiple) for a film and back afterwards. Only if the screen offers it at the resolution
+          multiple) for a movie and back afterwards. Only if the screen offers it at the resolution
           it is using.
         </span>
       </div>
@@ -89,9 +90,9 @@ export default function ScreenSection({ onError }: { onError: (message: string) 
           Resolution: {RESOLUTION_LABEL[settings.resolution]}
         </FocusButton>
         <span className="muted">
-          <strong>Auto</strong> only switches up: a 4K film on a 4K TV whose desktop is set to 1080p
+          <strong>Auto</strong> only switches up: a 4K movie on a 4K TV whose desktop is set to 1080p
           would otherwise be shrunk by Kinema and blown back up by the TV.{' '}
-          <strong>Match content</strong> always uses the film&rsquo;s own resolution, so the TV
+          <strong>Match content</strong> always uses the video&rsquo;s own resolution, so the TV
           &mdash; or a video processor like a madVR Envy &mdash; does the upscaling. Press to cycle.
         </span>
       </div>
@@ -104,11 +105,11 @@ export default function ScreenSection({ onError }: { onError: (message: string) 
             save(SWITCH_HDR_KEY, settings.hdr ? 'off' : 'on', { ...settings, hdr: !settings.hdr })
           }
         >
-          Turn HDR on for HDR films: {settings.hdr ? 'on' : 'off'}
+          Turn HDR on for HDR videos: {settings.hdr ? 'on' : 'off'}
         </FocusButton>
         <span className="muted">
           For a screen that can do HDR but is usually left with it off in Windows. Kinema switches
-          Windows HDR on for an HDR film and off again afterwards. With it off, HDR films are shown
+          Windows HDR on for an HDR video and off again afterwards. With it off, HDR videos are shown
           in SDR on such a screen.
         </span>
       </div>

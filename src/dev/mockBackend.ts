@@ -74,8 +74,8 @@ function mockEquipment() {
           { width: 3840, height: 2160, hz: 24, rate: 24 },
         ],
         notes: [
-          'Supports HDR, but Windows has it switched off — HDR films are converted to SDR on this screen until it is on.',
-          'Can show films without judder: 23.976 / 24 Hz at 3840×2160.',
+          'Supports HDR, but Windows has it switched off — HDR videos are converted to SDR on this screen until it is on.',
+          'Can show movies without judder: 23.976 / 24 Hz at 3840×2160.',
         ],
       },
       {
@@ -96,8 +96,8 @@ function mockEquipment() {
         bits_per_color: 10,
         modes: [{ width: 2560, height: 1600, hz: 60, rate: 60 }],
         notes: [
-          'SDR screen: HDR films are converted to SDR.',
-          'No 24 Hz mode: films play with 3:2 judder on this screen, whatever the setting.',
+          'SDR screen: HDR videos are converted to SDR.',
+          'No 24 Hz mode: movies play with 3:2 judder on this screen, whatever the setting.',
         ],
       },
     ],

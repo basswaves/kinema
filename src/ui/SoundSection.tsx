@@ -11,6 +11,7 @@
  * writes the settings it reads, and says in words what they will do with the
  * device that is actually connected.
  */
+import { userError } from './errors';
 import { useCallback, useEffect, useState } from 'react';
 import FocusButton from './FocusButton';
 import { setSetting } from '../metadata/api';
@@ -57,7 +58,7 @@ export default function SoundSection({ onError }: { onError: (message: string) =
   const save = useCallback(
     (key: string, value: string, next: AudioSettings) => {
       setSettings(next);
-      void setSetting(key, value).catch((e) => onError(String(e)));
+      void setSetting(key, value).catch((e) => onError(userError(e)));
     },
     [onError]
   );
@@ -96,11 +97,11 @@ export default function SoundSection({ onError }: { onError: (message: string) =
           Send sound straight to the receiver: {settings.direct ? 'on' : 'off'}
         </FocusButton>
         <span className="muted">
-          <strong>On:</strong> while a film plays, Kinema takes the sound device for itself and
-          sends the film&rsquo;s own soundtrack &mdash; Dolby TrueHD and Atmos, DTS-HD and DTS:X
+          <strong>On:</strong> while something plays, Kinema takes the sound device for itself and
+          sends the video&rsquo;s own soundtrack &mdash; Dolby TrueHD and Atmos, DTS-HD and DTS:X
           &mdash; to your receiver untouched, the way a disc player does. Windows&rsquo; speaker
           setup and spatial sound are bypassed, so they do not matter. Other sounds from this PC are
-          silent until the film stops. <strong>Off:</strong> sound goes through Windows like any
+          silent until it stops. <strong>Off:</strong> sound goes through Windows like any
           other program: decoded, mixed to Windows&rsquo; speaker setup, and without Atmos or DTS:X.
         </span>
       </div>
@@ -121,7 +122,7 @@ export default function SoundSection({ onError }: { onError: (message: string) =
               ? `${device.name} can take the lossless formats untouched. Turn this on to use that.`
               : `Sound goes through Windows to ${device.name}, mixed to ${device.mix_layout}.`}
           {!settings.direct && device.spatial_objects
-            ? " Windows spatial sound is on for this device: the receiver may show Atmos, but that is Windows re-wrapping decoded 7.1 — a film's own Atmos or DTS:X height sound is lost unless this is on."
+            ? " Windows spatial sound is on for this device: the receiver may show Atmos, but that is Windows re-wrapping decoded 7.1 — a movie's own Atmos or DTS:X height sound is lost unless this is on."
             : ''}
         </p>
       )}

@@ -14,13 +14,14 @@
  * settings screen you can only reach with a mouse is the one screen guaranteed
  * to be needed when no mouse is present.
  */
+import { userError } from './errors';
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import FocusButton from './FocusButton';
-import { formatBytes } from './format';
+import { count, formatBytes } from './format';
 import FocusInput from './FocusInput';
 import ConfirmButton from './ConfirmButton';
 import EquipmentSection from './EquipmentSection';
@@ -99,15 +100,15 @@ const SKIPTRO_SAVE_DEBOUNCE_MS = 600;
 
 function summaryLine(s: ScanSummary): string {
   const parts = [
-    `${s.filesAdded} new file(s)`,
+    `${count(s.filesAdded, 'new file')}`,
     `${s.matched} matched`,
     `${s.unmatched} left for review`,
   ];
-  if (s.artworkStored) parts.push(`${s.artworkStored} image(s) cached`);
-  if (s.detailsFilled) parts.push(`${s.detailsFilled} title(s) enriched`);
+  if (s.artworkStored) parts.push(`${count(s.artworkStored, 'image')} cached`);
+  if (s.detailsFilled) parts.push(`${count(s.detailsFilled, 'title')} enriched`);
   // The scan collected these all along and nothing ever rendered them, so an
   // unreachable share reported a perfectly cheerful "0 new files".
-  if (s.errors.length) parts.push(`${s.errors.length} problem(s)`);
+  if (s.errors.length) parts.push(count(s.errors.length, 'problem'));
   return parts.join(' · ');
 }
 
@@ -222,7 +223,7 @@ export default function Settings() {
       setArt(a);
       setBacklog(Object.fromEntries(pending));
     } catch (e) {
-      setError(String(e));
+      setError(userError(e));
     }
   }, []);
 
@@ -283,7 +284,7 @@ export default function Settings() {
   useEffect(() => {
     if (!skiptroLoaded) return;
     const id = window.setTimeout(() => {
-      void saveSkiptroFields().catch((e) => setError(String(e)));
+      void saveSkiptroFields().catch((e) => setError(userError(e)));
     }, SKIPTRO_SAVE_DEBOUNCE_MS);
     return () => window.clearTimeout(id);
   }, [skiptroLoaded, saveSkiptroFields]);
@@ -317,7 +318,7 @@ export default function Settings() {
           await setSetting('omdb_api_key', omdbKey.trim());
           setKeysSaved(true);
         } catch (e) {
-          setError(String(e));
+          setError(userError(e));
         }
       })();
     }, SKIPTRO_SAVE_DEBOUNCE_MS);
@@ -376,7 +377,7 @@ export default function Settings() {
           outcome(`${owner} ${code}: ${detail}`, true);
         }
       } catch (e) {
-        outcome(String(e), true);
+        outcome(userError(e), true);
       } finally {
         setDetecting(null);
         setDetectLine('');
@@ -417,7 +418,7 @@ export default function Settings() {
         await refresh();
         setNote(`Added ${selected}. Scan to pick up its files.`);
       } catch (e) {
-        setError(String(e));
+        setError(userError(e));
       }
     },
     [refresh]
@@ -429,7 +430,7 @@ export default function Settings() {
     setWritingNfo(true);
     try {
       const report = await writeNfo(await buildNfoExports(), overwrite);
-      const parts = [`Wrote ${report.written} NFO file(s)`];
+      const parts = [`Wrote ${count(report.written, 'NFO file')}`];
       if (report.skipped) parts.push(`${report.skipped} already existed and were left alone`);
       if (report.errors.length) parts.push(`${report.errors.length} failed`);
       setNote(`${parts.join(' · ')}.`);
@@ -437,7 +438,7 @@ export default function Settings() {
       // thousand identical lines say nothing the first three did not.
       if (report.errors.length) setError(report.errors.slice(0, 3).join(' · '));
     } catch (e) {
-      setError(String(e));
+      setError(userError(e));
     } finally {
       setWritingNfo(false);
     }
@@ -472,9 +473,9 @@ export default function Settings() {
             <ul className="settings-roots">
               {roots.map((root) => (
                 <li key={root.id}>
-                  <span className={`root-kind ${root.kind}`}>{root.kind}</span>
+                  <span className={`root-kind ${root.kind}`}>{root.kind === 'tv' ? 'TV' : 'Movies'}</span>
                   <span className="root-path">{root.path}</span>
-                  <span className="muted">{root.file_count} file(s)</span>
+                  <span className="muted">{count(root.file_count, 'file')}</span>
                   <ConfirmButton
                     keepInView="nearest"
                     className="settings-remove"
@@ -482,7 +483,7 @@ export default function Settings() {
                     onConfirm={() =>
                       void removeLibraryRoot(root.id)
                         .then(refresh)
-                        .catch((e) => setError(String(e)))
+                        .catch((e) => setError(userError(e)))
                     }
                   >
                     Remove
@@ -558,7 +559,7 @@ export default function Settings() {
         <section className="settings-section">
           <h2>Posters and descriptions</h2>
           <p className="muted">
-            TV shows work with no key at all, through TVmaze. Films need a key from TMDB —
+            TV shows work with no key at all, through TVmaze. Movies need a key from TMDB —
             it is free, and it is what fetches posters, backdrops, cast and episode stills.
             Keys are stored in the local database in app data, never in the project folder,
             and they save themselves as you type.
@@ -592,7 +593,7 @@ export default function Settings() {
           </label>
           <label className="settings-field">
             <span>
-              OMDb <span className="muted">optional — a fallback for films, poster only</span>
+              OMDb <span className="muted">optional — a fallback for movies, poster only</span>
             </span>
             <FocusInput
               className="settings-input"
@@ -621,7 +622,7 @@ export default function Settings() {
           <div className="settings-attribution">
             <img src="/tmdb.svg" alt="TMDB" className="tmdb-logo" />
             <p className="muted">
-              Film and TV data from TMDB. This product uses the TMDB API but is not endorsed or
+              Movie and TV data from TMDB. This product uses the TMDB API but is not endorsed or
               certified by TMDB. TV data also from <strong>TVmaze</strong>.
             </p>
           </div>
@@ -631,8 +632,8 @@ export default function Settings() {
         <section className="settings-section">
           <h2>Needs attention</h2>
           <p className="muted">
-            Films and episodes Kinema could not identify with confidence. Rather than attach the
-            wrong film to your file, it puts them here for you to pick from a list — which takes
+            Movies and episodes Kinema could not identify with confidence. Rather than attach the
+            wrong movie to your file, it puts them here for you to pick from a list — which takes
             a few seconds each. If this is empty, everything found a match.
           </p>
           <FocusButton
@@ -640,7 +641,7 @@ export default function Settings() {
             className={needsReview > 0 ? 'btn-primary' : 'btn-secondary'}
             onSelect={() => setPanel((p) => (p === 'review' ? 'none' : 'review'))}
           >
-            {needsReview > 0 ? `Review ${needsReview} item(s)` : 'Nothing to review'}
+            {needsReview > 0 ? `Review ${count(needsReview, 'item')}` : 'Nothing to review'}
           </FocusButton>
           {panel === 'review' && (
             <FixMatch
@@ -683,7 +684,7 @@ export default function Settings() {
                 const next = !autoSkip;
                 setAutoSkip(next);
                 void setSetting('skip_mode', next ? 'auto' : 'button').catch((e) =>
-                  setError(String(e))
+                  setError(userError(e))
                 );
               }}
             >
@@ -706,7 +707,7 @@ export default function Settings() {
                   CREDITS_TAIL_CHOICES[(index + 1) % CREDITS_TAIL_CHOICES.length] ??
                   DEFAULT_CREDITS_TAIL_SECS;
                 setCreditsTail(next);
-                void setSetting(CREDITS_TAIL_KEY, String(next)).catch((e) => setError(String(e)));
+                void setSetting(CREDITS_TAIL_KEY, String(next)).catch((e) => setError(userError(e)));
               }}
             >
               Offer the next episode: {creditsTail > 0 ? `${creditsTail}s early` : 'at the end'}
@@ -715,7 +716,7 @@ export default function Settings() {
               For episodes where nothing has found the credits, guess that they are the last{' '}
               {creditsTail > 0 ? `${creditsTail} seconds` : 'stretch'} and offer the next episode
               then. Anything that actually knows better — a real marker, or a chapter named for
-              the credits — is used instead. Never applies to films, or to the last episode you
+              the credits — is used instead. Never applies to movies, or to the last episode you
               have.{' '}
               <span className="muted">
                 Press it to cycle: {CREDITS_TAIL_CHOICES.map((n) => (n === 0 ? 'off' : `${n}s`)).join(', ')}.
@@ -735,7 +736,7 @@ export default function Settings() {
                 const next = !displaySync;
                 setDisplaySync(next);
                 void setSetting(VIDEO_SYNC_KEY, next ? 'display' : 'audio').catch((e) =>
-                  setError(String(e))
+                  setError(userError(e))
                 );
               }}
             >
@@ -747,7 +748,7 @@ export default function Settings() {
               smoother depends on your screen — so it is worth trying both and keeping whichever
               looks better. Nothing else changes.{' '}
               <span className="muted">
-                It will not fix the regular, rhythmic stutter that films show on most computer
+                It will not fix the regular, rhythmic stutter that movies show on most computer
                 monitors — that comes from the screen&rsquo;s refresh rate not dividing evenly
                 into 24 frames a second, and only changing the screen&rsquo;s refresh rate helps.
                 Press <kbd>i</kbd> while something is playing to see what you are getting.
@@ -806,7 +807,7 @@ export default function Settings() {
                 const next = !autoAnalyse;
                 setAutoAnalyse(next);
                 void setSetting(AUTO_ANALYSE_KEY, next ? 'on' : 'off').catch((e) =>
-                  setError(String(e))
+                  setError(userError(e))
                 );
               }}
             >
@@ -866,7 +867,7 @@ export default function Settings() {
                 const next = !introDb;
                 setIntroDb(next);
                 void setSetting(INTRODB_ENABLED_KEY, next ? 'on' : 'off').catch((e) =>
-                  setError(String(e))
+                  setError(userError(e))
                 );
               }}
             >
@@ -942,7 +943,7 @@ export default function Settings() {
                     await setSetting(SKIPTRO_PATH_KEY, chosen);
                     setNote('Skiptro location saved.');
                   } catch (e) {
-                    setError(String(e));
+                    setError(userError(e));
                   }
                 })()
               }
@@ -1015,7 +1016,7 @@ export default function Settings() {
               only ffmpeg, so hiding the button without Skiptro would hide the
               detector from anyone who never installs it.
 
-              TV roots only. Intros are a television thing, and a films folder
+              TV roots only. Intros are a television thing, and a movies folder
               would be a button that runs for a long time and finds nothing —
               the whole method is "what do these episodes have in common". */}
           <h3>Run detection</h3>
@@ -1055,7 +1056,7 @@ export default function Settings() {
                   {detecting !== root.path && (backlog[root.id] ?? 0) > 0 && (
                     <>
                       {' · '}
-                      <strong>{backlog[root.id]} episode(s) not analysed yet</strong>
+                      <strong>{count(backlog[root.id], 'episode')} not analysed yet</strong>
                     </>
                   )}
                   {detecting !== root.path && backlog[root.id] === 0 && ' · all analysed'}
@@ -1097,7 +1098,7 @@ export default function Settings() {
           <h2>Storage</h2>
           <p className="muted">
             Posters and artwork are kept on this machine —{' '}
-            {art ? `${art.files} image(s), ${formatBytes(art.bytes)}` : '—'} — so browsing works
+            {art ? `${count(art.files, 'image')}, ${formatBytes(art.bytes)}` : '—'} — so browsing works
             with the internet off. Clearing them is safe: nothing is lost from your library, and
             they download again on the next scan.
           </p>
@@ -1109,9 +1110,9 @@ export default function Settings() {
                 try {
                   const removed = await clearArtworkCache();
                   await refresh();
-                  setNote(`Removed ${removed} cached image(s).`);
+                  setNote(`Removed ${count(removed, 'cached image')}.`);
                 } catch (e) {
-                  setError(String(e));
+                  setError(userError(e));
                 }
               })()
             }
@@ -1184,7 +1185,7 @@ export default function Settings() {
             <FocusButton
               keepInView="nearest"
               className="btn-secondary"
-              onSelect={() => void openLogFolder().catch((e) => setError(String(e)))}
+              onSelect={() => void openLogFolder().catch((e) => setError(userError(e)))}
             >
               Open log folder
             </FocusButton>

@@ -101,11 +101,11 @@ export function checkPicture(f: OutputFacts): Check | null {
     return {
       label,
       verdict: 'info',
-      value: `${film} film scaled up ×${scale.toFixed(2)} by Kinema`,
+      value: `${film} video scaled up ×${scale.toFixed(2)} by Kinema`,
       why: 'Classical resampling (spline36): no detail invented, none sharpened in.',
       fix:
         f.switches.resolution !== 'match'
-          ? 'If your TV or video processor upscales better, Settings → Screen → Resolution → Match content hands it the film at its own size.'
+          ? 'If your TV or video processor upscales better, Settings → Screen → Resolution → Match content hands it the video at its own size.'
           : undefined,
     };
   }
@@ -116,13 +116,13 @@ export function checkPicture(f: OutputFacts): Check | null {
     label,
     // Only a problem if something could change it.
     verdict: canShow ? 'limited' : 'info',
-    value: `${film} film shrunk ×${scale.toFixed(2)} to fit the screen`,
+    value: `${film} video shrunk ×${scale.toFixed(2)} to fit the screen`,
     why: canShow
-      ? `The desktop is set lower than the film, though the screen can show ${film}.`
+      ? `The desktop is set lower than the video, though the screen can show ${film}.`
       : `This screen cannot show ${film}.`,
     fix: canShow
       ? f.switches.resolution === 'off'
-        ? 'Settings → Screen → Resolution → Auto switches up for films like this.'
+        ? 'Settings → Screen → Resolution → Auto switches up for videos like this.'
         : 'Set the Windows desktop to the screen’s full resolution.'
       : undefined,
   };
@@ -142,7 +142,7 @@ export function checkHdr(f: OutputFacts): Check {
           why:
             dv === 5
               ? 'Windows cannot send a Dolby Vision signal, and this profile has no HDR10 layer — it is converted to HDR10 with its own metadata.'
-              : 'Windows cannot send a Dolby Vision signal, so the film’s HDR10 layer is sent as mastered.',
+              : 'Windows cannot send a Dolby Vision signal, so the video’s HDR10 layer is sent as mastered.',
         };
       }
       return { label, verdict: 'native', value: 'HDR10 as mastered — the screen tone maps it' };
@@ -151,25 +151,25 @@ export function checkHdr(f: OutputFacts): Check {
         label,
         verdict: 'limited',
         value: 'HDR, compressed to the peak Windows reports',
-        why: 'The film is remapped before it reaches the screen.',
+        why: 'The video is remapped before it reaches the screen.',
       };
     case 'sdr':
       if (f.screen?.hdr === 'off') {
         return {
           label,
           verdict: 'limited',
-          value: 'HDR film shown in SDR',
+          value: 'HDR video shown in SDR',
           why: 'The screen can show HDR, but Windows has it switched off.',
           fix: f.switches.hdr
             ? 'Go fullscreen: HDR is switched on then (Settings → Screen).'
-            : 'Settings → Screen → Turn HDR on for HDR films, or switch HDR on in Windows.',
+            : 'Settings → Screen → Turn HDR on for HDR videos, or switch HDR on in Windows.',
         };
       }
       return {
         label,
         verdict: 'info',
-        value: 'HDR film tone mapped for an SDR screen',
-        why: 'This screen cannot show HDR; the conversion keeps the film’s look as closely as SDR allows.',
+        value: 'HDR video tone mapped for an SDR screen',
+        why: 'This screen cannot show HDR; the conversion keeps the video’s look as closely as SDR allows.',
       };
     default:
       return { label, verdict: 'info', value: 'not known yet' };
@@ -199,7 +199,7 @@ export function checkMotion(f: OutputFacts): Check | null {
   const here = fitting.some(
     (m) => f.screen && m.width === f.screen.width && m.height === f.screen.height
   );
-  const why = 'The screen’s refresh rate does not divide evenly by the film’s, so pans judder.';
+  const why = 'The screen’s refresh rate does not divide evenly by the video’s, so pans judder.';
   if (here) {
     return {
       label,
@@ -226,7 +226,7 @@ export function checkMotion(f: OutputFacts): Check | null {
     label,
     verdict: 'info',
     value: `judders — ${pair}`,
-    why: `${why} This screen has no mode that fits the film.`,
+    why: `${why} This screen has no mode that fits the video.`,
   };
 }
 
@@ -329,7 +329,7 @@ export function checkSound(f: OutputFacts): Check | null {
       value: `folded from ${a.inChannels} to ${a.outChannels} channels`,
       why: a.direct
         ? `${a.device?.name ?? 'The device'} takes only ${a.outChannels} channels.`
-        : 'Windows’ speaker setup for this device has fewer channels than the film.',
+        : 'Windows’ speaker setup for this device has fewer channels than the soundtrack.',
       fix: a.direct
         ? undefined
         : 'Settings → Sound → Send sound straight to the receiver, or set the speaker setup in Windows.',

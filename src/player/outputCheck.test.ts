@@ -104,7 +104,7 @@ describe('outputCheck', () => {
       })
     );
     expect(c['Picture size']).toMatchObject({ verdict: 'info' });
-    expect(c['Picture size']?.value).toMatch(/1080p film scaled up ×2\.00/);
+    expect(c['Picture size']?.value).toMatch(/1080p video scaled up ×2\.00/);
     expect(c['Picture size']?.fix).toMatch(/Match content/);
   });
 
@@ -137,7 +137,7 @@ describe('outputCheck', () => {
       outputCheck({ ...base, hdrOut: 'sdr', screen: { ...base.screen!, hdr: 'off' } })
     );
     expect(off.HDR).toMatchObject({ verdict: 'limited' });
-    expect(off.HDR?.fix).toMatch(/Turn HDR on for HDR films/);
+    expect(off.HDR?.fix).toMatch(/Turn HDR on for HDR videos/);
   });
 
   it('does not ask for a resolution drop to fix motion', () => {
@@ -205,7 +205,7 @@ describe('outputCheck motion', () => {
         },
       })
     );
-    expect(c.Motion?.why).toMatch(/no mode that fits the film/);
+    expect(c.Motion?.why).toMatch(/no mode that fits the video/);
   });
 });
 

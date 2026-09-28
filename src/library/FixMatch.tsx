@@ -13,6 +13,8 @@
  * Provider keys are never held in state here — they are read from the database
  * at the moment of each search and each link. See `loadProviderKeys`.
  */
+import { count } from '../ui/format';
+import { userError } from '../ui/errors';
 import { useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import FocusButton from '../ui/FocusButton';
@@ -66,7 +68,7 @@ export default function FixMatch({ onChanged }: Props) {
     try {
       setFiles(await listNeedsReview(QUEUE_LIMIT));
     } catch (e) {
-      setError(String(e));
+      setError(userError(e));
     }
   }, []);
 
@@ -105,7 +107,7 @@ export default function FixMatch({ onChanged }: Props) {
         await onChanged(message);
         setOpenKey(null);
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        setError(userError(e));
       } finally {
         setBusy(false);
       }
@@ -162,13 +164,13 @@ export default function FixMatch({ onChanged }: Props) {
                   candidate.year ? ` (${candidate.year})` : ''
                 } via ${provider}`
               );
-              return `Linked ${group.files.length} file(s) to “${candidate.title}”.`;
+              return `Linked ${count(group.files.length, 'file')} to “${candidate.title}”.`;
             })
           }
           onIgnore={() =>
             void run(async () => {
               await ignoreFiles(group.files);
-              return `Ignored ${group.files.length} file(s).`;
+              return `Ignored ${count(group.files.length, 'file')}.`;
             })
           }
         />
@@ -186,7 +188,7 @@ export default function FixMatch({ onChanged }: Props) {
                   <div className="fixmatch-title">
                     {group.title}
                     {group.year ? ` (${group.year})` : ''}
-                    <span className="muted"> · {group.files.length} file(s)</span>
+                    <span className="muted"> · {count(group.files.length, 'file')}</span>
                   </div>
                 </div>
                 <FocusButton
@@ -195,7 +197,7 @@ export default function FixMatch({ onChanged }: Props) {
                   onSelect={() =>
                     void run(async () => {
                       await returnFilesToReview(group.files);
-                      return `Restored ${group.files.length} file(s) to the review queue.`;
+                      return `Restored ${count(group.files.length, 'file')} to the review queue.`;
                     })
                   }
                 >
@@ -311,7 +313,7 @@ function GroupRow({
       setResults(found);
       setUsed({ provider, isSeries });
     } catch (e) {
-      setSearchError(e instanceof Error ? e.message : String(e));
+      setSearchError(userError(e));
     } finally {
       setSearching(false);
     }

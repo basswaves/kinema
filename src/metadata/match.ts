@@ -206,7 +206,7 @@ export async function applyMatch(
     throw new Error('OMDb has no TV data — use TMDB or TVmaze for a series.');
   }
   if (!isSeries && provider === 'tvmaze') {
-    throw new Error('TVmaze has no film data — use TMDB or OMDb for a movie.');
+    throw new Error('TVmaze has no movie data — use TMDB or OMDb for a movie.');
   }
 
   const metadata =

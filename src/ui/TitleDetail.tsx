@@ -5,6 +5,7 @@
  * greyed out rather than hidden — a season with gaps should look like a season
  * with gaps, not like a shorter season.
  */
+import { userError } from './errors';
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { openUrl } from '@tauri-apps/plugin-opener';
@@ -113,7 +114,7 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
         const owned = result.episodes.filter((e) => e.file_path);
         setSeason((owned[0] ?? result.episodes[0])?.season ?? null);
       })
-      .catch((e) => !cancelled && setError(String(e)));
+      .catch((e) => !cancelled && setError(userError(e)));
     return () => {
       cancelled = true;
     };
@@ -183,7 +184,7 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
         // Home re-reads Continue Watching whenever it is shown, so there is
         // nothing to notify here — see the effect in Browse.tsx.
       } catch (e) {
-        setError(String(e));
+        setError(userError(e));
       }
     },
     [title.id]
@@ -331,7 +332,7 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
                     onSelect={() =>
                       void openUrl(
                         `https://www.youtube.com/watch?v=${shown.trailer_key as string}`
-                      ).catch((e) => setError(String(e)))
+                      ).catch((e) => setError(userError(e)))
                     }
                   >
                     Trailer on YouTube ↗

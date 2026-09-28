@@ -13,6 +13,7 @@
  * shows that. "Check again" is the only thing that re-asks — for when a
  * receiver was switched on or a Windows setting changed since launch.
  */
+import { userError } from './errors';
 import { useCallback, useEffect, useState } from 'react';
 import FocusButton from './FocusButton';
 import {
@@ -44,7 +45,7 @@ export default function EquipmentSection() {
     try {
       setEquipment(await checkEquipment());
     } catch (e) {
-      setError(String(e));
+      setError(userError(e));
     } finally {
       setChecking(false);
     }
@@ -54,7 +55,7 @@ export default function EquipmentSection() {
     let live = true;
     getEquipment()
       .then((e) => live && setEquipment(e))
-      .catch((e: unknown) => live && setError(String(e)))
+      .catch((e: unknown) => live && setError(userError(e)))
       .finally(() => live && setChecking(false));
     return () => {
       live = false;

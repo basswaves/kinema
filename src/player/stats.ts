@@ -386,7 +386,7 @@ export function describeHdr(f: HdrFacts): StatRow {
     return {
       label: 'HDR pipeline',
       value: `passthrough — ${f.sourceGamma} in, ${f.targetGamma} out`,
-      note: "sent with the film's own HDR metadata; the display does its own tone mapping",
+      note: "sent with the video's own HDR metadata; the display does its own tone mapping",
     };
   }
 
@@ -872,7 +872,7 @@ export async function readPlaybackStats(): Promise<StatGroup[]> {
           value: `${text(colorspaceHint)} · ${text(colorspaceHintMode)}`,
           note:
             colorspaceHintMode === 'source'
-              ? "an HDR display gets the film's own metadata"
+              ? "an HDR display gets the video's own metadata"
               : colorspaceHintMode === 'target'
                 ? 'HDR is adapted to the peak Windows reports before it is sent'
                 : undefined,

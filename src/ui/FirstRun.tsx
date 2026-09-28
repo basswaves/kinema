@@ -16,6 +16,7 @@
  * afterwards in Settings — so nothing here is a gate, and there is no way to
  * get stuck part-way through.
  */
+import { describeError, userError } from './errors';
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -61,7 +62,7 @@ export default function FirstRun({ onDone }: Props) {
           setSavedKey(true);
         }
       } catch (e) {
-        setError(String(e));
+        setError(userError(e));
       }
     })();
   }, []);
@@ -74,7 +75,7 @@ export default function FirstRun({ onDone }: Props) {
       await addLibraryRoot(selected, kind);
       setRoots(await listLibraryRoots());
     } catch (e) {
-      setError(String(e));
+      setError(userError(e));
     }
   }, []);
 
@@ -84,7 +85,7 @@ export default function FirstRun({ onDone }: Props) {
       await setSetting('tmdb_api_key', tmdbKey.trim());
       setSavedKey(tmdbKey.trim().length > 0);
     } catch (e) {
-      setError(String(e));
+      setError(userError(e));
     }
   }, [tmdbKey]);
 
@@ -97,7 +98,7 @@ export default function FirstRun({ onDone }: Props) {
     setError(null);
     if (tmdbKey.trim()) await saveKey();
     const outcome = await runScanPipeline();
-    if (outcome.status === 'failed') setError(outcome.error);
+    if (outcome.status === 'failed') setError(describeError(outcome.error));
     onDone();
   }, [onDone, saveKey, tmdbKey]);
 
@@ -119,7 +120,7 @@ export default function FirstRun({ onDone }: Props) {
 
         <section className="first-run-step">
           <h2>
-            <span className="first-run-num">1</span> Where are your films and shows?
+            <span className="first-run-num">1</span> Where are your movies and shows?
           </h2>
           <p className="muted">
             Pick the folder you keep them in — a local drive or a network share both work.
@@ -127,7 +128,7 @@ export default function FirstRun({ onDone }: Props) {
           </p>
           <div className="settings-row">
             <FocusButton className="btn-primary" onSelect={() => void pickFolder('movies')}>
-              Add films folder
+              Add movies folder
             </FocusButton>
             <FocusButton className="btn-primary" onSelect={() => void pickFolder('tv')}>
               Add TV folder
@@ -138,7 +139,7 @@ export default function FirstRun({ onDone }: Props) {
               {roots.map((root) => (
                 <li key={root.id}>
                   <span className={`root-kind ${root.kind}`}>
-                    {root.kind === 'tv' ? 'TV' : 'Films'}
+                    {root.kind === 'tv' ? 'TV' : 'Movies'}
                   </span>
                   <span className="root-path">{root.path}</span>
                 </li>
@@ -153,7 +154,7 @@ export default function FirstRun({ onDone }: Props) {
             <span className="first-run-optional">optional</span>
           </h2>
           <p className="muted">
-            TV shows already work without this. Films need a key from TMDB to get posters,
+            TV shows already work without this. Movies need a key from TMDB to get posters,
             descriptions and artwork — it is free, and takes about two minutes to get.
           </p>
           <div className="settings-row">

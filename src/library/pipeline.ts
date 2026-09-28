@@ -15,6 +15,7 @@
  * unrelated places need it — the nav bar, which shows that something is
  * happening, and the settings screen, which shows what.
  */
+import { count } from '../ui/format';
 import { useSyncExternalStore } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import {
@@ -183,7 +184,7 @@ export async function runScanPipeline(): Promise<ScanOutcome> {
   let unmatched = 0;
 
   try {
-    setStatus({ stage: 'scanning', detail: `${roots.length} folder(s)` });
+    setStatus({ stage: 'scanning', detail: count(roots.length, 'folder') });
     const report = await scanLibrary();
     errors.push(...report.errors);
 
@@ -199,7 +200,7 @@ export async function runScanPipeline(): Promise<ScanOutcome> {
         batch.map((file) => parseForLibrary(file, roots))
       );
       filesParsed += batch.length;
-      setStatus({ stage: 'parsing', detail: `${filesParsed} file(s)` });
+      setStatus({ stage: 'parsing', detail: count(filesParsed, 'file') });
       if (batch.length < PARSE_BATCH) break;
     }
 
@@ -231,7 +232,7 @@ export async function runScanPipeline(): Promise<ScanOutcome> {
     // browsing should not need the network afterwards.
     setStatus({ stage: 'artwork', detail: '' });
     const art = await cacheArtwork();
-    if (art.failed > 0) errors.push(`${art.failed} artwork download(s) failed`);
+    if (art.failed > 0) errors.push(`${count(art.failed, 'artwork download')} failed`);
 
     // Last, and deliberately part of the same sequence rather than something the
     // user has to go and press afterwards. Everything before this decides *what*

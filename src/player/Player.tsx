@@ -11,6 +11,7 @@
  * is the cover shown *before* a file's first frame, which exists precisely
  * because a transparent window with no frame up shows the desktop.
  */
+import { userError } from '../ui/errors';
 import {
   useCallback,
   useEffect,
@@ -169,7 +170,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   });
   const fail = useCallback(
     (e: unknown) =>
-      dispatch({ type: 'error', message: e instanceof Error ? e.message : String(e) }),
+      dispatch({ type: 'error', message: userError(e) }),
     []
   );
   const [osdVisible, setOsdVisible] = useState(true);
@@ -208,7 +209,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   const matchScreen = useCallback(async () => {
     const film = await filmNow().catch(() => null);
     if (!film) return;
-    setNotice('Matching the screen to the film…');
+    setNotice('Matching the screen to the video…');
     try {
       if (await switchForFilm(film)) await matchHdrToDisplay();
     } catch (e) {

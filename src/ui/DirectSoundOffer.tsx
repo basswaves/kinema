@@ -39,13 +39,13 @@ export default function DirectSoundOffer({
     <FocusContext.Provider value={focusKey}>
       <div className="offer-backdrop">
         <div className="offer-card" ref={ref} role="dialog" aria-labelledby="offer-title">
-          <h2 id="offer-title">Send the film&rsquo;s own sound to {offer.device}?</h2>
+          <h2 id="offer-title">Send the movie&rsquo;s own sound to {offer.device}?</h2>
           <p>
             It takes {offer.formats.join(' and ')} untouched — Dolby Atmos and DTS:X included.
             Through Windows, those are decoded to plain surround and the height sound is lost.
           </p>
           <p className="muted">
-            With this on, Kinema holds the sound device only while a film plays; other sounds from
+            With this on, Kinema holds the sound device only while something plays; other sounds from
             this PC are silent until it stops. Windows&rsquo; own settings, spatial sound included,
             are left as they are. You can change it any time in Settings → Sound. This is only
             asked once.

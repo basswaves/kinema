@@ -5,6 +5,7 @@
  * library is small enough that instant local filtering beats a round trip, and
  * it keeps typing responsive on a TV remote.
  */
+import { describeError, userError } from './errors';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   init as initSpatial,
@@ -189,7 +190,7 @@ export default function Browse() {
       setTitles(list.filter((t) => t.file_count > 0));
       setResumable(resume);
     } catch (e) {
-      setError(String(e));
+      setError(userError(e));
     } finally {
       setLoaded(true);
     }
@@ -264,7 +265,7 @@ export default function Browse() {
         if (cancelled || outcome === null) return;
         if (outcome.status === 'failed') {
           console.warn('startup scan failed:', outcome.error);
-          setScanTrouble(`Could not check your library folders — ${outcome.error}`);
+          setScanTrouble(`Could not check your library folders — ${describeError(outcome.error)}`);
           return;
         }
         if (outcome.status !== 'done') return;
@@ -384,7 +385,7 @@ export default function Browse() {
 
         setError(`No playable file for “${title.title}”.`);
       } catch (e) {
-        setError(String(e));
+        setError(userError(e));
       }
     },
     [resumable, startPlayback]
@@ -403,7 +404,7 @@ export default function Browse() {
       try {
         await dismissContinue(item.title_id);
       } catch (e) {
-        setError(String(e));
+        setError(userError(e));
       }
       await load();
       // The Remove button that was pressed has just gone with its card.
@@ -467,7 +468,7 @@ export default function Browse() {
   return (
     <div className="browse" ref={shellRef}>
       <FocusContext.Provider value={shellFocusKey}>
-        <TopNav active={view.name} titleCount={titles.length} onNavigate={setView} />
+        <TopNav active={view.name} onNavigate={setView} />
 
         {error && (
           <div className="browse-error" onClick={() => setError(null)}>
@@ -562,11 +563,9 @@ export default function Browse() {
  */
 function TopNav({
   active,
-  titleCount,
   onNavigate,
 }: {
   active: string;
-  titleCount: number;
   onNavigate: (view: { name: NavTarget }) => void;
 }) {
   const { ref, focusKey } = useFocusable({
@@ -576,7 +575,8 @@ function TopNav({
   });
 
   // A scan is the only long-running thing the app does on its own, so it says
-  // so where the title count normally sits rather than interrupting anything.
+  // so at the end of the bar rather than interrupting anything. Otherwise that
+  // spot is empty: a running title count told nobody anything they acted on.
   const scan = useScanStatus();
 
   return (
@@ -605,9 +605,7 @@ function TopNav({
         >
           ?
         </FocusButton>
-        <span className="nav-count">
-          {scan ? `${scan.stage}…` : `${titleCount} titles`}
-        </span>
+        {scan && <span className="nav-count">{`${scan.stage}…`}</span>}
       </nav>
     </FocusContext.Provider>
   );

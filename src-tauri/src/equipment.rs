@@ -265,11 +265,11 @@ pub fn display_notes(d: &Display) -> Vec<String> {
             None => "HDR is on.".into(),
         }),
         HdrState::Off => notes.push(
-            "Supports HDR, but Windows has it switched off — HDR films are converted to SDR \
+            "Supports HDR, but Windows has it switched off — HDR videos are converted to SDR \
              on this screen until it is on."
                 .into(),
         ),
-        HdrState::Unsupported => notes.push("SDR screen: HDR films are converted to SDR.".into()),
+        HdrState::Unsupported => notes.push("SDR screen: HDR videos are converted to SDR.".into()),
         HdrState::Unknown => notes.push("Windows did not say whether this screen does HDR.".into()),
     }
 
@@ -282,21 +282,21 @@ pub fn display_notes(d: &Display) -> Vec<String> {
         .collect();
     if !at_native.is_empty() {
         notes.push(format!(
-            "Can show films without judder: {} Hz at {}×{}.",
+            "Can show movies without judder: {} Hz at {}×{}.",
             at_native.join(" / "),
             d.width,
             d.height
         ));
     } else if let Some(best) = film.first() {
         notes.push(format!(
-            "A film refresh rate is only offered at a lower resolution: {} Hz at {}×{}.",
+            "A 24 Hz mode is only offered at a lower resolution: {} Hz at {}×{}.",
             format_rate(best.rate),
             best.width,
             best.height
         ));
     } else if native {
         notes.push(
-            "No 24 Hz mode: films play with 3:2 judder on this screen, whatever the setting."
+            "No 24 Hz mode: movies play with 3:2 judder on this screen, whatever the setting."
                 .into(),
         );
     }

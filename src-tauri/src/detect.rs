@@ -371,8 +371,8 @@ fn run_analysis(
         // cannot see is the exact failure this whole area has already produced
         // once — and "still copying" is a state they can check for themselves.
         say(format!(
-            "waiting for {} file(s) still being written",
-            settling.iter().map(|s| s.episodes.len()).sum::<usize>()
+            "waiting for {} still being written",
+            crate::util::count(settling.iter().map(|s| s.episodes.len()).sum::<usize>(), "file")
         ));
     }
 
@@ -413,7 +413,8 @@ fn run_analysis(
         // picked up by the next run, because nothing was written for them.
         let Some(results) = results else {
             say(format!(
-                "analysis stopped part-way; {found} episode(s) with markers kept, the rest waits for the next run"
+                "analysis stopped part-way; {} with markers kept, the rest waits for the next run",
+                crate::util::count(found, "episode")
             ));
             return step("analyse", None, tail);
         };
@@ -731,7 +732,7 @@ pub async fn auto_detect(app: tauri::AppHandle) -> Result<AutoDetectReport, Stri
                                     remember_stamp(&app, *root_id, stamp);
                                 }
                                 let ran = reports.len();
-                                say("skiptro", true, format!("Skiptro finished ({ran} step(s))"));
+                                say("skiptro", true, format!("Skiptro finished ({})", crate::util::count(ran, "step")));
                             }
                             Ok(_) if jobs.detection_stopped() => {
                                 say("skiptro", false, "Skiptro was stopped".into());
@@ -765,7 +766,7 @@ pub async fn auto_detect(app: tauri::AppHandle) -> Result<AutoDetectReport, Stri
                 say(
                     "analyse",
                     false,
-                    format!("{pending} episode(s) not analysed — automatic detection is off in Settings"),
+                    format!("{} not analysed — automatic detection is off in Settings", crate::util::count(pending, "episode")),
                 );
                 continue;
             }

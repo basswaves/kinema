@@ -7,3 +7,13 @@ export function formatBytes(bytes: number): string {
   const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
   return `${(bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
+
+/**
+ * A count with its noun: `1 file`, `3 files`, `0 files`.
+ *
+ * Replaces the `file(s)` pattern, which reads as a form rather than a sentence.
+ * The plural is passed in when it is not simply the noun plus `s`.
+ */
+export function count(n: number, noun: string, plural = `${noun}s`): string {
+  return `${n} ${n === 1 ? noun : plural}`;
+}

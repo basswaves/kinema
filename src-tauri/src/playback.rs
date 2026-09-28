@@ -58,6 +58,11 @@ pub struct TitlePrefs {
     pub audio_lang: Option<String>,
     pub sub_lang: Option<String>,
     pub sub_enabled: bool,
+    /// Whether anything has been chosen for this title at all. Without a
+    /// choice the default languages in Settings apply; with one, the title's
+    /// own choice wins. Ignored when saving — saving is the choice.
+    #[serde(default)]
+    pub chosen: bool,
 }
 
 /// Whether a position counts as having finished the file.
@@ -600,6 +605,7 @@ pub fn get_title_prefs(db: tauri::State<Db>, title_id: i64) -> Result<TitlePrefs
                 audio_lang: r.get(0)?,
                 sub_lang: r.get(1)?,
                 sub_enabled: r.get::<_, i64>(2)? != 0,
+                chosen: true,
             })
         },
     )
@@ -608,6 +614,7 @@ pub fn get_title_prefs(db: tauri::State<Db>, title_id: i64) -> Result<TitlePrefs
             audio_lang: None,
             sub_lang: None,
             sub_enabled: true,
+            chosen: false,
         }),
         other => Err(to_string_err(other)),
     })

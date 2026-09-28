@@ -570,9 +570,10 @@ const handlers: Record<string, Handler> = {
     const first = list.find((f) => !playback.get(f.id)?.completed) ?? list[0];
     return first ? episodeRef(first) : null;
   },
-  get_title_prefs: (a) => prefs.get(num(a, 'titleId')) ?? { audio_lang: null, sub_lang: null, sub_enabled: true },
+  get_title_prefs: (a) =>
+    prefs.get(num(a, 'titleId')) ?? { audio_lang: null, sub_lang: null, sub_enabled: true, chosen: false },
   set_title_prefs: (a) => {
-    prefs.set(num(a, 'titleId'), a.prefs as TitlePrefs);
+    prefs.set(num(a, 'titleId'), { ...(a.prefs as TitlePrefs), chosen: true });
     return null;
   },
   get_skip_markers: (a) => files.find((f) => f.path === a.path)?.markers ?? null,

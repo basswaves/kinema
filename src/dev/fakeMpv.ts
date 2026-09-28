@@ -36,6 +36,7 @@ export interface FakeMpvState {
   commands: Array<{ name: string; args: unknown[] }>;
   volume: number;
   mute: boolean;
+  subVisible: boolean;
   /** Set to e.g. 'spdif-truehd' to stand in for sound going to a receiver. */
   audioOutFormat: string | null;
 }
@@ -57,6 +58,7 @@ const state: FakeMpvState = {
   commands: [],
   volume: 100,
   mute: false,
+  subVisible: true,
   audioOutFormat: 'float',
 };
 
@@ -149,6 +151,48 @@ export function command(name: string, args: unknown[]): null {
   return null;
 }
 
+/**
+ * The tracks every fixture file has: what an English film with Norwegian
+ * subtitles typically carries, so the track panel and the language defaults
+ * can be driven. `selected` follows `aid` / `sid` as they are set.
+ */
+const TRACKS = [
+  { type: 'video', id: 1, codec: 'hevc' },
+  { type: 'audio', id: 1, lang: 'eng', codec: 'truehd', channels: 8, profile: 'Dolby TrueHD + Dolby Atmos' },
+  { type: 'audio', id: 2, lang: 'eng', codec: 'ac3', channels: 2, title: 'Commentary with the director' },
+  { type: 'sub', id: 1, lang: 'eng', codec: 'hdmv_pgs_subtitle', title: 'English SDH' },
+  { type: 'sub', id: 2, lang: 'nor', codec: 'subrip' },
+  { type: 'sub', id: 3, lang: 'nor', codec: 'subrip', forced: true },
+] as const;
+
+const selectedTrack = { aid: 1, sid: 1 };
+
+function trackField(name: string): unknown {
+  const match = /^track-list\/(\d+)\/(.+)$/.exec(name);
+  if (!match) return undefined;
+  const track = TRACKS[Number(match[1])] as Record<string, unknown> | undefined;
+  if (!track) throw new Error(`property unavailable: ${name}`);
+  switch (match[2]) {
+    case 'selected':
+      return (
+        (track.type === 'audio' && track.id === selectedTrack.aid) ||
+        (track.type === 'sub' && track.id === selectedTrack.sid) ||
+        track.type === 'video'
+      );
+    case 'demux-channel-count':
+      return track.channels ?? null;
+    case 'codec-profile':
+      return track.profile ?? null;
+    case 'forced':
+    case 'external':
+    case 'default':
+    case 'hearing-impaired':
+      return Boolean(track[match[2]]);
+    default:
+      return track[match[2]] ?? null;
+  }
+}
+
 /** `plugin:libmpv|set_property`, and `set` through `command`. */
 export function setProperty(name: string, value: unknown): null {
   if (name === 'pause') {
@@ -156,6 +200,8 @@ export function setProperty(name: string, value: unknown): null {
     change('pause', state.paused);
   }
   if (name === 'volume') state.volume = Number(value);
+  if (name === 'aid' || name === 'sid') selectedTrack[name] = Number(value);
+  if (name === 'sub-visibility') state.subVisible = value === true || value === 'yes';
   if (name === 'mute') state.mute = value === true || value === 'yes';
   return null;
 }
@@ -177,18 +223,25 @@ export function getProperty(name: string): unknown {
     case 'eof-reached':
       return state.eof;
     case 'sub-visibility':
-      return true;
+      return state.subVisible;
     case 'volume':
       return state.volume;
     case 'mute':
       return state.mute;
     case 'audio-out-params/format':
       return state.audioOutFormat;
+    // Answered, or the player's never-silent check reads a playing file as mute.
+    case 'current-ao':
+      return state.path === null ? null : 'wasapi';
     case 'track-list/count':
+      return state.path === null ? 0 : TRACKS.length;
     case 'chapters':
       return 0;
-    default:
+    default: {
+      const field = trackField(name);
+      if (field !== undefined) return field;
       throw new Error(`property unavailable: ${name}`);
+    }
   }
 }
 

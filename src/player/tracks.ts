@@ -8,6 +8,7 @@
  */
 import { command } from 'tauri-plugin-libmpv-api';
 import { readProperty } from './property';
+import { languageName, sameLanguage } from './language';
 
 export interface MpvTrack {
   id: number;
@@ -19,6 +20,12 @@ export interface MpvTrack {
   forced: boolean;
   external: boolean;
   default: boolean;
+  /** Audio only: channels as the file carries them. */
+  channels?: number;
+  /** FFmpeg's profile name — where "DTS-HD MA" and "Atmos" are said. */
+  profile?: string;
+  /** Subtitles for the deaf and hard of hearing (SDH). */
+  hearingImpaired?: boolean;
 }
 
 /**
@@ -33,8 +40,20 @@ export async function readTracks(): Promise<MpvTrack[]> {
 
   const read = async (i: number): Promise<MpvTrack | null> => {
     const at = (field: string) => `track-list/${i}/${field}`;
-    const [type, id, title, lang, codec, selected, forced, external, isDefault] =
-      await Promise.all([
+    const [
+      type,
+      id,
+      title,
+      lang,
+      codec,
+      selected,
+      forced,
+      external,
+      isDefault,
+      channels,
+      profile,
+      hearingImpaired,
+    ] = await Promise.all([
         readProperty<string>(at('type'), 'string'),
         readProperty<number>(at('id'), 'int64'),
         readProperty<string>(at('title'), 'string'),
@@ -44,6 +63,9 @@ export async function readTracks(): Promise<MpvTrack[]> {
         readProperty<boolean>(at('forced'), 'flag'),
         readProperty<boolean>(at('external'), 'flag'),
         readProperty<boolean>(at('default'), 'flag'),
+        readProperty<number>(at('demux-channel-count'), 'int64'),
+        readProperty<string>(at('codec-profile'), 'string'),
+        readProperty<boolean>(at('hearing-impaired'), 'flag'),
       ]);
     if (!type) return null;
     return {
@@ -56,6 +78,9 @@ export async function readTracks(): Promise<MpvTrack[]> {
       forced: forced ?? false,
       external: external ?? false,
       default: isDefault ?? false,
+      channels: channels ?? undefined,
+      profile: profile ?? undefined,
+      hearingImpaired: hearingImpaired ?? false,
     };
   };
 
@@ -77,15 +102,97 @@ export async function setSubtitleVisibility(visible: boolean): Promise<void> {
   await command('set', ['sub-visibility', visible ? 'yes' : 'no']);
 }
 
+/** Codec names as they are printed on a disc box. */
+const AUDIO_CODECS: Record<string, string> = {
+  truehd: 'Dolby TrueHD',
+  eac3: 'Dolby Digital Plus',
+  ac3: 'Dolby Digital',
+  dts: 'DTS',
+  aac: 'AAC',
+  flac: 'FLAC',
+  opus: 'Opus',
+  vorbis: 'Vorbis',
+  mp3: 'MP3',
+  mp2: 'MP2',
+  alac: 'ALAC',
+};
+
+/** What FFmpeg's DTS profiles are called on the box. */
+const DTS_PROFILES: [RegExp, string][] = [
+  [/DTS:X/i, 'DTS:X'],
+  [/HD MA/i, 'DTS-HD Master Audio'],
+  [/HD HRA/i, 'DTS-HD High Resolution'],
+  [/Express/i, 'DTS Express'],
+  [/ES/, 'DTS-ES'],
+];
+
+function audioFormat(track: MpvTrack): string | null {
+  const codec = track.codec?.toLowerCase();
+  if (!codec) return null;
+  if (codec.startsWith('pcm')) return 'PCM';
+  let name = AUDIO_CODECS[codec] ?? codec.toUpperCase();
+  if (codec === 'dts' && track.profile) {
+    name = DTS_PROFILES.find(([pattern]) => pattern.test(track.profile as string))?.[1] ?? name;
+  }
+  if (track.profile && /atmos/i.test(track.profile)) name += ' Atmos';
+  return name;
+}
+
+function channelLayout(channels: number | undefined): string | null {
+  if (!channels) return null;
+  if (channels === 1) return 'Mono';
+  if (channels === 2) return 'Stereo';
+  if (channels === 6) return '5.1';
+  if (channels === 8) return '7.1';
+  return `${channels} channels`;
+}
+
+/**
+ * Words a track title often repeats from what is already on the line — the
+ * language, the codec, the channels. A title made only of these adds nothing;
+ * one with anything else ("Commentary with the director", "Signs & songs") is
+ * the most useful thing on the line and is kept.
+ */
+const REDUNDANT = new Set(
+  (
+    'audio track sub subs subtitle subtitles full dolby digital plus truehd atmos dts hd ma ' +
+    'master hra x es aac ac3 eac3 dd ddp flac opus pcm lpcm mp3 stereo mono surround channel ' +
+    'channels ch kbps khz bit 1 2 0 5 6 7 8 1 51 71 20 srt ass ssa pgs sup vobsub default original ' +
+    'forced sdh cc'
+  ).split(' ')
+);
+
+function informativeTitle(track: MpvTrack): string | null {
+  const title = track.title?.trim();
+  if (!title) return null;
+  const language = languageName(track.lang)?.toLowerCase() ?? '';
+  const words = title
+    .toLowerCase()
+    .split(/[^a-z0-9æøåäöüéèáàíóúñç]+/)
+    .filter((w) => w.length > 0);
+  const extra = words.filter((w) => !REDUNDANT.has(w) && !language.split(' ').includes(w));
+  return extra.length > 0 ? title : null;
+}
+
+/**
+ * A line a person reads: "English · 7.1 · Dolby TrueHD Atmos",
+ * "Norwegian · Forced", "English · SDH". It used to print mpv's own
+ * spelling — "ENG · truehd", "hdmv_pgs_subtitle" — which nobody but a
+ * developer can read.
+ */
 export function describeTrack(track: MpvTrack): string {
-  const parts = [
-    track.lang ? track.lang.toUpperCase() : null,
-    track.title,
-    track.codec,
-    track.forced ? 'forced' : null,
-    track.external ? 'external' : null,
-  ].filter(Boolean);
-  return parts.length > 0 ? parts.join(' · ') : `Track ${track.id}`;
+  const parts: (string | null)[] = [languageName(track.lang)];
+  if (track.type === 'audio') {
+    parts.push(channelLayout(track.channels), audioFormat(track));
+  } else {
+    parts.push(
+      track.forced ? 'Forced' : null,
+      track.hearingImpaired || /\bsdh\b|\bcc\b/i.test(track.title ?? '') ? 'SDH' : null
+    );
+  }
+  parts.push(informativeTitle(track), track.external ? 'separate file' : null);
+  const line = parts.filter((p): p is string => Boolean(p));
+  return line.length > 0 ? line.join(' · ') : `Track ${track.id}`;
 }
 
 /**
@@ -105,8 +212,7 @@ export function findTrackByLang(
   lang: string | null
 ): MpvTrack | null {
   if (!lang) return null;
-  const wanted = lang.toLowerCase();
-  const candidates = tracks.filter((t) => t.type === type && t.lang?.toLowerCase() === wanted);
+  const candidates = tracks.filter((t) => t.type === type && sameLanguage(t.lang, lang));
   if (candidates.length === 0) return null;
   return candidates.find((t) => !t.forced) ?? candidates[0];
 }

@@ -47,7 +47,6 @@ import UpNextCard from './UpNextCard';
 import { setShortcutsOpen } from '../ui/shortcutsState';
 import { ensureMpvInitialised, OBSERVED_PROPERTIES } from './mpv';
 import {
-  findTrackByLang,
   readTracks,
   selectTrack,
   setSubtitleVisibility,
@@ -82,6 +81,7 @@ import { initialSession, reduce, samePath } from './session';
 import { COMMIT_IDLE_MS, scrubStep, type Scrub } from './scrub';
 import { endsAtLabel, formatTime } from '../ui/format';
 import { resumePoint } from './resume';
+import { chooseTracks, readLanguageDefaults } from './trackChoice';
 import {
   BackTenIcon,
   ForwardTenIcon,
@@ -442,23 +442,19 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     const list = await readTracks();
     setTracks(list);
 
-    if (target.titleId !== null) {
-      try {
-        const prefs = await getTitlePrefs(target.titleId);
-
-        const audio = findTrackByLang(list, 'audio', prefs.audio_lang);
-        if (audio) await selectTrack('aid', audio.id);
-
-        if (!prefs.sub_enabled) {
-          await setSubtitleVisibility(false);
-        } else {
-          const sub = findTrackByLang(list, 'sub', prefs.sub_lang);
-          if (sub) await selectTrack('sid', sub.id);
-          await setSubtitleVisibility(true);
-        }
-      } catch (e) {
-        console.warn('could not apply title preferences', e);
-      }
+    // This title's own choice if there is one, else the defaults in Settings
+    // — see trackChoice.ts. A trailer (no title) takes the defaults too.
+    try {
+      const [prefs, defaults] = await Promise.all([
+        target.titleId !== null ? getTitlePrefs(target.titleId) : Promise.resolve(null),
+        readLanguageDefaults(),
+      ]);
+      const choice = chooseTracks(list, prefs, defaults);
+      if (choice.aid !== null) await selectTrack('aid', choice.aid);
+      if (choice.sid !== null) await selectTrack('sid', choice.sid);
+      if (choice.subVisible !== null) await setSubtitleVisibility(choice.subVisible);
+    } catch (e) {
+      console.warn('could not apply track preferences', e);
     }
 
     // Selected track ids come from the track list's own `selected` flags.

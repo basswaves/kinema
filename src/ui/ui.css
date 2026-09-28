@@ -1212,6 +1212,63 @@ html {
 }
 
 .settings-row,
+/* ---- a setting with its choices on screen (ChoiceRow) ------------------- */
+.choice-row {
+  margin: 0.25rem 0 1.125rem;
+}
+
+.choice-label {
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.choice-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.choice-options .choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.875rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #e8e8e8;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.choice-options .choice:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.choice-options .choice.chosen {
+  border-color: #fff;
+  background: #fff;
+  color: #111;
+  font-weight: 700;
+}
+
+.choice-options .choice.focused {
+  outline: var(--focus-ring) solid #fff;
+  outline-offset: 3px;
+}
+
+.choice-tick {
+  font-size: 0.75rem;
+}
+
+.choice-note {
+  margin: 0.5rem 0 0;
+  max-width: 44rem;
+  font-size: 0.78125rem;
+  line-height: 1.5;
+}
+
 .settings-toggle-row {
   display: flex;
   flex-wrap: wrap;

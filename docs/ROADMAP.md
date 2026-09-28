@@ -252,20 +252,20 @@ linearly at the end. Each step is verified before the next.
    **Done.**
 3. **TV mode runs fullscreen.** The whole app, library and player — so display
    switching, which only acts in fullscreen, is not silently off from the sofa.
-   Desk mode stays windowed. **Done** (mock; real app with steps 4–6).
+   Desk mode stays windowed. **Done** — real app confirmed fullscreen at launch, in the player and after it.
 4. **The remote works like a streaming app.** OK pauses; Left/Right seek and
    accelerate when held; Down reveals the controls; the seek bar is reachable
-   and scrubs. No "press Up first" mode to learn. **Done** (mock; real app with steps 5–6).
+   and scrubs. No "press Up first" mode to learn. **Done** — real app: OK paused, three taps sent one +30 s seek.
 5. **Player bar.** Icon transport group in the centre; Audio & subtitles,
    volume, fullscreen at the right; Stats off the bar (still `i`). Episode name
    and "Ends at" on screen. Volume and mute (M); "Volume on the receiver" while
-   bitstreaming. **Done** (mock; real app with step 6).
+   bitstreaming. **Done** — real app: volume applied.
 6. **Start over.** A button on the "Resumed from" notice while it shows, and
    Resume / Play from start on the detail page. **Done** (mock).
 7. **Tracks.** Plain names ("English · 7.1 · Dolby TrueHD Atmos", "SDH",
    "Forced"). A default audio and subtitle language in Settings, starting from
    Windows' language; a choice made in a show still wins for that show. Agreed
-   as a *preference*, not taste, so it fits the settings rule.
+   as a *preference*, not taste, so it fits the settings rule. **Done** (mock).
 8. **Detail page.** Opens on the season Play will start; Specials last. Quiet
    per-row tick instead of a bright button on every row, plus Mark season
    watched / unwatched. The YouTube trailer button stays, labelled as opening

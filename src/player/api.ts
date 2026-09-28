@@ -70,6 +70,8 @@ export interface TitlePrefs {
   audio_lang: string | null;
   sub_lang: string | null;
   sub_enabled: boolean;
+  /** Something was chosen in this title; false means the defaults apply. */
+  chosen?: boolean;
 }
 
 /**

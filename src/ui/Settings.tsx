@@ -15,6 +15,7 @@
  * to be needed when no mouse is present.
  */
 import { userError } from './errors';
+import LanguageSection from './LanguageSection';
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { listen } from '@tauri-apps/api/event';
@@ -676,6 +677,7 @@ export default function Settings() {
               <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>.
             </span>
           </div>
+          <LanguageSection onError={setError} />
           <div className="settings-toggle-row">
             <FocusButton
               keepInView="nearest"

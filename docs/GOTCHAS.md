@@ -771,6 +771,17 @@ release gets no release: the player's accelerating seek commits on `keyup`, so
 under a self-test it commits through its fallback instead, half a second after
 the last press. Plans that seek with the arrows should allow for that.
 
+### A self-test's screenshots are of whatever window is in front
+
+`selftest.ps1` photographs the primary screen, not Kinema's window. Started
+from a script while someone is using the PC, Windows' focus-stealing rules keep
+the new window *behind* the one they are working in — fullscreen or not — and
+every screenshot is of their browser. The run itself is fine (the report's
+timeline shows every step); only the pictures are wrong, and they show someone
+else's screen. **Do:** the self-test now sets the window always-on-top for the
+length of the run (`on-top` in the report's timeline); if it says
+`on-top-failed`, do not trust the screenshots.
+
 ### `process is not defined` from guessit-js
 
 guessit-js reads `process.env.DEBUG_*`. In Node those are harmlessly `undefined`; in a

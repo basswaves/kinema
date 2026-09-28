@@ -1,0 +1,22 @@
+{
+  "label": "Automatic test: TV mode, Home and the remote",
+  "path": "D:\\Media\\A 4K HDR10 film.mkv",
+  "fileId": null,
+  "titleId": null,
+  "openAfter": 12,
+  "seconds": 30,
+  "usbShots": "7000,24000,28500",
+  "usbShotDivisor": 2,
+  "actions": [
+    { "at": 0.2, "do": "call", "fn": "setSetting", "args": ["audio_direct", "off"] },
+    { "at": 0.3, "do": "call", "fn": "setSetting", "args": ["display_switch_refresh", "off"] },
+    { "at": 0.4, "do": "call", "fn": "setSetting", "args": ["display_switch_hdr", "off"] },
+    { "at": 0.6, "do": "call", "fn": "setTvMode", "args": [true], "note": "TV mode: the whole app should fill the screen" },
+    { "at": 6, "do": "mark", "note": "Home, fullscreen: the notices should be under the hero" },
+    { "at": 20, "do": "key", "key": "ArrowDown", "note": "the controls come up" },
+    { "at": 21, "do": "key", "key": "Enter", "note": "OK on Pause: paused, controls stay up" },
+    { "at": 26, "do": "key", "key": "Escape" },
+    { "at": 27, "do": "key", "key": "Escape", "note": "out of the player; the app stays fullscreen" }
+  ],
+  "probe": ["sid", "sub-visibility", "aid", "display-fps", "audio-out-params/format", "pause"]
+}

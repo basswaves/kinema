@@ -27,7 +27,12 @@ foreach ($plan in Get-ChildItem $here -Recurse -Filter plan.json) {
   # A fresh copy of the library for every run.
   $data = Join-Path $dir 'data'
   if (Test-Path $data) { Remove-Item $data -Recurse -Force }
-  & (Join-Path $here 'selftest.ps1') -Plan $plan.FullName -Exe $exe -ShotsAt '8000,16000,26000' -TimeoutSeconds 120
+  # A plan may choose its own screenshot times and size ("usbShots",
+  # "usbShotDivisor"); the app ignores fields it does not know.
+  $spec = Get-Content $plan.FullName -Raw | ConvertFrom-Json
+  $shots = if ($spec.usbShots) { [string]$spec.usbShots } else { '8000,16000,26000' }
+  $divisor = if ($spec.usbShotDivisor) { [int]$spec.usbShotDivisor } else { 4 }
+  & (Join-Path $here 'selftest.ps1') -Plan $plan.FullName -Exe $exe -ShotsAt $shots -ShotDivisor $divisor -TimeoutSeconds 120
   Start-Sleep -Seconds 5
   $summary += "After ${name}: $([System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Size)"
   $dest = Join-Path $out "auto-$name"

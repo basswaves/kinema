@@ -1,0 +1,29 @@
+{
+  "label": "Automatic test: everything on, the receiver has the volume",
+  "path": "D:\\Media\\A 4K HDR10 film.mkv",
+  "fileId": null,
+  "titleId": null,
+  "openAfter": 4,
+  "seconds": 30,
+  "usbShots": "12000,20000,27000",
+  "usbShotDivisor": 2,
+  "actions": [
+    { "at": 0.2, "do": "call", "fn": "setSetting", "args": ["audio_direct", "on"] },
+    { "at": 0.3, "do": "call", "fn": "setSetting", "args": ["display_switch_refresh", "on"] },
+    { "at": 0.4, "do": "call", "fn": "setSetting", "args": ["display_switch_hdr", "on"] },
+    { "at": 0.5, "do": "call", "fn": "setSetting", "args": ["display_switch_resolution", "auto"] },
+    { "at": 0.6, "do": "call", "fn": "setTvMode", "args": [true] },
+    { "at": 16, "do": "mark", "note": "switched and playing: probe now" },
+    { "at": 18, "do": "key", "key": "ArrowDown", "note": "controls up: volume should say Receiver" },
+    { "at": 24, "do": "key", "key": "Escape" },
+    { "at": 25, "do": "key", "key": "Escape", "note": "out of the player: the screen mode is put back" }
+  ],
+  "probe": [
+    "display-fps",
+    "video-target-params/gamma",
+    "audio-out-params/format",
+    "current-ao",
+    "sid",
+    "sub-visibility"
+  ]
+}

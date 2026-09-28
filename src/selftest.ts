@@ -26,6 +26,7 @@ import { command, getProperty, listenEvents } from 'tauri-plugin-libmpv-api';
 import { ensureMpvInitialised } from './player/mpv';
 import { readTracks } from './player/tracks';
 import { readChapters } from './player/chapters';
+import { setTvMode } from './ui/tv';
 import { scanLibrary } from './library/api';
 import {
   ignoreFileIds,
@@ -54,6 +55,9 @@ const CALLABLE: Record<string, (...args: never[]) => Promise<unknown>> = {
   setSetting,
   // Display switching only happens fullscreen, and Browse has no key for it.
   setFullscreen: (on: boolean) => getCurrentWindow().setFullscreen(on),
+  // TV mode is read at launch, before a plan's first action; this switches it
+  // the way the setting and Ctrl+Shift+T do — layout and fullscreen together.
+  setTvMode: async (on: boolean) => setTvMode(on),
   // Put the window on another screen before going fullscreen — so a test can
   // switch a second monitor while the main one stays in use. -1 means the
   // first screen that is not the primary; otherwise an index into Windows'
@@ -173,6 +177,14 @@ export async function runSelfTest(plan: SelfTestPlan): Promise<void> {
   const note = (kind: string, detail?: unknown) => timeline.push({ t: now(), kind, detail });
 
   note('start', { path: plan.path, openAfter: plan.openAfter ?? 0 });
+
+  // On top for the length of the run. Started from a script while someone is
+  // using the PC, Windows keeps a new window behind the one they are in, and
+  // every screenshot is of their screen instead (docs/GOTCHAS.md).
+  void getCurrentWindow()
+    .setAlwaysOnTop(true)
+    .then(() => note('on-top'))
+    .catch((e) => note('on-top-failed', String(e)));
 
   const unlisten = await listenEvents((event) => {
     const e = event as { event: string; name?: string; data?: unknown; reason?: string };

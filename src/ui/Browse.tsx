@@ -37,12 +37,13 @@ import {
   dismissContinue,
   type ContinueItem,
 } from '../player/api';
-import { cacheArtwork } from '../metadata/api';
+import { cacheArtwork, getSetting, setSetting } from '../metadata/api';
 import { countNeedsReview } from '../metadata/api';
 import { applyUpgrades, dismissUpgrades, readUpgrades, type Upgrade } from './qualityNotice';
 import { runScanPipeline, useScanStatus } from '../library/pipeline';
 import { getTitleDetail, listTitles, type Title } from './api';
 import { searchTitles, type SearchHit } from './search';
+import { arrangeGrid, GRID_SORTS, gridSettingKey, parseGridSetting, type GridSort } from './gridSort';
 import OnScreenKeyboard from './OnScreenKeyboard';
 import { useTvMode } from './tv';
 import { runSelfTest, selfTestPlan } from '../selftest';
@@ -72,16 +73,26 @@ initSpatial({
 installFocusWatchdog();
 
 /** The nav entries, in order. Detail and player are reached, not navigated to. */
-type NavTarget = 'home' | 'search' | 'settings';
+type NavTarget = 'home' | 'movies' | 'tv' | 'search' | 'settings';
+
+/** The top bar, in order. Movies and TV shows open the whole shelf as a grid. */
+const NAV_ITEMS: [NavTarget, string][] = [
+  ['home', 'Home'],
+  ['movies', 'Movies'],
+  ['tv', 'TV shows'],
+  ['search', 'Search'],
+  ['settings', 'Settings'],
+];
 
 /** The three nav views carry no payload, which is exactly what makes them nav. */
 type View =
   // `section` opens Settings on the review queue, from the notice on Home.
-  | { name: NavTarget; section?: 'review' }
+  | { name: 'home' | 'search' | 'settings'; section?: 'review' }
   | { name: 'detail'; title: Title }
   // Ids rather than the titles themselves, so the grid keeps showing current
   // rows after a reload rather than a snapshot taken when it was opened.
-  | { name: 'grid'; heading: string; titleIds: number[] }
+  // `kind` is a whole shelf from the top bar, read live from the library.
+  | { name: 'grid'; heading: string; titleIds?: number[]; kind?: 'movie' | 'series' }
   | { name: 'player'; target: PlaybackTarget };
 
 
@@ -213,9 +224,13 @@ export default function Browse() {
    * Stating it as "Home reflects the database while Home is visible" is what
    * makes it hold for the next screen that writes something, too. A callback
    * per writer would have to be remembered each time.
+   *
+   * The same holds for the other screens built from the title list, now that
+   * posters show what has been watched: a grid or search results reached back
+   * from a film would otherwise still show it as unwatched.
    */
   useEffect(() => {
-    if (view.name !== 'home') return;
+    if (view.name !== 'home' && view.name !== 'grid' && view.name !== 'search') return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [view.name, load]);
@@ -428,6 +443,8 @@ export default function Browse() {
   /** Resolve a grid's stored ids, keeping the order the rail had them in. */
   const gridTitles = useMemo(() => {
     if (view.name !== 'grid') return [];
+    if (view.kind) return titles.filter((t) => t.kind === view.kind);
+    if (!view.titleIds) return [];
     const byId = new Map(titles.map((t) => [t.id, t]));
     return view.titleIds.map((id) => byId.get(id)).filter((t): t is Title => t !== undefined);
   }, [view, titles]);
@@ -475,11 +492,19 @@ export default function Browse() {
     <div className="browse" ref={shellRef}>
       <FocusContext.Provider value={shellFocusKey}>
         <TopNav
-          active={view.name}
-          reviewCount={reviewCount}
-          onNavigate={(next) =>
-            setStack(navigate<View>({ name: 'home' }, next, next.name === 'home'))
+          active={
+            view.name === 'grid' && view.kind ? (view.kind === 'movie' ? 'movies' : 'tv') : view.name
           }
+          reviewCount={reviewCount}
+          onNavigate={(target) => {
+            const next: View =
+              target === 'movies'
+                ? { name: 'grid', heading: 'Movies', kind: 'movie' }
+                : target === 'tv'
+                  ? { name: 'grid', heading: 'TV shows', kind: 'series' }
+                  : { name: target };
+            setStack(navigate<View>({ name: 'home' }, next, target === 'home'));
+          }}
         />
 
         {error && (
@@ -545,6 +570,9 @@ export default function Browse() {
           <GridView
             heading={view.heading}
             titles={gridTitles}
+            // A whole shelf from the top bar has the bar for getting away;
+            // a See-all grid was reached from a rail and goes back to it.
+            showBack={!view.kind}
             onSelect={(title) => openView({ name: 'detail', title })}
             onBack={goBack}
           />
@@ -588,7 +616,7 @@ function TopNav({
 }: {
   active: string;
   reviewCount: number;
-  onNavigate: (view: { name: NavTarget }) => void;
+  onNavigate: (target: NavTarget) => void;
 }) {
   const { ref, focusKey } = useFocusable({
     focusKey: NAV_FOCUS_KEY,
@@ -605,14 +633,14 @@ function TopNav({
     <FocusContext.Provider value={focusKey}>
       <nav className="top-nav" ref={ref}>
         <span className="brand">Kinema</span>
-        {(['home', 'search', 'settings'] as const).map((name) => (
+        {NAV_ITEMS.map(([name, label]) => (
           <FocusButton
             key={name}
             className={active === name ? 'active' : ''}
             keepInView="page-top"
-            onSelect={() => onNavigate({ name })}
+            onSelect={() => onNavigate(name)}
           >
-            {name === 'home' ? 'Home' : name === 'search' ? 'Search' : 'Settings'}
+            {label}
             {name === 'settings' && reviewCount > 0 && (
               <span className="nav-badge" aria-label={`${reviewCount} to review`}>
                 {reviewCount}
@@ -653,11 +681,13 @@ function TopNav({
 function GridView({
   heading,
   titles,
+  showBack,
   onSelect,
   onBack,
 }: {
   heading: string;
   titles: Title[];
+  showBack: boolean;
   onSelect: (title: Title) => void;
   onBack: () => void;
 }) {
@@ -666,21 +696,75 @@ function GridView({
     trackChildren: true,
     saveLastFocusedChild: true,
   });
-  useClaimFocus(GRID_FOCUS_KEY, true);
+
+  const [arrangement, setArrangement] = useState<{ sort: GridSort; unwatched: boolean }>({
+    sort: 'added',
+    unwatched: false,
+  });
+  useEffect(() => {
+    let live = true;
+    void getSetting(gridSettingKey(heading))
+      .then((raw) => live && setArrangement(parseGridSetting(raw)))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [heading]);
+  const arrange = (next: { sort: GridSort; unwatched: boolean }) => {
+    setArrangement(next);
+    void setSetting(
+      gridSettingKey(heading),
+      `${next.sort}:${next.unwatched ? 'unwatched' : 'all'}`
+    ).catch((e) => console.warn('grid: could not remember the order', e));
+  };
+  const shown = useMemo(
+    () => arrangeGrid(titles, arrangement.sort, arrangement.unwatched),
+    [titles, arrangement]
+  );
+
+  // Land on the first title, not on Back or the sort buttons above it.
+  const first = shown[0] ? `grid:${shown[0].id}` : GRID_FOCUS_KEY;
+  useClaimFocus(first, titles.length > 0 || shown.length === 0);
 
   return (
     <FocusContext.Provider value={focusKey}>
       <div className="search" ref={ref}>
         <div className="grid-head">
-          <FocusButton className="back-button" keepInView="page-top" onSelect={onBack}>
-            ← Back
-          </FocusButton>
+          {showBack && (
+            <FocusButton className="back-button" keepInView="page-top" onSelect={onBack}>
+              ← Back
+            </FocusButton>
+          )}
           <h2 className="grid-heading">
-            {heading} <span className="muted">{titles.length}</span>
+            {heading} <span className="muted">{shown.length}</span>
           </h2>
         </div>
+        <div className="grid-controls choice-options" role="group" aria-label="Order">
+          {GRID_SORTS.map((s) => (
+            <FocusButton
+              key={s.value}
+              focusKey={`grid-sort:${s.value}`}
+              className={`choice ${arrangement.sort === s.value ? 'chosen' : ''}`}
+              keepInView="page-top"
+              onSelect={() => arrange({ ...arrangement, sort: s.value })}
+            >
+              {s.label}
+            </FocusButton>
+          ))}
+          <FocusButton
+            focusKey="grid-unwatched"
+            className={`choice grid-filter ${arrangement.unwatched ? 'chosen' : ''}`}
+            keepInView="page-top"
+            onSelect={() => arrange({ ...arrangement, unwatched: !arrangement.unwatched })}
+          >
+            {arrangement.unwatched ? '✓ ' : ''}Unwatched only
+          </FocusButton>
+        </div>
+        {shown.length === 0 && (
+          <p className="muted">Everything here has been watched. Switch off “Unwatched only” to see it all.</p>
+        )}
         <div className="search-grid">
-          {titles.map((title) => (
+          {shown.map((title) => (
             <Card key={title.id} title={title} onSelect={onSelect} focusKey={`grid:${title.id}`} />
           ))}
         </div>

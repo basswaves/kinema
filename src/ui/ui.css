@@ -90,6 +90,7 @@ html {
   background: transparent;
   color: rgba(245, 245, 247, 0.7);
   font-size: 0.8125rem;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -1186,6 +1187,15 @@ html {
   align-items: center;
   gap: 1rem;
   margin-bottom: 1.25rem;
+}
+
+/* Order and filter, above the grid (gridSort.ts). */
+.grid-controls {
+  margin-bottom: 1.5rem;
+}
+
+.grid-controls .grid-filter {
+  margin-left: 0.75rem;
 }
 
 .grid-head .back-button {

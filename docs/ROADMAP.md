@@ -281,7 +281,7 @@ linearly at the end. Each step is verified before the next.
 11. **Search.** An on-screen keyboard a remote can drive, Back leaves the box,
     and search matches cast, genre and year as well as titles. **Done** (mock).
 12. **Grids.** Sort (Recently added / A–Z / Year / Rating) and Unwatched only,
-    remembered per grid; Movies and TV shows as top-bar entries.
+    remembered per grid; Movies and TV shows as top-bar entries. **Done** (mock).
 13. **Settings.** A section list (Library · Playback · Picture & sound · Intro &
     credits · Advanced). Every option shows its choices side by side; one-line
     explanations with the rest behind "More about this".

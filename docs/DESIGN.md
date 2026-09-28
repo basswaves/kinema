@@ -173,10 +173,20 @@ into is offered rather than skipped past.
 
 **Exactly one keyboard handler owns the arrow keys at a time.** The player binds
 its own and the spatial navigation library binds another; `preventDefault` cannot
-stop the other listener. So the spatial system is paused while arrows seek and
-resumed only once **Up** hands the OSD focus. Without that split, one press both
-seeks and moves the focus ring. A focus ring never appears in seek mode, because
-the ring means "arrows move between these" and there it would be a lie.
+stop the other listener. So the spatial system is paused while watching — OK
+pauses, Left/Right seek (accelerating while held, `scrub.ts`) — and resumed only
+once **Up or Down** brings the controls up, as on a streaming app. Without that
+split, one press both seeks and moves the focus ring. A focus ring never appears
+while watching, because the ring means "arrows move between these" and there it
+would be a lie. The seek bar, once the controls have the arrows, keeps Left/Right
+for itself through the library's own `onArrowPress` (returning `false`), so it is
+still one handler per press. The controls hand the arrows back after six idle
+seconds.
+
+**Back goes back.** `history.ts` keeps the screens you came through, each with
+the focus key it was left on; Back pops one and puts focus back on that control
+(`returnFocusTo`). Top-bar destinations start again from Home. This only works
+for controls with stable focus keys — see GOTCHAS.
 
 **Rails are capped, and the cap lives in one place.** Every card is a registered
 focusable and spatial navigation measures elements live at navigation time, so

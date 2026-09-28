@@ -706,9 +706,12 @@ focus ring on one press.
 
 **Do:** make exactly one of them live at a time. `pause()` and `resume()`,
 exported from the spatial navigation package, are the switch — the player starts
-paused so arrows seek, and `resume()`s only once Up hands the OSD focus. The
-player's own handler then has to `break` on every arrow *and* on `Enter`, or
-both handlers act again.
+paused so arrows seek, and `resume()`s only once Up or Down brings the controls
+up. The player's own handler then has to `break` on every arrow *and* on
+`Enter`, or both handlers act again. A focusable that needs the arrows for
+itself while the controls are up (the seek bar) takes them in its
+`onArrowPress` and returns `false`, which stops the library moving the ring —
+one handler per press, still.
 
 **Also:** `resume()` before `setFocus()`. Navigation is ignored while paused, so
 focus aimed at a control the system is not yet listening for lands nowhere.
@@ -741,6 +744,32 @@ they sit as well as what they show (`rail:<heading>:<id>`, `grid:<id>`,
 ---
 
 ## Frontend
+
+### The dev server can go on serving a stylesheet from before an edit
+
+Seen during the September UX pass: after a run of edits to `ui.css`, a reload
+of `dev:mock` still had the old rules — `document.styleSheets` held the previous
+`.player-label` — while script changes were arriving fine. The layout looked
+wrong for a reason that was not in the code. **Do:** when a style change does
+not show, read the rule back from `document.styleSheets` before theorising, and
+restart the dev server if it is stale.
+
+### The mock library lives in the page, so a reload empties it
+
+`mockBackend.ts` keeps playback positions, watched flags and settings in memory.
+A `location.reload()` to pick up a change also throws away the state a check
+built up — the watched episodes, the answered notice — and the check then reads
+a fresh library as if it were the result. **Do:** set state with
+`__TAURI_INTERNALS__.invoke(...)` and move between screens to re-read it, and
+use the `localStorage` switches (`kinemaMockReview`, `kinemaMockUpdate`,
+`kinemaMockEmpty`) for anything that has to survive a reload.
+
+### A self-test presses keys and never lets go
+
+`selftest.ts` dispatches `keydown` only. Anything that acts on the key's
+release gets no release: the player's accelerating seek commits on `keyup`, so
+under a self-test it commits through its fallback instead, half a second after
+the last press. Plans that seek with the arrows should allow for that.
 
 ### `process is not defined` from guessit-js
 

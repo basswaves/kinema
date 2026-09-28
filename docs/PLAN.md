@@ -1434,6 +1434,61 @@ switch mode), and the equipment report makes a single launch there enough to
 read what that hardware says. What that run cannot show — whether a picture
 looks right across a room — is said so, not claimed.
 
+## Pre-launch UX pass ✅
+
+Done on 2026-09-28, on the `ux-pass` branch, after an outside-eye review of the
+finished app. The review used the app keyboard-only in `dev:mock` and read every
+screen; every point was put to the owner with options, and what follows is what
+was chosen and why. The step list is in ROADMAP.
+
+**The remote in the player follows the streaming-app convention.** OK pauses,
+Left/Right seek, Up or Down bring the controls up. The old model — arrows seek
+until Up hands them to the controls, OK only reveals them — was consistent, but
+it had to be taught: the help screen's main job was explaining it, and pausing
+took three presses. Seeking accelerates while held or tapped quickly
+(`scrub.ts`) and commits one seek on release, because a seek per key repeat is
+thirty seeks a second into a remux. The seek bar became reachable; the controls
+step aside after six idle seconds.
+
+**TV mode means fullscreen, for the whole app.** Display switching only acts
+in fullscreen (a mode change is a whole-desktop change), and a TV-mode library
+in a window meant every Screen switch did nothing until someone found the
+Fullscreen button. TV mode already means "this is on a TV", so it is the right
+switch; desk mode stays windowed. In TV mode the player has no Fullscreen
+button and Back leaves the player directly — the rung "leave fullscreen first"
+applies to desk mode only.
+
+**Default languages are a preference, not taste.** The settings rule is about
+the picture; which language you understand is about you. The default is Windows'
+language for subtitles *when the audio is in another language*, and the file's
+own audio — how most of the world watches. A choice made while watching a title
+still wins for that title (`TitlePrefs.chosen`).
+
+**The pre-play sound question became a notice.** It interrupted the first
+Play, and "Not now" meant never. Home now says when the equipment can do better
+than it is set to — per piece of equipment, so a receiver connected later is
+mentioned — with Turn on and OK. An answer given to the old question stands.
+
+**Refusals are in plain sight.** Home says how many videos could not be
+identified, with a Review button, and Settings carries the count. "A wrong match
+is worse than no match" is only fair if the refusals are visible where people
+look, and they were halfway down Settings.
+
+**The update notice is inside the maintenance rule.** One request to GitHub for
+a version number, per launch, downloading nothing; any failure is silence, so a
+change at GitHub cannot break Kinema. Full auto-update was offered and declined:
+it needs signing keys, an installer and a published update file every release.
+
+**Kinema stays unsigned** for now; the README explains SmartScreen instead.
+
+**Movies, not films.** One word throughout, the one most apps use; "video"
+where a sentence means whatever is playing.
+
+**Back remembers.** "Back from a detail page always goes Home" had been left
+alone because nobody had complained; the review called it the most likely
+first complaint. Implemented as a stack of views with focus keys, which is also
+why every card and button you can open something from now has a stable key.
+
 ## Open items
 
 **They live in [ROADMAP.md](ROADMAP.md), and only there.** They used to be

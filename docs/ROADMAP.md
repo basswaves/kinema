@@ -128,12 +128,10 @@ this order:
    a staged mid-film failure recovered in under two seconds. **Verified on
    the test receiver (USB round 3):** DTS-HD MA and TrueHD went out as
    `spdif-dtshd` / `spdif-truehd` in exclusive mode and the receiver's display
-   named each correctly. **The offer-once prompt** sits before a film starts
-   (`DirectSoundOffer.tsx`, from `startPlayback` in `Browse.tsx`), where the
-   remote works normally, rather than inside the player's focus handling: a
-   focus boundary that takes focus itself, Back cancels without answering,
-   either answer is final. Driven keyboard-only in `dev:mock`. **Step 3 is
-   done.**
+   named each correctly. The offer-once prompt that used to sit before the
+   first film was replaced on 2026-09-28 by a notice on Home that appears only
+   while the equipment can do better than it is set to (`qualityNotice.ts`, and
+   the UX pass below). **Step 3 is done.**
 
    **Spatial sound, as of USB round 2:** confirmed that with Atmos for home
    theater on, every film plays silent (`0x887C0077` on `Initialize`, twice
@@ -289,11 +287,28 @@ linearly at the end. Each step is verified before the next.
     number; if newer, a line in Settings and a dot on Settings. Downloads
     nothing, fails silent, can be switched off. **Done** (mock; the GitHub answer checked by hand).
 15. **Docs.** A built-in TMDB key goes to the top of "Worth doing"; the first-run
-    picture-and-sound setup stays there; decisions to PLAN.
+    picture-and-sound setup stays there; decisions to PLAN. **Done.**
 16. **README for launch.** Stays unsigned, with a clearer SmartScreen section;
     "Known limitations" in place of the testing paragraph; fresh screenshots.
 
 ## Worth doing, in rough order of payoff
+
+### A built-in TMDB key — first
+
+Movies do not appear at all without a TMDB key, and getting one means an
+account and a developer application form: for most people who download
+Kinema, the point where it stops working. The owner wants Kinema to work out of
+the box (2026-09-28) and put this first, as its own piece of work rather than
+part of the UX pass.
+
+What is known: TMDB's terms allow free non-commercial use with attribution,
+which Settings already shows; they neither forbid nor describe shipping a key in
+an open-source app, and Jellyfin ships one openly. It is a grey area, not a
+prohibition. The plan when it is done: a key in the build for Kinema's own use,
+the existing field kept as an override (if TMDB ever revoked the shared key,
+everyone would need their own again), and the first-run panel no longer asking.
+Kinema never had a key-free movie source — TVmaze is TV only and OMDb needs a
+key too — so this is the only route to movies with no setup.
 
 ### Tone mapping for the display's real brightness — later, maybe
 
@@ -318,8 +333,10 @@ the default, and one reason it may still be worth a switch:
 
 A window the first time Kinema starts that walks through the picture and sound
 choices — direct sound, display switching — with what each gains and costs,
-built on what the equipment check found. Not before the native-output steps
-exist: it would be a tour of switches that do not do anything yet.
+built on what the equipment check found. The notice on Home (2026-09-28) already
+says when the equipment can do better and turns it on in one press; a first-run
+setup would ask the same questions up front, on a setup where the notice would
+otherwise appear.
 
 ### Smooth motion (`tscale=oversample`) — deferred, not rejected
 

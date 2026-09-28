@@ -670,8 +670,8 @@ export default function Settings() {
               TV mode: {tvMode ? 'on' : 'off'}
             </FocusButton>
             <span className="muted">
-              Bigger text and artwork, for reading from across a room. Also leaves a wider margin
-              around the edges, because many televisions crop a little off every side. Turn it on
+              Fills the whole screen, with bigger text and artwork for reading from across a room
+              and a wider margin because many televisions crop a little off every side. Turn it on
               if this is on a TV, off if it is on a desk. Also on{' '}
               <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>.
             </span>

@@ -47,7 +47,7 @@ const GROUPS: Group[] = [
       [['←', '→'], 'Skip back or forward 10 seconds'],
       [['↑'], 'Open the player controls — subtitles, audio, fullscreen'],
       [['Esc'], 'Close what is open, then leave fullscreen, then stop'],
-      [['F'], 'Fullscreen'],
+      [['F'], 'Fullscreen (the TV layout is always fullscreen)'],
       [['N'], 'Next episode'],
       [['P'], 'Previous episode'],
       [['I'], 'Playback details — resolution, codecs, dropped frames'],

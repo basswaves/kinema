@@ -39,6 +39,7 @@ import {
 } from 'tauri-plugin-libmpv-api';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import FocusButton from '../ui/FocusButton';
+import { isTvMode, useTvMode } from '../ui/tv';
 import StatsPanel from './StatsPanel';
 import TrackPanel, { TRACK_PANEL_KEY } from './TrackPanel';
 import UpNextCard from './UpNextCard';
@@ -151,6 +152,7 @@ function formatTime(seconds: number | null): string {
 }
 
 export default function Player({ target, onExit, onPlayTarget }: Props) {
+  const tv = useTvMode();
   /**
    * The life of the file mpv has open — loading, open, first frame, position,
    * ended — as one state machine. See `session.ts`, and GOTCHAS for why the
@@ -475,7 +477,9 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
    */
   const exit = useCallback(async () => {
     const win = getCurrentWindow();
-    if (await win.isFullscreen()) await win.setFullscreen(false);
+    // TV mode keeps the whole app fullscreen; the library goes on filling the
+    // screen after the film, as a TV app would.
+    if (!isTvMode() && (await win.isFullscreen())) await win.setFullscreen(false);
     await restoreScreen();
     onExit();
   }, [onExit]);
@@ -1117,6 +1121,9 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   );
 
   const toggleFullscreen = useCallback(async () => {
+    // In TV mode the window is always fullscreen and has no other state to
+    // toggle to — see tv.ts.
+    if (isTvMode()) return;
     const win = getCurrentWindow();
     const entering = !(await win.isFullscreen());
     await win.setFullscreen(entering);
@@ -1145,13 +1152,15 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
    */
   const backOut = useCallback(async () => {
     const win = getCurrentWindow();
-    if (await win.isFullscreen()) {
+    if (!isTvMode() && (await win.isFullscreen())) {
       await win.setFullscreen(false);
       await restoreScreen();
       return;
     }
-    onExit();
-  }, [onExit]);
+    // Through exit, not straight out: in TV mode the film may have switched
+    // the screen's mode while fullscreen, and exit is what puts it back.
+    await exit();
+  }, [exit]);
 
   /** Changing a track also records the language for this whole title. */
   const chooseTrack = useCallback(
@@ -1558,7 +1567,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           >
             Stats
           </FocusButton>
-          <FocusButton onSelect={() => void toggleFullscreen()}>Fullscreen</FocusButton>
+          {!tv && <FocusButton onSelect={() => void toggleFullscreen()}>Fullscreen</FocusButton>}
           {/* Here as well as in the nav, because this is where the controls are
               least obvious: the OSD hides itself while you watch, so a remote
               user who does not already know that Up brings it back has nothing

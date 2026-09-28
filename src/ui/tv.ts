@@ -17,6 +17,7 @@
  * a preset UI by another name.
  */
 import { useSyncExternalStore } from 'react';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { getSetting, setSetting } from '../metadata/api';
 
 export const TV_MODE_KEY = 'tv_mode';
@@ -31,6 +32,28 @@ const listeners = new Set<() => void>();
  */
 function apply(on: boolean): void {
   document.documentElement.dataset.tv = on ? 'on' : 'off';
+}
+
+/**
+ * TV mode also means the whole screen, the way a TV app has it.
+ *
+ * On a TV nobody wants a title bar and a taskbar round the library, and the
+ * display switching in Settings → Screen only acts while the window is
+ * fullscreen — so a TV-mode library in a window meant every one of those
+ * switches did nothing until someone found the Fullscreen button. The player
+ * leaves the window fullscreen on the way out while this is on.
+ *
+ * Only ever *leaves* fullscreen when TV mode is being switched off: at a desk
+ * launch there is nothing to undo, and doing it anyway would pull a film the
+ * user made fullscreen themselves back into a window.
+ */
+async function fillScreen(on: boolean): Promise<void> {
+  try {
+    const win = getCurrentWindow();
+    if ((await win.isFullscreen()) !== on) await win.setFullscreen(on);
+  } catch (e) {
+    console.warn('tv mode: could not change fullscreen', e);
+  }
 }
 
 function emit(): void {
@@ -58,6 +81,7 @@ export async function loadTvMode(): Promise<void> {
   }
   apply(enabled);
   emit();
+  if (enabled) await fillScreen(true);
 }
 
 /**
@@ -66,12 +90,19 @@ export async function loadTvMode(): Promise<void> {
  * user is watching.
  */
 export function setTvMode(on: boolean): void {
+  const was = enabled;
   enabled = on;
   apply(on);
   emit();
+  if (on !== was) void fillScreen(on);
   void setSetting(TV_MODE_KEY, on ? 'on' : 'off').catch((e) =>
     console.warn('tv mode: could not save setting', e)
   );
+}
+
+/** For code outside React that needs to know, such as the player's exit path. */
+export function isTvMode(): boolean {
+  return enabled;
 }
 
 export function useTvMode(): boolean {

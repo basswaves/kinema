@@ -246,13 +246,13 @@ linearly at the end. Each step is verified before the next.
 
 1. **Wording.** "Movies" everywhere (not "films"), real plurals instead of
    "file(s)", readable error messages instead of raw `String(e)`, and no title
-   count in the top bar.
+   count in the top bar. **Done.**
 2. **Back remembers.** A view history: Back returns to the previous screen with
    focus on what was picked (search results, See-all grid, detail after a film).
    **Done.**
 3. **TV mode runs fullscreen.** The whole app, library and player — so display
    switching, which only acts in fullscreen, is not silently off from the sofa.
-   Desk mode stays windowed.
+   Desk mode stays windowed. **Done** (mock; real app with steps 4–6).
 4. **The remote works like a streaming app.** OK pauses; Left/Right seek and
    accelerate when held; Down reveals the controls; the seek bar is reachable
    and scrubs. No "press Up first" mode to learn.

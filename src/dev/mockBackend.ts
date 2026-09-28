@@ -513,6 +513,8 @@ type Handler = (args: Args) => unknown;
 
 const num = (args: Args, key: string) => Number(args[key]);
 
+let mockFullscreen = false;
+
 const handlers: Record<string, Handler> = {
   // library
   list_library_roots: () => [{ id: 1, path: 'C:\\fixture', kind: 'tv', file_count: files.length }],
@@ -630,8 +632,12 @@ const handlers: Record<string, Handler> = {
   'plugin:libmpv|command': (a) => fakeMpv.command(String(a.name), (a.args as unknown[]) ?? []),
   'plugin:libmpv|get_property': (a) => fakeMpv.getProperty(String(a.name)),
   'plugin:libmpv|set_property': (a) => fakeMpv.setProperty(String(a.name), a.value),
-  'plugin:window|is_fullscreen': () => false,
-  'plugin:window|set_fullscreen': () => null,
+  // Remembered, so a check can ask whether TV mode really filled the screen.
+  'plugin:window|is_fullscreen': () => mockFullscreen,
+  'plugin:window|set_fullscreen': (a) => {
+    mockFullscreen = Boolean(a.value);
+    return null;
+  },
   'plugin:window|show': () => null,
   'plugin:opener|open_url': () => null,
 };

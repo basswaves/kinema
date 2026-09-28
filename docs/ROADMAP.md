@@ -277,7 +277,7 @@ linearly at the end. Each step is verified before the next.
     Settings) for the review queue. And the one-time direct-sound dialog before
     Play goes: in its place a dismissible notice, shown only when the connected
     equipment could do better than the current settings (sound or screen), and
-    shown again if more capable equipment is connected later.
+    shown again if more capable equipment is connected later. **Done** (mock).
 11. **Search.** An on-screen keyboard a remote can drive, Back leaves the box,
     and search matches cast, genre and year as well as titles.
 12. **Grids.** Sort (Recently added / A–Z / Year / Rating) and Unwatched only,

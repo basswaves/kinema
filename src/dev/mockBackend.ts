@@ -562,6 +562,8 @@ function flag(name: string): string | null {
 const SLOW_MS = Number(flag('kinemaMockSlowMs') ?? 0) || 0;
 const EMPTY = flag('kinemaMockEmpty') === '1';
 const SLOW_DETECT = flag('kinemaMockSlowDetect') === '1';
+/** `kinemaMockReview` pretends that many videos wait in the review queue. */
+const REVIEW_COUNT = Number(flag('kinemaMockReview') ?? 0) || 0;
 
 const later = <T,>(value: T): Promise<T> =>
   new Promise((resolve) => window.setTimeout(() => resolve(value), SLOW_MS));
@@ -623,7 +625,7 @@ const handlers: Record<string, Handler> = {
   get_title_detail: (a) => titleDetail(num(a, 'titleId')),
   list_unmatched: () => [],
   list_needs_review: () => [],
-  count_needs_review: () => 0,
+  count_needs_review: () => REVIEW_COUNT,
   list_titles_needing_detail: () => [],
   cache_artwork: () => ({ stored: 0, failed: 0 }),
   artwork_stats: () => ({ files: 0, bytes: 0, failed: 0 }),

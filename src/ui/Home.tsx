@@ -12,6 +12,8 @@ import Rail from './Rail';
 import ContinueRail from './ContinueRail';
 import FocusButton from './FocusButton';
 import FirstRun from './FirstRun';
+import HomeNotices from './HomeNotices';
+import type { Upgrade } from './qualityNotice';
 import { useClaimFocus } from './focus';
 import type { ContinueItem } from '../player/api';
 import { parseGenres, type Title } from './api';
@@ -30,6 +32,11 @@ interface Props {
   onSeeAll: (heading: string, titles: Title[]) => void;
   /** Re-read the library, after the first-run panel has changed it. */
   onLibraryChanged: () => void;
+  reviewCount: number;
+  onReview: () => void;
+  upgrades: Upgrade[];
+  onApplyUpgrades: () => void;
+  onDismissUpgrades: () => void;
 }
 
 /**
@@ -58,6 +65,11 @@ export default function Home({
   onRemoveResumable,
   onSeeAll,
   onLibraryChanged,
+  reviewCount,
+  onReview,
+  upgrades,
+  onApplyUpgrades,
+  onDismissUpgrades,
 }: Props) {
   const { ref, focusKey } = useFocusable({ trackChildren: true, saveLastFocusedChild: true });
 
@@ -113,6 +125,14 @@ export default function Home({
     <FocusContext.Provider value={focusKey}>
       <div className="home" ref={ref}>
         {hero && <Hero title={hero} onPlay={onPlay} onSelect={onSelect} />}
+
+        <HomeNotices
+          reviewCount={reviewCount}
+          onReview={onReview}
+          upgrades={upgrades}
+          onApply={onApplyUpgrades}
+          onDismiss={onDismissUpgrades}
+        />
 
         {/* First rail, as on any streaming service: the thing you were most
             recently in the middle of is what you probably want. */}

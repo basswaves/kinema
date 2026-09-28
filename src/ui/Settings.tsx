@@ -139,13 +139,16 @@ function detectLines(steps: AutoStep[]): string[] {
   return steps.map((s) => `${s.ran ? '' : 'skipped — '}${s.note}`);
 }
 
-export default function Settings() {
+/** The Review button, where focus lands when Settings opens on the queue. */
+const REVIEW_BUTTON_KEY = 'settings-review-button';
+
+export default function Settings({ openSection }: { openSection?: 'review' }) {
   const { ref, focusKey } = useFocusable({
     focusKey: SETTINGS_FOCUS_KEY,
     trackChildren: true,
     saveLastFocusedChild: true,
   });
-  useClaimFocus(SETTINGS_FOCUS_KEY, true);
+  useClaimFocus(openSection === 'review' ? REVIEW_BUTTON_KEY : SETTINGS_FOCUS_KEY, true);
 
   const [roots, setRoots] = useState<LibraryRoot[]>([]);
   const [needsReview, setNeedsReview] = useState(0);
@@ -157,7 +160,9 @@ export default function Settings() {
   const [displaySync, setDisplaySync] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [panel, setPanel] = useState<'none' | 'review' | 'developer'>('none');
+  const [panel, setPanel] = useState<'none' | 'review' | 'developer'>(
+    openSection === 'review' ? 'review' : 'none'
+  );
   const [writingNfo, setWritingNfo] = useState(false);
 
   // Intro detection. `detecting` holds the root currently being worked on, so
@@ -638,6 +643,7 @@ export default function Settings() {
             a few seconds each. If this is empty, everything found a match.
           </p>
           <FocusButton
+            focusKey={REVIEW_BUTTON_KEY}
             keepInView="nearest"
             className={needsReview > 0 ? 'btn-primary' : 'btn-secondary'}
             onSelect={() => setPanel((p) => (p === 'review' ? 'none' : 'review'))}

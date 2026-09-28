@@ -37,14 +37,9 @@ import {
   dismissContinue,
   type ContinueItem,
 } from '../player/api';
-import { cacheArtwork, setSetting } from '../metadata/api';
-import DirectSoundOffer from './DirectSoundOffer';
-import {
-  AUDIO_DIRECT_KEY,
-  AUDIO_DIRECT_OFFERED_KEY,
-  directSoundOffer,
-  type DirectSoundOffer as Offer,
-} from '../player/audioOutput';
+import { cacheArtwork } from '../metadata/api';
+import { countNeedsReview } from '../metadata/api';
+import { applyUpgrades, dismissUpgrades, readUpgrades, type Upgrade } from './qualityNotice';
 import { runScanPipeline, useScanStatus } from '../library/pipeline';
 import { getTitleDetail, listTitles, type Title } from './api';
 import { runSelfTest, selfTestPlan } from '../selftest';
@@ -78,7 +73,8 @@ type NavTarget = 'home' | 'search' | 'settings';
 
 /** The three nav views carry no payload, which is exactly what makes them nav. */
 type View =
-  | { name: NavTarget }
+  // `section` opens Settings on the review queue, from the notice on Home.
+  | { name: NavTarget; section?: 'review' }
   | { name: 'detail'; title: Title }
   // Ids rather than the titles themselves, so the grid keeps showing current
   // rows after a reload rather than a snapshot taken when it was opened.
@@ -151,45 +147,19 @@ export default function Browse() {
   const [error, setError] = useState<string | null>(null);
   /** A root that could not be read at startup. Not an error — see below. */
   const [scanTrouble, setScanTrouble] = useState<string | null>(null);
-  /**
-   * The one-time offer of direct sound, with the film it is holding back.
-   * `returnTo` is the control that pressed Play, for when the offer is
-   * dismissed with Back rather than answered.
-   */
-  const [pending, setPending] = useState<{
-    target: PlaybackTarget;
-    offer: Offer;
-    returnTo: string;
-  } | null>(null);
+  /** Videos Kinema would not guess at, for the notice on Home. */
+  const [reviewCount, setReviewCount] = useState(0);
+  /** What the equipment could do that is switched off — see qualityNotice.ts. */
+  const [upgrades, setUpgrades] = useState<Upgrade[]>([]);
 
   /**
-   * Every Play from the browsing views comes through here: open the player,
-   * unless this is the moment for the one-time direct-sound offer. Trailers
-   * (no title) never trigger it, and anything that goes wrong asking falls
-   * through to playing — an offer is never a reason not to play.
+   * Every Play from the browsing views comes through here. It used to hold
+   * the first film back for a one-time question about the sound; that is a
+   * notice on Home now, and nothing stands between Play and the film.
    */
-  const startPlayback = useCallback(async (target: PlaybackTarget) => {
-    const offer = target.titleId === null ? null : await directSoundOffer().catch(() => null);
-    if (offer) setPending({ target, offer, returnTo: getCurrentFocusKey() });
-    else openView({ name: 'player', target });
-  }, [openView]);
-
-  const answerOffer = useCallback(
-    (accept: boolean) => {
-      if (!pending) return;
-      const { target, returnTo } = pending;
-      setPending(null);
-      void (async () => {
-        try {
-          if (accept) await setSetting(AUDIO_DIRECT_KEY, 'on');
-          await setSetting(AUDIO_DIRECT_OFFERED_KEY, 'yes');
-        } catch (e) {
-          console.warn('audio: could not save the answer to the offer', e);
-        }
-        openView({ name: 'player', target }, returnTo);
-      })();
-    },
-    [pending, openView]
+  const startPlayback = useCallback(
+    (target: PlaybackTarget) => openView({ name: 'player', target }),
+    [openView]
   );
 
   // The shell owns the nav↔content rule, because it is the only component that
@@ -213,6 +183,14 @@ export default function Browse() {
       // card that plays nothing.
       setTitles(list.filter((t) => t.file_count > 0));
       setResumable(resume);
+      // Neither is worth an error on screen if it cannot be read: the notices
+      // are extras, and Home is complete without them.
+      void countNeedsReview()
+        .then(setReviewCount)
+        .catch((e) => console.warn('review count:', e));
+      void readUpgrades()
+        .then(setUpgrades)
+        .catch((e) => console.warn('equipment notice:', e));
     } catch (e) {
       setError(userError(e));
     } finally {
@@ -463,20 +441,12 @@ export default function Browse() {
         const target = e.target as HTMLElement;
         if (target.tagName === 'INPUT') return;
         e.preventDefault();
-        // Back on the offer is "not this film", not an answer: close it, put
-        // focus back on Play, and ask again next time.
-        if (pending) {
-          const returnTo = pending.returnTo;
-          setPending(null);
-          void setFocus(returnTo);
-          return;
-        }
         goBack();
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [view.name, pending, goBack]);
+  }, [view.name, goBack]);
 
   useEffect(() => {
     // Arriving from the top bar puts you in the box; coming Back from a result
@@ -501,6 +471,7 @@ export default function Browse() {
       <FocusContext.Provider value={shellFocusKey}>
         <TopNav
           active={view.name}
+          reviewCount={reviewCount}
           onNavigate={(next) =>
             setStack(navigate<View>({ name: 'home' }, next, next.name === 'home'))
           }
@@ -528,6 +499,19 @@ export default function Browse() {
             onPlay={(title) => void playTitle(title)}
             onRemoveResumable={(item) => void removeResumable(item)}
             onLibraryChanged={() => void load()}
+            reviewCount={reviewCount}
+            onReview={() => openView({ name: 'settings', section: 'review' })}
+            upgrades={upgrades}
+            onApplyUpgrades={() =>
+              void applyUpgrades(upgrades)
+                .then(() => setUpgrades([]))
+                .catch((e) => setError(userError(e)))
+            }
+            onDismissUpgrades={() =>
+              void dismissUpgrades(upgrades)
+                .then(() => setUpgrades([]))
+                .catch((e) => setError(userError(e)))
+            }
             onSeeAll={(heading, list) =>
               openView({ name: 'grid', heading, titleIds: list.map((t) => t.id) })
             }
@@ -561,7 +545,7 @@ export default function Browse() {
           />
         )}
 
-        {view.name === 'settings' && <Settings />}
+        {view.name === 'settings' && <Settings openSection={view.section} />}
 
         {view.name === 'detail' && (
           <TitleDetailView
@@ -580,13 +564,6 @@ export default function Browse() {
             }
           />
         )}
-        {pending && (
-          <DirectSoundOffer
-            offer={pending.offer}
-            onAccept={() => answerOffer(true)}
-            onDecline={() => answerOffer(false)}
-          />
-        )}
       </FocusContext.Provider>
     </div>
   );
@@ -601,9 +578,11 @@ export default function Browse() {
  */
 function TopNav({
   active,
+  reviewCount,
   onNavigate,
 }: {
   active: string;
+  reviewCount: number;
   onNavigate: (view: { name: NavTarget }) => void;
 }) {
   const { ref, focusKey } = useFocusable({
@@ -629,6 +608,11 @@ function TopNav({
             onSelect={() => onNavigate({ name })}
           >
             {name === 'home' ? 'Home' : name === 'search' ? 'Search' : 'Settings'}
+            {name === 'settings' && reviewCount > 0 && (
+              <span className="nav-badge" aria-label={`${reviewCount} to review`}>
+                {reviewCount}
+              </span>
+            )}
           </FocusButton>
         ))}
         {/* The key list needs a control, not just the `?` key that opens it.

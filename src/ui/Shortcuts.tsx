@@ -4,13 +4,12 @@
  * Until this existed the control scheme was written down in exactly two places:
  * the README, which nobody reads from a sofa, and two passing sentences buried
  * in Settings help text. That was survivable for the person who wrote the keys
- * and nobody else — and one of them is not optional.
+ * and nobody else.
  *
- * **Up is what hands the arrow keys to the player's controls.** Without it a
- * remote cannot reach subtitles, audio tracks, the stats panel or fullscreen at
- * all: the OSD hides itself after a few seconds, so the buttons that would have
- * taught you it exists are not on screen to be found. A user who never guesses
- * Up has a player with no settings.
+ * The player's keys follow the streaming-app convention — OK pauses, Left and
+ * Right seek, Up or Down bring the controls up — so this list confirms rather
+ * than teaches. It used to carry the one key nobody would guess (Up, then the
+ * only way to reach subtitles); that mode is gone.
  *
  * The list is kept in one place rather than beside each handler on purpose. Two
  * lists drift, and the one that drifts is always the documentation.
@@ -43,9 +42,10 @@ const GROUPS: Group[] = [
   {
     heading: 'While something is playing',
     keys: [
+      [['Enter'], 'Pause and resume — a remote’s OK button'],
       [['Space'], 'Pause and resume'],
-      [['←', '→'], 'Skip back or forward 10 seconds'],
-      [['↑'], 'Open the player controls — subtitles, audio, fullscreen'],
+      [['←', '→'], 'Back or forward 10 seconds; hold to go faster'],
+      [['↑', '↓'], 'Bring up the controls — seek bar, subtitles, audio'],
       [['Esc'], 'Close what is open, then leave fullscreen, then stop'],
       [['F'], 'Fullscreen (the TV layout is always fullscreen)'],
       [['N'], 'Next episode'],
@@ -55,7 +55,7 @@ const GROUPS: Group[] = [
       [['⏪', '⏩'], 'A remote’s rewind and fast-forward jump 30 seconds'],
       [['⏹'], 'A remote’s stop key leaves the player'],
     ],
-    note: 'Up is the important one. The controls hide themselves while you watch, and Up is what brings them back and lets the arrows reach them.',
+    note: 'On the controls, the arrows move between them and the seek bar; they step back out of the way after a few seconds.',
   },
 ];
 

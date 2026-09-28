@@ -255,7 +255,7 @@ linearly at the end. Each step is verified before the next.
    Desk mode stays windowed. **Done** (mock; real app with steps 4–6).
 4. **The remote works like a streaming app.** OK pauses; Left/Right seek and
    accelerate when held; Down reveals the controls; the seek bar is reachable
-   and scrubs. No "press Up first" mode to learn.
+   and scrubs. No "press Up first" mode to learn. **Done** (mock; real app with steps 5–6).
 5. **Player bar.** Icon transport group in the centre; Audio & subtitles,
    volume, fullscreen at the right; Stats off the bar (still `i`). Episode name
    and "Ends at" on screen. Volume and mute (M); "Volume on the receiver" while

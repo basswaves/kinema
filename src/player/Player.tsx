@@ -20,6 +20,7 @@ import {
   useReducer,
   useRef,
   useState,
+  type ReactNode,
 } from 'react';
 import {
   doesFocusableExist,
@@ -78,6 +79,7 @@ import { applyAudioPlan, applyFallback, FALLBACKS, silencedAudioTrack } from './
 import { filmNow, mayswitch, restoreScreen, switchForFilm } from './displaySwitch';
 import { getSetting } from '../metadata/api';
 import { initialSession, reduce, samePath } from './session';
+import { COMMIT_IDLE_MS, scrubStep, type Scrub } from './scrub';
 
 export interface PlaybackTarget {
   path: string;
@@ -93,6 +95,8 @@ interface Props {
 }
 
 const OSD_HIDE_MS = 3200;
+/** With the ring on the controls and nothing pressed, this long hands the arrows back. */
+const OSD_FOCUS_IDLE_MS = 6000;
 const PROGRESS_SAVE_MS = 5000;
 /** Don't offer to resume a file that barely started. */
 const MIN_RESUME_SECS = 30;
@@ -135,6 +139,7 @@ const PLAYER_SHELL_KEY = 'player-shell';
 const PLAYER_PLAY_KEY = 'player-play';
 const PLAYER_TRACKS_KEY = 'player-tracks-button';
 const PLAYER_STATS_KEY = 'player-stats-button';
+const PLAYER_SEEK_KEY = 'player-seek';
 
 /** The label an episode carries into the player, shared with the browsing UI. */
 function labelFor(episode: EpisodeRef): string {
@@ -278,7 +283,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     // ring is on leaves a remote pressing arrows at an invisible control, which
     // is indistinguishable from a hang — the same silent dead end as focus
     // parked on an unmounted component (docs/GOTCHAS.md).
-    if (osdFocusRef.current) return;
+    if (osdFocusRef.current || sessionRef.current.paused) return;
     hideTimer.current = window.setTimeout(() => setOsdVisible(false), OSD_HIDE_MS);
   }, []);
 
@@ -1120,6 +1125,49 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     [showOsd, fail]
   );
 
+  // ---- seeking with Left/Right --------------------------------------------
+  /** The seek being steered right now, shown on the bar until committed. */
+  const scrubRef = useRef<Scrub | null>(null);
+  /** The last committed one, so quick taps keep accelerating across commits. */
+  const lastScrub = useRef<Scrub | null>(null);
+  const scrubTimer = useRef<number | undefined>(undefined);
+
+  /** Send the seek to mpv. Called on key release, or when presses stop. */
+  const commitScrub = useCallback(() => {
+    window.clearTimeout(scrubTimer.current);
+    const s = scrubRef.current;
+    if (!s) return;
+    scrubRef.current = null;
+    lastScrub.current = s;
+    dispatch({ type: 'scrub-end' });
+    void command('seek', [s.target, 'absolute']).catch(fail);
+    showOsd();
+  }, [fail, showOsd]);
+
+  const scrubBy = useCallback(
+    (dir: 1 | -1, repeat: boolean) => {
+      const { timePos: position, duration: length } = sessionRef.current;
+      if (!scrubRef.current) dispatch({ type: 'scrub-start' });
+      const next = scrubStep(
+        scrubRef.current ?? lastScrub.current,
+        performance.now(),
+        dir,
+        repeat,
+        position ?? 0,
+        length
+      );
+      scrubRef.current = next;
+      dispatch({ type: 'scrub', timePos: next.target });
+      showOsd();
+      // A remote that never sends a key release still gets its seek.
+      window.clearTimeout(scrubTimer.current);
+      scrubTimer.current = window.setTimeout(commitScrub, COMMIT_IDLE_MS);
+    },
+    [commitScrub, showOsd]
+  );
+
+  useEffect(() => () => window.clearTimeout(scrubTimer.current), []);
+
   const toggleFullscreen = useCallback(async () => {
     // In TV mode the window is always fullscreen and has no other state to
     // toggle to — see tv.ts.
@@ -1229,28 +1277,24 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
             void backOut();
           }
           break;
-        // Up is what hands the arrow keys over. Once the OSD has them, every
-        // arrow belongs to the spatial system and this handler must not touch
-        // them — `preventDefault` cannot stop the other listener, so acting on
-        // one here would seek *and* move the focus ring on the same press.
+        // Up or Down brings up the controls with the ring on them, as on any
+        // streaming app. Once the OSD has the arrows, every one belongs to the
+        // spatial system and this handler must not touch them —
+        // `preventDefault` cannot stop the other listener, so acting on one
+        // here would seek *and* move the focus ring on the same press.
         case 'ArrowUp':
+        case 'ArrowDown':
           if (!osdFocus) {
             e.preventDefault();
             enterOsdFocus();
           }
           break;
-        case 'ArrowDown':
-          if (!osdFocus) showOsd();
-          break;
+        // Seek, faster the longer it is held — see scrub.ts.
         case 'ArrowLeft':
-          if (osdFocus) break;
-          e.preventDefault();
-          void seekRelative(-10);
-          break;
         case 'ArrowRight':
           if (osdFocus) break;
           e.preventDefault();
-          void seekRelative(10);
+          scrubBy(e.key === 'ArrowLeft' ? -1 : 1, e.repeat);
           break;
         // Episode stepping. `n`/`p` for a keyboard; the media-key names are
         // what the transport buttons on a TV remote actually send, and a remote
@@ -1309,19 +1353,18 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         // — including the Skip and Up next buttons, which are focusable too.
         // Acting here as well would fire both handlers on one press.
         //
-        // In seek mode it takes whichever prompt is showing, and otherwise just
-        // reveals the OSD: rebinding it to play/pause would change a behaviour
-        // nobody asked to change.
+        // Otherwise it takes whichever prompt is showing, and with none it
+        // pauses and resumes, which is what OK does on every streaming app.
+        // It used to only reveal the controls, so pausing took Up, OK, Back.
         case 'Enter':
           if (osdFocus) break;
+          e.preventDefault();
           if (skipPrompt) {
-            e.preventDefault();
             void performSkip();
           } else if (upNext) {
-            e.preventDefault();
             setCountdown(0);
           } else {
-            showOsd();
+            void togglePause();
           }
           break;
         default:
@@ -1349,7 +1392,50 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     showStats,
     closeTracks,
     closeStats,
+    scrubBy,
   ]);
+
+  /**
+   * Letting go of Left/Right is what sends the seek. Only in watching mode:
+   * on the controls, the seek bar's own release handler does it.
+   */
+  useEffect(() => {
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (!osdFocus && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) commitScrub();
+    };
+    window.addEventListener('keyup', onKeyUp);
+    return () => window.removeEventListener('keyup', onKeyUp);
+  }, [osdFocus, commitScrub]);
+
+  /**
+   * The controls step back out of the way on their own, as they do on any
+   * streaming app — the ring used to stay on them until Back was pressed,
+   * with the arrows still moving it instead of seeking. Not while paused, and
+   * not while a panel or the Up next card is open: those are waiting for you.
+   */
+  const idleLeave = !paused && !showTracks && !showStats && upNext === null;
+  useEffect(() => {
+    if (!osdFocus || !idleLeave) return;
+    let timer = window.setTimeout(leaveOsdFocus, OSD_FOCUS_IDLE_MS);
+    const onKey = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(leaveOsdFocus, OSD_FOCUS_IDLE_MS);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('keydown', onKey, true);
+    };
+  }, [osdFocus, idleLeave, leaveOsdFocus]);
+
+  /**
+   * Paused, the controls stay up — the position and the way back to playing
+   * are what you want to see. Playing again, they start timing out.
+   */
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    showOsd();
+  }, [paused, showOsd]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -1494,24 +1580,36 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       <div className="player-controls">
         <div className="player-seek-row">
           <span className="player-time">{formatTime(timePos)}</span>
-          <input
-            className="player-seek"
-            type="range"
-            min={0}
-            max={100}
-            step={0.05}
-            value={progress}
-            onMouseDown={() => dispatch({ type: 'scrub-start' })}
-            onChange={(e) => {
-              const pct = Number(e.target.value);
-              if (duration) dispatch({ type: 'scrub', timePos: (pct / 100) * duration });
-            }}
-            onMouseUp={(e) => {
-              dispatch({ type: 'scrub-end' });
-              const pct = Number((e.target as HTMLInputElement).value);
-              if (duration) void command('seek', [(pct / 100) * duration, 'absolute']);
-            }}
-          />
+          <SeekBar
+            progress={progress}
+            onScrub={scrubBy}
+            onRelease={commitScrub}
+            onEnter={() => void togglePause()}
+          >
+            <input
+              className="player-seek"
+              type="range"
+              min={0}
+              max={100}
+              step={0.05}
+              value={progress}
+              tabIndex={-1}
+              onMouseDown={() => dispatch({ type: 'scrub-start' })}
+              onChange={(e) => {
+                const pct = Number(e.target.value);
+                if (duration) dispatch({ type: 'scrub', timePos: (pct / 100) * duration });
+              }}
+              onMouseUp={(e) => {
+                dispatch({ type: 'scrub-end' });
+                const input = e.target as HTMLInputElement;
+                const pct = Number(input.value);
+                if (duration) void command('seek', [(pct / 100) * duration, 'absolute']);
+                // Keep the browser's own arrow-key handling off the slider, or
+                // the next Left would move it *and* seek.
+                input.blur();
+              }}
+            />
+          </SeekBar>
           <span className="player-time">{formatTime(duration)}</span>
         </div>
 
@@ -1582,5 +1680,55 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       </div>
     </div>
     </FocusContext.Provider>
+  );
+}
+
+/**
+ * The seek bar, as something a remote can land on.
+ *
+ * It was a bare range input — absent from the focus tree, so a remote could
+ * only ever move in ten-second steps. On the bar, Left/Right steer the same
+ * accelerating seek as in watching mode, through the spatial library's own
+ * arrow callbacks: returning `false` keeps the press from also moving the
+ * ring, so exactly one handler acts on it. Up and Down still leave the bar.
+ */
+function SeekBar({
+  progress,
+  onScrub,
+  onRelease,
+  onEnter,
+  children,
+}: {
+  progress: number;
+  onScrub: (dir: 1 | -1, repeat: boolean) => void;
+  onRelease: () => void;
+  onEnter: () => void;
+  children: ReactNode;
+}) {
+  const { ref, focused } = useFocusable<object, HTMLDivElement>({
+    focusKey: PLAYER_SEEK_KEY,
+    onEnterPress: onEnter,
+    onArrowPress: (direction, _props, details) => {
+      if (direction !== 'left' && direction !== 'right') return true;
+      onScrub(direction === 'left' ? -1 : 1, (details.pressedKeys[direction] ?? 1) > 1);
+      return false;
+    },
+    onArrowRelease: (direction) => {
+      if (direction === 'left' || direction === 'right') onRelease();
+    },
+  });
+
+  return (
+    <div
+      ref={ref}
+      className={`player-seek-wrap ${focused ? 'focused' : ''}`}
+      role="slider"
+      aria-label="Position"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(progress)}
+    >
+      {children}
+    </div>
   );
 }

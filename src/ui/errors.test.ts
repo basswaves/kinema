@@ -45,7 +45,9 @@ describe('endsAtLabel', () => {
   it('adds what is left to the clock', () => {
     const now = new Date(2026, 8, 28, 21, 0, 0).getTime();
     const label = endsAtLabel(600, 600 + 100 * 60, now);
-    expect(label).toMatch(/22.40/);
+    // In the viewer's own clock format, so either "22:40" or "10:40 PM" —
+    // GitHub's runners are set to US English, this PC to 24 hours.
+    expect(label).toMatch(/^(22|10).40/);
   });
 
   it('says nothing until the length is known', () => {

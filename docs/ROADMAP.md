@@ -269,7 +269,7 @@ linearly at the end. Each step is verified before the next.
 8. **Detail page.** Opens on the season Play will start; Specials last. Quiet
    per-row tick instead of a bright button on every row, plus Mark season
    watched / unwatched. The YouTube trailer button stays, labelled as opening
-   the web browser.
+   the web browser. **Done** (mock).
 9. **Home.** Watched tick and progress bar on posters, unwatched-count on
    shows. The hero changes daily among things not finished, never the item
    already first in Continue watching; genre rows only once they add something.

@@ -164,6 +164,8 @@ interface FixtureFile {
 
 const SERIES_ID = 1;
 const FILM_ID = 2;
+/** A second show with two seasons and a special the library lacks. */
+const SAGA_ID = 3;
 
 const titles: Title[] = [
   {
@@ -207,6 +209,27 @@ const titles: Title[] = [
     rating: 8.1,
     file_count: 1,
     added_at: 1,
+  },
+  {
+    id: SAGA_ID,
+    kind: 'series',
+    provider: 'tmdb',
+    title: 'Example Saga',
+    year: 2019,
+    overview: 'A fixture series across two seasons, for the season list.',
+    genres: JSON.stringify(['Drama']),
+    runtime_mins: 50,
+    poster_url: null,
+    backdrop_url: null,
+    poster_path: null,
+    backdrop_path: null,
+    logo_url: null,
+    logo_path: null,
+    trailer_key: null,
+    trailer_site: null,
+    rating: 8.4,
+    file_count: 4,
+    added_at: 0,
   },
 ];
 
@@ -278,7 +301,24 @@ const files: FixtureFile[] = [
     duration: 6000,
     markers: null,
   },
+  ...[
+    [1, 1],
+    [1, 2],
+    [2, 1],
+    [2, 2],
+  ].map(([season, episode], i) => ({
+    id: 301 + i,
+    titleId: SAGA_ID,
+    path: `C:\\fixture\\Example Saga\\Season ${season}\\Example.Saga.S0${season}E0${episode}.mkv`,
+    season,
+    episode,
+    duration: 3000,
+    markers: null,
+  })),
 ];
+
+/** Episodes the provider lists that the library does not hold. */
+const MISSING = [{ titleId: SAGA_ID, season: 0, episode: 1, name: 'Behind the scenes' }];
 
 const playback = new Map<number, { position: number; duration: number | null; completed: boolean; updated: number }>();
 const prefs = new Map<number, TitlePrefs>();
@@ -400,6 +440,24 @@ function titleDetail(titleId: number): TitleDetail {
     position_secs: playback.get(f.id)?.position ?? null,
     duration_secs: playback.get(f.id)?.duration ?? null,
   }));
+  for (const gap of MISSING.filter((m) => m.titleId === titleId)) {
+    episodes.push({
+      id: 9000 + gap.season * 100 + gap.episode,
+      season: gap.season,
+      episode: gap.episode,
+      name: gap.name,
+      overview: 'Listed by the provider, not in the library.',
+      air_date: null,
+      runtime_mins: 20,
+      still_url: null,
+      still_path: null,
+      file_path: null,
+      file_id: null,
+      watched: false,
+      position_secs: null,
+      duration_secs: null,
+    });
+  }
   const movie = title.kind === 'movie' ? files.find((f) => f.titleId === titleId) : undefined;
   return {
     title,

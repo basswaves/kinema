@@ -7,7 +7,7 @@
  */
 import { userError } from './errors';
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import Art from './Art';
 import FocusButton from './FocusButton';
@@ -189,8 +189,27 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
 
   const seasons = useMemo(() => {
     if (!detail) return [];
-    return [...new Set(detail.episodes.map((e) => e.season))].sort((a, b) => a - b);
+    // Specials (season 0) last: they are extras, and first in the row they
+    // were the first thing a remote landed on.
+    return [...new Set(detail.episodes.map((e) => e.season))].sort(
+      (a, b) => Number(a === 0) - Number(b === 0) || a - b
+    );
   }, [detail]);
+
+  /**
+   * Open on the season Play would continue in. The list used to open on the
+   * first season whatever you were watching, so Play said S04E05 above a list
+   * of season one. Only on arrival: marking a season watched moves the next
+   * episode on, and the list must not jump to another season under the
+   * remote because of it — nor after a season tab has been pressed.
+   */
+  const seasonPicked = useRef(false);
+  const nextUpSeason = nextUp?.season ?? null;
+  useEffect(() => {
+    if (nextUpSeason === null || seasonPicked.current) return;
+    seasonPicked.current = true;
+    setSeason(nextUpSeason);
+  }, [nextUpSeason]);
 
   const visibleEpisodes = useMemo(
     () => detail?.episodes.filter((e) => e.season === season) ?? [],
@@ -236,6 +255,25 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
     },
     [title.id]
   );
+
+  /**
+   * Mark every episode of the season on screen, one way or the other. A
+   * season caught up on elsewhere used to take a press per episode.
+   */
+  const ownedInSeason = visibleEpisodes.filter((e) => e.file_path && e.file_id !== null);
+  const seasonWatched = ownedInSeason.length > 0 && ownedInSeason.every((e) => e.watched);
+  const markSeason = useCallback(async () => {
+    try {
+      for (const episode of ownedInSeason) {
+        if (episode.watched !== !seasonWatched) {
+          await setWatched(episode.file_id as number, !seasonWatched);
+        }
+      }
+      setDetail(await getTitleDetail(title.id));
+    } catch (e) {
+      setError(userError(e));
+    }
+  }, [ownedInSeason, seasonWatched, title.id]);
 
   const ownedCount = detail?.episodes.filter((e) => e.file_path).length ?? 0;
   const watchedCount = detail?.episodes.filter((e) => e.file_path && e.watched).length ?? 0;
@@ -368,7 +406,7 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
                       ).catch((e) => setError(userError(e)))
                     }
                   >
-                    Trailer on YouTube ↗
+                    Trailer · opens in your browser ↗
                   </FocusButton>
                 )}
               </div>
@@ -409,6 +447,7 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
 
           {seasons.length > 0 && (
             <>
+              <div className="season-bar">
               {seasons.length > 1 && (
                 <div className="season-tabs">
                   {seasons.map((s) => (
@@ -416,13 +455,26 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
                       key={s}
                       className={season === s ? 'active' : ''}
                       keepInView="nearest"
-                      onSelect={() => setSeason(s)}
+                      onSelect={() => {
+                        seasonPicked.current = true;
+                        setSeason(s);
+                      }}
                     >
                       {s === 0 ? 'Specials' : `Season ${s}`}
                     </FocusButton>
                   ))}
                 </div>
               )}
+              {ownedInSeason.length > 1 && (
+                <FocusButton
+                  className="season-watched"
+                  keepInView="nearest"
+                  onSelect={() => void markSeason()}
+                >
+                  {seasonWatched ? 'Mark season as not watched' : '✓ Mark season watched'}
+                </FocusButton>
+              )}
+              </div>
 
               <div className="episode-list">
                 {visibleEpisodes.map((episode) => (
@@ -503,12 +555,20 @@ function PlayableEpisodeRow({ episode, onPlay, onToggleWatched, focusKey }: Epis
         }`}
       >
         <EpisodePlayArea episode={episode} onPlay={onPlay} />
+        {/* A tick that stays out of the way until its row has the ring or
+            the pointer — ten identical bright buttons down a season competed
+            with the episodes themselves. The word appears with the ring. */}
         <FocusButton
           className={`watched-toggle ${episode.watched ? 'on' : ''}`}
           keepInView="nearest"
+          label={episode.watched ? 'Watched — press to mark as not watched' : 'Mark watched'}
+          title={episode.watched ? 'Watched — press to mark as not watched' : 'Mark watched'}
           onSelect={onToggleWatched}
         >
-          {episode.watched ? '✓ Watched' : 'Mark watched'}
+          <span className="watched-tick" aria-hidden="true">
+            ✓
+          </span>
+          <span className="watched-text">{episode.watched ? 'Watched' : 'Mark watched'}</span>
         </FocusButton>
       </div>
     </FocusContext.Provider>

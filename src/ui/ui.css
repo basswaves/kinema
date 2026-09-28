@@ -849,33 +849,102 @@ html {
   opacity: 0.72;
 }
 
-/* A state-showing button rather than a checkbox: a checkbox is a poor target
-   for a remote, and its state is much harder to read from across a room. */
+/* A tick at the end of the row, quiet until the row has the ring or the
+   pointer: then it grows its word and a pill to press. Watched episodes keep
+   a solid tick, so the state reads from across the room either way. A
+   button rather than a checkbox: a checkbox is a poor target for a remote. */
 .watched-toggle {
   flex: 0 0 auto;
-  padding: 0.4375rem 0.75rem;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4375rem;
+  min-width: 2.25rem;
+  height: 2.25rem;
+  padding: 0 0.5rem;
+  border: 1px solid transparent;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.05);
-  color: #fff;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.4);
   font-size: 0.75rem;
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
-  transition: background 120ms ease;
+  transition: background 120ms ease, color 120ms ease;
 }
 
-.watched-toggle:hover {
-  background: rgba(255, 255, 255, 0.14);
+.watched-tick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  font-size: 0.6875rem;
+}
+
+.watched-text {
+  display: none;
 }
 
 .watched-toggle.on {
-  background: rgba(255, 255, 255, 0.9);
-  border-color: transparent;
+  color: #fff;
+}
+
+.watched-toggle.on .watched-tick {
+  border-color: #fff;
+  background: #fff;
   color: #0a0a0c;
 }
 
+.episode-row.row-active .watched-toggle,
+.episode-row:hover .watched-toggle {
+  padding: 0 0.75rem 0 0.5rem;
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.episode-row.row-active .watched-text,
+.episode-row:hover .watched-text {
+  display: inline;
+}
+
 .watched-toggle.focused {
+  background: rgba(255, 255, 255, 0.16);
+  outline: var(--focus-ring) solid #fff;
+  outline-offset: 2px;
+}
+
+/* Season tabs and the whole-season watched button share one line. */
+.season-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.season-bar .season-tabs {
+  margin-bottom: 0;
+}
+
+.season-watched {
+  margin-left: auto;
+  padding: 0.4375rem 0.875rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(245, 245, 247, 0.85);
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.season-watched:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.season-watched.focused {
   outline: var(--focus-ring) solid #fff;
   outline-offset: 2px;
 }

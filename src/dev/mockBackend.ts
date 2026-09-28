@@ -569,6 +569,8 @@ const EMPTY = flag('kinemaMockEmpty') === '1';
 const SLOW_DETECT = flag('kinemaMockSlowDetect') === '1';
 /** `kinemaMockReview` pretends that many videos wait in the review queue. */
 const REVIEW_COUNT = Number(flag('kinemaMockReview') ?? 0) || 0;
+/** `kinemaMockUpdate` pretends that version is out on GitHub. */
+const UPDATE = flag('kinemaMockUpdate');
 
 const later = <T,>(value: T): Promise<T> =>
   new Promise((resolve) => window.setTimeout(() => resolve(value), SLOW_MS));
@@ -631,6 +633,8 @@ const handlers: Record<string, Handler> = {
   list_unmatched: () => [],
   list_needs_review: () => [],
   count_needs_review: () => REVIEW_COUNT,
+  latest_release: () =>
+    UPDATE ? { version: UPDATE, url: 'https://github.com/Basswaves/kinema/releases' } : null,
   list_titles_needing_detail: () => [],
   cache_artwork: () => ({ stored: 0, failed: 0 }),
   artwork_stats: () => ({ files: 0, bytes: 0, failed: 0 }),

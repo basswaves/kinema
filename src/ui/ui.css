@@ -137,6 +137,29 @@ html {
   vertical-align: 0.0625rem;
 }
 
+/* A newer Kinema is out: less urgent than a count, so a dot. */
+.nav-dot {
+  display: inline-block;
+  width: 0.4375rem;
+  height: 0.4375rem;
+  margin-left: 0.375rem;
+  border-radius: 50%;
+  background: #e50914;
+  vertical-align: 0.125rem;
+}
+
+.settings-update {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin: 0.25rem 0 1.25rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid rgba(229, 9, 20, 0.5);
+  border-radius: 0.75rem;
+  background: rgba(229, 9, 20, 0.08);
+}
+
 /* ---- notices on Home (HomeNotices) -------------------------------------- */
 .home-notices {
   display: flex;

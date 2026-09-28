@@ -40,6 +40,7 @@ import {
 import { cacheArtwork, getSetting, setSetting } from '../metadata/api';
 import { countNeedsReview } from '../metadata/api';
 import { applyUpgrades, dismissUpgrades, readUpgrades, type Upgrade } from './qualityNotice';
+import { availableUpdate } from './updates';
 import { runScanPipeline, useScanStatus } from '../library/pipeline';
 import { getTitleDetail, listTitles, type Title } from './api';
 import { searchTitles, type SearchHit } from './search';
@@ -165,6 +166,20 @@ export default function Browse() {
   const [reviewCount, setReviewCount] = useState(0);
   /** What the equipment could do that is switched off — see qualityNotice.ts. */
   const [upgrades, setUpgrades] = useState<Upgrade[]>([]);
+  /** A newer Kinema, for the dot on Settings. */
+  const [hasUpdate, setHasUpdate] = useState(false);
+
+  // Once per launch, and never under a self-test, which must not touch the
+  // network for anything it was not asked to.
+  useEffect(() => {
+    let live = true;
+    void selfTestPlan()
+      .then((plan) => (plan ? null : availableUpdate()))
+      .then((release) => live && setHasUpdate(release !== null));
+    return () => {
+      live = false;
+    };
+  }, []);
 
   /**
    * Every Play from the browsing views comes through here. It used to hold
@@ -496,6 +511,7 @@ export default function Browse() {
             view.name === 'grid' && view.kind ? (view.kind === 'movie' ? 'movies' : 'tv') : view.name
           }
           reviewCount={reviewCount}
+          hasUpdate={hasUpdate}
           onNavigate={(target) => {
             const next: View =
               target === 'movies'
@@ -612,10 +628,12 @@ export default function Browse() {
 function TopNav({
   active,
   reviewCount,
+  hasUpdate,
   onNavigate,
 }: {
   active: string;
   reviewCount: number;
+  hasUpdate: boolean;
   onNavigate: (target: NavTarget) => void;
 }) {
   const { ref, focusKey } = useFocusable({
@@ -645,6 +663,9 @@ function TopNav({
               <span className="nav-badge" aria-label={`${reviewCount} to review`}>
                 {reviewCount}
               </span>
+            )}
+            {name === 'settings' && reviewCount === 0 && hasUpdate && (
+              <span className="nav-dot" aria-label="A new version is available" />
             )}
           </FocusButton>
         ))}

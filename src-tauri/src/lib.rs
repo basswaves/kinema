@@ -20,6 +20,7 @@ mod settings;
 mod skip;
 mod skiptro;
 mod trailer;
+mod updates;
 mod util;
 
 use library::{Db, ScanDb};
@@ -160,6 +161,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            updates::latest_release,
             library::add_library_root,
             library::remove_library_root,
             library::list_library_roots,

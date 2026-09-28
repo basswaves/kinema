@@ -18,6 +18,7 @@ import { userError } from './errors';
 import LanguageSection from './LanguageSection';
 import ChoiceRow from './ChoiceRow';
 import MoreAbout from './MoreAbout';
+import { availableUpdate, UPDATE_CHECK_KEY, type Release } from './updates';
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { listen } from '@tauri-apps/api/event';
@@ -239,6 +240,18 @@ export default function Settings({ openSection }: { openSection?: 'review' }) {
 
   const tvMode = useTvMode();
   const scan = useScanStatus();
+
+  /** A newer release, if one is out; and whether looking for one is on. */
+  const [update, setUpdate] = useState<Release | null>(null);
+  const [checkUpdates, setCheckUpdates] = useState(true);
+  useEffect(() => {
+    let live = true;
+    void availableUpdate().then((r) => live && setUpdate(r));
+    void getSetting(UPDATE_CHECK_KEY).then((v) => live && setCheckUpdates(v !== 'off'));
+    return () => {
+      live = false;
+    };
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
@@ -500,7 +513,12 @@ export default function Settings({ openSection }: { openSection?: 'review' }) {
           {/* The sections, as a list down the side. OK opens one; Right goes
               into it and Left comes back. One section at a time, where there
               used to be one page of eight sections and two thousand words. */}
-          <SectionList section={section} reviewCount={needsReview} onChoose={chooseSection} />
+          <SectionList
+            section={section}
+            reviewCount={needsReview}
+            hasUpdate={update !== null}
+            onChoose={chooseSection}
+          />
 
           <div className="settings-content">
             {section === 'library' && (
@@ -1065,6 +1083,37 @@ export default function Settings({ openSection }: { openSection?: 'review' }) {
             {section === 'advanced' && (
               <>
                 <section className="settings-section">
+                  <h2>Updates</h2>
+                  {update && (
+                    <div className="settings-update">
+                      <strong>Kinema {update.version} is available.</strong>
+                      <FocusButton
+                        keepInView="nearest"
+                        className="btn-primary"
+                        onSelect={() =>
+                          void openUrl(update.url).catch((e) => setError(userError(e)))
+                        }
+                      >
+                        Open the download page ↗
+                      </FocusButton>
+                    </div>
+                  )}
+                  <ChoiceRow
+                    label="Look for new versions"
+                    choices={[
+                      { value: 'on', label: 'On' },
+                      { value: 'off', label: 'Off' },
+                    ]}
+                    value={checkUpdates ? 'on' : 'off'}
+                    onChange={(v) => {
+                      setCheckUpdates(v === 'on');
+                      void setSetting(UPDATE_CHECK_KEY, v).catch((e) => setError(userError(e)));
+                    }}
+                    note="Asks GitHub for the latest version number when Kinema starts. Downloads nothing."
+                  />
+                </section>
+
+                <section className="settings-section">
                   <h2>Storage</h2>
                   <p className="muted">
                     Artwork kept on this PC so browsing works offline:{' '}
@@ -1174,10 +1223,12 @@ export default function Settings({ openSection }: { openSection?: 'review' }) {
 function SectionList({
   section,
   reviewCount,
+  hasUpdate,
   onChoose,
 }: {
   section: SectionId;
   reviewCount: number;
+  hasUpdate: boolean;
   onChoose: (id: SectionId) => void;
 }) {
   const { ref, focusKey } = useFocusable({
@@ -1200,6 +1251,7 @@ function SectionList({
           >
             {label}
             {id === 'library' && reviewCount > 0 && <span className="nav-badge">{reviewCount}</span>}
+            {id === 'advanced' && hasUpdate && <span className="nav-dot" />}
           </FocusButton>
         ))}
       </nav>

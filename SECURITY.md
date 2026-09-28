@@ -7,9 +7,12 @@ Worth stating up front, because it is unusually small:
 - **No server, no daemon, no network listener.** Nothing accepts a connection.
 - **No accounts, no telemetry, no analytics.** Nothing is sent anywhere about
   what you watch.
-- **Outbound requests only, to four services**, and only for metadata: TMDB,
-  TVmaze, OMDb and TheIntroDB. The list is enforced in
-  `src-tauri/capabilities/default.json` for the frontend HTTP plugin.
+- **Outbound requests only, to four services for metadata** — TMDB, TVmaze,
+  OMDb and TheIntroDB — **and one to GitHub** per launch, asking for the latest
+  release's version number (`src-tauri/src/updates.rs`; Settings → Advanced
+  turns it off). Nothing is downloaded. The frontend's list is enforced in
+  `src-tauri/capabilities/default.json` for the HTTP plugin; the two made from
+  Rust are TheIntroDB and GitHub.
 - **Your API keys stay local.** TMDB and OMDb keys are entered by you, stored in
   the SQLite database in your app data folder, and sent only to the service they
   belong to. None are bundled and none are committed.

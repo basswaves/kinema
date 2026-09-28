@@ -287,7 +287,7 @@ linearly at the end. Each step is verified before the next.
     explanations with the rest behind "More about this". **Done** (mock).
 14. **New version notice.** Once per start, ask GitHub for the latest release
     number; if newer, a line in Settings and a dot on Settings. Downloads
-    nothing, fails silent, can be switched off.
+    nothing, fails silent, can be switched off. **Done** (mock; the GitHub answer checked by hand).
 15. **Docs.** A built-in TMDB key goes to the top of "Worth doing"; the first-run
     picture-and-sound setup stays there; decisions to PLAN.
 16. **README for launch.** Stays unsigned, with a clearer SmartScreen section;

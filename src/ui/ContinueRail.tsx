@@ -124,7 +124,8 @@ function ContinueCardBody({
       ? `S${String(item.season).padStart(2, '0')}E${String(item.episode).padStart(2, '0')}${
           item.episode_name ? ` · ${item.episode_name}` : ''
         }`
-      : (remainingLabel(item) ?? '');
+      : // A film has no episode line; its time left is the line below, once.
+        '';
 
   return (
     <div

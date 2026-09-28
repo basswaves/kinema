@@ -167,7 +167,10 @@ const FILM_ID = 2;
 /** A second show with two seasons and a special the library lacks. */
 const SAGA_ID = 3;
 
-const titles: Title[] = [
+/** A title as stored; what watching has done to it is worked out per read. */
+type StoredTitle = Omit<Title, 'episodes_owned' | 'episodes_watched' | 'watched' | 'progress'>;
+
+const titles: StoredTitle[] = [
   {
     id: SERIES_ID,
     kind: 'series',
@@ -329,6 +332,34 @@ let clock = 1000;
 const fileById = (id: number) => files.find((f) => f.id === id) ?? null;
 const titleById = (id: number) => titles.find((t) => t.id === id) ?? null;
 
+/** Same rules as TITLE_SELECT in metadata.rs. */
+function withWatchState(title: StoredTitle): Title {
+  const own = files.filter((f) => f.titleId === title.id);
+  const done = own.filter((f) => playback.get(f.id)?.completed);
+  if (title.kind === 'series') {
+    const owned = own.filter((f) => f.season !== null).length;
+    const watchedEps = done.filter((f) => f.season !== null).length;
+    return {
+      ...title,
+      episodes_owned: owned,
+      episodes_watched: watchedEps,
+      watched: owned > 0 && watchedEps >= owned,
+      progress: null,
+    };
+  }
+  const started = own
+    .map((f) => playback.get(f.id))
+    .filter((row) => row && !row.completed && row.duration)
+    .sort((a, b) => b!.updated - a!.updated)[0];
+  return {
+    ...title,
+    episodes_owned: 0,
+    episodes_watched: 0,
+    watched: done.length > 0,
+    progress: started ? started.position / (started.duration as number) : null,
+  };
+}
+
 function episodeRef(file: FixtureFile): EpisodeRef {
   return {
     file_id: file.id,
@@ -460,7 +491,7 @@ function titleDetail(titleId: number): TitleDetail {
   }
   const movie = title.kind === 'movie' ? files.find((f) => f.titleId === titleId) : undefined;
   return {
-    title,
+    title: withWatchState(title),
     episodes,
     cast: [],
     movie_path: movie?.path ?? null,
@@ -588,7 +619,7 @@ const handlers: Record<string, Handler> = {
   list_media_files: () => [],
 
   // metadata
-  list_titles: () => later(EMPTY ? [] : titles),
+  list_titles: () => later(EMPTY ? [] : titles.map(withWatchState)),
   get_title_detail: (a) => titleDetail(num(a, 'titleId')),
   list_unmatched: () => [],
   list_needs_review: () => [],

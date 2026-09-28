@@ -83,6 +83,14 @@ pub struct Title {
     pub file_count: i64,
     /// When this title's first file appeared, for the "recently added" rail.
     pub added_at: Option<i64>,
+    /// Episodes held, counted once however many copies there are.
+    pub episodes_owned: i64,
+    /// Of those, the ones watched to the end.
+    pub episodes_watched: i64,
+    /// A film watched to the end, or a series with every held episode watched.
+    pub watched: bool,
+    /// How far into a film that was started and not finished, 0–1.
+    pub progress: Option<f64>,
 }
 
 #[derive(Serialize)]
@@ -258,7 +266,25 @@ const TITLE_SELECT: &str = "
            t.trailer_key, t.trailer_site,
            t.logo_url,
            (SELECT :art || a.local_path FROM artwork_cache a
-             WHERE a.url = t.logo_url     AND a.local_path <> '')
+             WHERE a.url = t.logo_url     AND a.local_path <> ''),
+           -- What the posters show about watching. Episodes are counted by
+           -- season and number, so a second copy of one does not count twice.
+           (SELECT COUNT(DISTINCT m.parsed_season || 'x' || m.parsed_episode)
+              FROM media_files m
+             WHERE m.title_id = t.id AND m.missing = 0
+               AND m.parsed_season IS NOT NULL AND m.parsed_episode IS NOT NULL),
+           (SELECT COUNT(DISTINCT m.parsed_season || 'x' || m.parsed_episode)
+              FROM media_files m JOIN playback_state p ON p.file_id = m.id
+             WHERE m.title_id = t.id AND m.missing = 0 AND p.completed = 1
+               AND m.parsed_season IS NOT NULL AND m.parsed_episode IS NOT NULL),
+           (SELECT COALESCE(MAX(p.completed), 0)
+              FROM media_files m JOIN playback_state p ON p.file_id = m.id
+             WHERE m.title_id = t.id AND m.missing = 0),
+           (SELECT p.position_secs / p.duration_secs
+              FROM media_files m JOIN playback_state p ON p.file_id = m.id
+             WHERE m.title_id = t.id AND m.missing = 0 AND p.completed = 0
+               AND p.duration_secs > 0
+             ORDER BY p.updated_at DESC LIMIT 1)
       FROM titles t";
 
 fn map_title(r: &rusqlite::Row) -> rusqlite::Result<Title> {
@@ -282,6 +308,19 @@ fn map_title(r: &rusqlite::Row) -> rusqlite::Result<Title> {
         trailer_site: r.get(16)?,
         logo_url: r.get(17)?,
         logo_path: r.get(18)?,
+        episodes_owned: r.get(19)?,
+        episodes_watched: r.get(20)?,
+        watched: {
+            let kind: String = r.get(1)?;
+            let owned: i64 = r.get(19)?;
+            let watched_eps: i64 = r.get(20)?;
+            if kind == "series" {
+                owned > 0 && watched_eps >= owned
+            } else {
+                r.get::<_, i64>(21)? != 0
+            }
+        },
+        progress: r.get(22)?,
     })
 }
 
@@ -575,8 +614,63 @@ pub fn list_unmatched(
 
 #[cfg(test)]
 mod tests {
-    use super::episodes_for;
-    use rusqlite::params;
+    use super::{episodes_for, map_title, Title, TITLE_SELECT};
+    use rusqlite::{named_params, params};
+
+    fn title(conn: &rusqlite::Connection, id: i64) -> Title {
+        conn.query_row(
+            &format!("{TITLE_SELECT} WHERE t.id = :id"),
+            named_params! { ":art": "", ":id": id },
+            map_title,
+        )
+        .unwrap()
+    }
+
+    /// What a poster says: episodes counted once however many copies, and a
+    /// series watched only when every held episode is.
+    #[test]
+    fn a_series_counts_episodes_not_files() {
+        let conn = library("poster-series");
+        let show = title(&conn, 1);
+        // E01 (two copies), E02, E04.
+        assert_eq!(show.episodes_owned, 3);
+        assert_eq!(show.episodes_watched, 1);
+        assert!(!show.watched);
+
+        conn.execute_batch(
+            "INSERT INTO playback_state (file_id, position_secs, duration_secs, completed, updated_at)
+             VALUES (103, 1400, 1450, 1, 60), (104, 1400, 1450, 1, 70);",
+        )
+        .unwrap();
+        let show = title(&conn, 1);
+        assert_eq!(show.episodes_watched, 3);
+        assert!(show.watched);
+    }
+
+    #[test]
+    fn a_film_part_way_through_reports_how_far() {
+        let conn = library("poster-film");
+        conn.execute_batch(
+            "INSERT INTO titles (id, kind, provider, provider_id, title, fetched_at)
+                  VALUES (2, 'movie', 'tmdb', '2', 'Film', 0);
+             INSERT INTO media_files (id, root_id, path, parent_dir, file_name, extension,
+                  size_bytes, modified_at, first_seen_at, last_seen_at, match_status, title_id)
+                  VALUES (201, 1, 'C:/tv/film.mkv', 'C:/tv', 'film.mkv', 'mkv', 1, 0, 0, 0,
+                          'matched', 2);
+             INSERT INTO playback_state (file_id, position_secs, duration_secs, completed, updated_at)
+                  VALUES (201, 3000, 6000, 0, 80);",
+        )
+        .unwrap();
+        let film = title(&conn, 2);
+        assert!(!film.watched);
+        assert_eq!(film.progress, Some(0.5));
+
+        conn.execute("UPDATE playback_state SET completed = 1 WHERE file_id = 201", [])
+            .unwrap();
+        let film = title(&conn, 2);
+        assert!(film.watched);
+        assert_eq!(film.progress, None, "a finished film has no bar");
+    }
 
     /// A real library: one series, three provider episodes, and files that
     /// cover every case the detail list has to get right.

@@ -27,6 +27,13 @@ export interface Title {
   rating: number | null;
   file_count: number;
   added_at: number | null;
+  /** Episodes held, counted once however many copies. */
+  episodes_owned: number;
+  episodes_watched: number;
+  /** A film watched to the end, or a series with every held episode watched. */
+  watched: boolean;
+  /** 0–1, for a film started and not finished. */
+  progress: number | null;
 }
 
 export interface Episode {

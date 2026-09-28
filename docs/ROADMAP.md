@@ -272,7 +272,7 @@ linearly at the end. Each step is verified before the next.
    the web browser. **Done** (mock).
 9. **Home.** Watched tick and progress bar on posters, unwatched-count on
    shows. The hero changes daily among things not finished, never the item
-   already first in Continue watching; genre rows only once they add something.
+   already first in Continue watching; genre rows only once they add something. **Done** (mock).
 10. **Home notices.** "N movies need your help — Review" (plus a badge on
     Settings) for the review queue. And the one-time direct-sound dialog before
     Play goes: in its place a dismissible notice, shown only when the connected

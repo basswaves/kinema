@@ -6,7 +6,7 @@
  * deliberate instead of full of empty shelves.
  */
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import Art from './Art';
 import Rail from './Rail';
 import ContinueRail from './ContinueRail';
@@ -15,6 +15,7 @@ import FirstRun from './FirstRun';
 import { useClaimFocus } from './focus';
 import type { ContinueItem } from '../player/api';
 import { parseGenres, type Title } from './api';
+import { pickHero } from './hero';
 
 interface Props {
   titles: Title[];
@@ -31,8 +32,14 @@ interface Props {
   onLibraryChanged: () => void;
 }
 
-/** Minimum titles before a genre earns its own rail. */
-const MIN_PER_GENRE = 2;
+/**
+ * Genre rails only where they add something. On a small library every genre
+ * rail repeated titles already on screen three times over — the same poster
+ * in Recently added, Movies and Drama — so they wait for a library big enough
+ * to browse by genre, and a genre has to hold enough to be a shelf.
+ */
+const GENRE_MIN_LIBRARY = 12;
+const MIN_PER_GENRE = 4;
 
 /**
  * Where focus starts. A remote has no way to bootstrap focus the way a mouse
@@ -54,11 +61,13 @@ export default function Home({
 }: Props) {
   const { ref, focusKey } = useFocusable({ trackChildren: true, saveLastFocusedChild: true });
 
-  const hero = useMemo(() => {
-    const withBackdrop = titles.filter((t) => t.backdrop_url);
-    const pool = withBackdrop.length > 0 ? withBackdrop : titles;
-    return [...pool].sort((a, b) => (b.added_at ?? 0) - (a.added_at ?? 0))[0] ?? null;
-  }, [titles]);
+  // The moment Home opened, fixed for its life: the hero is the day's pick,
+  // not something that changes under the remote while you browse.
+  const [openedAt] = useState(() => Date.now());
+  const hero = useMemo(
+    () => pickHero(titles, resumable[0]?.title_id ?? null, openedAt),
+    [titles, resumable, openedAt]
+  );
 
   // Not sliced here: `Rail` applies the cap, so there is one number governing
   // how long a rail gets rather than one per rail.
@@ -71,6 +80,7 @@ export default function Home({
   const movies = useMemo(() => titles.filter((t) => t.kind === 'movie'), [titles]);
 
   const genreRails = useMemo(() => {
+    if (titles.length < GENRE_MIN_LIBRARY) return [];
     const byGenre = new Map<string, Title[]>();
     for (const title of titles) {
       for (const genre of parseGenres(title.genres)) {
@@ -80,7 +90,8 @@ export default function Home({
       }
     }
     return [...byGenre.entries()]
-      .filter(([, list]) => list.length >= MIN_PER_GENRE)
+      // A genre that is the whole library is just the library again.
+      .filter(([, list]) => list.length >= MIN_PER_GENRE && list.length < titles.length)
       .sort((a, b) => b[1].length - a[1].length)
       .slice(0, 8);
   }, [titles]);
@@ -113,8 +124,14 @@ export default function Home({
           onSelect={onSelect}
           onSeeAll={onSeeAll}
         />
-        <Rail heading="TV shows" titles={series} onSelect={onSelect} onSeeAll={onSeeAll} />
-        <Rail heading="Movies" titles={movies} onSelect={onSelect} onSeeAll={onSeeAll} />
+        {/* Only when the library holds both: with one kind, either rail is
+            Recently added again in another order. */}
+        {series.length > 0 && movies.length > 0 && (
+          <>
+            <Rail heading="TV shows" titles={series} onSelect={onSelect} onSeeAll={onSeeAll} />
+            <Rail heading="Movies" titles={movies} onSelect={onSelect} onSeeAll={onSeeAll} />
+          </>
+        )}
         {genreRails.map(([genre, list]) => (
           <Rail
             key={genre}

@@ -7,6 +7,7 @@ import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-naviga
 import { useEffect, useRef } from 'react';
 import Art from './Art';
 import type { Title } from './api';
+import { posterState } from './poster';
 
 interface Props {
   title: Title;
@@ -26,6 +27,7 @@ export default function Card({ title, onSelect, focusKey: key }: Props) {
   });
 
   const element = useRef<HTMLDivElement | null>(null);
+  const state = posterState(title);
 
   // Keep the focused card on screen when navigating by remote.
   useEffect(() => {
@@ -53,8 +55,16 @@ export default function Card({ title, onSelect, focusKey: key }: Props) {
             lazy
             fallback={<div className="card-art-empty">{title.title}</div>}
           />
-          {title.file_count > 0 && title.kind === 'series' && (
-            <span className="card-badge">{title.file_count} ep</span>
+          {state.badge && <span className="card-badge">{state.badge}</span>}
+          {state.watched && (
+            <span className="card-watched" aria-label="Watched">
+              ✓
+            </span>
+          )}
+          {state.progress !== null && (
+            <span className="card-progress" aria-hidden="true">
+              <span style={{ width: `${state.progress * 100}%` }} />
+            </span>
           )}
         </div>
         <div className="card-title">{title.title}</div>

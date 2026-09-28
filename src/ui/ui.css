@@ -430,6 +430,40 @@ html {
   font-weight: 600;
 }
 
+/* Seen it: a solid tick in the corner, readable from across a room. */
+.card-watched {
+  position: absolute;
+  top: 0.375rem;
+  right: 0.375rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.375rem;
+  height: 1.375rem;
+  border-radius: 50%;
+  background: #fff;
+  color: #0a0a0c;
+  font-size: 0.75rem;
+  font-weight: 800;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
+}
+
+/* Part-way through a film: the same bar Continue watching draws. */
+.card-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 0.25rem;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.card-progress span {
+  display: block;
+  height: 100%;
+  background: #e50914;
+}
+
 .card-title {
   margin-top: 0.4375rem;
   font-size: 0.78125rem;

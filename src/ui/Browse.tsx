@@ -19,7 +19,7 @@ import Home, { HERO_PLAY_FOCUS_KEY } from './Home';
 import TitleDetailView from './TitleDetail';
 import Card from './Card';
 import FocusButton from './FocusButton';
-import Settings from './Settings';
+import Settings, { type SettingsTarget } from './Settings';
 import {
   hasPendingReturn,
   installFocusWatchdog,
@@ -40,6 +40,7 @@ import {
 import { cacheArtwork, getSetting, setSetting } from '../metadata/api';
 import { countNeedsReview } from '../metadata/api';
 import { applyUpgrades, dismissUpgrades, readUpgrades, type Upgrade } from './qualityNotice';
+import { needsOwnTmdbKey } from '../metadata/builtinKey';
 import { availableUpdate } from './updates';
 import { runScanPipeline, useScanStatus } from '../library/pipeline';
 import { getTitleDetail, listTitles, type Title } from './api';
@@ -87,8 +88,9 @@ const NAV_ITEMS: [NavTarget, string][] = [
 
 /** The three nav views carry no payload, which is exactly what makes them nav. */
 type View =
-  // `section` opens Settings on the review queue, from the notice on Home.
-  | { name: 'home' | 'search' | 'settings'; section?: 'review' }
+  // `section` opens Settings on the review queue, or on the TMDB key field,
+  // from the notices on Home.
+  | { name: 'home' | 'search' | 'settings'; section?: SettingsTarget }
   | { name: 'detail'; title: Title }
   // Ids rather than the titles themselves, so the grid keeps showing current
   // rows after a reload rather than a snapshot taken when it was opened.
@@ -166,6 +168,7 @@ export default function Browse() {
   const [reviewCount, setReviewCount] = useState(0);
   /** What the equipment could do that is switched off — see qualityNotice.ts. */
   const [upgrades, setUpgrades] = useState<Upgrade[]>([]);
+  const [keyRejected, setKeyRejected] = useState(false);
   /** A newer Kinema, for the dot on Settings. */
   const [hasUpdate, setHasUpdate] = useState(false);
 
@@ -220,6 +223,9 @@ export default function Browse() {
       void readUpgrades()
         .then(setUpgrades)
         .catch((e) => console.warn('equipment notice:', e));
+      void needsOwnTmdbKey()
+        .then(setKeyRejected)
+        .catch((e) => console.warn('TMDB key notice:', e));
     } catch (e) {
       setError(userError(e));
     } finally {
@@ -547,6 +553,8 @@ export default function Browse() {
             onLibraryChanged={() => void load()}
             reviewCount={reviewCount}
             onReview={() => openView({ name: 'settings', section: 'review' })}
+            keyRejected={keyRejected}
+            onAddKey={() => openView({ name: 'settings', section: 'tmdb-key' })}
             upgrades={upgrades}
             onApplyUpgrades={() =>
               void applyUpgrades(upgrades)

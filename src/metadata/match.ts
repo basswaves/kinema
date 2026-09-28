@@ -27,11 +27,18 @@ import {
   tmdbGetEpisodes,
   tmdbGetTitle,
   tmdbSearch,
+  TmdbKeyRejected,
   tvmazeGetEpisodes,
   tvmazeGetShow,
   tvmazeSearch,
 } from './providers';
-import { BUILTIN_TMDB_KEY, chooseTmdbKey, type TmdbKeySource } from './builtinKey';
+import {
+  BUILTIN_REJECTED_KEY,
+  BUILTIN_TMDB_KEY,
+  chooseTmdbKey,
+  usableBuiltinKey,
+  type TmdbKeySource,
+} from './builtinKey';
 import { pickBest, type Candidate, type ScoreContext } from './score';
 import { nfoForGroup, resolveNfoIds, sourceName } from './nfo';
 
@@ -143,11 +150,12 @@ export type Provider = 'tmdb' | 'tvmaze' | 'omdb';
  * input boxes, and only what was saved should be used.
  */
 export async function loadProviderKeys(): Promise<ProviderKeys> {
-  const [own, omdb] = await Promise.all([
+  const [own, omdb, rejected] = await Promise.all([
     getSetting('tmdb_api_key'),
     getSetting('omdb_api_key'),
+    getSetting(BUILTIN_REJECTED_KEY),
   ]);
-  const tmdb = chooseTmdbKey(own, BUILTIN_TMDB_KEY);
+  const tmdb = chooseTmdbKey(own, usableBuiltinKey(BUILTIN_TMDB_KEY, rejected));
   return { tmdb: tmdb?.key ?? null, tmdbSource: tmdb?.source ?? null, omdb: omdb?.trim() || null };
 }
 
@@ -405,9 +413,10 @@ async function resolveGroup(
 
 export async function matchFiles(
   files: MediaFile[],
-  keys: ProviderKeys,
+  startingKeys: ProviderKeys,
   onProgress: (progress: MatchProgress) => void
 ): Promise<MatchOutcome> {
+  let keys = startingKeys;
   const groups = groupFiles(files);
   const outcome: MatchOutcome = { matched: 0, unmatched: 0, errors: [] };
 
@@ -446,6 +455,13 @@ export async function matchFiles(
     } catch (e) {
       const message = `${group.title}: ${e instanceof Error ? e.message : String(e)}`;
       outcome.errors.push(message);
+
+      // TMDB refused the built-in key: it has been set aside (builtinKey.ts),
+      // and the rest of this run uses what works without it rather than
+      // collecting the same refusal once per title.
+      if (e instanceof TmdbKeyRejected && keys.tmdbSource === 'builtin') {
+        keys = await loadProviderKeys();
+      }
 
       // A provider failure must not leave files in limbo — record it with the
       // reason attached. Not a refusal: nothing was decided, so the next scan

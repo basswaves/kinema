@@ -34,6 +34,7 @@ import {
 import { clearParseError, initParser, lastParseError, parseMediaFile, toPayload } from './parse';
 import { cacheArtwork, listUnmatched } from '../metadata/api';
 import { backfillTitleDetails, loadProviderKeys, matchFiles } from '../metadata/match';
+import { syncBuiltinKey } from '../metadata/builtinKey';
 
 /** Batched so a large library reports progress and never builds one huge IPC payload. */
 const PARSE_BATCH = 500;
@@ -204,6 +205,9 @@ export async function runScanPipeline(): Promise<ScanOutcome> {
       if (batch.length < PARSE_BATCH) break;
     }
 
+    // Before listing: a built-in key that arrived or went since the last scan
+    // re-opens the refusals it could change, and they belong in this list.
+    await syncBuiltinKey();
     const pending = await listUnmatched(2000);
     if (pending.length > 0) {
       setStatus({ stage: 'matching', detail: '' });

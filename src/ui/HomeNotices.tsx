@@ -10,6 +10,10 @@
  *  - **Equipment that could do better** than the current settings let it —
  *    see `qualityNotice.ts`.
  *
+ * And one that should never appear: TMDB refusing the key Kinema came with
+ * (builtinKey.ts), which leaves new movies unidentified until an update or a
+ * key of the user's own.
+ *
  * Quiet on purpose: one line each, in the flow of the page, reached with one
  * press of Down from the hero — never a dialog in front of what you came for.
  */
@@ -21,18 +25,52 @@ import type { Upgrade } from './qualityNotice';
 interface Props {
   reviewCount: number;
   onReview: () => void;
+  keyRejected: boolean;
+  onAddKey: () => void;
   upgrades: Upgrade[];
   onApply: () => void;
   onDismiss: () => void;
 }
 
-export default function HomeNotices({ reviewCount, onReview, upgrades, onApply, onDismiss }: Props) {
+export default function HomeNotices({
+  reviewCount,
+  onReview,
+  keyRejected,
+  onAddKey,
+  upgrades,
+  onApply,
+  onDismiss,
+}: Props) {
   const { ref, focusKey } = useFocusable({ trackChildren: true, saveLastFocusedChild: true });
-  if (reviewCount === 0 && upgrades.length === 0) return null;
+  if (reviewCount === 0 && upgrades.length === 0 && !keyRejected) return null;
 
   return (
     <FocusContext.Provider value={focusKey}>
       <section className="home-notices" ref={ref}>
+        {keyRejected && (
+          <div className="home-notice">
+            <span className="home-notice-icon" aria-hidden="true">
+              !
+            </span>
+            <div className="home-notice-text">
+              <strong>TMDB no longer accepts the key Kinema came with</strong>
+              <span className="muted">
+                {' '}
+                — new movies cannot be identified until an update brings a new one, or you add a
+                free key of your own.
+              </span>
+            </div>
+            <FocusButton
+              focusKey="notice-tmdb-key"
+              className="btn-primary"
+              keepInView="nearest"
+              onSelect={onAddKey}
+            >
+              Add a key
+            </FocusButton>
+          </div>
+        )}
+
         {reviewCount > 0 && (
           <div className="home-notice">
             <span className="home-notice-icon" aria-hidden="true">

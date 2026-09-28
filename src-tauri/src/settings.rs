@@ -44,8 +44,10 @@ pub fn set_setting(db: tauri::State<Db>, key: String, value: String) -> Result<(
     store(&conn, &key, &value)
 }
 
-/// The settings whose change can change a match's answer.
-const PROVIDER_KEYS: [&str; 2] = ["tmdb_api_key", "omdb_api_key"];
+/// The settings whose change can change a match's answer. `tmdb_builtin_key`
+/// is not a key but a fingerprint of the app's own one in effect
+/// (builtinKey.ts): the first release with one, or a new one in an update.
+const PROVIDER_KEYS: [&str; 3] = ["tmdb_api_key", "omdb_api_key", "tmdb_builtin_key"];
 
 pub(crate) fn store(conn: &rusqlite::Connection, key: &str, value: &str) -> Result<(), String> {
     let before = setting(conn, key);
@@ -157,6 +159,15 @@ mod tests {
         store(&conn, "tmdb_api_key", "abc").unwrap();
         store(&conn, "tv_mode", "on").unwrap();
         assert_eq!(status(&conn, 1), "unmatched");
+    }
+
+    /// The first release with a key of its own is a new key like any other: a
+    /// library whose movies were refused for want of one gets them matched.
+    #[test]
+    fn a_new_builtin_key_reopens_refusals() {
+        let conn = library("builtin");
+        store(&conn, "tmdb_builtin_key", "1a2b3c4d").unwrap();
+        assert_eq!(status(&conn, 1), "parsed");
     }
 
     /// Clearing a key cannot produce a new answer, so it reopens nothing.

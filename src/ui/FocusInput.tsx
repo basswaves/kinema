@@ -22,6 +22,8 @@ interface Props {
    * Enter doing nothing.
    */
   onEnter?: () => void;
+  /** A stable key, for landing on this field from elsewhere. */
+  focusKey?: string;
 }
 
 export default function FocusInput({
@@ -31,8 +33,9 @@ export default function FocusInput({
   className = '',
   type = 'text',
   onEnter,
+  focusKey,
 }: Props) {
-  const { ref, focused } = useFocusable<object, HTMLInputElement>({});
+  const { ref, focused } = useFocusable<object, HTMLInputElement>({ focusKey });
 
   useEffect(() => {
     const input = ref.current;

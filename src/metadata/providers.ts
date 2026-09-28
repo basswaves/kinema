@@ -15,6 +15,7 @@
  *             No backdrop, no logo, no usable cast.
  */
 import { fetch } from '@tauri-apps/plugin-http';
+import { noteTmdbRejection } from './builtinKey';
 import type { Candidate } from './score';
 
 export interface TitleMetadata {
@@ -377,10 +378,17 @@ function tmdbUrl(key: string, path: string, params: Record<string, string> = {})
   return `https://api.themoviedb.org/3${path}?${query.toString()}`;
 }
 
+/** TMDB answered 401: the key is not (or no longer) accepted. */
+export class TmdbKeyRejected extends Error {}
+
 /** Every TMDB request goes through here, which is what makes one queue enough. */
 async function tmdbGet<T>(key: string, path: string, params?: Record<string, string>): Promise<T> {
   return tmdbQueued(async () => {
     const response = await fetchPolitely(tmdbUrl(key, path, params), `TMDB ${path}`);
+    if (response.status === 401) {
+      await noteTmdbRejection(key);
+      throw new TmdbKeyRejected(`TMDB ${path} failed: HTTP 401 — the key was not accepted`);
+    }
     if (!response.ok) throw new Error(`TMDB ${path} failed: HTTP ${response.status}`);
     return (await response.json()) as T;
   });

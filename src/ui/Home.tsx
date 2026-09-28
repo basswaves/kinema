@@ -34,6 +34,8 @@ interface Props {
   onLibraryChanged: () => void;
   reviewCount: number;
   onReview: () => void;
+  keyRejected: boolean;
+  onAddKey: () => void;
   upgrades: Upgrade[];
   onApplyUpgrades: () => void;
   onDismissUpgrades: () => void;
@@ -67,6 +69,8 @@ export default function Home({
   onLibraryChanged,
   reviewCount,
   onReview,
+  keyRejected,
+  onAddKey,
   upgrades,
   onApplyUpgrades,
   onDismissUpgrades,
@@ -129,6 +133,8 @@ export default function Home({
         <HomeNotices
           reviewCount={reviewCount}
           onReview={onReview}
+          keyRejected={keyRejected}
+          onAddKey={onAddKey}
           upgrades={upgrades}
           onApply={onApplyUpgrades}
           onDismiss={onDismissUpgrades}

@@ -20,7 +20,7 @@ import ChoiceRow from './ChoiceRow';
 import MoreAbout from './MoreAbout';
 import { availableUpdate, UPDATE_CHECK_KEY, type Release } from './updates';
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import { openUrl } from '@tauri-apps/plugin-opener';
@@ -72,7 +72,7 @@ import {
   setSetting,
   type ArtworkStats,
 } from '../metadata/api';
-import { BUILTIN_TMDB_KEY } from '../metadata/builtinKey';
+import { BUILTIN_TMDB_KEY, builtinKeyRejected } from '../metadata/builtinKey';
 import {
   CREDITS_TAIL_CHOICES,
   CREDITS_TAIL_KEY,
@@ -145,6 +145,10 @@ function detectLines(steps: AutoStep[]): string[] {
 
 /** The Review button, where focus lands when Settings opens on the queue. */
 const REVIEW_BUTTON_KEY = 'settings-review-button';
+const TMDB_KEY_INPUT_KEY = 'settings-tmdb-key';
+
+/** Where Home's notices can open Settings: the review queue, or the TMDB key. */
+export type SettingsTarget = 'review' | 'tmdb-key';
 
 type SectionId = 'library' | 'playback' | 'picture' | 'intros' | 'advanced';
 
@@ -160,7 +164,7 @@ const SECTIONS: [SectionId, string][] = [
 /** Coming back to Settings opens the section you were last in. */
 let lastSection: SectionId = 'library';
 
-export default function Settings({ openSection }: { openSection?: 'review' }) {
+export default function Settings({ openSection }: { openSection?: SettingsTarget }) {
   const { ref, focusKey } = useFocusable({
     focusKey: SETTINGS_FOCUS_KEY,
     trackChildren: true,
@@ -168,7 +172,7 @@ export default function Settings({ openSection }: { openSection?: 'review' }) {
   });
 
   const [section, setSection] = useState<SectionId>(
-    openSection === 'review' ? 'library' : lastSection
+    openSection ? 'library' : lastSection
   );
   const chooseSection = useCallback((id: SectionId) => {
     lastSection = id;
@@ -177,13 +181,22 @@ export default function Settings({ openSection }: { openSection?: 'review' }) {
 
   // Land on the open section in the list — or, from Home's notice, straight
   // on the review queue.
-  useClaimFocus(openSection === 'review' ? REVIEW_BUTTON_KEY : `settings-nav:${section}`, true);
+  useClaimFocus(
+    openSection === 'review'
+      ? REVIEW_BUTTON_KEY
+      : openSection === 'tmdb-key'
+        ? TMDB_KEY_INPUT_KEY
+        : `settings-nav:${section}`,
+    true
+  );
 
   const [roots, setRoots] = useState<LibraryRoot[]>([]);
   const [needsReview, setNeedsReview] = useState(0);
   const [art, setArt] = useState<ArtworkStats | null>(null);
   const [tmdbKey, setTmdbKey] = useState('');
   const [omdbKey, setOmdbKey] = useState('');
+  /** TMDB has refused Kinema's own key, so one of the user's own is needed. */
+  const [builtinRejected, setBuiltinRejected] = useState(false);
   const [autoSkip, setAutoSkip] = useState(false);
   const [creditsTail, setCreditsTail] = useState(DEFAULT_CREDITS_TAIL_SECS);
   const [displaySync, setDisplaySync] = useState(false);
@@ -285,6 +298,7 @@ export default function Settings({ openSection }: { openSection?: 'review' }) {
       setTmdbKey((await getSetting('tmdb_api_key')) ?? '');
       setOmdbKey((await getSetting('omdb_api_key')) ?? '');
       setKeysLoaded(true);
+      setBuiltinRejected(await builtinKeyRejected());
       setAutoSkip((await getSetting('skip_mode')) === 'auto');
 
       // Unset keeps the default; 0 is a real value meaning "never guess", so it
@@ -328,9 +342,28 @@ export default function Settings({ openSection }: { openSection?: 'review' }) {
     await setSetting(FFMPEG_PATH_KEY, ffmpegPath.trim());
   }, [scanArgs, exportArgs, skiptroDbPath, ffmpegPath]);
 
+  /**
+   * Saves still waiting out their debounce, run when Settings closes instead
+   * of being dropped with their timer. Paste a key, press Back at once, and
+   * the key used to be gone — which looks exactly like the key being wrong.
+   */
+  const pendingSaves = useRef(new Map<string, () => Promise<void>>());
+  useEffect(() => {
+    const pending = pendingSaves.current;
+    return () => {
+      for (const save of pending.values()) {
+        void save().catch((e) => console.warn('settings: saving on the way out failed', e));
+      }
+      pending.clear();
+    };
+  }, []);
+
   useEffect(() => {
     if (!skiptroLoaded) return;
+    const pending = pendingSaves.current;
+    pending.set('skiptro', saveSkiptroFields);
     const id = window.setTimeout(() => {
+      pending.delete('skiptro');
       void saveSkiptroFields().catch((e) => setError(userError(e)));
     }, SKIPTRO_SAVE_DEBOUNCE_MS);
     return () => window.clearTimeout(id);
@@ -358,16 +391,17 @@ export default function Settings({ openSection }: { openSection?: 'review' }) {
    */
   useEffect(() => {
     if (!keysLoaded) return;
+    const save = async () => {
+      await setSetting('tmdb_api_key', tmdbKey.trim());
+      await setSetting('omdb_api_key', omdbKey.trim());
+    };
+    const pending = pendingSaves.current;
+    pending.set('keys', save);
     const id = window.setTimeout(() => {
-      void (async () => {
-        try {
-          await setSetting('tmdb_api_key', tmdbKey.trim());
-          await setSetting('omdb_api_key', omdbKey.trim());
-          setKeysSaved(true);
-        } catch (e) {
-          setError(userError(e));
-        }
-      })();
+      pending.delete('keys');
+      void save()
+        .then(() => setKeysSaved(true))
+        .catch((e) => setError(userError(e)));
     }, SKIPTRO_SAVE_DEBOUNCE_MS);
     return () => window.clearTimeout(id);
   }, [keysLoaded, tmdbKey, omdbKey]);
@@ -656,11 +690,15 @@ export default function Settings({ openSection }: { openSection?: 'review' }) {
                 <section className="settings-section">
                   <h2>Posters and descriptions</h2>
                   <p className="muted">
-                    {BUILTIN_TMDB_KEY
-                      ? 'Kinema looks up movies and TV shows on TMDB with a key of its own. ' +
-                        'Nothing to set up here — but you can use your own free key instead.'
-                      : 'TV shows need no key. Movies need a free key from TMDB for posters, ' +
-                        'descriptions and artwork.'}
+                    {!BUILTIN_TMDB_KEY
+                      ? 'TV shows need no key. Movies need a free key from TMDB for posters, ' +
+                        'descriptions and artwork.'
+                      : builtinRejected
+                        ? 'TMDB no longer accepts the key Kinema came with. Until an update ' +
+                          'brings a new one, new movies need a free key of your own to be ' +
+                          'identified.'
+                        : 'Kinema looks up movies and TV shows on TMDB with a key of its own. ' +
+                          'Nothing to set up here — but you can use your own free key instead.'}
                   </p>
                   <div className="settings-row">
                     <FocusButton
@@ -676,7 +714,7 @@ export default function Settings({ openSection }: { openSection?: 'review' }) {
                     <span>
                       {BUILTIN_TMDB_KEY ? 'Your own TMDB key ' : 'TMDB '}
                       <span className="muted">
-                        {BUILTIN_TMDB_KEY
+                        {BUILTIN_TMDB_KEY && !builtinRejected
                           ? 'optional — used instead of Kinema’s'
                           : 'posters, backdrops, cast, episode stills'}
                       </span>
@@ -684,6 +722,7 @@ export default function Settings({ openSection }: { openSection?: 'review' }) {
                     {/* Masked. This screen is routinely on a television, and a
                         key on a 60-inch panel in a living room is not private. */}
                     <FocusInput
+                      focusKey={TMDB_KEY_INPUT_KEY}
                       className="settings-input"
                       value={tmdbKey}
                       onChange={(v) => {
@@ -691,7 +730,9 @@ export default function Settings({ openSection }: { openSection?: 'review' }) {
                         setKeysSaved(false);
                       }}
                       type="password"
-                      placeholder={BUILTIN_TMDB_KEY ? 'Not needed' : 'Paste your TMDB key'}
+                      placeholder={
+                        BUILTIN_TMDB_KEY && !builtinRejected ? 'Not needed' : 'Paste your TMDB key'
+                      }
                     />
                   </label>
                   <label className="settings-field">

@@ -12,8 +12,15 @@ makes no stability promises.
 - **Kinema has its own TMDB key.** Movies are identified, with posters and
   descriptions, without registering for anything. A key of your own in
   Settings is still used instead when there is one.
+- **If TMDB ever stops accepting that key,** Kinema stops asking with it,
+  says so on Home, and takes you to the field for a key of your own. The
+  first release with a key re-checks movies that were waiting for one.
 
 ### Fixed
+
+- **A key or path typed just before leaving Settings is kept.** Fields there
+  save themselves a moment after the last keystroke, and pressing Back
+  within that moment used to drop the change.
 
 - **The volume says "Receiver" from the first frame.** With the sound going
   straight to a receiver, it read "100" until the controls were next

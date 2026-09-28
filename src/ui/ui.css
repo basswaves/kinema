@@ -1393,8 +1393,108 @@ html {
  * the position that needs it.
  */
 .settings {
-  max-width: 56rem;
+  max-width: 72rem;
   padding: 1.25rem var(--gutter) 3.75rem;
+}
+
+/* The section list down the side, the open section beside it. */
+.settings-layout {
+  display: grid;
+  grid-template-columns: 13rem minmax(0, 1fr);
+  gap: 2.5rem;
+  align-items: start;
+}
+
+.settings-nav {
+  position: sticky;
+  top: calc(4.5rem + var(--safe-top));
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.settings-nav button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.625rem 0.875rem;
+  border: none;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: rgba(245, 245, 247, 0.72);
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-nav button:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.settings-nav button.active {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-weight: 700;
+}
+
+.settings-nav button.focused {
+  outline: var(--focus-ring) solid #fff;
+  outline-offset: 2px;
+}
+
+/* A narrow window: the list goes above, as a row. */
+@media (max-width: 760px) {
+  .settings-layout {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+
+  .settings-nav {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}
+
+/* ---- More about this (MoreAbout) ---------------------------------------- */
+.more-about {
+  margin: 0.375rem 0 0.875rem;
+}
+
+.more-toggle {
+  padding: 0.25rem 0.625rem;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(245, 245, 247, 0.6);
+  font-size: 0.75rem;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+
+.more-toggle:hover {
+  color: #fff;
+}
+
+.more-toggle.focused {
+  color: #fff;
+  outline: var(--focus-ring) solid #fff;
+  outline-offset: 2px;
+}
+
+.more-body {
+  max-width: 44rem;
+  margin-top: 0.5rem;
+  padding: 0.25rem 0 0.25rem 0.875rem;
+  border-left: 2px solid rgba(255, 255, 255, 0.14);
+  font-size: 0.78125rem;
+  line-height: 1.55;
+  color: rgba(245, 245, 247, 0.72);
+}
+
+.more-body p {
+  margin: 0 0 0.625rem;
 }
 
 /* Where `keepInView="nearest"` stops. Without it a control scrolled to going up

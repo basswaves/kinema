@@ -13,7 +13,7 @@
  */
 import { userError } from './errors';
 import { useCallback, useEffect, useState } from 'react';
-import FocusButton from './FocusButton';
+import ChoiceRow from './ChoiceRow';
 import { setSetting } from '../metadata/api';
 import { getEquipment, type AudioDevice, type Equipment } from '../player/equipment';
 import {
@@ -28,7 +28,6 @@ import {
   type Override,
 } from '../player/audioOutput';
 
-const NEXT: Record<Override, Override> = { auto: 'on', on: 'off', off: 'auto' };
 
 function formatLabel(device: AudioDevice | null, codec: string): string {
   return device?.bitstream.find((b) => b.codec === codec)?.label ?? codec;
@@ -72,39 +71,37 @@ export default function SoundSection({ onError }: { onError: (message: string) =
     (b) => (b.codec === 'truehd' || b.codec === 'dts-hd') && b.result === 'yes'
   );
 
-  // Cycle: Windows default, then each connected device.
-  const cycleDevice = () => {
-    const ids = [null, ...connected.map((a) => a.id)];
-    const next = ids[(ids.indexOf(settings.deviceId) + 1) % ids.length] ?? null;
-    save(AUDIO_DEVICE_KEY, next ?? '', { ...settings, deviceId: next });
-  };
+  // Windows' default, then each connected device by name. The empty string
+  // is how "Windows default" is stored.
+  const deviceChoices = [
+    { value: '', label: 'Windows default' },
+    ...connected.map((a) => ({ value: a.id, label: a.name })),
+  ];
 
   return (
     <section className="settings-section">
       <h2>Sound</h2>
 
-      <div className="settings-toggle-row">
-        <FocusButton
-          keepInView="nearest"
-          className={settings.direct ? 'btn-primary' : 'btn-secondary'}
-          onSelect={() =>
-            save(AUDIO_DIRECT_KEY, settings.direct ? 'off' : 'on', {
-              ...settings,
-              direct: !settings.direct,
-            })
-          }
-        >
-          Send sound straight to the receiver: {settings.direct ? 'on' : 'off'}
-        </FocusButton>
-        <span className="muted">
-          <strong>On:</strong> while something plays, Kinema takes the sound device for itself and
-          sends the video&rsquo;s own soundtrack &mdash; Dolby TrueHD and Atmos, DTS-HD and DTS:X
-          &mdash; to your receiver untouched, the way a disc player does. Windows&rsquo; speaker
-          setup and spatial sound are bypassed, so they do not matter. Other sounds from this PC are
-          silent until it stops. <strong>Off:</strong> sound goes through Windows like any
-          other program: decoded, mixed to Windows&rsquo; speaker setup, and without Atmos or DTS:X.
-        </span>
-      </div>
+      <ChoiceRow
+        label="Send sound straight to the receiver"
+        choices={[
+          { value: 'off', label: 'Off' },
+          { value: 'on', label: 'On' },
+        ]}
+        value={settings.direct ? 'on' : 'off'}
+        onChange={(v) => save(AUDIO_DIRECT_KEY, v, { ...settings, direct: v === 'on' })}
+        note="On sends Dolby TrueHD, Atmos, DTS-HD and DTS:X to the receiver untouched, as a disc player does."
+        more={
+          <p>
+            <strong>On:</strong> while something plays, Kinema takes the sound device for itself
+            and sends the video&rsquo;s own soundtrack to your receiver untouched. Windows&rsquo;
+            speaker setup and spatial sound are bypassed, so they do not matter. Other sounds from
+            this PC are silent until it stops. <strong>Off:</strong> sound goes through Windows
+            like any other program: decoded, mixed to Windows&rsquo; speaker setup, and without
+            Atmos or DTS:X.
+          </p>
+        }
+      />
 
       {device && (
         <p className="muted">
@@ -127,46 +124,40 @@ export default function SoundSection({ onError }: { onError: (message: string) =
         </p>
       )}
 
-      <div className="settings-toggle-row">
-        <FocusButton keepInView="nearest" className="btn-secondary" onSelect={cycleDevice}>
-          Sound device:{' '}
-          {settings.deviceId
-            ? (connected.find((a) => a.id === settings.deviceId)?.name ?? 'not connected')
-            : 'Windows default'}
-        </FocusButton>
-        <span className="muted">
-          Press to cycle through the connected devices. &ldquo;Windows default&rdquo; follows
-          whatever Windows is set to; a chosen device that is unplugged falls back to it.
-        </span>
-      </div>
+      <ChoiceRow
+        label="Sound device"
+        choices={deviceChoices}
+        value={settings.deviceId ?? ''}
+        onChange={(v) => save(AUDIO_DEVICE_KEY, v, { ...settings, deviceId: v || null })}
+        note="Windows default follows whatever Windows is set to; a chosen device that is unplugged falls back to it."
+      />
 
       {settings.direct && (
         <>
           <h3>Formats</h3>
           <p className="muted">
-            Auto uses what the receiver itself told Windows (see Your equipment below). Only change
-            one if you know better: a format forced on that the receiver cannot take plays as
-            silence or noise.
+            Auto uses what the receiver told Windows. Force one on only if you know better &mdash;
+            a format it cannot take plays as silence or noise.
           </p>
           {BITSTREAM_CODECS.map((codec) => {
-            const override = settings.overrides[codec] ?? 'auto';
+            const override: Override = settings.overrides[codec] ?? 'auto';
             return (
-              <div className="settings-toggle-row" key={codec}>
-                <FocusButton
-                  keepInView="nearest"
-                  className={override === 'auto' ? 'btn-secondary' : 'btn-primary'}
-                  onSelect={() => {
-                    const next = NEXT[override];
-                    save(bitstreamKey(codec), next, {
-                      ...settings,
-                      overrides: { ...settings.overrides, [codec]: next },
-                    });
-                  }}
-                >
-                  {formatLabel(device, codec)}:{' '}
-                  {override === 'auto' ? `Auto (${detected(device, codec)})` : override}
-                </FocusButton>
-              </div>
+              <ChoiceRow
+                key={codec}
+                label={formatLabel(device, codec)}
+                choices={[
+                  { value: 'auto', label: `Auto (${detected(device, codec)})` },
+                  { value: 'on', label: 'On' },
+                  { value: 'off', label: 'Off' },
+                ]}
+                value={override}
+                onChange={(next) =>
+                  save(bitstreamKey(codec), next, {
+                    ...settings,
+                    overrides: { ...settings.overrides, [codec]: next },
+                  })
+                }
+              />
             );
           })}
         </>

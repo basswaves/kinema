@@ -9,6 +9,7 @@
  */
 import type { ReactNode } from 'react';
 import FocusButton from './FocusButton';
+import MoreAbout from './MoreAbout';
 
 export interface Choice<V extends string> {
   value: V;
@@ -22,6 +23,8 @@ interface Props<V extends string> {
   onChange: (value: V) => void;
   /** One line under the row. */
   note?: ReactNode;
+  /** The longer explanation, behind "More about this". */
+  more?: ReactNode;
 }
 
 export default function ChoiceRow<V extends string>({
@@ -30,6 +33,7 @@ export default function ChoiceRow<V extends string>({
   value,
   onChange,
   note,
+  more,
 }: Props<V>) {
   return (
     <div className="choice-row">
@@ -48,6 +52,7 @@ export default function ChoiceRow<V extends string>({
         ))}
       </div>
       {note && <p className="muted choice-note">{note}</p>}
+      {more && <MoreAbout>{more}</MoreAbout>}
     </div>
   );
 }

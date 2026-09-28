@@ -284,7 +284,7 @@ linearly at the end. Each step is verified before the next.
     remembered per grid; Movies and TV shows as top-bar entries. **Done** (mock).
 13. **Settings.** A section list (Library · Playback · Picture & sound · Intro &
     credits · Advanced). Every option shows its choices side by side; one-line
-    explanations with the rest behind "More about this".
+    explanations with the rest behind "More about this". **Done** (mock).
 14. **New version notice.** Once per start, ask GitHub for the latest release
     number; if newer, a line in Settings and a dot on Settings. Downloads
     nothing, fails silent, can be switched off.

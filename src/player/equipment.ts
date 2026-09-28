@@ -3,7 +3,7 @@
  * Windows: every screen, every audio output, and what each can take.
  *
  * Read-only, and nothing in playback acts on it yet. It is the first step of
- * the native-output plan (ROADMAP → "Native output"): passthrough and display
+ * the native-output work (docs/HISTORY.md → "Native output"): passthrough and display
  * switching will be built on these answers rather than on guesses.
  */
 import { invoke } from '@tauri-apps/api/core';

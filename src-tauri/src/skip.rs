@@ -61,7 +61,7 @@ const FROM_INTRODB: &str = "introdb";
 
 /// Below this, a Skiptro intro gives way to this app's own analysis.
 ///
-/// Measured, not guessed (2026-09-23, docs/ROADMAP.md): across 79 detections,
+/// Measured, not guessed (2026-09-23, docs/HISTORY.md): across 79 detections,
 /// every one where the two detectors disagreed by more than a few seconds had a
 /// Skiptro confidence of 0.70 or less, and every confident one agreed. So
 /// Skiptro keeps first place wherever it is sure, which is the decision, and

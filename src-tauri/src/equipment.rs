@@ -1,7 +1,7 @@
 //! What this PC is connected to — its screens and audio outputs — and what
 //! each of them can take.
 //!
-//! Step 1 of the native-output plan (ROADMAP → "Native output"). Nothing here
+//! Step 1 of native output (docs/HISTORY.md → "Native output"). Nothing here
 //! changes playback. It exists so that every later decision — which audio
 //! formats to pass through untouched, which refresh rate to switch to, whether
 //! HDR can be turned on — rests on what Windows actually reports rather than on

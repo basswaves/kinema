@@ -8,8 +8,8 @@ It was extracted from the README when that became a document for people who
 want to *use* the app rather than change it. Nothing here is required reading
 to run Kinema; all of it is required reading before arguing with how it works.
 
-See also [GOTCHAS.md](GOTCHAS.md) for the traps, [PLAN.md](PLAN.md) for what
-was built and in what order, and [ROADMAP.md](ROADMAP.md) for what is left.
+See also [GOTCHAS.md](GOTCHAS.md) for the traps, [HISTORY.md](HISTORY.md) for what
+was built and why, and [ROADMAP.md](ROADMAP.md) for what is next.
 
 ---
 

@@ -51,3 +51,7 @@ src-tauri/app.log
 /*.mp4
 /*.mkv
 /*.m2ts
+
+# Private working notes: a separate, private repo (basswaves/kinema-notes),
+# cloned here. Never part of this one. See CLAUDE.md.
+/notes/

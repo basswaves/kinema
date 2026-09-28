@@ -14,8 +14,8 @@ single most useful file in this repository.
 |---|---|
 | [docs/GOTCHAS.md](docs/GOTCHAS.md) | Traps in libmpv, Tauri, SQLite, spatial navigation and quick-xml |
 | [docs/DESIGN.md](docs/DESIGN.md) | Architecture, data flow, and the design decisions worth preserving |
-| [docs/PLAN.md](docs/PLAN.md) | What is done, and *why each decision went the way it did* |
-| [docs/ROADMAP.md](docs/ROADMAP.md) | What is left, and what each remaining item is blocked on |
+| [docs/HISTORY.md](docs/HISTORY.md) | How it was built, and *why each decision went the way it did* |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | What is next, what is not planned, and where help is wanted — a good place to start |
 | [CLAUDE.md](CLAUDE.md) | The working rules, in short form |
 
 ## Building
@@ -171,7 +171,7 @@ the pipeline. `F12` opens WebView2 DevTools in the app window.
 
 These are conclusions, not open questions. If a change seems to require breaking
 one, say so in the issue rather than working around it quietly. The full
-reasoning is in [docs/DESIGN.md](docs/DESIGN.md) and [docs/PLAN.md](docs/PLAN.md).
+reasoning is in [docs/DESIGN.md](docs/DESIGN.md) and [docs/HISTORY.md](docs/HISTORY.md).
 
 - **No machine-learning upscaling.** No FSRCNNX, RAVU, Anime4K, RTX VSR, Intel
   VSR. They synthesise detail that was never in the master. Classical resampling

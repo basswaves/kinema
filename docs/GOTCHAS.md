@@ -902,7 +902,7 @@ drift from mpv a "yes" stops meaning anything.
 at its default, **`target`**, mpv first adapts the picture to the peak Windows
 reports for the screen — which comes from the EDID and is often generic. `source`
 is what a disc player does: the film's own HDR10 metadata, and the TV tone maps.
-Until ROADMAP → Native output step 2, `mpvOptions.ts` says "passes through
+Until native output (HISTORY → Native output), `mpvOptions.ts` says "passes through
 untouched" and it does not.
 
 ### mpv sends HDR10 to an SDR screen, and Windows quietly converts it
@@ -939,7 +939,7 @@ Windows reports.
 
 mpv's shared-mode 7.1 stream passed `IsFormatSupported` and then failed
 `Initialize` with `0x887C0077`, and mpv carried on with `Audio: no audio` — a
-film playing silent, no error in the UI. **Cause, found in USB round 3:**
+film playing silent, no error in the UI. **Cause, found on the test TV:**
 a half-configured spatial mode — the device's format dropdown switched to an
 Atmos option without Dolby Access installed and spatial sound enabled. Nothing
 could play in that state, not just Kinema. Once Dolby Access was set up and

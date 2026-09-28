@@ -4,7 +4,7 @@
 //! through [`append_log`](crate::settings::append_log); the Rust side writes
 //! through [`log!`](crate::log). Before this, Rust used `eprintln!`, which in a
 //! release build — no console, `windows_subsystem = "windows"` — went nowhere
-//! at all, including the lines the ROADMAP relies on for calibration.
+//! at all, including the lines calibration relies on.
 //!
 //! Both logs live in `<app data>/logs`, beside the library, not in whatever the
 //! current directory happens to be. They used to be opened relative to it, so

@@ -1,4 +1,11 @@
-# Plan
+# History
+
+How Kinema was built, and why each decision went the way it did — in the order
+it happened. It is long, and nobody needs to read it to use Kinema. It is here
+for anyone who wants to change it: nearly every choice that looks arbitrary in
+the code has its reason in here, and so do the ideas that were tried and
+turned down. For what is planned next, see [ROADMAP.md](ROADMAP.md); for the
+architecture, [DESIGN.md](DESIGN.md); for the traps, [GOTCHAS.md](GOTCHAS.md).
 
 ## Goal
 
@@ -580,7 +587,7 @@ not put there.
 **Found while checking, not yet acted on:** audio is decoded to PCM and
 **downmixed 5.1 → 2.0**, because there is no `audio-spdif` configuration at all
 and the default Windows device is onboard stereo. That is a larger loss of
-intent than any scaler question. See ROADMAP.md.
+intent than any scaler question. (Addressed by native output, below.)
 
 ---
 
@@ -944,8 +951,8 @@ second on real content", and that was never checked. Against this library they
 disagreed on 34 of the 61 episodes both had an answer for, and every large
 disagreement was a detection Skiptro itself scored 0.70 or less (S04E05–E11 by
 ~7 s, all of S06 by ~15 s). So Skiptro now keeps first place only where its
-confidence is at least 0.8 (`MIN_SKIPTRO_CONFIDENCE`); the table is in
-ROADMAP under "Minimum confidence for skip markers".
+confidence is at least 0.8 (`MIN_SKIPTRO_CONFIDENCE`); the table is under
+"Minimum confidence for skip markers", below.
 
 ### ffmpeg, and why not pure Rust
 
@@ -1222,7 +1229,7 @@ tenth lands.
 ## The September 2026 review, and what it changed ✅
 
 A full review of the code, the logs and the library database, followed by a
-phased plan (in ROADMAP.md while it is open). Decisions taken along the way,
+phased plan. Decisions taken along the way,
 with their reasons:
 
 **Skip intro is offered from 0:00.** When an episode has a known intro, the
@@ -1342,14 +1349,14 @@ TMDB episode fetching to one request per twenty seasons and read tracks and
 chapters in parallel, and gave the window a CSP whose refusals are written to
 `app.log`, because otherwise they are silent.
 
-**Testing is done without the owner.** `npm run dev:mock` and
+**Testing is done without the maintainer.** `npm run dev:mock` and
 `scripts/selftest.ps1` exist so every change can be checked — keyboard-only in
 a browser against a fake mpv, and in the real app against a copy of the real
 library — without anyone clicking through a checklist.
 
-## Native output (in progress)
+## Native output ✅
 
-Agreed on 2026-09-24; the steps are in ROADMAP.md while they are open.
+Agreed on 2026-09-24 and shipped in 0.3.0.
 The aim is the one a UHD disc player has: 4K at 1:1 on a 4K screen, HDR10 sent
 as the disc carries it, surround sent to the receiver untouched, and the screen
 at the film's own frame rate — decided by the app from what the hardware says,
@@ -1370,7 +1377,7 @@ some TVs take longer. It is three switches (refresh, resolution, HDR), not one.
 
 **Resolution matching is offered, off.** The recommendation was to never switch
 resolution — keep the screen native and let the app upscale with spline36,
-which is neutral where a TV's scaler usually sharpens. The owner wanted it available
+which is neutral where a TV's scaler usually sharpens. The maintainer wanted it available
 anyway for people whose TV scales better; it only ever switches to the source's
 own resolution, never below it.
 
@@ -1397,9 +1404,9 @@ table, so it needed no database upgrade and a build carrying it can open a
 0.2.0 library and hand it back.
 
 **Exclusive audio is a switch, off by default.** Decided after the first
-run on his TV: Kinema must not take the audio device to itself unasked — it
+run on a real TV and receiver: Kinema must not take the audio device to itself unasked — it
 silences every other program for as long as a film plays. The consequence,
-said to him plainly: bitstreaming *is* exclusive on Windows (mpv opens every
+said plainly: bitstreaming *is* exclusive on Windows (mpv opens every
 passthrough stream exclusively whatever `--audio-exclusive` says), so with the
 switch off there is no passthrough and no Atmos — Windows' own "Dolby Atmos for
 home theater" needs an app to use its spatial audio API, which mpv does not. Off
@@ -1438,8 +1445,8 @@ looks right across a room — is said so, not claimed.
 
 Done on 2026-09-28, on the `ux-pass` branch, after an outside-eye review of the
 finished app. The review used the app keyboard-only in `dev:mock` and read every
-screen; every point was put to the owner with options, and what follows is what
-was chosen and why. The step list is in ROADMAP.
+screen; every point was put to the maintainer with options, and what follows
+is what was chosen and why. The changelog for 0.4.0 lists what changed.
 
 **The remote in the player follows the streaming-app convention.** OK pauses,
 Left/Right seek, Up or Down bring the controls up. The old model — arrows seek
@@ -1489,13 +1496,64 @@ alone because nobody had complained; the review called it the most likely
 first complaint. Implemented as a stack of views with focus keys, which is also
 why every card and button you can open something from now has a stable key.
 
+## Intro markers: trusting Skiptro, and how far ✅
+
+### Minimum confidence for skip markers ✅
+
+Skiptro records a `Confidence` per detection and nothing acts on it. A skip fired
+on a bad detection jumps over real content — the same class of silent wrongness
+as a bad metadata match.
+
+**The sample it was waiting for exists.** This section used to say every
+detection reported `1`; that was never true — the `skiptro: confidence` log
+line went through `eprintln!`, which a release build has no console for, so
+nobody saw it. Measured on 2026-09-23 against Skiptro's own database: **23 of
+79 intro detections are below 1**, lowest 0.48. And they are not random:
+
+| Skiptro confidence | What the analysis says |
+|---|---|
+| 0.9 – 1.0 (56 episodes) | agrees, mostly within a second |
+| 0.70 (S04E05–E11) | intro ends ~7 s later (37.6 s vs ~44.5 s) |
+| 0.48 – 0.70 (all of S06) | intro ends ~15 s later (29.1 s vs ~44 s) |
+
+So every large disagreement is one Skiptro itself was unsure of. **Done,
+2026-09-23:** below 0.8 the analysis's intro is used instead
+(`MIN_SKIPTRO_CONFIDENCE` in `skip.rs`), and Skiptro keeps first place wherever
+it is confident. With no analysis for the episode, the unsure Skiptro intro is
+still used, ahead of TheIntroDB.
+
+### Retiring Skiptro
+
+**Decided against, 2026-09-23.** The maintainer reports no bad intro endpoints and wants
+Skiptro kept as the first intro source. The earlier claim here, that the two
+detectors "agree within a second", did not survive measurement — see the table
+above — but the disagreements coincide with Skiptro's own low confidence, so
+they are a reason for a confidence threshold, not for removal — and that
+threshold is now in place.
+
+### The diagnostic player that was removed
+
+`src/spike/PlayerSpike.tsx` was the diagnostic tool for HDR passthrough — a
+standalone window that loaded one file and dumped every mpv property that
+matters to the render pipeline. It was unreachable from the UI and was deleted
+before publishing, along with its styles in `App.css`: 629 lines of dead code is
+a lot to ask a first-time reader to walk past.
+
+**If you have an HDR display and want to verify passthrough, it is worth
+resurrecting rather than rewriting:**
+
+```bash
+git log --oneline --diff-filter=D -- src/spike/PlayerSpike.tsx
+git checkout <that commit>~1 -- src/spike/ src/App.css
+```
+
+It renders through the same `ensureMpvInitialised` as the real player, so what
+it reports is what the player gets.
+
 ## Open items
 
-**They live in [ROADMAP.md](ROADMAP.md), and only there.** They used to be
-listed here twice — a "Backlog" and a "Still unverified" — as well as in
-HANDOVER, which is exactly the drift this file keeps warning about. This
-document is for decisions and the reasons behind them; what is left to do is a
-different question with a different shelf life.
+They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and
+the reasons behind it.
 
 ## Verification
 

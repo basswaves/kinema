@@ -13,14 +13,20 @@ A local, serverless media library. **Tauri 2 + React 19 + libmpv**, Windows 11.
 
 | File | Why |
 |---|---|
-| **docs/PLAN.md** | What is done, what is next, and *why each decision went the way it did*. The reasoning matters more than the status — it is what stops a later session re-opening a settled question. |
+| **notes/WORKING-AGREEMENTS.md** | **Private**, and read first: how the owner and Claude work — options before changes, no manual testing, nothing personal in this repo. `notes/` is a separate private repository (`basswaves/kinema-notes`), ignored by this one. If it is missing, clone it: `git clone https://github.com/basswaves/kinema-notes.git notes`. |
+| **docs/HISTORY.md** | How it was built and *why each decision went the way it did*. The reasoning matters more than the status — it is what stops a later session re-opening a settled question. |
 | **docs/GOTCHAS.md** | Traps in libmpv, Tauri, spatial navigation and quick-xml. **Read before touching the player or D-pad navigation.** Nearly every entry describes a failure that produces *no error at all*. |
 | **docs/DESIGN.md** | Architecture, data flow, and the design decisions to preserve. |
-| **docs/ROADMAP.md** | What is left, and what each remaining item is blocked on. The only place open items live. |
+| **docs/ROADMAP.md** | Public and short: what is next, being considered, not planned, and where help is wanted. |
 
-Add to these as you go. A trap that cost a debugging round belongs in GOTCHAS
-the same day; a decision with a reason belongs in PLAN. They are the only thing
-carrying context between sessions.
+Add to these as you go, each to the right one. A trap that cost a debugging
+round belongs in GOTCHAS the same day; a decision with a reason belongs in
+HISTORY. **The four docs are public** — written for anyone who might contribute.
+Everything that is ours rather than theirs goes in `notes/`: which machines were
+tested and what their equipment reported (`TEST-SETUP.md`), plans as they are
+carried out, with step checklists and results (`WORKLOG.md`), and how we work.
+Commit and push `notes/` to its own private remote. Together they are the only
+thing carrying context between sessions — and between computers.
 
 ## Settled decisions — do not re-open
 
@@ -46,7 +52,8 @@ breaking one, say so rather than quietly working around it.
   covers time. No frame interpolation — 24p judder on a 60 Hz panel is reported
   by the stats panel and
   deliberately not "fixed". mpv's `tscale=oversample` — madVR's "smooth motion"
-  — has been raised and **deferred, not rejected**; it is in the PLAN backlog.
+  — has been raised and **deferred, not rejected**; it is on the ROADMAP under
+  "Being considered".
   Do not enable it without asking.
 - **Vendor-neutral.** Must behave identically on AMD, Intel and NVIDIA.
 - **A wrong metadata match is worse than no match.** Keep the 0.75 threshold and

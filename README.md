@@ -220,8 +220,8 @@ visible error at all — only a log line.
 | [CONTRIBUTING.md](CONTRIBUTING.md) | How to build, verify and submit a change |
 | [docs/DESIGN.md](docs/DESIGN.md) | Architecture, data flow, and why each decision went the way it did |
 | [docs/GOTCHAS.md](docs/GOTCHAS.md) | Traps in libmpv, Tauri, SQLite and spatial navigation. Every entry cost a real debugging round |
-| [docs/PLAN.md](docs/PLAN.md) | What was built, in what order |
-| [docs/ROADMAP.md](docs/ROADMAP.md) | What is left, and what each item is blocked on |
+| [docs/HISTORY.md](docs/HISTORY.md) | How it was built, and why each decision went the way it did |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | What is next, what is not planned, and where help is wanted |
 | [NOTICE.md](NOTICE.md) | Third-party licences and attribution |
 | [SECURITY.md](SECURITY.md) | What the attack surface is, and how to report something |
 

@@ -1,7 +1,7 @@
 /**
  * How sound leaves the app — step 3 of the native-output plan.
  *
- * Two ways, one switch, and the switch is the user's (see PLAN.md → Native
+ * Two ways, one switch, and the switch is the user's (see docs/HISTORY.md → Native
  * output):
  *
  *  - **Through Windows** (the default). mpv plays in shared mode and Windows

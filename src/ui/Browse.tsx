@@ -379,6 +379,7 @@ export default function Browse() {
             path: inProgress.path,
             label: episodeLabel(title.title, inProgress.season, inProgress.episode),
             fileId: inProgress.file_id,
+            episodeName: inProgress.episode_name,
             titleId: title.id,
           });
           return;
@@ -391,6 +392,7 @@ export default function Browse() {
               path: next.path,
               label: episodeLabel(title.title, next.season, next.episode),
               fileId: next.file_id,
+              episodeName: next.name,
               titleId: title.id,
             });
             return;
@@ -534,6 +536,7 @@ export default function Browse() {
                 path: item.path,
                 label: episodeLabel(item.title, item.season, item.episode),
                 fileId: item.file_id,
+                episodeName: item.episode_name,
                 titleId: item.title_id,
               })
             }
@@ -564,7 +567,7 @@ export default function Browse() {
           <TitleDetailView
             title={view.title}
             onBack={goBack}
-            onPlayFile={(path, label, fileId, titleId) =>
+            onPlayFile={(path, label, fileId, titleId, episodeName) =>
               void startPlayback({
                 path,
                 label,
@@ -572,6 +575,7 @@ export default function Browse() {
                 // Explicit null means "not on behalf of this title" — a trailer
                 // must not adopt or overwrite the show's track preferences.
                 titleId: titleId === undefined ? (view as { title: Title }).title.id : titleId,
+                episodeName,
               })
             }
           />

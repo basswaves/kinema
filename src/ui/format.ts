@@ -17,3 +17,13 @@ export function formatBytes(bytes: number): string {
 export function count(n: number, noun: string, plural = `${noun}s`): string {
   return `${n} ${n === 1 ? noun : plural}`;
 }
+
+/**
+ * "22:40" — the wall-clock time this will finish at normal speed, in the
+ * system's own clock format. Null until there is a position and a length.
+ */
+export function endsAtLabel(position: number | null, length: number | null, now: number): string | null {
+  if (position === null || !length || length <= 0) return null;
+  const end = new Date(now + Math.max(0, length - position) * 1000);
+  return end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}

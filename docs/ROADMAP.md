@@ -259,7 +259,7 @@ linearly at the end. Each step is verified before the next.
 5. **Player bar.** Icon transport group in the centre; Audio & subtitles,
    volume, fullscreen at the right; Stats off the bar (still `i`). Episode name
    and "Ends at" on screen. Volume and mute (M); "Volume on the receiver" while
-   bitstreaming.
+   bitstreaming. **Done** (mock; real app with step 6).
 6. **Start over.** A button on the "Resumed from" notice while it shows, and
    Resume / Play from start on the detail page.
 7. **Tracks.** Plain names ("English · 7.1 · Dolby TrueHD Atmos", "SDH",

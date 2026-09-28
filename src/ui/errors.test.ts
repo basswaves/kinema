@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { describeError } from './errors';
-import { count } from './format';
+import { count, endsAtLabel } from './format';
 
 describe('describeError', () => {
   it('names a missing path without the Windows error number', () => {
@@ -38,5 +38,18 @@ describe('count', () => {
     expect(count(0, 'file')).toBe('0 files');
     expect(count(3, 'episode')).toBe('3 episodes');
     expect(count(2, 'library', 'libraries')).toBe('2 libraries');
+  });
+});
+
+describe('endsAtLabel', () => {
+  it('adds what is left to the clock', () => {
+    const now = new Date(2026, 8, 28, 21, 0, 0).getTime();
+    const label = endsAtLabel(600, 600 + 100 * 60, now);
+    expect(label).toMatch(/22.40/);
+  });
+
+  it('says nothing until the length is known', () => {
+    expect(endsAtLabel(null, 3600, 0)).toBeNull();
+    expect(endsAtLabel(10, null, 0)).toBeNull();
   });
 });

@@ -1592,8 +1592,26 @@ html {
 }
 
 .player-label {
-  font-size: 0.875rem;
-  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
+}
+
+.player-episode {
+  font-weight: 500;
+  opacity: 0.85;
+}
+
+.player-ends {
+  flex: 0 0 auto;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
 }
 
@@ -1655,50 +1673,194 @@ html {
   outline-offset: 2px;
 }
 
+/* Three columns, so the transport sits in the true centre whatever the two
+   sides hold. */
 .player-buttons {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.625rem;
+}
+
+.player-group {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin-top: 0.75rem;
 }
 
-.player-buttons button {
-  padding: 0.5rem 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 0.4375rem;
-  background: rgba(255, 255, 255, 0.1);
+.player-group-centre {
+  gap: 0.875rem;
+}
+
+.player-group-right {
+  justify-content: flex-end;
+}
+
+.player-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  flex: 0 0 auto;
+}
+
+/* Round, borderless, the icon alone — the transport reads as one unit. */
+.player-buttons .icon-button,
+.player-buttons .labelled-button,
+.volume-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: none;
+  background: transparent;
   color: #fff;
-  font-size: 0.8125rem;
   cursor: pointer;
+  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.7));
 }
 
-.player-buttons button:hover {
-  background: rgba(255, 255, 255, 0.2);
+.player-buttons .icon-button {
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  border-radius: 50%;
 }
 
-.player-buttons .btn-primary {
-  min-width: 6.625rem;
+/* The one control everything else frames. */
+.player-buttons .play-button {
+  width: 3.5rem;
+  height: 3.5rem;
+  background: rgba(255, 255, 255, 0.92);
+  color: #111;
+  filter: none;
 }
 
-/* Episode stepping frames the seek controls, the way a transport bar reads.
-   Kept on one line: at TV scale the row is close to wrapping already. */
-.player-buttons .episode-step {
+.player-buttons .play-button .player-icon {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+.help-glyph {
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.player-buttons .labelled-button,
+.volume-control {
+  height: 2.75rem;
+  padding: 0 0.875rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
   white-space: nowrap;
+}
+
+.player-buttons button:hover,
+.volume-control:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.player-buttons .play-button:hover {
+  background: #fff;
 }
 
 .player-buttons button.active {
   background: rgba(229, 9, 20, 0.85);
-  border-color: #e50914;
 }
 
 /* The D-pad ring, over video rather than over a page background — so it is a
-   solid white outline plus a lift of the button's own fill, because an outline
-   alone can land on a bright frame and disappear. `.btn-primary.focused` and
-   `.back-button.focused` already cover the play button and Back. */
-.player-buttons button.focused {
+   solid white outline plus a lift of the control's own fill, because an
+   outline alone can land on a bright frame and disappear. `.back-button.focused`
+   already covers Back. */
+.player-buttons button.focused,
+.volume-control.focused {
   background: rgba(255, 255, 255, 0.24);
   outline: var(--focus-ring) solid #fff;
   outline-offset: 2px;
+}
+
+.player-buttons .play-button.focused {
+  background: #fff;
+  outline-offset: 3px;
+}
+
+/* A narrow window has no room for the words; the icon and its tooltip stay. */
+@media (max-width: 900px) {
+  .player-buttons .labelled-button span {
+    display: none;
+  }
+
+  .player-group-centre {
+    gap: 0.375rem;
+  }
+}
+
+/* ---- volume ------------------------------------------------------------- */
+.volume-control {
+  position: relative;
+  min-width: 5.25rem;
+}
+
+.volume-value {
+  min-width: 2.25rem;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+
+.volume-control.receiver .volume-value {
+  opacity: 0.75;
+}
+
+/* The level, shown above the control while it has the ring or the pointer —
+   Up and Down change it then, so this is where they visibly act. */
+.volume-pop {
+  position: absolute;
+  bottom: calc(100% + 0.625rem);
+  left: 50%;
+  transform: translateX(-50%);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.625rem 0.5rem;
+  border-radius: 0.625rem;
+  background: rgba(20, 20, 24, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.volume-control.focused .volume-pop,
+.volume-control:hover .volume-pop {
+  display: flex;
+}
+
+.volume-track {
+  position: relative;
+  width: 0.375rem;
+  height: 6rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+}
+
+.volume-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #fff;
+}
+
+.volume-pop-hint {
+  font-size: 0.625rem;
+  opacity: 0.6;
+}
+
+.volume-pop-note {
+  width: 7.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.35;
+  text-align: center;
+  white-space: normal;
 }
 
 /* ---- resume toast -------------------------------------------------------- */

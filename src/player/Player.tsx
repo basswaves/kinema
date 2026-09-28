@@ -80,12 +80,35 @@ import { filmNow, mayswitch, restoreScreen, switchForFilm } from './displaySwitc
 import { getSetting } from '../metadata/api';
 import { initialSession, reduce, samePath } from './session';
 import { COMMIT_IDLE_MS, scrubStep, type Scrub } from './scrub';
+import { endsAtLabel } from '../ui/format';
+import {
+  BackTenIcon,
+  ForwardTenIcon,
+  FullscreenIcon,
+  NextIcon,
+  PauseIcon,
+  PlayIcon,
+  PreviousIcon,
+  SubtitlesIcon,
+} from './icons';
+import VolumeControl from './VolumeControl';
+import {
+  applyMute,
+  applyVolume,
+  bitstreaming,
+  clampVolume,
+  persistVolume,
+  savedVolume,
+  VOLUME_STEP,
+} from './volume';
 
 export interface PlaybackTarget {
   path: string;
   label: string;
   fileId: number | null;
   titleId: number | null;
+  /** Shown after the label at the top, where the caller knows it. */
+  episodeName?: string | null;
 }
 
 interface Props {
@@ -138,7 +161,6 @@ const AUDIO_NOTICE_MS = 12000;
 const PLAYER_SHELL_KEY = 'player-shell';
 const PLAYER_PLAY_KEY = 'player-play';
 const PLAYER_TRACKS_KEY = 'player-tracks-button';
-const PLAYER_STATS_KEY = 'player-stats-button';
 const PLAYER_SEEK_KEY = 'player-seek';
 
 /** The label an episode carries into the player, shared with the browsing UI. */
@@ -317,8 +339,10 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     if (osdFocusRef.current) void setFocus(PLAYER_TRACKS_KEY);
     setShowTracks(false);
   }, []);
+  // The stats panel has no button on the bar any more (it opens on `i`), so
+  // closing it hands the ring to Play rather than to a button that is gone.
   const closeStats = useCallback(() => {
-    if (osdFocusRef.current) void setFocus(PLAYER_STATS_KEY);
+    if (osdFocusRef.current) void setFocus(PLAYER_PLAY_KEY);
     setShowStats(false);
   }, []);
 
@@ -991,6 +1015,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         path: episode.path,
         label: labelFor(episode),
         fileId: episode.file_id,
+        episodeName: episode.name,
         titleId: target.titleId,
       });
     },
@@ -1168,6 +1193,76 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
 
   useEffect(() => () => window.clearTimeout(scrubTimer.current), []);
 
+  /**
+   * The clock, for "Ends at". Ticked rather than read during render, which
+   * would make the render impure; every 15 s is plenty for a minute display,
+   * and the position changing re-renders it in between anyway.
+   */
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 15000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  // ---- volume -------------------------------------------------------------
+  const [volume, setVolume] = useState(100);
+  const [muted, setMuted] = useState(false);
+  /** Sound bitstreamed to a receiver: this volume would do nothing. */
+  const [receiver, setReceiver] = useState(false);
+
+  // The remembered level, applied once per player; mpv keeps it across files.
+  useEffect(() => {
+    let live = true;
+    void savedVolume().then((level) => {
+      if (!live) return;
+      setVolume(level);
+      void applyVolume(level).catch((e) => console.warn('volume: could not apply', e));
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const changeVolume = useCallback(
+    (delta: number) => {
+      const level = clampVolume(volume + delta);
+      setVolume(level);
+      void applyVolume(level).catch(fail);
+      void persistVolume(level).catch((e) => console.warn('volume: could not save', e));
+      // Turning it up is a clear enough request to hear something.
+      if (muted && delta > 0) {
+        setMuted(false);
+        void applyMute(false).catch(fail);
+      }
+      showOsd();
+    },
+    [volume, muted, fail, showOsd]
+  );
+
+  const toggleMute = useCallback(() => {
+    const next = !muted;
+    setMuted(next);
+    void applyMute(next).catch(fail);
+    showOsd();
+  }, [muted, fail, showOsd]);
+
+  /**
+   * A volume key, asked of the sound path at the moment it is pressed rather
+   * than of the last answer: a fallback part-way through a file can change it,
+   * and a key that silently did nothing because of a stale answer is the kind
+   * of failure nobody can report.
+   */
+  const volumeKey = useCallback(
+    (act: () => void) => {
+      void bitstreaming().then((yes) => {
+        setReceiver(yes);
+        if (yes) showOsd();
+        else act();
+      });
+    },
+    [showOsd]
+  );
+
   const toggleFullscreen = useCallback(async () => {
     // In TV mode the window is always fullscreen and has no other state to
     // toggle to — see tv.ts.
@@ -1342,6 +1437,20 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           e.preventDefault();
           void seekRelative(-TRANSPORT_SKIP_SECS);
           break;
+        // Volume, on mpv's keys and the obvious ones. While the receiver has
+        // the volume they do nothing but bring up the bar that says so.
+        case 'm':
+          volumeKey(toggleMute);
+          break;
+        case '-':
+        case '9':
+          volumeKey(() => changeVolume(-VOLUME_STEP));
+          break;
+        case '+':
+        case '=':
+        case '0':
+          volumeKey(() => changeVolume(VOLUME_STEP));
+          break;
         // mpv's own key for its stats overlay, so the reflex transfers.
         case 'i':
           e.preventDefault();
@@ -1393,7 +1502,23 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     closeTracks,
     closeStats,
     scrubBy,
+    volumeKey,
+    toggleMute,
+    changeVolume,
   ]);
+
+  /**
+   * Whether the receiver has the volume, asked whenever the controls come up
+   * — the only time the answer is on screen, and a cheap scalar read.
+   */
+  useEffect(() => {
+    if (!osdVisible) return;
+    let live = true;
+    void bitstreaming().then((yes) => live && setReceiver(yes));
+    return () => {
+      live = false;
+    };
+  }, [osdVisible, target.path]);
 
   /**
    * Letting go of Left/Right is what sends the seek. Only in watching mode:
@@ -1486,6 +1611,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   ]);
 
   const progress = duration && timePos !== null ? (timePos / duration) * 100 : 0;
+  const endsAt = endsAtLabel(timePos, duration, now);
   const subTracks = tracks.filter((t) => t.type === 'sub');
   const audioTracks = tracks.filter((t) => t.type === 'audio');
 
@@ -1531,7 +1657,11 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         <FocusButton className="back-button" onSelect={() => void exit()}>
           ← Back
         </FocusButton>
-        <span className="player-label">{target.label}</span>
+        <span className="player-label">
+          {target.label}
+          {target.episodeName && <span className="player-episode"> · {target.episodeName}</span>}
+        </span>
+        {endsAt && <span className="player-ends">Ends at {endsAt}</span>}
       </div>
 
       {upNext && (
@@ -1613,69 +1743,106 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           <span className="player-time">{formatTime(duration)}</span>
         </div>
 
+        {/* Three groups: help at the left, the transport in the middle where the
+            eye goes, and the settings of the moment at the right. Icons rather
+            than words for the transport, as on every player; each carries its
+            name for a screen reader and a tooltip for the mouse. Stats is not
+            here any more — it is a diagnostic, on `i` and in the key list, not
+            something to walk past on the way to the subtitles. */}
         <div className="player-buttons">
-          {/* Rendered only for episodes that genuinely have a neighbour, so
-              these never appear on a film or at the ends of a run. */}
-          {neighbours.prev && (
+          <div className="player-group player-group-left">
             <FocusButton
-              className="episode-step"
-              title={`Previous: ${labelFor(neighbours.prev)}`}
-              onSelect={() => playNeighbour(neighbours.prev as EpisodeRef)}
+              className="icon-button"
+              label="Keyboard and remote controls"
+              title="Keyboard and remote controls (?)"
+              onSelect={() => setShortcutsOpen(true)}
             >
-              ⏮ Prev
+              <span className="help-glyph">?</span>
             </FocusButton>
-          )}
-          <FocusButton onSelect={() => void seekRelative(-10)}>−10s</FocusButton>
-          <FocusButton
-            focusKey={PLAYER_PLAY_KEY}
-            className="btn-primary"
-            onSelect={() => void togglePause()}
-          >
-            {paused ? '▶ Play' : '❚❚ Pause'}
-          </FocusButton>
-          <FocusButton onSelect={() => void seekRelative(10)}>+10s</FocusButton>
-          {neighbours.next && (
+          </div>
+          <div className="player-group player-group-centre">
+            {/* Rendered only for episodes that genuinely have a neighbour, so
+                these never appear on a film or at the ends of a run. */}
+            {neighbours.prev && (
+              <FocusButton
+                className="icon-button"
+                label={`Previous episode: ${labelFor(neighbours.prev)}`}
+                title={`Previous: ${labelFor(neighbours.prev)} (P)`}
+                onSelect={() => playNeighbour(neighbours.prev as EpisodeRef)}
+              >
+                <PreviousIcon />
+              </FocusButton>
+            )}
             <FocusButton
-              className="episode-step"
-              title={`Next: ${labelFor(neighbours.next)}`}
-              onSelect={() => playNeighbour(neighbours.next as EpisodeRef)}
+              className="icon-button"
+              label="Back 10 seconds"
+              title="Back 10 seconds (←)"
+              onSelect={() => void seekRelative(-10)}
             >
-              Next ⏭
+              <BackTenIcon />
             </FocusButton>
-          )}
-          <FocusButton
-            focusKey={PLAYER_TRACKS_KEY}
-            className={showTracks ? 'active' : ''}
-            onSelect={() => {
-              if (showTracks) {
-                closeTracks();
-                return;
-              }
-              setShowTracks(true);
-              void readTracks().then(setTracks);
-            }}
-          >
-            Audio &amp; subtitles
-          </FocusButton>
-          <FocusButton
-            focusKey={PLAYER_STATS_KEY}
-            className={showStats ? 'active' : ''}
-            title="Playback diagnostics (i)"
-            onSelect={() => (showStats ? closeStats() : setShowStats(true))}
-          >
-            Stats
-          </FocusButton>
-          {!tv && <FocusButton onSelect={() => void toggleFullscreen()}>Fullscreen</FocusButton>}
-          {/* Here as well as in the nav, because this is where the controls are
-              least obvious: the OSD hides itself while you watch, so a remote
-              user who does not already know that Up brings it back has nothing
-              on screen to tell them. */}
-          <FocusButton
-            title="Keyboard and remote controls (?)"
-            onSelect={() => setShortcutsOpen(true)}
-          >
-            ?
-          </FocusButton>
+            <FocusButton
+              focusKey={PLAYER_PLAY_KEY}
+              className="icon-button play-button"
+              label={paused ? 'Play' : 'Pause'}
+              title={paused ? 'Play (OK / Space)' : 'Pause (OK / Space)'}
+              onSelect={() => void togglePause()}
+            >
+              {paused ? <PlayIcon /> : <PauseIcon />}
+            </FocusButton>
+            <FocusButton
+              className="icon-button"
+              label="Forward 10 seconds"
+              title="Forward 10 seconds (→)"
+              onSelect={() => void seekRelative(10)}
+            >
+              <ForwardTenIcon />
+            </FocusButton>
+            {neighbours.next && (
+              <FocusButton
+                className="icon-button"
+                label={`Next episode: ${labelFor(neighbours.next)}`}
+                title={`Next: ${labelFor(neighbours.next)} (N)`}
+                onSelect={() => playNeighbour(neighbours.next as EpisodeRef)}
+              >
+                <NextIcon />
+              </FocusButton>
+            )}
+          </div>
+          <div className="player-group player-group-right">
+            <FocusButton
+              focusKey={PLAYER_TRACKS_KEY}
+              className={`labelled-button ${showTracks ? 'active' : ''}`}
+              onSelect={() => {
+                if (showTracks) {
+                  closeTracks();
+                  return;
+                }
+                setShowTracks(true);
+                void readTracks().then(setTracks);
+              }}
+            >
+              <SubtitlesIcon />
+              <span>Audio &amp; subtitles</span>
+            </FocusButton>
+            <VolumeControl
+              level={volume}
+              muted={muted}
+              receiver={receiver}
+              onChange={changeVolume}
+              onToggleMute={toggleMute}
+            />
+            {!tv && (
+              <FocusButton
+                className="icon-button"
+                label="Fullscreen"
+                title="Fullscreen (F)"
+                onSelect={() => void toggleFullscreen()}
+              >
+                <FullscreenIcon />
+              </FocusButton>
+            )}
+          </div>
         </div>
       </div>
     </div>

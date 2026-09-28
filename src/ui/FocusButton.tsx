@@ -38,6 +38,8 @@ interface Props {
   /** Pointer tooltip. A remote never sees it, so it must never be the only
    *  place a control's meaning is written down. */
   title?: string;
+  /** The name read out for a button whose content is an icon. */
+  label?: string;
 }
 
 export default function FocusButton({
@@ -48,6 +50,7 @@ export default function FocusButton({
   keepInView,
   disabled = false,
   title,
+  label,
 }: Props) {
   const { ref, focused } = useFocusable<object, HTMLButtonElement>({
     focusKey,
@@ -67,6 +70,7 @@ export default function FocusButton({
       className={`${className} ${focused ? 'focused' : ''}`.trim()}
       disabled={disabled}
       title={title}
+      aria-label={label}
       onClick={onSelect}
     >
       {children}

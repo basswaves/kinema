@@ -34,6 +34,10 @@ export interface FakeMpvState {
   loadDelayMs: number;
   /** Every command received, newest last, for assertions. */
   commands: Array<{ name: string; args: unknown[] }>;
+  volume: number;
+  mute: boolean;
+  /** Set to e.g. 'spdif-truehd' to stand in for sound going to a receiver. */
+  audioOutFormat: string | null;
 }
 
 /** How long each fixture file runs. Unknown paths get a TV-episode length. */
@@ -51,6 +55,9 @@ const state: FakeMpvState = {
   speed: 1,
   loadDelayMs: 300,
   commands: [],
+  volume: 100,
+  mute: false,
+  audioOutFormat: 'float',
 };
 
 let ticker: number | undefined;
@@ -148,6 +155,8 @@ export function setProperty(name: string, value: unknown): null {
     state.paused = value === true || value === 'yes';
     change('pause', state.paused);
   }
+  if (name === 'volume') state.volume = Number(value);
+  if (name === 'mute') state.mute = value === true || value === 'yes';
   return null;
 }
 
@@ -169,6 +178,12 @@ export function getProperty(name: string): unknown {
       return state.eof;
     case 'sub-visibility':
       return true;
+    case 'volume':
+      return state.volume;
+    case 'mute':
+      return state.mute;
+    case 'audio-out-params/format':
+      return state.audioOutFormat;
     case 'track-list/count':
     case 'chapters':
       return 0;

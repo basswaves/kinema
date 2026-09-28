@@ -33,7 +33,8 @@ interface Props {
     path: string,
     label: string,
     fileId: number | null,
-    titleId?: number | null
+    titleId?: number | null,
+    episodeName?: string | null
   ) => void;
   onBack: () => void;
 }
@@ -259,7 +260,9 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
                           onPlayFile(
                             nextUp.path,
                             episodeLabel(title.title, nextUp.season, nextUp.episode),
-                            nextUp.file_id
+                            nextUp.file_id,
+                            undefined,
+                            nextUp.name
                           )
                         }
                       >
@@ -407,7 +410,9 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
                         `${title.title} — S${String(episode.season).padStart(2, '0')}E${String(
                           episode.episode
                         ).padStart(2, '0')}`,
-                        episode.file_id
+                        episode.file_id,
+                        undefined,
+                        episode.name
                       )
                     }
                   />

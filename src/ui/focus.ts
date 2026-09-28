@@ -66,9 +66,55 @@ const landingSpots: string[] = [];
 const SECOND_LOOK_MS = 450;
 
 /**
+ * A control to put focus back on, once it exists — set when Back returns to a
+ * view, naming whatever was focused there when it was left.
+ *
+ * The returning view has to mount and usually load before that control exists
+ * (Home's rails, a detail page's episodes), so this waits for it rather than
+ * trying once. While it waits, views do not make their own landing claim: a
+ * claim that won would scroll Home to the hero and then back down to the card,
+ * which reads as the page jumping.
+ */
+let pendingReturn: string | null = null;
+let returnTimer = 0;
+
+/** How long to wait for the control before settling for the landing spot. */
+const RETURN_WAIT_MS = 2000;
+const RETURN_POLL_MS = 50;
+
+export function hasPendingReturn(): boolean {
+  return pendingReturn !== null;
+}
+
+export function returnFocusTo(focusKey: string | null): void {
+  window.clearInterval(returnTimer);
+  pendingReturn = focusKey;
+  if (!focusKey) return;
+
+  const started = Date.now();
+  returnTimer = window.setInterval(() => {
+    if (doesFocusableExist(focusKey)) {
+      window.clearInterval(returnTimer);
+      pendingReturn = null;
+      void setFocus(focusKey);
+    } else if (Date.now() - started > RETURN_WAIT_MS) {
+      // Gone for good — the card was removed, the episode is no longer in the
+      // list. Fall back to the view's own landing spot.
+      window.clearInterval(returnTimer);
+      pendingReturn = null;
+      if (!focusIsDead()) return;
+      const spot = [...landingSpots].reverse().find((key) => doesFocusableExist(key));
+      if (spot) void setFocus(spot);
+    }
+  }, RETURN_POLL_MS);
+}
+
+/**
  * Claim focus for `focusKey` once `ready`, unless something live already holds
  * it — and look again after the library's own delayed restore has had its
  * turn, since that can land on a dead key after this claim succeeded.
+ *
+ * Stands aside while Back is waiting to put focus back somewhere specific.
  *
  * Pointing this at a *container* is usually right — the spatial system then
  * descends to its last focused child, or its `preferredChildFocusKey`, which
@@ -78,10 +124,12 @@ export function useClaimFocus(focusKey: string, ready: boolean): void {
   useEffect(() => {
     if (!ready) return;
     landingSpots.push(focusKey);
-    if (focusIsDead()) void setFocus(focusKey);
+    if (focusIsDead() && !pendingReturn) void setFocus(focusKey);
 
     const second = window.setTimeout(() => {
-      if (focusIsDead() && doesFocusableExist(focusKey)) void setFocus(focusKey);
+      if (focusIsDead() && !pendingReturn && doesFocusableExist(focusKey)) {
+        void setFocus(focusKey);
+      }
     }, SECOND_LOOK_MS);
 
     return () => {

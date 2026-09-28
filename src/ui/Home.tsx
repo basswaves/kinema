@@ -39,7 +39,7 @@ const MIN_PER_GENRE = 2;
  * does by hovering, so without an explicit landing spot the first arrow press
  * from the couch does nothing at all and the app looks dead.
  */
-const HERO_PLAY_FOCUS_KEY = 'hero-play';
+export const HERO_PLAY_FOCUS_KEY = 'hero-play';
 
 export default function Home({
   titles,
@@ -182,6 +182,7 @@ function Hero({
               ▶ Play
             </FocusButton>
             <FocusButton
+              focusKey="hero-info"
               className="btn-secondary"
               keepInView="page-top"
               onSelect={() => onSelect(title)}

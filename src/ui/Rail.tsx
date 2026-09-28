@@ -42,7 +42,12 @@ export default function Rail({ heading, titles, onSelect, onSeeAll }: Props) {
         </h2>
         <div className="rail-track">
           {shown.map((title) => (
-            <Card key={title.id} title={title} onSelect={onSelect} />
+            <Card
+              key={title.id}
+              title={title}
+              onSelect={onSelect}
+              focusKey={`rail:${heading}:${title.id}`}
+            />
           ))}
           {/* At the end of the row rather than beside the heading: that is
               where you arrive having scrolled to the end, and it keeps the
@@ -50,6 +55,7 @@ export default function Rail({ heading, titles, onSelect, onSeeAll }: Props) {
               sit above the cards and compete with moving to the rail above. */}
           {hasMore && (
             <FocusButton
+              focusKey={`rail:${heading}:see-all`}
               className="see-all-card"
               keepInView="nearest"
               onSelect={() => onSeeAll?.(heading, titles)}

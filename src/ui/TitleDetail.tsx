@@ -485,7 +485,10 @@ function PlayableEpisodeRow({ episode, onPlay, onToggleWatched, focusKey }: Epis
 
 /** The part of the row that plays the episode: still, title, overview, runtime. */
 function EpisodePlayArea({ episode, onPlay }: { episode: Episode; onPlay: () => void }) {
-  const { ref, focused } = useFocusable<object, HTMLDivElement>({ onEnterPress: onPlay });
+  const { ref, focused } = useFocusable<object, HTMLDivElement>({
+    focusKey: `episode:${episode.id}`,
+    onEnterPress: onPlay,
+  });
 
   // A season is the one list here long enough to run off the bottom of the
   // screen, and more so at TV scale, where a third as many rows fit. Without

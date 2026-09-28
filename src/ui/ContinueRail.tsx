@@ -102,7 +102,10 @@ function ContinueCardBody({
   item: ContinueItem;
   onResume: (i: ContinueItem) => void;
 }) {
+  // Keyed by title, not file: after watching, the card for this show comes
+  // back holding the next episode, and Back should land on it.
   const { ref, focused } = useFocusable<object, HTMLDivElement>({
+    focusKey: `continue:${item.title_id}`,
     onEnterPress: () => onResume(item),
   });
 

@@ -15,12 +15,19 @@ import {
   FocusContext,
   type FocusableComponent,
 } from '@noriginmedia/norigin-spatial-navigation';
-import Home from './Home';
+import Home, { HERO_PLAY_FOCUS_KEY } from './Home';
 import TitleDetailView from './TitleDetail';
 import Card from './Card';
 import FocusButton from './FocusButton';
 import Settings from './Settings';
-import { installFocusWatchdog, recoverFocusSoon, useClaimFocus } from './focus';
+import {
+  hasPendingReturn,
+  installFocusWatchdog,
+  recoverFocusSoon,
+  returnFocusTo,
+  useClaimFocus,
+} from './focus';
+import { back, current, navigate, open, replace, type Entry } from './history';
 import { setShortcutsOpen } from './shortcutsState';
 import Player, { type PlaybackTarget } from '../player/Player';
 import {
@@ -122,7 +129,24 @@ export default function Browse() {
    */
   const [loaded, setLoaded] = useState(false);
   const [resumable, setResumable] = useState<ContinueItem[]>([]);
-  const [view, setView] = useState<View>({ name: 'home' });
+  const [stack, setStack] = useState<Entry<View>[]>([
+    { view: { name: 'home' }, returnFocus: null },
+  ]);
+  const view = current(stack);
+
+  /** Open a view on top of this one; Back returns here, to `from`. */
+  const openView = useCallback((next: View, from: string | null = getCurrentFocusKey()) => {
+    setStack((s) => open(s, next, from));
+  }, []);
+
+  const goBack = useCallback(() => {
+    const next = back(stack);
+    if (next === stack) return;
+    setStack(next);
+    // Home entered from the top bar has nothing remembered; the ring would
+    // otherwise stay up on the nav button that was pressed to leave it.
+    returnFocusTo(next[next.length - 1].returnFocus ?? HERO_PLAY_FOCUS_KEY);
+  }, [stack]);
   const [query, setQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
   /** A root that could not be read at startup. Not an error — see below. */
@@ -147,13 +171,13 @@ export default function Browse() {
   const startPlayback = useCallback(async (target: PlaybackTarget) => {
     const offer = target.titleId === null ? null : await directSoundOffer().catch(() => null);
     if (offer) setPending({ target, offer, returnTo: getCurrentFocusKey() });
-    else setView({ name: 'player', target });
-  }, []);
+    else openView({ name: 'player', target });
+  }, [openView]);
 
   const answerOffer = useCallback(
     (accept: boolean) => {
       if (!pending) return;
-      const { target } = pending;
+      const { target, returnTo } = pending;
       setPending(null);
       void (async () => {
         try {
@@ -162,10 +186,10 @@ export default function Browse() {
         } catch (e) {
           console.warn('audio: could not save the answer to the offer', e);
         }
-        setView({ name: 'player', target });
+        openView({ name: 'player', target }, returnTo);
       })();
     },
-    [pending]
+    [pending, openView]
   );
 
   // The shell owns the nav↔content rule, because it is the only component that
@@ -312,24 +336,27 @@ export default function Browse() {
     let cancelled = false;
     void selfTestPlan().then((plan) => {
       if (!plan || cancelled) return;
-      const open = () =>
-        setView({
-          name: 'player',
-          target: {
-            path: plan.path,
-            label: plan.label ?? 'Self-test',
-            fileId: plan.fileId,
-            titleId: plan.titleId,
+      const play = () =>
+        openView(
+          {
+            name: 'player',
+            target: {
+              path: plan.path,
+              label: plan.label ?? 'Self-test',
+              fileId: plan.fileId,
+              titleId: plan.titleId,
+            },
           },
-        });
-      if (plan.openAfter) window.setTimeout(open, plan.openAfter * 1000);
-      else open();
+          null
+        );
+      if (plan.openAfter) window.setTimeout(play, plan.openAfter * 1000);
+      else play();
       void runSelfTest(plan).catch((e) => console.error('selftest failed', e));
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [openView]);
 
   /**
    * Play the most sensible file for a title without making the user choose:
@@ -442,25 +469,27 @@ export default function Browse() {
           void setFocus(returnTo);
           return;
         }
-        setView({ name: 'home' });
+        goBack();
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [view.name, pending]);
+  }, [view.name, pending, goBack]);
 
   useEffect(() => {
-    if (view.name === 'search') setFocus('search-input');
+    // Arriving from the top bar puts you in the box; coming Back from a result
+    // puts you on that result instead, which returnFocusTo is already doing.
+    if (view.name === 'search' && !hasPendingReturn()) setFocus('search-input');
   }, [view.name]);
 
   if (view.name === 'player') {
     return (
       <Player
         target={view.target}
-        onPlayTarget={(target) => setView({ name: 'player', target })}
-        // Returning to Home re-reads the library on arrival, so what just
-        // played is reflected without a second load here.
-        onExit={() => setView({ name: 'home' })}
+        onPlayTarget={(target) => setStack((s) => replace(s, { name: 'player', target }))}
+        // Back to the page Play was pressed on. Home re-reads the library
+        // whenever it is shown, so what just played is reflected there too.
+        onExit={goBack}
       />
     );
   }
@@ -468,7 +497,12 @@ export default function Browse() {
   return (
     <div className="browse" ref={shellRef}>
       <FocusContext.Provider value={shellFocusKey}>
-        <TopNav active={view.name} onNavigate={setView} />
+        <TopNav
+          active={view.name}
+          onNavigate={(next) =>
+            setStack(navigate<View>({ name: 'home' }, next, next.name === 'home'))
+          }
+        />
 
         {error && (
           <div className="browse-error" onClick={() => setError(null)}>
@@ -488,12 +522,12 @@ export default function Browse() {
             titles={titles}
             loaded={loaded}
             resumable={resumable}
-            onSelect={(title) => setView({ name: 'detail', title })}
+            onSelect={(title) => openView({ name: 'detail', title })}
             onPlay={(title) => void playTitle(title)}
             onRemoveResumable={(item) => void removeResumable(item)}
             onLibraryChanged={() => void load()}
             onSeeAll={(heading, list) =>
-              setView({ name: 'grid', heading, titleIds: list.map((t) => t.id) })
+              openView({ name: 'grid', heading, titleIds: list.map((t) => t.id) })
             }
             onResume={(item) =>
               void startPlayback({
@@ -511,7 +545,7 @@ export default function Browse() {
             query={query}
             onQueryChange={setQuery}
             results={results}
-            onSelect={(title) => setView({ name: 'detail', title })}
+            onSelect={(title) => openView({ name: 'detail', title })}
           />
         )}
 
@@ -519,8 +553,8 @@ export default function Browse() {
           <GridView
             heading={view.heading}
             titles={gridTitles}
-            onSelect={(title) => setView({ name: 'detail', title })}
-            onBack={() => setView({ name: 'home' })}
+            onSelect={(title) => openView({ name: 'detail', title })}
+            onBack={goBack}
           />
         )}
 
@@ -529,7 +563,7 @@ export default function Browse() {
         {view.name === 'detail' && (
           <TitleDetailView
             title={view.title}
-            onBack={() => setView({ name: 'home' })}
+            onBack={goBack}
             onPlayFile={(path, label, fileId, titleId) =>
               void startPlayback({
                 path,
@@ -654,7 +688,7 @@ function GridView({
         </div>
         <div className="search-grid">
           {titles.map((title) => (
-            <Card key={title.id} title={title} onSelect={onSelect} />
+            <Card key={title.id} title={title} onSelect={onSelect} focusKey={`grid:${title.id}`} />
           ))}
         </div>
       </div>
@@ -691,7 +725,7 @@ function SearchView({
         <SearchInput value={query} onChange={onQueryChange} />
         <div className="search-grid">
           {results.map((title) => (
-            <Card key={title.id} title={title} onSelect={onSelect} />
+            <Card key={title.id} title={title} onSelect={onSelect} focusKey={`search:${title.id}`} />
           ))}
         </div>
         {results.length === 0 && <p className="muted center">No matches.</p>}

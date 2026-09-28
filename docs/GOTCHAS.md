@@ -725,6 +725,19 @@ system believes is focused after the browsing UI unmounted beneath it, no
 control may show a ring outside that mode — `.player:not(.osd-focused) .focused`
 in `ui.css` enforces it.
 
+### Back can only return to a control with a stable key
+
+Back remembers the focus key held on each view when it was left
+(`history.ts`) and puts focus back there on return (`returnFocusTo`). A
+focusable declared without a `focusKey` gets a generated one, and a remounted
+view generates **new** ones — so the remembered key names nothing, the wait
+times out after two seconds, and focus falls back to the view's landing spot.
+No error, just Back that lands at the top of the page instead of on the card
+you opened. Anything a user can open something from needs a key that is the
+same every time it renders, and unique on the page: cards are keyed by where
+they sit as well as what they show (`rail:<heading>:<id>`, `grid:<id>`,
+`search:<id>`), because one title appears in several rails at once.
+
 ---
 
 ## Frontend

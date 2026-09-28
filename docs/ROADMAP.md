@@ -249,7 +249,7 @@ linearly at the end. Each step is verified before the next.
    count in the top bar.
 2. **Back remembers.** A view history: Back returns to the previous screen with
    focus on what was picked (search results, See-all grid, detail after a film).
-   Replaces "Back from a detail page always goes Home" below.
+   **Done.**
 3. **TV mode runs fullscreen.** The whole app, library and player — so display
    switching, which only acts in fullscreen, is not silently off from the sofa.
    Desk mode stays windowed.
@@ -382,13 +382,6 @@ git checkout <that commit>~1 -- src/spike/ src/App.css
 
 It renders through the same `ensureMpvInitialised` as the real player, so what
 it reports is what the player gets.
-
-### Back from a detail page always goes Home
-
-Opening a title from a **See all** grid and pressing Back returns to Home rather
-than to the grid. A view stack instead of a single `View` would fix it. Left
-alone deliberately: it is a behaviour change, not a bug fix, and nobody has said
-the current behaviour annoys them.
 
 ---
 

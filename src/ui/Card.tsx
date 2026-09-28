@@ -11,10 +11,16 @@ import type { Title } from './api';
 interface Props {
   title: Title;
   onSelect: (title: Title) => void;
+  /**
+   * Stable across remounts, so Back can put focus back on this card. Unique per
+   * place the card appears: the same title sits in several rails at once.
+   */
+  focusKey?: string;
 }
 
-export default function Card({ title, onSelect }: Props) {
+export default function Card({ title, onSelect, focusKey: key }: Props) {
   const { ref, focused, focusKey } = useFocusable({
+    focusKey: key,
     onEnterPress: () => onSelect(title),
     extraProps: { titleId: title.id },
   });

@@ -1,6 +1,6 @@
 # Kinema
 
-A media library for the films and TV shows already on your disk. It scans your
+A media library for the movies and TV shows already on your disk. It scans your
 folders, finds the artwork and descriptions, remembers where you stopped, and
 plays them — with no server, no account, and nothing running in the background.
 
@@ -11,34 +11,43 @@ Kinema is one program: close it and nothing is left running.
 
 **Windows 11 only.** See [Platform support](#platform-support).
 
-![Kinema's home screen: a full-width backdrop for the most recently added title, with rails of posters beneath it](docs/images/home.jpg)
+![Kinema's home screen: a full-width backdrop for a title from the library, with rails of posters beneath it](docs/images/home.jpg)
 
-![A film's detail page, showing the poster, description and a row of cast portraits](docs/images/detail.jpg)
+![A movie's detail page, showing the poster, description and a row of cast portraits](docs/images/detail.jpg)
 
 Detail pages carry the cast, the description and — for a series — every season
-and episode, with progress on the ones you have started.
+and episode, opening on the season you are in, with progress on the ones you
+have started. Posters everywhere show what you have watched.
 
-![The player's on-screen controls: seek bar, transport buttons, and an audio and subtitle panel](docs/images/player.png)
+![The player's controls: seek bar, the transport in the middle, audio and subtitles and volume at the right, and when it will end](docs/images/player.jpg)
 
-The controls appear on any key or mouse move and hide themselves again. **Press
-`↑`** to hand the arrow keys to them, which is how a remote reaches subtitles,
-audio tracks and fullscreen.
+A remote works the way it does on any streaming app: **OK** pauses, **←/→**
+seek (hold to go faster), and **↑/↓** bring up the controls — the seek bar,
+audio and subtitles, volume. Back steps back to wherever you came from.
 
 ## What it does
 
-- **Finds your films and shows** by walking folders you nominate. It never reads
+- **Finds your movies and shows** by walking folders you nominate. It never reads
   file contents to identify them, so scanning a NAS stays cheap.
 - **Fetches posters, backdrops, descriptions, cast and episode stills**, and
   caches them locally so browsing works with no connection.
 - **Refuses to guess.** A match it is not confident about goes to a review queue
-  with the reason, rather than silently attaching the wrong film to your file.
+  with the reason, rather than silently attaching the wrong movie to your file —
+  and Home tells you when something is waiting there.
 - **Plays through mpv** — the same engine as the standalone player — with
   hardware decoding, HDR tone mapping, PGS subtitles and 4K remuxes.
 - **Remembers where you were**, per file, and offers the next episode.
 - **Skips intros and credits**, from a community database, from chapter markers,
   or by fingerprinting a season's audio and finding what the episodes share.
-- **Works from a sofa.** Browsing, playing, subtitles and resume are all
-  reachable with a D-pad, and there is a larger layout for a television.
+- **Works from a sofa.** Browsing, searching (with an on-screen keyboard),
+  playing, subtitles and resume all work with a D-pad, and the TV layout fills
+  the screen with bigger text.
+- **Speaks your language.** Subtitles in your language when the audio is in
+  another, and none when it is not — set once, remembered per show when you
+  change it.
+- **Gets the most out of your equipment.** If your TV or receiver can do better
+  than Kinema is set to — Atmos and DTS:X untouched, 24p without judder, HDR —
+  Home says so, and one press turns it on.
 
 ![The playback statistics panel, listing resolution, codec, cadence, scaling and colour information](docs/images/stats.png)
 
@@ -56,34 +65,44 @@ Download the ZIP from [Releases](https://github.com/Basswaves/kinema/releases),
 extract it anywhere, and run `kinema.exe`. There is no installer — it is a
 folder, and deleting the folder uninstalls it.
 
-### Windows will warn you
+### Windows will ask once whether to run it
 
-The executable is not code-signed, so SmartScreen shows **"Windows protected
-your PC"** the first time. Click **More info**, then **Run anyway**.
+The first time you open `kinema.exe`, Windows shows a blue box: **"Windows
+protected your PC"**. Click **More info**, then **Run anyway**. Windows
+remembers, and does not ask again.
 
-This is expected for any unsigned program and is not a sign that something is
-wrong — but you should not have to take that on faith. Every release publishes a
-SHA-256 alongside the ZIP; compare it before you extract:
+It says that because Kinema is not *code-signed* — signed with a paid
+certificate that tells Windows who made the program. That is all it means. It
+is the same box for any small program from an independent developer, and it is
+not a warning that something was found.
+
+You should not have to take that on faith, so every release publishes a
+checksum beside the ZIP. To check the file you downloaded is the one that was
+published, run this in PowerShell in your Downloads folder and compare the
+result with the one on the release page:
 
 ```powershell
-Get-FileHash .\kinema-0.1.0-windows-x64.zip -Algorithm SHA256
+Get-FileHash .\kinema-*-windows-x64.zip -Algorithm SHA256
 ```
 
-Code signing costs a few hundred euros a year and does not make the program any
-safer, only quieter. It may happen later.
+Kinema asks GitHub for the latest version number when it starts, and says in
+Settings when a newer one is out. It never downloads or installs anything by
+itself — you download the new ZIP when you choose to.
 
 ## First run
 
 The app opens on a setup panel with two steps.
 
-1. **Add a folder.** Point it at where you keep your films, and another at your
+1. **Add a folder.** Point it at where you keep your movies, and another at your
    TV shows if they live somewhere else. Local drives and network shares both
    work. Nothing is moved, renamed or written to — the files are only read.
 
-2. **Paste a TMDB key.** Optional but worth two minutes. TV shows already work
-   without one, but films need it for posters, descriptions and artwork. It is
-   free: the panel has a button that opens
-   [the page you get one from](https://www.themoviedb.org/settings/api).
+2. **Paste a TMDB key.** TV shows work without one, but **movies need it** —
+   without a key they cannot be identified and do not appear. It is free, and
+   the panel has a button that opens
+   [the page you get one from](https://www.themoviedb.org/settings/api): you
+   create a TMDB account and fill in a short form describing your use (personal,
+   non-commercial).
 
 Then press **Scan my library**. The first scan takes a few minutes on a large
 library; you can watch it fill in. After that it scans once at every start and
@@ -182,16 +201,17 @@ visible error at all — only a log line.
 
 `F12` opens WebView2 DevTools in the app window.
 
-## A word on how tested this is
+## Known limitations
 
-Honestly: not very, outside one machine. Kinema was built for its author's
-setup, and a good deal of it is calibrated against one display and one
-television series — HDR passthrough, TV overscan, the intro-detection thresholds,
-and behaviour on a library of several hundred films are all listed as unverified
-in [docs/ROADMAP.md](docs/ROADMAP.md).
-
-It is published at `0.1.0` for exactly that reason. If it does something strange
-on your hardware, that is useful information rather than a nuisance.
+- **Windows 11 only** — see [Platform support](#platform-support).
+- **Movies need a TMDB key** for now. A key built into Kinema is the first item
+  on the [roadmap](docs/ROADMAP.md).
+- **Tested on a small number of setups.** HDR passthrough, bitstreaming to a
+  receiver and display switching have been confirmed on a 4K HDR TV with an AV
+  receiver; TV overscan, intro detection on many different shows, and libraries
+  of several hundred movies have had less exposure. The roadmap lists what is
+  unverified. If something behaves strangely on your equipment, the log files
+  (below) are the most useful thing you can send.
 
 ## Documentation
 

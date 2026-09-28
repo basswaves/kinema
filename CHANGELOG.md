@@ -7,6 +7,58 @@ makes no stability promises.
 
 ## [Unreleased]
 
+A pass over everything a new user meets, after an outside-eye review.
+
+### Changed
+
+- **The remote in the player works like a streaming app.** OK pauses and
+  resumes; Left/Right seek, faster the longer they are held; Up or Down bring
+  up the controls, where the seek bar can now be reached. The controls step
+  aside by themselves.
+- **A redesigned player bar**, with icons, the episode's name, "Ends at", and
+  a **volume control** (M to mute, − and + to change it; it says so when the
+  receiver has the volume).
+- **TV mode fills the screen** — library and player — so display switching
+  works from the sofa without finding a Fullscreen button.
+- **Back goes back** to where you came from — search results, a grid, the page
+  a film was started from — with the thing you picked still highlighted.
+- **Settings has sections** (Library, Playback, Picture & sound, Intro &
+  credits, Advanced), every option shows its choices side by side, and each
+  has one line of explanation with the rest behind "More about this".
+- **Home changes daily** and repeats itself less; genre rows wait until the
+  library is big enough for them.
+- **Track names are readable**: "English · 7.1 · Dolby TrueHD Atmos",
+  "Norwegian · Forced", "English · SDH".
+- **A show's page opens on the season you are in**, Specials last, with a
+  quiet watched tick per episode and **Mark season watched**.
+- **Movies**, not films, throughout; counts read "1 file", "3 files"; error
+  messages say what happened in words.
+
+### Added
+
+- **Watched ticks and progress bars on posters**, and how many episodes are
+  left of a show you have started.
+- **Default audio and subtitle languages** in Settings → Playback. Subtitles
+  default to Windows' language when the audio is in another one.
+- **Start over** on the "Resumed from" notice, and **Resume / Play from start**
+  on a title's page.
+- **Search from a remote**, with an on-screen keyboard in the TV layout, and
+  search by actor, genre or year as well as title.
+- **Sorting and "Unwatched only"** in every grid, and **Movies** and **TV shows**
+  in the top bar.
+- **Home says when videos need identifying**, with a button straight to the
+  review queue.
+- **Home says when your equipment can do better** than it is set to — a
+  receiver that takes Atmos and DTS:X, a TV with a 24p mode, HDR switched off —
+  with one press to turn it on.
+- **A notice when a newer Kinema is out**, from one request to GitHub per launch
+  (Settings → Advanced turns it off). Nothing is downloaded.
+
+### Removed
+
+- The question about sending sound to the receiver that interrupted the first
+  film. The notice on Home replaces it.
+
 ## [0.3.1] — 2026-09-25
 
 Small follow-ups to 0.3.0's native output.

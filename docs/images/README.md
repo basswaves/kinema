@@ -4,10 +4,15 @@ Referenced from the top-level [README](../../README.md).
 
 | File | What it shows |
 |---|---|
-| `home.png` | The home screen — hero backdrop and the rails beneath it |
-| `detail.png` | A film's detail page, with the cast row |
-| `player.png` | The player controls over a playing file |
+| `home.jpg` | The home screen — hero backdrop, a notice, and the rails beneath it |
+| `detail.jpg` | A movie's detail page, with the cast row |
+| `player.jpg` | The player controls over a paused file |
 | `stats.png` | The playback statistics panel (`i` while watching) |
+
+`home`, `detail` and `player` were taken by `scripts/selftest.ps1 -ShotDivisor 2`
+on a copy of a real library with its watch history deleted and the equipment
+notice dismissed first — so no viewing history and no device names are in the
+pictures. Settings is left out on purpose: it shows the library's folder paths.
 
 Ordinary Windows capture — `Win`+`Shift`+`S` or PrintScreen — picks these up
 fine, video included. If the video area comes out black, check where you are in

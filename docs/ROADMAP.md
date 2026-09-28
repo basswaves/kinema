@@ -289,7 +289,7 @@ linearly at the end. Each step is verified before the next.
 15. **Docs.** A built-in TMDB key goes to the top of "Worth doing"; the first-run
     picture-and-sound setup stays there; decisions to PLAN. **Done.**
 16. **README for launch.** Stays unsigned, with a clearer SmartScreen section;
-    "Known limitations" in place of the testing paragraph; fresh screenshots.
+    "Known limitations" in place of the testing paragraph; fresh screenshots. **Done.**
 
 ## Worth doing, in rough order of payoff
 

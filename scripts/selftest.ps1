@@ -9,7 +9,7 @@
   plan's actions, writes report.json beside the plan and exits.
 
   While it runs, this script takes screenshots of the primary screen at the
-  given times (milliseconds after launch), scaled to a quarter, as
+  given times (milliseconds after launch), scaled to a quarter (-ShotDivisor), as
   shot-NNNNNms.png beside the plan. They are how the look of the first
   second - the see-through window, the black cover - is checked without a
   person watching.
@@ -44,6 +44,9 @@ param(
   # locale that reads ',' as a decimal separator '700,8000' became a single
   # huge number - a screenshot two hours away, and a script that never ends.
   [string]$ShotsAt = '300,700,1100,1600,2300,3500,8000',
+  # How much to shrink each screenshot: 4 (a quarter) for checking timing, 1 or 2
+  # for pictures worth looking at, such as the README's.
+  [int]$ShotDivisor = 4,
   [int]$TimeoutSeconds = 180
 )
 
@@ -80,7 +83,7 @@ foreach ($ms in $shots) {
   $bitmap = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height
   $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
   $graphics.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
-  $small = New-Object System.Drawing.Bitmap $bitmap, ([int]($bounds.Width / 4)), ([int]($bounds.Height / 4))
+  $small = New-Object System.Drawing.Bitmap $bitmap, ([int]($bounds.Width / $ShotDivisor)), ([int]($bounds.Height / $ShotDivisor))
   $small.Save((Join-Path $out ('shot-{0:D5}ms.png' -f $ms)))
   $graphics.Dispose(); $bitmap.Dispose(); $small.Dispose()
 }

@@ -15,9 +15,12 @@ import { useClaimFocus } from './focus';
 import {
   episodeLabel,
   firstUnwatchedEpisode,
+  getProgress,
   setWatched,
   type EpisodeRef,
 } from '../player/api';
+import { resumePoint } from '../player/resume';
+import { formatTime } from './format';
 import {
   findLocalTrailer,
   getTitleDetail,
@@ -27,15 +30,20 @@ import {
   type TitleDetail,
 } from './api';
 
+/** What a Play press on this page asks for. */
+export interface PlayRequest {
+  path: string;
+  label: string;
+  fileId: number | null;
+  /** Omitted means this title; null means on behalf of no title (a trailer). */
+  titleId?: number | null;
+  episodeName?: string | null;
+  fromStart?: boolean;
+}
+
 interface Props {
   title: Title;
-  onPlayFile: (
-    path: string,
-    label: string,
-    fileId: number | null,
-    titleId?: number | null,
-    episodeName?: string | null
-  ) => void;
+  onPlayFile: (request: PlayRequest) => void;
   onBack: () => void;
 }
 
@@ -140,6 +148,44 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
       cancelled = true;
     };
   }, [title.id, title.kind, detail]);
+
+  /**
+   * What Play starts: the next episode for a series, the file for a film. The
+   * label names the episode so a press is never a surprise.
+   */
+  const primary = useMemo((): (PlayRequest & { what: string }) | null => {
+    if (title.kind === 'series') {
+      if (!nextUp) return null;
+      const code = `S${String(nextUp.season).padStart(2, '0')}E${String(nextUp.episode).padStart(2, '0')}`;
+      return {
+        path: nextUp.path,
+        label: episodeLabel(title.title, nextUp.season, nextUp.episode),
+        fileId: nextUp.file_id,
+        episodeName: nextUp.name,
+        what: ` ${code}`,
+      };
+    }
+    if (!detail?.movie_path) return null;
+    return { path: detail.movie_path, label: title.title, fileId: detail.movie_file_id, what: '' };
+  }, [title.kind, title.title, nextUp, detail]);
+
+  /**
+   * Where that would resume, by the player's own rule — so "Resume 1:02:14"
+   * is what the player then does, and "Play from start" is only offered when
+   * there is something to start over from.
+   */
+  const [resumeAt, setResumeAt] = useState<number | null>(null);
+  const primaryFileId = primary?.fileId ?? null;
+  useEffect(() => {
+    if (primaryFileId === null) return;
+    let cancelled = false;
+    getProgress(primaryFileId)
+      .then((progress) => !cancelled && setResumeAt(resumePoint(progress)))
+      .catch((e) => console.warn('resume lookup failed', e));
+    return () => {
+      cancelled = true;
+    };
+  }, [primaryFileId]);
 
   const seasons = useMemo(() => {
     if (!detail) return [];
@@ -250,43 +296,27 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
                     feature-length finale. Play has to mean "carry on with this
                     show", and it says which episode so a press is never a
                     surprise. */}
-                {title.kind === 'series'
-                  ? nextUp && (
-                      <FocusButton
-                        focusKey={DETAIL_PLAY_KEY}
-                        className="btn-primary"
-                        keepInView="page-top"
-                        onSelect={() =>
-                          onPlayFile(
-                            nextUp.path,
-                            episodeLabel(title.title, nextUp.season, nextUp.episode),
-                            nextUp.file_id,
-                            undefined,
-                            nextUp.name
-                          )
-                        }
-                      >
-                        {`▶ Play S${String(nextUp.season).padStart(2, '0')}E${String(
-                          nextUp.episode
-                        ).padStart(2, '0')}`}
-                      </FocusButton>
-                    )
-                  : detail?.movie_path && (
-                      <FocusButton
-                        focusKey={DETAIL_PLAY_KEY}
-                        className="btn-primary"
-                        keepInView="page-top"
-                        onSelect={() =>
-                          onPlayFile(
-                            detail.movie_path as string,
-                            title.title,
-                            detail.movie_file_id
-                          )
-                        }
-                      >
-                        ▶ Play
-                      </FocusButton>
-                    )}
+                {primary && (
+                  <FocusButton
+                    focusKey={DETAIL_PLAY_KEY}
+                    className="btn-primary"
+                    keepInView="page-top"
+                    onSelect={() => onPlayFile(primary)}
+                  >
+                    {resumeAt !== null
+                      ? `▶ Resume${primary.what} from ${formatTime(resumeAt)}`
+                      : `▶ Play${primary.what}`}
+                  </FocusButton>
+                )}
+                {primary && resumeAt !== null && (
+                  <FocusButton
+                    className="btn-secondary"
+                    keepInView="page-top"
+                    onSelect={() => onPlayFile({ ...primary, fromStart: true })}
+                  >
+                    Play from start
+                  </FocusButton>
+                )}
 
                 {/* Series get their watched toggle per episode, on the rows.
                     A film is a single file, so this is the only place it can
@@ -318,7 +348,7 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
                       // is ephemeral: no resume point, no Continue Watching
                       // row, and no writing this file's audio/subtitle choice
                       // into the show's remembered languages.
-                      onPlayFile(trailerPath, `${title.title} — Trailer`, null, null)
+                      onPlayFile({ path: trailerPath, label: `${title.title} — Trailer`, fileId: null, titleId: null })
                     }
                   >
                     ▶ Trailer
@@ -405,15 +435,12 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
                     }
                     onPlay={() =>
                       episode.file_path &&
-                      onPlayFile(
-                        episode.file_path,
-                        `${title.title} — S${String(episode.season).padStart(2, '0')}E${String(
-                          episode.episode
-                        ).padStart(2, '0')}`,
-                        episode.file_id,
-                        undefined,
-                        episode.name
-                      )
+                      onPlayFile({
+                        path: episode.file_path,
+                        label: episodeLabel(title.title, episode.season, episode.episode),
+                        fileId: episode.file_id,
+                        episodeName: episode.name,
+                      })
                     }
                   />
                 ))}

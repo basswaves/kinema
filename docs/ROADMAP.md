@@ -261,7 +261,7 @@ linearly at the end. Each step is verified before the next.
    and "Ends at" on screen. Volume and mute (M); "Volume on the receiver" while
    bitstreaming. **Done** (mock; real app with step 6).
 6. **Start over.** A button on the "Resumed from" notice while it shows, and
-   Resume / Play from start on the detail page.
+   Resume / Play from start on the detail page. **Done** (mock).
 7. **Tracks.** Plain names ("English · 7.1 · Dolby TrueHD Atmos", "SDH",
    "Forced"). A default audio and subtitle language in Settings, starting from
    Windows' language; a choice made in a show still wins for that show. Agreed

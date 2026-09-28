@@ -80,7 +80,8 @@ import { filmNow, mayswitch, restoreScreen, switchForFilm } from './displaySwitc
 import { getSetting } from '../metadata/api';
 import { initialSession, reduce, samePath } from './session';
 import { COMMIT_IDLE_MS, scrubStep, type Scrub } from './scrub';
-import { endsAtLabel } from '../ui/format';
+import { endsAtLabel, formatTime } from '../ui/format';
+import { resumePoint } from './resume';
 import {
   BackTenIcon,
   ForwardTenIcon,
@@ -109,6 +110,8 @@ export interface PlaybackTarget {
   titleId: number | null;
   /** Shown after the label at the top, where the caller knows it. */
   episodeName?: string | null;
+  /** Ignore the stored position: "Play from start". */
+  fromStart?: boolean;
 }
 
 interface Props {
@@ -121,10 +124,6 @@ const OSD_HIDE_MS = 3200;
 /** With the ring on the controls and nothing pressed, this long hands the arrows back. */
 const OSD_FOCUS_IDLE_MS = 6000;
 const PROGRESS_SAVE_MS = 5000;
-/** Don't offer to resume a file that barely started. */
-const MIN_RESUME_SECS = 30;
-/** Or one that is effectively finished. */
-const RESUME_MAX_FRACTION = 0.94;
 const NEXT_EPISODE_COUNTDOWN = 12;
 /** Stats refresh. Fast enough to watch a drop counter, slow enough to be free. */
 const STATS_REFRESH_MS = 1000;
@@ -166,16 +165,6 @@ const PLAYER_SEEK_KEY = 'player-seek';
 /** The label an episode carries into the player, shared with the browsing UI. */
 function labelFor(episode: EpisodeRef): string {
   return episodeLabel(episode.title, episode.season, episode.episode);
-}
-
-function formatTime(seconds: number | null): string {
-  if (seconds === null || Number.isNaN(seconds)) return '--:--';
-  const s = Math.max(0, Math.floor(seconds));
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = s % 60;
-  const mm = h > 0 ? String(m).padStart(2, '0') : String(m);
-  return `${h > 0 ? `${h}:` : ''}${mm}:${String(sec).padStart(2, '0')}`;
 }
 
 export default function Player({ target, onExit, onPlayTarget }: Props) {
@@ -403,17 +392,11 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         // open yet — which meant every resumed episode first played its
         // opening frame and sound, then jumped. `mpv.log` showed each one
         // restarting at 0.000 and again at the resume point.
-        if (target.fileId !== null) {
-          const progress = await getProgress(target.fileId);
-          if (
-            progress &&
-            !progress.completed &&
-            progress.position_secs >= MIN_RESUME_SECS &&
-            (!progress.duration_secs ||
-              progress.position_secs / progress.duration_secs < RESUME_MAX_FRACTION)
-          ) {
-            pendingSeek.current = progress.position_secs;
-          }
+        //
+        // "Play from start" skips it; the stored position is overwritten as
+        // soon as this playback saves its own.
+        if (target.fileId !== null && !target.fromStart) {
+          pendingSeek.current = resumePoint(await getProgress(target.fileId));
         }
 
         // Before the file, so its first frame is already rendered for the
@@ -452,7 +435,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [target.path, target.fileId, fail, matchScreen]);
+  }, [target.path, target.fileId, target.fromStart, fail, matchScreen]);
 
   /** Apply this title's remembered languages to the freshly loaded file. */
   const applyPrefs = useCallback(async () => {
@@ -1150,6 +1133,13 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     [showOsd, fail]
   );
 
+  /** Back to 0:00, from the "Resumed from" notice. */
+  const startOver = useCallback(() => {
+    dispatch({ type: 'resume-shown' });
+    void command('seek', [0, 'absolute']).catch(fail);
+    showOsd();
+  }, [fail, showOsd]);
+
   // ---- seeking with Left/Right --------------------------------------------
   /** The seek being steered right now, shown on the bar until committed. */
   const scrubRef = useRef<Scrub | null>(null);
@@ -1468,7 +1458,9 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         case 'Enter':
           if (osdFocus) break;
           e.preventDefault();
-          if (skipPrompt) {
+          if (session.resumedFrom !== null) {
+            startOver();
+          } else if (skipPrompt) {
             void performSkip();
           } else if (upNext) {
             setCountdown(0);
@@ -1505,6 +1497,8 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     volumeKey,
     toggleMute,
     changeVolume,
+    session.resumedFrom,
+    startOver,
   ]);
 
   /**
@@ -1647,9 +1641,14 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       {error && <div className="player-error">{error}</div>}
       {notice && <div className="player-notice">{notice}</div>}
 
+      {/* Resuming is automatic, so this is where starting over is offered —
+          for as long as the notice shows, OK means "from the beginning". */}
       {session.resumedFrom !== null && (
         <div className="resume-toast" onAnimationEnd={() => dispatch({ type: 'resume-shown' })}>
-          Resumed from {formatTime(session.resumedFrom)}
+          <span>Resumed from {formatTime(session.resumedFrom)}</span>
+          <FocusButton className="resume-start-over" onSelect={startOver}>
+            Start over <span className="resume-key">OK</span>
+          </FocusButton>
         </div>
       )}
 

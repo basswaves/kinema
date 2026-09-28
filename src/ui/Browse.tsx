@@ -567,15 +567,15 @@ export default function Browse() {
           <TitleDetailView
             title={view.title}
             onBack={goBack}
-            onPlayFile={(path, label, fileId, titleId, episodeName) =>
+            onPlayFile={(request) =>
               void startPlayback({
-                path,
-                label,
-                fileId,
+                ...request,
                 // Explicit null means "not on behalf of this title" — a trailer
                 // must not adopt or overwrite the show's track preferences.
-                titleId: titleId === undefined ? (view as { title: Title }).title.id : titleId,
-                episodeName,
+                titleId:
+                  request.titleId === undefined
+                    ? (view as { title: Title }).title.id
+                    : request.titleId,
               })
             }
           />

@@ -128,3 +128,7 @@ export const clearArtworkCache = () => invoke<number>('clear_artwork_cache');
 export const listTitlesNeedingDetail = () =>
   invoke<TrailerTarget[]>('list_titles_needing_detail');
 
+/** Titles whose TMDB data is older than TMDB lets it be kept, oldest first. */
+export const listStaleTitles = (limit: number) =>
+  invoke<TrailerTarget[]>('list_stale_titles', { limit });
+

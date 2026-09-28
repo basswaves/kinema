@@ -33,7 +33,12 @@ import {
 } from './api';
 import { clearParseError, initParser, lastParseError, parseMediaFile, toPayload } from './parse';
 import { cacheArtwork, listUnmatched } from '../metadata/api';
-import { backfillTitleDetails, loadProviderKeys, matchFiles } from '../metadata/match';
+import {
+  backfillTitleDetails,
+  loadProviderKeys,
+  matchFiles,
+  refreshStaleTitles,
+} from '../metadata/match';
 import { syncBuiltinKey } from '../metadata/builtinKey';
 
 /** Batched so a large library reports progress and never builds one huge IPC payload. */
@@ -231,6 +236,10 @@ export async function runScanPipeline(): Promise<ScanOutcome> {
     setStatus({ stage: 'details', detail: '' });
     const details = await backfillTitleDetails();
     errors.push(...details.errors);
+    // TMDB's data may be kept six months; anything older is fetched again,
+    // a few titles per scan. Before artwork, so new image URLs are cached.
+    const refreshed = await refreshStaleTitles();
+    errors.push(...refreshed.errors);
 
     // After matching and details: every artwork URL is known now, and
     // browsing should not need the network afterwards.

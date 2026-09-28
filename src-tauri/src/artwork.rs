@@ -29,6 +29,17 @@ const CONCURRENCY: usize = 6;
 /// larger is not the picture we asked for.
 const MAX_BYTES: usize = 16 * 1024 * 1024;
 
+/// How many out-of-date TMDB images one pass downloads again. Past TMDB's age
+/// limit (`metadata::TMDB_MAX_AGE_SECS`) the whole library would otherwise
+/// fall due on the same day it was first cached.
+const REFRESH_PER_PASS: usize = 300;
+
+/// A cached image TMDB's terms say must be fetched again.
+fn past_tmdb_age(url: &str, fetched_at: i64, now: i64) -> bool {
+    url.starts_with("https://image.tmdb.org/")
+        && fetched_at < now - crate::metadata::TMDB_MAX_AGE_SECS
+}
+
 #[derive(Serialize)]
 pub struct CacheResult {
     /// Images downloaded and written on this pass.
@@ -101,7 +112,10 @@ fn all_urls(conn: &rusqlite::Connection) -> rusqlite::Result<Vec<String>> {
 /// which a hash of the URL could not promise.
 ///
 /// A URL already in the cache is skipped only if its file is genuinely still on
-/// disk, so a manually emptied `artwork/` directory heals itself.
+/// disk, so a manually emptied `artwork/` directory heals itself — and, for a
+/// TMDB image, only while it is younger than TMDB allows. An old one is
+/// downloaded again under its own row id, so the new file replaces the old
+/// under the same name, and the old one is shown until it does.
 fn reserve(app: &tauri::AppHandle, urls: &[String]) -> Result<Vec<(i64, String)>, String> {
     let base = app_data(app)?;
     let db = app.state::<Db>();
@@ -109,6 +123,8 @@ fn reserve(app: &tauri::AppHandle, urls: &[String]) -> Result<Vec<(i64, String)>
 
     let mut pending = Vec::new();
     let mut seen = HashSet::new();
+    let now = now_secs();
+    let mut refresh_budget = REFRESH_PER_PASS;
 
     for url in urls {
         let url = url.trim();
@@ -116,16 +132,21 @@ fn reserve(app: &tauri::AppHandle, urls: &[String]) -> Result<Vec<(i64, String)>
             continue;
         }
 
-        let cached: Option<String> = conn
+        let cached: Option<(i64, String, i64)> = conn
             .query_row(
-                "SELECT local_path FROM artwork_cache WHERE url = ?1 AND local_path <> ''",
+                "SELECT rowid, local_path, fetched_at FROM artwork_cache
+                  WHERE url = ?1 AND local_path <> ''",
                 params![url],
-                |r| r.get(0),
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
             )
             .ok();
 
-        if let Some(relative) = cached {
+        if let Some((id, relative, fetched_at)) = cached {
             if base.join(&relative).exists() {
+                if refresh_budget > 0 && past_tmdb_age(url, fetched_at, now) {
+                    refresh_budget -= 1;
+                    pending.push((id, url.to_string()));
+                }
                 continue;
             }
         }
@@ -304,7 +325,18 @@ pub async fn clear_artwork_cache(
 
 #[cfg(test)]
 mod tests {
-    use super::extension;
+    use super::{extension, past_tmdb_age};
+    use crate::metadata::TMDB_MAX_AGE_SECS;
+
+    /// TMDB's images have an age limit; images from elsewhere do not.
+    #[test]
+    fn only_old_tmdb_images_are_fetched_again() {
+        let now = TMDB_MAX_AGE_SECS * 2;
+        let old = now - TMDB_MAX_AGE_SECS - 1;
+        assert!(past_tmdb_age("https://image.tmdb.org/t/p/original/a.jpg", old, now));
+        assert!(!past_tmdb_age("https://image.tmdb.org/t/p/original/a.jpg", now - 60, now));
+        assert!(!past_tmdb_age("https://static.tvmaze.com/a.jpg", old, now));
+    }
 
     #[test]
     fn extension_comes_from_the_url() {

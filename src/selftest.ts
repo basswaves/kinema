@@ -34,9 +34,11 @@ import {
   recordProviderFailure,
   recordRefusal,
   returnToReview,
+  cacheArtwork,
   setSetting,
   unlinkFiles,
 } from './metadata/api';
+import { refreshStaleTitles } from './metadata/match';
 
 /**
  * The webview's own wrappers for the file lifecycle, callable from a plan —
@@ -53,6 +55,10 @@ const CALLABLE: Record<string, (...args: never[]) => Promise<unknown>> = {
   // Settings the player reads when a file opens — sound, display — so a plan
   // can set them on the copied library before opening the player (`openAfter`).
   setSetting,
+  // The scan's refresh of out-of-date TMDB data, and the artwork pass after it,
+  // without the rest of a scan (which would also start intro detection).
+  refreshStaleTitles,
+  cacheArtwork,
   // Display switching only happens fullscreen, and Browse has no key for it.
   setFullscreen: (on: boolean) => getCurrentWindow().setFullscreen(on),
   // TV mode is read at launch, before a plan's first action; this switches it

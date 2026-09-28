@@ -21,6 +21,10 @@ makes no stability promises.
 - **Setting up is one step: pick your folders.** The first-run panel no
   longer asks for a TMDB key. (A build from source, which has no key of its
   own, still asks.)
+- **TMDB's data is kept for six months at most,** as their terms ask. Older
+  titles, with their episodes and cast, are fetched again a few per scan,
+  and older posters and backdrops downloaded again a few hundred per pass —
+  the old picture stays on screen until the new one has arrived.
 
 ### Fixed
 

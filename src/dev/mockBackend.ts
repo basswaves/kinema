@@ -636,6 +636,7 @@ const handlers: Record<string, Handler> = {
   latest_release: () =>
     UPDATE ? { version: UPDATE, url: 'https://github.com/Basswaves/kinema/releases' } : null,
   list_titles_needing_detail: () => [],
+  list_stale_titles: () => [],
   cache_artwork: () => ({ stored: 0, failed: 0 }),
   artwork_stats: () => ({ files: 0, bytes: 0, failed: 0 }),
   find_local_trailer: () => null,

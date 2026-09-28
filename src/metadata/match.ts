@@ -12,6 +12,7 @@ import type { MediaFile } from '../library/api';
 import {
   getSetting,
   ignoreFileIds,
+  listStaleTitles,
   listTitlesNeedingDetail,
   recordMatch,
   recordProviderFailure,
@@ -288,6 +289,42 @@ export async function backfillTitleDetails(): Promise<DetailBackfill> {
     }
   }
 
+  return result;
+}
+
+/** How many out-of-date titles one scan fetches again. */
+const REFRESH_PER_SCAN = 40;
+
+/**
+ * Fetch again the titles whose TMDB data is older than TMDB lets it be kept.
+ *
+ * TMDB's terms allow caching their data for six months (`TMDB_MAX_AGE_SECS`
+ * in metadata.rs). A few titles per scan, oldest first, each by the same path
+ * a match takes — the title with its cast, and a series' episodes — so a
+ * library catches up over a few launches instead of re-fetching itself at
+ * once. Without a working key nothing can be refreshed, and what is stored
+ * stays: deleting a library's posters would help nobody.
+ */
+export async function refreshStaleTitles(): Promise<DetailBackfill> {
+  const result: DetailBackfill = { found: 0, none: 0, errors: [] };
+  const keys = await loadProviderKeys();
+  if (!keys.tmdb) return result;
+
+  for (const target of await listStaleTitles(REFRESH_PER_SCAN)) {
+    const kind = target.kind === 'series' ? 'series' : 'movie';
+    try {
+      const titleId = await saveTitle(await tmdbGetTitle(keys.tmdb, target.tmdb_id, kind));
+      if (kind === 'series') {
+        const episodes = await tmdbGetEpisodes(keys.tmdb, target.tmdb_id);
+        if (episodes.length > 0) await saveEpisodes(titleId, episodes);
+      }
+      result.found++;
+    } catch (e) {
+      result.errors.push(`${target.tmdb_id}: ${e instanceof Error ? e.message : String(e)}`);
+      // A refused key will be refused for every other title too.
+      if (e instanceof TmdbKeyRejected) break;
+    }
+  }
   return result;
 }
 

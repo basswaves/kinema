@@ -523,6 +523,45 @@ pub struct TrailerTarget {
     pub kind: String,
 }
 
+/// How long anything from TMDB may be kept before it is fetched again.
+///
+/// TMDB's API terms forbid caching "any information obtained through or from
+/// TMDB" for longer than six months. Titles and their episodes and cast are
+/// re-fetched past this age (`list_stale_titles`), and cached TMDB images are
+/// downloaded again (`artwork::reserve`) — both a few at a time, so a library
+/// matched in one evening does not re-fetch itself in one evening either.
+/// A little under six months, so a refresh that waits a few launches for its
+/// turn still lands inside the limit.
+pub const TMDB_MAX_AGE_SECS: i64 = 170 * 24 * 60 * 60;
+
+/// Titles whose TMDB data is older than `TMDB_MAX_AGE_SECS`, oldest first.
+/// Only TMDB's: TVmaze and OMDb set no such limit.
+fn stale_titles(
+    conn: &rusqlite::Connection,
+    now: i64,
+    limit: i64,
+) -> rusqlite::Result<Vec<TrailerTarget>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, provider_id, kind FROM titles
+          WHERE provider = 'tmdb' AND fetched_at < ?1
+          ORDER BY fetched_at, id LIMIT ?2",
+    )?;
+    let rows = stmt.query_map(params![now - TMDB_MAX_AGE_SECS, limit], |r| {
+        Ok(TrailerTarget {
+            id: r.get(0)?,
+            tmdb_id: r.get(1)?,
+            kind: r.get(2)?,
+        })
+    })?;
+    rows.collect()
+}
+
+#[tauri::command]
+pub fn list_stale_titles(db: tauri::State<Db>, limit: i64) -> Result<Vec<TrailerTarget>, String> {
+    let conn = db.0.lock().map_err(to_string_err)?;
+    stale_titles(&conn, crate::util::now_secs(), limit).map_err(to_string_err)
+}
+
 /// Titles matched before some part of the TMDB detail response was being used.
 ///
 /// Restricted to titles with a TMDB id, because it is the only provider here
@@ -624,7 +663,7 @@ pub fn list_unmatched(
 
 #[cfg(test)]
 mod tests {
-    use super::{episodes_for, map_title, Title, TITLE_SELECT};
+    use super::{episodes_for, map_title, stale_titles, Title, TITLE_SELECT, TMDB_MAX_AGE_SECS};
     use rusqlite::{named_params, params};
 
     fn title(conn: &rusqlite::Connection, id: i64) -> Title {
@@ -655,6 +694,31 @@ mod tests {
         let show = title(&conn, 1);
         assert_eq!(show.episodes_watched, 3);
         assert!(show.watched);
+    }
+
+    /// Only TMDB's data has an age limit, and the oldest is refreshed first.
+    #[test]
+    fn titles_past_tmdbs_age_limit_are_listed_oldest_first() {
+        let conn = library("stale");
+        let now = TMDB_MAX_AGE_SECS * 3;
+        conn.execute_batch(&format!(
+            "UPDATE titles SET fetched_at = {fresh} WHERE id = 1;
+             INSERT INTO titles (id, kind, provider, provider_id, title, fetched_at) VALUES
+                 (2, 'movie',  'tmdb',   '22', 'Older',  {older}),
+                 (3, 'movie',  'tmdb',   '33', 'Oldest', {oldest}),
+                 (4, 'series', 'tvmaze', '44', 'Show',   0);",
+            fresh = now - 10,
+            older = now - TMDB_MAX_AGE_SECS - 10,
+            oldest = now - TMDB_MAX_AGE_SECS - 20,
+        ))
+        .unwrap();
+        let stale: Vec<_> = stale_titles(&conn, now, 10)
+            .unwrap()
+            .into_iter()
+            .map(|t| t.tmdb_id)
+            .collect();
+        assert_eq!(stale, vec!["33", "22"]);
+        assert_eq!(stale_titles(&conn, now, 1).unwrap().len(), 1);
     }
 
     #[test]

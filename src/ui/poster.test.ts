@@ -26,6 +26,7 @@ const base: Title = {
   episodes_watched: 0,
   watched: false,
   progress: null,
+  cast: [],
 };
 
 describe('posterState', () => {

@@ -42,6 +42,9 @@ import { countNeedsReview } from '../metadata/api';
 import { applyUpgrades, dismissUpgrades, readUpgrades, type Upgrade } from './qualityNotice';
 import { runScanPipeline, useScanStatus } from '../library/pipeline';
 import { getTitleDetail, listTitles, type Title } from './api';
+import { searchTitles, type SearchHit } from './search';
+import OnScreenKeyboard from './OnScreenKeyboard';
+import { useTvMode } from './tv';
 import { runSelfTest, selfTestPlan } from '../selftest';
 import { ensureMpvInitialised } from '../player/mpv';
 import './ui.css';
@@ -420,11 +423,7 @@ export default function Browse() {
     [load]
   );
 
-  const results = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return titles;
-    return titles.filter((t) => t.title.toLowerCase().includes(needle));
-  }, [titles, query]);
+  const results = useMemo(() => searchTitles(titles, query), [titles, query]);
 
   /** Resolve a grid's stored ids, keeping the order the rail had them in. */
   const gridTitles = useMemo(() => {
@@ -438,8 +437,14 @@ export default function Browse() {
     const onKeyDown = (e: KeyboardEvent) => {
       if (view.name === 'player') return; // the player owns its own keys
       if (e.key === 'Escape' || e.key === 'Backspace' || e.key === 'BrowserBack') {
+        // In a text box Backspace deletes, as it should — but Escape and a
+        // remote's Back leave, or the search box was a place Back could not
+        // get out of.
         const target = e.target as HTMLElement;
-        if (target.tagName === 'INPUT') return;
+        if (target.tagName === 'INPUT') {
+          if (e.key === 'Backspace') return;
+          target.blur();
+        }
         e.preventDefault();
         goBack();
       }
@@ -698,7 +703,7 @@ function SearchView({
 }: {
   query: string;
   onQueryChange: (v: string) => void;
-  results: Title[];
+  results: SearchHit[];
   onSelect: (title: Title) => void;
 }) {
   const { ref, focusKey } = useFocusable({
@@ -706,14 +711,24 @@ function SearchView({
     trackChildren: true,
     saveLastFocusedChild: true,
   });
+  const tv = useTvMode();
 
   return (
     <FocusContext.Provider value={focusKey}>
       <div className="search" ref={ref}>
         <SearchInput value={query} onChange={onQueryChange} />
+        {/* The TV layout gets letters a remote can reach; a desk has a keyboard. */}
+        {tv && <OnScreenKeyboard value={query} onChange={onQueryChange} />}
+        <p className="muted search-hint">Titles, actors, genres or a year.</p>
         <div className="search-grid">
-          {results.map((title) => (
-            <Card key={title.id} title={title} onSelect={onSelect} focusKey={`search:${title.id}`} />
+          {results.map(({ title, why }) => (
+            <Card
+              key={title.id}
+              title={title}
+              note={why}
+              onSelect={onSelect}
+              focusKey={`search:${title.id}`}
+            />
           ))}
         </div>
         {results.length === 0 && <p className="muted center">No matches.</p>}
@@ -739,8 +754,11 @@ function SearchInput({ value, onChange }: { value: string; onChange: (v: string)
     focusKey: 'search-input',
   });
 
+  // And let go when the remote moves on: a box that kept the caret after the
+  // ring had gone down to the keyboard showed two things selected at once.
   useEffect(() => {
     if (focused) ref.current?.focus();
+    else ref.current?.blur();
   }, [focused, ref]);
 
   return (

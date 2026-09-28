@@ -34,6 +34,8 @@ export interface Title {
   watched: boolean;
   /** 0–1, for a film started and not finished. */
   progress: number | null;
+  /** Billed cast, in order — for search. */
+  cast: string[];
 }
 
 export interface Episode {

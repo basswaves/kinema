@@ -168,7 +168,10 @@ const FILM_ID = 2;
 const SAGA_ID = 3;
 
 /** A title as stored; what watching has done to it is worked out per read. */
-type StoredTitle = Omit<Title, 'episodes_owned' | 'episodes_watched' | 'watched' | 'progress'>;
+type StoredTitle = Omit<Title, 'episodes_owned' | 'episodes_watched' | 'watched' | 'progress' | 'cast'>;
+
+/** Billed cast per fixture title, for searching by actor. */
+const CAST: Record<number, string[]> = { 1: ['Pat Fixture', 'Sam Example'], 2: ['Ada Mock'] };
 
 const titles: StoredTitle[] = [
   {
@@ -345,6 +348,7 @@ function withWatchState(title: StoredTitle): Title {
       episodes_watched: watchedEps,
       watched: owned > 0 && watchedEps >= owned,
       progress: null,
+      cast: CAST[title.id] ?? [],
     };
   }
   const started = own
@@ -357,6 +361,7 @@ function withWatchState(title: StoredTitle): Title {
     episodes_watched: 0,
     watched: done.length > 0,
     progress: started ? started.position / (started.duration as number) : null,
+    cast: CAST[title.id] ?? [],
   };
 }
 

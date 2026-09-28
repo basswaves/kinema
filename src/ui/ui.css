@@ -544,6 +544,16 @@ html {
   opacity: 0.5;
 }
 
+/* Why a search result is here, when it is not its title. */
+.card-note {
+  margin-top: 0.125rem;
+  font-size: 0.6875rem;
+  color: #f5c518;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ---- continue watching --------------------------------------------------- */
 /* The card is a focus container; `.continue-body` is the half that plays. */
 .continue-card {
@@ -1205,6 +1215,55 @@ html {
 .search-input.focused {
   outline: var(--focus-ring) solid #fff;
   outline-offset: 1px;
+}
+
+.search-hint {
+  margin: 0.625rem 0 1.25rem;
+  font-size: 0.78125rem;
+}
+
+/* ---- on-screen keyboard (OnScreenKeyboard) ------------------------------ */
+.osk {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin-top: 0.875rem;
+}
+
+.osk-row {
+  display: flex;
+  gap: 0.375rem;
+}
+
+.osk-key {
+  min-width: 2.375rem;
+  height: 2.375rem;
+  padding: 0 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.4375rem;
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.osk-key.osk-wide {
+  min-width: 6rem;
+  font-size: 0.8125rem;
+  text-transform: none;
+}
+
+.osk-key:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.osk-key.focused {
+  background: #fff;
+  color: #0a0a0c;
+  outline: var(--focus-ring) solid #fff;
+  outline-offset: 2px;
 }
 
 .search-grid {

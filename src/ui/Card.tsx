@@ -17,9 +17,11 @@ interface Props {
    * place the card appears: the same title sits in several rails at once.
    */
   focusKey?: string;
+  /** A line under the title saying why it is here — "with …" in search. */
+  note?: string | null;
 }
 
-export default function Card({ title, onSelect, focusKey: key }: Props) {
+export default function Card({ title, onSelect, focusKey: key, note }: Props) {
   const { ref, focused, focusKey } = useFocusable({
     focusKey: key,
     onEnterPress: () => onSelect(title),
@@ -72,6 +74,7 @@ export default function Card({ title, onSelect, focusKey: key }: Props) {
           {title.year ?? ''}
           {title.rating ? ` · ★ ${title.rating.toFixed(1)}` : ''}
         </div>
+        {note && <div className="card-note">{note}</div>}
       </div>
     </FocusContext.Provider>
   );

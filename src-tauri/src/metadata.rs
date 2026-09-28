@@ -91,6 +91,8 @@ pub struct Title {
     pub watched: bool,
     /// How far into a film that was started and not finished, 0–1.
     pub progress: Option<f64>,
+    /// The billed cast, in order, for search to match on.
+    pub cast: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -284,7 +286,11 @@ const TITLE_SELECT: &str = "
               FROM media_files m JOIN playback_state p ON p.file_id = m.id
              WHERE m.title_id = t.id AND m.missing = 0 AND p.completed = 0
                AND p.duration_secs > 0
-             ORDER BY p.updated_at DESC LIMIT 1)
+             ORDER BY p.updated_at DESC LIMIT 1),
+           -- Names only, in billing order, for search. A tab cannot occur in
+           -- a name, so it separates them safely.
+           (SELECT GROUP_CONCAT(name, char(9))
+              FROM (SELECT p.name FROM people p WHERE p.title_id = t.id ORDER BY p.ord))
       FROM titles t";
 
 fn map_title(r: &rusqlite::Row) -> rusqlite::Result<Title> {
@@ -321,6 +327,10 @@ fn map_title(r: &rusqlite::Row) -> rusqlite::Result<Title> {
             }
         },
         progress: r.get(22)?,
+        cast: r
+            .get::<_, Option<String>>(23)?
+            .map(|names| names.split('\t').map(str::to_owned).collect())
+            .unwrap_or_default(),
     })
 }
 
@@ -645,6 +655,17 @@ mod tests {
         let show = title(&conn, 1);
         assert_eq!(show.episodes_watched, 3);
         assert!(show.watched);
+    }
+
+    #[test]
+    fn a_title_carries_its_cast_in_billing_order_for_search() {
+        let conn = library("poster-cast");
+        conn.execute_batch(
+            "INSERT INTO people (title_id, name, ord) VALUES (1, 'Second Billed', 1),
+                                                             (1, 'Top Billed', 0);",
+        )
+        .unwrap();
+        assert_eq!(title(&conn, 1).cast, vec!["Top Billed", "Second Billed"]);
     }
 
     #[test]

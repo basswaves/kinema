@@ -279,7 +279,7 @@ linearly at the end. Each step is verified before the next.
     equipment could do better than the current settings (sound or screen), and
     shown again if more capable equipment is connected later. **Done** (mock).
 11. **Search.** An on-screen keyboard a remote can drive, Back leaves the box,
-    and search matches cast, genre and year as well as titles.
+    and search matches cast, genre and year as well as titles. **Done** (mock).
 12. **Grids.** Sort (Recently added / A–Z / Year / Rating) and Unwatched only,
     remembered per grid; Movies and TV shows as top-bar entries.
 13. **Settings.** A section list (Library · Playback · Picture & sound · Intro &

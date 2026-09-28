@@ -29,6 +29,7 @@ const title = (id: number, fields: Partial<Title> = {}): Title => ({
   episodes_watched: 0,
   watched: false,
   progress: null,
+  cast: [],
   ...fields,
 });
 

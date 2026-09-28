@@ -15,6 +15,11 @@
  * enough to get a working library, the key can wait, and both are editable
  * afterwards in Settings — so nothing here is a gate, and there is no way to
  * get stuck part-way through.
+ *
+ * A released build carries Kinema's own TMDB key (builtinKey.ts), and there
+ * the key step is gone: a folder is the one thing left to ask. A build from
+ * source has no key, and keeps the step, since without it movies stay
+ * unidentified.
  */
 import { describeError, userError } from './errors';
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
@@ -27,11 +32,15 @@ import { useClaimFocus } from './focus';
 import { addLibraryRoot, listLibraryRoots, type LibraryKind, type LibraryRoot } from '../library/api';
 import { runScanPipeline, useScanStatus } from '../library/pipeline';
 import { getSetting, setSetting } from '../metadata/api';
+import { BUILTIN_TMDB_KEY } from '../metadata/builtinKey';
 
 /** Where TMDB hands out a free key. Linked rather than described. */
 const TMDB_KEY_URL = 'https://www.themoviedb.org/settings/api';
 
 const FIRST_RUN_FOCUS_KEY = 'first-run';
+
+/** Whether to ask for a TMDB key at all: only a build without one of its own. */
+const ASK_FOR_KEY = !BUILTIN_TMDB_KEY;
 
 interface Props {
   /** Re-read the library. Called after a scan finishes. */
@@ -109,7 +118,10 @@ export default function FirstRun({ onDone }: Props) {
       <div className="first-run" ref={ref}>
         <h1>Welcome to Kinema</h1>
         <p className="first-run-lede">
-          Two things to set up. Neither takes long, and both can be changed later in Settings.
+          {ASK_FOR_KEY
+            ? 'Two things to set up. Neither takes long, and both can be changed later in Settings.'
+            : 'Show Kinema where your movies and shows are, and it does the rest — posters, ' +
+              'descriptions and all. Folders can be changed later in Settings.'}
         </p>
 
         {error && (
@@ -120,7 +132,8 @@ export default function FirstRun({ onDone }: Props) {
 
         <section className="first-run-step">
           <h2>
-            <span className="first-run-num">1</span> Where are your movies and shows?
+            {ASK_FOR_KEY && <span className="first-run-num">1</span>} Where are your movies and
+            shows?
           </h2>
           <p className="muted">
             Pick the folder you keep them in — a local drive or a network share both work.
@@ -148,41 +161,43 @@ export default function FirstRun({ onDone }: Props) {
           )}
         </section>
 
-        <section className="first-run-step">
-          <h2>
-            <span className="first-run-num">2</span> Posters and descriptions{' '}
-            <span className="first-run-optional">optional</span>
-          </h2>
-          <p className="muted">
-            TV shows already work without this. Movies need a key from TMDB to get posters,
-            descriptions and artwork — it is free, and takes about two minutes to get.
-          </p>
-          <div className="settings-row">
-            <FocusButton className="btn-secondary" onSelect={() => void openUrl(TMDB_KEY_URL)}>
-              Get a free key ↗
-            </FocusButton>
-          </div>
-          <label className="settings-field">
-            <span>Paste it here</span>
-            <FocusInput
-              className="settings-input"
-              value={tmdbKey}
-              onChange={(v) => {
-                setTmdbKey(v);
-                setSavedKey(false);
-              }}
-              onEnter={() => void saveKey()}
-              type="password"
-              placeholder="TMDB API key"
-            />
-          </label>
-          <div className="settings-row">
-            <FocusButton className="btn-secondary" onSelect={() => void saveKey()}>
-              Save key
-            </FocusButton>
-            {savedKey && <span className="muted">Saved.</span>}
-          </div>
-        </section>
+        {ASK_FOR_KEY && (
+          <section className="first-run-step">
+            <h2>
+              <span className="first-run-num">2</span> Posters and descriptions{' '}
+              <span className="first-run-optional">optional</span>
+            </h2>
+            <p className="muted">
+              TV shows already work without this. Movies need a key from TMDB to get posters,
+              descriptions and artwork — it is free, and takes about two minutes to get.
+            </p>
+            <div className="settings-row">
+              <FocusButton className="btn-secondary" onSelect={() => void openUrl(TMDB_KEY_URL)}>
+                Get a free key ↗
+              </FocusButton>
+            </div>
+            <label className="settings-field">
+              <span>Paste it here</span>
+              <FocusInput
+                className="settings-input"
+                value={tmdbKey}
+                onChange={(v) => {
+                  setTmdbKey(v);
+                  setSavedKey(false);
+                }}
+                onEnter={() => void saveKey()}
+                type="password"
+                placeholder="TMDB API key"
+              />
+            </label>
+            <div className="settings-row">
+              <FocusButton className="btn-secondary" onSelect={() => void saveKey()}>
+                Save key
+              </FocusButton>
+              {savedKey && <span className="muted">Saved.</span>}
+            </div>
+          </section>
+        )}
 
         <section className="first-run-step">
           <div className="settings-row">

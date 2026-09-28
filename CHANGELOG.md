@@ -16,6 +16,12 @@ makes no stability promises.
   says so on Home, and takes you to the field for a key of your own. The
   first release with a key re-checks movies that were waiting for one.
 
+### Changed
+
+- **Setting up is one step: pick your folders.** The first-run panel no
+  longer asks for a TMDB key. (A build from source, which has no key of its
+  own, still asks.)
+
 ### Fixed
 
 - **A key or path typed just before leaving Settings is kept.** Fields there

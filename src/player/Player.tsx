@@ -1499,7 +1499,9 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
 
   /**
    * Whether the receiver has the volume, asked whenever the controls come up
-   * — the only time the answer is on screen, and a cheap scalar read.
+   * — the only time the answer is on screen, and a cheap scalar read — and
+   * again at the first frame: the controls are often already up while a file
+   * opens, before its sound output exists, and the answer asked then was "no".
    */
   useEffect(() => {
     if (!osdVisible) return;
@@ -1508,7 +1510,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     return () => {
       live = false;
     };
-  }, [osdVisible, target.path]);
+  }, [osdVisible, target.path, session.frameShown]);
 
   /**
    * Letting go of Left/Right is what sends the seek. Only in watching mode:

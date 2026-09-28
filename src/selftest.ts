@@ -85,7 +85,7 @@ export interface SelfTestAction {
    * mid-run ends what it started. Point the copied library's Skiptro setting
    * at something harmless first: this runs whatever is configured there.
    */
-  do: 'key' | 'seek' | 'mark' | 'detect' | 'call' | 'mpv';
+  do: 'key' | 'seek' | 'mark' | 'detect' | 'call' | 'mpv' | 'probe';
   key?: string;
   to?: number;
   root?: string;
@@ -95,6 +95,9 @@ export interface SelfTestAction {
    * For `call`, the wrapper's arguments. For `mpv`, an mpv command and its
    * arguments, e.g. `["set", "audio-device", "wasapi/{…}"]` then
    * `["ao-reload"]` — how an audio output that fails mid-file is staged.
+   * For `probe`, the mpv properties to read as text at that moment; the
+   * plan's own `probe` list is read when the run ends, after the player has
+   * closed, which is too late for anything about the file that was playing.
    */
   args?: unknown[];
   note?: string;
@@ -166,6 +169,12 @@ function screen(): Record<string, string | null> {
     error: text('.player-error'),
     notice: text('.player-notice'),
     label: text('.player-label'),
+    volume: text('.volume-control'),
+    controls: document.querySelector('.player')
+      ? document.querySelector('.player.osd-hidden')
+        ? 'hidden'
+        : 'shown'
+      : null,
   };
 }
 
@@ -265,6 +274,15 @@ export async function runSelfTest(plan: SelfTestPlan): Promise<void> {
           () => note('mpv:done', action.args),
           (e) => note('mpv:failed', { args: action.args, error: String(e) })
         );
+      } else if (action.do === 'probe' && action.args?.length) {
+        void Promise.all(
+          action.args.map(String).map((name) =>
+            getProperty(name, 'string').then(
+              (value) => [name, value] as const,
+              () => [name, null] as const
+            )
+          )
+        ).then((pairs) => note('probed', Object.fromEntries(pairs)));
       } else if (action.do === 'detect' && action.root) {
         invoke('detect_intros', { rootPath: action.root }).then(
           (report) => note('detect:done', report),

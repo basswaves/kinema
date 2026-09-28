@@ -782,6 +782,19 @@ else's screen. **Do:** the self-test now sets the window always-on-top for the
 length of the run (`on-top` in the report's timeline); if it says
 `on-top-failed`, do not trust the screenshots.
 
+### …and after a screen-mode switch they can be seconds old
+
+On the test TV, with the refresh rate and HDR switched as a film opened, the
+screenshot taken at 12 s showed the player as it was at 4 s — no times yet, a
+Play icon — while the report's clock had been running for three seconds. The
+one at 20 s still showed the volume as it read before the sound output opened,
+and was taken as proof of a bug that was only half there. **Do:** read what
+the report's timeline says was on screen (`screen` entries record the volume
+label and whether the controls are shown) before believing a picture, and
+read mpv with a `probe` action while the file plays. The plan's own `probe`
+list runs after the player has closed, when there is no file and no sound
+output to ask about.
+
 ### `process is not defined` from guessit-js
 
 guessit-js reads `process.env.DEBUG_*`. In Node those are harmlessly `undefined`; in a

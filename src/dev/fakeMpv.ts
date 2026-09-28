@@ -228,8 +228,9 @@ export function getProperty(name: string): unknown {
       return state.volume;
     case 'mute':
       return state.mute;
+    // As a real mpv: no sound output, so no format, until a file is open.
     case 'audio-out-params/format':
-      return state.audioOutFormat;
+      return state.path === null ? null : state.audioOutFormat;
     // Answered, or the player's never-silent check reads a playing file as mute.
     case 'current-ao':
       return state.path === null ? null : 'wasapi';

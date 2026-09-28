@@ -13,7 +13,7 @@
     { "at": 0.4, "do": "call", "fn": "setSetting", "args": ["display_switch_hdr", "on"] },
     { "at": 0.5, "do": "call", "fn": "setSetting", "args": ["display_switch_resolution", "auto"] },
     { "at": 0.6, "do": "call", "fn": "setTvMode", "args": [true] },
-    { "at": 16, "do": "mark", "note": "switched and playing: probe now" },
+    { "at": 16, "do": "probe", "args": ["display-fps", "video-target-params/gamma", "audio-out-params/format", "current-ao"], "note": "switched and playing" },
     { "at": 18, "do": "key", "key": "ArrowDown", "note": "controls up: volume should say Receiver" },
     { "at": 24, "do": "key", "key": "Escape" },
     { "at": 25, "do": "key", "key": "Escape", "note": "out of the player: the screen mode is put back" }

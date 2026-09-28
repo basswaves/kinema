@@ -26,8 +26,9 @@
 
   fileId and titleId are optional (null plays the file ad hoc, with no
   resume point and no remembered tracks). "do" is key, seek (with "to"),
-  mark, or detect (with "root" - runs whatever Skiptro the copied library is
-  set to, so point it at something harmless first). See src/selftest.ts.
+  mark, probe (with "args": mpv properties to read at that moment), or
+  detect (with "root" - runs whatever Skiptro the copied library is set to,
+  so point it at something harmless first). See src/selftest.ts.
 
   Delete <plan folder>\data to start again from a fresh copy of the library.
 

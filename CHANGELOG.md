@@ -7,6 +7,13 @@ makes no stability promises.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The volume says "Receiver" from the first frame.** With the sound going
+  straight to a receiver, it read "100" until the controls were next
+  brought up — they are often already up while a film opens, before its
+  sound has started.
+
 ## [0.4.0] — 2026-09-28
 
 A pass over everything a new user meets, after an outside-eye review. No

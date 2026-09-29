@@ -79,7 +79,10 @@ src/
                  focus.ts recovers focus after a view change;
                  FocusButton/FocusInput are the D-pad-reachable controls
                  everything else is built from. Rail.tsx owns the one cap on
-                 how long a rail gets
+                 how long a rail gets. badges.ts turns what the scan read
+                 from a file into the detail page's picture / sound / file
+                 badges; MediaBadges shows them, under the buttons and never
+                 focusable
   player/        Player, shared mpv lifecycle, track handling, mpv options.
                  chapters.ts and stats.ts read mpv as flat scalars only;
                  skip.ts continues the credits ladder past the marker Rust

@@ -217,6 +217,7 @@ pub fn run() {
             detect::analysis_backlog,
             ffmpeg::ffmpeg_status,
             probe::probe_library,
+            probe::file_facts,
             aspect::measure_pictures,
             equipment::get_equipment,
             equipment::check_equipment,

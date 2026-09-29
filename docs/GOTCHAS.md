@@ -669,6 +669,15 @@ still work, and the result looks exactly like `keepInView` being broken — the
 focus ring walks off the screen and the page stays put. Make sure the pane is
 visible before believing any scroll result.
 
+### Two key presses 25 ms apart are one key press
+
+`Browse.tsx` sets `throttleKeypresses` with a 25 ms throttle, which is what
+keeps a held arrow from racing through a rail. A scripted test that presses
+Right and Enter back to back — as a browser tool's batch does — has the
+Enter dropped, and it looks exactly like a control that does not respond, or
+focus that will not move. No remote presses that fast. **Do:** wait between
+scripted presses before believing a key did nothing.
+
 ### A focus zoom can swallow the gap to the control below it
 
 Continue Watching's **Remove** sits below its card precisely so Down reaches it

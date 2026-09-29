@@ -1718,6 +1718,30 @@ stream as sent — and misses `BDRemux`, `IMAX.Enhanced` and Auro-3D, which are
 matched by pattern. On the real library 78 of 79 files got a label — the
 79th an unnamed test clip — ten of them only because of their season folder.
 
+### The badges on the page ✅
+
+**Under the buttons, not under the title.** The agreed mock-up put three rows
+of tiles between the title and the description. In the TV layout that pushed
+Play to the bottom edge of the screen with a one-line description, and a real
+film's would have pushed it off; Play is where the remote lands. Under the
+buttons, Play stays where it always was and the badges sit above the cast or
+the episode list.
+
+**Never focusable.** They are read, not pressed, and a dozen tiles between
+Play and the season list would be a dozen presses in the way, as the cast row
+already decided. Down from Play goes to the season tabs.
+
+**What each says, and what it does not.** A badge describes the file:
+"Dolby Vision · Profile 7 · FEL" on a film that Windows will send as HDR10,
+since it cannot send Dolby Vision — the stats panel says what is sent. Sound
+lists each format once, commentary left out, with Atmos and DTS:X from
+ffprobe's own name for the track. A subtitle counts as SDH by its flag or,
+since few files set one, by a title like "English (SDH)". Without ffprobe only
+the source is left; without a readable name, nothing. For a series, the
+badges are the episode Play would start. Checked against the real app's answer
+for the library's films and episodes, and driven by keyboard alone in
+`dev:mock`, desktop and TV layouts.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

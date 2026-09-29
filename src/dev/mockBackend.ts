@@ -303,7 +303,7 @@ const files: FixtureFile[] = [
   {
     id: 201,
     titleId: FILM_ID,
-    path: 'C:\\fixture\\Example Film (2017)\\Example.Film.2017.mkv',
+    path: 'C:\\fixture\\Example Film (2017)\\Example.Film.2017.IMAX.2160p.UHD.BluRay.REMUX.DV.HDR.HEVC.TrueHD.7.1.Atmos-GRP.mkv',
     season: null,
     episode: null,
     duration: 6000,
@@ -317,13 +317,112 @@ const files: FixtureFile[] = [
   ].map(([season, episode], i) => ({
     id: 301 + i,
     titleId: SAGA_ID,
-    path: `C:\\fixture\\Example Saga\\Season ${season}\\Example.Saga.S0${season}E0${episode}.mkv`,
+    path: `C:\\fixture\\Example.Saga.S0${season}.1080p.NF.WEB-DL.DDP5.1.Atmos.H.265-GRP\\Season ${season}\\Example.Saga.S0${season}E0${episode}.mkv`,
     season,
     episode,
     duration: 3000,
     markers: null,
   })),
 ];
+
+/**
+ * What the scan would have read from a fixture file (`probe.rs`, `aspect.rs`),
+ * for the detail page's badges: the film as a 4K Dolby Vision profile 7 FEL
+ * remux with IMAX scenes, the saga as 1080p web episodes, the show unread —
+ * as a library without ffprobe would be.
+ */
+function mockFileFacts(fileId: number) {
+  const file = files.find((f) => f.id === fileId);
+  if (!file) return null;
+  const cut = file.path.lastIndexOf('\\');
+  const names = {
+    file_name: file.path.slice(cut + 1),
+    parent_dir: file.path.slice(0, cut),
+    extension: file.path.split('.').pop() ?? '',
+    root_path: 'C:\\fixture',
+  };
+  const audio = (codec: string, profile: string | null, layout: string, commentary = false) => ({
+    codec,
+    profile,
+    channels: null,
+    layout,
+    language: 'eng',
+    title: commentary ? 'Commentary' : null,
+    default: !commentary,
+    commentary,
+  });
+  const subtitle = (language: string, sdh = false) => ({
+    codec: 'hdmv_pgs_subtitle',
+    language,
+    title: sdh ? 'SDH' : null,
+    default: false,
+    forced: false,
+    hearing_impaired: sdh,
+  });
+  const video = {
+    stream_index: 0,
+    codec: 'hevc',
+    profile: 'Main 10',
+    bit_depth: 10,
+    frame_rate: 24000 / 1001,
+    interlaced: false,
+    hdr10_plus: false,
+    max_cll: null,
+    max_fall: null,
+  };
+
+  if (file.titleId === FILM_ID) {
+    return {
+      ...names,
+      details: {
+        container: 'matroska,webm',
+        duration_secs: file.duration,
+        bit_rate: 58_400_000,
+        video: {
+          ...video,
+          width: 3840,
+          height: 2160,
+          aspect_ratio: 16 / 9,
+          transfer: 'pq',
+          dolby_vision: { profile: 7, level: 6, compatibility: 6, enhancement_layer: 'FEL' },
+          mastering_peak_nits: 1000,
+        },
+        audio: [
+          audio('truehd', 'Dolby TrueHD + Dolby Atmos', '7.1'),
+          audio('dts', 'DTS-HD MA', '7.1'),
+          audio('ac3', null, '5.1(side)', true),
+        ],
+        subtitles: [subtitle('eng', true), subtitle('eng'), subtitle('nor'), subtitle('swe')],
+      },
+      picture_aspect: 2.39,
+      picture_aspect_alt: 1.9,
+    };
+  }
+  if (file.titleId === SAGA_ID) {
+    return {
+      ...names,
+      details: {
+        container: 'matroska,webm',
+        duration_secs: file.duration,
+        bit_rate: 6_200_000,
+        video: {
+          ...video,
+          width: 1920,
+          height: 1080,
+          aspect_ratio: 16 / 9,
+          transfer: 'sdr',
+          dolby_vision: null,
+          mastering_peak_nits: null,
+        },
+        audio: [audio('eac3', 'Dolby Digital Plus + Dolby Atmos', '5.1(side)')],
+        subtitles: [subtitle('eng')],
+      },
+      picture_aspect: 16 / 9,
+      picture_aspect_alt: null,
+    };
+  }
+  return { ...names, details: null, picture_aspect: null, picture_aspect_alt: null };
+}
 
 /** Episodes the provider lists that the library does not hold. */
 const MISSING = [{ titleId: SAGA_ID, season: 0, episode: 1, name: 'Behind the scenes' }];
@@ -632,6 +731,7 @@ const handlers: Record<string, Handler> = {
   // metadata
   list_titles: () => later(EMPTY ? [] : titles.map(withWatchState)),
   get_title_detail: (a) => titleDetail(num(a, 'titleId')),
+  file_facts: (a) => mockFileFacts(num(a, 'fileId')),
   list_unmatched: () => [],
   list_needs_review: () => [],
   count_needs_review: () => REVIEW_COUNT,

@@ -652,7 +652,6 @@ pub(crate) fn save(
 }
 
 /// What has been read about one file, if anything.
-#[allow(dead_code)] // The detail page's badges read this; they come next.
 pub fn details_for_file(conn: &Connection, file_id: i64) -> Option<MediaDetails> {
     let text: String = conn
         .query_row(
@@ -662,6 +661,60 @@ pub fn details_for_file(conn: &Connection, file_id: i64) -> Option<MediaDetails>
         )
         .ok()?;
     serde_json::from_str(&text).ok()
+}
+
+/// Everything the detail page's badges are made from, for one file.
+#[derive(Serialize)]
+pub struct FileFacts {
+    /// `None` until the file has been read, or when ffprobe is missing.
+    pub details: Option<MediaDetails>,
+    /// The picture's measured shape (`aspect.rs`) — the file's own for a
+    /// film, its season's for an episode.
+    pub picture_aspect: Option<f64>,
+    pub picture_aspect_alt: Option<f64>,
+    /// The names the source badge is read from (`release.ts`).
+    pub file_name: String,
+    pub parent_dir: String,
+    pub extension: String,
+    /// The library folder the file is in, which the source badge must not
+    /// read: it is "Movies", not a release name.
+    pub root_path: String,
+}
+
+/// Tauri command: the badges' facts for one file. A database read, so it
+/// stays synchronous (see `jobs.rs`).
+#[tauri::command]
+pub fn file_facts(db: tauri::State<Db>, file_id: i64) -> Result<Option<FileFacts>, String> {
+    let conn = db.0.lock().map_err(to_string_err)?;
+    let names = conn.query_row(
+        "SELECT m.file_name, m.parent_dir, m.extension, r.path
+           FROM media_files m JOIN library_roots r ON r.id = m.root_id
+          WHERE m.id = ?1",
+        params![file_id],
+        |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, String>(2)?,
+                r.get::<_, String>(3)?,
+            ))
+        },
+    );
+    let (file_name, parent_dir, extension, root_path) = match names {
+        Ok(names) => names,
+        Err(rusqlite::Error::QueryReturnedNoRows) => return Ok(None),
+        Err(e) => return Err(e.to_string()),
+    };
+    let shape = crate::aspect::shape_for_file(&conn, file_id);
+    Ok(Some(FileFacts {
+        details: details_for_file(&conn, file_id),
+        picture_aspect: shape.map(|s| s.main),
+        picture_aspect_alt: shape.and_then(|s| s.alt),
+        file_name,
+        parent_dir,
+        extension,
+        root_path,
+    }))
 }
 
 #[derive(Serialize, Clone)]

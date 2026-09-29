@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import Art from './Art';
 import FocusButton from './FocusButton';
+import MediaBadges from './MediaBadges';
 import { useClaimFocus } from './focus';
 import {
   episodeLabel,
@@ -275,6 +276,15 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
     }
   }, [ownedInSeason, seasonWatched, title.id]);
 
+  // The file the badges describe: the film, or the episode Play would start —
+  // the first owned one when there is nothing left to continue.
+  const badgeFileId =
+    title.kind === 'series'
+      ? (nextUp?.file_id ??
+        detail?.episodes.find((e) => e.file_path && e.file_id !== null)?.file_id ??
+        null)
+      : (detail?.movie_file_id ?? null);
+
   const ownedCount = detail?.episodes.filter((e) => e.file_path).length ?? 0;
   const watchedCount = detail?.episodes.filter((e) => e.file_path && e.watched).length ?? 0;
 
@@ -415,6 +425,10 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
                   </FocusButton>
                 )}
               </div>
+              {/* Below the buttons, not above them: three rows of tiles above
+                  Play pushed it off a TV screen under a long description, and
+                  Play is where a remote lands. */}
+              <MediaBadges fileId={badgeFileId} />
             </div>
           </div>
 

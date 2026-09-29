@@ -21,6 +21,16 @@ makes no stability promises.
   the fallback when TMDB cannot be asked, and once it can again, those films
   move to TMDB by the id Wikidata holds for them and get their pictures, with
   their watch history untouched.
+- **A title's page says what the file holds**, in three rows of badges under
+  its buttons. Picture: resolution, Dolby Vision profile — with FEL or MEL for
+  profile 7 — HDR10, HDR10+ or HLG with the mastering brightness, codec and
+  bit depth, frame rate, and the aspect ratio measured from the picture
+  itself, so a 2.39:1 film with black bars in a 16:9 file says 2.39:1, and one
+  with IMAX scenes says both. Sound: each format, with Atmos and DTS:X told
+  apart. File: where it came from (UHD Blu-ray remux, WEB-DL from Netflix…,
+  read from the release name), edition, subtitles and bitrate. For a series,
+  the badges are the episode Play would start. Needs ffmpeg for everything
+  but the source; each file is read once, when it is scanned.
 
 ### Changed
 

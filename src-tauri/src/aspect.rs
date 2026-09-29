@@ -285,7 +285,6 @@ fn save(conn: &Connection, file_id: i64, shape: Option<Shape>) -> rusqlite::Resu
 }
 
 /// The measured shape for a file: its own, or for an episode, its season's.
-#[allow(dead_code)] // The detail page's badges read this; they come next.
 pub fn shape_for_file(conn: &Connection, file_id: i64) -> Option<Shape> {
     conn.query_row(
         "SELECT p.picture_aspect, p.picture_aspect_alt

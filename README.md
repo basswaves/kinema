@@ -116,7 +116,7 @@ without it that feature is skipped and everything else carries on.
 
 | | What it adds | Without it |
 |---|---|---|
-| **[ffmpeg](https://ffmpeg.org/download.html)** | Kinema's own intro and credits detection, by fingerprinting a season's audio | Intros and credits come from TheIntroDB and chapter markers only |
+| **[ffmpeg](https://ffmpeg.org/download.html)** | Kinema's own intro and credits detection, by fingerprinting a season's audio; and the picture and sound badges on a title's page — resolution, Dolby Vision, HDR, Atmos, the measured aspect ratio | Intros and credits come from TheIntroDB and chapter markers only, and a title's page shows only where the file came from |
 | **[Skiptro](https://github.com/MikeSiLVO/skiptro-releases)** | A second, well-tuned intro detector that Kinema can run and read | The built-in detector handles it |
 
 Put ffmpeg on your `PATH`, or point Settings at it. Skiptro is configured the

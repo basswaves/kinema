@@ -55,6 +55,23 @@ export const logPaths = () => invoke<LogPaths>('log_paths');
 /** Show the log folder in Explorer, for attaching logs to a bug report. */
 export const openLogFolder = () => invoke<void>('open_log_folder');
 
+/** Show the folder of automatic safety copies of the library in Explorer. */
+export const openBackupFolder = () => invoke<void>('open_backup_folder');
+
+/** A safety copy of the library (backup.rs). */
+export interface BackupCopy {
+  name: string;
+  kind: 'weekly' | 'before_upgrade' | 'before_restore';
+  /** Seconds since the epoch. */
+  made_at: number;
+  bytes: number;
+}
+
+export const listBackups = () => invoke<BackupCopy[]>('list_backups');
+
+/** Close Kinema and put this copy back as it starts again. */
+export const restoreBackup = (name: string) => invoke<void>('restore_backup', { name });
+
 
 export const saveTitle = (title: TitleMetadata) => invoke<number>('save_title', { title });
 

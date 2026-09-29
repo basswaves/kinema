@@ -203,6 +203,25 @@ through for a second". Screenshots of the screen during a scripted run
 of it — and check with a screenshot, not by reasoning, since a white or
 see-through frame lasting a few hundred milliseconds is invisible in any log.
 
+### A screen that throws leaves the desktop, not a blank window
+
+React unmounts the whole tree when a component throws during rendering and
+nothing catches it. In an ordinary app that is a white page. Here the window is
+transparent (above), so it is the desktop, complete with a player that may still
+be sounding behind it, and no message, no log line about *why* the tree went,
+and no way to leave but the window's own close button, which TV mode's
+fullscreen does not have.
+
+`ErrorBoundary` (`src/ui/ErrorBoundary.tsx`) is the catch, and its screen is
+opaque. Two rules for it: keep it made of plain `<button>`s with their own arrow
+handling, because `FocusButton` needs the spatial navigation that lives inside the
+tree that failed, and never make its recovery reload the page, because mpv
+initialises once per window (see "Initialising mpv twice"). Errors in event
+handlers and promises do not unmount anything and never reach it; those are
+`devlog.ts`'s.
+
+**Do:** to test it, throw from a component in `dev:mock`, and revert.
+
 ### `loadfile` is asynchronous
 
 Seeking immediately after it fails — there is nothing loaded yet. The first fix
@@ -292,6 +311,20 @@ a mutex around one connection serialises everything regardless.
 
 **Do:** give the scanner its own connection (`ScanDb`). The mutex then only
 serialises access to each connection, and SQLite does the rest.
+
+### Swapping a WAL database's file leaves its log behind
+
+`library.db` in WAL mode has `library.db-wal` and `library.db-shm` beside it. Put
+another file in the place of `library.db` and leave those, and SQLite may apply
+the old log to the new file: a restored library that is silently damaged, or
+silently missing what the log held. A crash leaves the log behind; a clean
+close usually removes it, which is why "replace the file by hand" works nearly
+every time and is worse for it.
+
+`backup::apply_pending_restore` removes all three, and does it before anything
+opens the library. Copying the database out of a *running* app has the reverse
+trap, and it is why every copy here is `VACUUM INTO` and never a file copy (see
+`backup_before_upgrade`).
 
 ### `busy_timeout` is load-bearing the moment there is a second connection
 

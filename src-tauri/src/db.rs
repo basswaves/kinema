@@ -586,7 +586,7 @@ pub fn open(path: &Path) -> Result<Connection, DbError> {
 }
 
 /// Where the safety copies go, beside the database.
-const BACKUP_DIR: &str = "backups";
+pub const BACKUP_DIR: &str = "backups";
 
 /// How many safety copies to keep. Each is a whole library, so this is a
 /// balance: enough to step back past a bad upgrade and the one after it,
@@ -652,6 +652,85 @@ fn prune_backups(dir: &Path) {
     }
 }
 
+/// The weekly copies, named `library-auto-v<schema>-<seconds>.db`. A separate
+/// series from the pre-upgrade copies, so a run of quiet weeks can never push
+/// out the copy that was made before a schema change.
+const AUTO_PREFIX: &str = "library-auto-";
+
+/// How many weekly copies to keep: a month of them.
+const AUTO_KEPT: usize = 4;
+
+/// A copy is due once the newest is this old.
+const AUTO_EVERY_SECS: u64 = 7 * 24 * 60 * 60;
+
+/// The moment a weekly copy was made, from its name. The name rather than the
+/// file's modified time, which copying or restoring a file changes.
+pub(crate) fn auto_copy_stamp(name: &str) -> Option<u64> {
+    name.strip_prefix(AUTO_PREFIX)?
+        .strip_suffix(".db")?
+        .rsplit('-')
+        .next()?
+        .parse()
+        .ok()
+}
+
+fn auto_copies(dir: &Path) -> Vec<(u64, std::path::PathBuf)> {
+    let Ok(entries) = std::fs::read_dir(dir) else { return Vec::new() };
+    entries
+        .flatten()
+        .map(|e| e.path())
+        .filter_map(|p| Some((auto_copy_stamp(p.file_name()?.to_str()?)?, p)))
+        .collect()
+}
+
+/// Copy the library aside once a week, whatever the version.
+///
+/// The watch history, resume points, hand-made matches and settings exist
+/// nowhere else: the rest of the library is rebuilt by scanning again, these
+/// cannot be. A file can be damaged by a power cut, a failing disk or a mistake
+/// made in Settings, and the only other copy is the one made before an upgrade.
+/// The library is a few megabytes, so four whole copies cost little.
+///
+/// Best effort, unlike the copy before an upgrade: with nothing wrong on disk a
+/// missed weekly copy is not a reason to refuse to start. A library with no
+/// videos in it has nothing to protect and is not copied.
+pub fn periodic_backup(conn: &Connection, dir: &Path) -> Result<Option<std::path::PathBuf>, DbError> {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    periodic_backup_at(conn, dir, now)
+}
+
+fn periodic_backup_at(
+    conn: &Connection,
+    dir: &Path,
+    now: u64,
+) -> Result<Option<std::path::PathBuf>, DbError> {
+    let has_videos: bool =
+        conn.query_row("SELECT EXISTS(SELECT 1 FROM media_files)", [], |r| r.get(0))?;
+    if !has_videos {
+        return Ok(None);
+    }
+    let newest = auto_copies(dir).into_iter().map(|(stamp, _)| stamp).max();
+    if newest.is_some_and(|stamp| now.saturating_sub(stamp) < AUTO_EVERY_SECS) {
+        return Ok(None);
+    }
+
+    std::fs::create_dir_all(dir)
+        .map_err(|e| DbError::Backup(format!("{}: {e}", dir.display())))?;
+    let target = dir.join(format!("{AUTO_PREFIX}v{SCHEMA_VERSION}-{now}.db"));
+    conn.execute("VACUUM INTO ?1", [target.to_string_lossy()])
+        .map_err(|e| DbError::Backup(format!("{}: {e}", target.display())))?;
+
+    let mut copies = auto_copies(dir);
+    copies.sort_by_key(|(stamp, _)| std::cmp::Reverse(*stamp));
+    for (_, old) in copies.into_iter().skip(AUTO_KEPT) {
+        let _ = std::fs::remove_file(old);
+    }
+    Ok(Some(target))
+}
+
 /// A second connection to a database `open` has already migrated.
 ///
 /// The scanner gets one of these so that walking a NAS share does not hold the
@@ -665,7 +744,7 @@ pub fn open_secondary(path: &Path) -> rusqlite::Result<Connection> {
 }
 
 /// Every migration, in order. The index is the version it produces.
-const MIGRATIONS: [&str; SCHEMA_VERSION as usize] = [
+pub(crate) const MIGRATIONS: [&str; SCHEMA_VERSION as usize] = [
     SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6, SCHEMA_V7, SCHEMA_V8,
     SCHEMA_V9, SCHEMA_V10, SCHEMA_V11, SCHEMA_V12, SCHEMA_V13, SCHEMA_V14,
     SCHEMA_V15, SCHEMA_V16, SCHEMA_V17, SCHEMA_V18,
@@ -1025,5 +1104,77 @@ mod tests {
             )
             .expect("count");
         assert_eq!(exists, 0);
+    }
+
+    // ---- the weekly copy -------------------------------------------------
+
+    const WEEK: u64 = AUTO_EVERY_SECS;
+
+    fn auto_names(dir: &Path) -> Vec<String> {
+        let mut names: Vec<String> = backups_in(dir)
+            .iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().into_owned())
+            .filter(|n| n.starts_with(AUTO_PREFIX))
+            .collect();
+        names.sort();
+        names
+    }
+
+    /// The copy is made, holds the watch history, and is not made again until
+    /// a week has passed.
+    #[test]
+    fn a_weekly_copy_is_made_once_a_week() {
+        let (dir, writer) = library_on_disk("weekly", SCHEMA_VERSION);
+        let backups = dir.join(BACKUP_DIR);
+
+        let first = periodic_backup_at(&writer, &backups, 1_000_000).unwrap().expect("first copy");
+        let copy = Connection::open(&first).unwrap();
+        let position: f64 = copy
+            .query_row("SELECT position_secs FROM playback_state WHERE file_id = 1", [], |r| {
+                r.get(0)
+            })
+            .expect("the resume point is in the copy");
+        assert_eq!(position, 812.5);
+
+        assert!(periodic_backup_at(&writer, &backups, 1_000_000 + WEEK - 1).unwrap().is_none());
+        assert!(periodic_backup_at(&writer, &backups, 1_000_000 + WEEK).unwrap().is_some());
+        assert_eq!(auto_names(&dir).len(), 2);
+    }
+
+    /// A library with nothing in it has nothing to protect.
+    #[test]
+    fn an_empty_library_gets_no_weekly_copy() {
+        let dir = std::env::temp_dir().join("pn-db-backup-weekly-empty");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let conn = open(&dir.join("library.db")).unwrap();
+        assert!(periodic_backup_at(&conn, &dir.join(BACKUP_DIR), 1_000_000).unwrap().is_none());
+        assert!(backups_in(&dir).is_empty());
+    }
+
+    /// A month of weekly copies is kept, and the copies made before an upgrade
+    /// are a separate series that this never touches.
+    #[test]
+    fn old_weekly_copies_go_and_upgrade_copies_stay() {
+        let (dir, writer) = library_on_disk("weekly-prune", SCHEMA_VERSION);
+        let backups = dir.join(BACKUP_DIR);
+        std::fs::create_dir_all(&backups).unwrap();
+        std::fs::write(backups.join("library-v9-5.db"), b"before an upgrade").unwrap();
+
+        for week in 0..7 {
+            periodic_backup_at(&writer, &backups, 1_000_000 + week * WEEK).unwrap();
+        }
+
+        let kept = auto_names(&dir);
+        assert_eq!(kept.len(), AUTO_KEPT);
+        assert!(kept[0].ends_with(&format!("-{}.db", 1_000_000 + 3 * WEEK)), "{kept:?}");
+        assert!(backups.join("library-v9-5.db").exists());
+    }
+
+    #[test]
+    fn a_weekly_copys_time_is_read_from_its_name() {
+        assert_eq!(auto_copy_stamp("library-auto-v18-1790682921.db"), Some(1790682921));
+        assert_eq!(auto_copy_stamp("library-v13-1790682921.db"), None);
+        assert_eq!(auto_copy_stamp("library-auto-v18-soon.db"), None);
     }
 }

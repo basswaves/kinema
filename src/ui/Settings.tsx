@@ -26,6 +26,7 @@ import { openUrl } from '@tauri-apps/plugin-opener';
 import FocusButton from './FocusButton';
 import { count, formatBytes } from './format';
 import FocusInput from './FocusInput';
+import BackupSection from './BackupSection';
 import ConfirmButton from './ConfirmButton';
 import EquipmentSection from './EquipmentSection';
 import SoundSection from './SoundSection';
@@ -93,6 +94,7 @@ const TMDB_KEY_URL = 'https://www.themoviedb.org/settings/api';
  * whole settings screen used to read.
  */
 const SKIPTRO_URL = 'https://github.com/MikeSiLVO/skiptro-releases';
+const FFMPEG_URL = 'https://ffmpeg.org/download.html';
 
 /**
  * How long the Skiptro command fields wait after the last keystroke before
@@ -130,9 +132,10 @@ function problemLine(errors: string[]): string {
 /** The Review button, where focus lands when Settings opens on the queue. */
 const REVIEW_BUTTON_KEY = 'settings-review-button';
 const TMDB_KEY_INPUT_KEY = 'settings-tmdb-key';
+const FFMPEG_INPUT_KEY = 'settings-ffmpeg';
 
-/** Where Home's notices can open Settings: the review queue, or the TMDB key. */
-export type SettingsTarget = 'review' | 'tmdb-key';
+/** Where Home's notices can open Settings: the review queue, the TMDB key or ffmpeg. */
+export type SettingsTarget = 'review' | 'tmdb-key' | 'ffmpeg';
 
 type SectionId = 'library' | 'playback' | 'picture' | 'intros' | 'advanced';
 
@@ -156,7 +159,7 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
   });
 
   const [section, setSection] = useState<SectionId>(
-    openSection ? 'library' : lastSection
+    openSection === 'ffmpeg' ? 'intros' : openSection ? 'library' : lastSection
   );
   const chooseSection = useCallback((id: SectionId) => {
     lastSection = id;
@@ -170,7 +173,9 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
       ? REVIEW_BUTTON_KEY
       : openSection === 'tmdb-key'
         ? TMDB_KEY_INPUT_KEY
-        : `settings-nav:${section}`,
+        : openSection === 'ffmpeg'
+          ? FFMPEG_INPUT_KEY
+          : `settings-nav:${section}`,
     true
   );
 
@@ -909,6 +914,7 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
                       <span className="muted">(leave empty unless Kinema cannot find it)</span>
                     </span>
                     <FocusInput
+                      focusKey={FFMPEG_INPUT_KEY}
                       className="settings-input"
                       value={ffmpegPath}
                       onChange={setFfmpegPath}
@@ -933,6 +939,15 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
                     it: install it yourself and Kinema finds it. It is also used once per file to
                     read the resolution, HDR and sound format shown on a title&rsquo;s page.
                   </p>
+                  <div className="settings-row">
+                    <FocusButton
+                      keepInView="nearest"
+                      className="btn-secondary"
+                      onSelect={() => void openUrl(FFMPEG_URL)}
+                    >
+                      Open the ffmpeg download page ↗
+                    </FocusButton>
+                  </div>
 
                   <h3>TheIntroDB</h3>
                   <ChoiceRow
@@ -1217,6 +1232,8 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
                     and skips folders it cannot write to.
                   </p>
                 </section>
+
+                <BackupSection />
 
                 <section className="settings-section">
                   <h2>Developer tools</h2>

@@ -7,6 +7,33 @@ makes no stability promises.
 
 ## [Unreleased]
 
+### Added
+
+- **Safety copies of the library.** Once a week Kinema keeps a copy of
+  everything in it that cannot be rebuilt by scanning: what you have watched,
+  where you stopped, the matches you corrected by hand, your settings. The last
+  four are kept, apart from the copy made before each upgrade. Settings,
+  Advanced lists them and puts one back: Restore closes Kinema, and the copy is
+  swapped in as it starts again. What it replaces is kept too, so a restore can
+  be undone. If the library cannot be opened at all, the message now says where
+  the copies are.
+- **Kinema says when ffmpeg is missing.** The picture and sound details on a
+  title's page and Kinema's own intro detection both need it, and without it
+  they were simply absent. Home now says so once (Not now is for good), a
+  title's page says why its details are missing, and Settings has a link to
+  ffmpeg's download page beside the field for its location.
+
+### Changed
+
+- **A screen that fails to draw shows a message** with Try again, Open the log
+  folder and Close Kinema. It used to leave the window empty, and because the
+  window is transparent, an empty window showed the desktop.
+- **A crash on any thread is written to `app.log`**, with where it happened.
+  In the released app it used to leave no trace.
+- **Starting Kinema a second time brings the running one forward** instead of
+  opening another window that would fight the first for the screen and the
+  sound device.
+
 ## [0.5.0] — 2026-09-29
 
 A title's page now says what its file really holds, with badges down to the

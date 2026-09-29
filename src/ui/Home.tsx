@@ -39,6 +39,9 @@ interface Props {
   upgrades: Upgrade[];
   onApplyUpgrades: () => void;
   onDismissUpgrades: () => void;
+  ffmpegMissing: boolean;
+  onFfmpeg: () => void;
+  onDismissFfmpeg: () => void;
 }
 
 /**
@@ -74,6 +77,9 @@ export default function Home({
   upgrades,
   onApplyUpgrades,
   onDismissUpgrades,
+  ffmpegMissing,
+  onFfmpeg,
+  onDismissFfmpeg,
 }: Props) {
   const { ref, focusKey } = useFocusable({ trackChildren: true, saveLastFocusedChild: true });
 
@@ -138,6 +144,9 @@ export default function Home({
           upgrades={upgrades}
           onApply={onApplyUpgrades}
           onDismiss={onDismissUpgrades}
+          ffmpegMissing={ffmpegMissing}
+          onFfmpeg={onFfmpeg}
+          onDismissFfmpeg={onDismissFfmpeg}
         />
 
         {/* First rail, as on any streaming service: the thing you were most

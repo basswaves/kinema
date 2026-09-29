@@ -112,6 +112,19 @@ pub fn open_log_folder(app: tauri::AppHandle) -> Result<(), String> {
         .map_err(to_string_err)
 }
 
+/// Open the folder of safety copies, for putting one back by hand.
+#[tauri::command]
+pub fn open_backup_folder(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    let dir = crate::data_dir(&app)?.join(crate::db::BACKUP_DIR);
+    // Absent until the first copy is made, and Explorer would say so with an
+    // error of its own.
+    std::fs::create_dir_all(&dir).map_err(to_string_err)?;
+    app.opener()
+        .open_path(dir.to_string_lossy(), None::<&str>)
+        .map_err(to_string_err)
+}
+
 #[cfg(test)]
 mod tests {
     use super::store;

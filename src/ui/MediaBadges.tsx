@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Art from './Art';
 import type { Studio } from './api';
 import { initParser } from '../library/parse';
+import { useFfmpegMissing } from './ffmpegNotice';
 import { readRelease, type Release } from '../library/release';
 import {
   buildBadges,
@@ -73,7 +74,9 @@ export default function MediaBadges({ fileId, kind, studios }: Props) {
  * names what they describe when it is not obvious — "Season 5 · 8 episodes".
  */
 export function BadgeRows({ rows, heading }: { rows: BadgeRow[]; heading?: string }) {
-  if (rows.length === 0) return null;
+  // Without ffmpeg there may be no rows at all, not merely no picture row.
+  const sayNoFfmpeg = useFfmpegMissing() && !rows.some((row) => row.heading === 'Picture');
+  if (rows.length === 0 && !sayNoFfmpeg) return null;
 
   return (
     <div className="media-badges">
@@ -108,6 +111,14 @@ export function BadgeRows({ rows, heading }: { rows: BadgeRow[]; heading?: strin
           </ul>
         </div>
       ))}
+      {/* Said where the missing rows would be, not only in Settings: nothing
+          else on this page hints that they exist. */}
+      {sayNoFfmpeg && (
+        <p className="media-badges-note">
+          The picture and sound details appear here once Kinema can find ffmpeg. Settings, under
+          Intro &amp; credits, says how.
+        </p>
+      )}
     </div>
   );
 }

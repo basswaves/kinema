@@ -889,6 +889,12 @@ const handlers: Record<string, Handler> = {
   append_log: () => null,
   log_paths: () => ({ dir: 'C:\\fixture\\logs', mpv_log: 'C:\\fixture\\logs\\mpv.log' }),
   open_log_folder: () => null,
+  open_backup_folder: () => null,
+  list_backups: () => [
+    { name: 'library-auto-v18-1790600000.db', kind: 'weekly', made_at: 1790600000, bytes: 4200000 },
+    { name: 'library-v13-1790000000.db', kind: 'before_upgrade', made_at: 1790000000, bytes: 327680 },
+  ],
+  restore_backup: () => null,
   selftest_plan: () => null,
 
   // plugins

@@ -2,6 +2,7 @@ mod analyse;
 mod applog;
 mod aspect;
 mod artwork;
+mod backup;
 mod db;
 mod detect;
 mod display;
@@ -89,14 +90,65 @@ fn open_library(app: &tauri::AppHandle) -> Result<(), String> {
     }
     log!("--- Kinema {} started ---", env!("CARGO_PKG_VERSION"));
 
+    // Before anything opens the library: a restore asked for in Settings is
+    // carried out here, as Kinema starts again. Its outcome is said in a dialog,
+    // since the webview does not exist yet and a restore nobody hears about is
+    // one nobody can tell from one that did nothing.
+    if selftest::plan_path().is_none() {
+        match backup::apply_pending_restore(&dir) {
+            Ok(Some(done)) => {
+                log!("backup: restored the copy made at {}", done.made_at);
+                app.dialog()
+                    .message("Your library was put back from the safety copy you chose.")
+                    .title("Kinema")
+                    .kind(MessageDialogKind::Info)
+                    .blocking_show();
+            }
+            Ok(None) => {}
+            Err(reason) => {
+                log!("backup: restore failed: {reason}");
+                app.dialog()
+                    .message(format!(
+                        "Your library was not changed.
+
+{reason}"
+                    ))
+                    .title("The safety copy could not be put back")
+                    .kind(MessageDialogKind::Warning)
+                    .blocking_show();
+            }
+        }
+    }
+
     let path = dir.join("library.db");
 
     let primary = db::open(&path).map_err(|e| {
+        // A library from a newer Kinema is not damaged, and its message says
+        // what to do. Anything else might be, and the weekly copies are the
+        // way back: nobody should have to find that out from a bug report.
+        let copies = if matches!(e, db::DbError::TooNew { .. }) {
+            String::new()
+        } else {
+            format!(
+                "\n\nIf the file is damaged, earlier copies of it are kept in {}. \
+                 Close Kinema, replace library.db with the newest copy there (renamed), \
+                 and start it again.",
+                dir.join(db::BACKUP_DIR).display()
+            )
+        };
         format!(
-            "Kinema could not open its library database.\n\n{}\n\n{e}",
+            "Kinema could not open its library database.\n\n{}\n\n{e}{copies}",
             path.display()
         )
     })?;
+    // Not under a self-test, whose library is a throwaway copy.
+    if selftest::plan_path().is_none() {
+        match db::periodic_backup(&primary, &dir.join(db::BACKUP_DIR)) {
+            Ok(Some(copy)) => log!("library: weekly safety copy made: {}", copy.display()),
+            Ok(None) => {}
+            Err(e) => log!("library: could not make the weekly safety copy: {e}"),
+        }
+    }
     // Opened second, and only after the first has migrated: the scanner's
     // connection must never be the one that defines the schema. See `ScanDb`
     // for why it exists at all.
@@ -120,7 +172,31 @@ const REVEAL_FALLBACK: std::time::Duration = std::time::Duration::from_secs(4);
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    // First, so a panic anywhere after this, on any thread, is written down.
+    applog::install_panic_hook();
+
+    let mut builder = tauri::Builder::default();
+    // One Kinema at a time. Two would each switch the display and take the
+    // sound device, and the second player would either fail or fight the
+    // first for the screen. Starting it again brings the running one forward.
+    //
+    // Not in a development build, or it would refuse to start beside the
+    // release build in use, and not under a self-test, which works on its own
+    // copy of the library and must be able to run while Kinema is open. Both
+    // are decided here rather than in the plugin because it registers itself
+    // for the whole process. It has to come before the other plugins.
+    if !cfg!(debug_assertions) && selftest::plan_path().is_none() {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            log!("a second Kinema was started; bringing this one forward");
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }));
+    }
+
+    builder
         .plugin(tauri_plugin_libmpv::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
@@ -181,6 +257,9 @@ pub fn run() {
             settings::append_log,
             settings::log_paths,
             settings::open_log_folder,
+            settings::open_backup_folder,
+            backup::list_backups,
+            backup::restore_backup,
             selftest::selftest_plan,
             selftest::selftest_finish,
             metadata::save_title,

@@ -1878,6 +1878,71 @@ Things found by using the finished app, at a desk and on a TV.
   button per folder, and the Skiptro command fields only appear once Skiptro
   is set up.
 
+## The gaps before 1.0 ✅
+
+An audit of the whole project, asking what a stranger would meet, found the
+code sound and five things that were not: places where something going wrong
+left no trace, or where a feature vanished without saying why. None is a
+feature. They are why 1.0 is a promise about failure as much as about function.
+
+### A failed screen shows a message
+
+React unmounts the whole tree when a screen throws. Any other app gets a blank
+window; Kinema's is transparent, so it got the desktop, with nothing to say
+what happened or how to leave. `ErrorBoundary` wraps the app and puts an opaque
+screen up with three ways out. **Try again** rebuilds the tree from scratch,
+which is what going Home does anyway, and so is safe with the player: opening
+and leaving a film is routine. There is deliberately no "reload the page",
+because mpv initialises once per window (GOTCHAS). The buttons are plain
+`<button>`s with arrow-key handling of their own, the one exception to
+`FocusButton`: the spatial navigation lives in the tree that just failed.
+
+### Panics are logged
+
+A release build has no console, so the default panic message went nowhere and a
+panic on a background thread (the scanner, a detector) ended that work with no
+line in `app.log`. `applog::install_panic_hook` writes the thread, the place
+and a backtrace, and then runs the earlier hook as before.
+
+### One Kinema at a time
+
+Tauri's own `single-instance` plugin, so the second launch brings the first
+window forward and exits. A crate rather than a hand-made mutex because the
+plugin also does the "bring it forward", and it is Tauri's own. It is left out
+of development builds (or `npm run tauri dev` would refuse to start beside the
+release app) and of self-tests (which work on a copy and must run while Kinema
+is open).
+
+### Safety copies, and a way back
+
+The library holds three things nothing else does: watch history, hand-made
+matches, and settings. The rest is rebuilt by scanning. The only copy that
+existed was the one made before an upgrade. Now a whole-library copy is made
+at start when the newest is a week old, four kept, in a series of its own so
+that quiet weeks never push out a pre-upgrade copy. Whole copies rather than
+selected tables because the library is a few megabytes and a partial copy is a
+restore with rules.
+
+Restoring is a request at one start and a swap at the next, because the running
+app cannot replace the file it has open. The swap removes `library.db-wal` and
+`-shm` with the file (GOTCHAS), checks the copy first (`quick_check`, and not
+from a newer Kinema), keeps what it replaces, and removes its note before it
+starts so a failure cannot repeat at every launch. A restore says what it did
+in a dialog, since nothing else could be told apart from a restore that did
+nothing. It is never automatic: a library that will not open is reported with
+the folder of copies, and the person chooses, because guessing which copy
+is good is the kind of wrong-answer-is-worse-than-none call this project
+refuses to make elsewhere.
+
+### ffmpeg is said out loud
+
+The settled rule stands: nothing is bundled or downloaded. But the two features
+that depend on ffmpeg were absent without a word, and only Settings, which
+nobody opens to find what is missing, explained it. It is now a quiet notice on
+Home in the same form as the equipment one (one line, "Not now" is for good), a
+line on a title's page where the badges would be, and a link to the download
+page beside the field.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

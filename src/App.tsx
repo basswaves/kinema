@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import Browse from './ui/Browse';
+import ErrorBoundary from './ui/ErrorBoundary';
 import Shortcuts from './ui/Shortcuts';
 import { setShortcutsOpen, useShortcutsOpen } from './ui/shortcutsState';
 import { loadTvMode, setTvMode, useTvMode } from './ui/tv';
@@ -88,9 +89,9 @@ export default function App() {
   }, [showShortcuts]);
 
   return (
-    <>
+    <ErrorBoundary>
       <Browse />
       {showShortcuts && <Shortcuts onClose={() => setShortcutsOpen(false)} />}
-    </>
+    </ErrorBoundary>
   );
 }

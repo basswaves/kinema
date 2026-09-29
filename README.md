@@ -46,6 +46,9 @@ audio and subtitles, volume. Back steps back to wherever you came from.
   2.39:1. Where it came from (UHD Blu-ray remux, WEB-DL…) is read from the
   release name; nothing else is.
 - **Remembers where you were**, per file, and offers the next episode.
+- **Keeps a safety copy** of your watch history, resume points and hand-made
+  matches once a week, and puts one back from Settings if the library is ever
+  damaged.
 - **Skips intros and credits**, from a community database, from chapter markers,
   or by fingerprinting a season's audio and finding what the episodes share.
 - **Works from a sofa.** Browsing, searching (with an on-screen keyboard),

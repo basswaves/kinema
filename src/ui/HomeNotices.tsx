@@ -30,6 +30,9 @@ interface Props {
   upgrades: Upgrade[];
   onApply: () => void;
   onDismiss: () => void;
+  ffmpegMissing: boolean;
+  onFfmpeg: () => void;
+  onDismissFfmpeg: () => void;
 }
 
 export default function HomeNotices({
@@ -40,9 +43,12 @@ export default function HomeNotices({
   upgrades,
   onApply,
   onDismiss,
+  ffmpegMissing,
+  onFfmpeg,
+  onDismissFfmpeg,
 }: Props) {
   const { ref, focusKey } = useFocusable({ trackChildren: true, saveLastFocusedChild: true });
-  if (reviewCount === 0 && upgrades.length === 0 && !keyRejected) return null;
+  if (reviewCount === 0 && upgrades.length === 0 && !keyRejected && !ffmpegMissing) return null;
 
   return (
     <FocusContext.Provider value={focusKey}>
@@ -132,6 +138,41 @@ export default function HomeNotices({
                 onSelect={onDismiss}
               >
                 OK
+              </FocusButton>
+            </div>
+          </div>
+        )}
+
+        {ffmpegMissing && (
+          <div className="home-notice">
+            <span className="home-notice-icon" aria-hidden="true">
+              +
+            </span>
+            <div className="home-notice-text">
+              <strong>Two things need ffmpeg, which Kinema cannot find.</strong>
+              <span className="muted">
+                {' '}
+                Without it a title&rsquo;s page has no picture and sound details, and Kinema
+                cannot find intros and credits by itself. Everything else works. ffmpeg is a free
+                program you install yourself; Kinema never installs anything.
+              </span>
+            </div>
+            <div className="home-notice-actions">
+              <FocusButton
+                focusKey="notice-ffmpeg"
+                className="btn-primary"
+                keepInView="nearest"
+                onSelect={onFfmpeg}
+              >
+                How to add it
+              </FocusButton>
+              <FocusButton
+                focusKey="notice-ffmpeg-dismiss"
+                className="btn-secondary"
+                keepInView="nearest"
+                onSelect={onDismissFfmpeg}
+              >
+                Not now
               </FocusButton>
             </div>
           </div>

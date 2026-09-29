@@ -40,6 +40,7 @@ import {
 import { cacheArtwork, getSetting, setSetting } from '../metadata/api';
 import { countNeedsReview } from '../metadata/api';
 import { applyUpgrades, dismissUpgrades, readUpgrades, type Upgrade } from './qualityNotice';
+import { dismissFfmpegNotice, readFfmpegNotice } from './ffmpegNotice';
 import { needsOwnTmdbKey } from '../metadata/builtinKey';
 import { availableUpdate } from './updates';
 import { runScanPipeline, useScanStatus } from '../library/pipeline';
@@ -172,6 +173,8 @@ export default function Browse() {
   /** What the equipment could do that is switched off — see qualityNotice.ts. */
   const [upgrades, setUpgrades] = useState<Upgrade[]>([]);
   const [keyRejected, setKeyRejected] = useState(false);
+  /** ffmpeg cannot be found and the notice has not been waved away. */
+  const [ffmpegMissing, setFfmpegMissing] = useState(false);
   /** A newer Kinema, for the dot on Settings. */
   const [hasUpdate, setHasUpdate] = useState(false);
 
@@ -229,6 +232,9 @@ export default function Browse() {
       void needsOwnTmdbKey()
         .then(setKeyRejected)
         .catch((e) => console.warn('TMDB key notice:', e));
+      void readFfmpegNotice()
+        .then(setFfmpegMissing)
+        .catch((e) => console.warn('ffmpeg notice:', e));
     } catch (e) {
       setError(userError(e));
     } finally {
@@ -571,6 +577,13 @@ export default function Browse() {
             onDismissUpgrades={() =>
               void dismissUpgrades(upgrades)
                 .then(() => setUpgrades([]))
+                .catch((e) => setError(userError(e)))
+            }
+            ffmpegMissing={ffmpegMissing}
+            onFfmpeg={() => openView({ name: 'settings', section: 'ffmpeg' })}
+            onDismissFfmpeg={() =>
+              void dismissFfmpegNotice()
+                .then(() => setFfmpegMissing(false))
                 .catch((e) => setError(userError(e)))
             }
             onSeeAll={(heading, list) =>

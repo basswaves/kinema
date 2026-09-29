@@ -107,6 +107,45 @@ pub fn write(level: &str, message: &str) {
     }
 }
 
+/// What a panic says, as one paragraph for the log. Split from the hook so the
+/// wording can be tested without panicking.
+fn describe_panic(message: &str, thread: &str, location: Option<(&str, u32)>) -> String {
+    let at = match location {
+        Some((file, line)) => format!("{file}:{line}"),
+        None => "an unknown place".to_string(),
+    };
+    format!("panic in thread '{thread}' at {at}: {message}")
+}
+
+/// Send every panic to `app.log` before anything else happens to it.
+///
+/// A release build has no console, so the default hook's message goes nowhere,
+/// and a panic on a background thread, in the scanner or the detector, ends
+/// that work with no trace at all. Now it leaves a line with where it happened
+/// and a backtrace, which is what a bug report needs. The earlier hook still
+/// runs afterwards, so a development console shows it as before.
+pub fn install_panic_hook() {
+    let earlier = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let payload = info.payload();
+        let message = payload
+            .downcast_ref::<&str>()
+            .map(|s| s.to_string())
+            .or_else(|| payload.downcast_ref::<String>().cloned())
+            .unwrap_or_else(|| "(no message)".to_string());
+        let thread = std::thread::current();
+        let line = describe_panic(
+            &message,
+            thread.name().unwrap_or("unnamed"),
+            info.location().map(|l| (l.file(), l.line())),
+        );
+        let backtrace = std::backtrace::Backtrace::force_capture();
+        write("error", &format!("{line}
+{backtrace}"));
+        earlier(info);
+    }));
+}
+
 /// `log!("skiptro: …")` — the Rust side's way into `app.log`.
 #[macro_export]
 macro_rules! log {
@@ -118,6 +157,10 @@ macro_rules! log {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The log's state is one global, so the tests that start a session must
+    /// not overlap.
+    static SESSION: Mutex<()> = Mutex::new(());
 
     fn fresh(name: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!("pn-applog-{name}"));
@@ -145,6 +188,7 @@ mod tests {
     /// file, not on a console that a release build does not have.
     #[test]
     fn a_rust_line_reaches_the_file() {
+        let _session = SESSION.lock().unwrap_or_else(|e| e.into_inner());
         let dir = fresh("write");
         init(&dir).unwrap();
         crate::log!("skiptro: confidence {:.2} for {}", 0.61, "x.mkv");
@@ -186,5 +230,35 @@ mod tests {
         assert_eq!(read("app.previous-5.log"), None);
         // With the current log that the next launch writes, that is five.
         assert_eq!(std::fs::read_dir(&dir).unwrap().count(), KEEP_PREVIOUS);
+    }
+
+    #[test]
+    fn a_panic_says_where_and_in_which_thread() {
+        assert_eq!(
+            describe_panic("index out of bounds", "scan", Some(("src/scanner.rs", 42))),
+            "panic in thread 'scan' at src/scanner.rs:42: index out of bounds"
+        );
+        assert!(describe_panic("x", "main", None).contains("an unknown place"));
+    }
+
+    /// The reason the hook exists: a panic on a background thread, in a build
+    /// with no console, must still end up in the file.
+    #[test]
+    fn a_panic_on_another_thread_reaches_the_file() {
+        let _session = SESSION.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = fresh("panic");
+        init(&dir).unwrap();
+        install_panic_hook();
+        let _ = std::thread::Builder::new()
+            .name("test-worker".into())
+            .spawn(|| panic!("the scanner fell over"))
+            .unwrap()
+            .join();
+        let written = std::fs::read_to_string(dir.join(APP_LOG)).unwrap();
+        assert!(
+            written.contains("panic in thread 'test-worker'")
+                && written.contains("the scanner fell over"),
+            "got {written}"
+        );
     }
 }

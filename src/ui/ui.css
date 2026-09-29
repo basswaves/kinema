@@ -1683,7 +1683,6 @@ html {
   max-width: 44rem;
 }
 
-.settings-row,
 /* ---- a setting with its choices on screen (ChoiceRow) ------------------- */
 .choice-row {
   margin: 0.25rem 0 1.125rem;
@@ -1741,6 +1740,7 @@ html {
   line-height: 1.5;
 }
 
+.settings-row,
 .settings-toggle-row {
   display: flex;
   flex-wrap: wrap;

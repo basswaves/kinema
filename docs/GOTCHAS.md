@@ -626,6 +626,13 @@ image. The top row is the one place where the correct scroll position is
 absolute, not relative: see `scrollPageToTop` in `src/ui/focus.ts` and
 `keepInView="page-top"`.
 
+The bottom of a page has the mirror problem: `nearest` stops once the last
+control is visible, so text under it (a card's year, the notes under the last
+setting, the credits at the foot of Settings) stays below the edge with nothing
+left to press. `keepOnScreen` in the same file goes to the very bottom when
+everything below the control fits on screen with it. Use it, not a bare
+`scrollIntoView`, for anything focusable in the browsing views.
+
 ### A scroll between two presses sends focus backwards
 
 Holding Down in Settings bounced focus from a text field back up to a button
@@ -692,6 +699,21 @@ focused element (half the scale excess of its size, per side), in `rem` so it
 holds at TV scale. And do not let a container of a card-plus-secondary-control
 `saveLastFocusedChild`: arriving should land on the card, not on Remove
 because it was touched last.
+
+Sideways it is worse, because nothing looks wrong. Settings' Add movies folder,
+Add TV folder and Scan now sat edge to edge, and the focused one's 106% zoom
+covered the middle button entirely, so Right went straight from the first to
+the third. The row had lost its `gap` (below). **Do:** every row of buttons
+needs a real `gap`, not buttons that happen to touch.
+
+### A CSS block pasted into a selector list takes the list's rule with it
+
+`.settings-row,` was the first half of `.settings-row, .settings-toggle-row {
+display: flex; gap … }`. A later change inserted a new commented block between
+the two lines, so the stylesheet read `.settings-row, .choice-row { margin … }`
+and the settings rows silently lost their flex layout and their gap: no error,
+nothing in the diff that looks like a deletion. **Do:** when adding a block to
+`ui.css`, check the line above it does not end in a comma.
 
 ### A control overlaid on a card is unreachable, wherever you put it
 
@@ -800,6 +822,13 @@ of `dev:mock` still had the old rules — `document.styleSheets` held the previo
 wrong for a reason that was not in the code. **Do:** when a style change does
 not show, read the rule back from `document.styleSheets` before theorising, and
 restart the dev server if it is stale.
+
+Scripts can go stale too: after files were rewritten by a script,
+`FocusButton.tsx` was served in its old form while the other edited files were
+fresh, and a whole round of scroll tests measured code that was not the code on
+disk. **Do:** before believing a test in `dev:mock`, fetch the source the
+server hands out (`await (await fetch('/src/ui/FocusButton.tsx')).text()`) and
+check it contains the change.
 
 ### The mock library lives in the page, so a reload empties it
 

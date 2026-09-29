@@ -367,6 +367,7 @@ function mockFileFacts(fileId: number) {
     parent_dir: file.path.slice(0, cut),
     extension: file.path.split('.').pop() ?? '',
     root_path: 'C:\\fixture',
+    folder_shared: false,
   };
   const audio = (codec: string, profile: string | null, layout: string, commentary = false) => ({
     codec,

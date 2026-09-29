@@ -679,6 +679,26 @@ pub struct FileFacts {
     /// The library folder the file is in, which the source badge must not
     /// read: it is "Movies", not a release name.
     pub root_path: String,
+    /// The file's folder also holds files matched to another title, so its
+    /// name belongs to that title as much as this one and is not read.
+    pub folder_shared: bool,
+}
+
+/// Whether a file's folder holds files of another title as well.
+///
+/// Found on a real library: a film kept inside another film's release
+/// folder. The folder's name is that other film's release, and reading it
+/// would label this one "UHD Blu-ray remux" on the strength of a neighbour.
+/// A film's own extras, or files not matched to anything, do not count.
+fn folder_shared(conn: &Connection, file_id: i64) -> rusqlite::Result<bool> {
+    conn.query_row(
+        "SELECT EXISTS (
+             SELECT 1 FROM media_files o JOIN media_files m ON o.parent_dir = m.parent_dir
+              WHERE m.id = ?1 AND o.id <> m.id AND o.missing = 0
+                AND o.title_id IS NOT NULL AND o.title_id IS NOT m.title_id)",
+        params![file_id],
+        |r| r.get(0),
+    )
 }
 
 /// Tauri command: the badges' facts for one file. A database read, so it
@@ -706,6 +726,7 @@ pub fn file_facts(db: tauri::State<Db>, file_id: i64) -> Result<Option<FileFacts
         Err(e) => return Err(e.to_string()),
     };
     let shape = crate::aspect::shape_for_file(&conn, file_id);
+    let folder_shared = folder_shared(&conn, file_id).map_err(to_string_err)?;
     Ok(Some(FileFacts {
         details: details_for_file(&conn, file_id),
         picture_aspect: shape.map(|s| s.main),
@@ -714,6 +735,7 @@ pub fn file_facts(db: tauri::State<Db>, file_id: i64) -> Result<Option<FileFacts
         parent_dir,
         extension,
         root_path,
+        folder_shared,
     }))
 }
 
@@ -1206,6 +1228,27 @@ mod tests {
         conn.execute("UPDATE media_probe SET probe_version = ?1", [PROBE_VERSION - 1])
             .unwrap();
         assert_eq!(pending_ids(&conn), vec![1, 2]);
+    }
+
+    /// A film in another film's folder does not take that folder's name;
+    /// a film beside its own extras, or beside unmatched files, does.
+    #[test]
+    fn a_folder_shared_with_another_title_is_not_read() {
+        let conn = library();
+        conn.execute_batch(
+            "INSERT INTO titles (id, kind, provider, provider_id, title, fetched_at) VALUES
+                 (1, 'movie', 'tmdb', '1', 'A film', 0), (2, 'movie', 'tmdb', '2', 'Another', 0);
+             INSERT INTO media_files (id, root_id, path, parent_dir, file_name, extension,
+                                      size_bytes, modified_at, first_seen_at, last_seen_at, title_id)
+             VALUES (3, 1, 'D:\\Media\\Extra.mkv', 'D:\\Media', 'Extra.mkv', 'mkv', 1, 1, 0, 0, NULL);
+             UPDATE media_files SET title_id = 1 WHERE id = 1;",
+        )
+        .unwrap();
+        // File 2 is unmatched and file 3 has no title: neither is another title.
+        assert!(!folder_shared(&conn, 1).unwrap());
+        conn.execute("UPDATE media_files SET title_id = 2 WHERE id = 2", []).unwrap();
+        assert!(folder_shared(&conn, 1).unwrap());
+        assert!(folder_shared(&conn, 2).unwrap());
     }
 
     /// Removing a file from the library removes what was read from it.

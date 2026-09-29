@@ -82,6 +82,8 @@ export interface FileFacts {
   parent_dir: string;
   extension: string;
   root_path: string;
+  /** The file's folder also holds another title's files; its name is not this file's. */
+  folder_shared?: boolean;
 }
 
 /** The badges' facts for one file, or null for a file the library lacks. */
@@ -95,10 +97,15 @@ function comparable(path: string): string {
 
 /**
  * The file's name, then its folder and the folder above that — stopping at
- * the library folder, which is "Movies" or "TV", never a release name.
+ * the library folder, which is "Movies" or "TV", never a release name, and
+ * never reading a folder that holds another title's files: a film kept in
+ * another film's folder would otherwise be labelled with that film's release.
  */
-export function releaseNames(facts: Pick<FileFacts, 'file_name' | 'parent_dir' | 'root_path'>): string[] {
+export function releaseNames(
+  facts: Pick<FileFacts, 'file_name' | 'parent_dir' | 'root_path' | 'folder_shared'>
+): string[] {
   const names = [facts.file_name];
+  if (facts.folder_shared) return names;
   const root = comparable(facts.root_path);
   let dir = facts.parent_dir.replace(/[\\/]+$/, '');
   for (let i = 0; i < 2; i++) {
@@ -226,6 +233,16 @@ export function audioBadge(track: AudioTrack): Badge {
   }
 }
 
+/**
+ * `2.2 Mb/s`, `27 Mb/s`. A decimal below ten, where rounding hides the
+ * difference between a lean encode and one twice its size; whole numbers
+ * above, where it does not.
+ */
+export function bitrateLabel(bitsPerSecond: number): string {
+  const mbps = bitsPerSecond / 1_000_000;
+  return mbps < 10 ? `${(Math.round(mbps * 10) / 10).toFixed(1)} Mb/s` : `${Math.round(mbps)} Mb/s`;
+}
+
 /** Sound tiles beyond this many say more about the file than anyone reads. */
 const MAX_SOUND_BADGES = 4;
 
@@ -333,7 +350,7 @@ export function buildBadges(
     });
   }
   if (details?.bit_rate) {
-    file.push({ label: 'Bitrate', value: `${Math.round(details.bit_rate / 1_000_000)} Mb/s` });
+    file.push({ label: 'Bitrate', value: bitrateLabel(details.bit_rate) });
   }
   if (studio) file.push(studio);
 

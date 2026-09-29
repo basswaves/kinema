@@ -6,6 +6,7 @@ import {
   channelLabel,
   dolbyVisionLabel,
   frameRateLabel,
+  bitrateLabel,
   releaseNames,
   studioBadge,
   resolutionLabel,
@@ -273,5 +274,30 @@ describe('studioBadge', () => {
   it('joins the file row, even with nothing read from the file', () => {
     const rows = buildBadges(null, null, { label: 'Studio', value: 'A' });
     expect(rows).toEqual([{ heading: 'File', badges: [{ label: 'Studio', value: 'A' }] }]);
+  });
+});
+
+describe('bitrateLabel', () => {
+  /** 2.2 and 1.6 Mb/s are different encodes; both used to read "2 Mb/s". */
+  it('keeps a decimal below ten', () => {
+    expect(bitrateLabel(2_213_000)).toBe('2.2 Mb/s');
+    expect(bitrateLabel(1_560_000)).toBe('1.6 Mb/s');
+    expect(bitrateLabel(8_600_000)).toBe('8.6 Mb/s');
+    expect(bitrateLabel(9_990_000)).toBe('10.0 Mb/s');
+    expect(bitrateLabel(26_511_880)).toBe('27 Mb/s');
+  });
+});
+
+describe('the folder rule', () => {
+  /** A film kept in another film's folder is not that film's release. */
+  it('does not read a folder another title’s files are in', () => {
+    expect(
+      releaseNames({
+        file_name: 'A.Film.2014.mp4',
+        parent_dir: 'D:\\Movies\\Another.Film.2006.2160p.UHD.BluRay.REMUX',
+        root_path: 'D:\\Movies',
+        folder_shared: true,
+      })
+    ).toEqual(['A.Film.2014.mp4']);
   });
 });

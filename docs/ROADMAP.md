@@ -9,7 +9,7 @@ Ideas and reports are welcome as [issues](https://github.com/Basswaves/kinema/is
 
 ---
 
-## Being considered
+## Next
 
 ### A first-run setup for picture and sound
 
@@ -18,6 +18,10 @@ receiver, matching the TV's refresh rate, turning HDR on — with what each gain
 and costs, based on what Kinema can see of the equipment. Home already says when
 the equipment can do better and turns it on in one press; this would ask the
 same questions up front.
+
+---
+
+## Being considered
 
 ### Tone mapping for projectors and HGIG TVs
 

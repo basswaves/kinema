@@ -29,6 +29,7 @@ import { readChapters } from './player/chapters';
 import { setTvMode } from './ui/tv';
 import { measurePictures, probeLibrary, refreshImdbRatings, scanLibrary } from './library/api';
 import { fileFacts } from './ui/badges';
+import { refreshTomatometer } from './metadata/scores';
 import {
   cacheArtwork,
   ignoreFileIds,
@@ -77,6 +78,8 @@ const CALLABLE: Record<string, (...args: never[]) => Promise<unknown>> = {
   fileFacts,
   // The scan's IMDb step: fetches IMDb's ratings file if it is due.
   refreshImdbRatings,
+  // The scan's Rotten Tomatoes step, with whatever OMDb key the copy has.
+  refreshTomatometer: () => refreshTomatometer(),
   // A scan's matching step on its own: whatever is waiting to be matched,
   // with whichever keys the copied library has.
   matchUnmatched: async () =>

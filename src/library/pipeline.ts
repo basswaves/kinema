@@ -46,6 +46,7 @@ import {
   upgradeWikidataFilms,
 } from '../metadata/match';
 import { syncBuiltinKey } from '../metadata/builtinKey';
+import { refreshTomatometer } from '../metadata/scores';
 
 /** Batched so a large library reports progress and never builds one huge IPC payload. */
 const PARSE_BATCH = 500;
@@ -322,6 +323,11 @@ export async function runScanPipeline(): Promise<ScanOutcome> {
     } catch (e) {
       errors.push(String(e));
     }
+    // Rotten Tomatoes, only with an OMDb key of the user's own, and within a
+    // daily budget of that key's lookups. A wrong key is worth saying; the
+    // day's allowance running out is not a problem, only a pause.
+    const scores = await refreshTomatometer();
+    if (scores.stopped && !/limit/i.test(scores.stopped)) errors.push(scores.stopped);
 
     // After matching and details: every artwork URL is known now, and
     // browsing should not need the network afterwards.

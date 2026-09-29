@@ -37,6 +37,9 @@ makes no stability promises.
 - **IMDb's rating** beside TMDB's, from the ratings file IMDb publishes for
   personal use. No key and no account; Kinema fetches it at most once a week
   and keeps only your library's titles.
+- **Rotten Tomatoes' Tomatometer**, when you have entered an OMDb key of your
+  own. Each title is looked up once a month, using at most half of a free
+  key's daily allowance.
 
 ### Changed
 

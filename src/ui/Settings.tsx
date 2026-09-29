@@ -738,7 +738,10 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
                   </label>
                   <label className="settings-field">
                     <span>
-                      OMDb <span className="muted">optional — a fallback for movies, poster only</span>
+                      OMDb{' '}
+                      <span className="muted">
+                        optional — adds Rotten Tomatoes scores, and is a fallback for movies
+                      </span>
                     </span>
                     <FocusInput
                       className="settings-input"
@@ -757,6 +760,12 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
                       app data. A new key applies to matches made from now on; titles already in
                       the library keep what they matched until they are matched again.
                     </p>
+                    <p>
+                      With an OMDb key, each title's Rotten Tomatoes score is looked up once and
+                      again after a month. A free OMDb key allows 1,000 lookups a day; Kinema uses
+                      at most 500 of them for scores, so a large library fills in over a few
+                      days.
+                    </p>
                   </MoreAbout>
                   {/* Attribution TMDB require wherever their data is shown, and
                       TVmaze's licence asks for. The logo is TMDB's own unmodified
@@ -774,6 +783,11 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
                     <p className="muted">
                       IMDb ratings: Information courtesy of IMDb (https://www.imdb.com). Used with
                       permission.
+                    </p>
+                    {/* OMDb's data is CC BY-NC 4.0, which asks for a credit. */}
+                    <p className="muted">
+                      Rotten Tomatoes scores from <strong>OMDb</strong>, with your own key, under
+                      CC BY-NC 4.0.
                     </p>
                   </div>
                 </section>

@@ -121,6 +121,8 @@ pub struct Title {
     /// IMDb's rating out of 10 and its vote count, from IMDb's own file.
     pub imdb_rating: Option<f64>,
     pub imdb_votes: Option<i64>,
+    /// Rotten Tomatoes' Tomatometer, 0–100, through the user's OMDb key.
+    pub tomatometer: Option<i64>,
 }
 
 #[derive(Serialize)]
@@ -336,7 +338,8 @@ const TITLE_SELECT: &str = "
               FROM (SELECT p.name FROM people p WHERE p.title_id = t.id ORDER BY p.ord)),
            t.certification,
            (SELECT r.rating FROM imdb_ratings r WHERE r.imdb_id = t.imdb_id),
-           (SELECT r.votes  FROM imdb_ratings r WHERE r.imdb_id = t.imdb_id)
+           (SELECT r.votes  FROM imdb_ratings r WHERE r.imdb_id = t.imdb_id),
+           (SELECT s.tomatometer FROM omdb_scores s WHERE s.imdb_id = t.imdb_id)
       FROM titles t";
 
 fn map_title(r: &rusqlite::Row) -> rusqlite::Result<Title> {
@@ -380,6 +383,7 @@ fn map_title(r: &rusqlite::Row) -> rusqlite::Result<Title> {
         certification: r.get(24)?,
         imdb_rating: r.get(25)?,
         imdb_votes: r.get(26)?,
+        tomatometer: r.get(27)?,
     })
 }
 

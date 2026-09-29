@@ -107,8 +107,12 @@ attribution and permit non-commercial use. Requests are rate-limited in
 
 ### OMDb
 
-Optional movie fallback from [OMDb](https://www.omdbapi.com). User-supplied key,
-stored locally, subject to OMDb's terms.
+Optional, with a user-supplied key stored locally, subject to OMDb's terms:
+a movie fallback, and the source of Rotten Tomatoes scores. OMDb's data is
+licensed [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) and
+is credited in Settings. There is deliberately no key of Kinema's own: its free
+keys allow 1,000 lookups a day, and Kinema spends at most 500 of the user's on
+scores, one per title a month (`src/metadata/scores.ts`).
 
 ### Wikidata and Wikipedia
 

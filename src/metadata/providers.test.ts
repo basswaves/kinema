@@ -22,7 +22,15 @@ vi.mock('@tauri-apps/plugin-http', () => ({
   }),
 }));
 
-const { pickStudios, tmdbGetEpisodes, tmdbGetTitle, tvmazeSearch, usCertification } = await import(
+const {
+  OmdbStop,
+  omdbTomatometer,
+  pickStudios,
+  tmdbGetEpisodes,
+  tmdbGetTitle,
+  tvmazeSearch,
+  usCertification,
+} = await import(
   './providers'
 );
 
@@ -190,5 +198,40 @@ describe('TMDB age rating and studios', () => {
     expect(appended?.split(',')).toContain('release_dates');
     expect(title.certification).toBe('R');
     expect(title.studios).toEqual([{ name: 'A Studio', logo_url: 'https://image.tmdb.org/t/p/w300/s.png' }]);
+  });
+});
+
+describe('OMDb Rotten Tomatoes score', () => {
+  const ask = async (status: number, body: unknown) => {
+    responses = [{ status, body }];
+    const result = omdbTomatometer('key', 'tt0133093').catch((e: unknown) => e);
+    await vi.runAllTimersAsync();
+    return result;
+  };
+
+  /** The shape OMDb documents: Ratings as source/value pairs. */
+  it('reads the Tomatometer out of the ratings list', async () => {
+    const body = {
+      Response: 'True',
+      Ratings: [
+        { Source: 'Internet Movie Database', Value: '8.7/10' },
+        { Source: 'Rotten Tomatoes', Value: '83%' },
+        { Source: 'Metacritic', Value: '73/100' },
+      ],
+    };
+    expect(await ask(200, body)).toBe(83);
+  });
+
+  it('says none when OMDb has none, as for most series', async () => {
+    expect(await ask(200, { Response: 'True', Ratings: [] })).toBeNull();
+    expect(await ask(200, { Response: 'False', Error: 'Incorrect IMDb ID.' })).toBeNull();
+  });
+
+  it('stops the pass on a wrong key or a spent allowance', async () => {
+    const wrongKey = await ask(401, { Response: 'False', Error: 'Invalid API key!' });
+    expect(wrongKey).toBeInstanceOf(OmdbStop);
+    const spent = await ask(401, { Response: 'False', Error: 'Request limit reached!' });
+    expect(spent).toBeInstanceOf(OmdbStop);
+    expect((spent as Error).message).toContain('limit');
   });
 });

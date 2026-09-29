@@ -1782,6 +1782,24 @@ star, because the two are different audiences' numbers. IMDb spells itself
 with a small b, so the label is not upper-cased like the badges'. The credit
 IMDb requires is in Settings with TMDB's, word for word.
 
+### Rotten Tomatoes ✅
+
+**Only with the user's own OMDb key**, as decided at the start: OMDb is the
+one source of the Tomatometer an app can use, and a shared key cannot last a
+day. The key field already existed for OMDb's movie fallback; it now says it
+adds scores.
+
+**Spending someone else's allowance carefully.** One lookup per title, again
+after a month (critics' scores move while reviews come in); at most 100 per
+scan and 500 a day, half a free key's 1,000, so whatever else the key is used
+for still works; and the pass stops at the first "Invalid API key!" or
+"Request limit reached!", since every other title would get the same answer.
+A wrong key is reported with the scan's problems; a spent day is only a
+pause. OMDb rarely has a Tomatometer for a series — both series in the real
+library had none — and "none" is stored like a score, so it waits its month.
+On the real library through a real key: four lookups, two films scored, the
+day's count at four, and a second pass asking nothing.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

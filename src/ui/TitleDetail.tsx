@@ -352,6 +352,12 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
                     {shown.imdb_rating.toFixed(1)}
                   </span>
                 ) : null}
+                {shown.tomatometer !== null && shown.tomatometer !== undefined ? (
+                  <span className="detail-score">
+                    <span className="detail-score-source">Rotten Tomatoes</span>
+                    {shown.tomatometer}%
+                  </span>
+                ) : null}
                 {title.rating ? (
                   <span className="detail-score">
                     <span className="detail-score-source">TMDB</span>

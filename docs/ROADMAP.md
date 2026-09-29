@@ -17,8 +17,7 @@ The detail page shows what a file really holds, as precisely as a Kodi skin
 does: resolution, Dolby Vision profile with FEL or MEL, HDR10+, the exact
 audio format (TrueHD Atmos, DTS:X…), frame rate, bit depth, the measured
 aspect ratio, source and studio, with IMDb and — with an OMDb key of your own —
-Rotten Tomatoes scores. Being built now; everything but Rotten Tomatoes is
-on the page.
+Rotten Tomatoes scores. Built; the documentation is being brought up to date.
 
 ### A first-run setup for picture and sound
 

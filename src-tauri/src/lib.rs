@@ -15,6 +15,7 @@ mod library;
 mod lifecycle;
 mod metadata;
 mod nfo;
+mod omdb;
 mod playback;
 mod probe;
 mod scanner;
@@ -219,6 +220,8 @@ pub fn run() {
             ffmpeg::ffmpeg_status,
             probe::probe_library,
             imdb::refresh_imdb_ratings,
+            omdb::list_titles_needing_scores,
+            omdb::save_omdb_scores,
             probe::file_facts,
             aspect::measure_pictures,
             equipment::get_equipment,

@@ -749,6 +749,43 @@ export async function omdbGetMovie(key: string, imdbId: string): Promise<TitleMe
   };
 }
 
+/**
+ * OMDb refused to answer for any title: a wrong key, or the day's allowance
+ * used up. Whoever is looping over titles should stop, not try the next.
+ */
+export class OmdbStop extends Error {}
+
+/**
+ * Rotten Tomatoes' Tomatometer for one title, 0–100, or null when OMDb has
+ * none — which for a series is usual. Throws {@link OmdbStop} when the key
+ * itself is the problem.
+ */
+export async function omdbTomatometer(key: string, imdbId: string): Promise<number | null> {
+  const response = await omdbQueued(() =>
+    fetchPolitely(omdbUrl(key, { i: imdbId }), 'OMDb score')
+  );
+  let data: { Response?: string; Error?: string; Ratings?: Array<{ Source?: string; Value?: string }> } =
+    {};
+  try {
+    data = await response.json();
+  } catch {
+    // An unreadable body falls through to the status check below.
+  }
+
+  if (!response.ok || data.Response === 'False') {
+    const error = data.Error ?? `HTTP ${response.status}`;
+    // OMDb answers 401 with "Invalid API key!" or "Request limit reached!".
+    if (response.status === 401 || /api key|limit/i.test(error)) throw new OmdbStop(`OMDb: ${error}`);
+    if (/not found|incorrect imdb id|error getting data/i.test(error)) return null;
+    throw new Error(`OMDb: ${error}`);
+  }
+
+  const value = data.Ratings?.find((r) => r.Source === 'Rotten Tomatoes')?.Value ?? '';
+  const match = /^(\d{1,3})%$/.exec(value.trim());
+  const percent = match ? Number(match[1]) : null;
+  return percent !== null && percent <= 100 ? percent : null;
+}
+
 // ---------------------------------------------------------------------------
 // External-id lookups
 //

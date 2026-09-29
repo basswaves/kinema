@@ -37,6 +37,8 @@ export interface Title {
   /** IMDb's rating out of 10 and its vote count, from IMDb's own file. */
   imdb_rating?: number | null;
   imdb_votes?: number | null;
+  /** Rotten Tomatoes' Tomatometer, 0–100, through the user's OMDb key. */
+  tomatometer?: number | null;
   /** 0–1, for a film started and not finished. */
   progress: number | null;
   /** Billed cast, in order — for search. */

@@ -64,6 +64,9 @@ src-tauri/src/
                  from; per-episode, on play, cached with a TTL
   imdb.rs        IMDb's public ratings file, fetched weekly at most, read as
                  it arrives; only the library's titles are kept
+  omdb.rs        Which titles are due a Rotten Tomatoes lookup and what OMDb
+                 said; the lookups themselves are src/metadata/scores.ts, with
+                 the user's own key and a daily budget
   detect.rs      Runs the user's own Skiptro if configured, then analyse.rs.
                  Two ways in: a Detect button per TV folder, and automatically
                  at the end of every scan — Skiptro whenever new episodes

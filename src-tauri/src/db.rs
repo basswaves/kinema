@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use std::path::Path;
 
 /// The schema this build understands. Bump it with every new `SCHEMA_V*`.
-pub const SCHEMA_VERSION: i64 = 17;
+pub const SCHEMA_VERSION: i64 = 18;
 
 /// What can go wrong opening the library.
 ///
@@ -543,6 +543,19 @@ CREATE TABLE imdb_ratings (
 );
 "#;
 
+/// Schema version 18: Rotten Tomatoes scores from OMDb (`omdb.rs`).
+///
+/// Only with the user's own OMDb key. By IMDb id, like `imdb_ratings`.
+/// `tomatometer` NULL with a `fetched_at` means OMDb was asked and has none,
+/// which waits a month like any other answer.
+const SCHEMA_V18: &str = r#"
+CREATE TABLE omdb_scores (
+    imdb_id      TEXT    PRIMARY KEY,
+    tomatometer  INTEGER,
+    fetched_at   INTEGER NOT NULL
+);
+"#;
+
 /// How long a statement waits for the write lock before giving up.
 ///
 /// Load-bearing from the moment there is more than one connection. SQLite
@@ -655,7 +668,7 @@ pub fn open_secondary(path: &Path) -> rusqlite::Result<Connection> {
 const MIGRATIONS: [&str; SCHEMA_VERSION as usize] = [
     SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6, SCHEMA_V7, SCHEMA_V8,
     SCHEMA_V9, SCHEMA_V10, SCHEMA_V11, SCHEMA_V12, SCHEMA_V13, SCHEMA_V14,
-    SCHEMA_V15, SCHEMA_V16, SCHEMA_V17,
+    SCHEMA_V15, SCHEMA_V16, SCHEMA_V17, SCHEMA_V18,
 ];
 
 /// Bring the database up to [`SCHEMA_VERSION`].

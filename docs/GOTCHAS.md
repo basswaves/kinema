@@ -544,9 +544,24 @@ slice, and remux; ffprobe then reads it as a Dolby Vision stream.
 
 ## Spatial navigation (D-pad)
 
-Both entries below are invisible with a mouse. Hovering re-establishes focus and
+Every entry below is invisible with a mouse. Hovering re-establishes focus and
 clicking reaches anything, so the UI tests perfectly on a desk and is unusable
 from a sofa. **Test D-pad changes with the mouse physically untouched.**
+
+### A focus key that changes is never registered
+
+`useFocusable` registers a control with the spatial library **once**, when it
+first mounts, under whatever `focusKey` it had then. Later renders call
+`updateFocusable` with the *current* key — so if the key has changed, the
+update goes to a key that was never registered, and the control keeps the
+`onEnterPress` it was born with. Nothing errors; OK simply does the old thing.
+
+`ConfirmButton` walked into it. Arming swaps its button for a Fragment holding
+the confirm button first, and React keeps that first button as the same
+instance. Given a `focusKey` on the unarmed button only, the key changed from
+set to unset under a mounted control — and the second press armed again
+instead of confirming. **Do:** keep a control's `focusKey` the same for its
+whole life, or give it a React `key` so a different key means a new control.
 
 ### Focus cannot travel up into an overlay nav
 
@@ -1043,6 +1058,34 @@ changed. Its key used to cover only local sources, so switching TheIntroDB off
 left its times on every episode already played, with no way to tell why.
 **Do:** anything that decides which sources may answer belongs in the cache
 key (`local_key`'s `remotes`).
+
+## SIMKL
+
+### Nobody saying no looks exactly like nobody having answered yet
+
+The device sign-in has no "declined". A person who presses No on SIMKL's page
+produces `authorization_pending` forever, the same as one who walked away.
+**Do:** stop at the code's own expiry, by the clock, and offer to start again.
+
+### Polling early locks the sign-in out
+
+The poll timer is reset by the attempt itself, including one refused as too
+early (`slow_down`). A client that retries at once keeps re-arming it until the
+code expires. **Do:** add five seconds on `slow_down` and actually wait; Rust
+answers the page's faster timer with "waiting" rather than asking SIMKL early.
+
+### One grant, one live access token
+
+Refreshing replaces the access token for everyone holding it. Two processes on
+one library — a development build beside the release, or a self-test on its
+copy, tokens included — cut each other off with 401s that look like random
+expiry. **Do:** on a 401, look for a token someone else already refreshed
+before refreshing; a self-test never talks to SIMKL.
+
+### An unrecognised scope becomes read-only without a word
+
+A typo in `scope` gets a working token that fails at the first write. **Do:**
+check the granted `scope` for `media:write` before storing a token.
 
 ## Output hardware (Windows)
 

@@ -15,6 +15,12 @@ makes no stability promises.
 - **The scene after the credits.** Where a film has one, Skip takes you
   straight to it instead of the credits running out — always as a button, even
   with automatic skipping on.
+- **SIMKL.** Connect your SIMKL account in Settings → Playback — a code on
+  screen and a QR code for your phone — and each film and episode you finish
+  in Kinema is added to it, as is everything you had already watched, once.
+  It only adds: nothing comes back from SIMKL, and marking something unwatched
+  in Kinema leaves SIMKL alone. Anything finished while SIMKL cannot be reached
+  waits and goes later.
 - **IntroDB**, a second collection of intro, recap and credits times shared by
   viewers, used where TheIntroDB has nothing. On by default, with its own
   switch in Settings → Intro & credits; only which film or episode it is gets

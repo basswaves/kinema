@@ -120,6 +120,7 @@ fn still_being_written(path: &std::path::Path, now: i64) -> bool {
 /// which is inference and must not decide what counts as seen.
 #[tauri::command]
 pub fn save_progress(
+    app: tauri::AppHandle,
     db: tauri::State<Db>,
     file_id: i64,
     position_secs: f64,
@@ -162,7 +163,9 @@ pub fn save_progress(
     )
     .map_err(to_string_err)?;
     // The episode's, and every other copy's — see `history`.
-    crate::history::remember(&conn, file_id).map_err(to_string_err)?;
+    if crate::history::remember(&conn, file_id).map_err(to_string_err)? > 0 {
+        crate::simkl::send_soon(&app);
+    }
     Ok(())
 }
 
@@ -178,7 +181,12 @@ pub fn save_progress(
 /// and "no history" are the same state, and leaving the position behind would
 /// resume a file the user has just declared unseen.
 #[tauri::command]
-pub fn set_watched(db: tauri::State<Db>, file_id: i64, watched: bool) -> Result<(), String> {
+pub fn set_watched(
+    app: tauri::AppHandle,
+    db: tauri::State<Db>,
+    file_id: i64,
+    watched: bool,
+) -> Result<(), String> {
     let conn = db.0.lock().map_err(to_string_err)?;
 
     if watched {
@@ -200,7 +208,9 @@ pub fn set_watched(db: tauri::State<Db>, file_id: i64, watched: bool) -> Result<
     .map_err(to_string_err)?;
 
     // Watched or not is a fact about the episode, not the copy.
-    crate::history::remember(&conn, file_id).map_err(to_string_err)?;
+    if crate::history::remember(&conn, file_id).map_err(to_string_err)? > 0 {
+        crate::simkl::send_soon(&app);
+    }
     Ok(())
 }
 

@@ -27,6 +27,7 @@ import FocusButton from './FocusButton';
 import { count, formatBytes } from './format';
 import FocusInput from './FocusInput';
 import BackupSection from './BackupSection';
+import SimklSection, { SimklAppIdField } from './SimklSection';
 import ConfirmButton from './ConfirmButton';
 import EquipmentSection from './EquipmentSection';
 import SoundSection from './SoundSection';
@@ -798,78 +799,81 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
             )}
 
             {section === 'playback' && (
-              <section className="settings-section">
-                <h2>Playback</h2>
-                <ChoiceRow
-                  label="Where Kinema is used"
-                  choices={[
-                    { value: 'desk', label: 'At a desk' },
-                    { value: 'tv', label: 'On a TV' },
-                  ]}
-                  value={tvMode ? 'tv' : 'desk'}
-                  onChange={(v) => setTvMode(v === 'tv')}
-                  note="On a TV, Kinema fills the whole screen, with bigger text and a margin that keeps clear of the edges some TVs cut off. At a desk it runs in a window and its text grows with the window."
-                  hint={
-                    <>
-                      Switch between them any time with <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+
-                      <kbd>T</kbd>.
-                    </>
-                  }
-                />
-                <LanguageSection onError={setError} />
-                <ChoiceRow
-                  label="Intros and credits"
-                  choices={[
-                    { value: 'button', label: 'Show a Skip button' },
-                    { value: 'auto', label: 'Skip them' },
-                  ]}
-                  value={autoSkip ? 'auto' : 'button'}
-                  onChange={(v) => {
-                    setAutoSkip(v === 'auto');
-                    void setSetting('skip_mode', v).catch((e) => setError(userError(e)));
-                  }}
-                  note="Show a Skip button lets you choose each time. Skip them jumps straight past intros and end credits."
-                  hint="Works for episodes where Kinema knows where they are. Intro & credits says how it finds out."
-                />
-                <ChoiceRow
-                  label="When the end credits are not known, offer the next episode"
-                  choices={CREDITS_TAIL_CHOICES.map((n) => ({
-                    value: String(n),
-                    label: n === 0 ? 'At the end' : `${n}s before`,
-                  }))}
-                  value={String(creditsTail)}
-                  onChange={(v) => {
-                    const next = Number(v);
-                    setCreditsTail(next);
-                    void setSetting(CREDITS_TAIL_KEY, v).catch((e) => setError(userError(e)));
-                  }}
-                  note="For an episode where nothing has found the end credits, Kinema guesses they are the last stretch and offers the next episode this long before the end."
-                  hint="Where the credits are known, from detection or a chapter named for them, that is used instead. Never for movies, or for the last episode you have."
-                />
-                {/* The one rendering switch in the app, and it exists only
-                    because the right answer depends on hardware this code
-                    cannot see. Everything else the app decides for itself. */}
-                <ChoiceRow
-                  label="Frame timing"
-                  choices={[
-                    { value: 'audio', label: 'Match the sound' },
-                    { value: 'display', label: 'Match the screen' },
-                  ]}
-                  value={displaySync ? 'display' : 'audio'}
-                  onChange={(v) => {
-                    setDisplaySync(v === 'display');
-                    void setSetting(VIDEO_SYNC_KEY, v).catch((e) => setError(userError(e)));
-                  }}
-                  note="Two ways of deciding when each frame is shown. Which is smoother depends on the screen: keep Match the sound unless playback stutters slightly every few seconds, then try Match the screen."
-                  hint={
-                    <>
-                      Neither fixes the steady judder of a 24 frames a second movie on a 60 Hz
-                      screen; Match the refresh rate in Picture &amp; sound does. Press{' '}
-                      <kbd>I</kbd> while something plays to see what you are getting.
-                    </>
-                  }
-                />
-              </section>
+              <>
+                <section className="settings-section">
+                  <h2>Playback</h2>
+                  <ChoiceRow
+                    label="Where Kinema is used"
+                    choices={[
+                      { value: 'desk', label: 'At a desk' },
+                      { value: 'tv', label: 'On a TV' },
+                    ]}
+                    value={tvMode ? 'tv' : 'desk'}
+                    onChange={(v) => setTvMode(v === 'tv')}
+                    note="On a TV, Kinema fills the whole screen, with bigger text and a margin that keeps clear of the edges some TVs cut off. At a desk it runs in a window and its text grows with the window."
+                    hint={
+                      <>
+                        Switch between them any time with <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+
+                        <kbd>T</kbd>.
+                      </>
+                    }
+                  />
+                  <LanguageSection onError={setError} />
+                  <ChoiceRow
+                    label="Intros and credits"
+                    choices={[
+                      { value: 'button', label: 'Show a Skip button' },
+                      { value: 'auto', label: 'Skip them' },
+                    ]}
+                    value={autoSkip ? 'auto' : 'button'}
+                    onChange={(v) => {
+                      setAutoSkip(v === 'auto');
+                      void setSetting('skip_mode', v).catch((e) => setError(userError(e)));
+                    }}
+                    note="Show a Skip button lets you choose each time. Skip them jumps straight past intros and end credits."
+                    hint="Works for episodes where Kinema knows where they are. Intro & credits says how it finds out."
+                  />
+                  <ChoiceRow
+                    label="When the end credits are not known, offer the next episode"
+                    choices={CREDITS_TAIL_CHOICES.map((n) => ({
+                      value: String(n),
+                      label: n === 0 ? 'At the end' : `${n}s before`,
+                    }))}
+                    value={String(creditsTail)}
+                    onChange={(v) => {
+                      const next = Number(v);
+                      setCreditsTail(next);
+                      void setSetting(CREDITS_TAIL_KEY, v).catch((e) => setError(userError(e)));
+                    }}
+                    note="For an episode where nothing has found the end credits, Kinema guesses they are the last stretch and offers the next episode this long before the end."
+                    hint="Where the credits are known, from detection or a chapter named for them, that is used instead. Never for movies, or for the last episode you have."
+                  />
+                  {/* The one rendering switch in the app, and it exists only
+                      because the right answer depends on hardware this code
+                      cannot see. Everything else the app decides for itself. */}
+                  <ChoiceRow
+                    label="Frame timing"
+                    choices={[
+                      { value: 'audio', label: 'Match the sound' },
+                      { value: 'display', label: 'Match the screen' },
+                    ]}
+                    value={displaySync ? 'display' : 'audio'}
+                    onChange={(v) => {
+                      setDisplaySync(v === 'display');
+                      void setSetting(VIDEO_SYNC_KEY, v).catch((e) => setError(userError(e)));
+                    }}
+                    note="Two ways of deciding when each frame is shown. Which is smoother depends on the screen: keep Match the sound unless playback stutters slightly every few seconds, then try Match the screen."
+                    hint={
+                      <>
+                        Neither fixes the steady judder of a 24 frames a second movie on a 60 Hz
+                        screen; Match the refresh rate in Picture &amp; sound does. Press{' '}
+                        <kbd>I</kbd> while something plays to see what you are getting.
+                      </>
+                    }
+                  />
+                </section>
+                <SimklSection />
+              </>
             )}
 
             {section === 'picture' && (
@@ -1284,6 +1288,7 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
                       Open log folder
                     </FocusButton>
                   </div>
+                  <SimklAppIdField />
                 </section>
 
                 {panel === 'developer' && (

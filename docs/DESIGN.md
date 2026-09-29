@@ -80,6 +80,9 @@ src-tauri/src/
   trailer.rs     Finds local trailer files by Jellyfin/Kodi convention; the
                  scanner shares its test so trailers never become titles
   settings.rs    Key/value settings (API keys) + the frontend log bridge
+  simkl.rs       SIMKL, one way: the device sign-in, token refresh, and the
+                 queue of finished films and episodes (simkl_outbox), sent in
+                 batches. history.rs queues; nothing is read back
 
 src/
   ui/            Browse shell, Home, rails, cards, detail page, search, the
@@ -339,6 +342,19 @@ another tool and carries fields this app does not model.
 
 **Missing episodes are shown greyed out, not hidden.** A season with gaps should look
 like a season with gaps.
+
+**SIMKL hears about "watched," and only that.** When SIMKL is connected, the
+moment something becomes watched — `history::remember`, the one place that
+happens, by playing or by hand — it is queued in `simkl_outbox`, and a few
+seconds later everything queued goes in one request. SIMKL allows one write a
+second and suspends apps that keep exceeding it, so nothing is sent per item,
+nothing is polled, and a backlog goes a hundred at a time. The queue is what
+makes being offline harmless: rows leave only when SIMKL has accepted them.
+It only adds. Un-watching in Kinema removes nothing from SIMKL, which may have
+that watch from another app; and nothing is read back, so SIMKL can never
+change what Kinema says was watched. Signing in is SIMKL's device flow — a code
+and a QR code on screen, approval on a phone — so it works from a sofa and no
+secret has to live in the app.
 
 **There is one notion of "watched."** Marking an episode by hand writes the same
 `completed` flag that playback sets at 94%, not a column beside it. Two of them

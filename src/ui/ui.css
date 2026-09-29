@@ -2024,6 +2024,35 @@ html {
   color: #e8a838;
 }
 
+/*
+ * SIMKL sign-in (SimklSection.tsx): the QR code beside the code to type. The
+ * code is big because this is read across a room; the QR code sits on white,
+ * with its own quiet zone, because a phone camera needs the contrast.
+ */
+.simkl-code {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+  margin: 0.75rem 0;
+}
+
+.simkl-qr {
+  width: 10rem;
+  height: 10rem;
+  flex: none;
+  background: #fff;
+  border-radius: 0.5rem;
+  image-rendering: pixelated;
+}
+
+.simkl-user-code {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  margin: 0.25rem 0 0.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .settings-note,
 .settings-error {
   margin-bottom: 1rem;

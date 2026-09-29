@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use std::path::Path;
 
 /// The schema this build understands. Bump it with every new `SCHEMA_V*`.
-pub const SCHEMA_VERSION: i64 = 19;
+pub const SCHEMA_VERSION: i64 = 20;
 
 /// What can go wrong opening the library.
 ///
@@ -615,6 +615,28 @@ CREATE TABLE remote_skip_answers (
 );
 "#;
 
+/// Schema version 20: films and episodes finished while SIMKL is connected,
+/// waiting to be sent (`simkl.rs`).
+///
+/// A queue rather than a send on the spot, so being offline loses nothing:
+/// rows leave when SIMKL has accepted them. `key` makes one row per thing
+/// watched, so the same episode finished twice before a send is one watch —
+/// the first one kept. Nothing here refers to a file or a title row; like
+/// `watch_history`, it is by the ids SIMKL finds titles by.
+const SCHEMA_V20: &str = r#"
+CREATE TABLE simkl_outbox (
+    id          INTEGER PRIMARY KEY,
+    key         TEXT    NOT NULL UNIQUE,
+    kind        TEXT    NOT NULL,          -- 'movie' | 'episode'
+    imdb_id     TEXT,
+    tmdb_id     TEXT,
+    season      INTEGER,
+    episode     INTEGER,
+    watched_at  INTEGER NOT NULL,
+    queued_at   INTEGER NOT NULL
+);
+"#;
+
 /// How long a statement waits for the write lock before giving up.
 ///
 /// Load-bearing from the moment there is more than one connection. SQLite
@@ -807,6 +829,7 @@ pub(crate) const MIGRATIONS: [&str; SCHEMA_VERSION as usize] = [
     SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6, SCHEMA_V7, SCHEMA_V8,
     SCHEMA_V9, SCHEMA_V10, SCHEMA_V11, SCHEMA_V12, SCHEMA_V13, SCHEMA_V14,
     SCHEMA_V15, SCHEMA_V16, SCHEMA_V17, SCHEMA_V18, SCHEMA_V19,
+    SCHEMA_V20,
 ];
 
 /// Bring the database up to [`SCHEMA_VERSION`].

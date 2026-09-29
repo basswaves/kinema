@@ -6,7 +6,10 @@ Worth stating up front, because it is unusually small:
 
 - **No server, no daemon, no network listener.** Nothing accepts a connection.
 - **No accounts, no telemetry, no analytics.** Nothing is sent anywhere about
-  what you watch.
+  what you watch — unless you connect SIMKL yourself, in Settings → Playback.
+  Then the films and episodes you finish, and when, are sent to your SIMKL
+  account (`src-tauri/src/simkl.rs`), and nothing else is. Disconnecting ends
+  it and tells SIMKL to end the sign-in.
 - **Outbound requests only, to seven services for metadata** — TMDB, TVmaze,
   OMDb, Wikidata (with Wikipedia), TheIntroDB, IntroDB and IMDb's ratings
   file — **and
@@ -19,7 +22,8 @@ Worth stating up front, because it is unusually small:
   from Rust are TheIntroDB, IntroDB, IMDb and GitHub.
 - **Your API keys stay local.** TMDB and OMDb keys you enter are stored in
   the SQLite database in your app data folder, and sent only to the service they
-  belong to. Released builds carry one key of Kinema's own, for TMDB, added at
+  belong to. So is SIMKL's sign-in, when you connect it: SIMKL's own tokens,
+  never your password, which you type only on SIMKL's page. Released builds carry one key of Kinema's own, for TMDB, added at
   build time from a repository secret; no key is committed. That key is not a
   secret from anyone holding the app — any key a program sends can be read out
   of it — and gives access to nothing but TMDB's public, read-only data.
@@ -30,7 +34,8 @@ The parts most worth scrutiny are the ones that cross a trust boundary: the
 external process invocation in `src-tauri/src/detect.rs` (Skiptro and ffmpeg,
 launched with user-editable argument templates), the XML parsing in
 `src-tauri/src/nfo.rs`, and the HTTP clients in `src/metadata/providers.ts`,
-`src-tauri/src/introdb.rs` and `src-tauri/src/introdb_app.rs`.
+`src-tauri/src/introdb.rs`, `src-tauri/src/introdb_app.rs` and
+`src-tauri/src/simkl.rs` (which holds a user's SIMKL tokens).
 
 ## Reporting a vulnerability
 

@@ -46,6 +46,9 @@ audio and subtitles, volume. Back steps back to wherever you came from.
   2.39:1. Where it came from (UHD Blu-ray remux, WEB-DL…) is read from the
   release name; nothing else is.
 - **Remembers where you were**, per file, and offers the next episode.
+- **Tells SIMKL what you watched**, if you connect it: whatever you finish in
+  Kinema is added to your SIMKL account. Connecting is a code on screen and a
+  tap on your phone.
 - **Keeps a safety copy** of your watch history, resume points and hand-made
   matches once a week, and puts one back from Settings if the library is ever
   damaged.
@@ -145,6 +148,12 @@ also knows where some films have a scene after the credits, so Skip can take
 you straight to it. Only which film or episode it is gets sent — no account, no
 key, nothing about you. Turn either off in Settings if you would rather it did
 not.
+
+**SIMKL** is off until you connect it, in Settings → Playback. Kinema then adds
+each film and episode you finish to your SIMKL account — and, once, everything
+you had already watched in Kinema. It only ever adds: nothing comes back, and
+marking something unwatched in Kinema leaves SIMKL alone. You approve Kinema on
+SIMKL's own page, so Kinema never sees your password.
 
 ## Platform support
 

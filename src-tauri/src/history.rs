@@ -224,15 +224,35 @@ fn copies_of(conn: &Connection, file_id: i64, items: &[Item]) -> rusqlite::Resul
 /// progress, marked watched, marked unwatched. No state means unwatched, and
 /// unwatched is forgotten everywhere: "not seen" and "no history" are the
 /// same thing, as `set_watched` has always said.
-pub fn remember(conn: &Connection, file_id: i64) -> rusqlite::Result<()> {
+///
+/// This is also the one moment something *becomes* watched, however it
+/// happened, so it is where a finished film or episode is queued for SIMKL
+/// (`simkl.rs`). Returns how many were, so the caller can have them sent.
+/// Only the change counts: saving progress again on something already
+/// watched queues nothing, and un-watching sends nothing either way.
+pub fn remember(conn: &Connection, file_id: i64) -> rusqlite::Result<usize> {
     let items = items_of(conn, file_id)?;
     if items.is_empty() {
-        return Ok(());
+        return Ok(0);
     }
     let state = own_state(conn, file_id)?;
+    let mut finished = 0;
 
     for item in &items {
         let existing = find(conn, item)?;
+        let was_watched = existing.is_some_and(|(_, s)| s.completed);
+        if let Some(s) = state.filter(|s| s.completed && !was_watched) {
+            let queued = crate::simkl::queue_finished(
+                conn,
+                &item.kind,
+                item.imdb_id.as_deref(),
+                item.tmdb_id.as_deref(),
+                item.season,
+                item.episode,
+                s.updated_at,
+            )?;
+            finished += usize::from(queued);
+        }
         match (state, existing) {
             (Some(s), Some((id, _))) => {
                 conn.execute(
@@ -279,7 +299,7 @@ pub fn remember(conn: &Connection, file_id: i64) -> rusqlite::Result<()> {
             }
         }
     }
-    Ok(())
+    Ok(finished)
 }
 
 /// Files were just matched: give each the history of what it shows, when
@@ -568,5 +588,49 @@ mod tests {
         play(&conn, 7, 3000.0, false, 100);
         match_to(&conn, 8, 1);
         assert_eq!(state(&conn, 8), Some((3000.0, false, None)));
+    }
+
+    fn simkl_waiting(conn: &Connection) -> Vec<(String, Option<i64>, Option<i64>, i64)> {
+        let mut stmt = conn
+            .prepare("SELECT tmdb_id, season, episode, watched_at FROM simkl_outbox ORDER BY id")
+            .unwrap();
+        stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))
+            .unwrap()
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .unwrap()
+    }
+
+    /// Only the moment something becomes watched is sent to SIMKL: saving
+    /// progress on it again sends nothing more, and un-watching sends nothing
+    /// at all — SIMKL is told what was finished, and only that.
+    #[test]
+    fn finishing_an_episode_queues_it_for_simkl_once() {
+        let conn = library();
+        crate::settings::store(&conn, "simkl_access_token", "a").unwrap();
+        crate::settings::store(&conn, "simkl_refresh_token", "r").unwrap();
+        file(&conn, 1, Some(4), 2, 3);
+
+        play(&conn, 1, 600.0, false, 100);
+        assert!(simkl_waiting(&conn).is_empty(), "half-watched is not finished");
+
+        play(&conn, 1, 1750.0, true, 200);
+        assert_eq!(simkl_waiting(&conn), vec![("9001".into(), Some(2), Some(3), 200)]);
+
+        play(&conn, 1, 1790.0, true, 210);
+        assert_eq!(simkl_waiting(&conn).len(), 1, "still one watch");
+
+        conn.execute("DELETE FROM playback_state WHERE file_id = 1", []).unwrap();
+        remember(&conn, 1).unwrap();
+        assert_eq!(simkl_waiting(&conn).len(), 1, "un-watching removes nothing");
+    }
+
+    /// Without SIMKL connected nothing is queued; what was watched meanwhile
+    /// goes in the one batch sent at connect.
+    #[test]
+    fn nothing_is_queued_for_simkl_when_it_is_not_connected() {
+        let conn = library();
+        file(&conn, 1, Some(4), 2, 3);
+        play(&conn, 1, 1750.0, true, 200);
+        assert!(simkl_waiting(&conn).is_empty());
     }
 }

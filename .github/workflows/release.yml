@@ -55,9 +55,14 @@ jobs:
           VITE_TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
         run: if (-not $env:VITE_TMDB_API_KEY) { throw 'The TMDB_API_KEY repository secret is not set.' }
 
+      # Kinema's SIMKL app ID (src-tauri/src/simkl.rs), compiled in. Not a
+      # secret to SIMKL, but kept out of the source so the repository does not
+      # say whose account registered it. Unlike the TMDB key it is optional: a
+      # release without it simply has no SIMKL, as a build from source does.
       - name: Build the portable app
         env:
           VITE_TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          KINEMA_SIMKL_CLIENT_ID: ${{ secrets.SIMKL_CLIENT_ID }}
         run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-app.ps1 -NoShortcut
 
       - name: Package

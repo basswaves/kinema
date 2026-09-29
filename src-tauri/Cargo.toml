@@ -47,6 +47,12 @@ flate2 = "1"
 # Tauri's own plugin, so that starting Kinema twice brings the first window
 # forward instead of opening a second one (see `run` in lib.rs).
 tauri-plugin-single-instance = "2"
+# The QR code on the SIMKL sign-in screen (simkl.rs), so a phone can scan it
+# from the sofa. Pure Rust, no image library: it writes SVG text.
+qrcode = { version = "0.14", default-features = false, features = ["svg"] }
+# Already compiled in through Tauri's runtime; named for its timer, so the
+# SIMKL sender can wait between writes without holding a thread.
+tokio = { version = "1", features = ["time"] }
 
 # Microsoft's own bindings, already compiled in through Tauri at this version.
 # Used read-only by equipment.rs to ask Windows what the screens and audio

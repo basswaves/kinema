@@ -24,6 +24,7 @@ mod probe;
 mod scanner;
 mod selftest;
 mod settings;
+mod simkl;
 mod skip;
 mod skiptro;
 mod trailer;
@@ -165,6 +166,7 @@ fn open_library(app: &tauri::AppHandle) -> Result<(), String> {
     app.manage(ScanDb(Mutex::new(scanner)));
     app.manage(jobs::Jobs::default());
     app.manage(equipment::EquipmentState::default());
+    app.manage(simkl::SimklState::default());
     Ok(())
 }
 
@@ -226,6 +228,8 @@ pub fn run() {
             equipment::check_at_startup(app.handle().clone());
             // A screen a crashed session switched and never put back.
             display::restore_after_crash(app.handle());
+            // Anything finished while SIMKL could not be reached goes now.
+            simkl::send_soon(app.handle());
 
             // The window starts hidden and the page shows it once it has
             // something to paint (App.tsx). If that never happens — a script
@@ -259,6 +263,11 @@ pub fn run() {
             settings::log_paths,
             settings::open_log_folder,
             settings::open_backup_folder,
+            simkl::simkl_status,
+            simkl::simkl_start_connect,
+            simkl::simkl_poll_connect,
+            simkl::simkl_cancel_connect,
+            simkl::simkl_disconnect,
             backup::list_backups,
             backup::restore_backup,
             selftest::selftest_plan,

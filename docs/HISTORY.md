@@ -1981,6 +1981,47 @@ a row of its own (`remote_skip_answers`, schema 19). And the cache key now
 includes which services are switched on: before, switching TheIntroDB off left
 its times on every episode already played until something local changed.
 
+## SIMKL, one way
+
+Asked for by the owner, after seeing another media app link to Trakt and SIMKL.
+SIMKL first: in July 2026 Trakt limited a free account to one connected app,
+and SIMKL's API is free for a project like this.
+
+Four decisions, the owner's, each the recommended option:
+
+- **Only additions.** Finished in Kinema, added to SIMKL. Un-watching in
+  Kinema removes nothing there — SIMKL may have that watch from another app, and
+  a one-way link has no business deleting what it did not write.
+- **What was already watched is sent once**, at connect, with its dates.
+  SIMKL ignores a watch it already has, so connecting again is harmless.
+- **No "Watching now".** Only what was finished; SIMKL's live start, pause and
+  stop reports can come later.
+- **One app ID, built into releases** as a GitHub secret, like the TMDB key.
+  Not a secret to SIMKL — it is in every URL — but kept out of the source so
+  the repository does not say whose account registered it.
+
+Sign-in is SIMKL's **AUTH V2 device flow**: a code and a QR code on screen, the
+approval on a phone, no password or secret passing through Kinema. The older
+PIN flow was the obvious one to copy and retires around April 2027 — the kind
+of upkeep this project refuses. SIMKL's rules decided the sending: one write a
+second, suspension "without warning, no appeal" for overage, and arrays on
+every write endpoint. So a finished item is queued (`simkl_outbox`, schema 20)
+and the queue is sent ten seconds later, a hundred items a request — a whole
+season marked watched is one request, and a first-connect history of a large
+library a handful.
+
+Two things SIMKL's documentation warns about shaped the sign-in: nobody
+declining ever produces an answer, so the page stops at the code's own expiry;
+and a poll that comes too early resets SIMKL's timer, so Rust answers the
+page's two-second timer with "waiting" until SIMKL's interval has passed. And
+one shaped refreshing: a refresh replaces the access token for every process
+holding it, so a 401 first looks for a token another Kinema on the same library
+already refreshed, and a self-test, which works on a copy of the library with
+the tokens in it, never talks to SIMKL at all.
+
+Testing Disconnect from the keyboard found a bug in the button that asks
+first: see GOTCHAS, "A focus key that changes is never registered".
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

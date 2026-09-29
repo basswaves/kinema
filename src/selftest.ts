@@ -27,6 +27,7 @@ import { ensureMpvInitialised } from './player/mpv';
 import { readTracks } from './player/tracks';
 import { readChapters } from './player/chapters';
 import { setTvMode } from './ui/tv';
+import { simklStatus } from './metadata/simkl';
 import { measurePictures, probeLibrary, refreshImdbRatings, scanLibrary } from './library/api';
 import { fileFacts } from './ui/badges';
 import { seasonFacts } from './ui/seasonBadges';
@@ -70,6 +71,9 @@ const CALLABLE: Record<string, (...args: never[]) => Promise<unknown>> = {
   refreshStaleTitles,
   // The details pass: titles missing something TMDB has, fetched once more.
   backfillTitleDetails,
+  // What SIMKL looks like from here — which, under a self-test, must be
+  // "not available": a self-test never talks to SIMKL (simkl.rs).
+  simklStatus,
   cacheArtwork,
   upgradeWikidataFilms,
   // The scan's reading of files for the detail page's badges, on its own.

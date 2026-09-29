@@ -782,6 +782,21 @@ const mockDetection = (() => {
 type Args = Record<string, unknown>;
 type Handler = (args: Args) => unknown;
 
+/**
+ * A stand-in SIMKL: the sign-in is approved on the third poll, as if someone
+ * had typed the code on their phone in between. Nothing leaves the page.
+ */
+const simkl = {
+  connected: false,
+  polls: 0,
+  pending: false,
+};
+
+/** A small checkerboard in place of a QR code; the layout is what is tested. */
+const MOCK_QR =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8"><rect width="8" height="8" fill="#fff"/>' +
+  '<path d="M0 0h4v4H0zM4 4h4v4H4z"/></svg>';
+
 const num = (args: Args, key: string) => Number(args[key]);
 
 let mockFullscreen = false;
@@ -925,6 +940,43 @@ const handlers: Record<string, Handler> = {
   ],
   restore_backup: () => null,
   selftest_plan: () => null,
+
+  // SIMKL (simkl.rs), with the stand-in above
+  simkl_status: () => ({
+    available: true,
+    connected: simkl.connected,
+    needs_reconnect: false,
+    user: simkl.connected ? 'example-user' : null,
+    waiting: 0,
+    last_sent_at: simkl.connected ? 1790700000 : null,
+  }),
+  simkl_start_connect: () => {
+    simkl.polls = 0;
+    simkl.pending = true;
+    return {
+      user_code: 'BDWP-HQPK',
+      verification_uri: 'https://simkl.com/pin',
+      verification_uri_complete: 'https://simkl.com/pin?user_code=BDWP-HQPK',
+      expires_in: 900,
+      qr_svg: MOCK_QR,
+    };
+  },
+  simkl_poll_connect: () => {
+    if (!simkl.pending) return 'expired';
+    simkl.polls += 1;
+    if (simkl.polls < 3) return 'waiting';
+    simkl.pending = false;
+    simkl.connected = true;
+    return 'connected';
+  },
+  simkl_cancel_connect: () => {
+    simkl.pending = false;
+    return null;
+  },
+  simkl_disconnect: () => {
+    simkl.connected = false;
+    return null;
+  },
 
   // plugins
   'plugin:event|listen': (a) => listen(String(a.event), Number(a.handler)),

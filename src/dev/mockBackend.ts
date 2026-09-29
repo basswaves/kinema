@@ -700,6 +700,17 @@ const SLOW_DETECT = flag('kinemaMockSlowDetect') === '1';
 const REVIEW_COUNT = Number(flag('kinemaMockReview') ?? 0) || 0;
 /** `kinemaMockUpdate` pretends that version is out on GitHub. */
 const UPDATE = flag('kinemaMockUpdate');
+/**
+ * `kinemaMockDetectSteps`, a JSON list of report steps, stands in for what the
+ * scan's detection pass said — three TV folders with nothing new, say.
+ */
+const DETECT_STEPS: unknown[] = (() => {
+  try {
+    return JSON.parse(flag('kinemaMockDetectSteps') ?? '[]') as unknown[];
+  } catch {
+    return [];
+  }
+})();
 
 const later = <T,>(value: T): Promise<T> =>
   new Promise((resolve) => window.setTimeout(() => resolve(value), SLOW_MS));
@@ -819,9 +830,9 @@ const handlers: Record<string, Handler> = {
       ? mockDetection.run(20).then((r) =>
           r.stopped
             ? { steps: [{ root_path: '', step: 'detect', ran: false, note: 'you stopped detection; the rest is picked up by the next scan' }] }
-            : { steps: [] }
+            : { steps: DETECT_STEPS }
         )
-      : { steps: [] },
+      : { steps: DETECT_STEPS },
   analysis_backlog: () => [[1, 0]],
   detect_intros: () => mockDetection.run(),
   stop_detection: () => mockDetection.stop(),

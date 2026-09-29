@@ -499,8 +499,9 @@ fn backlog(app: &tauri::AppHandle) -> Result<Vec<(i64, usize)>, String> {
 #[derive(Serialize, Clone)]
 pub struct AutoStep {
     pub root_path: String,
-    /// `"skiptro"`, `"analyse"`, or `"root"` when the folder itself was the
-    /// problem and neither step could be attempted.
+    /// `"skiptro"`, `"analyse"`, `"root"` when the folder itself was the
+    /// problem and neither step could be attempted, or `"current"` when
+    /// Skiptro had nothing new to look at in this folder.
     pub step: String,
     pub ran: bool,
     /// One sentence written for the user rather than for a log: what it did, or
@@ -716,11 +717,13 @@ pub async fn auto_detect(app: tauri::AppHandle) -> Result<AutoDetectReport, Stri
                 Some(exe) if !std::path::Path::new(exe).is_file() => say(
                     "skiptro",
                     false,
-                    format!("Skiptro is set to {exe}, which is not there — skipped"),
+                    format!("Skiptro did not run: it is not at {exe} any more"),
                 ),
                 Some(exe) => {
                     if stamp.is_some() && stamp == last_stamp {
-                        say("skiptro", false, "no new episodes since its last run".into());
+                        // Its own step name, so Settings can fold these into
+                        // one line rather than repeat it per folder.
+                        say("current", false, "no new episodes since Skiptro last ran".into());
                     } else {
                         match run_skiptro(&app, exe, &plan.scan_args, &plan.export_args, root_path)
                         {
@@ -766,7 +769,7 @@ pub async fn auto_detect(app: tauri::AppHandle) -> Result<AutoDetectReport, Stri
                 say(
                     "analyse",
                     false,
-                    format!("{} not analysed — automatic detection is off in Settings", crate::util::count(pending, "episode")),
+                    format!("{} not analysed, because automatic detection is off in Settings", crate::util::count(pending, "episode")),
                 );
                 continue;
             }

@@ -173,7 +173,10 @@ export const AUTO_ANALYSE_KEY = 'auto_analyse_enabled';
 /** One thing the automatic pass did, or declined to do, and why. */
 export interface AutoStep {
   root_path: string;
-  /** `'skiptro'`, `'analyse'`, or `'root'` when the folder was unreachable. */
+  /**
+   * `'skiptro'`, `'analyse'`, `'root'` when the folder was unreachable, or
+   * `'current'` when Skiptro had nothing new to look at.
+   */
   step: string;
   ran: boolean;
   /** One sentence, written for the user. */

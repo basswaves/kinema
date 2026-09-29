@@ -50,7 +50,6 @@ import {
   SKIPTRO_EXPORT_ARGS_KEY,
   SKIPTRO_PATH_KEY,
   SKIPTRO_SCAN_ARGS_KEY,
-  type AutoStep,
   type DetectProgress,
   type FfmpegStatus,
   type LibraryKind,
@@ -80,6 +79,7 @@ import {
 } from '../player/skip';
 import { VIDEO_SYNC_KEY } from '../player/mpvOptions';
 import { buildNfoExports, writeNfo } from '../metadata/nfo';
+import { detectLines } from '../library/detectReport';
 import FixMatch from '../library/FixMatch';
 import LibraryView from '../library/LibraryView';
 
@@ -126,21 +126,6 @@ function summaryLine(s: ScanSummary): string {
 function problemLine(errors: string[]): string {
   const shown = errors.slice(0, 3).join(' · ');
   return errors.length > 3 ? `${shown} · and ${errors.length - 3} more` : shown;
-}
-
-/**
- * What the automatic intro/credits pass had to say, if anything.
- *
- * Shown next to the scan summary rather than in the markers section below,
- * because it is a report on something that has already happened and this is
- * where a user looks after a scan. The section below is where it is configured.
- *
- * Steps that ran and steps that did not are both worth showing: "Skiptro is not
- * where you said it was" is the whole reason this is here, and it is invisible
- * in a display that only reports successes.
- */
-function detectLines(steps: AutoStep[]): string[] {
-  return steps.map((s) => `${s.ran ? '' : 'skipped — '}${s.note}`);
 }
 
 /** The Review button, where focus lands when Settings opens on the queue. */
@@ -633,15 +618,15 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
 
                   {!scan && last && <p className="muted">Last scan: {summaryLine(last)}</p>}
                   {/* The report from the intro/credits pass at the end of the
-                      scan. Deliberately rendered even when every line is a
-                      "skipped": a Skiptro that is no longer where it was
-                      configured is exactly the failure this display exists to
-                      stop being silent. */}
+                      scan, here rather than under Intro & credits because this
+                      is where people look after a scan. Problems are always
+                      shown: a Skiptro that is no longer where it was set up is
+                      exactly the failure this exists to stop being silent. */}
                   {!scan &&
                     last &&
                     detectLines(last.detectNotes).map((line) => (
                       <p className="muted" key={line}>
-                        Markers: {line}
+                        {line}
                       </p>
                     ))}
                   <p className="muted">Checked every time Kinema starts, so the button is rarely needed.</p>

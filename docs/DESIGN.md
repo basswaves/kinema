@@ -354,7 +354,9 @@ focusable, and under Play so the remote's landing spot does not move.
 of TV styles would drift out of step with the desk styles the first time either was
 edited, and the drift would only be visible to whoever was sitting in front of the
 *other* screen. The switch is manual and persisted, because the webview can measure
-the panel but not how far away you are sitting.
+the panel but not how far away you are sitting. At a desk the root size also
+follows the window, from 16px up to TV mode's size on a maximised 2560-wide
+monitor: that is a measure of room, which the webview can see.
 
 **Every browsing control goes through `FocusButton`.** A bare `<button>` is
 reachable by mouse and invisible to a remote, and nothing about it looks wrong until

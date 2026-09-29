@@ -21,6 +21,13 @@
  *
  * Viewport-relative values (the hero's `62vh`) stay viewport-relative — the
  * hero should be a fraction of the screen, not a multiple of the type size.
+ *
+ * At a desk the root size also follows the window. The layout was drawn for a
+ * window of about 1,760 by 1,000 CSS pixels; a bigger window gets bigger type,
+ * up to TV mode's 1.45 on a maximised 2560-wide monitor, and a smaller one
+ * stays at 16px. Width and height both count, so a wide, short window does not
+ * grow text that no longer fits. It is still not a guess at distance — that is
+ * what the TV switch is for (tv.ts) — only at how much room there is.
  */
 
 :root {
@@ -51,6 +58,11 @@
 
 html {
   font-size: calc(16px * var(--ui-scale));
+}
+
+/* 0.909vw is 16px at 1,760 wide; 1.55vh is 16px at 1,032 high. */
+:root:not([data-tv='on']) {
+  font-size: clamp(16px, min(0.909vw, 1.55vh), 23.2px);
 }
 
 .browse {

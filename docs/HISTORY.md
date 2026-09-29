@@ -1801,6 +1801,29 @@ library had none — and "none" is stored like a score, so it waits its month.
 On the real library through a real key: four lookups, two films scored, the
 day's count at four, and a second pass asking nothing.
 
+## Tweaks after the UX pass
+
+Things found by using the finished app, at a desk and on a TV.
+
+- **Pausing puts the ring on Play/Pause**, and Down from the seek bar goes
+  there too. Pausing is when you want the controls; before, the ring stayed
+  off them and Down from the bar went to the key list at the far left.
+- **The volume bar works with a mouse.** A gap between the control and its
+  bar closed the bar on the way up to it, and a click on the control counted
+  as a click on the picture and paused the film.
+- **The last control on a page scrolls to the page's end** (`keepOnScreen`,
+  docs/GOTCHAS.md), so text under it is never out of reach.
+- **Detection after a scan is one line when nothing was new**, instead of
+  "Markers: skipped" once per TV folder.
+- **At a desk the size follows the window.** Nothing had shrunk: the desk
+  layout was 1.0 all along, but the development library had TV mode on at the
+  desk until TV mode started to fill the screen, so the size people had got
+  used to at the desk was TV size, 1.45. A fixed bigger desk size and making
+  the desk the TV size were both offered; following the window was chosen,
+  because a maximised window on a large monitor and a small laptop window want
+  different sizes and both are at arm's length. It measures room, not
+  distance, so it does not undo the reason TV mode is a switch.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

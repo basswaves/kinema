@@ -224,3 +224,54 @@ function scrollParent(node: HTMLElement | null): HTMLElement | null {
 export function scrollPageToTop(node: HTMLElement | null): void {
   scrollParent(node)?.scrollTo({ top: 0, behavior: 'smooth' });
 }
+
+/**
+ * The ancestor that scrolls the page up and down. A rail's track counts as
+ * scrollable to `scrollParent` (overflow on one axis makes the other `auto`),
+ * but it never has anything to scroll vertically, so it is passed over here.
+ */
+function pageScroller(node: HTMLElement): HTMLElement | null {
+  for (let el = node.parentElement; el; el = el.parentElement) {
+    const { overflowY } = getComputedStyle(el);
+    if ((overflowY === 'auto' || overflowY === 'scroll') && el.scrollHeight > el.clientHeight + 1)
+      return el;
+  }
+  return null;
+}
+
+/**
+ * Room left for the sticky top bar, in rem, when deciding what still fits —
+ * the same 4.5rem as the `scroll-margin` on `.browse *` in ui.css, plus TV
+ * mode's overscan inset.
+ */
+const TOP_BAR_REM = 4.5;
+const TV_SAFE_TOP_REM = 1.25;
+
+/**
+ * Keep a control the remote just moved to on screen.
+ *
+ * `scrollIntoView({ block: 'nearest' })` stops as soon as the control itself
+ * is visible, so whatever sits under the last control on a page — a card's
+ * title and year, the notes under the last setting — stayed below the edge,
+ * and nothing a remote could press would ever scroll to it. So when
+ * everything below the control fits on screen together with it, the page goes
+ * all the way to the bottom instead.
+ */
+export function keepOnScreen(node: HTMLElement | null, inline: 'center' | 'nearest' = 'center'): void {
+  if (!node) return;
+  node.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline });
+  const page = pageScroller(node);
+  if (!page) return;
+  const box = node.getBoundingClientRect();
+  const view = page.getBoundingClientRect();
+  // Measured from the content's top, so a scroll already under way does not
+  // change the answer.
+  const bottom = page.scrollTop + box.bottom - view.top;
+  const below = page.scrollHeight - bottom;
+  const root = document.documentElement;
+  const rem = parseFloat(getComputedStyle(root).fontSize);
+  const topBar = (TOP_BAR_REM + (root.dataset.tv === 'on' ? TV_SAFE_TOP_REM : 0)) * rem;
+  if (below > 0 && below + box.height + topBar < page.clientHeight) {
+    page.scrollTo({ top: page.scrollHeight, behavior: 'smooth' });
+  }
+}

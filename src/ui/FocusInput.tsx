@@ -8,6 +8,7 @@
  */
 import { useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import { useEffect } from 'react';
+import { keepOnScreen } from './focus';
 
 interface Props {
   value: string;
@@ -45,7 +46,7 @@ export default function FocusInput({
       // at once and the smooth scroll below then has nothing left to do — the
       // inputs lurched while every button around them glided.
       input.focus({ preventScroll: true });
-      input.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      keepOnScreen(input, 'nearest');
     } else if (document.activeElement === input) {
       // Give the caret back when the remote moves on, or this field keeps
       // taking keystrokes — Enter included — while the ring is somewhere else.

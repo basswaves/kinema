@@ -62,6 +62,16 @@ html {
   color: #f5f5f7;
 }
 
+/* Where scrolling to a focused control stops, on every page. Without it a
+   control scrolled to going up lands under the sticky top bar, which covers
+   the top ~3.5rem, and one going down sits flush on the bottom edge with its
+   focus zoom cut off. On everything, because cards, episode rows and buttons
+   are all scroll targets; the property does nothing to anything else. The
+   4.5rem is TOP_BAR_REM in focus.ts. */
+.browse * {
+  scroll-margin: calc(4.5rem + var(--safe-top)) 0 1.5rem;
+}
+
 /* ---- top nav ------------------------------------------------------------ */
 .top-nav {
   position: sticky;
@@ -1628,13 +1638,6 @@ html {
   margin: 0 0 0.625rem;
 }
 
-/* Where `keepInView="nearest"` stops. Without it a control scrolled to going up
-   lands under the sticky nav, which covers the top ~3.5rem of the page, and one
-   going down sits flush on the bottom edge with its focus zoom cut off. */
-.settings button,
-.settings input {
-  scroll-margin: calc(4.5rem + var(--safe-top)) 0 1.5rem;
-}
 
 .settings-title {
   margin: 0 0 1.25rem;

@@ -11,6 +11,7 @@ import { useEffect } from 'react';
 import Art from './Art';
 import FocusButton from './FocusButton';
 import type { ContinueItem } from '../player/api';
+import { keepOnScreen } from './focus';
 
 interface Props {
   items: ContinueItem[];
@@ -111,7 +112,7 @@ function ContinueCardBody({
 
   useEffect(() => {
     if (focused) {
-      ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      keepOnScreen(ref.current);
     }
   }, [focused, ref]);
 

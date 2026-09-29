@@ -9,7 +9,7 @@
  */
 import { useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import { useEffect, type ReactNode } from 'react';
-import { scrollPageToTop } from './focus';
+import { keepOnScreen, scrollPageToTop } from './focus';
 
 export type KeepInView = 'nearest' | 'page-top';
 
@@ -61,7 +61,7 @@ export default function FocusButton({
   useEffect(() => {
     if (!focused || !keepInView) return;
     if (keepInView === 'page-top') scrollPageToTop(ref.current);
-    else ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    else keepOnScreen(ref.current);
   }, [focused, keepInView, ref]);
 
   return (

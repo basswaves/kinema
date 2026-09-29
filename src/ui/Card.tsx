@@ -8,6 +8,7 @@ import { useEffect, useRef } from 'react';
 import Art from './Art';
 import type { Title } from './api';
 import { posterState } from './poster';
+import { keepOnScreen } from './focus';
 
 interface Props {
   title: Title;
@@ -34,7 +35,7 @@ export default function Card({ title, onSelect, focusKey: key, note }: Props) {
   // Keep the focused card on screen when navigating by remote.
   useEffect(() => {
     if (focused) {
-      element.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      keepOnScreen(element.current);
     }
   }, [focused]);
 

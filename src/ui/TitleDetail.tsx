@@ -12,7 +12,7 @@ import { openUrl } from '@tauri-apps/plugin-opener';
 import Art from './Art';
 import FocusButton from './FocusButton';
 import MediaBadges from './MediaBadges';
-import { useClaimFocus } from './focus';
+import { keepOnScreen, useClaimFocus } from './focus';
 import {
   episodeLabel,
   firstUnwatchedEpisode,
@@ -640,7 +640,7 @@ function EpisodePlayArea({ episode, onPlay }: { episode: Episode; onPlay: () => 
   // this, arrowing down past the fold moves focus to a row you cannot see.
   useEffect(() => {
     if (focused) {
-      ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      keepOnScreen(ref.current, 'nearest');
     }
   }, [focused, ref]);
 

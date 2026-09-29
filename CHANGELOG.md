@@ -7,6 +7,15 @@ makes no stability promises.
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-09-29
+
+A title's page now says what its file really holds, with badges down to the
+Dolby Vision profile and the measured aspect ratio, and scores from IMDb,
+TMDB and, with an OMDb key of your own, Rotten Tomatoes. Kinema carries its
+own TMDB key, so setting up is picking your folders. **The library is
+upgraded on first start**; a safety copy is made first (in app data, under
+`backups`), and 0.4.x cannot open the upgraded library.
+
 ### Added
 
 - **Kinema has its own TMDB key.** Movies are identified, with posters and
@@ -37,11 +46,14 @@ makes no stability promises.
   or TV network** as logos among the badges, from TMDB. Titles already in
   the library get them on the next scan.
 - **IMDb's rating** beside TMDB's, each score in its source's own colour, from
-  the ratings file IMDb publishes for personal use. No key and no account; Kinema fetches it at most once a week
-  and keeps only your library's titles.
+  the ratings file IMDb publishes for personal use. No key and no account;
+  Kinema fetches it at most once a week and keeps only your library's titles.
 - **Rotten Tomatoes' Tomatometer**, when you have entered an OMDb key of your
   own. Each title is looked up once a month, using at most half of a free
   key's daily allowance.
+- **Close, sleep or shut down from the sofa.** In TV mode, Back on Home now
+  offers Close Kinema, Put the PC to sleep and Shut down the PC. At a desk
+  nothing changes.
 
 ### Changed
 
@@ -52,6 +64,16 @@ makes no stability promises.
   titles, with their episodes and cast, are fetched again a few per scan,
   and older posters and backdrops downloaded again a few hundred per pass —
   the old picture stays on screen until the new one has arrived.
+- **Settings says everything on screen.** Each setting says what it does and,
+  in quieter type below, when to choose otherwise; "More about this" is gone.
+  One Detect button covers every TV folder, and Skiptro's command fields
+  appear only once Skiptro is set up.
+- **At a desk, Kinema grows with the window**, up to the TV layout's size on a
+  maximised large monitor. TV mode is unchanged.
+- **Pausing brings up the controls with the ring on Play/Pause**, so the next
+  OK plays again. Down from the seek bar goes to Play/Pause.
+- **Plainer wording throughout**: full stops and commas where there were
+  dashes, and an episode reads "Show · S01E04".
 
 ### Fixed
 
@@ -63,6 +85,15 @@ makes no stability promises.
   straight to a receiver, it read "100" until the controls were next
   brought up — they are often already up while a film opens, before its
   sound has started.
+- **The volume bar works with a mouse.** It used to close as the pointer
+  crossed the gap to it; now it can be reached, clicked and dragged. Clicking
+  the volume control mutes without also pausing the film.
+- **The last things on a page can be reached by remote.** Moving to the last
+  control now scrolls the page to the bottom, so the notes under the last
+  setting and the credits at the foot of Settings come into view.
+- **The Library buttons in Settings are spaced again**, so Right from Add
+  movies folder reaches Add TV folder instead of skipping to Scan now.
+- **"Nothing new" from intro detection is said once**, not once per TV folder.
 
 ## [0.4.0] — 2026-09-28
 

@@ -1698,6 +1698,26 @@ library: 2 films and 5 seasons in 19 s while a file played. A measurement
 belongs to the file's bytes: re-reading a file because the reader improved
 keeps it, the file changing drops it.
 
+### Where a file came from ✅
+
+**From the name, read when it is shown.** The source badge — UHD Blu-ray
+remux, WEB-DL from Netflix, a DVD image — is the one thing only a release
+name knows (`release.ts`). The scan's own parse keeps guessit's answer for
+whichever name gave the title, which for a season pack is the episode's bare
+file name while `…1080p.BluRay…` sits on the folder. Rather than store a
+second parse, and backfill it for every file already scanned, the detail page
+runs guessit on the file name and the folders above it (never the library
+folder) when it is shown; it is milliseconds, and the parser is already in the
+app. The file's own name speaks first, and a source is never paired with a
+"Remux" from a different name.
+
+**"Encode" where the name does not say "Remux".** "BluRay.x265" is a Blu-ray
+re-encoded, and the badge says so rather than "Blu-ray", which would read as
+the disc itself. guessit cannot tell WEB-DL from plain WEB — both mean the
+stream as sent — and misses `BDRemux`, `IMAX.Enhanced` and Auro-3D, which are
+matched by pattern. On the real library 78 of 79 files got a label — the
+79th an unnamed test clip — ten of them only because of their season folder.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

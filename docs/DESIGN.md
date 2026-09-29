@@ -84,9 +84,12 @@ src/
                  chapters.ts and stats.ts read mpv as flat scalars only;
                  skip.ts continues the credits ladder past the marker Rust
                  supplies — a named chapter, then a fenced guess at the tail
-  library/       pipeline.ts — the scan→parse→match→artwork→details sequence,
-                 shared by the startup scan and the Scan now button.
-                 parse.ts loads guessit-js on demand, not at startup. LibraryView
+  library/       pipeline.ts — the scan→parse→match→details→artwork→examine→
+                 detect→measure sequence, shared by the startup scan and the
+                 Scan now button. parse.ts loads guessit-js on demand, not at
+                 startup; release.ts reads the source badge (remux, WEB-DL,
+                 disc image, Auro-3D) from the file's name and folders, when a
+                 detail page is shown rather than at scan time. LibraryView
                  is the developer surface behind a disclosure in Settings and
                  keeps library.css in fixed px; FixMatch, the user-facing review
                  queue, has its own fixmatch.css in rem so it scales

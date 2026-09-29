@@ -41,6 +41,22 @@ export async function initParser(): Promise<void> {
   guessit = (await import('guessit-js')).guessit;
 }
 
+/**
+ * guessit's raw answer for one name, for reading its release tags (`source`,
+ * `other`, `edition`…) rather than a title. `{}` when it throws — a name the
+ * parser chokes on has no tags worth reading. Needs {@link initParser}.
+ */
+export function rawGuess(name: string): Record<string, unknown> {
+  if (!guessit) {
+    throw new Error('parser not loaded — call initParser() before rawGuess()');
+  }
+  try {
+    return guessit(name, { type: 'movie' }) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
 /** Tokens that mean a "title" is really just release metadata. */
 const TECHNICAL_TOKENS = new Set([
   'bluray',

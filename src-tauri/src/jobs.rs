@@ -46,8 +46,9 @@ use std::sync::{Arc, Mutex};
 ///   running covers what the other would have done; the automatic one skips,
 ///   and the button says detection is already running rather than queueing
 ///   minutes of work behind it.
-/// * **Probe** — refused, silently. Reading files is the scan's own step and
-///   finishes in seconds; a second pass would read nothing the first did not.
+/// * **Probe** — refused, silently. Reading files, and measuring pictures
+///   (`aspect.rs`), are the scan's own steps; a second pass would look at
+///   nothing the first did not.
 /// * **Artwork** — waits its turn, then runs. Not refused: the second caller
 ///   may know URLs the first did not (the details pass finds logos and cast
 ///   photos), and a refusal would leave those to the next launch. A run after

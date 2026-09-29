@@ -37,7 +37,9 @@ use std::process::{Command, Stdio};
 use tauri::{Emitter, Manager};
 
 /// Raise to read every file again, after a change to what is read or how.
-pub const PROBE_VERSION: i64 = 1;
+///
+/// 2: the video's stream index, which the aspect measurement needs.
+pub const PROBE_VERSION: i64 = 2;
 
 /// Emitted once per file, so the scan can say how far it has got.
 const PROGRESS_EVENT: &str = "probe-progress";
@@ -60,6 +62,10 @@ pub struct MediaDetails {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
 pub struct Video {
+    /// Which stream in the file this is, for tools that must pick the same
+    /// one (`aspect.rs`). Absent from details read before version 2.
+    #[serde(default)]
+    pub stream_index: Option<u32>,
     /// ffprobe's codec name: `hevc`, `h264`, `av1`, `vc1`, `mpeg2video`…
     pub codec: String,
     /// `Main 10`, `High`… as ffprobe reports it.
@@ -447,6 +453,7 @@ fn details_from(probe: ProbeOutput, frames: Option<FramesOutput>) -> MediaDetail
             (width > 0 && height > 0).then(|| width as f64 * pixel_shape / height as f64);
 
         Video {
+            stream_index: Some(stream.index),
             codec: stream.codec_name.clone().unwrap_or_default(),
             profile: stream.profile.clone(),
             width,
@@ -578,11 +585,11 @@ fn available(ffmpeg: &Path) -> bool {
 
 // ---- keeping it --------------------------------------------------------------
 
-struct Pending {
-    id: i64,
-    path: String,
-    size: i64,
-    modified: i64,
+pub(crate) struct Pending {
+    pub(crate) id: i64,
+    pub(crate) path: String,
+    pub(crate) size: i64,
+    pub(crate) modified: i64,
 }
 
 /// Files never read, changed since they were read, or read by an older
@@ -611,7 +618,11 @@ fn pending(conn: &Connection) -> rusqlite::Result<Vec<Pending>> {
     rows.collect()
 }
 
-fn save(conn: &Connection, file: &Pending, result: &Result<MediaDetails, String>) -> rusqlite::Result<()> {
+pub(crate) fn save(
+    conn: &Connection,
+    file: &Pending,
+    result: &Result<MediaDetails, String>,
+) -> rusqlite::Result<()> {
     let (details, error) = match result {
         Ok(details) => (serde_json::to_string(details).ok(), None),
         Err(e) => (None, Some(e.as_str())),
@@ -621,6 +632,17 @@ fn save(conn: &Connection, file: &Pending, result: &Result<MediaDetails, String>
              (file_id, size_bytes, modified_at, probe_version, probed_at, details, error)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
          ON CONFLICT(file_id) DO UPDATE SET
+             -- A measured picture belongs to the bytes it was measured in: kept
+             -- when only the reader changed, dropped when the file did.
+             picture_version = CASE WHEN size_bytes = excluded.size_bytes
+                                     AND modified_at = excluded.modified_at
+                                    THEN picture_version END,
+             picture_aspect = CASE WHEN size_bytes = excluded.size_bytes
+                                    AND modified_at = excluded.modified_at
+                                   THEN picture_aspect END,
+             picture_aspect_alt = CASE WHEN size_bytes = excluded.size_bytes
+                                        AND modified_at = excluded.modified_at
+                                       THEN picture_aspect_alt END,
              size_bytes = excluded.size_bytes, modified_at = excluded.modified_at,
              probe_version = excluded.probe_version, probed_at = excluded.probed_at,
              details = excluded.details, error = excluded.error",

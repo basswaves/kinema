@@ -1636,9 +1636,9 @@ Tomatoes scores beside TMDB's. Decisions made before any of it was built:
   Tomatoes.
 - **The aspect ratio by looking at the picture.** A remux keeps the black
   bars inside a 16:9 frame, so the file says 1.78:1 for a 2.39:1 film. Kodi,
-  Jellyfin, Plex and Zidoo all show the file's figure. Measured before
-  deciding: sampling five frames takes about 1.3 s for a 4K film and 0.3 s
-  for a 1080p one, once per file, so Kinema measures.
+  Jellyfin, Plex and Zidoo all show the file's figure. Kinema measures it,
+  for films and one episode per season — see "Measuring the picture" below
+  for the cost, and the figure first given for it, which was wrong.
 
 ### Reading the files ✅
 
@@ -1667,6 +1667,36 @@ library: 79 files in 27 s over a network drive while a film played; later
 scans read only what changed. A file ffprobe cannot read is kept as a failure
 and not retried until it changes. A file that is not *there* — its drive
 offline — is not recorded at all, or it would stay unread for good.
+
+### Measuring the picture ✅
+
+**The cost was first reported wrong.** The decision to measure was put to the
+owner with "about 1.3 s for a 4K film and 0.3 s for 1080p". Those were the
+figures for *one sample*; the film took 6.4 s and 1.5 s. The owner had made
+measuring conditional on it being cheap, so it went back to them with the
+right numbers and a cheaper method, and they chose films and one episode per
+season.
+
+**Opening the file is the cost, not decoding it.** Eight separate ffmpeg runs
+of one keyframe each took 11.7 s on a 4K film over a network drive — no less
+than three keyframes each. One run with the file opened eight times, each at
+its own point, took 2.5 s; a 1080p file about a second. Only keyframes are
+decoded (`-skip_frame nokey`).
+
+**One frame per point, and how that is made safe.** A dark scene's edges look
+like bars, so single frames measure short or narrow — two of eight did on a
+real episode. Darkness can only take picture away, never add it, so the
+answer is the height most samples agree on, and a *taller* shape is reported
+as one the film opens up to (IMAX scenes) only when two samples show it:
+subtitles burned into the lower bar make a single frame measure tall.
+
+**Once per season.** A season's episodes share their framing. Measuring each
+would multiply the cost by the episode count for nothing; one episode speaks
+for its season, and the next is tried if it cannot be measured. The pass runs
+last in a scan, after intro detection, so nothing waits behind it. On the real
+library: 2 films and 5 seasons in 19 s while a file played. A measurement
+belongs to the file's bytes: re-reading a file because the reader improved
+keeps it, the file changing drops it.
 
 ## Open items
 

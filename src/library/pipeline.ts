@@ -1,6 +1,6 @@
 /**
  * The library scan pipeline: scan → parse → match → details → artwork → examine
- * → detect.
+ * → detect → measure.
  *
  * One sequence with two callers — the automatic scan at startup and the manual
  * "Scan now" button — because two copies of an ordering this fiddly would drift,
@@ -22,6 +22,7 @@ import { listen } from '@tauri-apps/api/event';
 import {
   autoDetect,
   listLibraryRoots,
+  measurePictures,
   probeLibrary,
   listUnparsed,
   saveParseResults,
@@ -55,7 +56,8 @@ export type ScanStage =
   | 'artwork'
   | 'details'
   | 'examining'
-  | 'detecting';
+  | 'detecting'
+  | 'measuring';
 
 export interface ScanStatus {
   stage: ScanStage;
@@ -172,6 +174,33 @@ async function runProbe(errors: string[]): Promise<void> {
     }
   } catch (e) {
     errors.push(`reading files: ${String(e)}`);
+  } finally {
+    void off.then((stop) => stop());
+  }
+}
+
+/**
+ * The measuring stage: the real shape of each film's picture, black bars
+ * taken off, for the aspect-ratio badge.
+ *
+ * Last, after detection, because it is the least urgent thing a scan does and
+ * can take a second or two a film: nothing else should wait behind it. Never
+ * throws, and a missing ffmpeg is not reported, as with examining.
+ */
+async function runMeasure(errors: string[]): Promise<void> {
+  setStatus({ stage: 'measuring', detail: '' });
+
+  const off = listen<ProbeProgress>('measure-progress', (event) =>
+    setStatus({
+      stage: 'measuring',
+      detail: `${event.payload.done + 1}/${event.payload.total}`,
+    })
+  );
+
+  try {
+    await measurePictures();
+  } catch (e) {
+    errors.push(`measuring pictures: ${String(e)}`);
   } finally {
     void off.then((stop) => stop());
   }
@@ -302,6 +331,7 @@ export async function runScanPipeline(): Promise<ScanOutcome> {
     // one of the new episodes is played. It works out for itself whether there
     // is anything to do, so calling it unconditionally costs two queries.
     const detectNotes = await runAutoDetect(errors);
+    await runMeasure(errors);
 
     lastSummary = {
       filesAdded: report.files_added,

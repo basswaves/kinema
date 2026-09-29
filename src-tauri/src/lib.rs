@@ -1,5 +1,6 @@
 mod analyse;
 mod applog;
+mod aspect;
 mod artwork;
 mod db;
 mod detect;
@@ -216,6 +217,7 @@ pub fn run() {
             detect::analysis_backlog,
             ffmpeg::ffmpeg_status,
             probe::probe_library,
+            aspect::measure_pictures,
             equipment::get_equipment,
             equipment::check_equipment,
             equipment::window_display,

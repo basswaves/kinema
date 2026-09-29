@@ -57,6 +57,9 @@ src-tauri/src/
   probe.rs       What each file holds — codec, HDR, Dolby Vision profile and
                  FEL/MEL, audio formats, subtitles — read with ffprobe once per
                  file at scan time and kept in media_probe for the badges
+  aspect.rs      The picture's real shape with the black bars taken off:
+                 eight keyframes through each film and one episode per season,
+                 cropdetect, the shape most agree on
   introdb.rs     TheIntroDB lookups, keyed on TMDB id. Where end credits come
                  from; per-episode, on play, cached with a TTL
   detect.rs      Runs the user's own Skiptro if configured, then analyse.rs.
@@ -103,6 +106,8 @@ parse (TS)   →  guessit-js + parent-dir fallback → parsed_title/season/episo
 match (TS)   →  provider search → score → titles + episodes, or "unmatched" with reason
 artwork(Rust)→  posters, backdrops, logos, stills, cast faces into app data
 examine(Rust)→  ffprobe on each new or changed file → media_probe
+detect (Rust)→  Skiptro and the built-in analysis → skip markers
+measure(Rust)→  cropdetect, films and one episode a season → media_probe
 details (TS) →  re-fetch titles matched before a field was being stored,
                 TMDB data older than TMDB allows (six months), and films found
                 through Wikidata once there is a TMDB key to move them to

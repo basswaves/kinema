@@ -216,6 +216,18 @@ export interface ProbeReport {
  */
 export const probeLibrary = () => invoke<ProbeReport>('probe_library');
 
+export interface MeasureReport {
+  measured: number;
+  /** ffmpeg was not found, so nothing was measured. */
+  unavailable: boolean;
+}
+
+/**
+ * Measure the real shape of each film's picture — and one episode's per
+ * season — with the black bars taken off. See `aspect.rs`.
+ */
+export const measurePictures = () => invoke<MeasureReport>('measure_pictures');
+
 export const listMediaFiles = (limit: number) => invoke<MediaFile[]>('list_media_files', { limit });
 
 export const saveParseResults = (results: ParseResultPayload[]) =>

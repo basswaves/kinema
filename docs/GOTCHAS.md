@@ -478,6 +478,16 @@ poster rather than the film — which has no HDR10+, no Dolby Vision RPU, and
 reports neither missing. **Do:** skip `attached_pic` streams, and select the
 film by its absolute index (`-select_streams 3`), as `probe.rs` does.
 
+### `cropdetect` ignores the first two frames it is given
+
+Its `skip` option defaults to 2. Fed one or two frames — one keyframe per
+sample point, as `aspect.rs` does — it prints nothing at all and exits 0, and
+every file measures as "no answer". **Do:** `skip=0`.
+
+**Also:** with `-skip_frame nokey`, a seek past the file's last keyframe
+yields no frame either, which on a short clip with one keyframe is every seek
+but the first. Test clips need `-g` set.
+
 ### ffprobe's `vdr_in_max` is one fixed-point number
 
 A Dolby Vision RPU stores `vdr_in_max` as an integer part and a fraction;

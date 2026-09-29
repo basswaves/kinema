@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use std::path::Path;
 
 /// The schema this build understands. Bump it with every new `SCHEMA_V*`.
-pub const SCHEMA_VERSION: i64 = 14;
+pub const SCHEMA_VERSION: i64 = 15;
 
 /// What can go wrong opening the library.
 ///
@@ -495,6 +495,20 @@ CREATE TABLE media_probe (
 );
 "#;
 
+/// Schema version 15: the picture's own shape, measured (see `aspect.rs`).
+///
+/// A remux keeps a 2.39:1 film's black bars inside a 16:9 frame, so the
+/// file's own figure is 1.78:1. `picture_aspect` is what the picture measures
+/// once the bars are taken off; `picture_aspect_alt` is a taller shape it
+/// opens up to for part of its length (IMAX scenes), NULL for most films.
+/// `picture_version` is `aspect::MEASURE_VERSION` when measured — with both
+/// ratios NULL when the measurement found no answer — and NULL when not yet.
+const SCHEMA_V15: &str = r#"
+ALTER TABLE media_probe ADD COLUMN picture_version    INTEGER;
+ALTER TABLE media_probe ADD COLUMN picture_aspect     REAL;
+ALTER TABLE media_probe ADD COLUMN picture_aspect_alt REAL;
+"#;
+
 /// How long a statement waits for the write lock before giving up.
 ///
 /// Load-bearing from the moment there is more than one connection. SQLite
@@ -607,6 +621,7 @@ pub fn open_secondary(path: &Path) -> rusqlite::Result<Connection> {
 const MIGRATIONS: [&str; SCHEMA_VERSION as usize] = [
     SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6, SCHEMA_V7, SCHEMA_V8,
     SCHEMA_V9, SCHEMA_V10, SCHEMA_V11, SCHEMA_V12, SCHEMA_V13, SCHEMA_V14,
+    SCHEMA_V15,
 ];
 
 /// Bring the database up to [`SCHEMA_VERSION`].

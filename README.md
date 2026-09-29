@@ -149,7 +149,7 @@ you straight to it. Only which film or episode it is gets sent — no account, n
 key, nothing about you. Turn either off in Settings if you would rather it did
 not.
 
-**SIMKL** is off until you connect it, in Settings → Playback. Kinema then adds
+**SIMKL** is off until you connect it, in Settings → Accounts. Kinema then adds
 each film and episode you finish to your SIMKL account — and, once, everything
 you had already watched in Kinema. It only ever adds: nothing comes back, and
 marking something unwatched in Kinema leaves SIMKL alone. You approve Kinema on

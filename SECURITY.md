@@ -6,7 +6,7 @@ Worth stating up front, because it is unusually small:
 
 - **No server, no daemon, no network listener.** Nothing accepts a connection.
 - **No accounts, no telemetry, no analytics.** Nothing is sent anywhere about
-  what you watch — unless you connect SIMKL yourself, in Settings → Playback.
+  what you watch — unless you connect SIMKL yourself, in Settings → Accounts.
   Then the films and episodes you finish, and when, are sent to your SIMKL
   account (`src-tauri/src/simkl.rs`), and nothing else is. Disconnecting ends
   it and tells SIMKL to end the sign-in.

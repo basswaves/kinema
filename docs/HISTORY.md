@@ -2022,6 +2022,12 @@ the tokens in it, never talks to SIMKL at all.
 Testing Disconnect from the keyboard found a bug in the button that asks
 first: see GOTCHAS, "A focus key that changes is never registered".
 
+SIMKL first sat in Settings → Playback, and moved within the day to a tab of
+its own, **Accounts**: it is about where a watch history goes, not how things
+play, and it is where any later service signed into with the user's own
+account belongs (Trakt, OpenSubtitles). Keys that identify films stay in
+Library, and the keyless skip databases in Intro & credits.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

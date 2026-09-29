@@ -15,7 +15,7 @@ makes no stability promises.
 - **The scene after the credits.** Where a film has one, Skip takes you
   straight to it instead of the credits running out — always as a button, even
   with automatic skipping on.
-- **SIMKL.** Connect your SIMKL account in Settings → Playback — a code on
+- **SIMKL.** Connect your SIMKL account in Settings → Accounts — a code on
   screen and a QR code for your phone — and each film and episode you finish
   in Kinema is added to it, as is everything you had already watched, once.
   It only adds: nothing comes back from SIMKL, and marking something unwatched

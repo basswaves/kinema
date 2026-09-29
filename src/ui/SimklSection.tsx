@@ -1,5 +1,5 @@
 /**
- * Settings → Playback → SIMKL: connecting a SIMKL account, so what is finished
+ * Settings → Accounts → SIMKL: connecting a SIMKL account, so what is finished
  * in Kinema is added to it.
  *
  * Signing in is SIMKL's device flow, made for exactly this screen: a code and

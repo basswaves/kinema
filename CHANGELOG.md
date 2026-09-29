@@ -7,6 +7,13 @@ makes no stability promises.
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-09-29
+
+This release is about what happens when something goes wrong. Your library is
+kept safe and can be put back, a crash leaves a trace, and Kinema says when a
+feature is missing a program. No library upgrade: 0.5.0
+libraries open as they are.
+
 ### Added
 
 - **Safety copies of the library.** Once a week Kinema keeps a copy of

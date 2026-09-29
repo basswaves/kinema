@@ -201,6 +201,11 @@ function screen(): Record<string, string | null> {
     notice: text('.player-notice'),
     label: text('.player-label'),
     volume: text('.volume-control'),
+    // Where the remote's ring is: its label, or its text when it has none.
+    focus:
+      document.querySelector('.focused')?.getAttribute('aria-label') ?? text('.focused'),
+    // The Close / Sleep / Shut down dialog on Home, in TV mode.
+    leave: document.querySelector('.leave') ? 'open' : null,
     controls: document.querySelector('.player')
       ? document.querySelector('.player.osd-hidden')
         ? 'hidden'

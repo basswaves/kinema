@@ -1823,6 +1823,15 @@ Things found by using the finished app, at a desk and on a TV.
   because a maximised window on a large monitor and a small laptop window want
   different sizes and both are at arm's length. It measures room, not
   distance, so it does not undo the reason TV mode is a switch.
+- **A way out of Kinema from the sofa.** In TV mode the app fills the screen,
+  so there was no close button a remote could reach. Back on Home, with
+  nowhere further back to go, now offers Close Kinema, Put the PC to sleep and
+  Shut down the PC (`LeaveDialog.tsx`, `power.rs`). TV mode only: at a desk the
+  window's own close button is there. Sleep is Windows' `SetSuspendState`;
+  shutting down is Windows' own `shutdown.exe`, by full path and never forced,
+  so a program with unsaved work can still ask. After a refusal the ring stays
+  on the refused choice, because the first version sent it back to Close
+  Kinema, one OK away from closing instead of trying again.
 
 ## Open items
 

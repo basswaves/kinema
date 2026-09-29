@@ -836,6 +836,15 @@ const handlers: Record<string, Handler> = {
   analysis_backlog: () => [[1, 0]],
   detect_intros: () => mockDetection.run(),
   stop_detection: () => mockDetection.stop(),
+
+  // Leaving from the sofa. Recorded, never done: `window.__powerActions` is
+  // what a check reads, and `kinemaMockPowerFail` makes Windows refuse.
+  power_action: (a) => {
+    const w = window as unknown as { __powerActions?: unknown[] };
+    (w.__powerActions ??= []).push(a.action);
+    if (flag('kinemaMockPowerFail') === '1') throw new Error('Windows would not go to sleep');
+    return null;
+  },
   ffmpeg_status: () => ({ resolved: 'ffmpeg', available: false }),
   probe_library: () => ({ read: 0, failed: 0, unavailable: true }),
   measure_pictures: () => ({ measured: 0, unavailable: true }),

@@ -47,7 +47,8 @@ import { getTitleDetail, listTitles, type Title } from './api';
 import { searchTitles, type SearchHit } from './search';
 import { arrangeGrid, GRID_SORTS, gridSettingKey, parseGridSetting, type GridSort } from './gridSort';
 import OnScreenKeyboard from './OnScreenKeyboard';
-import { useTvMode } from './tv';
+import { isTvMode, useTvMode } from './tv';
+import LeaveDialog from './LeaveDialog';
 import { runSelfTest, selfTestPlan } from '../selftest';
 import { ensureMpvInitialised } from '../player/mpv';
 import './ui.css';
@@ -160,6 +161,8 @@ export default function Browse() {
     // otherwise stay up on the nav button that was pressed to leave it.
     returnFocusTo(next[next.length - 1].returnFocus ?? HERO_PLAY_FOCUS_KEY);
   }, [stack]);
+  /** The Close / Sleep / Shut down dialog, TV mode only (LeaveDialog.tsx). */
+  const [leaving, setLeaving] = useState(false);
   const [query, setQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
   /** A root that could not be read at startup. Not an error — see below. */
@@ -484,12 +487,16 @@ export default function Browse() {
           target.blur();
         }
         e.preventDefault();
-        goBack();
+        // Home with nowhere further back: in TV mode, the way out of the app.
+        // At a desk the window's own close button is there, and Back here
+        // does nothing, as before.
+        if (view.name === 'home' && stack.length === 1 && isTvMode()) setLeaving(true);
+        else goBack();
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [view.name, goBack]);
+  }, [view.name, goBack, stack.length]);
 
   useEffect(() => {
     // Arriving from the top bar puts you in the box; coming Back from a result
@@ -621,6 +628,8 @@ export default function Browse() {
             }
           />
         )}
+
+        {leaving && <LeaveDialog onClose={() => setLeaving(false)} />}
       </FocusContext.Provider>
     </div>
   );

@@ -17,6 +17,7 @@ mod metadata;
 mod nfo;
 mod omdb;
 mod playback;
+mod power;
 mod probe;
 mod scanner;
 mod selftest;
@@ -236,6 +237,7 @@ pub fn run() {
             nfo::write_nfo,
             nfo::nfo_targets,
             jobs::stop_detection,
+            power::power_action,
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application")

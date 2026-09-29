@@ -92,6 +92,10 @@ export interface TitleDetail {
 
 export const listTitles = () => invoke<Title[]>('list_titles');
 
+export type PowerAction = 'close' | 'sleep' | 'shutdown';
+/** Close Kinema, or put the PC to sleep or shut it down (power.rs). */
+export const powerAction = (action: PowerAction) => invoke<void>('power_action', { action });
+
 export const getTitleDetail = (titleId: number) =>
   invoke<TitleDetail>('get_title_detail', { titleId });
 

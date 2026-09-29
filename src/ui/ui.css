@@ -818,9 +818,11 @@ html {
   letter-spacing: -0.03em;
 }
 
+/* Dimmed by colour, not opacity: an opacity here would fade the score chips
+   inside the line too, and they must stay solid to be read from a sofa. */
 .detail-meta {
   font-size: 0.8125rem;
-  opacity: 0.7;
+  color: rgba(255, 255, 255, 0.7);
   margin-bottom: 0.875rem;
 }
 
@@ -916,15 +918,37 @@ html {
 .detail-score {
   margin-left: 0.875rem;
   font-weight: 700;
+  color: #fff;
   white-space: nowrap;
 }
 
-/* Not upper-cased: IMDb spells itself with a small b. */
+/* Each source a solid chip in its own colour, named in words rather than by
+   logo. Not upper-cased: IMDb spells itself with a small b. The red is
+   deeper than Rotten Tomatoes' own so white text on it stays readable
+   (4.9:1; theirs is 3.8:1). */
 .detail-score-source {
-  margin-right: 0.3125rem;
+  display: inline-block;
+  margin-right: 0.375rem;
+  padding: 0.0625rem 0.375rem;
+  border-radius: 0.25rem;
   font-size: 0.6875rem;
-  font-weight: 700;
-  opacity: 0.7;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.detail-score-source.imdb {
+  background: #f5c518;
+  color: #000;
+}
+
+.detail-score-source.rt {
+  background: #d92b0b;
+  color: #fff;
+}
+
+.detail-score-source.tmdb {
+  background: #01b4e4;
+  color: #0d253f;
 }
 
 .detail-overview {

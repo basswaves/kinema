@@ -68,6 +68,23 @@ foreach ($dll in $dlls) {
     }
 }
 
+# Kinema's SIMKL app ID is compiled into the Rust side (simkl.rs), so cargo has
+# to see it as an environment variable. Vite reads the git-ignored .env.local by
+# itself, but cargo does not - so a KINEMA_SIMKL_CLIENT_ID line there is passed
+# on here. On CI it comes from the repository secret instead (release.yml), and
+# anything already set in the environment wins.
+$envLocal = Join-Path $root '.env.local'
+if (-not $env:KINEMA_SIMKL_CLIENT_ID -and (Test-Path $envLocal)) {
+    foreach ($line in Get-Content $envLocal) {
+        if ($line -match '^\s*KINEMA_SIMKL_CLIENT_ID\s*=\s*(.+?)\s*$') {
+            $env:KINEMA_SIMKL_CLIENT_ID = $Matches[1]
+        }
+    }
+}
+if (-not $env:KINEMA_SIMKL_CLIENT_ID) {
+    Write-Host 'No KINEMA_SIMKL_CLIENT_ID: this build will have no SIMKL.'
+}
+
 Write-Host 'Building release binary (this takes a few minutes the first time)...'
 Push-Location $root
 try {

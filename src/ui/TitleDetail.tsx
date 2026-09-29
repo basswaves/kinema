@@ -326,6 +326,11 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
                   .join(' · ')}
               </div>
               {title.overview && <p className="detail-overview">{title.overview}</p>}
+              {/* Wikipedia's text is CC BY-SA, which asks for a credit where
+                  it is used; the rest of a Wikidata title is CC0. */}
+              {title.overview && title.provider === 'wikidata' && (
+                <p className="detail-credit muted">From Wikipedia · CC BY-SA 4.0</p>
+              )}
 
               <div className="detail-actions">
                 {/* A series and a film need different questions asked.

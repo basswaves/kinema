@@ -11,8 +11,8 @@
  *    see `qualityNotice.ts`.
  *
  * And one that should never appear: TMDB refusing the key Kinema came with
- * (builtinKey.ts), which leaves new movies unidentified until an update or a
- * key of the user's own.
+ * (builtinKey.ts), which leaves new movies to Wikidata — no posters — until an
+ * update or a key of the user's own.
  *
  * Quiet on purpose: one line each, in the flow of the page, reached with one
  * press of Down from the hero — never a dialog in front of what you came for.
@@ -56,8 +56,8 @@ export default function HomeNotices({
               <strong>TMDB no longer accepts the key Kinema came with</strong>
               <span className="muted">
                 {' '}
-                — new movies cannot be identified until an update brings a new one, or you add a
-                free key of your own.
+                — new movies are identified through Wikidata instead, without posters, until an
+                update brings a new one or you add a free key of your own.
               </span>
             </div>
             <FocusButton

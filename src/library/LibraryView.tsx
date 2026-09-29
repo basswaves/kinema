@@ -362,6 +362,7 @@ export default function LibraryView() {
           ['TMDB', providers.tmdb, 'movies + TV, posters/backdrops/stills'],
           ['TVmaze', true, 'TV fallback, keyless'],
           ['OMDb', providers.omdb, 'movie fallback, no backdrops'],
+          ['Wikidata', true, 'keyless movie fallback, no pictures'],
         ].map(([name, active, note]) => (
           <span key={String(name)} className={`provider-pill ${active ? 'on' : 'off'}`}>
             {String(name)} {active ? '✓' : '—'}

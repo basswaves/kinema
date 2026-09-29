@@ -810,6 +810,11 @@ html {
   opacity: 0.9;
 }
 
+.detail-credit {
+  margin: -0.75rem 0 1.25rem;
+  font-size: 0.75rem;
+}
+
 .detail-error {
   padding: 0.625rem 0.875rem;
   border-radius: 0.5rem;

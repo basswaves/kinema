@@ -225,8 +225,9 @@ function adviceFor(reason: string): string {
   if (/^unlinked by hand/.test(reason)) {
     return 'You unlinked this from a wrong title. It waits here until you pick the right one below.';
   }
+  // Refused by a version of Kinema that had nothing to look movies up with.
   if (/no provider available/.test(reason)) {
-    return 'No way to look this up yet — add a TMDB key under Posters and descriptions.';
+    return 'Kinema had no way to look this up when it was scanned. Search for it below.';
   }
   if (/no candidates (returned|scored)/.test(reason)) {
     return 'Nothing came back for this name. Search for it below using the real title.';
@@ -301,11 +302,6 @@ function GroupRow({
     try {
       const keys = await loadProviderKeys();
       const provider = providerForKind(isSeries, keys);
-      if (!provider) {
-        setSearchError('No provider for this kind. Add a TMDB key, or an OMDb key for movies.');
-        setResults(null);
-        return;
-      }
       // The year is deliberately not passed. The parsed year is often the very
       // thing that made the automatic match fail, so filtering by it here would
       // hide the entry being searched for.

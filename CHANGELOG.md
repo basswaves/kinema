@@ -15,6 +15,12 @@ makes no stability promises.
 - **If TMDB ever stops accepting that key,** Kinema stops asking with it,
   says so on Home, and takes you to the field for a key of your own. The
   first release with a key re-checks movies that were waiting for one.
+- **Movies are identified without any TMDB key,** through Wikidata: title,
+  year, running time, genres, cast, and the opening of the film's Wikipedia
+  article as its description — everything but posters and backdrops. It is
+  the fallback when TMDB cannot be asked, and once it can again, those films
+  move to TMDB by the id Wikidata holds for them and get their pictures, with
+  their watch history untouched.
 
 ### Changed
 

@@ -194,6 +194,8 @@ pub fn run() {
             metadata::reset_matches,
             metadata::list_titles_needing_detail,
             metadata::list_stale_titles,
+            metadata::list_wikidata_films,
+            metadata::adopt_provider,
             artwork::cache_artwork,
             artwork::artwork_stats,
             artwork::clear_artwork_cache,

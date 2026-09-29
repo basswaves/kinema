@@ -691,12 +691,13 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
                   <h2>Posters and descriptions</h2>
                   <p className="muted">
                     {!BUILTIN_TMDB_KEY
-                      ? 'TV shows need no key. Movies need a free key from TMDB for posters, ' +
-                        'descriptions and artwork.'
+                      ? 'Without a key, movies are identified through Wikidata — details and ' +
+                        'a description, but no posters. A free TMDB key adds posters, ' +
+                        'backdrops and artwork.'
                       : builtinRejected
                         ? 'TMDB no longer accepts the key Kinema came with. Until an update ' +
-                          'brings a new one, new movies need a free key of your own to be ' +
-                          'identified.'
+                          'brings a new one, new movies are identified through Wikidata, ' +
+                          'without posters — or add a free key of your own.'
                         : 'Kinema looks up movies and TV shows on TMDB with a key of its own. ' +
                           'Nothing to set up here — but you can use your own free key instead.'}
                   </p>
@@ -765,6 +766,8 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
                     <p className="muted">
                       Movie and TV data from TMDB. This product uses the TMDB API but is not
                       endorsed or certified by TMDB. TV data also from <strong>TVmaze</strong>.
+                      Movies found without a TMDB key: data from <strong>Wikidata</strong>, and
+                      descriptions from <strong>Wikipedia</strong> under CC BY-SA 4.0.
                     </p>
                   </div>
                 </section>

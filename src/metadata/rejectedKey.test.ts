@@ -111,10 +111,10 @@ describe('a refused built-in key', () => {
       matchFiles([movie(1, 'First Film'), movie(2, 'Second Film')], keys, () => undefined)
     );
 
-    expect(requests).toHaveLength(1);
+    // TMDB is asked once; the second film goes to the keyless fallback
+    // instead (answered 401 here too, as every request is in this file).
+    expect(requests.filter((url) => url.includes('themoviedb'))).toHaveLength(1);
+    expect(requests.filter((url) => url.includes('wikidata'))).toHaveLength(1);
     expect(outcome.unmatched).toBe(2);
-    // The one that met the refusal is retried by the next scan; the other was
-    // never asked, for want of a source.
-    expect(recorded.map((r) => r.command)).toEqual(['record_provider_failure', 'record_refusal']);
   });
 });

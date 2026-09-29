@@ -59,7 +59,7 @@ export interface CastMember {
  * cache by an order of magnitude for names nobody scrolls to. The first ten are
  * the ones anyone recognises.
  */
-const CAST_LIMIT = 10;
+export const CAST_LIMIT = 10;
 
 export interface Trailer {
   /** The site's own video id — a YouTube key, not a URL. */
@@ -171,7 +171,7 @@ function stripHtml(html: string | null | undefined): string | null {
   return html.replace(/<[^>]*>/g, '').trim() || null;
 }
 
-function yearOf(date: string | null | undefined): number | null {
+export function yearOf(date: string | null | undefined): number | null {
   if (!date) return null;
   const year = Number(date.slice(0, 4));
   return Number.isFinite(year) ? year : null;
@@ -202,7 +202,7 @@ interface TvmazeShow {
  * promises with a delay is both obviously correct and impossible to get subtly
  * wrong. Each provider gets its own chain, so a slow TVmaze cannot hold up TMDB.
  */
-function makeQueue(gapMs: number) {
+export function makeQueue(gapMs: number) {
   let chain: Promise<unknown> = Promise.resolve();
   return function queued<T>(work: () => Promise<T>): Promise<T> {
     const result = chain.then(async () => {
@@ -251,9 +251,13 @@ const RATE_LIMIT_RETRIES = 2;
  * when it does not. Everything else — 404, 401, a dead network — is handed
  * straight back to the caller, which already knows what to do with it.
  */
-async function fetchPolitely(url: string, label: string): Promise<Response> {
+export async function fetchPolitely(
+  url: string,
+  label: string,
+  headers?: Record<string, string>
+): Promise<Response> {
   for (let attempt = 0; ; attempt++) {
-    const response = await fetch(url, { method: 'GET' });
+    const response = await fetch(url, { method: 'GET', headers });
     if (response.status !== 429 || attempt >= RATE_LIMIT_RETRIES) return response;
 
     const header = Number(response.headers.get('retry-after'));

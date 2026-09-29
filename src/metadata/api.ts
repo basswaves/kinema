@@ -132,3 +132,11 @@ export const listTitlesNeedingDetail = () =>
 export const listStaleTitles = (limit: number) =>
   invoke<TrailerTarget[]>('list_stale_titles', { limit });
 
+/** Films found through Wikidata whose TMDB id Wikidata knows. */
+export const listWikidataFilms = (limit: number) =>
+  invoke<TrailerTarget[]>('list_wikidata_films', { limit });
+
+/** Re-key a title to another provider's entry, in place; false if it has a row already. */
+export const adoptProvider = (titleId: number, provider: string, providerId: string) =>
+  invoke<boolean>('adopt_provider', { titleId, provider, providerId });
+

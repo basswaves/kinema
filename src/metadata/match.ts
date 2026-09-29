@@ -12,8 +12,10 @@ import type { MediaFile } from '../library/api';
 import {
   getSetting,
   ignoreFileIds,
+  adoptProvider,
   listStaleTitles,
   listTitlesNeedingDetail,
+  listWikidataFilms,
   recordMatch,
   recordProviderFailure,
   recordRefusal,
@@ -41,6 +43,7 @@ import {
   type TmdbKeySource,
 } from './builtinKey';
 import { pickBest, type Candidate, type ScoreContext } from './score';
+import { wikidataGetMovie, wikidataSearch } from './wikidata';
 import { nfoForGroup, resolveNfoIds, sourceName } from './nfo';
 
 export interface MatchProgress {
@@ -140,7 +143,7 @@ export interface ProviderKeys {
   omdb: string | null;
 }
 
-export type Provider = 'tmdb' | 'tvmaze' | 'omdb';
+export type Provider = 'tmdb' | 'tvmaze' | 'omdb' | 'wikidata';
 
 /**
  * Read the provider keys from the database, at the moment they are needed.
@@ -167,15 +170,16 @@ export async function loadProviderKeys(): Promise<ProviderKeys> {
  * (builtinKey.ts): it is the only source here with backdrops,
  * logos and episode stills, which is what a poster-and-hero UI needs. Without
  * it, TV still works fully via keyless TVmaze, and movies fall back to OMDb
- * (poster only, no fanart).
+ * (a poster, but only with a key of the user's own) and then to keyless
+ * Wikidata (everything but pictures).
  */
-export function providerForKind(isSeries: boolean, keys: ProviderKeys): Provider | null {
+export function providerForKind(isSeries: boolean, keys: ProviderKeys): Provider {
   if (keys.tmdb) return 'tmdb';
   if (isSeries) return 'tvmaze';
-  return keys.omdb ? 'omdb' : null;
+  return keys.omdb ? 'omdb' : 'wikidata';
 }
 
-function providerFor(group: FileGroup, keys: ProviderKeys): Provider | null {
+function providerFor(group: FileGroup, keys: ProviderKeys): Provider {
   return providerForKind(group.isSeries, keys);
 }
 
@@ -191,6 +195,7 @@ export function searchProvider(
     return tmdbSearch(keys.tmdb as string, title, year, isSeries ? 'series' : 'movie');
   }
   if (provider === 'tvmaze') return tvmazeSearch(title);
+  if (provider === 'wikidata') return wikidataSearch(title);
   return omdbSearch(keys.omdb as string, title, year);
 }
 
@@ -222,13 +227,18 @@ export async function applyMatch(
   if (!isSeries && provider === 'tvmaze') {
     throw new Error('TVmaze has no movie data — use TMDB or OMDb for a movie.');
   }
+  if (isSeries && provider === 'wikidata') {
+    throw new Error('Kinema reads only films from Wikidata — use TMDB or TVmaze for a series.');
+  }
 
   const metadata =
     provider === 'tmdb'
       ? await tmdbGetTitle(keys.tmdb as string, providerId, kind)
       : provider === 'tvmaze'
         ? await tvmazeGetShow(providerId)
-        : await omdbGetMovie(keys.omdb as string, providerId);
+        : provider === 'wikidata'
+          ? await wikidataGetMovie(providerId)
+          : await omdbGetMovie(keys.omdb as string, providerId);
 
   const titleId = await saveTitle(metadata);
 
@@ -329,6 +339,40 @@ export async function refreshStaleTitles(): Promise<DetailBackfill> {
 }
 
 /**
+ * Move films found through Wikidata to TMDB, once there is a key to ask with.
+ *
+ * Wikidata is the fallback for movies when no TMDB key works (wikidata.ts),
+ * and it has no pictures. Its items carry the film's TMDB id, so when a key
+ * is back — an update with a new one, or a key of the user's own — each such
+ * film is fetched from TMDB by that id, no searching and no scoring, and its
+ * row re-keyed in place: files, watch history and track choices stay with it.
+ * A film TMDB already has a row for (the same film matched from another file)
+ * is left as it is.
+ */
+export async function upgradeWikidataFilms(): Promise<DetailBackfill> {
+  const result: DetailBackfill = { found: 0, none: 0, errors: [] };
+  const keys = await loadProviderKeys();
+  if (!keys.tmdb) return result;
+
+  for (const target of await listWikidataFilms(REFRESH_PER_SCAN)) {
+    try {
+      // Fetched before re-keying, so a failure leaves the row as it was.
+      const metadata = await tmdbGetTitle(keys.tmdb, target.tmdb_id, 'movie');
+      if (await adoptProvider(target.id, 'tmdb', target.tmdb_id)) {
+        await saveTitle(metadata);
+        result.found++;
+      } else {
+        result.none++;
+      }
+    } catch (e) {
+      result.errors.push(`${target.tmdb_id}: ${e instanceof Error ? e.message : String(e)}`);
+      if (e instanceof TmdbKeyRejected) break;
+    }
+  }
+  return result;
+}
+
+/**
  * Take files out of the review queue without matching them — trailers, samples
  * and extras are not work, and leaving them in the list forever would make
  * "needs attention" meaningless. Reversible: the files keep their parse data.
@@ -404,15 +448,6 @@ async function resolveGroup(
   };
 
   const provider = providerFor(group, keys);
-  if (!provider) {
-    return {
-      provider: null,
-      providerId: null,
-      confidence: 0,
-      reason: 'no provider available for movies (add a TMDB or OMDb key)',
-      matched: false,
-    };
-  }
 
   const candidates = await searchProvider(provider, keys, searchTitle, searchYear, group.isSeries);
 

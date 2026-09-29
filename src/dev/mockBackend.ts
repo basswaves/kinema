@@ -198,7 +198,9 @@ const titles: StoredTitle[] = [
   {
     id: FILM_ID,
     kind: 'movie',
-    provider: 'tmdb',
+    // Found through Wikidata, the keyless fallback: its description carries
+    // the Wikipedia credit on the detail page.
+    provider: 'wikidata',
     title: 'Example Film',
     year: 2017,
     overview: 'A fixture film.',
@@ -637,6 +639,8 @@ const handlers: Record<string, Handler> = {
     UPDATE ? { version: UPDATE, url: 'https://github.com/Basswaves/kinema/releases' } : null,
   list_titles_needing_detail: () => [],
   list_stale_titles: () => [],
+  list_wikidata_films: () => [],
+  adopt_provider: () => false,
   cache_artwork: () => ({ stored: 0, failed: 0 }),
   artwork_stats: () => ({ files: 0, bytes: 0, failed: 0 }),
   find_local_trailer: () => null,

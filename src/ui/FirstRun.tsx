@@ -168,8 +168,8 @@ export default function FirstRun({ onDone }: Props) {
               <span className="first-run-optional">optional</span>
             </h2>
             <p className="muted">
-              TV shows already work without this. Movies need a key from TMDB to get posters,
-              descriptions and artwork — it is free, and takes about two minutes to get.
+              Everything is identified without it, but only a key from TMDB brings posters,
+              backdrops and artwork for movies — it is free, and takes about two minutes to get.
             </p>
             <div className="settings-row">
               <FocusButton className="btn-secondary" onSelect={() => void openUrl(TMDB_KEY_URL)}>

@@ -29,16 +29,22 @@ import { readChapters } from './player/chapters';
 import { setTvMode } from './ui/tv';
 import { scanLibrary } from './library/api';
 import {
+  cacheArtwork,
   ignoreFileIds,
+  listUnmatched,
   recordMatch,
   recordProviderFailure,
   recordRefusal,
   returnToReview,
-  cacheArtwork,
   setSetting,
   unlinkFiles,
 } from './metadata/api';
-import { refreshStaleTitles } from './metadata/match';
+import {
+  loadProviderKeys,
+  matchFiles,
+  refreshStaleTitles,
+  upgradeWikidataFilms,
+} from './metadata/match';
 
 /**
  * The webview's own wrappers for the file lifecycle, callable from a plan —
@@ -59,6 +65,11 @@ const CALLABLE: Record<string, (...args: never[]) => Promise<unknown>> = {
   // without the rest of a scan (which would also start intro detection).
   refreshStaleTitles,
   cacheArtwork,
+  upgradeWikidataFilms,
+  // A scan's matching step on its own: whatever is waiting to be matched,
+  // with whichever keys the copied library has.
+  matchUnmatched: async () =>
+    matchFiles(await listUnmatched(2000), await loadProviderKeys(), () => {}),
   // Display switching only happens fullscreen, and Browse has no key for it.
   setFullscreen: (on: boolean) => getCurrentWindow().setFullscreen(on),
   // TV mode is read at launch, before a plan's first action; this switches it

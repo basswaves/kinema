@@ -38,6 +38,7 @@ import {
   loadProviderKeys,
   matchFiles,
   refreshStaleTitles,
+  upgradeWikidataFilms,
 } from '../metadata/match';
 import { syncBuiltinKey } from '../metadata/builtinKey';
 
@@ -240,6 +241,9 @@ export async function runScanPipeline(): Promise<ScanOutcome> {
     // a few titles per scan. Before artwork, so new image URLs are cached.
     const refreshed = await refreshStaleTitles();
     errors.push(...refreshed.errors);
+    // Films found through Wikidata get TMDB's pictures once a key works.
+    const upgraded = await upgradeWikidataFilms();
+    errors.push(...upgraded.errors);
 
     // After matching and details: every artwork URL is known now, and
     // browsing should not need the network afterwards.

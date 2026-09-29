@@ -562,6 +562,57 @@ pub fn list_stale_titles(db: tauri::State<Db>, limit: i64) -> Result<Vec<Trailer
     stale_titles(&conn, crate::util::now_secs(), limit).map_err(to_string_err)
 }
 
+/// Films identified through Wikidata, which has no pictures, that Wikidata
+/// also knows the TMDB id of — so they can move to TMDB once a key works.
+#[tauri::command]
+pub fn list_wikidata_films(db: tauri::State<Db>, limit: i64) -> Result<Vec<TrailerTarget>, String> {
+    let conn = db.0.lock().map_err(to_string_err)?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, tmdb_id, kind FROM titles
+              WHERE provider = 'wikidata' AND tmdb_id IS NOT NULL AND tmdb_id <> ''
+              ORDER BY id LIMIT ?1",
+        )
+        .map_err(to_string_err)?;
+    let rows = stmt
+        .query_map(params![limit], |r| {
+            Ok(TrailerTarget {
+                id: r.get(0)?,
+                tmdb_id: r.get(1)?,
+                kind: r.get(2)?,
+            })
+        })
+        .map_err(to_string_err)?;
+    rows.collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(to_string_err)
+}
+
+/// Re-key a title to another provider's entry for the same film, in place.
+/// The row keeps its id, so files, watch history and track choices stay with
+/// it, and `save_title` then fills it from the new provider. Refused — false —
+/// when that entry already has a row of its own: two rows for one film is a
+/// merge, which is not this.
+fn adopt(conn: &rusqlite::Connection, id: i64, provider: &str, provider_id: &str) -> rusqlite::Result<bool> {
+    let changed = conn.execute(
+        "UPDATE titles SET provider = ?2, provider_id = ?3
+          WHERE id = ?1
+            AND NOT EXISTS (SELECT 1 FROM titles WHERE provider = ?2 AND provider_id = ?3)",
+        params![id, provider, provider_id],
+    )?;
+    Ok(changed == 1)
+}
+
+#[tauri::command]
+pub fn adopt_provider(
+    db: tauri::State<Db>,
+    title_id: i64,
+    provider: String,
+    provider_id: String,
+) -> Result<bool, String> {
+    let conn = db.0.lock().map_err(to_string_err)?;
+    adopt(&conn, title_id, &provider, &provider_id).map_err(to_string_err)
+}
+
 /// Titles matched before some part of the TMDB detail response was being used.
 ///
 /// Restricted to titles with a TMDB id, because it is the only provider here
@@ -663,7 +714,9 @@ pub fn list_unmatched(
 
 #[cfg(test)]
 mod tests {
-    use super::{episodes_for, map_title, stale_titles, Title, TITLE_SELECT, TMDB_MAX_AGE_SECS};
+    use super::{
+        adopt, episodes_for, map_title, stale_titles, Title, TITLE_SELECT, TMDB_MAX_AGE_SECS,
+    };
     use rusqlite::{named_params, params};
 
     fn title(conn: &rusqlite::Connection, id: i64) -> Title {
@@ -719,6 +772,28 @@ mod tests {
             .collect();
         assert_eq!(stale, vec!["33", "22"]);
         assert_eq!(stale_titles(&conn, now, 1).unwrap().len(), 1);
+    }
+
+    /// A film found through Wikidata moves to TMDB under the same row, and
+    /// only if TMDB's entry for it is not already a row of its own.
+    #[test]
+    fn a_wikidata_film_is_rekeyed_in_place_unless_tmdb_already_has_it() {
+        let conn = library("adopt");
+        conn.execute_batch(
+            "INSERT INTO titles (id, kind, provider, provider_id, tmdb_id, title, fetched_at) VALUES
+                 (2, 'movie', 'wikidata', 'Q1', '550', 'Film', 0),
+                 (3, 'movie', 'wikidata', 'Q2', '551', 'Other', 0),
+                 (4, 'movie', 'tmdb',     '551', '551', 'Other', 0);",
+        )
+        .unwrap();
+        assert!(adopt(&conn, 2, "tmdb", "550").unwrap());
+        let (provider, id): (String, String) = conn
+            .query_row("SELECT provider, provider_id FROM titles WHERE id = 2", [], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })
+            .unwrap();
+        assert_eq!((provider.as_str(), id.as_str()), ("tmdb", "550"));
+        assert!(!adopt(&conn, 3, "tmdb", "551").unwrap());
     }
 
     #[test]

@@ -20,7 +20,9 @@
       "allow": [
         { "url": "https://api.tvmaze.com/*" },
         { "url": "https://www.omdbapi.com/*" },
-        { "url": "https://api.themoviedb.org/*" }
+        { "url": "https://api.themoviedb.org/*" },
+        { "url": "https://www.wikidata.org/w/api.php*" },
+        { "url": "https://en.wikipedia.org/w/api.php*" }
       ]
     }
   ]

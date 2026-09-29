@@ -25,6 +25,7 @@ import {
   tvmazeLookupByTvdb,
 } from './providers';
 import type { FileGroup, Provider, ProviderKeys } from './match';
+import { wikidataFindByImdb, wikidataFindByTmdb } from './wikidata';
 
 export interface NfoIds {
   tmdb: string | null;
@@ -145,6 +146,14 @@ export async function resolveNfoIds(
   // OMDb is keyed by IMDb id directly, so no lookup step is needed.
   if (imdb && keys.omdb) {
     return { provider: 'omdb', providerId: imdb, via: `imdb:${imdb}` };
+  }
+
+  // Without either key, Wikidata holds both ids against the film's item.
+  if (!keys.tmdb) {
+    const byTmdb = tmdb ? await wikidataFindByTmdb(tmdb) : null;
+    if (byTmdb) return { provider: 'wikidata', providerId: byTmdb, via: `tmdb:${tmdb}` };
+    const byImdb = imdb ? await wikidataFindByImdb(imdb) : null;
+    if (byImdb) return { provider: 'wikidata', providerId: byImdb, via: `imdb:${imdb}` };
   }
 
   return null;

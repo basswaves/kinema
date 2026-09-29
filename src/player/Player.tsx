@@ -1222,20 +1222,29 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     };
   }, []);
 
-  const changeVolume = useCallback(
-    (delta: number) => {
-      const level = clampVolume(volume + delta);
+  /**
+   * Set the level outright. `save` is false while a mouse drags the bar, so a
+   * drag is one saved setting when it is let go, not one per pixel.
+   */
+  const setVolumeLevel = useCallback(
+    (value: number, save = true) => {
+      const level = clampVolume(value);
       setVolume(level);
       void applyVolume(level).catch(fail);
-      void persistVolume(level).catch((e) => console.warn('volume: could not save', e));
+      if (save) void persistVolume(level).catch((e) => console.warn('volume: could not save', e));
       // Turning it up is a clear enough request to hear something.
-      if (muted && delta > 0) {
+      if (muted && level > volume) {
         setMuted(false);
         void applyMute(false).catch(fail);
       }
       showOsd();
     },
     [volume, muted, fail, showOsd]
+  );
+
+  const changeVolume = useCallback(
+    (delta: number) => setVolumeLevel(volume + delta),
+    [volume, setVolumeLevel]
   );
 
   const toggleMute = useCallback(() => {
@@ -1631,7 +1640,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       onClick={(e) => {
         if (
           (e.target as HTMLElement).closest(
-            'button, input, .track-panel, .up-next, .stats-panel'
+            'button, input, .volume-control, .track-panel, .up-next, .stats-panel'
           )
         )
           return;
@@ -1640,7 +1649,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       onDoubleClick={(e) => {
         if (
           (e.target as HTMLElement).closest(
-            'button, input, .track-panel, .up-next, .stats-panel'
+            'button, input, .volume-control, .track-panel, .up-next, .stats-panel'
           )
         )
           return;
@@ -1840,6 +1849,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
               muted={muted}
               receiver={receiver}
               onChange={changeVolume}
+              onSet={setVolumeLevel}
               onToggleMute={toggleMute}
             />
             {!tv && (

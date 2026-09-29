@@ -2310,9 +2310,28 @@ html {
   border: 1px solid rgba(255, 255, 255, 0.14);
 }
 
+/* Fills the gap between the control and the pop-up, so the pointer can
+   travel up to the bar without leaving the control and closing it. */
+.volume-pop::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  height: 0.75rem;
+}
+
 .volume-control.focused .volume-pop,
 .volume-control:hover .volume-pop {
   display: flex;
+}
+
+.volume-hit {
+  display: flex;
+  justify-content: center;
+  padding: 0 0.625rem;
+  cursor: pointer;
+  touch-action: none;
 }
 
 .volume-track {

@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use std::path::Path;
 
 /// The schema this build understands. Bump it with every new `SCHEMA_V*`.
-pub const SCHEMA_VERSION: i64 = 18;
+pub const SCHEMA_VERSION: i64 = 19;
 
 /// What can go wrong opening the library.
 ///
@@ -556,6 +556,65 @@ CREATE TABLE omdb_scores (
 );
 "#;
 
+/// Schema version 19: recaps, a film's scene after the credits, and a second
+/// community source (IntroDB.app, `introdb_app.rs`).
+///
+/// `skip_markers` gains the two new segments and loses `remote_at`. With two
+/// network sources one timestamp could not say which of them was due, so each
+/// source's answer now has a row of its own in `remote_skip_answers`, with the
+/// time it was given. Both tables are caches — the first is rebuilt from the
+/// sources in one call, the second expires after a month by the services'
+/// terms — so the old table is dropped rather than migrated, as in V8. The cost
+/// is that TheIntroDB is asked once more about each episode as it is next
+/// played.
+const SCHEMA_V19: &str = r#"
+DROP TABLE IF EXISTS skip_markers;
+
+CREATE TABLE skip_markers (
+    file_id             INTEGER PRIMARY KEY REFERENCES media_files(id) ON DELETE CASCADE,
+
+    intro_start         REAL,
+    intro_end           REAL,
+    intro_source        TEXT,
+
+    recap_start         REAL,
+    recap_end           REAL,
+    recap_source        TEXT,
+
+    credits_start       REAL,
+    -- NULL means "to the end of the file", as in V8.
+    credits_end         REAL,
+    credits_source      TEXT,
+
+    post_credits_start  REAL,
+    post_credits_end    REAL,
+    post_credits_source TEXT,
+
+    local_key           TEXT    NOT NULL,
+    checked_at          INTEGER NOT NULL
+);
+
+CREATE TABLE remote_skip_answers (
+    file_id             INTEGER NOT NULL REFERENCES media_files(id) ON DELETE CASCADE,
+    -- 'introdb' (TheIntroDB) or 'introdb-app' (IntroDB.app).
+    source              TEXT    NOT NULL,
+
+    intro_start         REAL,
+    intro_end           REAL,
+    recap_start         REAL,
+    recap_end           REAL,
+    credits_start       REAL,
+    credits_end         REAL,
+    post_credits_start  REAL,
+    post_credits_end    REAL,
+
+    -- When the service answered. A row with every segment NULL is an answer
+    -- too: "nobody has timed this", which waits its month like any other.
+    fetched_at          INTEGER NOT NULL,
+    PRIMARY KEY (file_id, source)
+);
+"#;
+
 /// How long a statement waits for the write lock before giving up.
 ///
 /// Load-bearing from the moment there is more than one connection. SQLite
@@ -747,7 +806,7 @@ pub fn open_secondary(path: &Path) -> rusqlite::Result<Connection> {
 pub(crate) const MIGRATIONS: [&str; SCHEMA_VERSION as usize] = [
     SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6, SCHEMA_V7, SCHEMA_V8,
     SCHEMA_V9, SCHEMA_V10, SCHEMA_V11, SCHEMA_V12, SCHEMA_V13, SCHEMA_V14,
-    SCHEMA_V15, SCHEMA_V16, SCHEMA_V17, SCHEMA_V18,
+    SCHEMA_V15, SCHEMA_V16, SCHEMA_V17, SCHEMA_V18, SCHEMA_V19,
 ];
 
 /// Bring the database up to [`SCHEMA_VERSION`].

@@ -268,6 +268,19 @@ const titles: StoredTitle[] = [
   },
 ];
 
+/** Markers with every segment absent except those given. */
+const marked = (over: Partial<SkipMarkers>): SkipMarkers => ({
+  intro: null,
+  intro_source: null,
+  recap: null,
+  recap_source: null,
+  credits: null,
+  credits_source: null,
+  post_credits: null,
+  post_credits_source: null,
+  ...over,
+});
+
 const intro = (start: number, end: number, source: string) => ({
   intro: { start, end },
   intro_source: source,
@@ -283,7 +296,7 @@ const files: FixtureFile[] = [
     season: 1,
     episode: 1,
     duration: 1500,
-    markers: { ...intro(0.2, 45.6, 'skiptro-db'), credits: { start: 1430, end: null }, credits_source: 'analysis' },
+    markers: marked({ ...intro(0.2, 45.6, 'skiptro-db'), credits: { start: 1430, end: null }, credits_source: 'analysis' }),
   },
   // A cold open: ten seconds of story before the intro.
   {
@@ -293,7 +306,7 @@ const files: FixtureFile[] = [
     season: 1,
     episode: 2,
     duration: 1500,
-    markers: { ...intro(10.0, 46.0, 'analysis'), credits: { start: 1428, end: null }, credits_source: 'analysis' },
+    markers: marked({ ...intro(10.0, 46.0, 'analysis'), credits: { start: 1428, end: null }, credits_source: 'analysis' }),
   },
   // Long credits: they start before the 94% "watched" line, and
   // there is a next episode to move on to.
@@ -304,7 +317,7 @@ const files: FixtureFile[] = [
     season: 1,
     episode: 3,
     duration: 1440,
-    markers: { ...intro(0, 44, 'analysis'), credits: { start: 1330, end: null }, credits_source: 'analysis' },
+    markers: marked({ ...intro(0, 44, 'analysis'), credits: { start: 1330, end: null }, credits_source: 'analysis' }),
   },
   // No markers from any source, with a next episode: the credits here can only
   // be the tail guess, which may offer but never decide.
@@ -334,7 +347,14 @@ const files: FixtureFile[] = [
     season: null,
     episode: null,
     duration: 6000,
-    markers: null,
+    // Credits from TheIntroDB and a scene after them from IntroDB.app: the
+    // credits skip becomes "Skip to the scene after the credits".
+    markers: marked({
+      credits: { start: 5600, end: null },
+      credits_source: 'introdb',
+      post_credits: { start: 5880, end: 5940 },
+      post_credits_source: 'introdb-app',
+    }),
   },
   ...[
     [1, 1],
@@ -350,7 +370,16 @@ const files: FixtureFile[] = [
     season,
     episode,
     duration: 3000,
-    markers: null,
+    // The first episode opens on a recap and then the intro: two presses,
+    // "Skip recap" and then "Skip intro".
+    markers:
+      i === 0
+        ? marked({
+            recap: { start: 0, end: 40 },
+            recap_source: 'introdb',
+            ...intro(40, 70, 'introdb-app'),
+          })
+        : null,
   })),
 ];
 

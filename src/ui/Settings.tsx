@@ -45,6 +45,7 @@ import {
   DEFAULT_SKIPTRO_EXPORT_ARGS,
   DEFAULT_SKIPTRO_SCAN_ARGS,
   FFMPEG_PATH_KEY,
+  INTRODB_APP_ENABLED_KEY,
   INTRODB_ENABLED_KEY,
   SKIPTRO_DB_PATH_KEY,
   SKIPTRO_EXPORT_ARGS_KEY,
@@ -239,6 +240,7 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
   const [keysSaved, setKeysSaved] = useState(false);
   // Unset means on. Only an explicit 'off' stops the lookups.
   const [introDb, setIntroDb] = useState(true);
+  const [introDbApp, setIntroDbApp] = useState(true);
   // Likewise: the built-in analysis runs after a scan unless it is switched off.
   const [autoAnalyse, setAutoAnalyse] = useState(true);
 
@@ -309,6 +311,7 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
       setSkiptroLoaded(true);
 
       setIntroDb((await getSetting(INTRODB_ENABLED_KEY)) !== 'off');
+      setIntroDbApp((await getSetting(INTRODB_APP_ENABLED_KEY)) !== 'off');
       setAutoAnalyse((await getSetting(AUTO_ANALYSE_KEY)) !== 'off');
     })();
   }, []);
@@ -879,16 +882,18 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
 
             {section === 'intros' && (
               <>
-                {/* Three sources, in the order they are trusted: Skiptro and
+                {/* Four sources, in the order they are trusted: Skiptro and
                     this app's own analysis both measure the exact file on this
-                    disk, but only the analysis finds credits; TheIntroDB was
-                    timed by people against some copy of the episode, and is the
-                    only one that answers without reading the file at all. */}
+                    disk, but only the analysis finds credits; TheIntroDB and
+                    IntroDB.app were timed by people against some copy of the
+                    episode, answer without reading the file at all, and are
+                    the only ones that know recaps and a film's scene after
+                    the credits. */}
                 <section className="settings-section">
                   <h2>Intro and credits</h2>
                   <p className="settings-intro">
-                    How Kinema finds where intros and end credits are, for the Skip button and
-                    for offering the next episode. It works by itself: new episodes are checked
+                    How Kinema finds where intros, recaps and end credits are, for the Skip button
+                    and for offering the next episode. It works by itself: new episodes are checked
                     after every scan. When more than one source knows an episode, the most
                     reliable one is used.
                   </p>
@@ -967,6 +972,28 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
                   {/* Attribution they request; it costs one line. */}
                   <p className="settings-hint">
                     Segment data from <strong>TheIntroDB</strong>, <code>https://theintrodb.org</code>.
+                  </p>
+
+                  <h3>IntroDB</h3>
+                  <ChoiceRow
+                    label="Look up IntroDB"
+                    choices={[
+                      { value: 'on', label: 'On' },
+                      { value: 'off', label: 'Off' },
+                    ]}
+                    value={introDbApp ? 'on' : 'off'}
+                    onChange={(v) => {
+                      setIntroDbApp(v === 'on');
+                      void setSetting(INTRODB_APP_ENABLED_KEY, v).catch((e) =>
+                        setError(userError(e))
+                      );
+                    }}
+                    note="A second collection of times shared by viewers, and a separate service from TheIntroDB. It fills what TheIntroDB does not know, and it is the only source that knows where a film has a scene after its credits."
+                    hint="Kinema sends only which film or episode it is, by its IMDb number, keeps each answer for a month and never looks up your whole library at once. No account or key."
+                  />
+                  {/* The attribution they ask for, in their words. */}
+                  <p className="settings-hint">
+                    Intro data provided by <strong>IntroDB</strong> (<code>introdb.app</code>).
                   </p>
 
                   <h3>Skiptro</h3>

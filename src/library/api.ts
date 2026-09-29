@@ -95,6 +95,12 @@ export const DEFAULT_SKIPTRO_EXPORT_ARGS = '';
 export const INTRODB_ENABLED_KEY = 'introdb_enabled';
 
 /**
+ * Setting key: `'off'` stops the app asking IntroDB.app anything — a different
+ * service from TheIntroDB, whatever the names suggest.
+ */
+export const INTRODB_APP_ENABLED_KEY = 'introdb_app_enabled';
+
+/**
  * Setting key: where ffmpeg is. Empty means "whatever is on PATH".
  *
  * Needed only by this app's own intro/credits analysis, which decodes short

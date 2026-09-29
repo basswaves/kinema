@@ -95,6 +95,10 @@ there is.
 - **Credits times from TheIntroDB** during real playback, and **chapters named
   for the credits** in a real file. Both paths are built; neither has met a
   file that has them.
+- **Recaps, and a film's scene after the credits**, from TheIntroDB and
+  IntroDB during real playback. Both are built and tested against recorded
+  answers; neither has been watched on a real file. A note of where Skip
+  landed against where the scene really starts is a useful report.
 - **.nfo files from other programs** (Kodi, MediaElch, tinyMediaManager). Only
   Kinema's own exported files have been read back.
 - **TV overscan and the TV layout's size** from a sofa, on different TVs.

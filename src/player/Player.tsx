@@ -66,6 +66,7 @@ import {
 } from './api';
 import {
   activeSkip,
+  checkedAgainstFile,
   withResolvedCredits,
   CREDITS_TAIL_KEY,
   DEFAULT_CREDITS_TAIL_SECS,
@@ -823,17 +824,19 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
    *
    * The guess is gated on there being a next episode. Without one, "skip the
    * credits" can only mean ending the film early, which is not a skip.
+   *
+   * Then a community-timed recap, or scene after the credits, that does not
+   * fit this file's length is dropped here, where the length is known.
    */
-  const resolved = useMemo(
-    () =>
-      withResolvedCredits(markers, {
-        chapters,
-        duration,
-        tailSecs: creditsTailSecs,
-        allowTailGuess: neighbours.next !== null,
-      }),
-    [markers, chapters, duration, creditsTailSecs, neighbours.next]
-  );
+  const resolved = useMemo(() => {
+    const withCredits = withResolvedCredits(markers, {
+      chapters,
+      duration,
+      tailSecs: creditsTailSecs,
+      allowTailGuess: neighbours.next !== null,
+    });
+    return { ...withCredits, markers: checkedAgainstFile(withCredits.markers, duration) };
+  }, [markers, chapters, duration, creditsTailSecs, neighbours.next]);
 
   /**
    * Where the credits start, for deciding what counts as watched — or null
@@ -862,17 +865,21 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
    * thing a diagnostic must never do.
    */
   const introSource = resolved.markers?.intro_source ?? null;
+  const recapSource = resolved.markers?.recap_source ?? null;
   const creditsSource = resolved.creditsSource;
+  const sceneSource = resolved.markers?.post_credits_source ?? null;
   useEffect(() => {
     if (!session.open || markersFor !== target.path) return;
     const id = window.setTimeout(() => {
       console.log(
         `markers for ${target.path}: intro from ${introSource ?? 'none'}, ` +
-          `credits from ${creditsSource ?? 'none'}`
+          `recap from ${recapSource ?? 'none'}, ` +
+          `credits from ${creditsSource ?? 'none'}` +
+          (sceneSource ? `, scene after the credits from ${sceneSource}` : '')
       );
     }, MARKER_LOG_SETTLE_MS);
     return () => window.clearTimeout(id);
-  }, [session.open, markersFor, target.path, introSource, creditsSource]);
+  }, [session.open, markersFor, target.path, introSource, recapSource, creditsSource, sceneSource]);
 
   // Gated on the file being open, which is the whole defence against acting on
   // the outgoing file's position. One check here covers everything downstream:
@@ -886,13 +893,16 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   /** The credits segment is the tail guess, not a marker or a chapter. */
   const guessedCredits = resolved.creditsSource === 'tail';
   const activeKind = active?.kind ?? null;
+  /** The credits skip lands on a scene after them rather than ending the file. */
+  const activeToScene = active?.toScene ?? false;
 
   const performSkip = useCallback(async () => {
     if (!active) return;
-    if (active.kind === 'intro') {
-      // Not dismissed: the seek itself takes the position past the intro, so
-      // the button goes by itself — and seeking back into the intro brings it
-      // back, which is what a remembered dismissal used to prevent.
+    if (active.kind !== 'credits' || active.toScene) {
+      // Not dismissed: the seek itself takes the position past the segment,
+      // so the button goes by itself — and seeking back into it brings it
+      // back, which is what a remembered dismissal used to prevent. A scene
+      // after the credits is a seek too: the film goes on to it.
       await command('seek', [active.seekTo, 'absolute']).catch(fail);
       showOsd();
     } else {
@@ -908,6 +918,9 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   // `active` is a fresh object on every position tick.
   useEffect(() => {
     if (!autoSkip || !active) return;
+    // A scene after a film's credits is offered, never jumped to by itself:
+    // see `ActiveSkip.toScene`.
+    if (active.toScene) return;
     // Taking a credits segment *ends the file*. With nothing to move on to that
     // is not a skip, it is quitting a film a minute before the end. The prompt
     // path has always refused this; automatic mode did not, and the two new
@@ -953,7 +966,13 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     // coming regardless, so that card is not an offer and must not be withdrawn.
     if (countdown !== null) return;
 
-    if (activeKind !== 'credits' || !neighbours.next || dismissed === activeKey) {
+    // Credits with a scene after them are not the end of anything yet.
+    if (
+      activeKind !== 'credits' ||
+      activeToScene ||
+      !neighbours.next ||
+      dismissed === activeKey
+    ) {
       if (upNext) setUpNext(null);
       return;
     }
@@ -964,6 +983,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     guessedCredits,
     activeKind,
     activeKey,
+    activeToScene,
     countdown,
     dismissed,
     neighbours.next,
@@ -976,13 +996,15 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   // over, and the seek that skipping performs is what removes it.
 
   // In automatic mode the button still shows during a cold open, where
-  // nothing will happen by itself until the intro begins.
-  const promptAllowed = active !== null && (!autoSkip || !active.inSegment);
+  // nothing will happen by itself until the intro begins — and over credits
+  // with a scene after them, which automatic mode never jumps to.
+  const promptAllowed =
+    active !== null && (!autoSkip || !active.inSegment || active.toScene);
   const skipPrompt =
     active && promptAllowed && !upNext && dismissed !== active.key
       ? // A credits prompt with nothing to move on to would be a button that
         // does nothing useful.
-        active.kind === 'intro' || neighbours.next !== null
+        active.kind !== 'credits' || active.toScene || neighbours.next !== null
         ? active
         : null
       : null;
@@ -1705,7 +1727,13 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
 
       {skipPrompt && (
         <FocusButton className="skip-button" onSelect={() => void performSkip()}>
-          {skipPrompt.kind === 'intro' ? 'Skip intro' : 'Next episode ›'}
+          {skipPrompt.kind === 'intro'
+            ? 'Skip intro'
+            : skipPrompt.kind === 'recap'
+              ? 'Skip recap'
+              : skipPrompt.toScene
+                ? 'Skip to the scene after the credits'
+                : 'Next episode ›'}
         </FocusButton>
       )}
 

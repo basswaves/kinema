@@ -201,8 +201,9 @@ reasoning is in [docs/DESIGN.md](docs/DESIGN.md) and [docs/HISTORY.md](docs/HIST
   years. `yt-dlp`, the Kodi YouTube resolver and an in-app embed with an ad
   blocker were all rejected on exactly this ground. A read-only metadata service
   behind a stable API, used on its own terms — TMDB, TVmaze, TheIntroDB,
-  Wikidata, IMDb's published ratings file — is not maintenance; a scraper or a
-  downloader is.
+  IntroDB, Wikidata, IMDb's published ratings file — is not maintenance; a
+  scraper or a downloader is. The two skip-time services are asked about one
+  title at a time, when it is played, and never about a whole library.
 - **The detail page's badges describe the file, from the file.** Resolution,
   HDR, Dolby Vision, sound format and the rest are read with ffprobe and
   measured, never taken from the release name — a name saying "DV" or "Atmos"

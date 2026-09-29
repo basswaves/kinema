@@ -1,10 +1,15 @@
 /**
- * Intro/credits skip logic, kept out of the player component so it stays
+ * Intro/recap/credits skip logic, kept out of the player component so it stays
  * testable by reading rather than by watching an episode.
  *
  * Markers arrive already ranked from `src-tauri/src/skip.rs`, which picks
- * between Skiptro's database, a `.skiptro.json` sidecar and TheIntroDB. Nothing
- * here detects anything.
+ * between Skiptro's database, a `.skiptro.json` sidecar, the app's own
+ * analysis, TheIntroDB and IntroDB.app. Nothing here detects anything.
+ *
+ * Two things are decided here rather than there, because they need the file's
+ * length, which only the player knows: whether a community-timed recap and a
+ * film's scene after the credits actually fit *this* file
+ * (`checkedAgainstFile`).
  *
  * What is still resolved here is the **fallback** for a credits segment,
  * because a marker is not guaranteed: Skiptro cannot detect credits at all, and
@@ -23,7 +28,7 @@
 import type { Chapter } from './chapters';
 import type { Segment, SkipMarkers } from './api';
 
-export type SkipKind = 'intro' | 'credits';
+export type SkipKind = 'intro' | 'recap' | 'credits';
 
 export interface ActiveSkip {
   kind: SkipKind;
@@ -42,6 +47,13 @@ export interface ActiveSkip {
    * skips a cold open on its own; a person pressing the button may.
    */
   inSegment: boolean;
+  /**
+   * For credits: the skip lands on a scene after them, rather than ending the
+   * file. Such a skip is a seek, never an ending, and is only ever offered —
+   * automatic mode leaves it to a person (decided 2026-09-30: those timings are
+   * usually one viewer's, and a film's credits were never skipped by itself).
+   */
+  toScene: boolean;
 }
 
 /**
@@ -57,7 +69,26 @@ export function activeSkip(
 ): ActiveSkip | null {
   if (!markers || timePos === null) return null;
 
-  const { intro, credits } = markers;
+  const { intro, recap, credits, post_credits: scene } = markers;
+
+  // A recap is offered only while it is on screen. When it comes before the
+  // intro, that makes two presses — "Skip recap", then "Skip intro" — each
+  // skipping one thing (decided 2026-09-30). Before the recap begins, through
+  // a cold open, the intro's offer from 0:00 still stands and skips both.
+  if (
+    recap &&
+    recap.end !== null &&
+    timePos >= recap.start &&
+    timePos < recap.end - MIN_WORTH_SKIPPING_SECS
+  ) {
+    return {
+      kind: 'recap',
+      seekTo: recap.end,
+      key: `recap:${recap.start}`,
+      inSegment: true,
+      toScene: false,
+    };
+  }
 
   // Offered from the very start of the file, not from where the intro begins.
   // That is the decided behaviour: an episode with a known intro shows Skip
@@ -74,17 +105,42 @@ export function activeSkip(
       seekTo: intro.end,
       key: `intro:${intro.start}`,
       inSegment: timePos >= intro.start,
+      toScene: false,
     };
   }
 
   // Credits run to the end of the file, so only the start matters — there is
   // nothing after them to seek to.
   if (credits && timePos >= credits.start) {
+    // A scene after the credits turns "skip the credits" into a seek to it.
+    // `checkedAgainstFile` has already made sure it starts after them.
+    if (scene && scene.end !== null) {
+      if (timePos < scene.start - MIN_WORTH_SKIPPING_SECS) {
+        return {
+          kind: 'credits',
+          seekTo: scene.start,
+          key: `credits:${credits.start}`,
+          inSegment: true,
+          toScene: true,
+        };
+      }
+      // Watching the scene: nothing to offer over it.
+      if (timePos < scene.end) return null;
+      // Past it, whatever is left is the end of the credits, as before.
+      return {
+        kind: 'credits',
+        seekTo: scene.end,
+        key: `credits:${scene.end}`,
+        inSegment: true,
+        toScene: false,
+      };
+    }
     return {
       kind: 'credits',
       seekTo: credits.start,
       key: `credits:${credits.start}`,
       inSegment: true,
+      toScene: false,
     };
   }
 
@@ -93,7 +149,59 @@ export function activeSkip(
 
 /** Whether markers are worth acting on at all. */
 export function hasAnyMarkers(markers: SkipMarkers | null): boolean {
-  return Boolean(markers && (markers.intro || markers.credits));
+  return Boolean(
+    markers && (markers.intro || markers.recap || markers.credits || markers.post_credits)
+  );
+}
+
+// ---- fitting community timings to this file ------------------------------
+
+/**
+ * How far past the end of this file a community timing may reach and still be
+ * believed. A few seconds covers rounding and a slightly different mux; more
+ * than that and the timing was taken against a longer copy, where every number
+ * in it is somewhere else.
+ */
+const LENGTH_TOLERANCE_SECS = 5;
+
+/**
+ * Drop a recap or a scene after the credits that does not fit this file.
+ *
+ * Both come only from the community services, timed against somebody's copy
+ * and — for IntroDB.app — with no way to say which. A scene is kept only when
+ * it starts after the credits, and before the end of this file, and ends
+ * within it; a recap only when it ends within the file. Until the length is
+ * known, a scene is not offered at all: a seek to a time past the end is a
+ * seek to the end, which is the ending of the film, skipped.
+ *
+ * Returns the same object when nothing is dropped, so it can sit in a memo.
+ */
+export function checkedAgainstFile(
+  markers: SkipMarkers | null,
+  duration: number | null
+): SkipMarkers | null {
+  if (!markers) return markers;
+  const length = duration ?? 0;
+  const known = length > 0;
+  const { recap, credits, post_credits: scene } = markers;
+
+  const recapFits =
+    !recap || !known || (recap.end !== null && recap.end <= length + LENGTH_TOLERANCE_SECS);
+  const sceneFits =
+    !scene ||
+    (known &&
+      credits !== null &&
+      scene.end !== null &&
+      scene.start > credits.start &&
+      scene.start < length - MIN_WORTH_SKIPPING_SECS &&
+      scene.end <= length + LENGTH_TOLERANCE_SECS);
+
+  if (recapFits && sceneFits) return markers;
+  return {
+    ...markers,
+    ...(recapFits ? {} : { recap: null, recap_source: null }),
+    ...(sceneFits ? {} : { post_credits: null, post_credits_source: null }),
+  };
 }
 
 // ---- resolving a credits segment ------------------------------------------
@@ -216,8 +324,15 @@ export function withResolvedCredits(
   const credits: Segment = { start, end: duration };
   return {
     markers: {
-      intro: markers?.intro ?? null,
-      intro_source: markers?.intro_source ?? null,
+      intro: null,
+      intro_source: null,
+      recap: null,
+      recap_source: null,
+      post_credits: null,
+      post_credits_source: null,
+      // Everything else the sources said is kept — a recap, and a film's
+      // scene after a credits start that only a chapter supplied.
+      ...markers,
       credits,
       credits_source: source,
     },

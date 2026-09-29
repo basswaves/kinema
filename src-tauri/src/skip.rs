@@ -1,14 +1,20 @@
-//! Where intro and credits markers come from, and which source wins.
+//! Where skip markers come from, and which source wins.
 //!
-//! Three sources, ranked per segment rather than overall, because they are good
+//! Five sources, ranked per segment rather than overall, because they are good
 //! at different things:
 //!
-//! | | intro | credits |
-//! |---|---|---|
-//! | **Skiptro's database** | 1st — measured on *this* file | never has any |
-//! | **`.skiptro.json` sidecar** | 2nd — same detection, exported | 1st, if a producer ever writes one |
-//! | **This app's own analysis** | 3rd — measured on this file too | 2nd, and the one that usually answers |
-//! | **TheIntroDB** | 4th — community-timed | 3rd |
+//! | | intro | credits | recap | scene after the credits |
+//! |---|---|---|---|---|
+//! | **Skiptro's database** | 1st — measured on *this* file | never has any | — | — |
+//! | **`.skiptro.json` sidecar** | 2nd — same detection, exported | 1st, if a producer ever writes one | — | — |
+//! | **This app's own analysis** | 3rd — measured on this file too | 2nd, and the one that usually answers | — | — |
+//! | **TheIntroDB** | 4th — community-timed | 3rd | 1st | never has any |
+//! | **IntroDB.app** | 5th — community-timed | 4th | 2nd | the only source, films only |
+//!
+//! Recaps and the scene after a film's credits come only from the two
+//! community services: nothing local detects either. Between those two,
+//! TheIntroDB is asked first because it is told the file's length and uses it
+//! to tell releases apart; IntroDB.app is not.
 //!
 //! **One rule, applied to both segments: local before remote.** Something
 //! measured against the actual bytes on this disk beats something timed by
@@ -32,12 +38,13 @@
 //! would break a library that already has them for no gain.
 //!
 //! Every source is optional and every failure is silent-but-logged. With
-//! Skiptro never installed, TheIntroDB switched off and no sidecars, this
-//! returns nothing and the player behaves exactly as it did before any of it
-//! existed.
+//! Skiptro never installed, both community services switched off and no
+//! sidecars, this returns nothing and the player behaves exactly as it did
+//! before any of it existed.
 
 use crate::util::{now_secs, to_string_err};
-use crate::introdb;
+use crate::introdb::{self, Lookup};
+use crate::introdb_app;
 use crate::library::Db;
 use crate::settings::setting;
 use crate::skiptro;
@@ -58,6 +65,8 @@ const FROM_SKIPTRO_DB: &str = "skiptro-db";
 const FROM_SIDECAR: &str = "sidecar";
 const FROM_ANALYSIS: &str = "analysis";
 const FROM_INTRODB: &str = "introdb";
+/// IntroDB.app — a different service from TheIntroDB, whatever the names say.
+const FROM_INTRODB_APP: &str = "introdb-app";
 
 /// Below this, a Skiptro intro gives way to this app's own analysis.
 ///
@@ -71,7 +80,7 @@ const MIN_SKIPTRO_CONFIDENCE: f64 = 0.8;
 /// Changes whenever the *ranking* changes, so rows cached under the old rules
 /// are recomputed. Without it `local_key` covers every input but the code, and
 /// a new rule would not reach an episode until one of its sources moved.
-const RANKING_VERSION: &str = "rank2";
+const RANKING_VERSION: &str = "rank3";
 
 #[derive(Serialize, Clone, Copy, Debug, PartialEq)]
 pub struct Segment {
@@ -83,19 +92,63 @@ pub struct Segment {
     pub end: Option<f64>,
 }
 
-#[derive(Serialize, Debug, Default, Clone)]
+#[derive(Serialize, Debug, Default, Clone, PartialEq)]
 pub struct SkipMarkers {
     pub intro: Option<Segment>,
     /// Which source the intro came from, so a skip that fires somewhere
     /// surprising can be traced to the thing that claimed it.
     pub intro_source: Option<String>,
+    /// "Previously on…". Always with a real end, like the intro.
+    pub recap: Option<Segment>,
+    pub recap_source: Option<String>,
     pub credits: Option<Segment>,
     pub credits_source: Option<String>,
+    /// A film's scene after the credits, always with a real end. Whether it
+    /// actually follows *these* credits, in *this* file, is checked in
+    /// `skip.ts`, which knows the file's length.
+    pub post_credits: Option<Segment>,
+    pub post_credits_source: Option<String>,
 }
 
 impl SkipMarkers {
     fn is_empty(&self) -> bool {
-        self.intro.is_none() && self.credits.is_none()
+        self.intro.is_none()
+            && self.recap.is_none()
+            && self.credits.is_none()
+            && self.post_credits.is_none()
+    }
+
+    /// Fill whatever is still missing from one community service's answer.
+    ///
+    /// Called once per service, in rank order, after every local source has
+    /// had its turn — so a community timing never displaces a measurement of
+    /// this file, and the first service to answer a segment keeps it.
+    fn fill_from(&mut self, found: &Lookup, source: &str) {
+        let closed = |(start, end): (f64, f64)| Segment { start, end: Some(end) };
+        if self.credits.is_none() {
+            if let Some((start, end)) = found.credits {
+                self.credits = Some(Segment { start, end });
+                self.credits_source = Some(source.into());
+            }
+        }
+        if self.intro.is_none() {
+            if let Some(intro) = found.intro {
+                self.intro = Some(closed(intro));
+                self.intro_source = Some(source.into());
+            }
+        }
+        if self.recap.is_none() {
+            if let Some(recap) = found.recap {
+                self.recap = Some(closed(recap));
+                self.recap_source = Some(source.into());
+            }
+        }
+        if self.post_credits.is_none() {
+            if let Some(scene) = found.post_credits {
+                self.post_credits = Some(closed(scene));
+                self.post_credits_source = Some(source.into());
+            }
+        }
     }
 }
 
@@ -217,11 +270,17 @@ fn find_sidecar(video: &Path) -> Option<Sidecar> {
 /// file replaced *since the last scan* — and if nothing else moved, the key was
 /// identical and this served markers measured against bytes that are gone. It
 /// costs one `stat`, next to the one `find_sidecar` already does.
+///
+/// `remotes` names the community services that are switched on. A row written
+/// while one was on carries its segments, and without this it would go on
+/// serving them after the service was switched off — until something local
+/// happened to move.
 fn local_key(
     video: &Path,
     skiptro_db: Option<&Path>,
     sidecar: Option<&Sidecar>,
     analysed_at: Option<i64>,
+    remotes: &str,
 ) -> String {
     let file = std::fs::metadata(video)
         .map(|m| {
@@ -241,7 +300,7 @@ fn local_key(
     // A fresh analysis has to invalidate the cache too, or running Detect would
     // leave the file playing with whatever it was given before.
     let analysed = analysed_at.map(|t| t.to_string()).unwrap_or_default();
-    format!("{file}|{db}|{side}|{analysed}|{RANKING_VERSION}")
+    format!("{file}|{db}|{side}|{analysed}|{remotes}|{RANKING_VERSION}")
 }
 
 /// This app's own analysis for one file, if it is still valid for these bytes.
@@ -279,35 +338,41 @@ fn read_analysis(
 struct Cached {
     markers: SkipMarkers,
     local_key: String,
-    remote_at: Option<i64>,
+}
+
+/// A segment from two nullable columns. The end may be NULL only where the
+/// segment allows it (credits); elsewhere a row with a NULL end was never
+/// written, since every source drops such a segment.
+fn segment_at(r: &rusqlite::Row, start: usize) -> rusqlite::Result<Option<Segment>> {
+    Ok(r.get::<_, Option<f64>>(start)?.map(|s| Segment {
+        start: s,
+        end: r.get::<_, Option<f64>>(start + 1).unwrap_or(None),
+    }))
 }
 
 fn read_cache(conn: &rusqlite::Connection, file_id: i64) -> Option<Cached> {
     conn.query_row(
         "SELECT intro_start, intro_end, intro_source,
+                recap_start, recap_end, recap_source,
                 credits_start, credits_end, credits_source,
-                local_key, remote_at
+                post_credits_start, post_credits_end, post_credits_source,
+                local_key
            FROM skip_markers
           WHERE file_id = ?1",
         params![file_id],
         |r| {
-            let intro = r.get::<_, Option<f64>>(0)?.map(|start| Segment {
-                start,
-                end: r.get::<_, Option<f64>>(1).unwrap_or(None),
-            });
-            let credits = r.get::<_, Option<f64>>(3)?.map(|start| Segment {
-                start,
-                end: r.get::<_, Option<f64>>(4).unwrap_or(None),
-            });
             Ok(Cached {
                 markers: SkipMarkers {
-                    intro,
+                    intro: segment_at(r, 0)?,
                     intro_source: r.get(2)?,
-                    credits,
-                    credits_source: r.get(5)?,
+                    recap: segment_at(r, 3)?,
+                    recap_source: r.get(5)?,
+                    credits: segment_at(r, 6)?,
+                    credits_source: r.get(8)?,
+                    post_credits: segment_at(r, 9)?,
+                    post_credits_source: r.get(11)?,
                 },
-                local_key: r.get(6)?,
-                remote_at: r.get(7)?,
+                local_key: r.get(12)?,
             })
         },
     )
@@ -319,72 +384,197 @@ fn write_cache(
     file_id: i64,
     markers: &SkipMarkers,
     key: &str,
-    remote_at: Option<i64>,
 ) -> rusqlite::Result<()> {
+    let start = |s: Option<Segment>| s.map(|s| s.start);
+    let end = |s: Option<Segment>| s.and_then(|s| s.end);
     conn.execute(
         "INSERT INTO skip_markers
             (file_id, intro_start, intro_end, intro_source,
+             recap_start, recap_end, recap_source,
              credits_start, credits_end, credits_source,
-             local_key, remote_at, checked_at)
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)
+             post_credits_start, post_credits_end, post_credits_source,
+             local_key, checked_at)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15)
          ON CONFLICT(file_id) DO UPDATE SET
-            intro_start    = excluded.intro_start,
-            intro_end      = excluded.intro_end,
-            intro_source   = excluded.intro_source,
-            credits_start  = excluded.credits_start,
-            credits_end    = excluded.credits_end,
-            credits_source = excluded.credits_source,
-            local_key      = excluded.local_key,
-            remote_at      = excluded.remote_at,
-            checked_at     = excluded.checked_at",
+            intro_start         = excluded.intro_start,
+            intro_end           = excluded.intro_end,
+            intro_source        = excluded.intro_source,
+            recap_start         = excluded.recap_start,
+            recap_end           = excluded.recap_end,
+            recap_source        = excluded.recap_source,
+            credits_start       = excluded.credits_start,
+            credits_end         = excluded.credits_end,
+            credits_source      = excluded.credits_source,
+            post_credits_start  = excluded.post_credits_start,
+            post_credits_end    = excluded.post_credits_end,
+            post_credits_source = excluded.post_credits_source,
+            local_key           = excluded.local_key,
+            checked_at          = excluded.checked_at",
         params![
             file_id,
-            markers.intro.map(|s| s.start),
-            markers.intro.and_then(|s| s.end),
+            start(markers.intro),
+            end(markers.intro),
             markers.intro_source,
-            markers.credits.map(|s| s.start),
-            markers.credits.and_then(|s| s.end),
+            start(markers.recap),
+            end(markers.recap),
+            markers.recap_source,
+            start(markers.credits),
+            end(markers.credits),
             markers.credits_source,
+            start(markers.post_credits),
+            end(markers.post_credits),
+            markers.post_credits_source,
             key,
-            remote_at,
             now_secs()
         ],
     )?;
     Ok(())
 }
 
-// ---- assembling the answer -------------------------------------------------
+// ---- community services' answers ---------------------------------------------
 
-/// What TheIntroDB needs to be asked about a file, gathered from the library.
-struct RemoteQuery {
-    tmdb_id: String,
-    season: Option<i64>,
-    episode: Option<i64>,
-    duration_secs: Option<f64>,
+/// One service's stored answer for a file, if it is still in date.
+///
+/// An expired answer is treated as no answer at all, even when the service
+/// cannot be reached to replace it: keeping answers only for a month is the
+/// services' terms, not a freshness preference.
+fn read_answer(
+    conn: &rusqlite::Connection,
+    file_id: i64,
+    source: &str,
+    ttl_secs: i64,
+) -> Option<Lookup> {
+    let pair = |r: &rusqlite::Row, i: usize| -> rusqlite::Result<Option<(f64, f64)>> {
+        Ok(match (r.get::<_, Option<f64>>(i)?, r.get::<_, Option<f64>>(i + 1)?) {
+            (Some(start), Some(end)) => Some((start, end)),
+            _ => None,
+        })
+    };
+    conn.query_row(
+        "SELECT intro_start, intro_end, recap_start, recap_end,
+                credits_start, credits_end, post_credits_start, post_credits_end
+           FROM remote_skip_answers
+          WHERE file_id = ?1 AND source = ?2 AND fetched_at > ?3",
+        params![file_id, source, now_secs() - ttl_secs],
+        |r| {
+            Ok(Lookup {
+                intro: pair(r, 0)?,
+                recap: pair(r, 2)?,
+                credits: r
+                    .get::<_, Option<f64>>(4)?
+                    .map(|start| (start, r.get::<_, Option<f64>>(5).unwrap_or(None))),
+                post_credits: pair(r, 6)?,
+            })
+        },
+    )
+    .ok()
 }
 
-/// Only a matched file can be looked up: the whole API is keyed on a TMDB id,
-/// and a file in the Needs attention queue has none. That is a real gap and the
-/// reason the local sources are not merely a fallback — they work on anything.
-fn remote_query(conn: &rusqlite::Connection, file_id: i64) -> Option<RemoteQuery> {
-    conn.query_row(
-        "SELECT t.tmdb_id, m.parsed_season, m.parsed_episode, p.duration_secs
+fn write_answer(
+    conn: &rusqlite::Connection,
+    file_id: i64,
+    source: &str,
+    found: &Lookup,
+) -> rusqlite::Result<()> {
+    conn.execute(
+        "INSERT INTO remote_skip_answers
+            (file_id, source, intro_start, intro_end, recap_start, recap_end,
+             credits_start, credits_end, post_credits_start, post_credits_end, fetched_at)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)
+         ON CONFLICT(file_id, source) DO UPDATE SET
+            intro_start        = excluded.intro_start,
+            intro_end          = excluded.intro_end,
+            recap_start        = excluded.recap_start,
+            recap_end          = excluded.recap_end,
+            credits_start      = excluded.credits_start,
+            credits_end        = excluded.credits_end,
+            post_credits_start = excluded.post_credits_start,
+            post_credits_end   = excluded.post_credits_end,
+            fetched_at         = excluded.fetched_at",
+        params![
+            file_id,
+            source,
+            found.intro.map(|s| s.0),
+            found.intro.map(|s| s.1),
+            found.recap.map(|s| s.0),
+            found.recap.map(|s| s.1),
+            found.credits.map(|s| s.0),
+            found.credits.and_then(|s| s.1),
+            found.post_credits.map(|s| s.0),
+            found.post_credits.map(|s| s.1),
+            now_secs()
+        ],
+    )?;
+    Ok(())
+}
+
+/// Let go of answers past their month. Only episodes that were played ever have
+/// one, but a month is the terms, and a row past it has no further use.
+fn forget_expired_answers(conn: &rusqlite::Connection) -> rusqlite::Result<()> {
+    let ttl = introdb::CACHE_TTL_SECS.max(introdb_app::CACHE_TTL_SECS);
+    conn.execute(
+        "DELETE FROM remote_skip_answers WHERE fetched_at <= ?1",
+        params![now_secs() - ttl],
+    )?;
+    Ok(())
+}
+
+// ---- assembling the answer -------------------------------------------------
+
+/// What the community services need to be asked about a file, gathered from
+/// the library.
+struct RemoteQueries {
+    /// TheIntroDB, keyed on the TMDB id.
+    theintrodb: Option<introdb::Query>,
+    /// IntroDB.app, keyed on the IMDb id.
+    introdb_app: Option<introdb_app::Query>,
+}
+
+/// Only a matched file can be looked up: both services are keyed on an id the
+/// match supplies, and a file in the Needs attention queue has none. That is a
+/// real gap and the reason the local sources are not merely a fallback — they
+/// work on anything.
+fn remote_queries(conn: &rusqlite::Connection, file_id: i64) -> RemoteQueries {
+    let row = conn.query_row(
+        "SELECT t.tmdb_id, t.imdb_id, t.kind, m.parsed_season, m.parsed_episode, p.duration_secs
            FROM media_files m
            JOIN titles t ON t.id = m.title_id
            LEFT JOIN playback_state p ON p.file_id = m.id
           WHERE m.id = ?1",
         params![file_id],
         |r| {
-            Ok(RemoteQuery {
-                tmdb_id: r.get::<_, Option<String>>(0)?.unwrap_or_default(),
-                season: r.get(1)?,
-                episode: r.get(2)?,
-                duration_secs: r.get(3)?,
-            })
+            Ok((
+                r.get::<_, Option<String>>(0)?.unwrap_or_default(),
+                r.get::<_, Option<String>>(1)?.unwrap_or_default(),
+                r.get::<_, String>(2)?,
+                r.get::<_, Option<i64>>(3)?,
+                r.get::<_, Option<i64>>(4)?,
+                r.get::<_, Option<f64>>(5)?,
+            ))
         },
-    )
-    .ok()
-    .filter(|q| !q.tmdb_id.trim().is_empty())
+    );
+    let Ok((tmdb_id, imdb_id, kind, season, episode, duration_secs)) = row else {
+        return RemoteQueries {
+            theintrodb: None,
+            introdb_app: None,
+        };
+    };
+
+    // Both or neither: a season with no episode would ask about the wrong
+    // thing rather than about nothing.
+    let numbered = season.is_some() && episode.is_some();
+    let theintrodb = (!tmdb_id.trim().is_empty()).then(|| introdb::Query {
+        tmdb_id: tmdb_id.trim().to_string(),
+        season: season.filter(|_| numbered),
+        episode: episode.filter(|_| numbered),
+        duration_secs,
+    });
+    let introdb_app = introdb_app::Query::for_title(&imdb_id, kind == "movie", season, episode);
+
+    RemoteQueries {
+        theintrodb,
+        introdb_app,
+    }
 }
 
 /// Read every local source and rank them.
@@ -473,7 +663,7 @@ fn local_markers(
 /// Markers for one video, or `None` when no source has anything to say.
 ///
 /// `file_id` is optional so an ad-hoc file (dragged in, not in the library)
-/// still gets local markers — it just gets no cache entry and no TheIntroDB
+/// still gets local markers — it just gets no cache entry and no community
 /// lookup, since there is no title to look up.
 #[tauri::command]
 pub async fn get_skip_markers(
@@ -484,9 +674,9 @@ pub async fn get_skip_markers(
     let video = PathBuf::from(&path);
 
     // Everything the database is needed for, taken in one lock and then let go.
-    // The TheIntroDB lookup below is an await, and a held guard across an await
-    // is how a UI freezes on a slow network.
-    let (skiptro_db, introdb_enabled, cached, query, analysis) = {
+    // The lookups below are awaits, and a held guard across an await is how a
+    // UI freezes on a slow network.
+    let (skiptro_db, cached, analysis, theintrodb, introdb_app, remotes) = {
         let db = app.state::<Db>();
         let conn = db.0.lock().map_err(to_string_err)?;
 
@@ -494,17 +684,36 @@ pub async fn get_skip_markers(
             .map(PathBuf::from)
             .or_else(skiptro::default_db_path);
 
-        let introdb_enabled =
-            setting(&conn, introdb::ENABLED_KEY).as_deref() != Some("off");
+        let theintrodb_on = setting(&conn, introdb::ENABLED_KEY).as_deref() != Some("off");
+        let introdb_app_on = setting(&conn, introdb_app::ENABLED_KEY).as_deref() != Some("off");
+        // Which services are on is part of the cache key: see `local_key`.
+        let remotes = format!(
+            "{}{}",
+            if theintrodb_on { "t" } else { "" },
+            if introdb_app_on { "a" } else { "" }
+        );
 
         let cached = file_id.and_then(|id| read_cache(&conn, id));
-        let query = match (file_id, introdb_enabled) {
-            (Some(id), true) => remote_query(&conn, id),
+        let analysis = file_id.and_then(|id| read_analysis(&conn, id));
+        let queries = file_id.map(|id| remote_queries(&conn, id));
+        let (tq, aq) = queries.map_or((None, None), |q| (q.theintrodb, q.introdb_app));
+
+        // For each service that is on and has something to be asked: the
+        // stored answer if it is still in date, and otherwise the question.
+        let theintrodb = match (file_id, tq) {
+            (Some(id), Some(q)) if theintrodb_on => Some(
+                read_answer(&conn, id, FROM_INTRODB, introdb::CACHE_TTL_SECS).ok_or(q),
+            ),
             _ => None,
         };
-        let analysis = file_id.and_then(|id| read_analysis(&conn, id));
+        let introdb_app = match (file_id, aq) {
+            (Some(id), Some(q)) if introdb_app_on => Some(
+                read_answer(&conn, id, FROM_INTRODB_APP, introdb_app::CACHE_TTL_SECS).ok_or(q),
+            ),
+            _ => None,
+        };
 
-        (skiptro_db, introdb_enabled, cached, query, analysis)
+        (skiptro_db, cached, analysis, theintrodb, introdb_app, remotes)
     };
 
     let sidecar = find_sidecar(&video);
@@ -513,23 +722,16 @@ pub async fn get_skip_markers(
         skiptro_db.as_deref(),
         sidecar.as_ref(),
         analysis.as_ref().map(|(_, _, at)| *at),
+        &remotes,
     );
 
-    let remote_fresh = |at: Option<i64>| -> bool {
-        at.is_some_and(|at| now_secs() - at < introdb::CACHE_TTL_SECS)
-    };
-
-    // The cache answers outright only when *both* halves of it are still valid:
-    // the local sources unchanged, and either no network source wanted or its
-    // answer not yet due to be re-asked.
+    // The cache answers outright only when the local sources are unchanged and
+    // no service is due to be asked. A stored answer that is still in date is
+    // already folded into the cached row: this function wrote both.
+    let must_ask = matches!(theintrodb, Some(Err(_))) || matches!(introdb_app, Some(Err(_)));
     if let Some(cached) = &cached {
-        let remote_settled = !introdb_enabled || query.is_none() || remote_fresh(cached.remote_at);
-        if cached.local_key == key && remote_settled {
-            return Ok(if cached.markers.is_empty() {
-                None
-            } else {
-                Some(cached.markers.clone())
-            });
+        if cached.local_key == key && !must_ask {
+            return Ok((!cached.markers.is_empty()).then(|| cached.markers.clone()));
         }
     }
 
@@ -540,84 +742,55 @@ pub async fn get_skip_markers(
         analysis.map(|(intro, credits, _)| (intro, credits)),
     );
 
-    // Reuse a remote answer that is still in date even when a local source has
-    // changed underneath it — a Skiptro rescan is no reason to ask their server
-    // about the credits again.
-    let mut remote_at = None;
-    // Switched off means switched off: a stored answer is not reused either,
-    // or turning it off would leave credits appearing for another month with
-    // no way to tell why.
-    let reusable = cached
-        .as_ref()
-        .filter(|_| introdb_enabled)
-        .filter(|c| remote_fresh(c.remote_at));
-
-    // Fills the same gaps the fetch below would, in the same order. The two
-    // paths must agree: reusing a stored answer more eagerly than a fresh one
-    // would make the ranking depend on whether the cache happened to be warm.
-    if let Some(cached) = reusable {
-        remote_at = cached.remote_at;
-        if markers.credits.is_none()
-            && cached.markers.credits_source.as_deref() == Some(FROM_INTRODB)
-        {
-            markers.credits = cached.markers.credits;
-            markers.credits_source = cached.markers.credits_source.clone();
-        }
-        if markers.intro.is_none() && cached.markers.intro_source.as_deref() == Some(FROM_INTRODB) {
-            markers.intro = cached.markers.intro;
-            markers.intro_source = cached.markers.intro_source.clone();
-        }
-    } else if let Some(query) = query {
-        let found = introdb::lookup(&introdb::Query {
-            tmdb_id: query.tmdb_id,
-            // Both or neither: a season with no episode would ask about the
-            // wrong thing rather than about nothing.
-            season: query.season.filter(|_| query.episode.is_some()),
-            episode: query.episode.filter(|_| query.season.is_some()),
-            duration_secs: query.duration_secs,
-        })
-        .await;
-
-        if let Some(found) = found {
-            // Only an *answered* question starts the month-long clock. A 404 is
-            // an answer, so an untimed show is asked about once a month; being
-            // offline is not, so an outage does not cache "no credits" until
-            // September.
-            remote_at = Some(now_secs());
-
-            // Credits: nothing local has ever produced one, so this is simply
-            // the answer unless a sidecar surprised us.
-            if markers.credits.is_none() {
-                if let Some((start, end)) = found.credits {
-                    markers.credits = Some(Segment { start, end });
-                    markers.credits_source = Some(FROM_INTRODB.into());
-                }
+    // Each service: the stored answer, or a fresh one. Only an *answered*
+    // question is stored — a 404 or "nobody has timed this" is an answer, so
+    // an untimed episode is asked about once a month; being offline is not,
+    // so an outage does not store "no credits" until next month.
+    let mut fetched: Vec<(&str, Lookup)> = Vec::new();
+    let theintrodb = match theintrodb {
+        Some(Ok(stored)) => Some(stored),
+        Some(Err(query)) => {
+            let found = introdb::lookup(&query).await;
+            if let Some(found) = found {
+                fetched.push((FROM_INTRODB, found));
             }
-            // Intro: last, behind both local sources, because they measured
-            // this file and this timed some copy of the episode.
-            if markers.intro.is_none() {
-                if let Some((start, end)) = found.intro {
-                    markers.intro = Some(Segment {
-                        start,
-                        end: Some(end),
-                    });
-                    markers.intro_source = Some(FROM_INTRODB.into());
-                }
-            }
+            found
         }
+        None => None,
+    };
+    let introdb_app = match introdb_app {
+        Some(Ok(stored)) => Some(stored),
+        Some(Err(query)) => {
+            let found = introdb_app::lookup(&query).await;
+            if let Some(found) = found {
+                fetched.push((FROM_INTRODB_APP, found));
+            }
+            found
+        }
+        None => None,
+    };
+
+    // After every local source, and in rank order: see the table at the top.
+    if let Some(found) = &theintrodb {
+        markers.fill_from(found, FROM_INTRODB);
+    }
+    if let Some(found) = &introdb_app {
+        markers.fill_from(found, FROM_INTRODB_APP);
     }
 
     if let Some(id) = file_id {
         let db = app.state::<Db>();
         let conn = db.0.lock().map_err(to_string_err)?;
-        write_cache(&conn, id, &markers, &key, remote_at).map_err(to_string_err)?;
+        for (source, found) in &fetched {
+            write_answer(&conn, id, source, found).map_err(to_string_err)?;
+        }
+        if !fetched.is_empty() {
+            forget_expired_answers(&conn).map_err(to_string_err)?;
+        }
+        write_cache(&conn, id, &markers, &key).map_err(to_string_err)?;
     }
 
-    Ok(if markers.is_empty() {
-        None
-    } else {
-        Some(markers)
-    })
+    Ok((!markers.is_empty()).then_some(markers))
 }
 
 #[cfg(test)]
@@ -867,7 +1040,7 @@ mod tests {
     /// would not reach an episode until one of its sources happened to move.
     #[test]
     fn the_cache_key_carries_the_ranking_version() {
-        let key = local_key(Path::new(r"Z:\offline\Show.mkv"), None, None, None);
+        let key = local_key(Path::new(r"Z:\offline\Show.mkv"), None, None, None, "");
         assert!(key.ends_with(RANKING_VERSION), "got {key}");
     }
 
@@ -919,10 +1092,10 @@ mod tests {
         let video = dir.join("Show S01E01.mkv");
         let db = dir.join("skiptro.db");
         std::fs::write(&db, b"x").unwrap();
-        let before = local_key(&video, Some(&db), None, None);
+        let before = local_key(&video, Some(&db), None, None, "");
 
         std::fs::write(db.with_extension("db-wal"), b"a scan happened").unwrap();
-        assert_ne!(local_key(&video, Some(&db), None, None), before);
+        assert_ne!(local_key(&video, Some(&db), None, None, ""), before);
     }
 
     /// …and when Detect produces a fresh analysis, or the cached answer from
@@ -931,12 +1104,12 @@ mod tests {
     fn the_local_key_changes_when_the_analysis_is_rerun() {
         let video = Path::new(r"C:\media\x.mkv");
         assert_ne!(
-            local_key(video, None, None, Some(200)),
-            local_key(video, None, None, Some(100))
+            local_key(video, None, None, Some(200), ""),
+            local_key(video, None, None, Some(100), "")
         );
         assert_ne!(
-            local_key(video, None, None, Some(100)),
-            local_key(video, None, None, None)
+            local_key(video, None, None, Some(100), ""),
+            local_key(video, None, None, None, "")
         );
     }
 
@@ -951,17 +1124,139 @@ mod tests {
 
         let video = dir.join("Show S01E01.mkv");
         std::fs::write(&video, b"half a download").unwrap();
-        let before = local_key(&video, None, None, None);
+        let before = local_key(&video, None, None, None, "");
 
         std::fs::write(&video, b"the whole thing, which is longer").unwrap();
-        assert_ne!(local_key(&video, None, None, None), before);
+        assert_ne!(local_key(&video, None, None, None, ""), before);
     }
 
     /// A file that is not there yields a key rather than a panic: an offline
     /// share must degrade to "no markers", not take the player down.
     #[test]
     fn a_missing_video_still_produces_a_key() {
-        let key = local_key(Path::new(r"Z:\offline\Show.mkv"), None, None, None);
+        let key = local_key(Path::new(r"Z:\offline\Show.mkv"), None, None, None, "");
         assert!(key.starts_with('|'), "got {key}");
+    }
+
+    fn answer(
+        intro: Option<(f64, f64)>,
+        recap: Option<(f64, f64)>,
+        credits: Option<(f64, Option<f64>)>,
+        post_credits: Option<(f64, f64)>,
+    ) -> Lookup {
+        Lookup {
+            intro,
+            recap,
+            credits,
+            post_credits,
+        }
+    }
+
+    /// A measurement of this file keeps its segments; the community services
+    /// only fill what is still missing, TheIntroDB before IntroDB.app.
+    #[test]
+    fn community_answers_fill_gaps_in_rank_order() {
+        let mut markers = local_markers(
+            None,
+            Path::new(r"C:\media\x.mkv"),
+            None,
+            Some((Some(Segment { start: 0.0, end: Some(45.0) }), None)),
+        );
+        markers.fill_from(
+            &answer(Some((2.0, 50.0)), None, Some((1400.0, None)), None),
+            FROM_INTRODB,
+        );
+        markers.fill_from(
+            &answer(
+                Some((3.0, 51.0)),
+                Some((50.0, 80.0)),
+                Some((1390.0, Some(1450.0))),
+                None,
+            ),
+            FROM_INTRODB_APP,
+        );
+
+        assert_eq!(markers.intro_source.as_deref(), Some(FROM_ANALYSIS));
+        assert_eq!(markers.intro.unwrap().end, Some(45.0));
+        assert_eq!(markers.credits_source.as_deref(), Some(FROM_INTRODB));
+        assert_eq!(markers.credits.unwrap().start, 1400.0);
+        // Only IntroDB.app had a recap, so it supplies one.
+        assert_eq!(markers.recap_source.as_deref(), Some(FROM_INTRODB_APP));
+        assert_eq!(markers.recap, Some(Segment { start: 50.0, end: Some(80.0) }));
+    }
+
+    /// TheIntroDB answers first for a recap, as for everything else.
+    #[test]
+    fn theintrodb_keeps_the_recap_when_both_have_one() {
+        let mut markers = SkipMarkers::default();
+        markers.fill_from(&answer(None, Some((0.0, 40.0)), None, None), FROM_INTRODB);
+        markers.fill_from(&answer(None, Some((0.0, 55.0)), None, None), FROM_INTRODB_APP);
+        assert_eq!(markers.recap_source.as_deref(), Some(FROM_INTRODB));
+        assert_eq!(markers.recap.unwrap().end, Some(40.0));
+    }
+
+    /// A film's scene after the credits comes through beside credits from
+    /// another source; whether the two fit together is `skip.ts`'s question.
+    #[test]
+    fn the_scene_after_the_credits_is_carried_beside_other_credits() {
+        let mut markers = SkipMarkers::default();
+        markers.fill_from(&answer(None, None, Some((7000.0, None)), None), FROM_INTRODB);
+        markers.fill_from(
+            &answer(None, None, Some((7010.0, Some(7500.0))), Some((7500.0, 7560.0))),
+            FROM_INTRODB_APP,
+        );
+        assert_eq!(markers.credits_source.as_deref(), Some(FROM_INTRODB));
+        assert_eq!(markers.post_credits_source.as_deref(), Some(FROM_INTRODB_APP));
+        assert_eq!(markers.post_credits, Some(Segment { start: 7500.0, end: Some(7560.0) }));
+    }
+
+    /// A recap alone is still something to say.
+    #[test]
+    fn a_recap_alone_is_not_empty() {
+        let mut markers = SkipMarkers::default();
+        assert!(markers.is_empty());
+        markers.fill_from(&answer(None, Some((0.0, 30.0)), None, None), FROM_INTRODB);
+        assert!(!markers.is_empty());
+    }
+
+    /// Switching a service off must change the key, or a row written while it
+    /// was on would keep serving its segments.
+    #[test]
+    fn the_local_key_changes_when_a_service_is_switched_off() {
+        let video = Path::new(r"C:\media\x.mkv");
+        assert_ne!(
+            local_key(video, None, None, None, "ta"),
+            local_key(video, None, None, None, "a")
+        );
+    }
+
+    /// The round trip through both tables on the real schema: a stored answer
+    /// reads back as it went in, and one past its month does not.
+    #[test]
+    fn a_stored_answer_reads_back_and_expires() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        crate::db::migrate(&conn).unwrap();
+        conn.execute_batch("PRAGMA foreign_keys=OFF;").unwrap();
+
+        let found = answer(
+            None,
+            Some((0.0, 41.0)),
+            Some((3431.0, None)),
+            Some((3500.0, 3520.0)),
+        );
+        write_answer(&conn, 7, FROM_INTRODB_APP, &found).unwrap();
+        assert_eq!(read_answer(&conn, 7, FROM_INTRODB_APP, 60), Some(found));
+        assert_eq!(read_answer(&conn, 7, FROM_INTRODB, 60), None);
+
+        conn.execute("UPDATE remote_skip_answers SET fetched_at = fetched_at - 120", [])
+            .unwrap();
+        assert_eq!(read_answer(&conn, 7, FROM_INTRODB_APP, 60), None);
+
+        let mut markers = SkipMarkers::default();
+        markers.fill_from(&found, FROM_INTRODB_APP);
+        write_cache(&conn, 7, &markers, "k").unwrap();
+        let cached = read_cache(&conn, 7).unwrap();
+        assert_eq!(cached.markers, markers);
+        assert_eq!(cached.local_key, "k");
     }
 }

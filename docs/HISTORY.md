@@ -1943,6 +1943,44 @@ Home in the same form as the equipment one (one line, "Not now" is for good), a
 line on a title's page where the badges would be, and a link to the download
 page beside the field.
 
+## Recaps, a second skip database, and the scene after the credits
+
+Came out of a comparison with another open-source media app, which reads skip
+times from **IntroDB.app** — a different service from the TheIntroDB this app
+already used, whatever the names suggest. It has two things TheIntroDB does not:
+a count of how many viewers agreed on each timing, and, for films, **where the
+scene after the credits is**.
+
+It is used on TheIntroDB's terms: per title, when played, a month's cache,
+attribution in Settings. It is **ranked after** TheIntroDB for every segment,
+because TheIntroDB is told the file's length and uses it to tell releases
+apart; IntroDB.app cannot be. It gets its own switch, so either service can be
+turned off without the other and it is plain which one is being asked.
+
+Three decisions, made by the owner with the options in front of them:
+
+- **A recap before the intro is its own press** — "Skip recap", then "Skip
+  intro" — rather than one button skipping both. Each press skips one thing.
+- **The jump to a film's scene after the credits is only ever offered**, even
+  in automatic mode. Most of those timings are one viewer's, and automatic mode
+  never touched a film's credits before.
+- **Two switches, not one.**
+
+Its data needed reading narrowly. Asked about a handful of well-known films,
+it returned an "intro" at the very end of one (its API documents no intro for
+films) and, for another, a "post-credits" scene that ended exactly where the
+credits began — a mid-credits scene, labelled as the other kind. So only the
+segments its API documents for that kind of title are read, and a scene is
+offered only when it starts after the credits and fits inside the file being
+played; that check needs the file's length, so it is made in the player
+(`checkedAgainstFile`), not in Rust.
+
+Two changes to the skip cache came with it. With two network sources, one
+"asked at" time could not say which was due, so each service's answer now has
+a row of its own (`remote_skip_answers`, schema 19). And the cache key now
+includes which services are switched on: before, switching TheIntroDB off left
+its times on every episode already played until something local changed.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

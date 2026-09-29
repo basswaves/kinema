@@ -60,8 +60,11 @@ src-tauri/src/
   aspect.rs      The picture's real shape with the black bars taken off:
                  eight keyframes through each film and one episode per season,
                  cropdetect, the shape most agree on
-  introdb.rs     TheIntroDB lookups, keyed on TMDB id. Where end credits come
-                 from; per-episode, on play, cached with a TTL
+  introdb.rs     TheIntroDB lookups, keyed on TMDB id. Credits, intros and
+                 recaps; per-episode, on play, cached with a TTL
+  introdb_app.rs IntroDB.app lookups — a different service — keyed on IMDb
+                 id. Second in line, and the only source of a film's scene
+                 after the credits; same terms, same TTL
   imdb.rs        IMDb's public ratings file, fetched weekly at most, read as
                  it arrives; only the library's titles are kept
   omdb.rs        Which titles are due a Rotten Tomatoes lookup and what OMDb
@@ -253,6 +256,25 @@ are in `introdb.rs` where the code that must honour them lives. Attribution is
 in Settings. It is a second metadata service on top of TMDB, not a new class of
 dependency; if it goes away, the local sources mean that is a degradation rather
 than a regression.
+
+**A second community database, and what only it knows.** IntroDB.app is a
+separate service from TheIntroDB, keyed on IMDb ids, and it is asked on exactly
+the same terms. It is ranked after TheIntroDB for every segment, because
+TheIntroDB is told the file's length and uses it to tell releases apart. What it
+adds is coverage, and one thing nobody else has: where a film has a **scene
+after its credits**. Then "skip the credits" becomes a seek to the scene rather
+than an ending, and it is only ever **offered** — automatic mode never jumps
+there, since those timings are mostly one viewer's. Its data is read narrowly:
+only the segments its API documents for that kind of title, and a scene only
+when it starts after the credits and fits inside this file (`skip.ts`,
+`checkedAgainstFile`). Real answers have held an "intro" at the end of a film
+and a "post-credits" scene timed before the credits.
+
+**Recaps are their own press.** Both community services time "previously on".
+A recap is offered only while it is on screen, so a recap followed by an intro
+is two presses, "Skip recap" then "Skip intro" — each skipping one thing. Before
+the recap begins, through a cold open, the intro's offer from 0:00 stands and
+skips both, as it always has.
 
 **Local measurement outranks a community timing, for both segments.** Skiptro
 and this app's own analysis both fingerprint the exact file on this disk, so

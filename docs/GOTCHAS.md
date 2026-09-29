@@ -1009,6 +1009,41 @@ for it. Only accept fields that are direct children of the root.
 
 ---
 
+## Community skip services
+
+### TheIntroDB and IntroDB.app are two different services
+
+`introdb.rs` is **TheIntroDB** (theintrodb.org, TMDB ids, arrays of segments);
+`introdb_app.rs` is **IntroDB.app** (introdb.app, IMDb ids, one object or null
+per segment). Different people, different data, different shapes. The source
+strings are `introdb` and `introdb-app`, and the settings keys
+`introdb_enabled` and `introdb_app_enabled`. Reading "IntroDB" in an issue does
+not say which is meant — ask.
+
+### IntroDB.app says "nobody has timed this" with a 200
+
+Not a 404, though its documentation lists one: an untimed title is a 200 with
+every segment `null`. Both are answers and are stored for a month. Only a
+failure to ask — offline, a timeout, a 429 — is not stored, or one moment
+offline would mean no skip times for a month.
+
+### Community answers contain the wrong kind of segment
+
+Seen in IntroDB.app's real answers for films: an `intro` at the very end of a
+film, and a `post_credits` scene that ended where the credits began (a
+mid-credits scene, labelled as the other kind). Nothing errors; the Skip button
+simply lands somewhere absurd. **Do:** read only the segments the API
+documents for that kind of title, and check a scene against the credits and
+the file's length before offering it (`checkedAgainstFile` in `skip.ts`).
+
+### A cached skip row outlives switching a service off
+
+`skip_markers` is served straight back when the local sources have not
+changed. Its key used to cover only local sources, so switching TheIntroDB off
+left its times on every episode already played, with no way to tell why.
+**Do:** anything that decides which sources may answer belongs in the cache
+key (`local_key`'s `remotes`).
+
 ## Output hardware (Windows)
 
 What the screens and the audio device can take. Every entry here is something

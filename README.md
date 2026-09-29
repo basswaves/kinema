@@ -49,8 +49,10 @@ audio and subtitles, volume. Back steps back to wherever you came from.
 - **Keeps a safety copy** of your watch history, resume points and hand-made
   matches once a week, and puts one back from Settings if the library is ever
   damaged.
-- **Skips intros and credits**, from a community database, from chapter markers,
-  or by fingerprinting a season's audio and finding what the episodes share.
+- **Skips intros, recaps and credits**, from two community databases, from
+  chapter markers, or by fingerprinting a season's audio and finding what the
+  episodes share. Where a film has a scene after its credits, Skip takes you
+  straight to it.
 - **Works from a sofa.** Browsing, searching (with an on-screen keyboard),
   playing, subtitles and resume all work with a D-pad, and the TV layout fills
   the screen with bigger text.
@@ -136,10 +138,13 @@ Put ffmpeg on your `PATH`, or point Settings at it. Skiptro is configured the
 same way, at whatever path you installed it to — point Kinema at `skiptro.exe`,
 the command-line one, not `Skiptro-Desktop.exe`.
 
-**TheIntroDB** is on by default and needs nothing installed. It looks up
-community-contributed intro and credits times, one episode at a time, when you
-play it. Only the show's id, season and episode number are sent — no account, no
-key, nothing about you. Turn it off in Settings if you would rather it did not.
+**TheIntroDB** and **IntroDB** are on by default and need nothing installed.
+They are two separate collections of intro, recap and credits times that viewers
+have shared, looked up one episode or film at a time, when you play it. IntroDB
+also knows where some films have a scene after the credits, so Skip can take
+you straight to it. Only which film or episode it is gets sent — no account, no
+key, nothing about you. Turn either off in Settings if you would rather it did
+not.
 
 ## Platform support
 
@@ -240,7 +245,7 @@ visible error at all — only a log line.
 
 Kinema links against libmpv, which is LGPL, and the release bundles an
 unmodified LGPL build of it that you are free to replace. It uses data from TMDB,
-TVmaze, Wikidata, Wikipedia and TheIntroDB, each under their own terms. [NOTICE.md](NOTICE.md) has the
+TVmaze, Wikidata, Wikipedia, TheIntroDB and IntroDB, each under their own terms. [NOTICE.md](NOTICE.md) has the
 detail.
 
 This product uses the TMDB API but is not endorsed or certified by TMDB.

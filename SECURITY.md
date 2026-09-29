@@ -7,15 +7,16 @@ Worth stating up front, because it is unusually small:
 - **No server, no daemon, no network listener.** Nothing accepts a connection.
 - **No accounts, no telemetry, no analytics.** Nothing is sent anywhere about
   what you watch.
-- **Outbound requests only, to six services for metadata** — TMDB, TVmaze,
-  OMDb, Wikidata (with Wikipedia), TheIntroDB and IMDb's ratings file — **and
+- **Outbound requests only, to seven services for metadata** — TMDB, TVmaze,
+  OMDb, Wikidata (with Wikipedia), TheIntroDB, IntroDB and IMDb's ratings
+  file — **and
   one to GitHub** per launch, asking for the latest
   release's version number (`src-tauri/src/updates.rs`; Settings → Advanced
   turns it off). No program is downloaded; the one file is IMDb's public
   ratings table, fetched weekly at most, read as it arrives, and not kept
   (`src-tauri/src/imdb.rs`). The frontend's list is enforced in
-  `src-tauri/capabilities/default.json` for the HTTP plugin; the three made
-  from Rust are TheIntroDB, IMDb and GitHub.
+  `src-tauri/capabilities/default.json` for the HTTP plugin; the four made
+  from Rust are TheIntroDB, IntroDB, IMDb and GitHub.
 - **Your API keys stay local.** TMDB and OMDb keys you enter are stored in
   the SQLite database in your app data folder, and sent only to the service they
   belong to. Released builds carry one key of Kinema's own, for TMDB, added at
@@ -28,8 +29,8 @@ Worth stating up front, because it is unusually small:
 The parts most worth scrutiny are the ones that cross a trust boundary: the
 external process invocation in `src-tauri/src/detect.rs` (Skiptro and ffmpeg,
 launched with user-editable argument templates), the XML parsing in
-`src-tauri/src/nfo.rs`, and the HTTP clients in `src/metadata/providers.ts` and
-`src-tauri/src/introdb.rs`.
+`src-tauri/src/nfo.rs`, and the HTTP clients in `src/metadata/providers.ts`,
+`src-tauri/src/introdb.rs` and `src-tauri/src/introdb_app.rs`.
 
 ## Reporting a vulnerability
 

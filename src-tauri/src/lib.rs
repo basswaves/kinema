@@ -11,6 +11,7 @@ mod ffmpeg;
 mod history;
 mod imdb;
 mod introdb;
+mod introdb_app;
 mod jobs;
 mod library;
 mod lifecycle;

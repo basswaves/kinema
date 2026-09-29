@@ -56,14 +56,25 @@ export interface Segment {
 
 export interface SkipMarkers {
   intro: Segment | null;
+  /** "Previously on…", from TheIntroDB or IntroDB.app. Always has an end. */
+  recap: Segment | null;
   credits: Segment | null;
   /**
-   * Which source each segment came from — `skiptro-db`, `sidecar` or
-   * `introdb`. Diagnostic: a skip that fires somewhere surprising should be
-   * traceable to the thing that claimed it, without reading the database.
+   * A film's scene after the credits, from IntroDB.app. Always has an end.
+   * Not yet checked against this file: `checkedAgainstFile` in `skip.ts` does
+   * that once the file's length is known.
+   */
+  post_credits: Segment | null;
+  /**
+   * Which source each segment came from — `skiptro-db`, `sidecar`,
+   * `analysis`, `introdb` (TheIntroDB) or `introdb-app` (IntroDB.app).
+   * Diagnostic: a skip that fires somewhere surprising should be traceable to
+   * the thing that claimed it, without reading the database.
    */
   intro_source: string | null;
+  recap_source: string | null;
   credits_source: string | null;
+  post_credits_source: string | null;
 }
 
 export interface TitlePrefs {
@@ -158,8 +169,9 @@ export const setTitlePrefs = (titleId: number, prefs: TitlePrefs) =>
  * Intro and credits markers, from whichever source has them.
  *
  * Null when no source does. Rust ranks Skiptro's database, a `.skiptro.json`
- * sidecar and TheIntroDB and returns the winner per segment, so there is one
- * call here regardless of how many sources are configured.
+ * sidecar, the app's own analysis, TheIntroDB and IntroDB.app and returns the
+ * winner per segment, so there is one call here regardless of how many sources
+ * are configured.
  */
 export const getSkipMarkers = (path: string, fileId: number | null) =>
   invoke<SkipMarkers | null>('get_skip_markers', { path, fileId });

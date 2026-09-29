@@ -7,6 +7,27 @@ makes no stability promises.
 
 ## [Unreleased]
 
+### Added
+
+- **Skip recap.** "Previously on…" gets a button of its own, from TheIntroDB
+  or IntroDB. When a recap comes before the intro, that is two presses: Skip
+  recap, then Skip intro. Automatic skipping skips recaps too.
+- **The scene after the credits.** Where a film has one, Skip takes you
+  straight to it instead of the credits running out — always as a button, even
+  with automatic skipping on.
+- **IntroDB**, a second collection of intro, recap and credits times shared by
+  viewers, used where TheIntroDB has nothing. On by default, with its own
+  switch in Settings → Intro & credits; only which film or episode it is gets
+  sent. It is a different service from TheIntroDB.
+
+### Fixed
+
+- Switching TheIntroDB off did not take its times away from an episode that
+  had already been played; they stayed until something else about the episode
+  changed. Now switching either service off takes effect at the next play.
+  The skip cache is rebuilt once as a result, so each episode's times are
+  asked for again the next time it is played.
+
 ## [0.5.1] — 2026-09-29
 
 This release is about what happens when something goes wrong. Your library is

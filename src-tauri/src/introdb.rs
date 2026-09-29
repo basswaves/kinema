@@ -63,20 +63,29 @@ struct Response {
     #[serde(default)]
     intro: Vec<RawSegment>,
     #[serde(default)]
+    recap: Vec<RawSegment>,
+    #[serde(default)]
     credits: Vec<RawSegment>,
 }
 
-/// What this app takes from a lookup. `recap` and `preview` are returned by the
-/// API and deliberately ignored — the player has no path for them, and parsing
-/// a segment nothing can act on would only invite acting on it.
-#[derive(Debug, Default, PartialEq)]
+/// What this app takes from a lookup — from this service or from IntroDB.app
+/// (`introdb_app.rs`), which answer in different shapes and are read into this
+/// one. `preview` is returned by TheIntroDB and deliberately ignored: the
+/// player has no path for it, and parsing a segment nothing can act on would
+/// only invite acting on it.
+#[derive(Debug, Default, PartialEq, Clone, Copy)]
 pub struct Lookup {
     /// Start and end in seconds. An intro with no end is unusable — there would
     /// be nowhere to seek to — so it is dropped rather than guessed at.
     pub intro: Option<(f64, f64)>,
+    /// "Previously on…", with a real end for the same reason as the intro.
+    pub recap: Option<(f64, f64)>,
     /// Start in seconds, and an end that is `None` when the credits run to the
     /// end of the file.
     pub credits: Option<(f64, Option<f64>)>,
+    /// A film's scene after the credits. Only IntroDB.app has these, and only
+    /// for films; TheIntroDB never sets it.
+    pub post_credits: Option<(f64, f64)>,
 }
 
 /// Which media item to ask about.
@@ -106,12 +115,17 @@ fn ms_to_secs(ms: f64) -> Option<f64> {
 /// dropped. The same rule the sidecar reader applies, for the same reason: a
 /// marker that is wrong in that particular way skips over real content.
 fn interpret(response: &Response) -> Lookup {
-    let intro = response.intro.iter().find_map(|s| {
-        // A null start means the file opens on the intro.
-        let start = s.start_ms.map_or(Some(0.0), ms_to_secs)?;
-        let end = s.end_ms.and_then(ms_to_secs)?;
-        (end > start).then_some((start, end))
-    });
+    // A null start means the file opens on the segment; a null end leaves
+    // nowhere to seek to.
+    let opening = |segments: &[RawSegment]| {
+        segments.iter().find_map(|s| {
+            let start = s.start_ms.map_or(Some(0.0), ms_to_secs)?;
+            let end = s.end_ms.and_then(ms_to_secs)?;
+            (end > start).then_some((start, end))
+        })
+    };
+    let intro = opening(&response.intro);
+    let recap = opening(&response.recap);
 
     let credits = response.credits.iter().find_map(|s| {
         let start = s.start_ms.and_then(ms_to_secs)?;
@@ -125,7 +139,12 @@ fn interpret(response: &Response) -> Lookup {
         }
     });
 
-    Lookup { intro, credits }
+    Lookup {
+        intro,
+        recap,
+        credits,
+        post_credits: None,
+    }
 }
 
 fn build_url(query: &Query) -> String {
@@ -259,14 +278,23 @@ mod tests {
         assert_eq!(parse(r#"{"tmdb_id":1,"type":"movie"}"#), Lookup::default());
     }
 
-    /// `recap` and `preview` exist in the API and must not leak in as an intro.
+    /// `preview` exists in the API and must not leak in as an intro.
     #[test]
     fn ignores_segment_types_the_player_cannot_act_on() {
-        let lookup = parse(
-            r#"{"recap":[{"start_ms":0,"end_ms":30000}],
-                "preview":[{"start_ms":1680000,"end_ms":1740000}]}"#,
-        );
+        let lookup = parse(r#"{"preview":[{"start_ms":1680000,"end_ms":1740000}]}"#);
         assert_eq!(lookup, Lookup::default());
+    }
+
+    /// A recap is read like an intro — a null start is the first frame — and
+    /// kept apart from it, so it can have a button of its own.
+    #[test]
+    fn reads_a_recap_as_its_own_segment() {
+        let lookup = parse(
+            r#"{"recap":[{"start_ms":null,"end_ms":41000}],
+                "intro":[{"start_ms":41000,"end_ms":71000}]}"#,
+        );
+        assert_eq!(lookup.recap, Some((0.0, 41.0)));
+        assert_eq!(lookup.intro, Some((41.0, 71.0)));
     }
 
     #[test]

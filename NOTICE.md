@@ -142,6 +142,21 @@ rather than only in documentation — see the module header of
 
 Accuracy and coverage vary, as with any community database.
 
+### IntroDB
+
+Intro, recap, credits and post-credits segment times from
+[IntroDB](https://introdb.app) — a separate service from TheIntroDB, despite the
+name. Intro data provided by IntroDB (introdb.app). Reads are unauthenticated,
+by IMDb id, and nothing is submitted. Their terms allow use in media players and
+forbid bulk downloading; as with TheIntroDB, this is honoured in code — see the
+module header of `src-tauri/src/introdb_app.rs`:
+
+- **One film or episode at a time, when it is played.** Never the library in
+  bulk.
+- **The cache expires** after 30 days, as TheIntroDB's does.
+- **Attribution is shown in Settings**, in the words they ask for, beside the
+  switch that enables it.
+
 ### IMDb
 
 Information courtesy of IMDb (https://www.imdb.com). Used with permission.

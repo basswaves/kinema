@@ -1111,15 +1111,28 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   }, [showStats]);
 
   // ---- controls -----------------------------------------------------------
-  const togglePause = useCallback(async () => {
+  /** Resolves to whether it is paused now, or null if mpv did not answer. */
+  const togglePause = useCallback(async (): Promise<boolean | null> => {
     try {
       const current = await getProperty('pause', 'flag');
       await setProperty('pause', !current);
       showOsd();
+      return !current;
     } catch (e) {
       fail(e);
+      return null;
     }
   }, [showOsd, fail]);
+
+  /**
+   * Pause or play from a key or the remote. Pausing puts the ring on
+   * Play/Pause, so the next OK plays again and the arrows are already on the
+   * controls — a paused film is when you want them. A mouse click on the
+   * picture uses `togglePause` and moves nothing.
+   */
+  const togglePauseByKey = useCallback(async () => {
+    if (await togglePause()) enterOsdFocus();
+  }, [togglePause, enterOsdFocus]);
 
   const seekRelative = useCallback(
     async (delta: number) => {
@@ -1330,7 +1343,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       switch (e.key) {
         case ' ':
           e.preventDefault();
-          void togglePause();
+          void togglePauseByKey();
           break;
         case 'f':
           void toggleFullscreen();
@@ -1399,7 +1412,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         // spatial system the way the arrows would.
         case 'MediaPlayPause':
           e.preventDefault();
-          void togglePause();
+          void togglePauseByKey();
           break;
         case 'MediaPlay':
           e.preventDefault();
@@ -1407,7 +1420,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           break;
         case 'MediaPause':
           e.preventDefault();
-          void setProperty('pause', true).then(showOsd);
+          void setProperty('pause', true).then(enterOsdFocus);
           break;
         // Stop means leave the player, the same way out as Back takes from
         // the top of its ladder — including out of fullscreen.
@@ -1461,7 +1474,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           } else if (upNext) {
             setCountdown(0);
           } else {
-            void togglePause();
+            void togglePauseByKey();
           }
           break;
         default:
@@ -1471,7 +1484,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [
-    togglePause,
+    togglePauseByKey,
     toggleFullscreen,
     backOut,
     exit,
@@ -1711,7 +1724,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
             progress={progress}
             onScrub={scrubBy}
             onRelease={commitScrub}
-            onEnter={() => void togglePause()}
+            onEnter={() => void togglePauseByKey()}
           >
             <input
               className="player-seek"
@@ -1873,6 +1886,13 @@ function SeekBar({
     focusKey: PLAYER_SEEK_KEY,
     onEnterPress: onEnter,
     onArrowPress: (direction, _props, details) => {
+      // Down lands on Play/Pause, the control under the middle of the bar.
+      // Left to the spatial library it went to whatever sat nearest the bar's
+      // left end, which was the key list.
+      if (direction === 'down') {
+        void setFocus(PLAYER_PLAY_KEY);
+        return false;
+      }
       if (direction !== 'left' && direction !== 'right') return true;
       onScrub(direction === 'left' ? -1 : 1, (details.pressedKeys[direction] ?? 1) > 1);
       return false;

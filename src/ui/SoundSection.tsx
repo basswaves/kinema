@@ -90,17 +90,8 @@ export default function SoundSection({ onError }: { onError: (message: string) =
         ]}
         value={settings.direct ? 'on' : 'off'}
         onChange={(v) => save(AUDIO_DIRECT_KEY, v, { ...settings, direct: v === 'on' })}
-        note="On sends Dolby TrueHD, Atmos, DTS-HD and DTS:X to the receiver untouched, as a disc player does."
-        more={
-          <p>
-            <strong>On:</strong> while something plays, Kinema takes the sound device for itself
-            and sends the video&rsquo;s own soundtrack to your receiver untouched. Windows&rsquo;
-            speaker setup and spatial sound are bypassed, so they do not matter. Other sounds from
-            this PC are silent until it stops. <strong>Off:</strong> sound goes through Windows
-            like any other program: decoded, mixed to Windows&rsquo; speaker setup, and without
-            Atmos or DTS:X.
-          </p>
-        }
+        note="On sends the video's own soundtrack to your receiver untouched, as a disc player does, including Dolby TrueHD, Atmos, DTS-HD and DTS:X. Off sends sound through Windows like any other program, which mixes it to Windows' speaker setup and loses Atmos and DTS:X height sound."
+        hint="While a video plays with this on, other sounds from this PC are silent, and Windows' speaker and spatial sound settings make no difference."
       />
 
       {device && (
@@ -119,7 +110,7 @@ export default function SoundSection({ onError }: { onError: (message: string) =
               ? `${device.name} can take the lossless formats untouched. Turn this on to use that.`
               : `Sound goes through Windows to ${device.name}, mixed to ${device.mix_layout}.`}
           {!settings.direct && device.spatial_objects
-            ? " Windows spatial sound is on for this device: the receiver may show Atmos, but that is Windows re-wrapping decoded 7.1 — a movie's own Atmos or DTS:X height sound is lost unless this is on."
+            ? " Windows spatial sound is on for this device. The receiver may show Atmos, but that is Windows re-wrapping decoded 7.1: a movie's own Atmos or DTS:X height sound is lost unless this is on."
             : ''}
         </p>
       )}
@@ -129,15 +120,15 @@ export default function SoundSection({ onError }: { onError: (message: string) =
         choices={deviceChoices}
         value={settings.deviceId ?? ''}
         onChange={(v) => save(AUDIO_DEVICE_KEY, v, { ...settings, deviceId: v || null })}
-        note="Windows default follows whatever Windows is set to; a chosen device that is unplugged falls back to it."
+        note="Windows default follows whatever Windows is set to. If a device chosen here is unplugged, Kinema uses the Windows default until it is back."
       />
 
       {settings.direct && (
         <>
           <h3>Formats</h3>
-          <p className="muted">
-            Auto uses what the receiver told Windows. Force one on only if you know better &mdash;
-            a format it cannot take plays as silence or noise.
+          <p className="settings-intro">
+            Auto uses what the receiver told Windows it can play. Only force a format on if you
+            know better: a format the receiver cannot play comes out as silence or noise.
           </p>
           {BITSTREAM_CODECS.map((codec) => {
             const override: Override = settings.overrides[codec] ?? 'auto';

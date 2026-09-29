@@ -17,7 +17,6 @@
 import { userError } from './errors';
 import LanguageSection from './LanguageSection';
 import ChoiceRow from './ChoiceRow';
-import MoreAbout from './MoreAbout';
 import { availableUpdate, UPDATE_CHECK_KEY, type Release } from './updates';
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -210,15 +209,16 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
   const [backlog, setBacklog] = useState<Record<number, number>>({});
   const [detectLine, setDetectLine] = useState('');
   /**
-   * How the last Detect ended, shown in that folder's own row. It used to go
-   * to the banner under the page title, a screen and a half above the button —
-   * the trap GOTCHAS describes, where a working button reads as a dead one.
+   * How the last Detect ended for each folder, shown in that folder's own
+   * line. It used to go to the banner under the page title, a screen and a
+   * half above the button: the trap GOTCHAS describes, where a working button
+   * reads as a dead one.
    */
-  const [detectOutcome, setDetectOutcome] = useState<{
-    path: string;
-    text: string;
-    failed: boolean;
-  } | null>(null);
+  const [detectOutcomes, setDetectOutcomes] = useState<
+    Record<string, { text: string; failed: boolean }>
+  >({});
+  /** Set by Stop, so the folders after the current one are not started. */
+  const detectStopped = useRef(false);
   /**
    * Whether the Skiptro fields have finished loading from the database.
    *
@@ -406,54 +406,73 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
     };
   }, []);
 
+  /**
+   * Detect in every TV folder, one after another. It used to be one Detect
+   * button per folder, which on a library of three folders was three buttons
+   * with the same name and no way to tell why there were three.
+   */
   const runDetect = useCallback(
-    async (root: LibraryRoot) => {
+    async (folders: LibraryRoot[]) => {
       setError(null);
       setNote(null);
-      setDetectOutcome(null);
-      setDetectLine('');
-      setDetecting(root.path);
-      const outcome = (text: string, failed = false) =>
-        setDetectOutcome({ path: root.path, text, failed });
+      setDetectOutcomes({});
+      detectStopped.current = false;
       try {
         // Flush the command fields before reading them in Rust. The debounce
         // above would almost always have fired by now, and "almost always" is
         // how you get a detect run that silently used the previous command.
         await saveSkiptroFields();
-        const report = await detectIntros(root.path);
-        if (report.stopped) {
-          outcome('Stopped. Seasons it had finished are kept; the rest is picked up next time.');
-        } else if (report.ok) {
-          // No longer "sidecars written": the detections go into Skiptro's own
-          // database and are read from there. Nothing is written beside the
-          // videos unless an export command has been typed back in.
-          outcome('Finished.');
-        } else {
-          // Name the step that actually failed, and name it *correctly*. This
-          // used to take the last step and call it Skiptro — but this app's own
-          // analysis is always pushed last, under the name `analyse`, so a
-          // missing ffmpeg was reported as a Skiptro failure to users who had
-          // never installed Skiptro. The Rust messages were fine all along;
-          // only this line was wrong.
-          const failed =
-            report.steps.find((s) => s.exit_code !== 0) ?? report.steps[report.steps.length - 1];
-          const owner = failed?.step === 'analyse' ? 'Detection' : `Skiptro "${failed?.step}"`;
-          const code = failed?.exit_code === null ? 'did not finish' : `exited with ${failed?.exit_code}`;
-          const detail = failed?.tail.slice(-3).join(' · ') || 'no output';
-          outcome(`${owner} ${code}: ${detail}`, true);
-        }
       } catch (e) {
-        outcome(userError(e), true);
-      } finally {
-        setDetecting(null);
-        setDetectLine('');
-        // The backlog is why the button was pressed; it has to be re-read, or
-        // it would still claim the work is outstanding.
-        void refresh();
+        setError(userError(e));
+        return;
       }
+      for (const root of folders) {
+        if (detectStopped.current) break;
+        setDetectLine('');
+        setDetecting(root.path);
+        const outcome = (text: string, failed = false) =>
+          setDetectOutcomes((o) => ({ ...o, [root.path]: { text, failed } }));
+        try {
+          const report = await detectIntros(root.path);
+          if (report.stopped) {
+            outcome('Stopped. Seasons it had finished are kept; the rest is picked up next time.');
+            break;
+          } else if (report.ok) {
+            // No longer "sidecars written": the detections go into Skiptro's own
+            // database and are read from there. Nothing is written beside the
+            // videos unless an export command has been typed back in.
+            outcome('Finished.');
+          } else {
+            // Name the step that actually failed, and name it *correctly*. This
+            // used to take the last step and call it Skiptro, but this app's own
+            // analysis is always pushed last, under the name `analyse`, so a
+            // missing ffmpeg was reported as a Skiptro failure to users who had
+            // never installed Skiptro.
+            const failed =
+              report.steps.find((s) => s.exit_code !== 0) ?? report.steps[report.steps.length - 1];
+            const owner = failed?.step === 'analyse' ? 'Detection' : `Skiptro "${failed?.step}"`;
+            const code =
+              failed?.exit_code === null ? 'did not finish' : `stopped with code ${failed?.exit_code}`;
+            const detail = failed?.tail.slice(-3).join(' · ') || 'no output';
+            outcome(`${owner} ${code}: ${detail}`, true);
+          }
+        } catch (e) {
+          outcome(userError(e), true);
+        }
+      }
+      setDetecting(null);
+      setDetectLine('');
+      // The backlog is why the button was pressed; it has to be re-read, or
+      // it would still claim the work is outstanding.
+      void refresh();
     },
     [saveSkiptroFields, refresh]
   );
+
+  const stopDetecting = useCallback(() => {
+    detectStopped.current = true;
+    void stopDetection();
+  }, []);
 
   const scanNow = useCallback(async () => {
     setError(null);
@@ -463,12 +482,12 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
     else if (outcome.status === 'skipped')
       setNote(
         outcome.reason === 'no-roots'
-          ? 'Add a folder first — there is nothing to scan.'
+          ? 'Add a folder first. There is nothing to scan yet.'
           : 'A scan is already running.'
       );
     else {
       setNote(summaryLine(outcome.summary));
-      if (outcome.summary.parseError) setError(`Parser threw — ${outcome.summary.parseError}`);
+      if (outcome.summary.parseError) setError(`The file name reader failed: ${outcome.summary.parseError}`);
       else if (outcome.summary.errors.length) setError(problemLine(outcome.summary.errors));
     }
     await refresh();
@@ -545,10 +564,12 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
               <>
                 <section className="settings-section">
                   <h2>Folders</h2>
+                  <p className="settings-intro">
+                    Where Kinema finds your movies and TV shows. It checks them every time it
+                    starts, so Scan now is only needed for files added while Kinema is open.
+                  </p>
                   {roots.length === 0 ? (
-                    <p className="muted">
-                      No folders yet. Add one and Kinema will scan it now and at every start.
-                    </p>
+                    <p className="muted">No folders yet. Add one and Kinema scans it straight away.</p>
                   ) : (
                     <ul className="settings-roots">
                       {roots.map((root) => (
@@ -612,7 +633,7 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
                   {scan && (
                     <p className="settings-progress">
                       {scan.stage}
-                      {scan.detail ? ` — ${scan.detail}` : ''}
+                      {scan.detail ? `: ${scan.detail}` : ''}
                     </p>
                   )}
 
@@ -629,25 +650,20 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
                         {line}
                       </p>
                     ))}
-                  <p className="muted">Checked every time Kinema starts, so the button is rarely needed.</p>
-                  <MoreAbout>
-                    <p>
-                      Kinema only looks at file names, sizes and dates rather than reading the
-                      videos themselves, which keeps it quick even over a network. A folder that
-                      is switched off or unplugged is left alone until it comes back, not
-                      forgotten. When it finds new episodes it goes on to look for their intros
-                      and credits, so a season you drop in is ready without pressing anything.
-                    </p>
-                  </MoreAbout>
+                  <p className="settings-hint">
+                    A scan reads only file names, sizes and dates, so it is quick even over a
+                    network. A folder that is switched off or unplugged is left alone until it is
+                    back. New episodes are checked for intros and credits straight afterwards.
+                  </p>
                 </section>
 
                 {/* Under the folders, because these two are the whole of what a
                     new library needs. */}
                 <section className="settings-section">
                   <h2>Needs attention</h2>
-                  <p className="muted">
-                    Videos Kinema could not identify for certain. Pick the right title for each
-                    rather than have it guess.
+                  <p className="settings-intro">
+                    Videos Kinema could not identify for certain. It asks you instead of guessing,
+                    because a wrong title is harder to spot than a missing one.
                   </p>
                   <FocusButton
                     focusKey={REVIEW_BUTTON_KEY}
@@ -674,17 +690,17 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
 
                 <section className="settings-section">
                   <h2>Posters and descriptions</h2>
-                  <p className="muted">
+                  <p className="settings-intro">
                     {!BUILTIN_TMDB_KEY
-                      ? 'Without a key, movies are identified through Wikidata — details and ' +
+                      ? 'Without a TMDB key, movies are identified through Wikidata: details and ' +
                         'a description, but no posters. A free TMDB key adds posters, ' +
-                        'backdrops and artwork.'
+                        'backdrops and cast.'
                       : builtinRejected
                         ? 'TMDB no longer accepts the key Kinema came with. Until an update ' +
                           'brings a new one, new movies are identified through Wikidata, ' +
-                          'without posters — or add a free key of your own.'
-                        : 'Kinema looks up movies and TV shows on TMDB with a key of its own. ' +
-                          'Nothing to set up here — but you can use your own free key instead.'}
+                          'without posters. A free key of your own brings them back.'
+                        : 'Kinema looks up movies and TV shows on TMDB with a key of its own, ' +
+                          'so there is nothing to set up. You can use your own free key instead.'}
                   </p>
                   <div className="settings-row">
                     <FocusButton
@@ -698,11 +714,11 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
                   </div>
                   <label className="settings-field">
                     <span>
-                      {BUILTIN_TMDB_KEY ? 'Your own TMDB key ' : 'TMDB '}
+                      {BUILTIN_TMDB_KEY ? 'Your own TMDB key ' : 'TMDB key '}
                       <span className="muted">
                         {BUILTIN_TMDB_KEY && !builtinRejected
-                          ? 'optional — used instead of Kinema’s'
-                          : 'posters, backdrops, cast, episode stills'}
+                          ? '(optional, used instead of Kinema’s)'
+                          : '(posters, backdrops, cast and episode pictures)'}
                       </span>
                     </span>
                     {/* Masked. This screen is routinely on a television, and a
@@ -723,10 +739,7 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
                   </label>
                   <label className="settings-field">
                     <span>
-                      OMDb{' '}
-                      <span className="muted">
-                        optional — adds Rotten Tomatoes scores, and is a fallback for movies
-                      </span>
+                      OMDb key <span className="muted">(optional)</span>
                     </span>
                     <FocusInput
                       className="settings-input"
@@ -739,19 +752,16 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
                       placeholder="Paste your OMDb key"
                     />
                   </label>
-                  <MoreAbout>
-                    <p>
-                      Keys save themselves as you type, and are stored in the local database in
-                      app data. A new key applies to matches made from now on; titles already in
-                      the library keep what they matched until they are matched again.
-                    </p>
-                    <p>
-                      With an OMDb key, each title's Rotten Tomatoes score is looked up once and
-                      again after a month. A free OMDb key allows 1,000 lookups a day; Kinema uses
-                      at most 500 of them for scores, so a large library fills in over a few
-                      days.
-                    </p>
-                  </MoreAbout>
+                  <p className="choice-note">
+                    An OMDb key adds Rotten Tomatoes scores to a title&rsquo;s page, and helps
+                    identify movies. A free key allows 1,000 lookups a day and Kinema uses at most
+                    500, so a large library fills in over a few days.
+                  </p>
+                  <p className="settings-hint">
+                    Keys save as you type. A new key is used for titles identified from now on;
+                    titles already in the library keep what they have until they are looked up
+                    again.
+                  </p>
                   {/* Attribution TMDB require wherever their data is shown, and
                       TVmaze's licence asks for. The logo is TMDB's own unmodified
                       SVG, served from the app rather than hotlinked. */}
@@ -790,10 +800,11 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
                   ]}
                   value={tvMode ? 'tv' : 'desk'}
                   onChange={(v) => setTvMode(v === 'tv')}
-                  note={
+                  note="On a TV, Kinema fills the whole screen, with bigger text and a margin that keeps clear of the edges some TVs cut off. At a desk it runs in a window and its text grows with the window."
+                  hint={
                     <>
-                      On a TV, Kinema fills the screen with bigger text and a safe margin. Also on{' '}
-                      <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>.
+                      Switch between them any time with <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+
+                      <kbd>T</kbd>.
                     </>
                   }
                 />
@@ -809,10 +820,11 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
                     setAutoSkip(v === 'auto');
                     void setSetting('skip_mode', v).catch((e) => setError(userError(e)));
                   }}
-                  note="Works wherever their times are known — see Intro & credits."
+                  note="Show a Skip button lets you choose each time. Skip them jumps straight past intros and end credits."
+                  hint="Works for episodes where Kinema knows where they are. Intro & credits says how it finds out."
                 />
                 <ChoiceRow
-                  label="Offer the next episode, when the credits are not known"
+                  label="When the end credits are not known, offer the next episode"
                   choices={CREDITS_TAIL_CHOICES.map((n) => ({
                     value: String(n),
                     label: n === 0 ? 'At the end' : `${n}s before`,
@@ -823,15 +835,8 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
                     setCreditsTail(next);
                     void setSetting(CREDITS_TAIL_KEY, v).catch((e) => setError(userError(e)));
                   }}
-                  note="A guess at where the credits start, used only when nothing knows better."
-                  more={
-                    <p>
-                      For episodes where nothing has found the credits, Kinema guesses they are
-                      the last stretch and offers the next episode then. Anything that actually
-                      knows — a real marker, or a chapter named for the credits — is used
-                      instead. Never applies to movies, or to the last episode you have.
-                    </p>
-                  }
+                  note="For an episode where nothing has found the end credits, Kinema guesses they are the last stretch and offers the next episode this long before the end."
+                  hint="Where the credits are known, from detection or a chapter named for them, that is used instead. Never for movies, or for the last episode you have."
                 />
                 {/* The one rendering switch in the app, and it exists only
                     because the right answer depends on hardware this code
@@ -847,16 +852,13 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
                     setDisplaySync(v === 'display');
                     void setSetting(VIDEO_SYNC_KEY, v).catch((e) => setError(userError(e)));
                   }}
-                  note="If playback stutters slightly every few seconds, try the other one."
-                  more={
-                    <p>
-                      Two ways of deciding when to show each frame; which is smoother depends on
-                      your screen, so keep whichever looks better. It will not fix the regular,
-                      rhythmic judder movies show on most monitors — that is the refresh rate not
-                      dividing into 24 frames a second, which only matching the refresh rate
-                      helps (Picture &amp; sound). Press <kbd>i</kbd> while something plays to
-                      see what you are getting.
-                    </p>
+                  note="Two ways of deciding when each frame is shown. Which is smoother depends on the screen: keep Match the sound unless playback stutters slightly every few seconds, then try Match the screen."
+                  hint={
+                    <>
+                      Neither fixes the steady judder of a 24 frames a second movie on a 60 Hz
+                      screen; Match the refresh rate in Picture &amp; sound does. Press{' '}
+                      <kbd>I</kbd> while something plays to see what you are getting.
+                    </>
                   }
                 />
               </section>
@@ -879,23 +881,16 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
                     only one that answers without reading the file at all. */}
                 <section className="settings-section">
                   <h2>Intro and credits</h2>
-                  <p className="muted">
-                    Where Kinema finds out when intros and credits start. Nothing here needs
-                    setting up: new episodes are looked at by themselves.
+                  <p className="settings-intro">
+                    How Kinema finds where intros and end credits are, for the Skip button and
+                    for offering the next episode. It works by itself: new episodes are checked
+                    after every scan. When more than one source knows an episode, the most
+                    reliable one is used.
                   </p>
-                  <MoreAbout>
-                    <p>
-                      There is more than one source and they are good at different things; if
-                      several find the same episode, the most reliable one wins. Every time a
-                      scan finds new episodes Kinema looks for their intros and credits straight
-                      afterwards. The Detect button below does the same on demand, one TV folder
-                      at a time.
-                    </p>
-                  </MoreAbout>
 
-                  <h3>Built in</h3>
+                  <h3>Built into Kinema</h3>
                   <ChoiceRow
-                    label="Built-in detection"
+                    label="Detect intros and credits"
                     choices={[
                       { value: 'on', label: 'After each scan' },
                       { value: 'off', label: 'Only when I press Detect' },
@@ -905,22 +900,13 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
                       setAutoAnalyse(v === 'on');
                       void setSetting(AUTO_ANALYSE_KEY, v).catch((e) => setError(userError(e)));
                     }}
-                    note="Listens to a season's episodes for the music they share. A few minutes per season, once."
-                    more={
-                      <p>
-                        Near the beginning the shared stretch is the theme tune, near the end the
-                        closing music. It is the only source that finds credits by measuring them,
-                        and the only one that works on episodes Kinema could not identify. It
-                        reads about six minutes of audio per episode. Turning it off loses
-                        nothing already found, and the Detect row below says how many episodes
-                        are waiting.
-                      </p>
-                    }
+                    note="Kinema listens to a season's episodes for the music they share: the theme tune near the start, the closing music near the end. It takes a few minutes per season, once."
+                    hint="The only source that measures end credits, and the only one that works on episodes Kinema could not identify. Needs ffmpeg (below). Turning it off keeps everything already found."
                   />
                   <label className="settings-field">
                     <span>
                       Where ffmpeg is{' '}
-                      <span className="muted">leave this empty unless Kinema cannot find it</span>
+                      <span className="muted">(leave empty unless Kinema cannot find it)</span>
                     </span>
                     <FocusInput
                       className="settings-input"
@@ -937,25 +923,20 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
                       {ffmpeg.available
                         ? `Found ffmpeg at ${ffmpeg.resolved}.`
                         : `Could not find ffmpeg (looked for "${ffmpeg.resolved}"). Install it, ` +
-                          `or type the full path to ffmpeg.exe here. Without it, the built-in ` +
-                          `detection and the picture and sound details on a title's page are ` +
-                          `skipped — everything else works normally.`}
+                          `or type the full path to ffmpeg.exe here. Without it, this detection ` +
+                          `and the picture and sound details on a title's page are skipped. ` +
+                          `Everything else works normally.`}
                     </p>
                   )}
-                  <MoreAbout>
-                    <p>
-                      ffmpeg is a free tool for reading video and audio files. Kinema does not
-                      include it: install it yourself and it is found automatically. Without it,
-                      this source is skipped and the others carry on. Kinema also uses it (its
-                      companion ffprobe, which comes with it) to read what each file holds —
-                      resolution, HDR and Dolby Vision, the sound format — once, when the file
-                      is first scanned.
-                    </p>
-                  </MoreAbout>
+                  <p className="settings-hint">
+                    ffmpeg is a free program for reading video and audio. Kinema does not include
+                    it: install it yourself and Kinema finds it. It is also used once per file to
+                    read the resolution, HDR and sound format shown on a title&rsquo;s page.
+                  </p>
 
                   <h3>TheIntroDB</h3>
                   <ChoiceRow
-                    label="TheIntroDB"
+                    label="Look up TheIntroDB"
                     choices={[
                       { value: 'on', label: 'On' },
                       { value: 'off', label: 'Off' },
@@ -965,25 +946,19 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
                       setIntroDb(v === 'on');
                       void setSetting(INTRODB_ENABLED_KEY, v).catch((e) => setError(userError(e)));
                     }}
-                    note="Times shared by other viewers, looked up quietly the first time you play an episode."
-                    more={
-                      <p>
-                        It answers straight away without reading your files, but popular shows
-                        are covered far better than obscure ones. Kinema keeps each answer for a
-                        month, never looks up your whole library at once, and sends only which
-                        episode it is — nothing about you or your files. No account or key.
-                      </p>
-                    }
+                    note="Intro and credit times shared by other viewers, looked up the first time you play an episode. It answers straight away, without reading your files."
+                    hint="Popular shows are covered far better than rare ones. Kinema sends only which episode it is, keeps each answer for a month and never looks up your whole library at once. No account or key."
                   />
                   {/* Attribution they request; it costs one line. */}
-                  <p className="muted">
-                    Segment data from <strong>TheIntroDB</strong> — <code>https://theintrodb.org</code>.
+                  <p className="settings-hint">
+                    Segment data from <strong>TheIntroDB</strong>, <code>https://theintrodb.org</code>.
                   </p>
 
                   <h3>Skiptro</h3>
-                  <p className="muted">
-                    Optional: a separate free program that finds intros very well. If you have
-                    never heard of it, leave this alone.
+                  <p className="choice-note">
+                    Optional: a separate free program that is very good at finding intros (not
+                    credits). Where it and the built-in detection disagree about an intro, Skiptro
+                    wins. If you have not heard of it, you can leave this alone.
                   </p>
                   <div className="settings-row">
                     <FocusButton
@@ -1013,131 +988,140 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
                         })()
                       }
                     >
-                      {skiptroPath ? 'Change Skiptro location' : 'Choose Skiptro executable'}
+                      {skiptroPath ? 'Change Skiptro location' : 'Choose Skiptro'}
                     </FocusButton>
                   </div>
-                  <p className="muted">
+                  <p className="settings-hint">
                     {skiptroPath ? (
-                      <code>{skiptroPath}</code>
+                      <>
+                        Using <code>{skiptroPath}</code>. Kinema does not include Skiptro: it runs
+                        the copy you installed after every scan that finds new episodes, and says
+                        so after the scan if it has gone missing.
+                      </>
                     ) : (
                       <>
-                        Not set. Use <code>skiptro.exe</code> — the command-line one, not{' '}
+                        Not set. Choose <code>skiptro.exe</code>, the command-line one, not{' '}
                         <code>Skiptro-Desktop.exe</code>.
                       </>
                     )}
                   </p>
-                  <MoreAbout>
-                    <p>
-                      Skiptro finds TV intros — not credits — and after years of tuning, where it
-                      and the built-in detection disagree about an intro, Skiptro wins. Kinema
-                      does not include it and never will: you install it yourself, and Kinema
-                      runs it whenever a scan finds new episodes and reads its results. If it
-                      stops being where you pointed, Kinema says so after the scan.
-                    </p>
-                    {/* Text fields rather than hard-coded, so a change to
-                        Skiptro's command line is an edit here and not a new
-                        build. They save themselves. */}
-                    <label className="settings-field">
-                      <span>
-                        How to run it{' '}
-                        <span className="muted">
-                          leave as it is unless Skiptro changes; {'{dir}'} stands for the folder
+                  {/* Only once Skiptro is set up: until then none of these do
+                      anything, and three fields about a program someone has
+                      never heard of are the clutter this page was cut down to
+                      get rid of. Text fields rather than hard-coded, so a
+                      change to Skiptro's command line is an edit here and not a
+                      new build. They save themselves. */}
+                  {skiptroPath && (
+                    <div className="settings-subgroup">
+                      <label className="settings-field">
+                        <span>
+                          How to run it{' '}
+                          <span className="muted">
+                            (leave it as it is unless Skiptro changes; {'{dir}'} stands for the
+                            folder)
+                          </span>
                         </span>
-                      </span>
-                      <FocusInput
-                        className="settings-input"
-                        value={scanArgs}
-                        onChange={setScanArgs}
-                        placeholder={DEFAULT_SKIPTRO_SCAN_ARGS}
-                      />
-                    </label>
-                    <label className="settings-field">
-                      <span>
-                        How to export <span className="muted">leave empty</span>
-                      </span>
-                      <FocusInput
-                        className="settings-input"
-                        value={exportArgs}
-                        onChange={setExportArgs}
-                        placeholder="not run"
-                      />
-                    </label>
-                    <p>
-                      Exporting writes one small extra file beside every episode, holding what
-                      Kinema already reads from Skiptro&rsquo;s database — worth it only if another
-                      player should read the same results. Type <code>export {'{dir}'}</code> to
-                      switch it on.
-                    </p>
-                    <label className="settings-field">
-                      <span>
-                        Skiptro database <span className="muted">only if you moved it</span>
-                      </span>
-                      <FocusInput
-                        className="settings-input"
-                        value={skiptroDbPath}
-                        onChange={setSkiptroDbPath}
-                        placeholder="%APPDATA%\Skiptro\skiptro.db"
-                      />
-                    </label>
-                  </MoreAbout>
+                        <FocusInput
+                          className="settings-input"
+                          value={scanArgs}
+                          onChange={setScanArgs}
+                          placeholder={DEFAULT_SKIPTRO_SCAN_ARGS}
+                        />
+                      </label>
+                      <label className="settings-field">
+                        <span>
+                          How to export <span className="muted">(leave empty)</span>
+                        </span>
+                        <FocusInput
+                          className="settings-input"
+                          value={exportArgs}
+                          onChange={setExportArgs}
+                          placeholder="not run"
+                        />
+                      </label>
+                      <p className="settings-hint">
+                        Exporting writes a small extra file next to every episode with what Kinema
+                        already reads from Skiptro&rsquo;s database. Only worth it if another player
+                        should read the same results; type <code>export {'{dir}'}</code> to switch
+                        it on.
+                      </p>
+                      <label className="settings-field">
+                        <span>
+                          Skiptro&rsquo;s database{' '}
+                          <span className="muted">(only if you moved it)</span>
+                        </span>
+                        <FocusInput
+                          className="settings-input"
+                          value={skiptroDbPath}
+                          onChange={setSkiptroDbPath}
+                          placeholder="%APPDATA%\Skiptro\skiptro.db"
+                        />
+                      </label>
+                    </div>
+                  )}
 
-                  {/* One button per TV root, running every source that is
-                      configured. TV roots only: the method is "what do these
+                  {/* One button for every TV folder, running every source that
+                      is set up. TV folders only: the method is "what do these
                       episodes have in common", which a movies folder cannot
                       answer. */}
-                  <h3>Run detection</h3>
-                  <p className="muted">
-                    {tvRoots.length === 0
-                      ? 'Add a TV folder in Library to detect intros and credits in it.'
-                      : 'Only needed after changing something here. Nothing is written next to your videos.'}
-                  </p>
-                  {tvRoots.map((root) => (
-                    <div className="settings-toggle-row" key={root.id}>
-                      {/* While this folder is detecting, the button stops it —
-                          the same button, so focus has nowhere to fall when
-                          detection ends. Only one detection runs at a time. */}
-                      <FocusButton
-                        keepInView="nearest"
-                        className="btn-secondary"
-                        disabled={
-                          (detecting !== null && detecting !== root.path) ||
-                          scan?.stage === 'detecting'
-                        }
-                        onSelect={() =>
-                          void (detecting === root.path ? stopDetection() : runDetect(root))
-                        }
-                      >
-                        {detecting === root.path ? 'Stop detecting' : 'Detect'}
-                      </FocusButton>
-
-                      <span className="muted">
-                        <code>{root.path}</code>
-                        {detecting !== root.path && (backlog[root.id] ?? 0) > 0 && (
-                          <>
-                            {' · '}
-                            <strong>{count(backlog[root.id], 'episode')} not analysed yet</strong>
-                          </>
-                        )}
-                        {detecting !== root.path && backlog[root.id] === 0 && ' · all analysed'}
-                        {detecting === root.path && detectLine && (
-                          <>
-                            <br />
-                            <span className="settings-progress">{detectLine}</span>
-                          </>
-                        )}
-                        {detecting === null && detectOutcome?.path === root.path && (
-                          <>
-                            <br />
-                            {detectOutcome.failed ? (
-                              <strong>{detectOutcome.text}</strong>
-                            ) : (
-                              <span className="settings-progress">{detectOutcome.text}</span>
-                            )}
-                          </>
-                        )}
-                      </span>
-                    </div>
-                  ))}
+                  <h3>Detect now</h3>
+                  {tvRoots.length === 0 ? (
+                    <p className="choice-note">
+                      Add a TV folder under Library to detect intros and credits in it.
+                    </p>
+                  ) : (
+                    <>
+                      <p className="choice-note">
+                        Looks for intros and credits in all your TV folders now. Only needed after
+                        changing something above. Nothing is written next to your videos.
+                      </p>
+                      {/* While detection runs, this same button stops it: a Stop
+                          that appeared in its place would take the remote's
+                          focus with it when detection ended. */}
+                      <div className="settings-row">
+                        <FocusButton
+                          keepInView="nearest"
+                          className="btn-secondary"
+                          disabled={detecting === null && scan?.stage === 'detecting'}
+                          onSelect={() =>
+                            detecting !== null ? stopDetecting() : void runDetect(tvRoots)
+                          }
+                        >
+                          {detecting !== null ? 'Stop detecting' : 'Detect now'}
+                        </FocusButton>
+                      </div>
+                      <ul className="detect-folders">
+                        {tvRoots.map((root) => {
+                          const waiting = backlog[root.id] ?? 0;
+                          const outcome = detectOutcomes[root.path];
+                          return (
+                            <li key={root.id}>
+                              <code>{root.path}</code>
+                              <span className="muted">
+                                {detecting === root.path
+                                  ? ' · detecting'
+                                  : waiting > 0
+                                    ? ` · ${count(waiting, 'episode')} not analysed yet`
+                                    : backlog[root.id] === 0
+                                      ? ' · all analysed'
+                                      : ''}
+                              </span>
+                              {detecting === root.path && detectLine && (
+                                <span className="settings-progress">{detectLine}</span>
+                              )}
+                              {detecting !== root.path && outcome && (
+                                <span
+                                  className={outcome.failed ? 'detect-failed' : 'settings-progress'}
+                                >
+                                  {outcome.text}
+                                </span>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </>
+                  )}
                 </section>
               </>
             )}
@@ -1171,16 +1155,16 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
                       setCheckUpdates(v === 'on');
                       void setSetting(UPDATE_CHECK_KEY, v).catch((e) => setError(userError(e)));
                     }}
-                    note="Asks GitHub for the latest version number when Kinema starts. Downloads nothing."
+                    note="When Kinema starts, it asks GitHub for the number of the latest version and says here if there is a newer one. Nothing is downloaded."
                   />
                 </section>
 
                 <section className="settings-section">
                   <h2>Storage</h2>
-                  <p className="muted">
-                    Artwork kept on this PC so browsing works offline:{' '}
-                    {art ? `${count(art.files, 'image')}, ${formatBytes(art.bytes)}` : '—'}. Safe to
-                    clear; it downloads again.
+                  <p className="settings-intro">
+                    Posters and backgrounds are kept on this PC so browsing works offline
+                    {art ? ` (${count(art.files, 'image')}, ${formatBytes(art.bytes)})` : ''}.
+                    Clearing them is safe: they download again.
                   </p>
                   <FocusButton
                     keepInView="nearest"
@@ -1203,9 +1187,11 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
 
                 <section className="settings-section">
                   <h2>Sharing with other media apps</h2>
-                  <p className="muted">
-                    Kinema reads .nfo files beside your videos and believes them. It can also write
-                    them, for Kodi and other apps to read.
+                  <p className="settings-intro">
+                    .nfo files are small text files next to a video that say what it is. Kodi,
+                    MediaElch and tinyMediaManager read and write them. Kinema reads them and
+                    trusts them over its own guess, which makes one the quickest fix for a movie
+                    it keeps getting wrong. It can also write them for other apps to read.
                   </p>
                   <div className="settings-row">
                     <FocusButton
@@ -1226,22 +1212,17 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
                       Replace every one
                     </ConfirmButton>
                   </div>
-                  <MoreAbout>
-                    <p>
-                      .nfo files are small text files that sit next to a video and say what it
-                      is; Kodi, MediaElch and tinyMediaManager all read and write them. One next
-                      to a video wins over Kinema&rsquo;s own guess — often the quickest fix for a
-                      stubborn mismatch. Writing leaves existing files alone unless you choose
-                      to replace them, and skips folders it cannot write to.
-                    </p>
-                  </MoreAbout>
+                  <p className="settings-hint">
+                    Writing leaves existing .nfo files alone unless you choose Replace every one,
+                    and skips folders it cannot write to.
+                  </p>
                 </section>
 
                 <section className="settings-section">
                   <h2>Developer tools</h2>
-                  <p className="muted">
-                    For working on Kinema itself, and mouse-only. The log folder holds what a bug
-                    report needs: <code>app.log</code> and <code>mpv.log</code>.
+                  <p className="settings-intro">
+                    For working on Kinema itself, and made for a mouse. The log folder holds what a
+                    bug report needs: <code>app.log</code> and <code>mpv.log</code>.
                   </p>
                   <div className="settings-row">
                     <FocusButton

@@ -72,11 +72,10 @@ export default function EquipmentSection() {
   return (
     <section className="settings-section">
       <h2>Your equipment</h2>
-      <p className="muted">
-        What Windows tells Kinema about the screens and sound devices connected to this PC, checked
-        every time Kinema starts and remembered from one time to the next. Nothing here is a setting
-        — it is what playback decisions are based on, so if something looks wrong here, it is wrong
-        in Windows or in the cabling, not in Kinema.
+      <p className="settings-intro">
+        What Windows reports about the screens and sound devices connected to this PC. Kinema checks
+        every time it starts and bases its playback choices on this. Nothing here is a setting: if
+        something looks wrong, the cause is in Windows or the cables, not in Kinema.
       </p>
       <div className="settings-toggle-row">
         <FocusButton keepInView="nearest" className="btn-secondary" onSelect={() => void check()}>
@@ -86,8 +85,8 @@ export default function EquipmentSection() {
           {equipment
             ? `Last checked ${new Date(equipment.checked_at * 1000).toLocaleTimeString()}. `
             : ''}
-          Only needed if a TV or receiver was switched on, or a Windows sound or display setting
-          changed, since Kinema started.
+          Only needed if a TV or receiver was switched on, or a Windows sound or display setting was
+          changed, after Kinema started.
         </span>
       </div>
       {error && <p className="equipment-problem">Could not check: {error}</p>}
@@ -152,7 +151,7 @@ export default function EquipmentSection() {
               <ul className="equipment-notes">
                 {away.map((d) => (
                   <li key={d.id}>
-                    {d.name} <span className="muted">— last seen {day(d.last_seen)}</span>
+                    {d.name} <span className="muted">· last seen {day(d.last_seen)}</span>
                   </li>
                 ))}
               </ul>

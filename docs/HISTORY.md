@@ -1832,6 +1832,18 @@ Things found by using the finished app, at a desk and on a TV.
   so a program with unsaved work can still ask. After a refusal the ring stays
   on the refused choice, because the first version sent it back to Close
   Kinema, one OK away from closing instead of trying again.
+- **Settings say everything, briefly.** The UX pass had put the reasons
+  behind a "More about this" button on every setting, and the reasons were
+  often the part that mattered. Now nothing is hidden. Each setting says what
+  it does, then in quieter type when to choose otherwise, with figures in
+  brackets for whoever wants them. Section intros are set apart from setting
+  notes, so "only while a video plays fullscreen" reads as governing the whole
+  Screen section and not as a footnote to its first switch. Match the refresh
+  rate now says what the code does: any frame rate, only rates the screen
+  offers at the resolution in use, never a lower resolution to get one.
+  Intro & credits has one Detect now for every TV folder instead of one
+  button per folder, and the Skiptro command fields only appear once Skiptro
+  is set up.
 
 ## Open items
 

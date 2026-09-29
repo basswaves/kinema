@@ -67,14 +67,15 @@ export default function LanguageSection({ onError }: { onError: (message: string
         choices={audioChoices}
         value={audio}
         onChange={(v) => save(AUDIO_DEFAULT_KEY, v, setAudio)}
-        note="As the file sets it is nearly always the original language."
+        note="The language a movie or show starts in. As the file sets it is nearly always the original language."
       />
       <ChoiceRow
         label="Subtitles"
         choices={subChoices}
         value={subs}
         onChange={(v) => save(SUBS_DEFAULT_KEY, v, setSubs)}
-        note={`“When needed” shows them when the audio is in another language — and only the forced lines when it is not. Changing the audio or subtitles while watching a show is remembered for that show and wins over these.`}
+        note="When needed turns subtitles on when the audio is in another language. Otherwise it shows only forced subtitles, the ones for signs and lines in a foreign language."
+        hint="If you change the audio or subtitles while watching a show, Kinema remembers that for the show, and it wins over these."
       />
     </>
   );

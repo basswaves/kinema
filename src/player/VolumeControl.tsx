@@ -58,7 +58,7 @@ export default function VolumeControl({
   const name = receiver
     ? 'Volume is on the receiver'
     : muted
-      ? 'Sound off — press to turn it on'
+      ? 'Sound off, press to turn it on'
       : `Volume ${level}%`;
 
   return (
@@ -67,7 +67,7 @@ export default function VolumeControl({
       className={`volume-control ${focused ? 'focused' : ''} ${receiver ? 'receiver' : ''}`}
       role="button"
       aria-label={name}
-      title={receiver ? name : `${name} — scroll to change, click to mute (M)`}
+      title={receiver ? name : `${name}. Scroll to change, click to mute (M)`}
       onClick={() => !receiver && onToggleMute()}
       onWheel={(e) => !receiver && onChange(e.deltaY < 0 ? VOLUME_STEP : -VOLUME_STEP)}
     >

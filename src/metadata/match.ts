@@ -222,13 +222,13 @@ export async function applyMatch(
   // happily store a title of the wrong kind instead of failing, so refuse the
   // combination rather than rely on callers picking the provider correctly.
   if (isSeries && provider === 'omdb') {
-    throw new Error('OMDb has no TV data — use TMDB or TVmaze for a series.');
+    throw new Error('OMDb has no TV data. Use TMDB or TVmaze for a series.');
   }
   if (!isSeries && provider === 'tvmaze') {
-    throw new Error('TVmaze has no movie data — use TMDB or OMDb for a movie.');
+    throw new Error('TVmaze has no movie data. Use TMDB or OMDb for a movie.');
   }
   if (isSeries && provider === 'wikidata') {
-    throw new Error('Kinema reads only films from Wikidata — use TMDB or TVmaze for a series.');
+    throw new Error('Kinema reads only movies from Wikidata. Use TMDB or TVmaze for a series.');
   }
 
   const metadata =

@@ -120,7 +120,7 @@ export default function FirstRun({ onDone }: Props) {
         <p className="first-run-lede">
           {ASK_FOR_KEY
             ? 'Two things to set up. Neither takes long, and both can be changed later in Settings.'
-            : 'Show Kinema where your movies and shows are, and it does the rest — posters, ' +
+            : 'Show Kinema where your movies and shows are, and it does the rest: posters, ' +
               'descriptions and all. Folders can be changed later in Settings.'}
         </p>
 
@@ -136,7 +136,7 @@ export default function FirstRun({ onDone }: Props) {
             shows?
           </h2>
           <p className="muted">
-            Pick the folder you keep them in — a local drive or a network share both work.
+            Pick the folder you keep them in. A local drive or a network share both work.
             Nothing is moved, renamed or written to; the files are only read.
           </p>
           <div className="settings-row">
@@ -169,7 +169,7 @@ export default function FirstRun({ onDone }: Props) {
             </h2>
             <p className="muted">
               Everything is identified without it, but only a key from TMDB brings posters,
-              backdrops and artwork for movies — it is free, and takes about two minutes to get.
+              backdrops and artwork for movies. It is free, and takes about two minutes to get.
             </p>
             <div className="settings-row">
               <FocusButton className="btn-secondary" onSelect={() => void openUrl(TMDB_KEY_URL)}>

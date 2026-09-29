@@ -195,7 +195,7 @@ export function pickBest(
       return {
         best: {
           ...best,
-          reason: `${best.reason} — tie vs "${runnerUp.title}" broken by popularity`,
+          reason: `${best.reason}; tie vs "${runnerUp.title}" broken by popularity`,
         },
         matched: best.confidence >= MATCH_THRESHOLD,
         all: scored,
@@ -203,7 +203,7 @@ export function pickBest(
     }
 
     return {
-      best: { ...best, reason: `${best.reason} — ambiguous vs "${runnerUp.title}"` },
+      best: { ...best, reason: `${best.reason}; ambiguous vs "${runnerUp.title}"` },
       matched: false,
       all: scored,
     };

@@ -90,7 +90,7 @@ export function episodeLabel(
   if (season === null || episode === null) return showTitle;
   const s = String(season).padStart(2, '0');
   const e = String(episode).padStart(2, '0');
-  return `${showTitle} — S${s}E${e}`;
+  return `${showTitle} · S${s}E${e}`;
 }
 
 /**

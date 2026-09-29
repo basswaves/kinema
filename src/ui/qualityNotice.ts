@@ -58,7 +58,7 @@ export function upgradesFor(
       out.push({
         kind: 'sound',
         id: `sound:${device.id}`,
-        text: `${device.name} can take Dolby Atmos and DTS:X untouched — through Windows the height channels are lost.`,
+        text: `${device.name} can take Dolby Atmos and DTS:X untouched. Through Windows the height channels are lost.`,
         setting: AUDIO_DIRECT_KEY,
       });
     }
@@ -80,7 +80,7 @@ export function upgradesFor(
       out.push({
         kind: 'hdr',
         id: `hdr:${display.id}`,
-        text: `${display.name} can show HDR, but Windows has it switched off — so HDR videos play in SDR.`,
+        text: `${display.name} can show HDR, but Windows has it switched off, so HDR videos play in SDR.`,
         setting: SWITCH_HDR_KEY,
       });
     }

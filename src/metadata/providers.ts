@@ -481,7 +481,7 @@ async function tmdbGet<T>(key: string, path: string, params?: Record<string, str
     const response = await fetchPolitely(tmdbUrl(key, path, params), `TMDB ${path}`);
     if (response.status === 401) {
       await noteTmdbRejection(key);
-      throw new TmdbKeyRejected(`TMDB ${path} failed: HTTP 401 — the key was not accepted`);
+      throw new TmdbKeyRejected(`TMDB ${path} failed: HTTP 401, the key was not accepted`);
     }
     if (!response.ok) throw new Error(`TMDB ${path} failed: HTTP ${response.status}`);
     return (await response.json()) as T;

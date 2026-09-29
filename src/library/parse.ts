@@ -48,7 +48,7 @@ export async function initParser(): Promise<void> {
  */
 export function rawGuess(name: string): Record<string, unknown> {
   if (!guessit) {
-    throw new Error('parser not loaded — call initParser() before rawGuess()');
+    throw new Error('parser not loaded: call initParser() before rawGuess()');
   }
   try {
     return guessit(name, { type: 'movie' }) as Record<string, unknown>;
@@ -136,7 +136,7 @@ function runGuessit(input: string, kind: LibraryKind): Guess {
   // so it stops the run loudly instead of quietly recording every file as
   // unparseable, which looks identical to a library of unrecognisable names.
   if (!guessit) {
-    throw new Error('parser not loaded — call initParser() before parseMediaFile()');
+    throw new Error('parser not loaded: call initParser() before parseMediaFile()');
   }
 
   let raw: Record<string, unknown>;
@@ -306,9 +306,9 @@ export async function selfTest(): Promise<string> {
     // WebView2 would look exactly like a parser that throws.
     await initParser();
     const raw = (guessit as GuessitFn)(sample, { type: 'episode' }) as Record<string, unknown>;
-    return `OK — ${JSON.stringify(raw)}`;
+    return `OK: ${JSON.stringify(raw)}`;
   } catch (e) {
-    return `THREW — ${e instanceof Error ? `${e.name}: ${e.message}` : String(e)}`;
+    return `THREW: ${e instanceof Error ? `${e.name}: ${e.message}` : String(e)}`;
   }
 }
 

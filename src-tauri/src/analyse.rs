@@ -527,7 +527,7 @@ pub fn analyse_season(
                 results[i].credits = Some((refined, end));
             } else {
                 progress(format!(
-                    "kept the audio credits at {audio_start:.1}s — the picture would have \
+                    "kept the audio credits at {audio_start:.1}s; the picture would have \
                      stretched them to {:.0}s: {name}",
                     end - refined
                 ));

@@ -119,7 +119,7 @@ export default function FixMatch({ onChanged }: Props) {
     return (
       <section className="fixmatch">
         <p className="muted">
-          Nothing needs attention — every parsed file is matched. Files the matcher refuses to
+          Nothing needs attention: every parsed file is matched. Files the matcher refuses to
           guess at appear here, with the reason it gave.
         </p>
       </section>

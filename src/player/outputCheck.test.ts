@@ -73,7 +73,7 @@ describe('outputCheck', () => {
     const c = byLabel(outputCheck(base));
     expect(c['Picture size']?.verdict).toBe('native');
     expect(c.HDR?.verdict).toBe('native');
-    expect(c.Motion).toMatchObject({ verdict: 'limited', value: 'judders — 23.976 fps on 60 Hz' });
+    expect(c.Motion).toMatchObject({ verdict: 'limited', value: 'judders, 23.976 fps on 60 Hz' });
     expect(c.Motion?.fix).toMatch(/Match the refresh rate/);
     expect(c['Colour depth']).toMatchObject({ verdict: 'limited', value: 'HDR squeezed to 8-bit RGB' });
     expect(c['Colour depth']?.why).toMatch(/cable cannot carry 10-bit/);

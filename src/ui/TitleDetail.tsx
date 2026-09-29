@@ -431,7 +431,7 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
                       // is ephemeral: no resume point, no Continue Watching
                       // row, and no writing this file's audio/subtitle choice
                       // into the show's remembered languages.
-                      onPlayFile({ path: trailerPath, label: `${title.title} — Trailer`, fileId: null, titleId: null })
+                      onPlayFile({ path: trailerPath, label: `${title.title} · Trailer`, fileId: null, titleId: null })
                     }
                   >
                     ▶ Trailer
@@ -614,8 +614,8 @@ function PlayableEpisodeRow({ episode, onPlay, onToggleWatched, focusKey }: Epis
         <FocusButton
           className={`watched-toggle ${episode.watched ? 'on' : ''}`}
           keepInView="nearest"
-          label={episode.watched ? 'Watched — press to mark as not watched' : 'Mark watched'}
-          title={episode.watched ? 'Watched — press to mark as not watched' : 'Mark watched'}
+          label={episode.watched ? 'Watched. Press to mark as not watched' : 'Mark watched'}
+          title={episode.watched ? 'Watched. Press to mark as not watched' : 'Mark watched'}
           onSelect={onToggleWatched}
         >
           <span className="watched-tick" aria-hidden="true">

@@ -180,7 +180,7 @@ function describeCadence(sourceFps: number | null, displayHz: number | null): St
   if (whole >= 1 && near(ratio, whole)) {
     return {
       label: 'Cadence',
-      value: `${whole}:${whole} — even`,
+      value: `${whole}:${whole}, even`,
       note: 'every frame held for the same number of refreshes; motion is as shot',
     };
   }
@@ -188,7 +188,7 @@ function describeCadence(sourceFps: number | null, displayHz: number | null): St
   if (near(ratio, 2.5)) {
     return {
       label: 'Cadence',
-      value: '3:2 pulldown — uneven',
+      value: '3:2 pulldown, uneven',
       note: `frames alternate between 3 and 2 refreshes; judders on pans. A ${(
         sourceFps * 5
       ).toFixed(0)} Hz display mode would give an even 5:5`,
@@ -198,7 +198,7 @@ function describeCadence(sourceFps: number | null, displayHz: number | null): St
 
   return {
     label: 'Cadence',
-    value: `${ratio.toFixed(3)} refreshes per frame — uneven`,
+    value: `${ratio.toFixed(3)} refreshes per frame, uneven`,
     note: 'frames are held for differing numbers of refreshes; motion will judder',
     warn: true,
   };
@@ -230,7 +230,7 @@ function describeScaling(
   if (Math.abs(sourceW - videoW) <= 1 && Math.abs(sourceH - videoH) <= 1) {
     return {
       label: 'Luma scaling',
-      value: 'none — 1:1',
+      value: 'none, 1:1',
       note: resizesOnly
         ? 'scaler-resizes-only keeps every scaler out of the path at native size'
         : 'frame is already at output size',
@@ -244,7 +244,7 @@ function describeScaling(
     ? {
         label: 'Luma scaling',
         value: `upscale ${factor}× · ${text(scale)}`,
-        note: 'classical resampling in sigmoidised light — no ML, nothing invented',
+        note: 'classical resampling in sigmoidised light; no ML, nothing invented',
       }
     : {
         label: 'Luma scaling',
@@ -358,7 +358,7 @@ export function describeHdr(f: HdrFacts): StatRow {
   if (!isHdr(f.sourceGamma)) {
     return {
       label: 'HDR pipeline',
-      value: 'SDR source — nothing to map',
+      value: 'SDR source, nothing to map',
       note: `transfer ${text(f.sourceGamma)}`,
     };
   }
@@ -366,7 +366,7 @@ export function describeHdr(f: HdrFacts): StatRow {
   if (!f.targetGamma) {
     return {
       label: 'HDR pipeline',
-      value: `${DASH} — mpv did not report its output`,
+      value: `${DASH} mpv did not report its output`,
       note: 'video-target-params is empty until the first frame is drawn',
     };
   }
@@ -385,7 +385,7 @@ export function describeHdr(f: HdrFacts): StatRow {
     }
     return {
       label: 'HDR pipeline',
-      value: `passthrough — ${f.sourceGamma} in, ${f.targetGamma} out`,
+      value: `passthrough, ${f.sourceGamma} in, ${f.targetGamma} out`,
       note: "sent with the video's own HDR metadata; the display does its own tone mapping",
     };
   }
@@ -483,7 +483,7 @@ function displayGroup(
         label: 'Video rectangle',
         value: resolution(videoW, videoH),
         note: letterboxed
-          ? 'letterboxed inside the surface — this, not the window, is what the frame is scaled to'
+          ? 'letterboxed inside the surface; this, not the window, is what the frame is scaled to'
           : undefined,
       },
       describeCadence(sourceFps, refreshHz),
@@ -699,12 +699,12 @@ export async function readPlaybackStats(): Promise<StatGroup[]> {
   // "0.00× SDR white" is worse than saying there is nothing to report.
   const hdrSource = isHdr(gamma);
   const peak = !hdrSource
-    ? 'n/a — SDR source'
+    ? 'n/a, SDR source'
     : maxLuma !== null && maxLuma > 0
       ? `${maxLuma.toFixed(0)} nits`
       : sigPeak !== null && sigPeak > 0
         ? `${sigPeak.toFixed(2)}× SDR white`
-        : `${DASH} — not tagged in the file`;
+        : `${DASH} not tagged in the file`;
 
   // Chroma is subsampled in essentially every consumer encode, so this scaler
   // runs on every file whatever the resolution. Worth stating plainly: it is
@@ -781,8 +781,8 @@ export async function readPlaybackStats(): Promise<StatGroup[]> {
           value:
             interlaced === true
               ? deinterlaceActive === true
-                ? 'interlaced — deinterlacing'
-                : 'interlaced — NOT deinterlaced'
+                ? 'interlaced, deinterlacing'
+                : 'interlaced, NOT deinterlaced'
               : 'progressive',
           note:
             interlaced === true
@@ -817,7 +817,7 @@ export async function readPlaybackStats(): Promise<StatGroup[]> {
               {
                 label: 'Render passes',
                 value: 'not reported by this VO',
-                note: `${passes.unavailable} — the settings above are what was requested, not what ran`,
+                note: `${passes.unavailable}; the settings above are what was requested, not what ran`,
               },
             ]
           : []),
@@ -825,8 +825,8 @@ export async function readPlaybackStats(): Promise<StatGroup[]> {
           label: 'Debanding',
           value: deband ? 'on' : 'off',
           note: deband
-            ? 'adds dithered noise across the frame — not in the master'
-            : 'off on purpose — debanding alters the image to hide a source artifact',
+            ? 'adds dithered noise across the frame, not in the master'
+            : 'off on purpose: debanding alters the image to hide a source artifact',
           warn: deband === true,
         },
         { label: 'Dither', value: text(dither) },
@@ -892,7 +892,7 @@ export async function readPlaybackStats(): Promise<StatGroup[]> {
           label: 'To device',
           value: `${text(outChannels)} · ${num(outRate, 0, ' Hz')} · ${text(outFormat)}`,
           note: downmixed
-            ? 'channels differ from the source — the layout is being remapped or downmixed'
+            ? 'channels differ from the source: the layout is being remapped or downmixed'
             : 'matches the source layout',
           warn: downmixed,
         },
@@ -916,7 +916,7 @@ export async function readPlaybackStats(): Promise<StatGroup[]> {
         {
           label: 'Demuxer cache',
           value: num(cache, 1, ' s'),
-          note: 'how far ahead the file is read — low values over SMB mean the share is the limit',
+          note: 'how far ahead the file is read; low values over SMB mean the share is the limit',
         },
       ],
     },

@@ -95,7 +95,7 @@ export function checkPicture(f: OutputFacts): Check | null {
   // The limiting side decides: a scope film fills the width, not the height.
   const scale = Math.min(f.drawn.width / f.source.width, f.drawn.height / f.source.height);
   if (Math.abs(scale - 1) < 0.01) {
-    return { label, verdict: 'native', value: `1:1 — ${res(f.source)}, every pixel as encoded` };
+    return { label, verdict: 'native', value: `1:1, ${res(f.source)}, every pixel as encoded` };
   }
   if (scale > 1) {
     return {
@@ -141,11 +141,11 @@ export function checkHdr(f: OutputFacts): Check {
           value: `Dolby Vision profile ${dv}, sent as HDR10`,
           why:
             dv === 5
-              ? 'Windows cannot send a Dolby Vision signal, and this profile has no HDR10 layer — it is converted to HDR10 with its own metadata.'
+              ? 'Windows cannot send a Dolby Vision signal, and this profile has no HDR10 layer, so it is converted to HDR10 with its own metadata.'
               : 'Windows cannot send a Dolby Vision signal, so the video’s HDR10 layer is sent as mastered.',
         };
       }
-      return { label, verdict: 'native', value: 'HDR10 as mastered — the screen tone maps it' };
+      return { label, verdict: 'native', value: 'HDR10 as mastered; the screen tone maps it' };
     case 'compressed':
       return {
         label,
@@ -190,7 +190,7 @@ export function checkMotion(f: OutputFacts): Check | null {
   const label = 'Motion';
   const pair = `${formatRate(f.fps)} fps on ${formatRate(f.displayHz)} Hz`;
   if (evenCadence(f.fps, f.displayHz)) {
-    return { label, verdict: 'native', value: `even — ${pair}` };
+    return { label, verdict: 'native', value: `even, ${pair}` };
   }
   const fps = f.fps;
   const fitting = (f.screen?.modes ?? [])
@@ -204,7 +204,7 @@ export function checkMotion(f: OutputFacts): Check | null {
     return {
       label,
       verdict: 'limited',
-      value: `judders — ${pair}`,
+      value: `judders, ${pair}`,
       why,
       fix: !f.switches.refresh
         ? 'Settings → Screen → Match the refresh rate: this screen has an even mode at its current resolution.'
@@ -218,14 +218,14 @@ export function checkMotion(f: OutputFacts): Check | null {
     return {
       label,
       verdict: 'info',
-      value: `judders — ${pair}`,
+      value: `judders, ${pair}`,
       why: `${why} This screen offers an even rate only at ${m.width}×${m.height}, and Kinema will not lower the resolution to get it.`,
     };
   }
   return {
     label,
     verdict: 'info',
-    value: `judders — ${pair}`,
+    value: `judders, ${pair}`,
     why: `${why} This screen has no mode that fits the video.`,
   };
 }
@@ -263,14 +263,14 @@ export function checkColourDepth(f: OutputFacts): Check | null {
     verdict: 'limited',
     value: `HDR squeezed to ${link}`,
     why:
-      'HDR is made for 10 bits, and at this refresh rate the cable has room for it — the graphics ' +
+      'HDR is made for 10 bits, and at this refresh rate the cable has room for it. The graphics ' +
       'driver is set to send 8 bits.',
     // Seen on a test PC: at 4K the driver offered only 8 bpc while the output
     // colour format was RGB, and 10/12 bpc once it was set to YCbCr 4:2:2 —
     // after which this check read "HDR at 10-bit YCbCr 4:2:2".
     fix:
       'In the graphics driver’s settings, set the output colour depth to 10 or 12 bpc. If only 8 is ' +
-      'offered, set the output colour format to YCbCr 4:2:2 first — some drivers offer more than ' +
+      'offered, set the output colour format to YCbCr 4:2:2 first: some drivers offer more than ' +
       '8 bits at 4K only then. Kinema cannot change either: there is no way to do that which works ' +
       'the same on every make of graphics card.',
   };
@@ -305,7 +305,7 @@ export function checkSound(f: OutputFacts): Check | null {
       label,
       verdict: 'native',
       value: `untouched ${CODEC_NAME[bitstreamFor(a.codec, a.device) ?? ''] ?? a.codec} → receiver`,
-      why: 'The receiver decodes it — Atmos and DTS:X included.',
+      why: 'The receiver decodes it, Atmos and DTS:X included.',
     };
   }
   const stream = bitstreamFor(a.codec, a.device);
@@ -318,7 +318,7 @@ export function checkSound(f: OutputFacts): Check | null {
       label,
       verdict: 'limited',
       value: `decoded by Kinema${folded ? `, folded from ${a.inChannels} to ${a.outChannels} channels` : ''}`,
-      why: `${a.device?.name ?? 'The device'} takes ${CODEC_NAME[stream!] ?? stream} untouched, but the sound goes through Windows — any Atmos or DTS:X height sound is lost.`,
+      why: `${a.device?.name ?? 'The device'} takes ${CODEC_NAME[stream!] ?? stream} untouched, but the sound goes through Windows, so any Atmos or DTS:X height sound is lost.`,
       fix: 'Settings → Sound → Send sound straight to the receiver.',
     };
   }

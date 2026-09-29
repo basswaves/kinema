@@ -309,7 +309,7 @@ export default function Browse() {
         if (cancelled || outcome === null) return;
         if (outcome.status === 'failed') {
           console.warn('startup scan failed:', outcome.error);
-          setScanTrouble(`Could not check your library folders — ${describeError(outcome.error)}`);
+          setScanTrouble(`Could not check your library folders: ${describeError(outcome.error)}`);
           return;
         }
         if (outcome.status !== 'done') return;
@@ -545,7 +545,7 @@ export default function Browse() {
         {scanTrouble && (
           <div className="browse-notice" onClick={() => setScanTrouble(null)}>
             {scanTrouble}
-            <span className="muted"> — anything from that folder is hidden until it is back.</span>
+            <span className="muted">. Anything from that folder is hidden until it is back.</span>
           </div>
         )}
 

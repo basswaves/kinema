@@ -74,7 +74,7 @@ function mockEquipment() {
           { width: 3840, height: 2160, hz: 24, rate: 24 },
         ],
         notes: [
-          'Supports HDR, but Windows has it switched off — HDR videos are converted to SDR on this screen until it is on.',
+          'Supports HDR, but Windows has it switched off, so HDR videos are converted to SDR on this screen until it is on.',
           'Can show movies without judder: 23.976 / 24 Hz at 3840×2160.',
         ],
       },
@@ -121,7 +121,7 @@ function mockEquipment() {
           { codec: 'truehd', label: 'Dolby TrueHD (incl. Atmos)', result: 'yes', detail: null, remembered: true },
         ],
         notes: [
-          'Windows is set to stereo for this device, though it takes 8 channels directly — anything mixed by Windows is folded down to stereo.',
+          'Windows is set to stereo for this device, though it takes 8 channels directly. Anything mixed by Windows is folded down to stereo.',
         ],
       },
       {

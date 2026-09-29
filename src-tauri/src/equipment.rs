@@ -265,7 +265,7 @@ pub fn display_notes(d: &Display) -> Vec<String> {
             None => "HDR is on.".into(),
         }),
         HdrState::Off => notes.push(
-            "Supports HDR, but Windows has it switched off — HDR videos are converted to SDR \
+            "Supports HDR, but Windows has it switched off, so HDR videos are converted to SDR \
              on this screen until it is on."
                 .into(),
         ),
@@ -313,8 +313,8 @@ pub fn audio_notes(a: &AudioDevice) -> Vec<String> {
         );
     } else if a.bitstream.iter().any(|b| b.remembered) {
         notes.push(
-            "Could not be asked this time — another program had it to itself, or it did not \
-             answer — so these are its answers from the last check that worked."
+            "Could not be asked this time (another program had it to itself, or it did not \
+             answer), so these are its answers from the last check that worked."
                 .into(),
         );
     } else if a.bitstream.iter().any(|b| b.result == Probe::Busy) {
@@ -339,7 +339,7 @@ pub fn audio_notes(a: &AudioDevice) -> Vec<String> {
     };
     if a.connection == "HDMI" && takes("ac3") && refuses("truehd") && refuses("dts-hd") {
         notes.push(
-            "Takes Dolby Digital but not TrueHD or DTS-HD — typical of a TV rather than a \
+            "Takes Dolby Digital but not TrueHD or DTS-HD, which is typical of a TV rather than a \
              receiver. If a receiver sits behind this TV, connecting the PC to the receiver \
              directly usually unlocks the lossless formats."
                 .into(),
@@ -363,8 +363,8 @@ pub fn audio_notes(a: &AudioDevice) -> Vec<String> {
     if let (Some(max), "HDMI") = (a.max_pcm_channels, a.connection.as_str()) {
         if a.mix_channels < max && a.mix_channels <= 2 {
             notes.push(format!(
-                "Windows is set to {} for this device, though it takes {} channels directly — \
-                 anything mixed by Windows is folded down to {}.",
+                "Windows is set to {} for this device, though it takes {} channels directly. \
+                 Anything mixed by Windows is folded down to {}.",
                 a.mix_layout,
                 max,
                 a.mix_layout

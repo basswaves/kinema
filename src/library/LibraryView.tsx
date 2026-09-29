@@ -116,7 +116,7 @@ export default function LibraryView() {
     try {
       const pending = await listUnmatched(2000);
       if (pending.length === 0) {
-        setDiagnosis('Nothing to match — parse files first.');
+        setDiagnosis('Nothing to match. Parse files first.');
         return;
       }
       // Keys come from the database, never from component state: state can be
@@ -169,7 +169,7 @@ export default function LibraryView() {
         );
         await refresh();
         setDiagnosis(
-          `Unlinked ${owned.length} file(s) from “${title.title}” — they are back under Needs attention.`
+          `Unlinked ${owned.length} file(s) from “${title.title}”. They are back under Needs attention.`
         );
       } catch (e) {
         setError(String(e));
@@ -266,7 +266,7 @@ export default function LibraryView() {
         if (batch.length < PARSE_BATCH) break;
       }
       await refresh();
-      if (lastParseError) setDiagnosis(`Parser threw — ${lastParseError}`);
+      if (lastParseError) setDiagnosis(`Parser threw: ${lastParseError}`);
     } catch (e) {
       setError(String(e));
     } finally {
@@ -373,7 +373,7 @@ export default function LibraryView() {
 
       {progress && progress.currentTitle && (
         <div className="library-diagnosis">
-          Matching “{progress.currentTitle}” — {progress.groupsDone}/{progress.groupsTotal} groups,{' '}
+          Matching “{progress.currentTitle}”: {progress.groupsDone}/{progress.groupsTotal} groups,{' '}
           {progress.matched} matched, {progress.unmatched} for review
         </div>
       )}
@@ -425,7 +425,7 @@ export default function LibraryView() {
 
       {report && (
         <section className="scan-report">
-          Scanned {report.roots_scanned} root(s) in {report.duration_ms} ms — {report.files_seen} seen,{' '}
+          Scanned {report.roots_scanned} root(s) in {report.duration_ms} ms: {report.files_seen} seen,{' '}
           {report.files_added} added, {report.files_updated} changed, {report.files_unchanged} unchanged,{' '}
           {report.files_missing} missing
           {report.errors.length > 0 && (
@@ -543,7 +543,7 @@ export default function LibraryView() {
           </tbody>
         </table>
 
-        {visible.length === 0 && <p className="muted center">Nothing to show yet — scan a folder first.</p>}
+        {visible.length === 0 && <p className="muted center">Nothing to show yet. Scan a folder first.</p>}
       </section>
     </div>
   );

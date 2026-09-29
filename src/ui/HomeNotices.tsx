@@ -53,10 +53,10 @@ export default function HomeNotices({
               !
             </span>
             <div className="home-notice-text">
-              <strong>TMDB no longer accepts the key Kinema came with</strong>
+              <strong>TMDB no longer accepts the key Kinema came with.</strong>
               <span className="muted">
                 {' '}
-                — new movies are identified through Wikidata instead, without posters, until an
+                New movies are identified through Wikidata instead, without posters, until an
                 update brings a new one or you add a free key of your own.
               </span>
             </div>
@@ -78,11 +78,11 @@ export default function HomeNotices({
             </span>
             <div className="home-notice-text">
               <strong>
-                {count(reviewCount, 'video')} could not be identified for certain
+                {count(reviewCount, 'video')} could not be identified for certain,
               </strong>
               <span className="muted">
                 {' '}
-                — so {reviewCount === 1 ? 'it is' : 'they are'} not on Home yet. Picking the right
+                so {reviewCount === 1 ? 'it is' : 'they are'} not on Home yet. Picking the right
                 title takes a few seconds each.
               </span>
             </div>

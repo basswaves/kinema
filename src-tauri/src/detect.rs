@@ -340,7 +340,7 @@ fn run_analysis(
 
     if !crate::ffmpeg::is_available(&ffmpeg_path) {
         say(format!(
-            "ffmpeg not found at '{}' — set its location in Settings, or leave it blank to use PATH",
+            "ffmpeg not found at '{}'. Set its location in Settings, or leave it blank to use PATH",
             ffmpeg_path.display()
         ));
         return step("analyse", None, tail);
@@ -807,7 +807,7 @@ pub async fn detect_intros(
         .state::<crate::jobs::Jobs>()
         .try_start(crate::jobs::Job::Detect)
         .ok_or(
-            "Detection is already running — the library scan starts it by itself. \
+            "Detection is already running: the library scan starts it by itself. \
              Wait for it to finish, then try again.",
         )?;
 

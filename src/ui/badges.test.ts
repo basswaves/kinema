@@ -7,6 +7,7 @@ import {
   dolbyVisionLabel,
   frameRateLabel,
   releaseNames,
+  studioBadge,
   resolutionLabel,
   type AudioTrack,
   type FileFacts,
@@ -237,5 +238,40 @@ describe('releaseNames', () => {
     expect(
       releaseNames({ file_name: 'f.mkv', parent_dir: 'D:/TV/a/b/c/d', root_path: 'D:/TV' })
     ).toEqual(['f.mkv', 'd', 'c']);
+  });
+});
+
+describe('studioBadge', () => {
+  const studio = (name: string, logo: boolean) => ({
+    name,
+    logo_url: logo ? `https://example.test/${name}.png` : null,
+    logo_path: null,
+  });
+
+  it('draws the studios that have logos, up to three', () => {
+    const badge = studioBadge('movie', [
+      studio('A', true),
+      studio('B', false),
+      studio('C', true),
+      studio('D', true),
+      studio('E', true),
+    ]);
+    expect(badge?.label).toBe('Studio');
+    expect(badge?.logos?.map((s) => s.name)).toEqual(['A', 'C', 'D']);
+    expect(badge?.value).toBe('A · C · D');
+  });
+
+  it('names them when none has a logo, and calls a series’ its network', () => {
+    expect(studioBadge('series', [studio('A Network', false)])).toEqual({
+      label: 'Network',
+      value: 'A Network',
+    });
+    expect(studioBadge('movie', [])).toBeNull();
+  });
+
+  /** A title's studio shows even before — or without — its file's details. */
+  it('joins the file row, even with nothing read from the file', () => {
+    const rows = buildBadges(null, null, { label: 'Studio', value: 'A' });
+    expect(rows).toEqual([{ heading: 'File', badges: [{ label: 'Studio', value: 'A' }] }]);
   });
 });

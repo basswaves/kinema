@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use std::path::Path;
 
 /// The schema this build understands. Bump it with every new `SCHEMA_V*`.
-pub const SCHEMA_VERSION: i64 = 15;
+pub const SCHEMA_VERSION: i64 = 16;
 
 /// What can go wrong opening the library.
 ///
@@ -509,6 +509,25 @@ ALTER TABLE media_probe ADD COLUMN picture_aspect     REAL;
 ALTER TABLE media_probe ADD COLUMN picture_aspect_alt REAL;
 "#;
 
+/// Schema version 16: the US age rating and the studios, from TMDB.
+///
+/// `certification` follows the TMDB-only convention of `logo_url`: NULL means
+/// never asked, which is what makes the details pass fetch every existing
+/// TMDB title once to fill it; an empty string means TMDB has none. The
+/// studios — production companies for a film, networks for a series — come
+/// in the same fetch and are replaced wholesale, like the cast.
+const SCHEMA_V16: &str = r#"
+ALTER TABLE titles ADD COLUMN certification TEXT;
+
+CREATE TABLE studios (
+    title_id  INTEGER NOT NULL REFERENCES titles(id) ON DELETE CASCADE,
+    ord       INTEGER NOT NULL,
+    name      TEXT    NOT NULL,
+    logo_url  TEXT,
+    PRIMARY KEY (title_id, ord)
+);
+"#;
+
 /// How long a statement waits for the write lock before giving up.
 ///
 /// Load-bearing from the moment there is more than one connection. SQLite
@@ -621,7 +640,7 @@ pub fn open_secondary(path: &Path) -> rusqlite::Result<Connection> {
 const MIGRATIONS: [&str; SCHEMA_VERSION as usize] = [
     SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6, SCHEMA_V7, SCHEMA_V8,
     SCHEMA_V9, SCHEMA_V10, SCHEMA_V11, SCHEMA_V12, SCHEMA_V13, SCHEMA_V14,
-    SCHEMA_V15,
+    SCHEMA_V15, SCHEMA_V16,
 ];
 
 /// Bring the database up to [`SCHEMA_VERSION`].

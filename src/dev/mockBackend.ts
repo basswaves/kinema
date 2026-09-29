@@ -19,7 +19,7 @@
 import { mockIPC, mockWindows } from '@tauri-apps/api/mocks';
 import * as fakeMpv from './fakeMpv';
 import type { ContinueItem, EpisodeRef, Progress, SkipMarkers, TitlePrefs } from '../player/api';
-import type { Episode, Title, TitleDetail } from '../ui/api';
+import type { Episode, Studio, Title, TitleDetail } from '../ui/api';
 
 // The setup this is ultimately for: a 4K HDR TV behind a receiver that takes
 // everything, next to this dev machine's SDR monitor and onboard sound — plus a
@@ -170,6 +170,28 @@ const SAGA_ID = 3;
 /** A title as stored; what watching has done to it is worked out per read. */
 type StoredTitle = Omit<Title, 'episodes_owned' | 'episodes_watched' | 'watched' | 'progress' | 'cast'>;
 
+/**
+ * A studio logo drawn here rather than fetched — a coloured word on
+ * transparency, as TMDB's are — so the badge's white-out can be seen offline.
+ */
+const logo = (text: string, colour: string) =>
+  `data:image/svg+xml,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${text.length * 34}" height="60"><text x="2" y="46" textLength="${text.length * 34 - 4}" lengthAdjust="spacingAndGlyphs" font-family="Georgia" font-size="46" font-weight="700" fill="${colour}">${text}</text></svg>`
+  )}`;
+
+/**
+ * Studios per fixture title: the film has two with logos and one without, as
+ * TMDB's lists usually go; the saga has a network; the show has none.
+ */
+const STUDIOS: Record<number, Studio[]> = {
+  2: [
+    { name: 'Example Pictures', logo_url: logo('EXAMPLE', '#1a4fb5'), logo_path: null },
+    { name: 'Fixture Film Partnership', logo_url: null, logo_path: null },
+    { name: 'Mock Bros.', logo_url: logo('MOCK', '#b51a1a'), logo_path: null },
+  ],
+  3: [{ name: 'Example Network', logo_url: logo('XNET', '#2a8f3a'), logo_path: null }],
+};
+
 /** Billed cast per fixture title, for searching by actor. */
 const CAST: Record<number, string[]> = { 1: ['Pat Fixture', 'Sam Example'], 2: ['Ada Mock'] };
 
@@ -202,6 +224,7 @@ const titles: StoredTitle[] = [
     // the Wikipedia credit on the detail page.
     provider: 'wikidata',
     title: 'Example Film',
+    certification: 'R',
     year: 2017,
     overview: 'A fixture film.',
     genres: JSON.stringify(['Drama']),
@@ -223,6 +246,7 @@ const titles: StoredTitle[] = [
     kind: 'series',
     provider: 'tmdb',
     title: 'Example Saga',
+    certification: 'TV-MA',
     year: 2019,
     overview: 'A fixture series across two seasons, for the season list.',
     genres: JSON.stringify(['Drama']),
@@ -600,6 +624,7 @@ function titleDetail(titleId: number): TitleDetail {
     title: withWatchState(title),
     episodes,
     cast: [],
+    studios: STUDIOS[titleId] ?? [],
     movie_path: movie?.path ?? null,
     movie_file_id: movie?.id ?? null,
     movie_watched: movie ? (playback.get(movie.id)?.completed ?? false) : false,

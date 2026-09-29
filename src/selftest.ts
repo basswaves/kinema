@@ -41,6 +41,7 @@ import {
   unlinkFiles,
 } from './metadata/api';
 import {
+  backfillTitleDetails,
   loadProviderKeys,
   matchFiles,
   refreshStaleTitles,
@@ -65,6 +66,8 @@ const CALLABLE: Record<string, (...args: never[]) => Promise<unknown>> = {
   // The scan's refresh of out-of-date TMDB data, and the artwork pass after it,
   // without the rest of a scan (which would also start intro detection).
   refreshStaleTitles,
+  // The details pass: titles missing something TMDB has, fetched once more.
+  backfillTitleDetails,
   cacheArtwork,
   upgradeWikidataFilms,
   // The scan's reading of files for the detail page's badges, on its own.

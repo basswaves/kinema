@@ -101,7 +101,9 @@ fn all_urls(conn: &rusqlite::Connection) -> rusqlite::Result<Vec<String>> {
          UNION
          SELECT still_url    FROM episodes WHERE still_url    IS NOT NULL AND still_url    <> ''
          UNION
-         SELECT profile_url  FROM people   WHERE profile_url  IS NOT NULL AND profile_url  <> ''",
+         SELECT profile_url  FROM people   WHERE profile_url  IS NOT NULL AND profile_url  <> ''
+         UNION
+         SELECT logo_url     FROM studios  WHERE logo_url     IS NOT NULL AND logo_url     <> ''",
     )?;
     let rows = stmt.query_map([], |r| r.get::<_, String>(0))?;
     rows.collect()

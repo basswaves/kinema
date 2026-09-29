@@ -27,6 +27,7 @@ import {
   getTitleDetail,
   parseGenres,
   type Episode,
+  type Studio,
   type Title,
   type TitleDetail,
 } from './api';
@@ -64,6 +65,9 @@ interface Props {
 const DETAIL_FOCUS_KEY = 'detail-root';
 const DETAIL_PLAY_KEY = 'detail-play';
 const DETAIL_FIRST_EPISODE_KEY = 'detail-first-episode';
+
+/** Stable while the detail loads, so the badges do not rebuild for nothing. */
+const NO_STUDIOS: Studio[] = [];
 
 function runtimeLabel(mins: number | null): string {
   if (!mins) return '';
@@ -322,6 +326,13 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
             <div className="detail-info">
               <h1>{title.title}</h1>
               <div className="detail-meta">
+                {/* The age rating boxed, as a disc case or a TV guide shows
+                    it, so it reads as a rating rather than one more word. */}
+                {shown.certification && (
+                  <span className="detail-cert" aria-label={`Rated ${shown.certification}`}>
+                    {shown.certification}
+                  </span>
+                )}
                 {[
                   title.year,
                   title.rating ? `★ ${title.rating.toFixed(1)}` : null,
@@ -428,7 +439,11 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
               {/* Below the buttons, not above them: three rows of tiles above
                   Play pushed it off a TV screen under a long description, and
                   Play is where a remote lands. */}
-              <MediaBadges fileId={badgeFileId} />
+              <MediaBadges
+                fileId={badgeFileId}
+                kind={title.kind}
+                studios={detail?.studios ?? NO_STUDIOS}
+              />
             </div>
           </div>
 

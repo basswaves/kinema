@@ -31,6 +31,29 @@ pub struct TitleInput {
     /// Billed cast, already capped and ordered by the provider client.
     #[serde(default)]
     pub cast: Vec<CastInput>,
+    /// The US age rating: `R`, `PG-13`, `TV-MA`; empty when TMDB has none,
+    /// absent from providers that do not do ratings (all but TMDB).
+    #[serde(default)]
+    pub certification: Option<String>,
+    /// Production companies (a film) or networks (a series), in TMDB's
+    /// order. Absent means "this provider does not do studios" — keep what
+    /// is stored; present and empty means TMDB lists none.
+    #[serde(default)]
+    pub studios: Option<Vec<StudioInput>>,
+}
+
+#[derive(Deserialize)]
+pub struct StudioInput {
+    pub name: String,
+    pub logo_url: Option<String>,
+}
+
+/// A studio or network as the detail page shows it.
+#[derive(Serialize)]
+pub struct Studio {
+    pub name: String,
+    pub logo_url: Option<String>,
+    pub logo_path: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -93,6 +116,8 @@ pub struct Title {
     pub progress: Option<f64>,
     /// The billed cast, in order, for search to match on.
     pub cast: Vec<String>,
+    /// The US age rating, or `None`/empty when there is none.
+    pub certification: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -122,6 +147,8 @@ pub struct TitleDetail {
     pub title: Title,
     pub episodes: Vec<Episode>,
     pub cast: Vec<CastMember>,
+    /// Production companies or networks, in TMDB's order.
+    pub studios: Vec<Studio>,
     /// For movies: the playable file.
     pub movie_path: Option<String>,
     pub movie_file_id: Option<i64>,
@@ -138,8 +165,8 @@ pub fn save_title(db: tauri::State<Db>, title: TitleInput) -> Result<i64, String
         "INSERT INTO titles
             (kind, provider, provider_id, imdb_id, tmdb_id, title, year, overview,
              genres, runtime_mins, rating, poster_url, backdrop_url, fetched_at,
-             trailer_key, trailer_site, logo_url)
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17)
+             trailer_key, trailer_site, logo_url, certification)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18)
          ON CONFLICT(provider, provider_id) DO UPDATE SET
             imdb_id = excluded.imdb_id, tmdb_id = excluded.tmdb_id,
             title = excluded.title, year = excluded.year, overview = excluded.overview,
@@ -152,12 +179,13 @@ pub fn save_title(db: tauri::State<Db>, title: TitleInput) -> Result<i64, String
             -- story — only TMDB has one, so any other provider must leave it.
             trailer_key  = COALESCE(excluded.trailer_key,  titles.trailer_key),
             trailer_site = COALESCE(excluded.trailer_site, titles.trailer_site),
-            logo_url     = COALESCE(excluded.logo_url,     titles.logo_url)",
+            logo_url     = COALESCE(excluded.logo_url,     titles.logo_url),
+            certification = COALESCE(excluded.certification, titles.certification)",
         params![
             title.kind, title.provider, title.provider_id, title.imdb_id, title.tmdb_id,
             title.title, title.year, title.overview, title.genres, title.runtime_mins,
             title.rating, title.poster_url, title.backdrop_url, now_secs(),
-            title.trailer_key, title.trailer_site, title.logo_url
+            title.trailer_key, title.trailer_site, title.logo_url, title.certification
         ],
     )
     .map_err(to_string_err)?;
@@ -194,6 +222,18 @@ pub fn save_title(db: tauri::State<Db>, title: TitleInput) -> Result<i64, String
                 index as i64
             ])
             .map_err(to_string_err)?;
+        }
+    }
+
+    if let Some(studios) = &title.studios {
+        tx.execute("DELETE FROM studios WHERE title_id = ?1", params![title_id])
+            .map_err(to_string_err)?;
+        let mut stmt = tx
+            .prepare("INSERT INTO studios (title_id, ord, name, logo_url) VALUES (?1, ?2, ?3, ?4)")
+            .map_err(to_string_err)?;
+        for (index, studio) in studios.iter().enumerate() {
+            stmt.execute(params![title_id, index as i64, studio.name, studio.logo_url])
+                .map_err(to_string_err)?;
         }
     }
 
@@ -290,7 +330,8 @@ const TITLE_SELECT: &str = "
            -- Names only, in billing order, for search. A tab cannot occur in
            -- a name, so it separates them safely.
            (SELECT GROUP_CONCAT(name, char(9))
-              FROM (SELECT p.name FROM people p WHERE p.title_id = t.id ORDER BY p.ord))
+              FROM (SELECT p.name FROM people p WHERE p.title_id = t.id ORDER BY p.ord)),
+           t.certification
       FROM titles t";
 
 fn map_title(r: &rusqlite::Row) -> rusqlite::Result<Title> {
@@ -331,6 +372,7 @@ fn map_title(r: &rusqlite::Row) -> rusqlite::Result<Title> {
             .get::<_, Option<String>>(23)?
             .map(|names| names.split('\t').map(str::to_owned).collect())
             .unwrap_or_default(),
+        certification: r.get(24)?,
     })
 }
 
@@ -397,10 +439,36 @@ pub fn get_title_detail(
         rows
     };
 
+    let studios = {
+        let mut stmt = conn
+            .prepare(
+                "SELECT s.name, s.logo_url,
+                        (SELECT :art || a.local_path FROM artwork_cache a
+                          WHERE a.url = s.logo_url AND a.local_path <> '')
+                   FROM studios s
+                  WHERE s.title_id = :id
+                  ORDER BY s.ord",
+            )
+            .map_err(to_string_err)?;
+        let rows = stmt
+            .query_map(named_params! { ":art": &art, ":id": title_id }, |r| {
+                Ok(Studio {
+                    name: r.get(0)?,
+                    logo_url: r.get(1)?,
+                    logo_path: r.get(2)?,
+                })
+            })
+            .map_err(to_string_err)?
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(to_string_err)?;
+        rows
+    };
+
     Ok(TitleDetail {
         title,
         episodes,
         cast,
+        studios,
         movie_path: movie.as_ref().map(|m| m.0.clone()),
         movie_file_id: movie.as_ref().map(|m| m.1),
         movie_watched: movie.map(|m| m.2).unwrap_or(false),
@@ -616,7 +684,7 @@ pub fn adopt_provider(
 /// Titles matched before some part of the TMDB detail response was being used.
 ///
 /// Restricted to titles with a TMDB id, because it is the only provider here
-/// carrying trailers, logos or cast at all — asking about the others would be
+/// carrying trailers, logos, cast, age ratings or studios at all — asking about the others would be
 /// querying for something that cannot exist.
 ///
 /// `NULL` means never asked; an **empty string** means asked and there is none.
@@ -625,27 +693,27 @@ pub fn adopt_provider(
 #[tauri::command]
 pub fn list_titles_needing_detail(db: tauri::State<Db>) -> Result<Vec<TrailerTarget>, String> {
     let conn = db.0.lock().map_err(to_string_err)?;
-    let mut stmt = conn
-        .prepare(
-            "SELECT id, tmdb_id, kind FROM titles
-              WHERE tmdb_id IS NOT NULL AND tmdb_id <> ''
-                AND (trailer_key IS NULL OR logo_url IS NULL)
-              ORDER BY id",
-        )
-        .map_err(to_string_err)?;
+    titles_needing_detail(&conn).map_err(to_string_err)
+}
 
-    let rows = stmt
-        .query_map([], |r| {
-            Ok(TrailerTarget {
-                id: r.get(0)?,
-                tmdb_id: r.get(1)?,
-                kind: r.get(2)?,
-            })
+/// See [`list_titles_needing_detail`]. `certification` joined the list in
+/// schema 16, so every TMDB title matched before it is fetched once more — the
+/// one-time refresh that brings existing titles their age rating and studios.
+fn titles_needing_detail(conn: &rusqlite::Connection) -> rusqlite::Result<Vec<TrailerTarget>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, tmdb_id, kind FROM titles
+          WHERE tmdb_id IS NOT NULL AND tmdb_id <> ''
+            AND (trailer_key IS NULL OR logo_url IS NULL OR certification IS NULL)
+          ORDER BY id",
+    )?;
+    let rows = stmt.query_map([], |r| {
+        Ok(TrailerTarget {
+            id: r.get(0)?,
+            tmdb_id: r.get(1)?,
+            kind: r.get(2)?,
         })
-        .map_err(to_string_err)?;
-
-    rows.collect::<rusqlite::Result<Vec<_>>>()
-        .map_err(to_string_err)
+    })?;
+    rows.collect()
 }
 
 /// Which files the review queue works on: everything the matcher declined or
@@ -715,7 +783,8 @@ pub fn list_unmatched(
 #[cfg(test)]
 mod tests {
     use super::{
-        adopt, episodes_for, map_title, stale_titles, Title, TITLE_SELECT, TMDB_MAX_AGE_SECS,
+        adopt, episodes_for, map_title, stale_titles, titles_needing_detail, Title, TITLE_SELECT,
+        TMDB_MAX_AGE_SECS,
     };
     use rusqlite::{named_params, params};
 
@@ -747,6 +816,26 @@ mod tests {
         let show = title(&conn, 1);
         assert_eq!(show.episodes_watched, 3);
         assert!(show.watched);
+    }
+
+    /// A TMDB title fetched before age ratings were kept is fetched once more:
+    /// NULL means never asked. Once asked — a rating, or '' for none — it is
+    /// left alone, and only TMDB titles are asked at all.
+    #[test]
+    fn titles_without_an_age_rating_are_fetched_once() {
+        let conn = library("certification");
+        conn.execute_batch(
+            "UPDATE titles SET trailer_key = '', logo_url = '', certification = NULL;
+             UPDATE titles SET tmdb_id = '1' WHERE id = 1;
+             INSERT INTO titles (id, kind, provider, provider_id, tmdb_id, title, fetched_at,
+                                 trailer_key, logo_url, certification) VALUES
+                 (2, 'movie',  'tmdb',   '22', '22', 'Rated',   0, '', '', 'R'),
+                 (3, 'movie',  'tmdb',   '33', '33', 'Unrated', 0, '', '', ''),
+                 (4, 'series', 'tvmaze', '44', NULL, 'Show',    0, NULL, NULL, NULL);",
+        )
+        .unwrap();
+        let ids: Vec<i64> = titles_needing_detail(&conn).unwrap().iter().map(|t| t.id).collect();
+        assert_eq!(ids, vec![1]);
     }
 
     /// Only TMDB's data has an age limit, and the oldest is refreshed first.

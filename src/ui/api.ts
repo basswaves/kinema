@@ -32,6 +32,8 @@ export interface Title {
   episodes_watched: number;
   /** A film watched to the end, or a series with every held episode watched. */
   watched: boolean;
+  /** The US age rating (`R`, `TV-MA`); empty or absent when there is none. */
+  certification?: string | null;
   /** 0–1, for a film started and not finished. */
   progress: number | null;
   /** Billed cast, in order — for search. */
@@ -64,11 +66,20 @@ export interface CastMember {
   profile_path: string | null;
 }
 
+export interface Studio {
+  name: string;
+  logo_url: string | null;
+  /** Cached copy in app data, when one has been downloaded. */
+  logo_path: string | null;
+}
+
 export interface TitleDetail {
   title: Title;
   episodes: Episode[];
   /** Billed cast in provider order, capped at ten. Empty for non-TMDB titles. */
   cast: CastMember[];
+  /** Production companies (a film) or networks (a series), in TMDB's order. */
+  studios: Studio[];
   movie_path: string | null;
   movie_file_id: number | null;
   movie_watched: boolean;

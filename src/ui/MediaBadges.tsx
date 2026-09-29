@@ -7,13 +7,19 @@
  * would be a remote made worse.
  */
 import { useEffect, useMemo, useState } from 'react';
+import Art from './Art';
+import type { Studio } from './api';
 import { initParser } from '../library/parse';
 import { readRelease, type Release } from '../library/release';
-import { buildBadges, fileFacts, releaseNames, type FileFacts } from './badges';
+import { buildBadges, fileFacts, releaseNames, studioBadge, type FileFacts } from './badges';
 
 interface Props {
   /** The file the badges describe: the film, or the episode Play would start. */
   fileId: number | null;
+  /** `movie` or `series`: a series' studios are its networks. */
+  kind: string;
+  /** The title's studios, from TMDB; empty for other providers. */
+  studios: Studio[];
 }
 
 /** What has been loaded, and for which file — so another file's badges are never shown. */
@@ -23,7 +29,7 @@ interface Loaded {
   release: Release | null;
 }
 
-export default function MediaBadges({ fileId }: Props) {
+export default function MediaBadges({ fileId, kind, studios }: Props) {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
 
   useEffect(() => {
@@ -48,8 +54,9 @@ export default function MediaBadges({ fileId }: Props) {
 
   const current = loaded !== null && loaded.fileId === fileId ? loaded : null;
   const rows = useMemo(
-    () => (current ? buildBadges(current.facts, current.release) : []),
-    [current]
+    () =>
+      buildBadges(current?.facts ?? null, current?.release ?? null, studioBadge(kind, studios)),
+    [current, kind, studios]
   );
   if (rows.length === 0) return null;
 
@@ -62,7 +69,24 @@ export default function MediaBadges({ fileId }: Props) {
             {row.badges.map((badge) => (
               <li className="media-badge" key={`${badge.label}|${badge.value}`}>
                 <span className="media-badge-label">{badge.label}</span>
-                <span className="media-badge-value">{badge.value}</span>
+                {badge.logos ? (
+                  // The names stay, for screen readers and for a logo that
+                  // will not load.
+                  <span className="media-badge-logos" aria-label={badge.value}>
+                    {badge.logos.map((studio) => (
+                      <Art
+                        key={studio.name}
+                        className="media-badge-logo"
+                        local={studio.logo_path}
+                        remote={studio.logo_url}
+                        alt={studio.name}
+                        fallback={<span className="media-badge-value">{studio.name}</span>}
+                      />
+                    ))}
+                  </span>
+                ) : (
+                  <span className="media-badge-value">{badge.value}</span>
+                )}
               </li>
             ))}
           </ul>

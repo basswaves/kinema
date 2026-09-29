@@ -1742,6 +1742,26 @@ badges are the episode Play would start. Checked against the real app's answer
 for the library's films and episodes, and driven by keyboard alone in
 `dev:mock`, desktop and TV layouts.
 
+### Age rating and studios ✅
+
+**US, by the owner's choice**, and from the one TMDB request a title already
+makes: `release_dates` for a film (the theatrical rating first — a premiere is
+often unrated), `content_ratings` for a series. Kept in `titles.certification`
+with the TMDB-only convention: NULL never asked, empty for none. Adding it to
+what the details pass looks for is what fetched every existing title once
+more, so a library already matched gets its ratings on the next scan without
+a separate backfill.
+
+**No studio is chosen.** TMDB lists a film's companies in no order of
+importance — for one film the distributor came fourth, after the
+co-producers — so picking "the" studio would mean keeping a list of majors,
+which is taste and upkeep. The page shows the companies that have a logo, up
+to three, in TMDB's order; a series shows its network. Logos come in the
+brands' colours; they are drawn white to sit with the lettering around them,
+which only works because TMDB's are on transparency (all nine the real
+library fetched were). They are cached like every other image, so a detail
+page needs no network.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

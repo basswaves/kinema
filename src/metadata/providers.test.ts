@@ -22,7 +22,9 @@ vi.mock('@tauri-apps/plugin-http', () => ({
   }),
 }));
 
-const { tmdbGetEpisodes, tvmazeSearch } = await import('./providers');
+const { pickStudios, tmdbGetEpisodes, tmdbGetTitle, tvmazeSearch, usCertification } = await import(
+  './providers'
+);
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -111,5 +113,82 @@ describe('TMDB episodes', () => {
     expect(calls).toHaveLength(3);
     expect(calls[2].url).toContain('/tv/105/season/2');
     expect(episodes.map((e) => `${e.season}x${e.episode}`)).toEqual(['1x1', '2x1', '2x2']);
+  });
+});
+
+describe('TMDB age rating and studios', () => {
+  /** A film's US rating is its theatrical one; a premiere is often unrated. */
+  it('takes the theatrical US rating', () => {
+    const dates = {
+      results: [
+        { iso_3166_1: 'GB', release_dates: [{ certification: '15', type: 3 }] },
+        {
+          iso_3166_1: 'US',
+          release_dates: [
+            { certification: '', type: 1 },
+            { certification: 'NC-17', type: 4 },
+            { certification: 'R', type: 3 },
+          ],
+        },
+      ],
+    };
+    expect(usCertification('movie', dates, undefined)).toBe('R');
+  });
+
+  it('says none, not a guess, when there is no US rating', () => {
+    const dates = { results: [{ iso_3166_1: 'GB', release_dates: [{ certification: '15', type: 3 }] }] };
+    expect(usCertification('movie', dates, undefined)).toBe('');
+    expect(usCertification('movie', undefined, undefined)).toBe('');
+    expect(
+      usCertification('series', undefined, { results: [{ iso_3166_1: 'US', rating: 'TV-MA' }] })
+    ).toBe('TV-MA');
+  });
+
+  it('names a series by its network and a film by its companies', () => {
+    const networks = [{ name: 'Example Network', logo_path: '/n.png' }];
+    const companies = [
+      { name: 'Co-producer', logo_path: '/c.png' },
+      { name: 'No Logo Partnership', logo_path: null },
+      { name: 'Vector Pictures', logo_path: '/v.svg' },
+    ];
+    expect(pickStudios('series', networks, companies)).toEqual([
+      { name: 'Example Network', logo_url: 'https://image.tmdb.org/t/p/w300/n.png' },
+    ]);
+    // Order kept; an SVG logo is dropped for the reason pickLogo gives.
+    expect(pickStudios('movie', networks, companies)).toEqual([
+      { name: 'Co-producer', logo_url: 'https://image.tmdb.org/t/p/w300/c.png' },
+      { name: 'No Logo Partnership', logo_url: null },
+      { name: 'Vector Pictures', logo_url: null },
+    ]);
+  });
+
+  /** In the same request as everything else: a new match stays one round trip. */
+  it('asks for the rating in the title request', async () => {
+    responses = [
+      {
+        status: 200,
+        body: {
+          id: 603,
+          title: 'A Film',
+          release_date: '1999-03-31',
+          overview: '',
+          genres: [],
+          vote_average: 8,
+          poster_path: null,
+          backdrop_path: null,
+          production_companies: [{ name: 'A Studio', logo_path: '/s.png' }],
+          release_dates: { results: [{ iso_3166_1: 'US', release_dates: [{ certification: 'R', type: 3 }] }] },
+        },
+      },
+    ];
+    const result = tmdbGetTitle('key', '603', 'movie');
+    await vi.runAllTimersAsync();
+    const title = await result;
+
+    expect(calls).toHaveLength(1);
+    const appended = new URL(calls[0].url).searchParams.get('append_to_response');
+    expect(appended?.split(',')).toContain('release_dates');
+    expect(title.certification).toBe('R');
+    expect(title.studios).toEqual([{ name: 'A Studio', logo_url: 'https://image.tmdb.org/t/p/w300/s.png' }]);
   });
 });

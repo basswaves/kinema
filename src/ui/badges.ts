@@ -15,6 +15,7 @@
  */
 import { invoke } from '@tauri-apps/api/core';
 import type { Release } from '../library/release';
+import type { Studio } from './api';
 import { sourceLabel } from '../library/release';
 
 // ---- what Rust sends (probe.rs → MediaDetails, FileFacts) ------------------
@@ -115,6 +116,8 @@ export function releaseNames(facts: Pick<FileFacts, 'file_name' | 'parent_dir' |
 export interface Badge {
   label: string;
   value: string;
+  /** Logos drawn in place of the value, which is then their names in words. */
+  logos?: Studio[];
 }
 
 export interface BadgeRow {
@@ -231,12 +234,35 @@ function isSdh(track: SubtitleTrack): boolean {
   return track.hearing_impaired || /\b(sdh|cc|hearing)\b/i.test(track.title ?? '');
 }
 
+/** Studio logos shown at most. More is a row of logos nobody reads. */
+const MAX_STUDIOS = 3;
+
+/**
+ * The studio tile: the companies (or a series' networks) that have a logo,
+ * up to three, drawn as logos; the first two by name when none has one.
+ * TMDB's order is kept. It names no company first, so none is chosen.
+ */
+export function studioBadge(kind: string, studios: Studio[]): Badge | null {
+  const label = kind === 'series' ? 'Network' : 'Studio';
+  const withLogos = studios.filter((s) => s.logo_url || s.logo_path).slice(0, MAX_STUDIOS);
+  if (withLogos.length > 0) {
+    return { label, value: withLogos.map((s) => s.name).join(' · '), logos: withLogos };
+  }
+  const named = studios.slice(0, 2);
+  return named.length > 0 ? { label, value: named.map((s) => s.name).join(' · ') } : null;
+}
+
 /**
  * The rows for one file. `release` is what its name says (`readRelease`), or
- * null while that is still being read. A row with nothing in it is left out.
+ * null while that is still being read; `studio` is the title's studio tile,
+ * if it has one. A row with nothing in it is left out.
  */
-export function buildBadges(facts: FileFacts, release: Release | null): BadgeRow[] {
-  const details = facts.details;
+export function buildBadges(
+  facts: FileFacts | null,
+  release: Release | null,
+  studio: Badge | null = null
+): BadgeRow[] {
+  const details = facts?.details ?? null;
   const video = details?.video ?? null;
   const picture: Badge[] = [];
   const sound: Badge[] = [];
@@ -274,9 +300,9 @@ export function buildBadges(facts: FileFacts, release: Release | null): BadgeRow
     }
     // The measured shape when there is one; otherwise the file's own figure,
     // as every other player shows it.
-    const main = facts.picture_aspect ?? video.aspect_ratio;
+    const main = facts?.picture_aspect ?? video.aspect_ratio;
     if (main) {
-      const alt = facts.picture_aspect_alt;
+      const alt = facts?.picture_aspect_alt;
       picture.push(
         alt
           ? { label: 'Variable aspect', value: `${aspectLabel(main)} · ${aspectLabel(alt)}` }
@@ -309,6 +335,7 @@ export function buildBadges(facts: FileFacts, release: Release | null): BadgeRow
   if (details?.bit_rate) {
     file.push({ label: 'Bitrate', value: `${Math.round(details.bit_rate / 1_000_000)} Mb/s` });
   }
+  if (studio) file.push(studio);
 
   const rows: BadgeRow[] = [
     { heading: 'Picture', badges: picture },

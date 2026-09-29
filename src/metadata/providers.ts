@@ -43,6 +43,18 @@ export interface TitleMetadata {
   trailer_site: string | null;
   /** Billed cast, in order, capped by the provider client. */
   cast: CastMember[];
+  /**
+   * The US age rating — `R`, `PG-13`, `TV-MA` — or an empty string when TMDB
+   * has none. Left out by every provider but TMDB, which keeps what is stored.
+   */
+  certification?: string | null;
+  /** Production companies (a film) or networks (a series). TMDB only. */
+  studios?: Studio[];
+}
+
+export interface Studio {
+  name: string;
+  logo_url: string | null;
 }
 
 export interface CastMember {
@@ -116,6 +128,84 @@ function pickLogo(logos: TmdbImage[] | undefined): string | null {
   // Every candidate was an SVG. Better none than one that renders at the wrong
   // size over the hero image.
   return rank(best) === 3 ? null : `${TMDB_IMAGE}${best.file_path}`;
+}
+
+/** TMDB's release dates for a film, per country, each with its rating. */
+interface TmdbReleaseDates {
+  results?: Array<{
+    iso_3166_1: string;
+    release_dates?: Array<{ certification?: string; type?: number }>;
+  }>;
+}
+
+/** TMDB's age ratings for a series, per country. */
+interface TmdbContentRatings {
+  results?: Array<{ iso_3166_1: string; rating?: string }>;
+}
+
+/**
+ * Release types in the order their rating is trusted: theatrical, then
+ * digital, physical, TV, limited, premiere. A premiere is often unrated, and
+ * the theatrical rating is the one a film is known by.
+ */
+const RELEASE_TYPE_ORDER = [3, 4, 5, 6, 2, 1];
+
+/**
+ * The US age rating TMDB holds, or `''` when it has none. US by the owner's
+ * choice: it is the rating nearly every title on TMDB has, and the one Kodi
+ * skins show.
+ */
+export function usCertification(
+  kind: 'movie' | 'series',
+  releaseDates: TmdbReleaseDates | undefined,
+  contentRatings: TmdbContentRatings | undefined
+): string {
+  if (kind === 'series') {
+    return contentRatings?.results?.find((r) => r.iso_3166_1 === 'US')?.rating?.trim() ?? '';
+  }
+  const us = releaseDates?.results?.find((r) => r.iso_3166_1 === 'US')?.release_dates ?? [];
+  const rated = us.filter((d) => d.certification?.trim());
+  const rank = (type: number | undefined) => {
+    const index = RELEASE_TYPE_ORDER.indexOf(type ?? 0);
+    return index === -1 ? RELEASE_TYPE_ORDER.length : index;
+  };
+  rated.sort((a, b) => rank(a.type) - rank(b.type));
+  return rated[0]?.certification?.trim() ?? '';
+}
+
+/** How many studios to keep. The page shows up to three; this leaves spares. */
+const STUDIO_LIMIT = 6;
+
+/**
+ * The studios to name: a series' networks, a film's production companies,
+ * in TMDB's order. TMDB's order puts no company first on purpose — for one
+ * film the distributor came fourth, after the co-producers — so none is
+ * chosen here as "the" studio; the page shows several.
+ *
+ * Logos at w300, and never an SVG, for the reason `pickLogo` gives.
+ */
+export function pickStudios(
+  kind: 'movie' | 'series',
+  networks: TmdbCompany[] | undefined,
+  companies: TmdbCompany[] | undefined
+): Studio[] {
+  const source = kind === 'series' && networks?.length ? networks : (companies ?? []);
+  return source
+    .filter((c) => c.name?.trim())
+    .slice(0, STUDIO_LIMIT)
+    .map((c) => ({
+      name: c.name.trim(),
+      logo_url:
+        c.logo_path && !c.logo_path.toLowerCase().endsWith('.svg')
+          ? `https://image.tmdb.org/t/p/w300${c.logo_path}`
+          : null,
+    }));
+}
+
+/** A production company or network, as TMDB lists them. */
+interface TmdbCompany {
+  name: string;
+  logo_path: string | null;
 }
 
 /** One entry from TMDB's `/videos` list. */
@@ -460,12 +550,19 @@ export async function tmdbGetTitle(
     videos?: { results: TmdbVideo[] };
     images?: { logos?: TmdbImage[] };
     credits?: { cast?: TmdbCastMember[] };
+    release_dates?: TmdbReleaseDates;
+    content_ratings?: TmdbContentRatings;
+    production_companies?: TmdbCompany[];
+    networks?: TmdbCompany[];
     // Everything is appended to the one detail request, so a new match stays a
     // single round trip however much of it we use. `include_image_language`
     // is what makes `images` useful: without it TMDB returns only images
     // tagged with the request language, which for logos is usually none.
   }>(key, kind === 'movie' ? `/movie/${id}` : `/tv/${id}`, {
-    append_to_response: 'external_ids,videos,images,credits',
+    // The age rating lives in a different sub-resource for each kind.
+    append_to_response: `external_ids,videos,images,credits,${
+      kind === 'movie' ? 'release_dates' : 'content_ratings'
+    }`,
     include_image_language: 'en,null',
   });
 
@@ -507,6 +604,8 @@ export async function tmdbGetTitle(
         // originals would be several megabytes each for a face on a card.
         profile_url: c.profile_path ? `https://image.tmdb.org/t/p/w185${c.profile_path}` : null,
       })),
+    certification: usCertification(kind, detail.release_dates, detail.content_ratings),
+    studios: pickStudios(kind, detail.networks, detail.production_companies),
   };
 }
 

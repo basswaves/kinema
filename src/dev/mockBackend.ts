@@ -344,7 +344,9 @@ const files: FixtureFile[] = [
   ].map(([season, episode], i) => ({
     id: 301 + i,
     titleId: SAGA_ID,
-    path: `C:\\fixture\\Example.Saga.S0${season}.1080p.NF.WEB-DL.DDP5.1.Atmos.H.265-GRP\\Season ${season}\\Example.Saga.S0${season}E0${episode}.mkv`,
+    // Season 1 a Netflix download, season 2 an Amazon one — a show whose
+    // seasons differ, for the season badges.
+    path: `C:\\fixture\\Example.Saga.S0${season}.1080p.${season === 1 ? 'NF.WEB-DL' : 'AMZN.WEBRip'}.DDP5.1.Atmos.H.265-GRP\\Season ${season}\\Example.Saga.S0${season}E0${episode}.mkv`,
     season,
     episode,
     duration: 3000,
@@ -432,11 +434,12 @@ function mockFileFacts(fileId: number) {
       details: {
         container: 'matroska,webm',
         duration_secs: file.duration,
-        bit_rate: 6_200_000,
+        bit_rate: file.season === 2 ? 9_400_000 : 6_200_000,
         video: {
           ...video,
-          width: 1920,
-          height: 1080,
+          // S02E02 is the one 720p episode of its season.
+          width: file.season === 2 && file.episode === 2 ? 1280 : 1920,
+          height: file.season === 2 && file.episode === 2 ? 720 : 1080,
           aspect_ratio: 16 / 9,
           transfer: 'sdr',
           dolby_vision: null,
@@ -772,6 +775,10 @@ const handlers: Record<string, Handler> = {
   list_titles: () => later(EMPTY ? [] : titles.map(withWatchState)),
   get_title_detail: (a) => titleDetail(num(a, 'titleId')),
   file_facts: (a) => mockFileFacts(num(a, 'fileId')),
+  season_facts: (a) =>
+    episodesOf(num(a, 'titleId'))
+      .filter((f) => f.season === num(a, 'season'))
+      .map((f) => ({ file_id: f.id, ...mockFileFacts(f.id) })),
   list_unmatched: () => [],
   list_needs_review: () => [],
   count_needs_review: () => REVIEW_COUNT,

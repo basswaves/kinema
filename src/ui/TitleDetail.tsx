@@ -11,7 +11,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import Art from './Art';
 import FocusButton from './FocusButton';
-import MediaBadges from './MediaBadges';
+import MediaBadges, { BadgeRows } from './MediaBadges';
+import { useSeasonBadges } from './seasonBadges';
 import { keepOnScreen, useClaimFocus } from './focus';
 import {
   episodeLabel,
@@ -280,14 +281,18 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
     }
   }, [ownedInSeason, seasonWatched, title.id]);
 
-  // The file the badges describe: the film, or the episode Play would start —
-  // the first owned one when there is nothing left to continue.
-  const badgeFileId =
-    title.kind === 'series'
-      ? (nextUp?.file_id ??
-        detail?.episodes.find((e) => e.file_path && e.file_id !== null)?.file_id ??
-        null)
-      : (detail?.movie_file_id ?? null);
+  // A film's badges describe its file; a series' describe the season on
+  // screen, which opens on the one Play continues in (see seasonBadges.ts).
+  const studios = detail?.studios ?? NO_STUDIOS;
+  const seasonBadges = useSeasonBadges(title.id, title.kind === 'series' ? season : null, studios);
+  const seasonHeading = (() => {
+    if (!seasonBadges || !detail) return undefined;
+    const owned = detail.episodes.filter(
+      (e) => e.season === seasonBadges.season && e.file_path
+    ).length;
+    const name = seasonBadges.season === 0 ? 'Specials' : `Season ${seasonBadges.season}`;
+    return `${name} · ${owned === 1 ? '1 episode' : `${owned} episodes`}`;
+  })();
 
   const ownedCount = detail?.episodes.filter((e) => e.file_path).length ?? 0;
   const watchedCount = detail?.episodes.filter((e) => e.file_path && e.watched).length ?? 0;
@@ -458,11 +463,15 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
               {/* Below the buttons, not above them: three rows of tiles above
                   Play pushed it off a TV screen under a long description, and
                   Play is where a remote lands. */}
-              <MediaBadges
-                fileId={badgeFileId}
-                kind={title.kind}
-                studios={detail?.studios ?? NO_STUDIOS}
-              />
+              {title.kind === 'series' ? (
+                seasonBadges && <BadgeRows rows={seasonBadges.rows} heading={seasonHeading} />
+              ) : (
+                <MediaBadges
+                  fileId={detail?.movie_file_id ?? null}
+                  kind={title.kind}
+                  studios={studios}
+                />
+              )}
             </div>
           </div>
 
@@ -534,6 +543,11 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
                   <EpisodeRow
                     key={episode.id}
                     episode={episode}
+                    differences={
+                      episode.file_id !== null
+                        ? seasonBadges?.exceptions.get(episode.file_id)
+                        : undefined
+                    }
                     focusKey={episode.id === firstOwnedId ? DETAIL_FIRST_EPISODE_KEY : undefined}
                     onToggleWatched={() =>
                       void toggleWatched(episode.file_id as number, !episode.watched)
@@ -560,6 +574,8 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
 
 interface EpisodeRowProps {
   episode: Episode;
+  /** What this episode has that its season mostly does not: `720p`, `SDR`. */
+  differences?: string[];
   onPlay: () => void;
   onToggleWatched: () => void;
   focusKey?: string;
@@ -592,7 +608,13 @@ function EpisodeRow(props: EpisodeRowProps) {
  * reads the focus context of the component it is called in: calling them here
  * would parent them to the episode list and leave this container childless.
  */
-function PlayableEpisodeRow({ episode, onPlay, onToggleWatched, focusKey }: EpisodeRowProps) {
+function PlayableEpisodeRow({
+  episode,
+  differences,
+  onPlay,
+  onToggleWatched,
+  focusKey,
+}: EpisodeRowProps) {
   const { ref, focusKey: rowKey, hasFocusedChild } = useFocusable({
     focusKey,
     trackChildren: true,
@@ -607,7 +629,7 @@ function PlayableEpisodeRow({ episode, onPlay, onToggleWatched, focusKey }: Epis
           episode.watched ? 'watched' : ''
         }`}
       >
-        <EpisodePlayArea episode={episode} onPlay={onPlay} />
+        <EpisodePlayArea episode={episode} differences={differences} onPlay={onPlay} />
         {/* A tick that stays out of the way until its row has the ring or
             the pointer — ten identical bright buttons down a season competed
             with the episodes themselves. The word appears with the ring. */}
@@ -629,7 +651,15 @@ function PlayableEpisodeRow({ episode, onPlay, onToggleWatched, focusKey }: Epis
 }
 
 /** The part of the row that plays the episode: still, title, overview, runtime. */
-function EpisodePlayArea({ episode, onPlay }: { episode: Episode; onPlay: () => void }) {
+function EpisodePlayArea({
+  episode,
+  differences,
+  onPlay,
+}: {
+  episode: Episode;
+  differences?: string[];
+  onPlay: () => void;
+}) {
   const { ref, focused } = useFocusable<object, HTMLDivElement>({
     focusKey: `episode:${episode.id}`,
     onEnterPress: onPlay,
@@ -672,7 +702,16 @@ function EpisodePlayArea({ episode, onPlay }: { episode: Episode; onPlay: () => 
         )}
       </div>
       <div className="episode-text">
-        <div className="episode-name">{episode.name ?? `Episode ${episode.episode}`}</div>
+        <div className="episode-name">
+          {episode.name ?? `Episode ${episode.episode}`}
+          {/* Only where this episode is not like its season; a season all
+              alike shows none. */}
+          {differences?.map((difference) => (
+            <span className="episode-difference" key={difference}>
+              {difference}
+            </span>
+          ))}
+        </div>
         {episode.overview && <p className="episode-overview">{episode.overview}</p>}
       </div>
       <div className="episode-runtime">{runtimeLabel(episode.runtime_mins)}</div>

@@ -29,6 +29,7 @@ import { readChapters } from './player/chapters';
 import { setTvMode } from './ui/tv';
 import { measurePictures, probeLibrary, refreshImdbRatings, scanLibrary } from './library/api';
 import { fileFacts } from './ui/badges';
+import { seasonFacts } from './ui/seasonBadges';
 import { refreshTomatometer } from './metadata/scores';
 import {
   cacheArtwork,
@@ -76,6 +77,8 @@ const CALLABLE: Record<string, (...args: never[]) => Promise<unknown>> = {
   measurePictures,
   // What the detail page's badges are made from, for one file.
   fileFacts,
+  // And for a whole season of a series.
+  seasonFacts,
   // The scan's IMDb step: fetches IMDb's ratings file if it is due.
   refreshImdbRatings,
   // The scan's Rotten Tomatoes step, with whatever OMDb key the copy has.

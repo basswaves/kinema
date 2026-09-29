@@ -11,7 +11,14 @@ import Art from './Art';
 import type { Studio } from './api';
 import { initParser } from '../library/parse';
 import { readRelease, type Release } from '../library/release';
-import { buildBadges, fileFacts, releaseNames, studioBadge, type FileFacts } from './badges';
+import {
+  buildBadges,
+  fileFacts,
+  releaseNames,
+  studioBadge,
+  type BadgeRow,
+  type FileFacts,
+} from './badges';
 
 interface Props {
   /** The file the badges describe: the film, or the episode Play would start. */
@@ -58,10 +65,19 @@ export default function MediaBadges({ fileId, kind, studios }: Props) {
       buildBadges(current?.facts ?? null, current?.release ?? null, studioBadge(kind, studios)),
     [current, kind, studios]
   );
+  return <BadgeRows rows={rows} />;
+}
+
+/**
+ * The rows themselves, for a film's file or a series' season. `heading`
+ * names what they describe when it is not obvious — "Season 5 · 8 episodes".
+ */
+export function BadgeRows({ rows, heading }: { rows: BadgeRow[]; heading?: string }) {
   if (rows.length === 0) return null;
 
   return (
     <div className="media-badges">
+      {heading && <div className="media-badges-heading">{heading}</div>}
       {rows.map((row) => (
         <div className="badge-row" key={row.heading}>
           <span className="badge-row-heading">{row.heading}</span>

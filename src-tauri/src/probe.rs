@@ -706,6 +706,56 @@ fn folder_shared(conn: &Connection, file_id: i64) -> rusqlite::Result<bool> {
 #[tauri::command]
 pub fn file_facts(db: tauri::State<Db>, file_id: i64) -> Result<Option<FileFacts>, String> {
     let conn = db.0.lock().map_err(to_string_err)?;
+    facts_for(&conn, file_id).map_err(to_string_err)
+}
+
+/// One file of a season, with its facts.
+#[derive(Serialize)]
+pub struct EpisodeFacts {
+    pub file_id: i64,
+    #[serde(flatten)]
+    pub facts: FileFacts,
+}
+
+/// Tauri command: the badges' facts for every file of one season of a series,
+/// in episode order. The detail page's badges describe the season on screen
+/// (see `seasonBadges.ts`), because a season is far more often alike than a
+/// whole show is — one library's show has Blu-ray encodes for three seasons and
+/// web releases from two services for the others.
+#[tauri::command]
+pub fn season_facts(
+    db: tauri::State<Db>,
+    title_id: i64,
+    season: i64,
+) -> Result<Vec<EpisodeFacts>, String> {
+    let conn = db.0.lock().map_err(to_string_err)?;
+    season_files(&conn, title_id, season)
+        .and_then(|ids| {
+            ids.into_iter()
+                .filter_map(|id| match facts_for(&conn, id) {
+                    Ok(Some(facts)) => Some(Ok(EpisodeFacts { file_id: id, facts })),
+                    Ok(None) => None,
+                    Err(e) => Some(Err(e)),
+                })
+                .collect()
+        })
+        .map_err(to_string_err)
+}
+
+/// A season's files that are on disk, in episode order.
+fn season_files(conn: &Connection, title_id: i64, season: i64) -> rusqlite::Result<Vec<i64>> {
+    let mut statement = conn.prepare(
+        "SELECT id FROM media_files
+          WHERE title_id = ?1 AND parsed_season = ?2 AND missing = 0
+          ORDER BY parsed_episode, id",
+    )?;
+    let rows = statement.query_map(params![title_id, season], |r| r.get(0))?;
+    rows.collect()
+}
+
+/// Everything the badges need about one file, or `None` for a file the
+/// library does not have.
+fn facts_for(conn: &Connection, file_id: i64) -> rusqlite::Result<Option<FileFacts>> {
     let names = conn.query_row(
         "SELECT m.file_name, m.parent_dir, m.extension, r.path
            FROM media_files m JOIN library_roots r ON r.id = m.root_id
@@ -723,12 +773,12 @@ pub fn file_facts(db: tauri::State<Db>, file_id: i64) -> Result<Option<FileFacts
     let (file_name, parent_dir, extension, root_path) = match names {
         Ok(names) => names,
         Err(rusqlite::Error::QueryReturnedNoRows) => return Ok(None),
-        Err(e) => return Err(e.to_string()),
+        Err(e) => return Err(e),
     };
-    let shape = crate::aspect::shape_for_file(&conn, file_id);
-    let folder_shared = folder_shared(&conn, file_id).map_err(to_string_err)?;
+    let shape = crate::aspect::shape_for_file(conn, file_id);
+    let folder_shared = folder_shared(conn, file_id)?;
     Ok(Some(FileFacts {
-        details: details_for_file(&conn, file_id),
+        details: details_for_file(conn, file_id),
         picture_aspect: shape.map(|s| s.main),
         picture_aspect_alt: shape.and_then(|s| s.alt),
         file_name,
@@ -1249,6 +1299,29 @@ mod tests {
         conn.execute("UPDATE media_files SET title_id = 2 WHERE id = 2", []).unwrap();
         assert!(folder_shared(&conn, 1).unwrap());
         assert!(folder_shared(&conn, 2).unwrap());
+    }
+
+    /// A season's files, on disk, in episode order; other seasons and missing
+    /// files left out.
+    #[test]
+    fn a_season_is_its_own_files_in_order() {
+        let conn = library();
+        conn.execute_batch(
+            "INSERT INTO titles (id, kind, provider, provider_id, title, fetched_at)
+                 VALUES (1, 'series', 'tmdb', '1', 'A show', 0);
+             INSERT INTO media_files (id, root_id, path, parent_dir, file_name, extension,
+                                      size_bytes, modified_at, first_seen_at, last_seen_at,
+                                      title_id, parsed_season, parsed_episode, missing)
+             VALUES (3, 1, 'D:\\S2E2.mkv', 'D:\\', 'S2E2.mkv', 'mkv', 1, 1, 0, 0, 1, 2, 2, 0),
+                    (4, 1, 'D:\\S2E1.mkv', 'D:\\', 'S2E1.mkv', 'mkv', 1, 1, 0, 0, 1, 2, 1, 0),
+                    (5, 1, 'D:\\S2E3.mkv', 'D:\\', 'S2E3.mkv', 'mkv', 1, 1, 0, 0, 1, 2, 3, 1),
+                    (6, 1, 'D:\\S1E1.mkv', 'D:\\', 'S1E1.mkv', 'mkv', 1, 1, 0, 0, 1, 1, 1, 0);",
+        )
+        .unwrap();
+        assert_eq!(season_files(&conn, 1, 2).unwrap(), vec![4, 3]);
+        let facts = facts_for(&conn, 4).unwrap().unwrap();
+        assert_eq!(facts.file_name, "S2E1.mkv");
+        assert!(facts_for(&conn, 99).unwrap().is_none());
     }
 
     /// Removing a file from the library removes what was read from it.

@@ -17,7 +17,8 @@ Kinema is one program: close it and nothing is left running.
 
 Detail pages carry the cast, the description and — for a series — every season
 and episode, opening on the season you are in, with progress on the ones you
-have started. Under the buttons, badges say what the file really holds, and
+have started. Under the buttons, badges say what the file really holds — for a
+series, what the season on screen holds, and which episodes differ — and
 beside the year are its age rating and its IMDb, Rotten Tomatoes and TMDB
 scores. Posters everywhere show what you have watched.
 

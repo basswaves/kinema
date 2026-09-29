@@ -838,6 +838,14 @@ html {
   margin: 1.25rem 0 0;
 }
 
+.media-badges-heading {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  opacity: 0.55;
+}
+
 .badge-row {
   display: flex;
   align-items: center;
@@ -1312,6 +1320,22 @@ html {
 .episode-text {
   flex: 1;
   min-width: 0;
+}
+
+/* An episode that differs from its season — 720p in a 1080p season. Amber so
+   it reads as "note this", not as a warning; small so a list of them does not
+   crowd the titles. */
+.episode-difference {
+  flex: none;
+  padding: 0 0.3125rem;
+  border: 1px solid rgba(242, 201, 106, 0.7);
+  border-radius: 0.25rem;
+  color: #f2c96a;
+  font-size: 0.625rem;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: nowrap;
 }
 
 .episode-name {

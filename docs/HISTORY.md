@@ -1743,6 +1743,39 @@ badges are the episode Play would start. Checked against the real app's answer
 for the library's films and episodes, and driven by keyboard alone in
 `dev:mock`, desktop and TV layouts.
 
+### Seasons, and the first real show ✅
+
+**One set of badges for a whole show was wrong for the first show it met.**
+The owner's longest series has Blu-ray encodes at 2.2 Mb/s for three seasons
+and web releases for two, one of them half from one service and half from
+another, at 8.6–10 Mb/s; the page described the episode Play would start, so
+every season read "Blu-ray encode · 2 Mb/s". Other players step round it:
+Plex, Jellyfin and Emby show details only on an episode's own page, Kodi
+skins and Zidoo for the episode under the cursor, Infuse on each episode row.
+
+**The owner chose badges that follow the season tab**, with the episodes
+that differ marked in the list. A value the season shares shows once; one
+that varies shows every version ("Source · varies"); one only some episodes
+have says so ("Dolby Vision · 3 of 10"); bitrate and subtitle counts become
+ranges. An episode unlike its season's usual gets a small amber chip —
+"720p", or "SDR" in an HDR season — and a season all alike adds nothing to
+its rows. Following the highlighted episode, Kodi's way, was the other
+choice: the badges sit above the list, so they would scroll away from the
+episode they described. The network stays with the show, since TMDB records
+none per season; a season's streaming service is part of its source. On the
+real show the mixed season shows both services and both sound formats, and
+its four episodes from the second service carry chips saying so.
+
+**Found alongside.** The scores' colours were not the chips' fault: the whole
+title line was dimmed with `opacity`, which fades everything inside it; it is
+dimmed by colour now, and the chips are solid in their sources' colours —
+Rotten Tomatoes' red deepened so white text on it is readable. A bitrate
+under 10 Mb/s keeps a decimal: 1.6 and 2.2 Mb/s are different encodes and
+both read "2 Mb/s". And one film on the real library sat inside another's
+release folder, so its source would have been read from its neighbour's name
+had its own said nothing; a folder that holds another title's files is no
+longer read.
+
 ### Age rating and studios ✅
 
 **US, by the owner's choice**, and from the one TMDB request a title already

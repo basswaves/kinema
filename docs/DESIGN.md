@@ -86,8 +86,9 @@ src/
                  everything else is built from. Rail.tsx owns the one cap on
                  how long a rail gets. badges.ts turns what the scan read
                  from a file into the detail page's picture / sound / file
-                 badges; MediaBadges shows them, under the buttons and never
-                 focusable
+                 badges; seasonBadges.ts sums a series' season up and finds
+                 the episodes unlike it; MediaBadges shows them, under the
+                 buttons and never focusable
   player/        Player, shared mpv lifecycle, track handling, mpv options.
                  chapters.ts and stats.ts read mpv as flat scalars only;
                  skip.ts continues the credits ladder past the marker Rust

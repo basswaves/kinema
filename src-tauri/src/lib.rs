@@ -224,6 +224,7 @@ pub fn run() {
             omdb::list_titles_needing_scores,
             omdb::save_omdb_scores,
             probe::file_facts,
+            probe::season_facts,
             aspect::measure_pictures,
             equipment::get_equipment,
             equipment::check_equipment,

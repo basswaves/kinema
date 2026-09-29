@@ -201,7 +201,20 @@ reasoning is in [docs/DESIGN.md](docs/DESIGN.md) and [docs/HISTORY.md](docs/HIST
   years. `yt-dlp`, the Kodi YouTube resolver and an in-app embed with an ad
   blocker were all rejected on exactly this ground. A read-only metadata service
   behind a stable API, used on its own terms — TMDB, TVmaze, TheIntroDB,
-  Wikidata — is not maintenance; a scraper or a downloader is.
+  Wikidata, IMDb's published ratings file — is not maintenance; a scraper or a
+  downloader is.
+- **The detail page's badges describe the file, from the file.** Resolution,
+  HDR, Dolby Vision, sound format and the rest are read with ffprobe and
+  measured, never taken from the release name — a name saying "DV" or "Atmos"
+  is not believed. Only the source (remux, WEB-DL…), the edition and Auro-3D
+  come from the name, because nothing inside a file says them. The badges are
+  in Kinema's own lettering: Dolby, DTS and IMDb logos are trademarks for
+  licensed products, which this is not.
+- **No shared key for scores.** IMDb's rating comes from the file IMDb
+  publishes, on its terms: that file only, never imdb.com, and only the
+  library's rows kept. Rotten Tomatoes needs OMDb, and only with the user's own
+  key — a key built into every copy would exhaust OMDb's daily allowance for
+  everyone within hours.
 - **No third-party binaries in the repo or the bundle.** The app may *invoke* a
   tool the user installed themselves, at a path they chose. It ships nothing,
   downloads nothing, and depends on nothing being present.

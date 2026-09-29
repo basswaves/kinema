@@ -1606,7 +1606,7 @@ with it.
 **First run lost its key step** in released builds. A build from source keeps
 it, since without it there are no posters.
 
-## Picture and sound badges (in progress)
+## Picture and sound badges ✅
 
 Agreed on 2026-09-29: the detail page gets badges as detailed as a Kodi skin's
 or a Zidoo player's — resolution, the Dolby Vision profile and whether its
@@ -1736,8 +1736,9 @@ already decided. Down from Play goes to the season tabs.
 since it cannot send Dolby Vision — the stats panel says what is sent. Sound
 lists each format once, commentary left out, with Atmos and DTS:X from
 ffprobe's own name for the track. A subtitle counts as SDH by its flag or,
-since few files set one, by a title like "English (SDH)". Without ffprobe only
-the source is left; without a readable name, nothing. For a series, the
+since few files set one, by a title like "English (SDH)". Without ffprobe the
+source is left, and — added later — the studios, age rating and scores, which
+come from TMDB, IMDb and OMDb rather than the file. For a series, the
 badges are the episode Play would start. Checked against the real app's answer
 for the library's films and episodes, and driven by keyboard alone in
 `dev:mock`, desktop and TV layouts.

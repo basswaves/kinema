@@ -29,8 +29,8 @@ makes no stability promises.
   with IMAX scenes says both. Sound: each format, with Atmos and DTS:X told
   apart. File: where it came from (UHD Blu-ray remux, WEB-DL from Netflix…,
   read from the release name), edition, subtitles and bitrate. For a series,
-  the badges are the episode Play would start. Needs ffmpeg for everything
-  but the source; each file is read once, when it is scanned.
+  the badges are the episode Play would start. The picture and sound badges
+  need ffmpeg; each file is read once, when it is scanned.
 - **The US age rating** (R, PG-13, TV-MA) beside the year, and **the studios
   or TV network** as logos among the badges, from TMDB. Titles already in
   the library get them on the next scan.

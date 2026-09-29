@@ -1,6 +1,6 @@
 /**
- * The library scan pipeline: scan → parse → match → details → artwork → examine
- * → detect → measure.
+ * The library scan pipeline: scan → parse → match → details → ratings → artwork
+ * → examine → detect → measure.
  *
  * One sequence with two callers — the automatic scan at startup and the manual
  * "Scan now" button — because two copies of an ordering this fiddly would drift,

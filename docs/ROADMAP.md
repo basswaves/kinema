@@ -11,14 +11,6 @@ Ideas and reports are welcome as [issues](https://github.com/Basswaves/kinema/is
 
 ## Next
 
-### Picture and sound badges
-
-The detail page shows what a file really holds, as precisely as a Kodi skin
-does: resolution, Dolby Vision profile with FEL or MEL, HDR10+, the exact
-audio format (TrueHD Atmos, DTS:X…), frame rate, bit depth, the measured
-aspect ratio, source and studio, with IMDb and — with an OMDb key of your own —
-Rotten Tomatoes scores. Built; the documentation is being brought up to date.
-
 ### A first-run setup for picture and sound
 
 A short walk-through the first time Kinema starts — sending sound straight to a
@@ -88,6 +80,13 @@ there is.
   Intel and NVIDIA should behave identically), and projectors are unknown.
 - **Dolby Vision files.** Profiles 5, 7 and 8 are handled in code and named in
   the stats panel (`i`), but no Dolby Vision file has been played end to end.
+  The detail page's badge — the profile, and FEL or MEL for profile 7 — has
+  been checked against dovi_tool's sample data, not against a real disc.
+- **The picture and sound badges on more files.** DTS:X, DD+ Atmos, HDR10+,
+  HLG and Auro-3D names have been checked only against sample output; the
+  aspect-ratio measurement has not yet met a film with IMAX scenes or a remux
+  with black bars. Settings → Advanced → Open log folder, and a note of what
+  the badge said against what the disc box says, is a useful report.
 - **Intro and credits detection on more shows.** The thresholds were tuned
   against one programme. Shows with a quiet intro, a spoken cold open, no
   closing theme, or credits over live picture rather than black are the

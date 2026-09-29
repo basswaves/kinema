@@ -92,8 +92,8 @@ src/
                  chapters.ts and stats.ts read mpv as flat scalars only;
                  skip.ts continues the credits ladder past the marker Rust
                  supplies — a named chapter, then a fenced guess at the tail
-  library/       pipeline.ts — the scan→parse→match→details→artwork→examine→
-                 detect→measure sequence, shared by the startup scan and the
+  library/       pipeline.ts — the scan→parse→match→details→ratings→artwork→
+                 examine→detect→measure sequence, shared by the startup scan and the
                  Scan now button. parse.ts loads guessit-js on demand, not at
                  startup; release.ts reads the source badge (remux, WEB-DL,
                  disc image, Auro-3D) from the file's name and folders, when a
@@ -115,13 +115,16 @@ src/
 scan (Rust)  →  media_files rows          identity = path + size + mtime
 parse (TS)   →  guessit-js + parent-dir fallback → parsed_title/season/episode
 match (TS)   →  provider search → score → titles + episodes, or "unmatched" with reason
+details (TS) →  re-fetch titles matched before a field was being stored,
+                TMDB data older than TMDB allows (six months), and films found
+                through Wikidata once there is a TMDB key to move them to
+ratings(Rust)→  IMDb's ratings file when due, keeping the library's rows;
+                Rotten Tomatoes through the user's OMDb key (TS), within a
+                daily budget
 artwork(Rust)→  posters, backdrops, logos, stills, cast faces into app data
 examine(Rust)→  ffprobe on each new or changed file → media_probe
 detect (Rust)→  Skiptro and the built-in analysis → skip markers
 measure(Rust)→  cropdetect, films and one episode a season → media_probe
-details (TS) →  re-fetch titles matched before a field was being stored,
-                TMDB data older than TMDB allows (six months), and films found
-                through Wikidata once there is a TMDB key to move them to
 browse (TS)  →  titles/episodes → rails, detail pages
 play  (TS)   →  mpv loadfile → resume seek → progress saved every 5s
 ```
@@ -336,6 +339,15 @@ rates in separate rows, and it lists the **render passes that actually ran**
 rather than the settings that were requested — different claims, and only the
 second answers "is anything touching my image?". All flat scalar reads, polled
 rather than observed, each one individually allowed to fail.
+
+**Badges say what the file holds, and the file says it.** The detail page's
+picture and sound badges are the stats panel's counterpart for a file not
+playing: ffprobe's reading of the file at scan time (`probe.rs`), the picture's
+measured shape (`aspect.rs`), and only for where it came from, the release
+name (`release.ts`). They describe the file — a Dolby Vision badge on a film
+Windows will send as HDR10 is still true of the file, and the stats panel says
+what was sent. Kinema's own lettering throughout, no brand logos; never
+focusable, and under Play so the remote's landing spot does not move.
 
 **One layout, one scale knob — not a TV skin.** Every dimension in `ui.css` is in
 `rem`; TV mode multiplies the root font size and everything follows. A parallel set

@@ -17,7 +17,9 @@ Kinema is one program: close it and nothing is left running.
 
 Detail pages carry the cast, the description and — for a series — every season
 and episode, opening on the season you are in, with progress on the ones you
-have started. Posters everywhere show what you have watched.
+have started. Under the buttons, badges say what the file really holds, and
+beside the year are its age rating and its IMDb, Rotten Tomatoes and TMDB
+scores. Posters everywhere show what you have watched.
 
 ![The player's controls: seek bar, the transport in the middle, audio and subtitles and volume at the right, and when it will end](docs/images/player.jpg)
 
@@ -36,6 +38,12 @@ audio and subtitles, volume. Back steps back to wherever you came from.
   and Home tells you when something is waiting there.
 - **Plays through mpv** — the same engine as the standalone player — with
   hardware decoding, HDR tone mapping, PGS subtitles and 4K remuxes.
+- **Says what each file really holds.** A title's page shows the resolution,
+  the Dolby Vision profile — with FEL or MEL — and HDR format, the exact sound
+  format (TrueHD Atmos, DTS:X, DD+ Atmos), frame rate, bit depth and the aspect
+  ratio measured from the picture itself, so a 2.39:1 film in a 16:9 file says
+  2.39:1. Where it came from (UHD Blu-ray remux, WEB-DL…) is read from the
+  release name; nothing else is.
 - **Remembers where you were**, per file, and offers the next episode.
 - **Skips intros and credits**, from a community database, from chapter markers,
   or by fingerprinting a season's audio and finding what the episodes share.
@@ -116,8 +124,9 @@ without it that feature is skipped and everything else carries on.
 
 | | What it adds | Without it |
 |---|---|---|
-| **[ffmpeg](https://ffmpeg.org/download.html)** | Kinema's own intro and credits detection, by fingerprinting a season's audio; and the picture and sound badges on a title's page — resolution, Dolby Vision, HDR, Atmos, the measured aspect ratio | Intros and credits come from TheIntroDB and chapter markers only, and a title's page shows only where the file came from |
+| **[ffmpeg](https://ffmpeg.org/download.html)** | Kinema's own intro and credits detection, by fingerprinting a season's audio; and the picture and sound badges on a title's page — resolution, Dolby Vision, HDR, Atmos, the measured aspect ratio | Intros and credits come from TheIntroDB and chapter markers only; a title's page keeps its source, studio, age rating and scores, without the picture and sound badges |
 | **[Skiptro](https://github.com/MikeSiLVO/skiptro-releases)** | A second, well-tuned intro detector that Kinema can run and read | The built-in detector handles it |
+| **An [OMDb key](https://www.omdbapi.com/apikey.aspx)** (free) | Rotten Tomatoes scores on a title's page, in Settings → Library. Kinema spends at most half of a free key's daily lookups | IMDb's and TMDB's scores only |
 
 Put ffmpeg on your `PATH`, or point Settings at it. Skiptro is configured the
 same way, at whatever path you installed it to — point Kinema at `skiptro.exe`,

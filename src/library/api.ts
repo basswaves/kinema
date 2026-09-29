@@ -194,6 +194,28 @@ export interface AutoDetectReport {
  */
 export const autoDetect = () => invoke<AutoDetectReport>('auto_detect');
 
+/** How far the scan's reading of files has got. */
+export interface ProbeProgress {
+  done: number;
+  total: number;
+}
+
+export interface ProbeReport {
+  /** Files read on this pass. */
+  read: number;
+  /** Files ffprobe could not read; tried again when they change. */
+  failed: number;
+  /** ffprobe was not found, so nothing was read. Not a problem to report. */
+  unavailable: boolean;
+}
+
+/**
+ * Read what is inside every new or changed file — picture, sound, subtitles —
+ * with the user's own ffprobe, for the detail page's badges. Only files that
+ * need it are read, so after the first scan this is usually nothing at all.
+ */
+export const probeLibrary = () => invoke<ProbeReport>('probe_library');
+
 export const listMediaFiles = (limit: number) => invoke<MediaFile[]>('list_media_files', { limit });
 
 export const saveParseResults = (results: ParseResultPayload[]) =>

@@ -1,5 +1,6 @@
 /**
- * The library scan pipeline: scan → parse → match → artwork → details → detect.
+ * The library scan pipeline: scan → parse → match → details → artwork → examine
+ * → detect.
  *
  * One sequence with two callers — the automatic scan at startup and the manual
  * "Scan now" button — because two copies of an ordering this fiddly would drift,
@@ -21,6 +22,7 @@ import { listen } from '@tauri-apps/api/event';
 import {
   autoDetect,
   listLibraryRoots,
+  probeLibrary,
   listUnparsed,
   saveParseResults,
   scanLibrary,
@@ -30,6 +32,7 @@ import {
   type LibraryRoot,
   type MediaFile,
   type ParseResultPayload,
+  type ProbeProgress,
 } from './api';
 import { clearParseError, initParser, lastParseError, parseMediaFile, toPayload } from './parse';
 import { cacheArtwork, listUnmatched } from '../metadata/api';
@@ -45,7 +48,14 @@ import { syncBuiltinKey } from '../metadata/builtinKey';
 /** Batched so a large library reports progress and never builds one huge IPC payload. */
 const PARSE_BATCH = 500;
 
-export type ScanStage = 'scanning' | 'parsing' | 'matching' | 'artwork' | 'details' | 'detecting';
+export type ScanStage =
+  | 'scanning'
+  | 'parsing'
+  | 'matching'
+  | 'artwork'
+  | 'details'
+  | 'examining'
+  | 'detecting';
 
 export interface ScanStatus {
   stage: ScanStage;
@@ -134,6 +144,37 @@ export function parseForLibrary(file: MediaFile, roots: LibraryRoot[]): ParseRes
   const root = rootForPath(roots, file.path);
   const kind: LibraryKind = root?.kind ?? 'movies';
   return toPayload(file, parseMediaFile(file, kind, root?.path));
+}
+
+/**
+ * The examining stage: what is inside each new or changed file, for the
+ * detail page's badges.
+ *
+ * Never throws, for the same reason detection does not: a file whose details
+ * could not be read is a detail page with fewer badges, not a failed scan. A
+ * missing ffprobe is not reported at all — it is optional, and Settings says
+ * so where ffmpeg's path is set.
+ */
+async function runProbe(errors: string[]): Promise<void> {
+  setStatus({ stage: 'examining', detail: '' });
+
+  const off = listen<ProbeProgress>('probe-progress', (event) =>
+    setStatus({
+      stage: 'examining',
+      detail: `${event.payload.done + 1}/${event.payload.total}`,
+    })
+  );
+
+  try {
+    const report = await probeLibrary();
+    if (report.failed > 0) {
+      errors.push(`${count(report.failed, 'file')} could not be read by ffprobe`);
+    }
+  } catch (e) {
+    errors.push(`reading files: ${String(e)}`);
+  } finally {
+    void off.then((stop) => stop());
+  }
 }
 
 /**
@@ -250,6 +291,10 @@ export async function runScanPipeline(): Promise<ScanOutcome> {
     setStatus({ stage: 'artwork', detail: '' });
     const art = await cacheArtwork();
     if (art.failed > 0) errors.push(`${count(art.failed, 'artwork download')} failed`);
+
+    // Before detection, which can take minutes: a fraction of a second per new
+    // file, and the badges on a new film should not wait for a season's intros.
+    await runProbe(errors);
 
     // Last, and deliberately part of the same sequence rather than something the
     // user has to go and press afterwards. Everything before this decides *what*

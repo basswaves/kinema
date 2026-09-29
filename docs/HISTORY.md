@@ -1606,6 +1606,68 @@ with it.
 **First run lost its key step** in released builds. A build from source keeps
 it, since without it there are no posters.
 
+## Picture and sound badges (in progress)
+
+Agreed on 2026-09-29: the detail page gets badges as detailed as a Kodi skin's
+or a Zidoo player's — resolution, the Dolby Vision profile and whether its
+enhancement layer is full or minimal, HDR10+, the exact object-audio format,
+frame rate, bit depth, aspect ratio, source, studio — with IMDb and Rotten
+Tomatoes scores beside TMDB's. Decisions made before any of it was built:
+
+- **What a file holds comes from the file.** Never from the release name,
+  except for the one thing only the name knows: where it came from (a remux,
+  a web download, a disc image). A file called `…DV…` without Dolby Vision in
+  it gets no Dolby Vision badge. Auro-3D is the other exception: it hides
+  inside ordinary PCM and nothing on Windows can detect it.
+- **Kinema's own lettering, not the brands' logos.** Kodi skins and Zidoo
+  players show the real Dolby Vision, Atmos and DTS:X marks. Those are
+  trademarks whose use comes with a licence — Zidoo's players are licensed —
+  and Kinema has none. Naming a format in plain text to say what a file
+  contains is how open-source players do it. Studio logos are different: TMDB
+  serves them to apps.
+- **Scores: IMDb's own ratings file, TMDB, and Rotten Tomatoes only with a key
+  of the user's own.** OMDb has both IMDb and Rotten Tomatoes, but its free
+  keys allow 1,000 lookups a day; one key built into every copy of Kinema
+  would run out within hours and fail for everyone until the next day.
+  (Jellyfin's source carries a shared OMDb key; that arrangement is theirs,
+  not something another app can borrow.) IMDb publishes a daily ratings file
+  for personal, non-commercial use with a credit line, which each copy of
+  Kinema can fetch for itself. An OMDb key entered in Settings adds Rotten
+  Tomatoes.
+- **The aspect ratio by looking at the picture.** A remux keeps the black
+  bars inside a 16:9 frame, so the file says 1.78:1 for a 2.39:1 film. Kodi,
+  Jellyfin, Plex and Zidoo all show the file's figure. Measured before
+  deciding: sampling five frames takes about 1.3 s for a 4K film and 0.3 s
+  for a 1080p one, once per file, so Kinema measures.
+
+### Reading the files ✅
+
+**ffprobe, not MediaInfo.** MediaInfo is open source and very thorough, and
+was looked at. For these badges it reports what ffprobe does — ffprobe 8
+names "Dolby TrueHD + Dolby Atmos" and "DTS-HD MA + DTS:X" itself — and it
+cannot tell FEL from MEL either (an open request on MediaInfoLib). It would be
+a second program for people to install, where ffprobe already comes with the
+ffmpeg Kinema uses.
+
+**FEL or MEL without a new dependency.** The only place that says whether a
+profile 7 enhancement layer carries picture is the RPU in each frame. The
+`dolby_vision` crate (dovi_tool's) parses it, but ffmpeg already does:
+decoding one frame, ffprobe prints the RPU's NLQ parameters, and dovi_tool's
+rule — a minimal layer's parameters are all at their do-nothing values — reads
+as well from those. Checked against dovi_tool's own sample RPUs put into a
+test clip: FEL, MEL and profile 8 each came out right. No Dolby Vision film
+was at hand; the end-to-end reading of a real disc is still to be seen.
+
+**Read at scan time, once.** A detail page cannot wait for a subprocess, and a
+file on a sleeping NAS takes seconds to answer. The scan reads every new or
+changed file after artwork and before intro detection (`probe.rs`), keeps the
+result in `media_probe`, and reads a file again only when its size or
+modification time changes or the reader's version is raised. The real
+library: 79 files in 27 s over a network drive while a film played; later
+scans read only what changed. A file ffprobe cannot read is kept as a failure
+and not retried until it changes. A file that is not *there* — its drive
+offline — is not recorded at all, or it would stay unread for good.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

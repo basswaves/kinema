@@ -41,7 +41,7 @@ pub const SAMPLE_RATE: u32 = 11_025;
 /// finishes a minute later. Below-normal only yields when something else wants
 /// the CPU; on an idle machine it still runs flat out.
 #[cfg(windows)]
-fn no_window(command: &mut Command) {
+pub(crate) fn no_window(command: &mut Command) {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
     const BELOW_NORMAL_PRIORITY_CLASS: u32 = 0x0000_4000;
@@ -49,7 +49,7 @@ fn no_window(command: &mut Command) {
 }
 
 #[cfg(not(windows))]
-fn no_window(_command: &mut Command) {}
+pub(crate) fn no_window(_command: &mut Command) {}
 
 /// The configured ffmpeg, or plain `ffmpeg` to be resolved through `PATH`.
 pub fn resolve(configured: Option<&str>) -> PathBuf {
@@ -64,7 +64,7 @@ pub fn resolve(configured: Option<&str>) -> PathBuf {
 /// Derived rather than configured separately: the two ship together in every
 /// build, and a second path field would be one more thing to get wrong for no
 /// benefit. A bare `ffmpeg` from `PATH` yields a bare `ffprobe` from `PATH`.
-fn probe_binary(ffmpeg: &Path) -> PathBuf {
+pub(crate) fn probe_binary(ffmpeg: &Path) -> PathBuf {
     match ffmpeg.parent().filter(|p| !p.as_os_str().is_empty()) {
         Some(dir) => {
             let name = if cfg!(windows) { "ffprobe.exe" } else { "ffprobe" };

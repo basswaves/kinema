@@ -11,6 +11,14 @@ Ideas and reports are welcome as [issues](https://github.com/Basswaves/kinema/is
 
 ## Next
 
+### Picture and sound badges
+
+The detail page shows what a file really holds, as precisely as a Kodi skin
+does: resolution, Dolby Vision profile with FEL or MEL, HDR10+, the exact
+audio format (TrueHD Atmos, DTS:X…), frame rate, bit depth, the measured
+aspect ratio, source and studio, with IMDb and — with an OMDb key of your own —
+Rotten Tomatoes scores. Being built now; reading the files is done.
+
 ### A first-run setup for picture and sound
 
 A short walk-through the first time Kinema starts — sending sound straight to a

@@ -40,7 +40,8 @@ npm run tauri dev
 ```
 
 `ffmpeg` on `PATH` is optional; without it the app's own intro/credits detection
-is skipped and everything else works.
+and the reading of each file's picture and sound format are skipped, and
+everything else works.
 
 Released builds carry Kinema's own TMDB key, added at build time from a
 repository secret and never committed. A build from source has none, and

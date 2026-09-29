@@ -27,7 +27,7 @@ import { ensureMpvInitialised } from './player/mpv';
 import { readTracks } from './player/tracks';
 import { readChapters } from './player/chapters';
 import { setTvMode } from './ui/tv';
-import { scanLibrary } from './library/api';
+import { probeLibrary, scanLibrary } from './library/api';
 import {
   cacheArtwork,
   ignoreFileIds,
@@ -66,6 +66,8 @@ const CALLABLE: Record<string, (...args: never[]) => Promise<unknown>> = {
   refreshStaleTitles,
   cacheArtwork,
   upgradeWikidataFilms,
+  // The scan's reading of files for the detail page's badges, on its own.
+  probeLibrary,
   // A scan's matching step on its own: whatever is waiting to be matched,
   // with whichever keys the copied library has.
   matchUnmatched: async () =>

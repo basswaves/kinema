@@ -698,6 +698,7 @@ const handlers: Record<string, Handler> = {
   detect_intros: () => mockDetection.run(),
   stop_detection: () => mockDetection.stop(),
   ffmpeg_status: () => ({ resolved: 'ffmpeg', available: false }),
+  probe_library: () => ({ read: 0, failed: 0, unavailable: true }),
   get_equipment: () => mockEquipment(),
   check_equipment: () => mockEquipment(),
   window_display: () => ({ gdi_name: '', hdr: 'unknown' }),

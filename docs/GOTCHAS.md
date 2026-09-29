@@ -469,6 +469,34 @@ to stderr, because "it usually does not write much there" is not a guarantee.
 `CommandExt::creation_flags`, or every spawned step flashes a console window
 over the app.
 
+### Cover art is a video stream
+
+MP4 and Matroska carry a poster as a *video* stream flagged
+`disposition.attached_pic`, and in an MP4 it is often stream 0. "The first
+video stream" is then a 600×900 JPEG, and `-select_streams v:0` decodes the
+poster rather than the film — which has no HDR10+, no Dolby Vision RPU, and
+reports neither missing. **Do:** skip `attached_pic` streams, and select the
+film by its absolute index (`-select_streams 3`), as `probe.rs` does.
+
+### ffprobe's `vdr_in_max` is one fixed-point number
+
+A Dolby Vision RPU stores `vdr_in_max` as an integer part and a fraction;
+ffmpeg joins them into one number with `coef_log2_denom` fractional bits. So
+the "1.0" that marks a minimal enhancement layer (MEL) is printed as
+`8388608` (`1 << 23`), not `1`. A check for `vdr_in_max == 1` calls every MEL
+disc FEL.
+
+### Your ffmpeg may not write Dolby Vision, and says nothing
+
+To make a Dolby Vision test clip, `-x265-params dolby-vision-profile=8.1:
+dolby-vision-rpu=rpu.bin` is the documented way. With an x265 built without
+Dolby Vision support — the one in gyan.dev's ffmpeg build, for one — it
+encodes a perfectly good HDR10 clip, exits 0, and leaves the RPU out. Check
+the result with `ffprobe -show_frames -read_intervals %+#1` before trusting
+it. What worked instead: encode plain HEVC to a raw `.hevc`, append the RPU as
+a NAL unit of type 62 (`00 00 00 01 7C 01` + the RPU) after each picture's
+slice, and remux; ffprobe then reads it as a Dolby Vision stream.
+
 ---
 
 ## Spatial navigation (D-pad)

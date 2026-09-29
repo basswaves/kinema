@@ -14,6 +14,7 @@ mod lifecycle;
 mod metadata;
 mod nfo;
 mod playback;
+mod probe;
 mod scanner;
 mod selftest;
 mod settings;
@@ -214,6 +215,7 @@ pub fn run() {
             detect::auto_detect,
             detect::analysis_backlog,
             ffmpeg::ffmpeg_status,
+            probe::probe_library,
             equipment::get_equipment,
             equipment::check_equipment,
             equipment::window_display,

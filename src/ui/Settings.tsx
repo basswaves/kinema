@@ -933,14 +933,18 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
                         ? `Found ffmpeg at ${ffmpeg.resolved}.`
                         : `Could not find ffmpeg (looked for "${ffmpeg.resolved}"). Install it, ` +
                           `or type the full path to ffmpeg.exe here. Without it, the built-in ` +
-                          `detection is skipped — everything else works normally.`}
+                          `detection and the picture and sound details on a title's page are ` +
+                          `skipped — everything else works normally.`}
                     </p>
                   )}
                   <MoreAbout>
                     <p>
                       ffmpeg is a free tool for reading video and audio files. Kinema does not
                       include it: install it yourself and it is found automatically. Without it,
-                      this source is skipped and the others carry on.
+                      this source is skipped and the others carry on. Kinema also uses it (its
+                      companion ffprobe, which comes with it) to read what each file holds —
+                      resolution, HDR and Dolby Vision, the sound format — once, when the file
+                      is first scanned.
                     </p>
                   </MoreAbout>
 

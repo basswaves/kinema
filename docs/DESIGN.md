@@ -54,6 +54,9 @@ src-tauri/src/
                  boundary onto the fade to black the picture actually has
   ffmpeg.rs      Finding ffmpeg; decoding short windows of audio, and finding
                  black frames, with it
+  probe.rs       What each file holds — codec, HDR, Dolby Vision profile and
+                 FEL/MEL, audio formats, subtitles — read with ffprobe once per
+                 file at scan time and kept in media_probe for the badges
   introdb.rs     TheIntroDB lookups, keyed on TMDB id. Where end credits come
                  from; per-episode, on play, cached with a TTL
   detect.rs      Runs the user's own Skiptro if configured, then analyse.rs.
@@ -99,6 +102,7 @@ scan (Rust)  →  media_files rows          identity = path + size + mtime
 parse (TS)   →  guessit-js + parent-dir fallback → parsed_title/season/episode
 match (TS)   →  provider search → score → titles + episodes, or "unmatched" with reason
 artwork(Rust)→  posters, backdrops, logos, stills, cast faces into app data
+examine(Rust)→  ffprobe on each new or changed file → media_probe
 details (TS) →  re-fetch titles matched before a field was being stored,
                 TMDB data older than TMDB allows (six months), and films found
                 through Wikidata once there is a TMDB key to move them to

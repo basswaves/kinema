@@ -46,6 +46,8 @@ use std::sync::{Arc, Mutex};
 ///   running covers what the other would have done; the automatic one skips,
 ///   and the button says detection is already running rather than queueing
 ///   minutes of work behind it.
+/// * **Probe** — refused, silently. Reading files is the scan's own step and
+///   finishes in seconds; a second pass would read nothing the first did not.
 /// * **Artwork** — waits its turn, then runs. Not refused: the second caller
 ///   may know URLs the first did not (the details pass finds logos and cast
 ///   photos), and a refusal would leave those to the next launch. A run after
@@ -61,6 +63,7 @@ use std::sync::{Arc, Mutex};
 pub struct Jobs {
     scan: Arc<AtomicBool>,
     detect: Arc<AtomicBool>,
+    probe: Arc<AtomicBool>,
     pub artwork: tauri::async_runtime::Mutex<()>,
     stop_detect: AtomicBool,
     /// The Skiptro process running right now, so Stop can end it.
@@ -71,6 +74,7 @@ pub struct Jobs {
 pub enum Job {
     Scan,
     Detect,
+    Probe,
 }
 
 /// Proof that a job is running. The job is finished when this is dropped —
@@ -90,6 +94,7 @@ impl Jobs {
         match job {
             Job::Scan => &self.scan,
             Job::Detect => &self.detect,
+            Job::Probe => &self.probe,
         }
     }
 

@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use std::path::Path;
 
 /// The schema this build understands. Bump it with every new `SCHEMA_V*`.
-pub const SCHEMA_VERSION: i64 = 13;
+pub const SCHEMA_VERSION: i64 = 14;
 
 /// What can go wrong opening the library.
 ///
@@ -471,6 +471,30 @@ SELECT kind, provider, provider_id, imdb_id, tmdb_id, season, episode, label,
  WHERE n = 1;
 "#;
 
+/// Schema version 14: what is inside each file — picture, sound, subtitles.
+///
+/// Read with ffprobe (see `probe.rs`) once per file and kept here, because a
+/// detail page cannot wait for a subprocess and a file on a sleeping NAS may
+/// take seconds to answer. `size_bytes` and `modified_at` are the file as it
+/// was read: when either differs from `media_files`, the file is read again.
+/// `probe_version` does the same job for the reader itself — raising
+/// `probe::PROBE_VERSION` re-reads everything once.
+///
+/// `details` is NULL and `error` set when ffprobe could not read the file (a
+/// disc image, a damaged file). That is kept too, so the file is not tried on
+/// every scan; it is tried again when it changes.
+const SCHEMA_V14: &str = r#"
+CREATE TABLE media_probe (
+    file_id       INTEGER PRIMARY KEY REFERENCES media_files(id) ON DELETE CASCADE,
+    size_bytes    INTEGER NOT NULL,
+    modified_at   INTEGER NOT NULL,
+    probe_version INTEGER NOT NULL,
+    probed_at     INTEGER NOT NULL,
+    details       TEXT,                      -- JSON, probe::MediaDetails
+    error         TEXT
+);
+"#;
+
 /// How long a statement waits for the write lock before giving up.
 ///
 /// Load-bearing from the moment there is more than one connection. SQLite
@@ -582,7 +606,7 @@ pub fn open_secondary(path: &Path) -> rusqlite::Result<Connection> {
 /// Every migration, in order. The index is the version it produces.
 const MIGRATIONS: [&str; SCHEMA_VERSION as usize] = [
     SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6, SCHEMA_V7, SCHEMA_V8,
-    SCHEMA_V9, SCHEMA_V10, SCHEMA_V11, SCHEMA_V12, SCHEMA_V13,
+    SCHEMA_V9, SCHEMA_V10, SCHEMA_V11, SCHEMA_V12, SCHEMA_V13, SCHEMA_V14,
 ];
 
 /// Bring the database up to [`SCHEMA_VERSION`].
@@ -598,7 +622,7 @@ const MIGRATIONS: [&str; SCHEMA_VERSION as usize] = [
 ///
 /// `PRAGMA user_version` lives in the database header and is written inside the
 /// transaction like anything else, so a rollback takes it with the schema.
-fn migrate(conn: &Connection) -> Result<(), DbError> {
+pub(crate) fn migrate(conn: &Connection) -> Result<(), DbError> {
     let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
 
     // Refuse a database from a newer build rather than limping on. Without this

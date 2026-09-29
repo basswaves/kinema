@@ -769,6 +769,12 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
                       Movies found without a TMDB key: data from <strong>Wikidata</strong>, and
                       descriptions from <strong>Wikipedia</strong> under CC BY-SA 4.0.
                     </p>
+                    {/* The exact statement IMDb's terms for its ratings file
+                        require. */}
+                    <p className="muted">
+                      IMDb ratings: Information courtesy of IMDb (https://www.imdb.com). Used with
+                      permission.
+                    </p>
                   </div>
                 </section>
               </>

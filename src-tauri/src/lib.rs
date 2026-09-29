@@ -8,6 +8,7 @@ mod display;
 mod equipment;
 mod ffmpeg;
 mod history;
+mod imdb;
 mod introdb;
 mod jobs;
 mod library;
@@ -217,6 +218,7 @@ pub fn run() {
             detect::analysis_backlog,
             ffmpeg::ffmpeg_status,
             probe::probe_library,
+            imdb::refresh_imdb_ratings,
             probe::file_facts,
             aspect::measure_pictures,
             equipment::get_equipment,

@@ -41,6 +41,9 @@ tauri-plugin-http = "2"
 # being another installed tool. Decoding still needs ffmpeg (see ffmpeg.rs):
 # Symphonia cannot read AC-3, E-AC-3, DTS or TrueHD, which is most of a remux.
 rusty-chromaprint = "0.3.0"
+# Decompresses IMDb's ratings file (imdb.rs). Already compiled in through the
+# PNG decoder Tauri uses, so naming it adds no new code to the build.
+flate2 = "1"
 
 # Microsoft's own bindings, already compiled in through Tauri at this version.
 # Used read-only by equipment.rs to ask Windows what the screens and audio

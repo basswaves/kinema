@@ -138,6 +138,20 @@ rather than only in documentation — see the module header of
 
 Accuracy and coverage vary, as with any community database.
 
+### IMDb
+
+Information courtesy of IMDb (https://www.imdb.com). Used with permission.
+
+Ratings and vote counts from IMDb's
+[non-commercial datasets](https://data.imdb.com/non-commercial-datasets/),
+used for personal and non-commercial purposes under IMDb's
+[terms for them](https://help.imdb.com/article/imdb/general-information/can-i-use-imdb-data-in-my-software/G5JTRESSHJBBHTGX).
+As those terms require, only the published file is used — imdb.com itself is
+never read — and no copy of it is kept: each copy of Kinema fetches
+`title.ratings.tsv.gz` for itself, weekly at most, and keeps only the rows for
+titles in its own library (`src-tauri/src/imdb.rs`). The credit above is shown
+in Settings.
+
 ---
 
 ## Prior art

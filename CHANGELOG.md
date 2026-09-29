@@ -34,6 +34,9 @@ makes no stability promises.
 - **The US age rating** (R, PG-13, TV-MA) beside the year, and **the studios
   or TV network** as logos among the badges, from TMDB. Titles already in
   the library get them on the next scan.
+- **IMDb's rating** beside TMDB's, from the ratings file IMDb publishes for
+  personal use. No key and no account; Kinema fetches it at most once a week
+  and keeps only your library's titles.
 
 ### Changed
 

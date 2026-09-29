@@ -1762,6 +1762,26 @@ which only works because TMDB's are on transparency (all nine the real
 library fetched were). They are cached like every other image, so a detail
 page needs no network.
 
+### IMDb's rating ✅
+
+**IMDb's own file, fetched by each copy of Kinema.** `title.ratings.tsv.gz`
+is 8.7 MB and updated daily; downloading and reading it took 1.3 s, and
+keeping the library's rows — its terms allow no wider copy — means it is read
+as it arrives and never stored. Decompressing it needed flate2, which Kinema
+already compiled in through the PNG decoder, so naming it added no code.
+
+**How often.** When it has never been fetched, when the last fetch is a month
+old, or when a title has joined the library since the last one and that was a
+week ago. The first version asked instead whether any title was unrated, and
+the real library had a series IMDb gives no rating: it would have brought
+nine megabytes down every week for ever. A title looked up and not found now
+has a row with no rating, which counts as asked.
+
+**Shown beside TMDB's, each named.** "IMDb 7.6 · TMDB 7.1" rather than one
+star, because the two are different audiences' numbers. IMDb spells itself
+with a small b, so the label is not upper-cased like the badges'. The credit
+IMDb requires is in Settings with TMDB's, word for word.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

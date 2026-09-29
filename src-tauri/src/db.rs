@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use std::path::Path;
 
 /// The schema this build understands. Bump it with every new `SCHEMA_V*`.
-pub const SCHEMA_VERSION: i64 = 16;
+pub const SCHEMA_VERSION: i64 = 17;
 
 /// What can go wrong opening the library.
 ///
@@ -528,6 +528,21 @@ CREATE TABLE studios (
 );
 "#;
 
+/// Schema version 17: IMDb's ratings for the library's titles (`imdb.rs`).
+///
+/// Keyed by IMDb id rather than by title row, so a title matched again keeps
+/// its rating. Only the library's rows of IMDb's file are ever kept — its
+/// terms allow no wider copy — and each fetch replaces them all. A library
+/// title IMDb has no rating for gets a row with NULLs: looked up, none, so it
+/// does not bring the file down again every week.
+const SCHEMA_V17: &str = r#"
+CREATE TABLE imdb_ratings (
+    imdb_id  TEXT    PRIMARY KEY,
+    rating   REAL,
+    votes    INTEGER
+);
+"#;
+
 /// How long a statement waits for the write lock before giving up.
 ///
 /// Load-bearing from the moment there is more than one connection. SQLite
@@ -640,7 +655,7 @@ pub fn open_secondary(path: &Path) -> rusqlite::Result<Connection> {
 const MIGRATIONS: [&str; SCHEMA_VERSION as usize] = [
     SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6, SCHEMA_V7, SCHEMA_V8,
     SCHEMA_V9, SCHEMA_V10, SCHEMA_V11, SCHEMA_V12, SCHEMA_V13, SCHEMA_V14,
-    SCHEMA_V15, SCHEMA_V16,
+    SCHEMA_V15, SCHEMA_V16, SCHEMA_V17,
 ];
 
 /// Bring the database up to [`SCHEMA_VERSION`].

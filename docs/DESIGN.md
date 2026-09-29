@@ -62,6 +62,8 @@ src-tauri/src/
                  cropdetect, the shape most agree on
   introdb.rs     TheIntroDB lookups, keyed on TMDB id. Where end credits come
                  from; per-episode, on play, cached with a TTL
+  imdb.rs        IMDb's public ratings file, fetched weekly at most, read as
+                 it arrives; only the library's titles are kept
   detect.rs      Runs the user's own Skiptro if configured, then analyse.rs.
                  Two ways in: a Detect button per TV folder, and automatically
                  at the end of every scan — Skiptro whenever new episodes

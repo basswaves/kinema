@@ -34,6 +34,9 @@ export interface Title {
   watched: boolean;
   /** The US age rating (`R`, `TV-MA`); empty or absent when there is none. */
   certification?: string | null;
+  /** IMDb's rating out of 10 and its vote count, from IMDb's own file. */
+  imdb_rating?: number | null;
+  imdb_votes?: number | null;
   /** 0–1, for a film started and not finished. */
   progress: number | null;
   /** Billed cast, in order — for search. */

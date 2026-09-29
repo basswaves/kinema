@@ -228,6 +228,20 @@ export interface MeasureReport {
  */
 export const measurePictures = () => invoke<MeasureReport>('measure_pictures');
 
+export interface ImdbReport {
+  /** The ratings file was fetched on this pass. */
+  fetched: boolean;
+  /** Library titles with an IMDb rating now. */
+  rated: number;
+}
+
+/**
+ * Fetch IMDb's ratings file if it is due — never fetched, a month old, or a
+ * week old with a title still unrated — keeping only the library's rows.
+ * See `imdb.rs` for IMDb's terms and how they are kept.
+ */
+export const refreshImdbRatings = () => invoke<ImdbReport>('refresh_imdb_ratings');
+
 export const listMediaFiles = (limit: number) => invoke<MediaFile[]>('list_media_files', { limit });
 
 export const saveParseResults = (results: ParseResultPayload[]) =>

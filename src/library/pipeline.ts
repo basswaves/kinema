@@ -24,6 +24,7 @@ import {
   listLibraryRoots,
   measurePictures,
   probeLibrary,
+  refreshImdbRatings,
   listUnparsed,
   saveParseResults,
   scanLibrary,
@@ -314,6 +315,13 @@ export async function runScanPipeline(): Promise<ScanOutcome> {
     // Films found through Wikidata get TMDB's pictures once a key works.
     const upgraded = await upgradeWikidataFilms();
     errors.push(...upgraded.errors);
+    // After matching and details, so every IMDb id the library has is known.
+    // Usually nothing: the file is fetched weekly at most.
+    try {
+      await refreshImdbRatings();
+    } catch (e) {
+      errors.push(String(e));
+    }
 
     // After matching and details: every artwork URL is known now, and
     // browsing should not need the network afterwards.

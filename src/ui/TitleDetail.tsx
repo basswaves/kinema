@@ -335,7 +335,6 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
                 )}
                 {[
                   title.year,
-                  title.rating ? `★ ${title.rating.toFixed(1)}` : null,
                   runtimeLabel(title.runtime_mins),
                   title.kind === 'series' ? `${ownedCount} episodes in library` : null,
                   title.kind === 'series' && watchedCount > 0
@@ -345,6 +344,20 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
                 ]
                   .filter(Boolean)
                   .join(' · ')}
+                {/* Scores, each named by where it comes from: IMDb's from
+                    its own ratings file, TMDB's from its users. */}
+                {shown.imdb_rating ? (
+                  <span className="detail-score">
+                    <span className="detail-score-source">IMDb</span>
+                    {shown.imdb_rating.toFixed(1)}
+                  </span>
+                ) : null}
+                {title.rating ? (
+                  <span className="detail-score">
+                    <span className="detail-score-source">TMDB</span>
+                    {title.rating.toFixed(1)}
+                  </span>
+                ) : null}
               </div>
               {title.overview && <p className="detail-overview">{title.overview}</p>}
               {/* Wikipedia's text is CC BY-SA, which asks for a credit where

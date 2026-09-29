@@ -118,6 +118,9 @@ pub struct Title {
     pub cast: Vec<String>,
     /// The US age rating, or `None`/empty when there is none.
     pub certification: Option<String>,
+    /// IMDb's rating out of 10 and its vote count, from IMDb's own file.
+    pub imdb_rating: Option<f64>,
+    pub imdb_votes: Option<i64>,
 }
 
 #[derive(Serialize)]
@@ -331,7 +334,9 @@ const TITLE_SELECT: &str = "
            -- a name, so it separates them safely.
            (SELECT GROUP_CONCAT(name, char(9))
               FROM (SELECT p.name FROM people p WHERE p.title_id = t.id ORDER BY p.ord)),
-           t.certification
+           t.certification,
+           (SELECT r.rating FROM imdb_ratings r WHERE r.imdb_id = t.imdb_id),
+           (SELECT r.votes  FROM imdb_ratings r WHERE r.imdb_id = t.imdb_id)
       FROM titles t";
 
 fn map_title(r: &rusqlite::Row) -> rusqlite::Result<Title> {
@@ -373,6 +378,8 @@ fn map_title(r: &rusqlite::Row) -> rusqlite::Result<Title> {
             .map(|names| names.split('\t').map(str::to_owned).collect())
             .unwrap_or_default(),
         certification: r.get(24)?,
+        imdb_rating: r.get(25)?,
+        imdb_votes: r.get(26)?,
     })
 }
 

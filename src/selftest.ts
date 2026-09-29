@@ -27,7 +27,7 @@ import { ensureMpvInitialised } from './player/mpv';
 import { readTracks } from './player/tracks';
 import { readChapters } from './player/chapters';
 import { setTvMode } from './ui/tv';
-import { measurePictures, probeLibrary, scanLibrary } from './library/api';
+import { measurePictures, probeLibrary, refreshImdbRatings, scanLibrary } from './library/api';
 import { fileFacts } from './ui/badges';
 import {
   cacheArtwork,
@@ -75,6 +75,8 @@ const CALLABLE: Record<string, (...args: never[]) => Promise<unknown>> = {
   measurePictures,
   // What the detail page's badges are made from, for one file.
   fileFacts,
+  // The scan's IMDb step: fetches IMDb's ratings file if it is due.
+  refreshImdbRatings,
   // A scan's matching step on its own: whatever is waiting to be matched,
   // with whichever keys the copied library has.
   matchUnmatched: async () =>

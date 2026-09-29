@@ -7,15 +7,18 @@ Worth stating up front, because it is unusually small:
 - **No server, no daemon, no network listener.** Nothing accepts a connection.
 - **No accounts, no telemetry, no analytics.** Nothing is sent anywhere about
   what you watch.
-- **Outbound requests only, to four services for metadata** — TMDB, TVmaze,
-  OMDb and TheIntroDB — **and one to GitHub** per launch, asking for the latest
+- **Outbound requests only, to five services for metadata** — TMDB, TVmaze,
+  OMDb, Wikidata (with Wikipedia) and TheIntroDB — **and one to GitHub** per launch, asking for the latest
   release's version number (`src-tauri/src/updates.rs`; Settings → Advanced
   turns it off). Nothing is downloaded. The frontend's list is enforced in
   `src-tauri/capabilities/default.json` for the HTTP plugin; the two made from
   Rust are TheIntroDB and GitHub.
-- **Your API keys stay local.** TMDB and OMDb keys are entered by you, stored in
+- **Your API keys stay local.** TMDB and OMDb keys you enter are stored in
   the SQLite database in your app data folder, and sent only to the service they
-  belong to. None are bundled and none are committed.
+  belong to. Released builds carry one key of Kinema's own, for TMDB, added at
+  build time from a repository secret; no key is committed. That key is not a
+  secret from anyone holding the app — any key a program sends can be read out
+  of it — and gives access to nothing but TMDB's public, read-only data.
 - **Media files are read, never modified** — with one explicit exception you
   have to press: NFO export writes `.nfo` sidecars beside your videos.
 

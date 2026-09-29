@@ -193,10 +193,14 @@ reasoning is in [docs/DESIGN.md](docs/DESIGN.md) and [docs/HISTORY.md](docs/HIST
 - **A wrong metadata match is worse than no match.** The 0.75 threshold and the
   0.05 runner-up margin stay. Refusing and surfacing for review beats guessing —
   which is only defensible because the **Needs attention** queue makes refusals
-  correctable, so that queue is load-bearing.
+  correctable, so that queue is load-bearing. A second source (Wikidata, for
+  movies) is a fallback for when TMDB cannot be asked, never a way to accept
+  what TMDB alone would not.
 - **Nothing that needs periodic maintenance.** This has to run untended for
   years. `yt-dlp`, the Kodi YouTube resolver and an in-app embed with an ad
-  blocker were all rejected on exactly this ground.
+  blocker were all rejected on exactly this ground. A read-only metadata service
+  behind a stable API, used on its own terms — TMDB, TVmaze, TheIntroDB,
+  Wikidata — is not maintenance; a scraper or a downloader is.
 - **No third-party binaries in the repo or the bundle.** The app may *invoke* a
   tool the user installed themselves, at a path they chose. It ships nothing,
   downloads nothing, and depends on nothing being present.

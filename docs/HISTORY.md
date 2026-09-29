@@ -1550,6 +1550,62 @@ git checkout <that commit>~1 -- src/spike/ src/App.css
 It renders through the same `ensureMpvInitialised` as the real player, so what
 it reports is what the player gets.
 
+## A TMDB key of Kinema's own, and what happens without one ✅
+
+Done on 2026-09-29. Movies needed a TMDB key before they could be identified,
+and getting one meant an account and a form: the point where Kinema stopped
+working for most people who tried it. It was the first item on the roadmap.
+
+**A key built in, because TMDB allows it.** Their terms permit free,
+non-commercial use with the attribution Settings already showed. Asked about
+keys in open-source apps, their staff call it allowed but discouraged, the risk
+being that a copied key gets abused and blocked. Jellyfin and Kodi ship keys
+the same way. The key belongs to a TMDB account made for Kinema, not the
+maintainer's own, so a block would not touch anything personal.
+
+**Added at build time, not written in the source.** Release builds take it
+from a repository secret as `VITE_TMDB_API_KEY` (`builtinKey.ts`), and the
+release workflow stops if the secret is missing. It can still be read out of
+the built app, as any key a program sends can; keeping it out of the
+repository only stops the bots that harvest keys from GitHub, which is where
+the abuse would come from. A build from source has no key and works as
+Kinema always did.
+
+**A refused key is expected, not ruled out.** If TMDB answers 401 to the
+built-in key, Kinema records the key's fingerprint and stops using it. The
+rest of the scan carries on without it, Home says so with a button to the key
+field, and a new release's key, with a different fingerprint, is used at once.
+A key of the user's own that is refused is left to its error; it is theirs to
+fix. Which built-in key is in effect is stored like a provider key, so the
+first release with one re-opens the refusals made for want of it.
+
+**Six months, and why that became Kinema's problem.** TMDB's terms forbid
+keeping their data longer than six months. With each user's own key, meeting
+that was between them and TMDB; with one shared key it is the maintainer's
+agreement. Titles past 170 days are fetched again, forty per scan, and images
+three hundred per pass, in place, so a library matched in one evening does not
+re-fetch itself in one evening. Nothing is deleted when there is no key to
+refresh with.
+
+**Wikidata as the fallback for movies, not as a second opinion.** OMDb, TVDB
+and Trakt all need keys; Wikidata needs nothing and holds each film's TMDB and
+IMDb ids. Without a working key, movies are identified through it, with a
+description from Wikipedia. There are no pictures: Wikipedia's film posters
+are used there under fair use, which does not carry over to an app. It fits
+the maintenance rule for the same reason TheIntroDB does: a read-only
+metadata service behind a standard, long-stable API, used politely. Using it
+to double-check TMDB was considered. A second source could only turn matches
+into refusals under "a wrong match is worse than no match", and letting it
+accept what TMDB alone would not is a change to that rule, which was not made.
+
+**Films found through Wikidata move to TMDB by id.** When a key works again,
+each is fetched from TMDB by the id Wikidata holds, with no search and no
+scoring, and its row is re-keyed in place, so files and watch history stay
+with it.
+
+**First run lost its key step** in released builds. A build from source keeps
+it, since without it there are no posters.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

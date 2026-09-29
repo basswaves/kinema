@@ -83,10 +83,13 @@ here.
 
 This product uses the TMDB API but is **not endorsed or certified by TMDB**.
 
-Data and images from [The Movie Database](https://www.themoviedb.org). Kinema
-does not ship an API key; each user supplies their own in Settings, and it is
-stored only in the local database in app data. Use of the API is subject to
-[TMDB's terms of use](https://www.themoviedb.org/api-terms-of-use).
+Data and images from [The Movie Database](https://www.themoviedb.org), used
+non-commercially under [TMDB's terms of use](https://www.themoviedb.org/api-terms-of-use).
+Released builds carry an API key of Kinema's own, added at build time and not
+in this repository; a key a user enters in Settings is used instead and stays
+in the local database in app data. As the terms require, nothing from TMDB is
+kept longer than six months: older titles and images are fetched again
+(`TMDB_MAX_AGE_SECS` in `src-tauri/src/metadata.rs`).
 
 `public/tmdb.svg` is TMDB's own logo, unmodified, taken from their
 [logo and attribution page](https://www.themoviedb.org/about/logos-attribution)
@@ -106,6 +109,18 @@ attribution and permit non-commercial use. Requests are rate-limited in
 
 Optional movie fallback from [OMDb](https://www.omdbapi.com). User-supplied key,
 stored locally, subject to OMDb's terms.
+
+### Wikidata and Wikipedia
+
+The movie fallback when no TMDB key can be used (`src/metadata/wikidata.ts`).
+Film data from [Wikidata](https://www.wikidata.org), which is dedicated to the
+public domain under [CC0](https://creativecommons.org/publicdomain/zero/1.0/).
+Descriptions are the opening of the film's article on
+[English Wikipedia](https://en.wikipedia.org), under
+[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), and are
+credited where they are shown and in Settings. Requests follow Wikimedia's API
+etiquette: one at a time, with an identifying `Api-User-Agent`, backing off on
+`maxlag`. No key required, and no pictures are taken from either.
 
 ### TheIntroDB
 

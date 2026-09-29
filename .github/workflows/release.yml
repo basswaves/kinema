@@ -102,10 +102,10 @@ jobs:
 
             ### First run
 
-            Kinema opens on a setup panel: add a movies or TV folder, and paste
-            a free [TMDB API key](https://www.themoviedb.org/settings/api).
-            TV shows work without a key; **movies need one** to be identified
-            and appear.
+            Kinema opens on a setup panel: add your movies and TV folders, and
+            scan. Posters and descriptions come from TMDB through a key Kinema
+            carries, so there is nothing to sign up for; a free key of your own
+            can be entered in Settings instead.
 
             ---
 

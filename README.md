@@ -91,22 +91,20 @@ itself — you download the new ZIP when you choose to.
 
 ## First run
 
-The app opens on a setup panel with two steps.
-
-1. **Add a folder.** Point it at where you keep your movies, and another at your
-   TV shows if they live somewhere else. Local drives and network shares both
-   work. Nothing is moved, renamed or written to — the files are only read.
-
-2. **Paste a TMDB key.** TV shows work without one, but **movies need it** —
-   without a key they cannot be identified and do not appear. It is free, and
-   the panel has a button that opens
-   [the page you get one from](https://www.themoviedb.org/settings/api): you
-   create a TMDB account and fill in a short form describing your use (personal,
-   non-commercial).
+The app opens on a setup panel that asks one thing: **where your videos are.**
+Point it at where you keep your movies, and another at your TV shows if they
+live somewhere else. Local drives and network shares both work. Nothing is
+moved, renamed or written to — the files are only read.
 
 Then press **Scan my library**. The first scan takes a few minutes on a large
 library; you can watch it fill in. After that it scans once at every start and
 only looks at what changed.
+
+Posters, descriptions and artwork come from [TMDB](https://www.themoviedb.org),
+through a key Kinema carries — there is nothing to sign up for. If you would
+rather use a free TMDB key of your own, paste it in Settings → Library. Should
+TMDB ever be out of reach, movies are still identified through Wikidata, just
+without pictures.
 
 Press **?** at any time — or the **?** button in the top bar — for the full list
 of keys and remote buttons.
@@ -204,8 +202,6 @@ visible error at all — only a log line.
 ## Known limitations
 
 - **Windows 11 only** — see [Platform support](#platform-support).
-- **Movies need a TMDB key** for now. A key built into Kinema is the first item
-  on the [roadmap](docs/ROADMAP.md).
 - **Tested on a small number of setups.** HDR passthrough, bitstreaming to a
   receiver and display switching have been confirmed on a 4K HDR TV with an AV
   receiver; TV overscan, intro detection on many different shows, and libraries
@@ -231,7 +227,7 @@ visible error at all — only a log line.
 
 Kinema links against libmpv, which is LGPL, and the release bundles an
 unmodified LGPL build of it that you are free to replace. It uses data from TMDB,
-TVmaze and TheIntroDB, each under their own terms. [NOTICE.md](NOTICE.md) has the
+TVmaze, Wikidata, Wikipedia and TheIntroDB, each under their own terms. [NOTICE.md](NOTICE.md) has the
 detail.
 
 This product uses the TMDB API but is not endorsed or certified by TMDB.

@@ -34,7 +34,9 @@ src-tauri/src/
                  batches, so the write lock is never held for network I/O
   library.rs     Roots, scan, parse write-back, stats. Owns both `Db` and
                  `ScanDb` — the scanner's separate connection
-  metadata.rs    Titles, episodes, cast, file→title links, detail queries
+  metadata.rs    Titles, episodes, cast, file→title links, detail queries.
+                 TMDB_MAX_AGE_SECS, TMDB's six-month limit on keeping their
+                 data, lives here and in artwork.rs's refresh
   playback.rs    Resume points, Continue Watching (part-watched *and* next-up),
                  watched state, the adjacent-episode lookup shared by three
                  callers, track prefs
@@ -82,7 +84,11 @@ src/
                  is the developer surface behind a disclosure in Settings and
                  keeps library.css in fixed px; FixMatch, the user-facing review
                  queue, has its own fixmatch.css in rem so it scales
-  metadata/      Providers, match scoring, orchestration
+  metadata/      Providers, match scoring, orchestration. TMDB first, with
+                 the user's key or the one a release is built with
+                 (builtinKey.ts, which also sets a refused one aside); TVmaze
+                 for TV and Wikidata for movies (wikidata.ts) when there is
+                 none
   devlog.ts      Forwards console + unhandled errors to app.log (app data\logs)
 ```
 
@@ -93,7 +99,9 @@ scan (Rust)  →  media_files rows          identity = path + size + mtime
 parse (TS)   →  guessit-js + parent-dir fallback → parsed_title/season/episode
 match (TS)   →  provider search → score → titles + episodes, or "unmatched" with reason
 artwork(Rust)→  posters, backdrops, logos, stills, cast faces into app data
-details (TS) →  re-fetch titles matched before a field was being stored
+details (TS) →  re-fetch titles matched before a field was being stored,
+                TMDB data older than TMDB allows (six months), and films found
+                through Wikidata once there is a TMDB key to move them to
 browse (TS)  →  titles/episodes → rails, detail pages
 play  (TS)   →  mpv loadfile → resume seek → progress saved every 5s
 ```

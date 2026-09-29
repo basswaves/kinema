@@ -9,20 +9,6 @@ Ideas and reports are welcome as [issues](https://github.com/Basswaves/kinema/is
 
 ---
 
-## Next
-
-### Movies without a TMDB key
-
-TV shows work out of the box, but movies can only be identified with a TMDB
-key, and getting one means creating an account and filling in a form — the
-point where Kinema stops working for most people who try it. The plan is a key
-built into Kinema for its own use, with the existing field kept so anyone can
-use their own instead. TMDB's terms allow free, non-commercial use with the
-attribution Kinema already shows; other open-source media players ship a key
-the same way.
-
----
-
 ## Being considered
 
 ### A first-run setup for picture and sound
@@ -102,6 +88,10 @@ there is.
   Kinema's own exported files have been read back.
 - **TV overscan and the TV layout's size** from a sofa, on different TVs.
 - **Large libraries** — several hundred titles.
+- **Movies identified through Wikidata**, the fallback when no TMDB key works.
+  It has matched the films it has been tried on; how it does with a large,
+  messily named movie collection is unknown. To try it, build from source
+  without a key.
 - **Files whose container reports the wrong length.** One such file is known;
   if they turn out to be common, Kinema could compare with ffprobe's length.
 - **The stats panel's render passes**, which the current mpv build does not

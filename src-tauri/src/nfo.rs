@@ -383,8 +383,8 @@ fn show_nfo_paths(video: &Path) -> Vec<PathBuf> {
 /// update rather than a second, competing file.
 fn show_nfo_target(video: &Path) -> Option<PathBuf> {
     for candidate in show_nfo_paths(video) {
-        if candidate.is_file() {
-            return Some(candidate);
+        if let Some(found) = crate::util::existing_file(&candidate) {
+            return Some(found);
         }
     }
 
@@ -404,9 +404,9 @@ fn show_nfo_target(video: &Path) -> Option<PathBuf> {
 
 fn first_parsed(paths: Vec<PathBuf>) -> Option<Nfo> {
     for path in paths {
-        if !path.is_file() {
+        let Some(path) = crate::util::existing_file(&path) else {
             continue;
-        }
+        };
         let source = path.display().to_string();
         let Some(raw) = read_text(&path) else {
             crate::log!("nfo: could not read {source}");
@@ -651,7 +651,10 @@ fn write_all(exports: Vec<NfoExport>, overwrite: bool) -> WriteReport {
         } else {
             let mut name = stem.to_os_string();
             name.push(".nfo");
-            video.with_file_name(name)
+            // An existing `Film.NFO` is overwritten, not joined by a second
+            // `Film.nfo` on a filesystem that tells the two apart.
+            let target = video.with_file_name(name);
+            crate::util::existing_file(&target).unwrap_or(target)
         };
 
         if target.exists() && !overwrite {

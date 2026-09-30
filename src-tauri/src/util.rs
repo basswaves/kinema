@@ -5,6 +5,8 @@
 //! folder rule into two, where the copies had already drifted: one knew
 //! `Staffel 3` and the other did not.
 
+use std::path::{Path, PathBuf};
+
 /// For `.map_err(to_string_err)`: Tauri commands report errors as strings.
 pub fn to_string_err<E: std::fmt::Display>(e: E) -> String {
     e.to_string()
@@ -45,9 +47,54 @@ pub fn is_season_folder(name: &str) -> bool {
         .is_some_and(|rest| !rest.is_empty() && rest.chars().all(|c| c.is_ascii_digit()))
 }
 
+/// `path` if it is a file, or the file beside it whose name differs only in
+/// case — `TVShow.nfo` for `tvshow.nfo`.
+///
+/// Sidecars are named by people and a dozen tools, not by us, so the case they
+/// use is anyone's. On Windows the filesystem already ignores it, and the
+/// folder is never listed: most lookups are for a file that is simply not
+/// there, and listing a NAS folder for each would slow every scan. Elsewhere a
+/// wrong case was a silent miss, so the folder is searched — an exact match
+/// first, then the first by name, so the answer is the same every time.
+pub fn existing_file(path: &Path) -> Option<PathBuf> {
+    if path.is_file() {
+        return Some(path.to_path_buf());
+    }
+    if cfg!(windows) {
+        return None;
+    }
+    let wanted = path.file_name()?.to_string_lossy().to_lowercase();
+    let mut found: Vec<PathBuf> = std::fs::read_dir(path.parent()?)
+        .ok()?
+        .filter_map(Result::ok)
+        .filter(|e| e.file_name().to_string_lossy().to_lowercase() == wanted)
+        .map(|e| e.path())
+        .filter(|p| p.is_file())
+        .collect();
+    found.sort();
+    found.into_iter().next()
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{count, is_season_folder};
+    use super::{count, existing_file, is_season_folder};
+
+    #[test]
+    fn existing_file_ignores_case_and_nothing_else() {
+        let dir = std::env::temp_dir().join(format!("kinema-case-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("TVShow.NFO"), "x").unwrap();
+
+        // Windows hands back the name as asked, and opens the file by it;
+        // Linux must hand back the name on disk, or opening it fails.
+        let found = existing_file(&dir.join("tvshow.nfo")).expect("found whatever the case");
+        assert!(found.is_file(), "{found:?}");
+        assert!(found.ends_with("tvshow.nfo") || found.ends_with("TVShow.NFO"));
+        assert!(existing_file(&dir.join("tvshow.nfo.bak")).is_none());
+        assert!(existing_file(&dir.join("missing").join("tvshow.nfo")).is_none());
+
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 
     #[test]
     fn count_uses_the_singular_only_for_one() {

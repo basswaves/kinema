@@ -232,6 +232,9 @@ struct Sidecar {
 
 fn find_sidecar(video: &Path) -> Option<Sidecar> {
     for path in candidate_paths(video) {
+        let Some(path) = crate::util::existing_file(&path) else {
+            continue;
+        };
         let Ok(meta) = std::fs::metadata(&path) else {
             continue;
         };

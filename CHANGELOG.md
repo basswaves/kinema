@@ -7,6 +7,12 @@ makes no stability promises.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Episodes on a network share named only by their numbering** — a
+  `Season 1\S01E01.mkv` with nothing else in its name — now take their show's
+  name from the folder above, as they already did on a local drive.
+
 ## [0.7.0] — 2026-09-30
 
 Subtitles from OpenSubtitles, forced subtitles that show with subtitles off,

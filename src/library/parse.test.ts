@@ -67,6 +67,24 @@ describe('a title from the show folder', () => {
     expect(parsed.needsAttention).toBe(true);
   });
 
+  /**
+   * The climb once dropped a path's leading `\\` or `/`, so the show folder was
+   * never "inside" a network share or a Linux folder and the title was lost.
+   */
+  it.each([
+    ['a drive', String.raw`D:\TV`],
+    ['a network share', String.raw`\\NAS\TV`],
+    ['a Linux folder', '/media/TV'],
+  ])('works under %s', (_, root) => {
+    const sep = root.startsWith('/') ? '/' : '\\';
+    const season = [root, 'Show Name', 'Season 1'].join(sep);
+    const parsed = parseMediaFile(file('S01E01.mkv', season), 'tv', root);
+    expect(parsed.title).toBe('Show Name');
+
+    const top = parseMediaFile(file('S01E01.mkv', [root, 'Season 1'].join(sep)), 'tv', root);
+    expect(top.title).toBeNull();
+  });
+
   it('is not used when the file already names the show', () => {
     const parsed = parseMediaFile(
       file('Other.Show.S01E01.mkv', 'D:/TV/Show Name/Season 1'),

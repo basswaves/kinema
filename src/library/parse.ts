@@ -209,10 +209,16 @@ function baseName(dir: string): string {
   return parts.length > 0 ? parts[parts.length - 1] : dir;
 }
 
-/** The directory above `dir`, or null at the top. */
+/**
+ * The directory above `dir`, or null at the top. Cut from the string rather
+ * than rebuilt from its parts, which lost a leading `\\` or `/` and so put
+ * every show folder on a network share or on Linux outside its library.
+ */
 function parentOf(dir: string): string | null {
-  const parts = dir.split(/[\\/]/).filter(Boolean);
-  return parts.length > 1 ? parts.slice(0, -1).join('/') : null;
+  const trimmed = dir.replace(/[\\/]+$/, '');
+  const cut = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'));
+  const parent = cut > 0 ? trimmed.slice(0, cut).replace(/[\\/]+$/, '') : '';
+  return parent.replace(/[\\/]/g, '') === '' ? null : parent;
 }
 
 /** Comparable form of a path: separators unified, case folded, no trailing slash. */

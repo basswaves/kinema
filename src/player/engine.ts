@@ -30,6 +30,7 @@ import {
 import { BASE_MPV_OPTIONS, IDLE_SURFACE_OPTIONS, TONE_MAPPING_OPTIONS } from './mpvOptions';
 import { logPaths } from '../metadata/api';
 import { capabilitiesNow, loadCapabilities } from '../capabilities';
+import { keyCommand, keyFromValue, KEY_PROPERTY, MPV_KEYS } from './mpvKeys';
 
 // ---- starting mpv ------------------------------------------------------------
 //
@@ -62,7 +63,11 @@ async function initialOptions(): Promise<MpvConfig['initialOptions']> {
     : {};
   // A window of its own (capabilities.rs, `own_window`): full screen, and
   // only while something plays — no idle surface waiting over the library.
-  if (video?.own_window) Object.assign(graphics, { 'force-window': 'no', fs: 'yes' });
+  // Its window is then the one with the keyboard, so mpv listens to it — for
+  // the keys bound in `bindKeys` only; its own bindings stay off.
+  if (video?.own_window) {
+    Object.assign(graphics, { 'force-window': 'no', fs: 'yes', 'input-vo-keyboard': 'yes' });
+  }
   try {
     const { mpv_log } = await logPaths();
     return { ...BASE_MPV_OPTIONS, 'log-file': mpv_log, ...graphics };
@@ -85,6 +90,9 @@ const OBSERVED = [
   // means mpv never emits `end-file` at the end of playback. `eof-reached` is
   // the signal that actually fires under that option.
   ['eof-reached', 'flag', 'none'],
+  // A key pressed on mpv's own window (mpvKeys.ts). Never changes where mpv
+  // has no window of its own.
+  [KEY_PROPERTY, 'string', 'none'],
 ] as const;
 
 /** Start the engine, or wait for the start already under way. */
@@ -108,11 +116,28 @@ export function startEngine(): Promise<string> {
             console.warn(`mpv rejected optional setting ${key}=${value}`);
           }
         }
+        if (capabilitiesNow()?.mpv_video.own_window) await bindKeys();
         return label;
       });
   }
 
   return host.__mpvInit;
+}
+
+/**
+ * Bind every key Kinema uses to a message back to Kinema (mpvKeys.ts). One
+ * refused key — a name this mpv does not know — costs that key only.
+ */
+async function bindKeys(): Promise<void> {
+  // A known starting value, so the first `cycle-values` has one to leave.
+  await command('set', [KEY_PROPERTY, 'none']);
+  for (const [index, [mpvKey]] of MPV_KEYS.entries()) {
+    try {
+      await command('keybind', [mpvKey, keyCommand(index)]);
+    } catch (e) {
+      console.warn(`mpv: could not bind ${mpvKey}`, e);
+    }
+  }
 }
 
 // ---- Kinema's terms ----------------------------------------------------------
@@ -133,7 +158,12 @@ export type PlaybackEvent =
   | { type: 'reached-end' }
   | { type: 'paused'; value: boolean }
   | { type: 'position'; value: number | null }
-  | { type: 'duration'; value: number | null };
+  | { type: 'duration'; value: number | null }
+  /**
+   * A key pressed on the engine's own window, by its DOM name — only where
+   * the engine has one (capabilities `own_window`).
+   */
+  | { type: 'key'; key: string };
 
 /**
  * Hear every `PlaybackEvent`, until the returned function is called.
@@ -175,6 +205,11 @@ export async function onPlaybackEvent(handle: (event: PlaybackEvent) => void): P
       case 'eof-reached':
         if (data === true) handle({ type: 'reached-end' });
         break;
+      case KEY_PROPERTY: {
+        const key = keyFromValue(data);
+        if (key !== null) handle({ type: 'key', key });
+        break;
+      }
     }
   });
   return () => {

@@ -826,6 +826,11 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       if (event.type === 'duration') dispatch({ type: 'duration', value: event.value });
       // The real end-of-playback signal while keep-open holds the last frame.
       if (event.type === 'reached-end') dispatch({ type: 'eof' });
+      // A key pressed on mpv's own window (Linux): pressed on this page the
+      // way the self-test presses one, so every handler here takes it as is.
+      if (event.type === 'key') {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: event.key, bubbles: true }));
+      }
     }).then((fn) => {
       // Torn down before registration finished: remove it now, or it leaks
       // and keeps receiving every event with a stale closure.

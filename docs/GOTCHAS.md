@@ -1505,3 +1505,26 @@ clock and the events all look fine. `GALLIUM_DRIVER=d3d12` is WSL's route to
 the real card (`glxinfo -B` then names it); `selftest.sh` sets it inside
 WSL. With it, mpv decodes on the card (`hwdec-current` = `nvdec-copy` on
 the development PC).
+
+### The libmpv wrapper crashes on a client message
+
+`script-message` is the obvious way for an mpv key binding to tell Kinema
+something, and the first key pressed took the whole program down. The
+wrapper (libmpv-wrapper v0.1.1, `src/event.rs`) walks a client message's
+arguments until it meets a null pointer, but mpv gives a count, not a
+terminator; it reads past the end. Nothing in Kinema may send or cause a
+client message while that stands. Keys come through an observed property
+instead (`mpvKeys.ts`).
+
+### `user-data` looks made for passing values, and is not
+
+Values set under `user-data/…` come back from a string read as JSON —
+`"9a"`, quotes included — so a binding's `cycle-values` never recognises the
+current value and a key pressed twice is one change; `add` on them is
+refused (`-2`). A plain string option nobody reads (`term-status-msg`, with
+`terminal=no`) behaves as expected.
+
+### `console.info` never reaches app.log
+
+`devlog.ts` forwards `log`, `warn` and `error`. A diagnostic written with
+`info` or `debug` vanishes, and its absence looks like the code never ran.

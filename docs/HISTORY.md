@@ -2055,6 +2055,14 @@ A free Trakt account may connect only one outside app (since July 2026);
 Settings says so before connecting. Trakt, unlike SIMKL, says when someone
 declines, and the page says so too.
 
+The owner's first real connect worked — 80 episodes sent, one play each — but
+checking the account afterwards showed the comparison had been blind: Trakt's
+watched-shows list no longer carries episodes, and its watched-films list is
+paged. It did no harm only because none of those episodes were on Trakt yet.
+The comparison now reads every page of films and asks each show for its
+progress; run read-only against the same account it finds all 80 and would
+send none. See GOTCHAS.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

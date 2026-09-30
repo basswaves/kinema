@@ -1102,9 +1102,20 @@ check the granted `scope` for `media:write` before storing a token.
 
 SIMKL ignores a watch it already has; Trakt records it again, as a rewatch.
 "It is up to your app to verify this and not send duplicate plays." **Do:**
-never send a history without first reading the account's watched lists
-(`/sync/watched/movies`, `/sync/watched/shows`), and never re-queue a batch
-Trakt accepted.
+never send a history without first reading what the account has, and never
+re-queue a batch Trakt accepted.
+
+### Trakt's watched lists are paged, and no longer list episodes
+
+Both found on the first real connect (2026-09-30), and both silent:
+`/sync/watched/movies` answers a hundred at a time (`X-Pagination-Page-Count`
+says how many pages; an account's 135 films arrived as 100), and
+`/sync/watched/shows` returns the shows **without** their seasons and episodes,
+whatever `extended` says — so a comparison built on it saw no watched episodes
+at all. `/sync/watched/episodes` has them, but names each by its own ids, not
+its show's. **Do:** read every page of the films, and ask each show Kinema has
+episodes of for its progress (`/shows/:id/progress/watched`, by IMDb id, or the
+Trakt id found from the TMDB id), which marks each episode `completed`.
 
 ### A refresh token works once
 

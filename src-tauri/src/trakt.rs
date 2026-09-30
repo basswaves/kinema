@@ -70,6 +70,9 @@ const BATCH: usize = 100;
 const SEND_DELAY: Duration = Duration::from_secs(10);
 /// Trakt allows one write a second per user.
 const WRITE_GAP: Duration = Duration::from_millis(1500);
+/// Between reads. Trakt allows 500 in five minutes; this keeps a large first
+/// comparison well inside that.
+const READ_GAP: Duration = Duration::from_millis(400);
 const REFRESH_MARGIN_SECS: i64 = 24 * 60 * 60;
 const TIMEOUT: Duration = Duration::from_secs(20);
 
@@ -148,14 +151,49 @@ async fn post(client_id: &str, path: &str, access: Option<&str>, body: &Value) -
 }
 
 async fn get(client_id: &str, path: &str, access: &str) -> Result<(u16, Value), String> {
+    get_paged(client_id, path, access).await.map(|(status, _, body)| (status, body))
+}
+
+/// A GET, with how many pages the list has (`X-Pagination-Page-Count`, 1 when
+/// Trakt does not say).
+async fn get_paged(client_id: &str, path: &str, access: &str) -> Result<(u16, u32, Value), String> {
     let http = http().ok_or("could not start a web request")?;
     let response = request(&http, tauri_plugin_http::reqwest::Method::GET, path, client_id, Some(access))
         .send()
         .await
         .map_err(|e| e.to_string())?;
     let status = response.status().as_u16();
+    let pages = response
+        .headers()
+        .get("x-pagination-page-count")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(1);
     let text = response.text().await.unwrap_or_default();
-    Ok((status, serde_json::from_str(&text).unwrap_or(Value::Null)))
+    Ok((status, pages, serde_json::from_str(&text).unwrap_or(Value::Null)))
+}
+
+/// Every page of a list, in one array.
+///
+/// Trakt answers lists a hundred at a time (found 2026-09-30: an account's
+/// 135 watched films came back as 100). Reading only the first page would
+/// leave the rest looking unwatched, and they would be sent again.
+async fn get_all(client_id: &str, path: &str, access: &str) -> Result<Vec<Value>, String> {
+    let mut all = Vec::new();
+    let mut page = 1;
+    loop {
+        let (status, pages, body) =
+            get_paged(client_id, &format!("{path}?page={page}&limit=100"), access).await?;
+        if status != 200 {
+            return Err(format!("{path} answered {status}"));
+        }
+        all.extend(body.as_array().cloned().unwrap_or_default());
+        if page >= pages {
+            return Ok(all);
+        }
+        page += 1;
+        tokio::time::sleep(READ_GAP).await;
+    }
 }
 
 // ---- tokens -------------------------------------------------------------------
@@ -332,51 +370,61 @@ fn not_found_summary(response: &Value) -> Option<String> {
     (total > 0).then(|| format!("{total} item(s) not found: {nf}"))
 }
 
-/// What the account has already watched, as keys comparable with Kinema's
-/// own: `movie|imdb|tmdb` and `episode|imdb|tmdb|season|episode`, one for each
-/// id Trakt knows, so a match on either id counts.
-fn already_watched(movies: &Value, shows: &Value) -> HashSet<String> {
-    let mut seen = HashSet::new();
-    let id_forms = |ids: &Value| -> Vec<String> {
-        let mut forms = Vec::new();
-        if let Some(imdb) = ids.get("imdb").and_then(Value::as_str) {
-            forms.push(format!("imdb:{imdb}"));
-        }
-        if let Some(tmdb) = ids.get("tmdb").and_then(Value::as_i64) {
-            forms.push(format!("tmdb:{tmdb}"));
-        }
-        forms
-    };
-    for m in movies.as_array().into_iter().flatten() {
-        for id in id_forms(&m["movie"]["ids"]) {
-            seen.insert(format!("movie|{id}"));
-        }
+/// A title's ids as comparable keys — `imdb:tt…` and `tmdb:…` — so a match on
+/// either counts.
+fn id_forms(imdb: Option<&str>, tmdb: Option<i64>) -> Vec<String> {
+    let mut forms = Vec::new();
+    if let Some(imdb) = imdb.map(str::trim).filter(|s| !s.is_empty()) {
+        forms.push(format!("imdb:{imdb}"));
     }
-    for s in shows.as_array().into_iter().flatten() {
-        let show_ids = id_forms(&s["show"]["ids"]);
-        for season in s["seasons"].as_array().into_iter().flatten() {
-            let Some(sn) = season["number"].as_i64() else { continue };
-            for ep in season["episodes"].as_array().into_iter().flatten() {
-                let Some(en) = ep["number"].as_i64() else { continue };
-                for id in &show_ids {
-                    seen.insert(format!("episode|{id}|{sn}|{en}"));
-                }
-            }
+    if let Some(tmdb) = tmdb {
+        forms.push(format!("tmdb:{tmdb}"));
+    }
+    forms
+}
+
+/// The films the account has watched, from every page of
+/// `/sync/watched/movies`, as `movie|imdb:…` and `movie|tmdb:…` keys.
+fn films_watched(movies: &[Value]) -> HashSet<String> {
+    let mut seen = HashSet::new();
+    for m in movies {
+        let ids = &m["movie"]["ids"];
+        for id in id_forms(ids["imdb"].as_str(), ids["tmdb"].as_i64()) {
+            seen.insert(format!("movie|{id}"));
         }
     }
     seen
 }
 
+/// Add one show's watched episodes, from its `/shows/:id/progress/watched`
+/// answer, under the ids *Kinema* has for the show — the ones `has` will look
+/// them up by.
+///
+/// Per show, because Trakt's `/sync/watched/shows` no longer lists seasons and
+/// episodes (found 2026-09-30), and `/sync/watched/episodes` names each episode
+/// by its own ids, not its show's.
+fn add_show_progress(seen: &mut HashSet<String>, show_ids: &[String], progress: &Value) {
+    for season in progress["seasons"].as_array().into_iter().flatten() {
+        let Some(sn) = season["number"].as_i64() else { continue };
+        for ep in season["episodes"].as_array().into_iter().flatten() {
+            if ep["completed"].as_bool() != Some(true) {
+                continue;
+            }
+            let Some(en) = ep["number"].as_i64() else { continue };
+            for id in show_ids {
+                seen.insert(format!("episode|{id}|{sn}|{en}"));
+            }
+        }
+    }
+}
+
 /// Whether Trakt already has this — by either id.
 fn has(seen: &HashSet<String>, f: &tracking::Finished) -> bool {
     let is_film = f.kind == "movie";
-    let mut forms = Vec::new();
-    if let Some(imdb) = f.imdb_id.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
-        forms.push(format!("imdb:{imdb}"));
-    }
-    if let Some(tmdb) = f.tmdb_id.as_deref().and_then(|t| t.trim().parse::<i64>().ok()) {
-        forms.push(format!("tmdb:{tmdb}"));
-    }
+    let forms = id_forms(
+        f.imdb_id.as_deref(),
+        f.tmdb_id.as_deref().and_then(|t| t.trim().parse::<i64>().ok()),
+    );
     forms.iter().any(|id| {
         if is_film {
             seen.contains(&format!("movie|{id}"))
@@ -521,39 +569,92 @@ async fn send_all(app: &tauri::AppHandle) -> Result<(), String> {
 /// The history sent once at connect: everything finished in Kinema that the
 /// account does not already have. Trakt would count a repeat as a second play.
 ///
-/// If the account cannot be read, nothing is queued and it is tried again at
-/// the next send — sending the whole history blind would be the one way to
-/// put duplicates into someone's Trakt.
+/// Films: every page of the account's watched films. Episodes: one question per
+/// show Kinema has episodes of — its watched progress — since nothing else
+/// Trakt answers says which show's episodes were watched. If any of it cannot
+/// be read, nothing is queued and it is tried again at the next send — sending
+/// the history blind is the one way to put duplicates into someone's Trakt.
 async fn queue_missing_history(app: &tauri::AppHandle, client_id: &str, access: &str) -> Result<(), String> {
-    let movies = get(client_id, "/sync/watched/movies", access).await;
-    tokio::time::sleep(WRITE_GAP).await;
-    let shows = get(client_id, "/sync/watched/shows", access).await;
-    let (movies, shows) = match (movies, shows) {
-        (Ok((200, m)), Ok((200, s))) => (m, s),
-        (m, s) => {
-            let status = |r: &Result<(u16, Value), String>| match r {
-                Ok((code, _)) => code.to_string(),
-                Err(e) => e.clone(),
-            };
-            return Err(format!(
-                "could not read what the account has watched ({} / {}); the history waits",
-                status(&m),
-                status(&s)
-            ));
-        }
+    let history = {
+        let db = app.state::<Db>();
+        let conn = db.0.lock().map_err(to_string_err)?;
+        tracking::finished_history(&conn).map_err(to_string_err)?
     };
-    let seen = already_watched(&movies, &shows);
+
+    let films = get_all(client_id, "/sync/watched/movies", access)
+        .await
+        .map_err(|e| format!("could not read the account's watched films ({e}); the history waits"))?;
+    let mut seen = films_watched(&films);
+    let films_on_trakt = films.len();
+
+    // Each show once, by the ids Kinema has for it.
+    let mut shows: Vec<(Option<String>, Option<String>)> = Vec::new();
+    for f in history.iter().filter(|f| f.kind != "movie") {
+        let key = (f.imdb_id.clone(), f.tmdb_id.clone());
+        if !shows.contains(&key) {
+            shows.push(key);
+        }
+    }
+    for (imdb, tmdb) in &shows {
+        tokio::time::sleep(READ_GAP).await;
+        let tmdb_num = tmdb.as_deref().and_then(|t| t.trim().parse::<i64>().ok());
+        let Some(show_id) = trakt_show_id(client_id, access, imdb.as_deref(), tmdb_num).await? else {
+            // Trakt does not know the show, so it has none of its episodes.
+            continue;
+        };
+        tokio::time::sleep(READ_GAP).await;
+        let (status, progress) = get(
+            client_id,
+            &format!("/shows/{show_id}/progress/watched?hidden=true&specials=true"),
+            access,
+        )
+        .await
+        .map_err(|e| format!("could not read a show's progress ({e}); the history waits"))?;
+        match status {
+            200 => add_show_progress(&mut seen, &id_forms(imdb.as_deref(), tmdb_num), &progress),
+            404 => {}
+            other => return Err(format!("a show's progress answered {other}; the history waits")),
+        }
+    }
+
     let db = app.state::<Db>();
     let conn = db.0.lock().map_err(to_string_err)?;
-    let history = tracking::finished_history(&conn).map_err(to_string_err)?;
     let missing: Vec<_> = history.into_iter().filter(|f| !has(&seen, f)).collect();
     let queued = tracking::queue_all(&conn, TRAKT, &missing).map_err(to_string_err)?;
     clear(&conn, HISTORY_DUE_KEY)?;
     crate::log!(
-        "trakt: the account already has {} watched item(s); {queued} more from Kinema queued",
-        seen.len()
+        "trakt: the account has {films_on_trakt} film(s) watched, and {} show(s) were checked; \
+         {queued} item(s) from Kinema it does not have were queued",
+        shows.len()
     );
     Ok(())
+}
+
+/// The id to ask Trakt about a show by: its IMDb id, which Trakt's show
+/// endpoints take as they are, or else its Trakt id found from the TMDB id.
+/// `None` when Trakt does not know the show.
+async fn trakt_show_id(
+    client_id: &str,
+    access: &str,
+    imdb: Option<&str>,
+    tmdb: Option<i64>,
+) -> Result<Option<String>, String> {
+    if let Some(imdb) = imdb.map(str::trim).filter(|s| s.starts_with("tt")) {
+        return Ok(Some(imdb.to_string()));
+    }
+    let Some(tmdb) = tmdb else { return Ok(None) };
+    let (status, found) = get(client_id, &format!("/search/tmdb/{tmdb}?type=show"), access)
+        .await
+        .map_err(|e| format!("could not look a show up ({e}); the history waits"))?;
+    if status != 200 {
+        return Err(format!("looking a show up answered {status}; the history waits"));
+    }
+    Ok(found
+        .as_array()
+        .and_then(|a| a.first())
+        .and_then(|hit| hit.pointer("/show/ids/trakt"))
+        .and_then(Value::as_i64)
+        .map(|id| id.to_string()))
 }
 
 // ---- connecting -------------------------------------------------------------------
@@ -790,20 +891,26 @@ mod tests {
     }
 
     /// The whole point of reading the account first: what Trakt has, by
-    /// either id, is not sent again.
+    /// either id, is not sent again. Shapes as Trakt answered on 2026-09-30.
     #[test]
     fn what_the_account_already_has_is_recognised_by_either_id() {
-        let movies = json!([{ "plays": 1, "movie": { "ids": { "trakt": 1, "imdb": "tt0000001", "tmdb": 11 } } }]);
-        let shows = json!([{
-            "plays": 3,
-            "show": { "ids": { "trakt": 2, "imdb": "tt0000002", "tmdb": 105 } },
-            "seasons": [{ "number": 1, "episodes": [{ "number": 1, "plays": 1 }, { "number": 2, "plays": 2 }] }]
-        }]);
-        let seen = already_watched(&movies, &shows);
+        let films = [json!({ "plays": 1, "movie": { "ids": { "trakt": 1, "imdb": "tt0000001", "tmdb": 11 } } })];
+        let mut seen = films_watched(&films);
+        let progress = json!({
+            "aired": 3, "completed": 2,
+            "seasons": [{ "number": 1, "episodes": [
+                { "number": 1, "completed": true },
+                { "number": 2, "completed": true },
+                { "number": 3, "completed": false }
+            ] }]
+        });
+        add_show_progress(&mut seen, &id_forms(Some("tt0000002"), Some(105)), &progress);
+
         assert!(has(&seen, &finished("movie", None, Some("11"), None, None)));
         assert!(has(&seen, &finished("movie", Some("tt0000001"), None, None, None)));
         assert!(has(&seen, &finished("series", None, Some("105"), Some(1), Some(2))));
         assert!(has(&seen, &finished("series", Some("tt0000002"), None, Some(1), Some(1))));
+        // Aired but not watched on Trakt: Kinema's watch goes.
         assert!(!has(&seen, &finished("series", None, Some("105"), Some(1), Some(3))));
         assert!(!has(&seen, &finished("series", None, Some("105"), Some(2), Some(1))));
         assert!(!has(&seen, &finished("movie", None, Some("12"), None, None)));
@@ -811,7 +918,8 @@ mod tests {
 
     #[test]
     fn an_empty_account_has_nothing() {
-        let seen = already_watched(&json!([]), &json!([]));
+        let mut seen = films_watched(&[]);
+        add_show_progress(&mut seen, &id_forms(None, Some(105)), &json!({ "seasons": [] }));
         assert!(seen.is_empty());
         assert!(!has(&seen, &finished("movie", None, Some("11"), None, None)));
     }

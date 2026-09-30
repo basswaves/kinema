@@ -22,7 +22,8 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "tsc --noEmit && eslint . && vitest run",
+    "check": "tsc --noEmit && tsc --noEmit -p tsconfig.e2e.json && eslint . && vitest run",
+    "test:ui": "playwright test",
     "tauri": "tauri",
     "app:build": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-app.ps1"
   },
@@ -39,6 +40,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.63.0",
     "@tauri-apps/cli": "^2",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",

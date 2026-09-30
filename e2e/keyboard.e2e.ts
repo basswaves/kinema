@@ -1,0 +1,130 @@
+/**
+ * The watching path and the capability-driven screens, by keyboard alone, in
+ * each engine `playwright.config.ts` lists. Nothing here touches the mouse:
+ * one stray hover repairs focus and hides the failure (CONTRIBUTING, "Two
+ * failure modes").
+ */
+import { expect, test, type Page } from '@playwright/test';
+
+/** Presses far enough apart that the app sees two (docs/GOTCHAS.md). */
+async function press(page: Page, key: string, times = 1): Promise<void> {
+  for (let i = 0; i < times; i++) {
+    await page.keyboard.press(key);
+    await page.waitForTimeout(150);
+  }
+}
+
+/** The text of the control the focus ring is on. */
+function focused(page: Page): Promise<string | undefined> {
+  return page.evaluate(() => document.querySelector('.focused')?.textContent?.trim());
+}
+
+interface FakeMpv {
+  path: string | null;
+  paused: boolean;
+  position: number;
+}
+
+function mpv(page: Page): Promise<FakeMpv> {
+  return page.evaluate(() => {
+    const f = (window as unknown as { __fakeMpv: FakeMpv }).__fakeMpv;
+    return { path: f.path, paused: f.paused, position: f.position };
+  });
+}
+
+/** Switch TV mode on through the app's own module, as Settings would. */
+async function tvMode(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const path = '/src/ui/tv.ts';
+    const tv = await import(/* @vite-ignore */ path);
+    await tv.setTvMode(true);
+  });
+}
+
+/** Open the mock as a given system (`kinemaMockSystem`), Home focused. */
+async function open(page: Page, system: 'windows' | 'linux'): Promise<void> {
+  await page.addInitScript((s) => {
+    if (s === 'linux') localStorage.setItem('kinemaMockSystem', 'linux');
+    else localStorage.removeItem('kinemaMockSystem');
+  }, system);
+  await page.goto('/');
+  await expect.poll(() => focused(page)).toContain('Play');
+}
+
+test('an episode plays, pauses and rolls on to the next', async ({ page }) => {
+  await open(page, 'windows');
+  await press(page, 'Enter');
+
+  await expect.poll(async () => (await mpv(page)).path).toContain('S01E01');
+  await expect.poll(async () => (await mpv(page)).position).toBeGreaterThan(1);
+
+  await press(page, 'Space');
+  await expect.poll(async () => (await mpv(page)).paused).toBe(true);
+  await press(page, 'Space');
+  await expect.poll(async () => (await mpv(page)).paused).toBe(false);
+  // Leave the controls to hide, as on a sofa: while they are up OK belongs to
+  // the control the ring is on, not to a prompt.
+  await expect(page.locator('.player.osd-hidden')).toBeAttached({ timeout: 10_000 });
+
+  // To the very end — past the credits offer, which a few seconds earlier
+  // would ask first — and the next episode is offered. With the controls
+  // hidden OK takes whatever prompt is showing, no ring needed (Player.tsx).
+  await page.evaluate(() => {
+    (window as unknown as { __fakeMpv: FakeMpv }).__fakeMpv.position = 2999.9;
+  });
+  await expect(page.getByRole('button', { name: /Play now/ })).toBeVisible({ timeout: 15_000 });
+  // A person reads the card first. Pressed in the same instant it appears,
+  // OK can land before the player has started listening for the card (one
+  // run in 24 did, in WebKit).
+  await page.waitForTimeout(500);
+  await press(page, 'Enter');
+  await expect.poll(async () => (await mpv(page)).path).toContain('S01E02');
+});
+
+test('a file that cannot be opened says so, and Back still works', async ({ page }) => {
+  await open(page, 'windows');
+  await page.evaluate(() => {
+    const f = (window as unknown as { __fakeMpv: { failNextLoad: string | null } }).__fakeMpv;
+    f.failNextLoad = 'no such file or directory';
+  });
+  await press(page, 'Enter');
+  await expect(page.getByText('Could not play this file: no such file or directory')).toBeVisible();
+  await press(page, 'Escape');
+  await expect.poll(() => focused(page)).toContain('Play');
+});
+
+for (const [system, choices] of [
+  ['windows', ['Close Kinema', 'Put the PC to sleep', 'Shut down the PC', 'Cancel']],
+  ['linux', ['Close Kinema', 'Cancel']],
+] as const) {
+  test(`Leave offers what ${system} can do`, async ({ page }) => {
+    await open(page, system);
+    await tvMode(page);
+    await press(page, 'Escape');
+    await expect(page.locator('.leave-choice')).toHaveText([...choices]);
+    await expect.poll(() => focused(page)).toBe('Close Kinema');
+    await press(page, 'ArrowDown', choices.length - 1);
+    await expect.poll(() => focused(page)).toBe('Cancel');
+  });
+}
+
+for (const [system, sections] of [
+  ['windows', ['Screen', 'Sound', 'Your equipment']],
+  ['linux', ['Picture & sound']],
+] as const) {
+  test(`Picture & sound shows what ${system} can do`, async ({ page }) => {
+    await open(page, system);
+    await press(page, 'ArrowUp', 2);
+    await expect.poll(() => focused(page)).toBe('Home');
+    await press(page, 'ArrowRight', 4);
+    await expect.poll(() => focused(page)).toBe('Settings');
+    await press(page, 'Enter');
+    await press(page, 'ArrowDown');
+    await expect.poll(() => focused(page)).toBe('Library');
+    // A column down the left at this width (a row of tabs when narrower).
+    await press(page, 'ArrowDown', 2);
+    await expect.poll(() => focused(page)).toBe('Picture & sound');
+    await press(page, 'Enter');
+    await expect(page.locator('.settings-section h2')).toHaveText([...sections]);
+  });
+}

@@ -98,10 +98,23 @@ scripts\wsl.ps1 'cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets
 ```
 
 It builds a copy of your working tree, uncommitted changes included, inside
-the distribution — never edit that copy. CI runs the same checks on Windows
-and on Linux for x86 and ARM on every push, so this is about finding out
-before pushing, not instead of it. The traps behind that design are in
+the distribution — never edit that copy. The traps behind that design are in
 GOTCHAS ("Linux, and building it from Windows").
+
+The interface itself is checked in both browser engines, keyboard only,
+against `dev:mock`: WebKit (Linux's) and Edge (the same Chromium as WebView2,
+already on Windows). Once, `npx playwright install webkit`; then:
+
+```bash
+npm run test:ui
+```
+
+The tests are in `e2e/`. They press keys the way a remote does — and wait as
+a person would, since two presses 25 ms apart are one (GOTCHAS).
+
+CI runs all of this on every push — Windows, and Linux for x86 and ARM, with
+the WebKit tests on x86 Linux — so checking here is about finding out before
+pushing, not instead of it.
 
 ### Running the UI without the native app
 

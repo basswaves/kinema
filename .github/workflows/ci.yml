@@ -68,6 +68,15 @@ jobs:
       - name: Build the frontend
         run: npm run build
 
+      # The interface by keyboard, against dev:mock, in WebKit — the engine
+      # Linux's window uses. Once, on x86 Linux: the engines are what differ,
+      # not the processors. Playwright's WebKit is fetched here, never shipped.
+      - name: Keyboard tests in WebKit
+        if: matrix.os == 'ubuntu-24.04'
+        run: |
+          npx playwright install --with-deps webkit
+          npm run test:ui
+
       # No libmpv needed. It is loaded dynamically at runtime rather than
       # linked, so the 95 MB download is not a test dependency.
       - name: Rust tests

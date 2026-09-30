@@ -55,3 +55,5 @@ src-tauri/app.log
 # The maintainer's local working notes and editor-assistant config.
 /notes/
 /CLAUDE.md
+test-results/
+playwright-report/

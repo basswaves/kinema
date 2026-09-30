@@ -53,6 +53,9 @@ qrcode = { version = "0.14", default-features = false, features = ["svg"] }
 # Already compiled in through Tauri's runtime; named for its timer, so the
 # SIMKL sender can wait between writes without holding a thread.
 tokio = { version = "1", features = ["time"] }
+# Already compiled in through Tauri and the libmpv plugin; named so their
+# warnings and errors can be sent to app.log (applog.rs, `Forward`).
+log = "0.4"
 
 # Microsoft's own bindings, already compiled in through Tauri at this version.
 # Used read-only by equipment.rs to ask Windows what the screens and audio

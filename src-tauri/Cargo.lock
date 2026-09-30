@@ -2003,6 +2003,7 @@ name = "kinema"
 version = "0.7.0"
 dependencies = [
  "flate2",
+ "log",
  "qrcode",
  "quick-xml 0.38.4",
  "rusqlite",

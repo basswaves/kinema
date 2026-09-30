@@ -32,6 +32,10 @@ fi
 [ -f "$dir/data/library.db" ] || echo "No $dir/data/library.db: the app will start with an empty library." >&2
 
 export KINEMA_SELFTEST="$plan"
+# Inside WSL, Mesa picks its software renderer unless told otherwise, and mpv
+# refuses software renderers — so there is no picture at all. d3d12 is WSL's
+# own route to the real graphics card. Left alone if already set.
+if [ -d /usr/lib/wsl/lib ]; then export GALLIUM_DRIVER="${GALLIUM_DRIVER:-d3d12}"; fi
 "$exe" > "$dir/stdout.log" 2>&1 &
 pid=$!
 

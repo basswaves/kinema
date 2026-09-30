@@ -1482,7 +1482,26 @@ rewrite it on open; never let a stored path depend on where it was written.
 
 `force-window=yes` keeps an idle surface for the transparent window to show,
 and on Windows that surface lives in Kinema's window through `--wid`. On
-Linux the plugin passed no window at all — under Wayland it cannot, and on
-the first X11 run it did not either — so mpv opened a separate window at
-start. Playback on Linux is its own step (notes: the player phase); until
-then, expect a second, black window.
+Linux it does not, for two different reasons. Under Wayland the plugin
+cannot give mpv a window at all ("Window embedding via --wid is not
+supported on Wayland"). Under X11 it does — `options/wid` reads Kinema's
+window — but mpv still picks its Wayland context first whenever
+`WAYLAND_DISPLAY` is set, and opens its own window anyway. Only an explicit
+`gpu-context` would make it draw into Kinema's window, and on X11 that is on
+top of the page, not under it.
+
+### A library's warnings go nowhere unless something listens
+
+The libmpv plugin reports through the `log` crate. Nothing listened, so its
+one useful sentence — why mpv got no window — was never written anywhere,
+and the first Linux runs could only guess. `applog::forward_library_logs`
+now sends every library's warnings and errors to `app.log`, named by crate.
+
+### In WSL, Mesa renders in software unless told otherwise
+
+Ubuntu's Mesa in WSL picks `llvmpipe`, and mpv refuses a software renderer
+— it tries every context and ends with no picture, while playback, the
+clock and the events all look fine. `GALLIUM_DRIVER=d3d12` is WSL's route to
+the real card (`glxinfo -B` then names it); `selftest.sh` sets it inside
+WSL. With it, mpv decodes on the card (`hwdec-current` = `nvdec-copy` on
+the development PC).

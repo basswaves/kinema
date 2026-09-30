@@ -192,6 +192,7 @@ const REVEAL_FALLBACK: std::time::Duration = std::time::Duration::from_secs(4);
 pub fn run() {
     // First, so a panic anywhere after this, on any thread, is written down.
     applog::install_panic_hook();
+    applog::forward_library_logs();
 
     let mut builder = tauri::Builder::default();
     // One Kinema at a time. Two would each switch the display and take the

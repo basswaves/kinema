@@ -146,6 +146,35 @@ pub fn install_panic_hook() {
     }));
 }
 
+/// Libraries report through the `log` crate, which nothing here listened to.
+/// The libmpv plugin's "could not get the window, skipping embedding" went
+/// nowhere, and on Linux mpv silently opened a window of its own. Their
+/// warnings and errors now come here, named by where they came from; their
+/// info and debug lines stay out, as noise.
+struct Forward;
+
+impl log::Log for Forward {
+    fn enabled(&self, metadata: &log::Metadata) -> bool {
+        metadata.level() <= log::Level::Warn
+    }
+
+    fn log(&self, record: &log::Record) {
+        if self.enabled(record.metadata()) {
+            write(record.level().as_str(), &format!("{}: {}", record.target(), record.args()));
+        }
+    }
+
+    fn flush(&self) {}
+}
+
+/// Start forwarding libraries' warnings and errors (see [`Forward`]). Once.
+pub fn forward_library_logs() {
+    static FORWARD: Forward = Forward;
+    if log::set_logger(&FORWARD).is_ok() {
+        log::set_max_level(log::LevelFilter::Warn);
+    }
+}
+
 /// `log!("skiptro: …")` — the Rust side's way into `app.log`.
 #[macro_export]
 macro_rules! log {

@@ -9,7 +9,7 @@ interface into skin XML, and every good-looking option (Jellyfin Media Player)
 is a thin client that does nothing without a Jellyfin server running somewhere.
 Kinema is one program: close it and nothing is left running.
 
-**Windows 11 only.** See [Platform support](#platform-support).
+**Windows 11.** A Linux port has begun; see [Platform support](#platform-support).
 
 ![Kinema's home screen: a full-width backdrop for a title from the library, with rails of posters beneath it](docs/images/home.jpg)
 
@@ -176,19 +176,23 @@ account can be connected to only one app besides Trakt's own.
 Windows 11, using the WebView2 runtime that ships with it. Nothing else to
 install.
 
-Linux and macOS are not supported and are not close. The Rust half is nearly
-platform-clean, but three things are not:
+**A Linux port has begun.** Kinema builds and passes its tests on Linux (x86
+and ARM, on every push), and the interface is tested in WebKit, the engine of
+Linux's window. Playback is the next step, and the hard one: Kinema's design
+has mpv drawing **beneath a transparent page**, and the libmpv plugin has no
+Wayland support — window embedding goes through `--wid`, which Wayland does
+not offer. Nothing is released for Linux yet.
 
-- The player asks mpv for the **d3d11** backend and **d3d11va** decoding by
-  name, and those are in the set of options that abort mpv's startup if refused
-  rather than falling back.
-- The libmpv plugin has **no Wayland support** — window embedding goes through
-  `--wid`, which Wayland does not offer.
-- The whole architecture rests on **mpv rendering into a native surface beneath
-  a transparent WebView2**, which is the part least likely to survive a move to
-  WebKitGTK or WKWebView.
+An Android version is planned after it. macOS is not planned by the author;
+a port is welcome, and [CONTRIBUTING.md](CONTRIBUTING.md) ("More than one
+platform") says how the code is arranged for one.
 
-A port is welcome but it is real work, and it needs someone who can test it.
+| | Windows 11 | Linux |
+|---|---|---|
+| Builds and passes its tests | ✓ | ✓ |
+| Library, matching, artwork, accounts | ✓ | ✓ untested as an app |
+| Playback | ✓ | next |
+| Equipment check, screen switching, sleep / shut down | ✓ | not yet — hidden rather than offered |
 
 ## Building from source
 
@@ -244,7 +248,7 @@ visible error at all — only a log line.
 
 ## Known limitations
 
-- **Windows 11 only** — see [Platform support](#platform-support).
+- **Windows 11 only, for now** — Linux is under way; see [Platform support](#platform-support).
 - **Tested on a small number of setups.** HDR passthrough, bitstreaming to a
   receiver and display switching have been confirmed on a 4K HDR TV with an AV
   receiver; TV overscan, intro detection on many different shows, and libraries

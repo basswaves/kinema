@@ -7,6 +7,15 @@ makes no stability promises.
 
 ## [Unreleased]
 
+### Added
+
+- **Trakt.** Connect your Trakt account in Settings → Accounts, beside SIMKL —
+  a code on screen and a QR code for your phone — and each film and episode you
+  finish in Kinema is added to it. What you had already watched in Kinema is
+  sent once, leaving out what Trakt already has, since Trakt would otherwise
+  count it twice. It only adds, as SIMKL does. A free Trakt account can be
+  connected to only one app besides Trakt's own.
+
 ## [0.6.0] — 2026-09-30
 
 Recaps and the scene after a film's credits can be skipped to, a second

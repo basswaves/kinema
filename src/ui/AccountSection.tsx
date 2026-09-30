@@ -1,14 +1,15 @@
 /**
- * Settings → Accounts → SIMKL: connecting a SIMKL account, so what is finished
- * in Kinema is added to it.
+ * Settings → Accounts: connecting SIMKL or Trakt, so what is finished in
+ * Kinema is added to the account.
  *
- * Signing in is SIMKL's device flow, made for exactly this screen: a code and
- * a QR code here, approval on a phone. So every control is a `FocusButton` —
- * connecting from the sofa is the point — and when the buttons change under
- * the focus ring (Connect becomes Cancel, Cancel becomes Disconnect), focus is
- * claimed for the new one rather than left on a control that is gone.
+ * Both sign in the same way — a code and a QR code here, approval on a phone —
+ * so one panel serves both, told apart by `SERVICES`. Every control is a
+ * `FocusButton`, because connecting from the sofa is the point, and when the
+ * buttons change under the focus ring (Connect becomes Cancel, Cancel becomes
+ * Disconnect), focus is claimed for the new one rather than left on a control
+ * that is gone.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import ConfirmButton from './ConfirmButton';
 import FocusButton from './FocusButton';
@@ -17,22 +18,42 @@ import { getSetting, setSetting } from '../metadata/api';
 import { useClaimFocus } from './focus';
 import { userError } from './errors';
 import {
+  accountApi,
   countdown,
   POLL_EVERY_MS,
   qrSource,
-  simklCancelConnect,
-  simklDisconnect,
-  simklPollConnect,
-  simklStartConnect,
-  simklStatus,
   SIMKL_CLIENT_ID_KEY,
+  TRAKT_CLIENT_ID_KEY,
+  TRAKT_CLIENT_SECRET_KEY,
+  type AccountStatus,
   type DeviceCode,
-  type SimklStatus,
-} from '../metadata/simkl';
+  type Service,
+} from '../metadata/tracking';
 
-const CONNECT_KEY = 'simkl-connect';
-const CANCEL_KEY = 'simkl-cancel';
-const DISCONNECT_KEY = 'simkl-disconnect';
+interface ServiceText {
+  name: string;
+  /** Where its developer apps are made, for the Developer tools fields. */
+  developerPage: string;
+  /** Anything extra worth saying before connecting. */
+  beforeConnecting?: string;
+  /** Why the service might stop accepting Kinema's sign-in. */
+  whyReconnect: string;
+}
+
+const SERVICES: Record<Service, ServiceText> = {
+  simkl: {
+    name: 'SIMKL',
+    developerPage: 'simkl.com/settings/developer',
+    whyReconnect: 'it was ended on SIMKL, or Kinema went unused for six months',
+  },
+  trakt: {
+    name: 'Trakt',
+    developerPage: 'app.trakt.tv/settings/apps',
+    beforeConnecting:
+      'A free Trakt account can be connected to only one app besides Trakt’s own. If yours is already connected to another (Kodi, Plex, a phone app), disconnect it on Trakt first, or Trakt will refuse.',
+    whyReconnect: 'it was ended on Trakt, or Kinema went unused for a long time',
+  },
+};
 
 const day = (secs: number) =>
   new Date(secs * 1000).toLocaleDateString(undefined, {
@@ -41,50 +62,59 @@ const day = (secs: number) =>
     year: 'numeric',
   });
 
-export default function SimklSection() {
-  const [status, setStatus] = useState<SimklStatus | null>(null);
+export default function AccountSection({ service }: { service: Service }) {
+  const text = SERVICES[service];
+  const api = useMemo(() => accountApi(service), [service]);
+  const connectKey = `${service}-connect`;
+  const cancelKey = `${service}-cancel`;
+  const disconnectKey = `${service}-disconnect`;
+
+  const [status, setStatus] = useState<AccountStatus | null>(null);
   const [code, setCode] = useState<DeviceCode | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  /** When the code runs out, by the clock — polling stops there whatever SIMKL says. */
+  /** When the code runs out, by the clock — polling stops there whatever the service says. */
   const deadline = useRef(0);
 
   const refresh = useCallback(() => {
-    simklStatus()
+    api
+      .status()
       .then(setStatus)
       .catch((e: unknown) => setError(userError(e)));
-  }, []);
+  }, [api]);
 
   useEffect(() => {
     refresh();
   }, [refresh]);
 
-  // Leaving Settings mid-sign-in ends it: nothing should keep asking SIMKL
-  // about a code nobody is looking at.
+  // Leaving Settings mid-sign-in ends it: nothing should keep asking about a
+  // code nobody is looking at.
   useEffect(() => {
     return () => {
-      void simklCancelConnect().catch(() => undefined);
+      void api.cancelConnect().catch(() => undefined);
     };
-  }, []);
+  }, [api]);
 
   // Waiting for approval: ask every couple of seconds until an answer, or
   // until the code runs out. SIMKL never says "declined" — a refusal looks
-  // exactly like waiting — so the clock is what ends it.
+  // exactly like waiting — so the clock is what ends it there.
   useEffect(() => {
     if (!code) return;
     let live = true;
+    const ranOut = 'The code ran out before it was approved. Connect again for a new one.';
     const tick = window.setInterval(() => {
       const left = (deadline.current - Date.now()) / 1000;
       setSecondsLeft(left);
       if (left <= 0) {
         setCode(null);
-        setNote('The code ran out before it was approved. Connect again for a new one.');
+        setNote(ranOut);
       }
     }, 1000);
     const poll = window.setInterval(() => {
-      simklPollConnect()
+      api
+        .pollConnect()
         .then((outcome) => {
           if (!live) return;
           switch (outcome) {
@@ -95,14 +125,20 @@ export default function SimklSection() {
               break;
             case 'expired':
               setCode(null);
-              setNote('The code ran out before it was approved. Connect again for a new one.');
+              setNote(ranOut);
+              break;
+            case 'denied':
+              setCode(null);
+              setNote(`Kinema was declined on ${text.name}. Connect again if that was a mistake.`);
               break;
             case 'refused':
               setCode(null);
-              setError('SIMKL does not recognise this copy of Kinema. The log has the details.');
+              setError(
+                `${text.name} does not recognise this copy of Kinema. The log has the details.`
+              );
               break;
             case 'failed':
-              setNote('SIMKL could not be reached just now. Still trying.');
+              setNote(`${text.name} could not be reached just now. Still trying.`);
               break;
             case 'waiting':
               break;
@@ -115,14 +151,14 @@ export default function SimklSection() {
       window.clearInterval(tick);
       window.clearInterval(poll);
     };
-  }, [code, refresh]);
+  }, [code, refresh, api, text.name]);
 
   const connect = async () => {
     setBusy(true);
     setError(null);
     setNote(null);
     try {
-      const shown = await simklStartConnect();
+      const shown = await api.startConnect();
       deadline.current = Date.now() + shown.expires_in * 1000;
       setSecondsLeft(shown.expires_in);
       setCode(shown);
@@ -136,13 +172,13 @@ export default function SimklSection() {
   const cancel = () => {
     setCode(null);
     setNote(null);
-    void simklCancelConnect().catch((e: unknown) => setError(userError(e)));
+    void api.cancelConnect().catch((e: unknown) => setError(userError(e)));
   };
 
   const disconnect = async () => {
     setBusy(true);
     try {
-      await simklDisconnect();
+      await api.disconnect();
       refresh();
     } catch (e) {
       setError(userError(e));
@@ -152,33 +188,39 @@ export default function SimklSection() {
   };
 
   const connected = status?.connected ?? false;
-  useClaimFocus(CANCEL_KEY, code !== null);
-  useClaimFocus(DISCONNECT_KEY, connected && code === null);
-  useClaimFocus(CONNECT_KEY, status !== null && !connected && code === null);
+  useClaimFocus(cancelKey, code !== null);
+  useClaimFocus(disconnectKey, connected && code === null);
+  useClaimFocus(connectKey, status !== null && !connected && code === null);
 
   if (!status) return null;
   const qr = qrSource(code?.qr_svg ?? null);
 
   return (
     <section className="settings-section">
-      <h2>SIMKL</h2>
+      <h2>{text.name}</h2>
       <p className="settings-intro">
-        Adds what you finish watching in Kinema to your SIMKL account, including anything you mark
-        as watched. It only ever adds: nothing comes back from SIMKL, and marking something as not
-        watched here leaves SIMKL as it is.
+        Adds what you finish watching in Kinema to your {text.name} account, including anything you
+        mark as watched. It only ever adds: nothing comes back from {text.name}, and marking
+        something as not watched here leaves {text.name} as it is.
       </p>
       {error && <p className="settings-warn">{error}</p>}
 
       {!status.available && (
         <p className="settings-hint">
-          This copy of Kinema was built without a SIMKL app ID, so it cannot connect. Released
+          This copy of Kinema was built without a {text.name} app, so it cannot connect. Released
           copies have one; a build from source can use its own, under Advanced → Developer tools.
         </p>
       )}
 
       {status.available && code && (
         <div className="simkl-code">
-          {qr && <img className="simkl-qr" src={qr} alt="QR code for the SIMKL sign-in page" />}
+          {qr && (
+            <img
+              className="simkl-qr"
+              src={qr}
+              alt={`QR code for the ${text.name} sign-in page`}
+            />
+          )}
           <div>
             <p className="settings-intro">
               Scan the code with your phone, or go to <strong>{code.verification_uri}</strong> and
@@ -186,7 +228,8 @@ export default function SimklSection() {
             </p>
             <p className="simkl-user-code">{code.user_code}</p>
             <p className="settings-hint">
-              Then approve Kinema on SIMKL. This code works for {countdown(secondsLeft)} more.
+              Then approve Kinema on {text.name}. This code works for {countdown(secondsLeft)}{' '}
+              more.
             </p>
             {note && <p className="settings-hint">{note}</p>}
             <div className="settings-row">
@@ -204,7 +247,7 @@ export default function SimklSection() {
               <FocusButton
                 keepInView="nearest"
                 className="btn-secondary"
-                focusKey={CANCEL_KEY}
+                focusKey={cancelKey}
                 onSelect={cancel}
               >
                 Cancel
@@ -225,7 +268,7 @@ export default function SimklSection() {
               'Connected.'
             )}{' '}
             {status.waiting > 0
-              ? `${status.waiting} watched ${status.waiting === 1 ? 'item is' : 'items are'} waiting to be sent; they go as soon as SIMKL can be reached.`
+              ? `${status.waiting} watched ${status.waiting === 1 ? 'item is' : 'items are'} waiting to be sent; they go as soon as ${text.name} can be reached.`
               : status.last_sent_at
                 ? `Everything is sent; last on ${day(status.last_sent_at)}.`
                 : 'Everything is sent.'}
@@ -234,10 +277,10 @@ export default function SimklSection() {
             <ConfirmButton
               keepInView="nearest"
               className="btn-secondary"
-              confirmLabel="Disconnect SIMKL"
+              confirmLabel={`Disconnect ${text.name}`}
               onConfirm={() => void disconnect()}
               disabled={busy}
-              focusKey={DISCONNECT_KEY}
+              focusKey={disconnectKey}
             >
               Disconnect
             </ConfirmButton>
@@ -249,8 +292,8 @@ export default function SimklSection() {
         <>
           {status.needs_reconnect && (
             <p className="settings-warn">
-              SIMKL no longer accepts Kinema's sign-in — it was ended on SIMKL, or Kinema went
-              unused for six months. Connect again; what you watched meanwhile is kept and sent.
+              {text.name} no longer accepts Kinema&rsquo;s sign-in — {text.whyReconnect}. Connect
+              again; what you watched meanwhile is kept and sent.
             </p>
           )}
           {note && <p className="settings-hint">{note}</p>}
@@ -258,18 +301,20 @@ export default function SimklSection() {
             <FocusButton
               keepInView="nearest"
               className="btn-primary"
-              focusKey={CONNECT_KEY}
+              focusKey={connectKey}
               onSelect={() => void connect()}
               disabled={busy}
             >
-              {status.needs_reconnect ? 'Connect SIMKL again' : 'Connect SIMKL'}
+              {status.needs_reconnect ? `Connect ${text.name} again` : `Connect ${text.name}`}
             </FocusButton>
           </div>
           <p className="settings-hint">
-            You approve on SIMKL&rsquo;s own page, on your phone or here; Kinema never sees your
-            password. Everything you have already watched in Kinema is sent once when you
-            connect.
+            You approve on {text.name}&rsquo;s own page, on your phone or here; Kinema never sees
+            your password. Everything you have already watched in Kinema is sent once when you
+            connect
+            {service === 'trakt' ? ', leaving out what Trakt already has' : ''}.
           </p>
+          {text.beforeConnecting && <p className="settings-hint">{text.beforeConnecting}</p>}
         </>
       )}
     </section>
@@ -277,43 +322,75 @@ export default function SimklSection() {
 }
 
 /**
- * Developer tools: a SIMKL app ID of one's own, for a build from source that
- * has none built in. A release never needs it. Saved as it is typed, like the
- * keys in Library.
+ * Developer tools: one text field saved as it is typed, like the keys in
+ * Library. For the apps of one's own that a build from source needs.
  */
-export function SimklAppIdField() {
+function SettingField({
+  settingKey,
+  label,
+  placeholder,
+  secret = false,
+}: {
+  settingKey: string;
+  label: string;
+  placeholder: string;
+  secret?: boolean;
+}) {
   const [value, setValue] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    getSetting(SIMKL_CLIENT_ID_KEY)
+    getSetting(settingKey)
       .then((v) => setValue(v ?? ''))
       .catch((e: unknown) => setError(userError(e)));
-  }, []);
+  }, [settingKey]);
 
   useEffect(() => {
     if (value === null) return;
     const id = window.setTimeout(() => {
-      void setSetting(SIMKL_CLIENT_ID_KEY, value.trim()).catch((e: unknown) =>
-        setError(userError(e))
-      );
+      void setSetting(settingKey, value.trim()).catch((e: unknown) => setError(userError(e)));
     }, 600);
     return () => window.clearTimeout(id);
-  }, [value]);
+  }, [value, settingKey]);
 
   if (value === null) return null;
   return (
     <label className="settings-field">
       <span>
-        SIMKL app ID <span className="muted">(only for a build without one)</span>
+        {label} <span className="muted">(only for a build without one)</span>
       </span>
       <FocusInput
         className="settings-input"
         value={value}
         onChange={setValue}
-        placeholder="From simkl.com/settings/developer"
+        placeholder={placeholder}
+        type={secret ? 'password' : undefined}
       />
       {error && <span className="settings-warn">{error}</span>}
     </label>
+  );
+}
+
+/** Developer tools: the SIMKL and Trakt apps of one's own. */
+export function AccountAppFields() {
+  return (
+    <>
+      <SettingField
+        settingKey={SIMKL_CLIENT_ID_KEY}
+        label="SIMKL app ID"
+        placeholder={`From ${SERVICES.simkl.developerPage}`}
+      />
+      <SettingField
+        settingKey={TRAKT_CLIENT_ID_KEY}
+        label="Trakt client ID"
+        placeholder={`From ${SERVICES.trakt.developerPage}`}
+      />
+      <SettingField
+        settingKey={TRAKT_CLIENT_SECRET_KEY}
+        label="Trakt client secret"
+        placeholder="Used with the client ID above"
+        secret
+      />
+    </>
   );
 }

@@ -783,13 +783,13 @@ type Args = Record<string, unknown>;
 type Handler = (args: Args) => unknown;
 
 /**
- * A stand-in SIMKL: the sign-in is approved on the third poll, as if someone
- * had typed the code on their phone in between. Nothing leaves the page.
+ * Stand-in SIMKL and Trakt: a sign-in is approved on the third poll, as if
+ * someone had typed the code on their phone in between. Nothing leaves the
+ * page.
  */
-const simkl = {
-  connected: false,
-  polls: 0,
-  pending: false,
+const accounts = {
+  simkl: { connected: false, polls: 0, pending: false, user: 'example-user', code: 'BDWP-HQPK', page: 'https://simkl.com/pin' },
+  trakt: { connected: false, polls: 0, pending: false, user: 'example-trakt', code: '5055CC52', page: 'https://trakt.tv/activate' },
 };
 
 /** A small checkerboard in place of a QR code; the layout is what is tested. */
@@ -941,42 +941,64 @@ const handlers: Record<string, Handler> = {
   restore_backup: () => null,
   selftest_plan: () => null,
 
-  // SIMKL (simkl.rs), with the stand-in above
-  simkl_status: () => ({
-    available: true,
-    connected: simkl.connected,
-    needs_reconnect: false,
-    user: simkl.connected ? 'example-user' : null,
-    waiting: 0,
-    last_sent_at: simkl.connected ? 1790700000 : null,
-  }),
-  simkl_start_connect: () => {
-    simkl.polls = 0;
-    simkl.pending = true;
-    return {
-      user_code: 'BDWP-HQPK',
-      verification_uri: 'https://simkl.com/pin',
-      verification_uri_complete: 'https://simkl.com/pin?user_code=BDWP-HQPK',
-      expires_in: 900,
-      qr_svg: MOCK_QR,
-    };
-  },
-  simkl_poll_connect: () => {
-    if (!simkl.pending) return 'expired';
-    simkl.polls += 1;
-    if (simkl.polls < 3) return 'waiting';
-    simkl.pending = false;
-    simkl.connected = true;
-    return 'connected';
-  },
-  simkl_cancel_connect: () => {
-    simkl.pending = false;
-    return null;
-  },
-  simkl_disconnect: () => {
-    simkl.connected = false;
-    return null;
-  },
+  // SIMKL and Trakt (simkl.rs, trakt.rs), with the stand-ins above
+  ...Object.fromEntries(
+    (['simkl', 'trakt'] as const).flatMap((service) => {
+      const a = accounts[service];
+      return [
+        [
+          `${service}_status`,
+          () => ({
+            available: true,
+            connected: a.connected,
+            needs_reconnect: false,
+            user: a.connected ? a.user : null,
+            waiting: 0,
+            last_sent_at: a.connected ? 1790700000 : null,
+          }),
+        ],
+        [
+          `${service}_start_connect`,
+          () => {
+            a.polls = 0;
+            a.pending = true;
+            return {
+              user_code: a.code,
+              verification_uri: a.page,
+              verification_uri_complete: a.page,
+              expires_in: 900,
+              qr_svg: MOCK_QR,
+            };
+          },
+        ],
+        [
+          `${service}_poll_connect`,
+          () => {
+            if (!a.pending) return 'expired';
+            a.polls += 1;
+            if (a.polls < 3) return 'waiting';
+            a.pending = false;
+            a.connected = true;
+            return 'connected';
+          },
+        ],
+        [
+          `${service}_cancel_connect`,
+          () => {
+            a.pending = false;
+            return null;
+          },
+        ],
+        [
+          `${service}_disconnect`,
+          () => {
+            a.connected = false;
+            return null;
+          },
+        ],
+      ] as [string, Handler][];
+    })
+  ),
 
   // plugins
   'plugin:event|listen': (a) => listen(String(a.event), Number(a.handler)),

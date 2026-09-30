@@ -68,21 +68,28 @@ foreach ($dll in $dlls) {
     }
 }
 
-# Kinema's SIMKL app ID is compiled into the Rust side (simkl.rs), so cargo has
-# to see it as an environment variable. Vite reads the git-ignored .env.local by
-# itself, but cargo does not - so a KINEMA_SIMKL_CLIENT_ID line there is passed
-# on here. On CI it comes from the repository secret instead (release.yml), and
-# anything already set in the environment wins.
+# Kinema's SIMKL and Trakt apps are compiled into the Rust side (simkl.rs,
+# trakt.rs), so cargo has to see them as environment variables. Vite reads the
+# git-ignored .env.local by itself, but cargo does not - so KINEMA_SIMKL_* and
+# KINEMA_TRAKT_* lines there are passed on here. On CI they come from the
+# repository secrets instead (release.yml), and anything already set in the
+# environment wins.
 $envLocal = Join-Path $root '.env.local'
-if (-not $env:KINEMA_SIMKL_CLIENT_ID -and (Test-Path $envLocal)) {
+$appVars = @('KINEMA_SIMKL_CLIENT_ID', 'KINEMA_TRAKT_CLIENT_ID', 'KINEMA_TRAKT_CLIENT_SECRET')
+if (Test-Path $envLocal) {
     foreach ($line in Get-Content $envLocal) {
-        if ($line -match '^\s*KINEMA_SIMKL_CLIENT_ID\s*=\s*(.+?)\s*$') {
-            $env:KINEMA_SIMKL_CLIENT_ID = $Matches[1]
+        foreach ($name in $appVars) {
+            if ($line -match "^\s*$name\s*=\s*(.+?)\s*$" -and -not [Environment]::GetEnvironmentVariable($name)) {
+                [Environment]::SetEnvironmentVariable($name, $Matches[1])
+            }
         }
     }
 }
 if (-not $env:KINEMA_SIMKL_CLIENT_ID) {
     Write-Host 'No KINEMA_SIMKL_CLIENT_ID: this build will have no SIMKL.'
+}
+if (-not ($env:KINEMA_TRAKT_CLIENT_ID -and $env:KINEMA_TRAKT_CLIENT_SECRET)) {
+    Write-Host 'No KINEMA_TRAKT_CLIENT_ID and _SECRET: this build will have no Trakt.'
 }
 
 Write-Host 'Building release binary (this takes a few minutes the first time)...'

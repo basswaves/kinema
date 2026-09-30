@@ -24,7 +24,7 @@
 //! was sent but not acknowledged is simply sent again.
 //!
 //! **The queue survives being offline.** Finished items wait in
-//! `simkl_outbox` until SIMKL has them: a failure to reach SIMKL keeps them,
+//! `watch_outbox` until SIMKL has them: a failure to reach SIMKL keeps them,
 //! and they go at the next launch or the next thing finished.
 //!
 //! **Tokens.** An access token lasts 7 days and is refreshed a day before it
@@ -40,10 +40,10 @@
 //! the real Kinema's token off (SIMKL's "one grant, one live access token").
 
 use crate::library::Db;
+use crate::tracking::{self, iso8601, qr_svg, DeviceCode, PollOutcome, Status, Waiting, SIMKL};
 use crate::settings::setting;
 use crate::util::{now_secs, to_string_err};
 use rusqlite::{params, Connection};
-use serde::Serialize;
 use serde_json::{json, Value};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
@@ -149,182 +149,11 @@ fn allowed() -> bool {
 }
 
 /// Connected means holding a refresh token that SIMKL has not refused.
-fn connected(conn: &Connection) -> bool {
+pub(crate) fn connected(conn: &Connection) -> bool {
     setting(conn, REFRESH_KEY).is_some() && setting(conn, RECONNECT_KEY).is_none()
 }
 
-// ---- the queue --------------------------------------------------------------
-
-/// Queue one finished film or episode, if SIMKL is connected.
-///
-/// Called by `history::remember` at the moment something becomes watched —
-/// the one place that happens, whether by playing or by hand. Returns whether
-/// anything was queued, so the caller knows to schedule a send.
-///
-/// Needs an IMDb or TMDB id: SIMKL finds a title by its ids, and without one
-/// there is nothing to tell it that it could act on. An episode also needs its
-/// numbers.
-pub fn queue_finished(
-    conn: &Connection,
-    kind: &str,
-    imdb_id: Option<&str>,
-    tmdb_id: Option<&str>,
-    season: Option<i64>,
-    episode: Option<i64>,
-    watched_at: i64,
-) -> rusqlite::Result<bool> {
-    if !connected(conn) {
-        return Ok(false);
-    }
-    queue(conn, kind, imdb_id, tmdb_id, season, episode, watched_at)
-}
-
-/// Queue without asking whether SIMKL is connected — for the first-connect
-/// history, which is queued the moment the tokens are stored.
-fn queue(
-    conn: &Connection,
-    kind: &str,
-    imdb_id: Option<&str>,
-    tmdb_id: Option<&str>,
-    season: Option<i64>,
-    episode: Option<i64>,
-    watched_at: i64,
-) -> rusqlite::Result<bool> {
-    let imdb_id = imdb_id.map(str::trim).filter(|s| !s.is_empty());
-    let tmdb_id = tmdb_id.map(str::trim).filter(|s| !s.is_empty());
-    if imdb_id.is_none() && tmdb_id.is_none() {
-        return Ok(false);
-    }
-    let is_film = kind == "movie";
-    if !is_film && (season.is_none() || episode.is_none()) {
-        return Ok(false);
-    }
-    // One row per thing watched: the same episode finished twice before a
-    // send is one watch as far as SIMKL's history goes, and the first time is
-    // the one kept.
-    let key = format!(
-        "{}|{}|{}|{}|{}",
-        if is_film { "movie" } else { "episode" },
-        imdb_id.unwrap_or(""),
-        tmdb_id.unwrap_or(""),
-        season.map(|s| s.to_string()).unwrap_or_default(),
-        episode.map(|e| e.to_string()).unwrap_or_default()
-    );
-    let added = conn.execute(
-        "INSERT OR IGNORE INTO simkl_outbox
-            (key, kind, imdb_id, tmdb_id, season, episode, watched_at, queued_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-        params![
-            key,
-            if is_film { "movie" } else { "episode" },
-            imdb_id,
-            tmdb_id,
-            if is_film { None } else { season },
-            if is_film { None } else { episode },
-            watched_at,
-            now_secs()
-        ],
-    )?;
-    Ok(added > 0)
-}
-
-/// Everything already watched, for the first send after connecting.
-fn queue_history(conn: &Connection) -> rusqlite::Result<usize> {
-    let mut stmt = conn.prepare(
-        "SELECT kind, imdb_id, tmdb_id, season, episode, updated_at
-           FROM watch_history
-          WHERE completed = 1",
-    )?;
-    let rows = stmt
-        .query_map([], |r| {
-            Ok((
-                r.get::<_, String>(0)?,
-                r.get::<_, Option<String>>(1)?,
-                r.get::<_, Option<String>>(2)?,
-                r.get::<_, Option<i64>>(3)?,
-                r.get::<_, Option<i64>>(4)?,
-                r.get::<_, i64>(5)?,
-            ))
-        })?
-        .collect::<rusqlite::Result<Vec<_>>>()?;
-
-    let mut queued = 0;
-    for (kind, imdb, tmdb, season, episode, at) in rows {
-        if queue(conn, &kind, imdb.as_deref(), tmdb.as_deref(), season, episode, at)? {
-            queued += 1;
-        }
-    }
-    Ok(queued)
-}
-
-#[derive(Debug, Clone, PartialEq)]
-struct Waiting {
-    id: i64,
-    is_film: bool,
-    imdb_id: Option<String>,
-    tmdb_id: Option<String>,
-    season: Option<i64>,
-    episode: Option<i64>,
-    watched_at: i64,
-}
-
-fn waiting(conn: &Connection, limit: usize) -> rusqlite::Result<Vec<Waiting>> {
-    let mut stmt = conn.prepare(
-        "SELECT id, kind, imdb_id, tmdb_id, season, episode, watched_at
-           FROM simkl_outbox ORDER BY id LIMIT ?1",
-    )?;
-    let rows = stmt.query_map(params![limit as i64], |r| {
-        Ok(Waiting {
-            id: r.get(0)?,
-            is_film: r.get::<_, String>(1)? == "movie",
-            imdb_id: r.get(2)?,
-            tmdb_id: r.get(3)?,
-            season: r.get(4)?,
-            episode: r.get(5)?,
-            watched_at: r.get(6)?,
-        })
-    })?;
-    rows.collect()
-}
-
-fn waiting_count(conn: &Connection) -> i64 {
-    conn.query_row("SELECT COUNT(*) FROM simkl_outbox", [], |r| r.get(0))
-        .unwrap_or(0)
-}
-
-fn forget_sent(conn: &Connection, sent: &[Waiting]) -> rusqlite::Result<()> {
-    for row in sent {
-        conn.execute("DELETE FROM simkl_outbox WHERE id = ?1", params![row.id])?;
-    }
-    Ok(())
-}
-
 // ---- the request ------------------------------------------------------------
-
-/// A Unix time as the ISO-8601 SIMKL asks for, `2026-09-30T20:15:00Z`.
-///
-/// Written out rather than pulled in from a date crate for the one format:
-/// days since 1970 to a civil date is a few lines of well-known arithmetic
-/// (Howard Hinnant's `civil_from_days`).
-fn iso8601(secs: i64) -> String {
-    let days = secs.div_euclid(86_400);
-    let rem = secs.rem_euclid(86_400);
-    let z = days + 719_468;
-    let era = z.div_euclid(146_097);
-    let doe = z.rem_euclid(146_097);
-    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let day = doy - (153 * mp + 2) / 5 + 1;
-    let month = if mp < 10 { mp + 3 } else { mp - 9 };
-    let year = yoe + era * 400 + i64::from(month <= 2);
-    format!(
-        "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}Z",
-        rem / 3600,
-        (rem % 3600) / 60,
-        rem % 60
-    )
-}
 
 /// A show's IMDb and TMDB ids, which together say which show an episode is of.
 type ShowIds = (Option<String>, Option<String>);
@@ -606,7 +435,7 @@ async fn send_all(app: &tauri::AppHandle) -> Result<(), String> {
             }
             let Some(client_id) = client_id(&conn) else { return Ok(()) };
             let Some(tokens) = read_tokens(&conn) else { return Ok(()) };
-            let batch = waiting(&conn, BATCH).map_err(to_string_err)?;
+            let batch = tracking::waiting(&conn, SIMKL, BATCH).map_err(to_string_err)?;
             (client_id, tokens, batch)
         };
         if batch.is_empty() {
@@ -654,7 +483,7 @@ async fn send_all(app: &tauri::AppHandle) -> Result<(), String> {
                 if let Some(missing) = not_found_summary(&response) {
                     crate::log!("simkl: {missing}");
                 }
-                forget_sent(&conn, &batch).map_err(to_string_err)?;
+                tracking::forget_sent(&conn, &batch).map_err(to_string_err)?;
                 store(&conn, LAST_SENT_KEY, &now_secs().to_string())?;
                 crate::log!("simkl: sent {} watched item(s)", batch.len());
             }
@@ -670,7 +499,7 @@ async fn send_all(app: &tauri::AppHandle) -> Result<(), String> {
                 // and fixed; the rows go, or the same refusal would block
                 // everything queued behind them for good.
                 crate::log!("simkl: SIMKL rejected a batch ({why}); it was {body}");
-                forget_sent(&conn, &batch).map_err(to_string_err)?;
+                tracking::forget_sent(&conn, &batch).map_err(to_string_err)?;
             }
         }
     }
@@ -723,47 +552,6 @@ struct Pending {
 #[derive(Default)]
 pub struct SimklState(Mutex<Option<Pending>>);
 
-/// What the page shows while waiting for approval.
-#[derive(Serialize)]
-pub struct DeviceCode {
-    /// `XXXX-YYYY`, shown exactly as SIMKL gave it.
-    pub user_code: String,
-    /// `https://simkl.com/pin`, for typing the code by hand.
-    pub verification_uri: String,
-    /// The same page with the code filled in — what the QR code holds.
-    pub verification_uri_complete: String,
-    pub expires_in: i64,
-    /// The QR code as an SVG, to scan with a phone from the sofa.
-    pub qr_svg: Option<String>,
-}
-
-#[derive(Serialize, Debug, PartialEq)]
-#[serde(rename_all = "snake_case")]
-pub enum PollOutcome {
-    /// Not approved yet. Ask again later.
-    Waiting,
-    Connected,
-    /// The code ran out. Start again.
-    Expired,
-    /// SIMKL does not accept this app ID — a configuration problem, not
-    /// something waiting will fix.
-    Refused,
-    /// Anything else, including being offline. Worth trying again.
-    Failed,
-}
-
-#[derive(Serialize)]
-pub struct Status {
-    /// There is an app ID, so connecting is possible at all.
-    pub available: bool,
-    pub connected: bool,
-    pub needs_reconnect: bool,
-    pub user: Option<String>,
-    /// Finished items not yet accepted by SIMKL.
-    pub waiting: i64,
-    pub last_sent_at: Option<i64>,
-}
-
 #[tauri::command]
 pub fn simkl_status(db: tauri::State<Db>) -> Result<Status, String> {
     let conn = db.0.lock().map_err(to_string_err)?;
@@ -772,21 +560,9 @@ pub fn simkl_status(db: tauri::State<Db>) -> Result<Status, String> {
         connected: connected(&conn),
         needs_reconnect: setting(&conn, RECONNECT_KEY).is_some(),
         user: setting(&conn, USER_KEY),
-        waiting: waiting_count(&conn),
+        waiting: tracking::waiting_count(&conn, SIMKL),
         last_sent_at: setting(&conn, LAST_SENT_KEY).and_then(|s| s.parse().ok()),
     })
-}
-
-fn qr_svg(text: &str) -> Option<String> {
-    use qrcode::render::svg;
-    let code = qrcode::QrCode::new(text.as_bytes()).ok()?;
-    Some(
-        code.render::<svg::Color>()
-            .quiet_zone(true)
-            .dark_color(svg::Color("#000000"))
-            .light_color(svg::Color("#ffffff"))
-            .build(),
-    )
 }
 
 /// Parse SIMKL's answer to the first step of signing in.
@@ -938,7 +714,8 @@ pub async fn simkl_poll_connect(app: tauri::AppHandle) -> Result<PollOutcome, St
             }
             // Everything already watched, once — decided 2026-09-30. SIMKL
             // ignores a watch it already has, so connecting again is harmless.
-            let queued = queue_history(&conn).map_err(to_string_err)?;
+            let history = tracking::finished_history(&conn).map_err(to_string_err)?;
+            let queued = tracking::queue_all(&conn, SIMKL, &history).map_err(to_string_err)?;
             crate::log!("simkl: connected; {queued} already-watched item(s) queued");
         }
         send_soon(&app);
@@ -1019,7 +796,7 @@ pub async fn simkl_disconnect(app: tauri::AppHandle) -> Result<(), String> {
     for key in [ACCESS_KEY, REFRESH_KEY, EXPIRES_KEY, USER_KEY, RECONNECT_KEY, LAST_SENT_KEY] {
         clear(&conn, key).map_err(to_string_err)?;
     }
-    conn.execute("DELETE FROM simkl_outbox", []).map_err(to_string_err)?;
+    tracking::forget_all(&conn, SIMKL).map_err(to_string_err)?;
     crate::log!("simkl: disconnected");
     Ok(())
 }
@@ -1046,46 +823,17 @@ mod tests {
         .unwrap();
     }
 
-    #[test]
-    fn nothing_is_queued_while_disconnected() {
-        let conn = db();
-        assert!(!queue_finished(&conn, "movie", Some("tt0000001"), None, None, None, 1).unwrap());
-        assert_eq!(waiting_count(&conn), 0);
-    }
-
-    #[test]
-    fn a_finished_film_and_episode_are_queued_once_each() {
-        let conn = db();
-        connect(&conn);
-        assert!(queue_finished(&conn, "movie", Some("tt0000001"), Some("11"), None, None, 5).unwrap());
-        assert!(queue_finished(&conn, "series", None, Some("105"), Some(1), Some(2), 6).unwrap());
-        // Finished again before it went: still one watch, the first time kept.
-        assert!(!queue_finished(&conn, "series", None, Some("105"), Some(1), Some(2), 9).unwrap());
-        let rows = waiting(&conn, 10).unwrap();
-        assert_eq!(rows.len(), 2);
-        assert_eq!(rows[1].watched_at, 6);
-    }
-
-    /// SIMKL finds titles by id; without one there is nothing it could act on.
-    #[test]
-    fn a_title_with_no_ids_or_an_episode_with_no_numbers_is_not_queued() {
-        let conn = db();
-        connect(&conn);
-        assert!(!queue_finished(&conn, "movie", None, Some("  "), None, None, 1).unwrap());
-        assert!(!queue_finished(&conn, "series", Some("tt0000002"), None, Some(1), None, 1).unwrap());
-    }
-
     /// A refused refresh token means connecting again; until then nothing
     /// new is queued, but what was queued stays.
     #[test]
     fn needing_to_reconnect_stops_new_items_and_keeps_old_ones() {
         let conn = db();
         connect(&conn);
-        queue_finished(&conn, "movie", Some("tt0000001"), None, None, None, 1).unwrap();
+        tracking::queue_finished(&conn, "movie", Some("tt0000001"), None, None, None, 1).unwrap();
         mark_needs_reconnect(&conn, "test").unwrap();
         assert!(!connected(&conn));
-        assert!(!queue_finished(&conn, "movie", Some("tt0000003"), None, None, None, 1).unwrap());
-        assert_eq!(waiting_count(&conn), 1);
+        tracking::queue_finished(&conn, "movie", Some("tt0000003"), None, None, None, 1).unwrap();
+        assert_eq!(tracking::waiting_count(&conn, SIMKL), 1);
         // Connecting again clears it.
         connect(&conn);
         assert!(connected(&conn));
@@ -1121,35 +869,6 @@ mod tests {
         assert_eq!(seasons[0]["episodes"].as_array().unwrap().len(), 2);
         assert_eq!(seasons[0]["episodes"][1]["number"], 2);
         assert_eq!(seasons[0]["episodes"][1]["watched_at"], "2026-09-21T14:13:20Z");
-    }
-
-    #[test]
-    fn times_are_written_as_iso_8601() {
-        assert_eq!(iso8601(0), "1970-01-01T00:00:00Z");
-        assert_eq!(iso8601(951_782_400), "2000-02-29T00:00:00Z");
-        assert_eq!(iso8601(1_790_000_000), "2026-09-21T14:13:20Z");
-        assert_eq!(iso8601(4_107_542_399), "2100-02-28T23:59:59Z");
-    }
-
-    /// Everything already watched is queued at connect; anything unfinished
-    /// is not.
-    #[test]
-    fn connecting_queues_what_was_already_watched() {
-        let conn = db();
-        let insert = |kind: &str, tmdb: &str, s: Option<i64>, e: Option<i64>, done: bool| {
-            conn.execute(
-                "INSERT INTO watch_history
-                    (kind, provider, provider_id, imdb_id, tmdb_id, season, episode, label,
-                     position_secs, completed, updated_at)
-                 VALUES (?1, 'tmdb', ?2, NULL, ?2, ?3, ?4, 'x', 0, ?5, 100)",
-                params![kind, tmdb, s, e, done as i64],
-            )
-            .unwrap();
-        };
-        insert("movie", "11", None, None, true);
-        insert("series", "105", Some(1), Some(1), true);
-        insert("series", "105", Some(1), Some(2), false);
-        assert_eq!(queue_history(&conn).unwrap(), 2);
     }
 
     #[test]

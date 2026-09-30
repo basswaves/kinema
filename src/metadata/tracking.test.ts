@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { countdown, qrSource } from './simkl';
+import { countdown, qrSource } from './tracking';
 
 describe('countdown', () => {
   it('shows minutes and seconds left on the code', () => {

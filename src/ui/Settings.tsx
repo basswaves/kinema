@@ -27,7 +27,7 @@ import FocusButton from './FocusButton';
 import { count, formatBytes } from './format';
 import FocusInput from './FocusInput';
 import BackupSection from './BackupSection';
-import SimklSection, { SimklAppIdField } from './SimklSection';
+import AccountSection, { AccountAppFields } from './AccountSection';
 import ConfirmButton from './ConfirmButton';
 import EquipmentSection from './EquipmentSection';
 import SoundSection from './SoundSection';
@@ -1172,7 +1172,12 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
               </>
             )}
 
-            {section === 'accounts' && <SimklSection />}
+            {section === 'accounts' && (
+              <>
+                <AccountSection service="simkl" />
+                <AccountSection service="trakt" />
+              </>
+            )}
 
             {section === 'advanced' && (
               <>
@@ -1290,7 +1295,7 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
                       Open log folder
                     </FocusButton>
                   </div>
-                  <SimklAppIdField />
+                  <AccountAppFields />
                 </section>
 
                 {panel === 'developer' && (

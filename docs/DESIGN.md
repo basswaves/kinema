@@ -80,9 +80,13 @@ src-tauri/src/
   trailer.rs     Finds local trailer files by Jellyfin/Kodi convention; the
                  scanner shares its test so trailers never become titles
   settings.rs    Key/value settings (API keys) + the frontend log bridge
-  simkl.rs       SIMKL, one way: the device sign-in, token refresh, and the
-                 queue of finished films and episodes (simkl_outbox), sent in
-                 batches. history.rs queues; nothing is read back
+  tracking.rs    What SIMKL and Trakt share: the queue of finished films and
+                 episodes (watch_outbox, one row per service), filled from
+                 history.rs, and the sign-in page's shapes
+  simkl.rs       SIMKL, one way: the device sign-in, token refresh, sending
+                 the queue in batches. Nothing is read back
+  trakt.rs       Trakt, the same, except that it reads the account's watched
+                 list once at connect — Trakt keeps duplicate plays
 
 src/
   ui/            Browse shell, Home, rails, cards, detail page, search, the
@@ -345,7 +349,7 @@ like a season with gaps.
 
 **SIMKL hears about "watched," and only that.** When SIMKL is connected, the
 moment something becomes watched — `history::remember`, the one place that
-happens, by playing or by hand — it is queued in `simkl_outbox`, and a few
+happens, by playing or by hand — it is queued in `watch_outbox`, and a few
 seconds later everything queued goes in one request. SIMKL allows one write a
 second and suspends apps that keep exceeding it, so nothing is sent per item,
 nothing is polled, and a backlog goes a hundred at a time. The queue is what
@@ -355,6 +359,13 @@ that watch from another app; and nothing is read back, so SIMKL can never
 change what Kinema says was watched. Signing in is SIMKL's device flow — a code
 and a QR code on screen, approval on a phone — so it works from a sofa and no
 secret has to live in the app.
+
+**Trakt is told only what it does not have.** Trakt, unlike SIMKL, keeps every
+play it is sent, so sending a history it partly has would show rewatches that
+never happened. At connect, Kinema reads the account's watched films and
+episodes and queues only the rest; if the account cannot be read, the history
+waits rather than going blind. Its refresh tokens are single-use, so a new pair
+is stored the moment it arrives.
 
 **There is one notion of "watched."** Marking an episode by hand writes the same
 `completed` flag that playback sets at 94%, not a column beside it. Two of them

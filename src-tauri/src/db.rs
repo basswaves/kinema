@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use std::path::Path;
 
 /// The schema this build understands. Bump it with every new `SCHEMA_V*`.
-pub const SCHEMA_VERSION: i64 = 20;
+pub const SCHEMA_VERSION: i64 = 21;
 
 /// What can go wrong opening the library.
 ///
@@ -637,6 +637,35 @@ CREATE TABLE simkl_outbox (
 );
 "#;
 
+/// Schema version 21: one send queue for every watch-tracking service.
+///
+/// `simkl_outbox` becomes `watch_outbox` with a `service` column, so Trakt
+/// (`trakt.rs`) queues beside SIMKL from the same place, and a finished episode
+/// is one row per connected service. Rows waiting for SIMKL are carried over,
+/// not dropped: they are watches SIMKL has not heard about yet.
+const SCHEMA_V21: &str = r#"
+CREATE TABLE watch_outbox (
+    id          INTEGER PRIMARY KEY,
+    service     TEXT    NOT NULL,          -- 'simkl' | 'trakt'
+    key         TEXT    NOT NULL,
+    kind        TEXT    NOT NULL,          -- 'movie' | 'episode'
+    imdb_id     TEXT,
+    tmdb_id     TEXT,
+    season      INTEGER,
+    episode     INTEGER,
+    watched_at  INTEGER NOT NULL,
+    queued_at   INTEGER NOT NULL,
+    UNIQUE (service, key)
+);
+
+INSERT INTO watch_outbox
+    (service, key, kind, imdb_id, tmdb_id, season, episode, watched_at, queued_at)
+SELECT 'simkl', key, kind, imdb_id, tmdb_id, season, episode, watched_at, queued_at
+  FROM simkl_outbox ORDER BY id;
+
+DROP TABLE simkl_outbox;
+"#;
+
 /// How long a statement waits for the write lock before giving up.
 ///
 /// Load-bearing from the moment there is more than one connection. SQLite
@@ -829,7 +858,7 @@ pub(crate) const MIGRATIONS: [&str; SCHEMA_VERSION as usize] = [
     SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6, SCHEMA_V7, SCHEMA_V8,
     SCHEMA_V9, SCHEMA_V10, SCHEMA_V11, SCHEMA_V12, SCHEMA_V13, SCHEMA_V14,
     SCHEMA_V15, SCHEMA_V16, SCHEMA_V17, SCHEMA_V18, SCHEMA_V19,
-    SCHEMA_V20,
+    SCHEMA_V20, SCHEMA_V21,
 ];
 
 /// Bring the database up to [`SCHEMA_VERSION`].
@@ -889,6 +918,36 @@ mod tests {
                 .expect("version bump");
         }
         conn
+    }
+
+    /// Watches still waiting for SIMKL when schema 21 arrives are carried into
+    /// the shared queue, not lost.
+    #[test]
+    fn v21_carries_waiting_simkl_rows_into_the_shared_queue() {
+        let conn = at_version(20);
+        conn.execute(
+            "INSERT INTO simkl_outbox (key, kind, imdb_id, tmdb_id, season, episode, watched_at, queued_at)
+             VALUES ('episode||105|1|2', 'episode', NULL, '105', 1, 2, 50, 60)",
+            [],
+        )
+        .unwrap();
+        migrate(&conn).unwrap();
+        let row: (String, String, i64, i64) = conn
+            .query_row(
+                "SELECT service, tmdb_id, episode, watched_at FROM watch_outbox",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+            )
+            .unwrap();
+        assert_eq!(row, ("simkl".into(), "105".into(), 2, 50));
+        let old: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE name = 'simkl_outbox'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(old, 0);
     }
 
     fn version_of(conn: &Connection) -> i64 {

@@ -46,8 +46,8 @@ audio and subtitles, volume. Back steps back to wherever you came from.
   2.39:1. Where it came from (UHD Blu-ray remux, WEB-DL…) is read from the
   release name; nothing else is.
 - **Remembers where you were**, per file, and offers the next episode.
-- **Tells SIMKL what you watched**, if you connect it: whatever you finish in
-  Kinema is added to your SIMKL account. Connecting is a code on screen and a
+- **Tells SIMKL and Trakt what you watched**, if you connect them: whatever you
+  finish in Kinema is added to your account. Connecting is a code on screen and a
   tap on your phone.
 - **Keeps a safety copy** of your watch history, resume points and hand-made
   matches once a week, and puts one back from Settings if the library is ever
@@ -154,6 +154,11 @@ each film and episode you finish to your SIMKL account — and, once, everything
 you had already watched in Kinema. It only ever adds: nothing comes back, and
 marking something unwatched in Kinema leaves SIMKL alone. You approve Kinema on
 SIMKL's own page, so Kinema never sees your password.
+
+**Trakt** works the same way, beside SIMKL in Settings → Accounts, with one
+difference: Trakt keeps every play it is sent, so when you connect Kinema first
+asks what your Trakt account already has and sends only the rest. A free Trakt
+account can be connected to only one app besides Trakt's own.
 
 ## Platform support
 

@@ -1096,6 +1096,23 @@ before refreshing; a self-test never talks to SIMKL.
 A typo in `scope` gets a working token that fails at the first write. **Do:**
 check the granted `scope` for `media:write` before storing a token.
 
+## Trakt
+
+### Trakt counts every play it is sent
+
+SIMKL ignores a watch it already has; Trakt records it again, as a rewatch.
+"It is up to your app to verify this and not send duplicate plays." **Do:**
+never send a history without first reading the account's watched lists
+(`/sync/watched/movies`, `/sync/watched/shows`), and never re-queue a batch
+Trakt accepted.
+
+### A refresh token works once
+
+Each refresh returns a new refresh token and kills the old one. Store the pair
+before doing anything else; a crash between the answer and the write loses the
+sign-in. A refresh refused because another process already used the token looks
+exactly like one revoked by the user — compare with what is stored first.
+
 ## Output hardware (Windows)
 
 What the screens and the audio device can take. Every entry here is something

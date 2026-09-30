@@ -63,6 +63,11 @@ jobs:
         env:
           VITE_TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
           KINEMA_SIMKL_CLIENT_ID: ${{ secrets.SIMKL_CLIENT_ID }}
+          # Kinema's Trakt app (trakt.rs). Trakt's device sign-in needs the
+          # secret as well as the ID; like the TMDB key, it is readable by
+          # anyone holding the app. Optional, as SIMKL's is.
+          KINEMA_TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
+          KINEMA_TRAKT_CLIENT_SECRET: ${{ secrets.TRAKT_CLIENT_SECRET }}
         run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-app.ps1 -NoShortcut
 
       - name: Package

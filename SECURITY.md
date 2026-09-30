@@ -6,10 +6,12 @@ Worth stating up front, because it is unusually small:
 
 - **No server, no daemon, no network listener.** Nothing accepts a connection.
 - **No accounts, no telemetry, no analytics.** Nothing is sent anywhere about
-  what you watch — unless you connect SIMKL yourself, in Settings → Accounts.
-  Then the films and episodes you finish, and when, are sent to your SIMKL
-  account (`src-tauri/src/simkl.rs`), and nothing else is. Disconnecting ends
-  it and tells SIMKL to end the sign-in.
+  what you watch — unless you connect SIMKL or Trakt yourself, in Settings →
+  Accounts. Then the films and episodes you finish, and when, are sent to that
+  account (`src-tauri/src/simkl.rs`, `src-tauri/src/trakt.rs`), and nothing
+  else is; for Trakt, Kinema also reads which films and episodes the account
+  has already watched, once, so as not to send them twice. Disconnecting ends
+  it and asks the service to end the sign-in.
 - **Outbound requests only, to seven services for metadata** — TMDB, TVmaze,
   OMDb, Wikidata (with Wikipedia), TheIntroDB, IntroDB and IMDb's ratings
   file — **and
@@ -22,11 +24,13 @@ Worth stating up front, because it is unusually small:
   from Rust are TheIntroDB, IntroDB, IMDb and GitHub.
 - **Your API keys stay local.** TMDB and OMDb keys you enter are stored in
   the SQLite database in your app data folder, and sent only to the service they
-  belong to. So is SIMKL's sign-in, when you connect it: SIMKL's own tokens,
-  never your password, which you type only on SIMKL's page. Released builds carry one key of Kinema's own, for TMDB, added at
-  build time from a repository secret; no key is committed. That key is not a
-  secret from anyone holding the app — any key a program sends can be read out
-  of it — and gives access to nothing but TMDB's public, read-only data.
+  belong to. So are SIMKL's and Trakt's sign-ins, when you connect them: the
+  service's own tokens, never your password, which you type only on the
+  service's page. Released builds carry keys of Kinema's own — for TMDB, and
+  the SIMKL and Trakt app IDs with Trakt's client secret — added at build time
+  from repository secrets; none is committed. They are not secret from anyone
+  holding the app — any key a program sends can be read out of it — and none
+  gives access to anyone's account: that needs the person's own approval.
 - **Media files are read, never modified** — with one explicit exception you
   have to press: NFO export writes `.nfo` sidecars beside your videos.
 
@@ -35,7 +39,8 @@ external process invocation in `src-tauri/src/detect.rs` (Skiptro and ffmpeg,
 launched with user-editable argument templates), the XML parsing in
 `src-tauri/src/nfo.rs`, and the HTTP clients in `src/metadata/providers.ts`,
 `src-tauri/src/introdb.rs`, `src-tauri/src/introdb_app.rs` and
-`src-tauri/src/simkl.rs` (which holds a user's SIMKL tokens).
+`src-tauri/src/simkl.rs` and `src-tauri/src/trakt.rs` (which hold a user's
+tokens).
 
 ## Reporting a vulnerability
 

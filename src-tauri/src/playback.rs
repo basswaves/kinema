@@ -164,7 +164,7 @@ pub fn save_progress(
     .map_err(to_string_err)?;
     // The episode's, and every other copy's — see `history`.
     if crate::history::remember(&conn, file_id).map_err(to_string_err)? > 0 {
-        crate::simkl::send_soon(&app);
+        crate::tracking::send_soon(&app);
     }
     Ok(())
 }
@@ -209,7 +209,7 @@ pub fn set_watched(
 
     // Watched or not is a fact about the episode, not the copy.
     if crate::history::remember(&conn, file_id).map_err(to_string_err)? > 0 {
-        crate::simkl::send_soon(&app);
+        crate::tracking::send_soon(&app);
     }
     Ok(())
 }

@@ -216,11 +216,12 @@ reasoning is in [docs/DESIGN.md](docs/DESIGN.md) and [docs/HISTORY.md](docs/HIST
   library's rows kept. Rotten Tomatoes needs OMDb, and only with the user's own
   key — a key built into every copy would exhaust OMDb's daily allowance for
   everyone within hours.
-- **SIMKL is one way, and only adds.** What is finished in Kinema is added to
-  the user's SIMKL history; nothing comes back, and un-watching in Kinema never
-  removes anything from SIMKL, which may have that watch from elsewhere. No
-  live "Watching now". Sign-in is SIMKL's AUTH V2 device flow, with no secret
-  in the app.
+- **SIMKL and Trakt are one way, and only add.** What is finished in Kinema is
+  added to the user's history there; nothing comes back, and un-watching in
+  Kinema never removes anything, which the service may have from elsewhere. No
+  live "Watching now". Both sign in with a device flow (a code and a phone).
+  Trakt keeps duplicate plays, so what it already has is never sent to it
+  again.
 - **No third-party binaries in the repo or the bundle.** The app may *invoke* a
   tool the user installed themselves, at a path they chose. It ships nothing,
   downloads nothing, and depends on nothing being present.

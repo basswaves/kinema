@@ -95,9 +95,9 @@ there is.
 - **Credits times from TheIntroDB** during real playback, and **chapters named
   for the credits** in a real file. Both paths are built; neither has met a
   file that has them.
-- **SIMKL with a real account.** Connecting, the first batch of history, and
-  later finishes are built and tested against a stand-in and SIMKL's documented
-  answers; a release needs Kinema's own SIMKL app ID before anyone can connect.
+- **Trakt with a real account.** Connecting, comparing the history with what
+  the account has, and later finishes are built and tested against a stand-in
+  and Trakt's documented answers. SIMKL has been used for real.
 - **Recaps, and a film's scene after the credits**, from TheIntroDB and
   IntroDB during real playback. Both are built and tested against recorded
   answers; neither has been watched on a real file. A note of where Skip

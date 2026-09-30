@@ -226,8 +226,9 @@ fn copies_of(conn: &Connection, file_id: i64, items: &[Item]) -> rusqlite::Resul
 /// same thing, as `set_watched` has always said.
 ///
 /// This is also the one moment something *becomes* watched, however it
-/// happened, so it is where a finished film or episode is queued for SIMKL
-/// (`simkl.rs`). Returns how many were, so the caller can have them sent.
+/// happened, so it is where a finished film or episode is queued for SIMKL and
+/// Trakt, whichever are connected (`tracking.rs`). Returns how many were
+/// queued, so the caller can have them sent.
 /// Only the change counts: saving progress again on something already
 /// watched queues nothing, and un-watching sends nothing either way.
 pub fn remember(conn: &Connection, file_id: i64) -> rusqlite::Result<usize> {
@@ -242,7 +243,7 @@ pub fn remember(conn: &Connection, file_id: i64) -> rusqlite::Result<usize> {
         let existing = find(conn, item)?;
         let was_watched = existing.is_some_and(|(_, s)| s.completed);
         if let Some(s) = state.filter(|s| s.completed && !was_watched) {
-            let queued = crate::simkl::queue_finished(
+            let queued = crate::tracking::queue_finished(
                 conn,
                 &item.kind,
                 item.imdb_id.as_deref(),
@@ -251,7 +252,7 @@ pub fn remember(conn: &Connection, file_id: i64) -> rusqlite::Result<usize> {
                 item.episode,
                 s.updated_at,
             )?;
-            finished += usize::from(queued);
+            finished += queued;
         }
         match (state, existing) {
             (Some(s), Some((id, _))) => {
@@ -592,7 +593,7 @@ mod tests {
 
     fn simkl_waiting(conn: &Connection) -> Vec<(String, Option<i64>, Option<i64>, i64)> {
         let mut stmt = conn
-            .prepare("SELECT tmdb_id, season, episode, watched_at FROM simkl_outbox ORDER BY id")
+            .prepare("SELECT tmdb_id, season, episode, watched_at FROM watch_outbox ORDER BY id")
             .unwrap();
         stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))
             .unwrap()

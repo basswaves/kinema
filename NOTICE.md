@@ -165,6 +165,16 @@ under SIMKL's [terms](https://simkl.com/about/policies/terms/) and API rules.
 Nothing is read back and no SIMKL data is shown, beyond the account's name in
 Settings. Released builds carry Kinema's own SIMKL app ID, added at build time.
 
+### Trakt
+
+Only when a user connects their own [Trakt](https://trakt.tv) account: the
+films and episodes they finish are added to its history through Trakt's API,
+under Trakt's API terms, and — once, at connect — the account's watched films
+and episodes are read so nothing is sent twice. Nothing else is read back, and
+no Trakt data or logo is shown beyond the account's name in Settings. Kinema is
+not endorsed by or affiliated with Trakt. Released builds carry Kinema's own
+Trakt app, added at build time.
+
 ### IMDb
 
 Information courtesy of IMDb (https://www.imdb.com). Used with permission.

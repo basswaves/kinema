@@ -2028,6 +2028,33 @@ play, and it is where any later service signed into with the user's own
 account belongs (Trakt, OpenSubtitles). Keys that identify films stay in
 Library, and the keyless skip databases in Intro & credits.
 
+## Trakt, one way
+
+The most-used tracking service, added after SIMKL with the same four decisions
+(only adds; history once at connect; no "Watching now"; one app built into
+releases). SIMKL's queue became a shared one, `watch_outbox` with a `service`
+column (schema 21), so a finished episode is queued once per connected
+service from the same place, and SIMKL's waiting rows were carried across.
+
+Three things Trakt does differently decided the rest:
+
+- **It keeps duplicates.** Its documentation leaves de-duplication to the app,
+  so the history at connect is compared with the account's own watched list
+  first and only the difference is sent. The comparison runs in the sender, not
+  at the moment of connecting, so being offline then only delays it; and if the
+  account cannot be read, nothing is sent blind.
+- **Refresh tokens are single-use.** The new pair is stored at once, and a
+  refusal is first checked against the stored token, in case another Kinema on
+  the same library refreshed first.
+- **The device sign-in needs a client secret**, per its documentation. A
+  desktop program cannot keep one; it is built into releases like the TMDB key.
+  Trakt has been removing the secret from its other flows, so this may become
+  unnecessary.
+
+A free Trakt account may connect only one outside app (since July 2026);
+Settings says so before connecting. Trakt, unlike SIMKL, says when someone
+declines, and the page says so too.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

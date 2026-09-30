@@ -32,6 +32,12 @@ import {
 
 interface ServiceText {
   name: string;
+  /**
+   * The service's own mark, unmodified, from public/ (see NOTICE.md). Trakt's
+   * is its full logo, which carries the name; SIMKL's is the "S" alone, so the
+   * name is written beside it.
+   */
+  logo: { src: string; withName: boolean };
   /** Where its developer apps are made, for the Developer tools fields. */
   developerPage: string;
   /** Anything extra worth saying before connecting. */
@@ -43,11 +49,13 @@ interface ServiceText {
 const SERVICES: Record<Service, ServiceText> = {
   simkl: {
     name: 'SIMKL',
+    logo: { src: '/simkl.svg', withName: true },
     developerPage: 'simkl.com/settings/developer',
     whyReconnect: 'it was ended on SIMKL, or Kinema went unused for six months',
   },
   trakt: {
     name: 'Trakt',
+    logo: { src: '/trakt.svg', withName: false },
     developerPage: 'app.trakt.tv/settings/apps',
     beforeConnecting:
       'A free Trakt account can be connected to only one app besides Trakt’s own. If yours is already connected to another (Kodi, Plex, a phone app), disconnect it on Trakt first, or Trakt will refuse.',
@@ -197,7 +205,16 @@ export default function AccountSection({ service }: { service: Service }) {
 
   return (
     <section className="settings-section">
-      <h2>{text.name}</h2>
+      <h2 className="account-heading">
+        {text.logo.withName ? (
+          <>
+            <img src={text.logo.src} alt="" className="account-mark" />
+            {text.name}
+          </>
+        ) : (
+          <img src={text.logo.src} alt={text.name} className="account-logo" />
+        )}
+      </h2>
       <p className="settings-intro">
         Adds what you finish watching in Kinema to your {text.name} account, including anything you
         mark as watched. It only ever adds: nothing comes back from {text.name}, and marking

@@ -1794,6 +1794,32 @@ html {
   color: rgba(245, 245, 247, 0.6);
 }
 
+/* Settings → Accounts: each service under its own mark (AccountSection.tsx),
+   the files unmodified in public/ as Trakt and SIMKL ask. */
+.account-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* SIMKL's one-colour mark is black; SIMKL publishes it to be recoloured to
+   suit the app, and white is what sits on this background. */
+.account-mark {
+  width: 1.25rem;
+  height: 1.25rem;
+  filter: invert(1);
+}
+
+/* Trakt's full logo carries the name. Their guidelines ask for clear space
+   round it as tall as its "T" — about 1.25rem at this height — so nothing
+   comes nearer, the intro below included. */
+.account-logo {
+  display: block;
+  height: 1.5rem;
+  width: auto;
+  margin-bottom: 0.75rem;
+}
+
 .settings-section h2 + h3 {
   margin-top: 0.25rem;
 }

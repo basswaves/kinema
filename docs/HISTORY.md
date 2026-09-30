@@ -2091,6 +2091,23 @@ request carrying a value equal to its default; and a condition inside a `try`
 in the player made the React Compiler give up on the whole component, which
 switched every react-hooks rule in that file off without an error.
 
+## The services' own marks in Settings → Accounts
+
+The owner asked whether SIMKL's, Trakt's and OpenSubtitles' logos could replace
+their names, or whether that was against someone's rights. It is not the
+question the badges settled: Dolby, DTS and IMDb license their logos to
+products, so Kinema letters those itself. A service shown beside your own
+account on it is attribution, and two of the three ask for exactly that.
+SIMKL's API rules want the mark visible and publish it, in colour and in one
+colour to recolour; Trakt's branding page allows its approved logos unaltered,
+with clear space, and without implying endorsement. OpenSubtitles publishes no
+such terms, so it stays a name until it does.
+
+Trakt's page offers each logo as a download that fills in its colours for the
+background chosen; `public/trakt.svg` is what that download gives for the
+dark one, rebuilt the same way because the page would not load outside a
+browser.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

@@ -165,6 +165,12 @@ under SIMKL's [terms](https://simkl.com/about/policies/terms/) and API rules.
 Nothing is read back and no SIMKL data is shown, beyond the account's name in
 Settings. Released builds carry Kinema's own SIMKL app ID, added at build time.
 
+`public/simkl.svg` is SIMKL's brand mark, unmodified, as published in SIMKL's
+API documentation for apps to show; their API rules ask that SIMKL is named and
+its mark visible. It is drawn white on Kinema's dark settings, which the same
+documentation provides for (the one-colour mark recoloured by CSS). The mark is
+SIMKL's property and is used solely to identify their service.
+
 ### OpenSubtitles
 
 Subtitles from [OpenSubtitles.com](https://www.opensubtitles.com), through its
@@ -180,9 +186,15 @@ Only when a user connects their own [Trakt](https://trakt.tv) account: the
 films and episodes they finish are added to its history through Trakt's API,
 under Trakt's API terms, and — once, at connect — the account's watched films
 and episodes are read so nothing is sent twice. Nothing else is read back, and
-no Trakt data or logo is shown beyond the account's name in Settings. Kinema is
-not endorsed by or affiliated with Trakt. Released builds carry Kinema's own
-Trakt app, added at build time.
+no Trakt data is shown beyond the account's name in Settings. Kinema is not
+endorsed by or affiliated with Trakt. Released builds carry Kinema's own Trakt
+app, added at build time.
+
+`public/trakt.svg` is Trakt's full logo for dark backgrounds, one of the
+approved versions on Trakt's [branding page](https://app.trakt.tv/branding),
+exactly as that page's download gives it. It is shown as their guidelines
+require: unaltered, with clear space round it, and only to name their service —
+not as part of Kinema's own mark or to suggest Trakt endorses it.
 
 ### IMDb
 

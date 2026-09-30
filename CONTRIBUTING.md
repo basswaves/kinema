@@ -210,7 +210,10 @@ reasoning is in [docs/DESIGN.md](docs/DESIGN.md) and [docs/HISTORY.md](docs/HIST
   is not believed. Only the source (remux, WEB-DL…), the edition and Auro-3D
   come from the name, because nothing inside a file says them. The badges are
   in Kinema's own lettering: Dolby, DTS and IMDb logos are trademarks for
-  licensed products, which this is not.
+  licensed products, which this is not. The services a user connects are
+  different — Settings → Accounts shows SIMKL's and Trakt's own marks because
+  both ask apps to, each as its guidelines say (NOTICE.md). A service that
+  publishes no terms for its logo is shown by name.
 - **No shared key for scores.** IMDb's rating comes from the file IMDb
   publishes, on its terms: that file only, never imdb.com, and only the
   library's rows kept. Rotten Tomatoes needs OMDb, and only with the user's own

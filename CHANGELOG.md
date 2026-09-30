@@ -26,6 +26,12 @@ makes no stability promises.
   count it twice. It only adds, as SIMKL does. A free Trakt account can be
   connected to only one app besides Trakt's own.
 
+### Changed
+
+- **Settings → Accounts shows SIMKL's and Trakt's own marks**, as both
+  services ask apps to. OpenSubtitles stays a name: it publishes no terms for
+  its logo.
+
 ### Fixed
 
 - **The cover on a title's page is no longer stretched.** Since the picture

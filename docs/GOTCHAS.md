@@ -1359,6 +1359,16 @@ Get-NetTCPConnection -LocalPort 1420 -State Listen -ErrorAction SilentlyContinue
   ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
 ```
 
+### CI's clippy can be newer than yours
+
+CI installs the latest stable Rust on every run (`dtolnay/rust-toolchain@stable`),
+so a lint added in a new release fails CI on code that passed clippy locally
+the same day. 0.7.0's release commit did exactly that: Rust 1.98's
+`chunks_exact_to_as_chunks` against a local 1.97. The release workflow does
+not run clippy, so the release itself built — only the CI badge went red.
+**Do:** `rustup update` before a release, and read the CI run for the release
+commit, not only the release run.
+
 ### `cargo build` fails while the app is running
 
 The running `.exe` is locked. Stop `kinema` first. `npm run app:build`

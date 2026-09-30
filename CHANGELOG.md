@@ -12,6 +12,8 @@ makes no stability promises.
 - **Episodes on a network share named only by their numbering** — a
   `Season 1\S01E01.mkv` with nothing else in its name — now take their show's
   name from the folder above, as they already did on a local drive.
+- **Pictures in a library brought from another system** — a safety copy
+  restored on a new PC — are found again instead of downloaded afresh.
 
 ## [0.7.0] — 2026-09-30
 

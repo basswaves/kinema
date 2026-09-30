@@ -151,6 +151,12 @@ fn open_library(app: &tauri::AppHandle) -> Result<(), String> {
             path.display()
         )
     })?;
+    // A library brought from another system (a restored safety copy).
+    match artwork::use_this_systems_separator(&primary) {
+        Ok(0) => {}
+        Ok(n) => log!("artwork: {n} cached paths rewritten for this system"),
+        Err(e) => log!("artwork: could not check cached paths: {e}"),
+    }
     // Not under a self-test, whose library is a throwaway copy.
     if selftest::plan_path().is_none() {
         match db::periodic_backup(&primary, &dir.join(db::BACKUP_DIR)) {

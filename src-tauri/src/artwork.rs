@@ -325,10 +325,50 @@ pub async fn clear_artwork_cache(
     .await
 }
 
+/// Rewrite cached artwork paths written on another system to this one's
+/// separator. Returns how many were rewritten.
+///
+/// `local_path` is stored as `artwork` + the system's separator + the file
+/// name, and read by plain concatenation onto `path_prefix`. A library made on
+/// Windows and opened on Linux — a safety copy restored on a new PC — says
+/// `artwork\52.jpg`, which Linux takes as one file name: every cached picture
+/// then "fails" and quietly comes from the network again. Found on the first
+/// Linux run, on a copy of a Windows library. Cheap and idempotent, so it runs
+/// at every start.
+pub fn use_this_systems_separator(conn: &rusqlite::Connection) -> rusqlite::Result<usize> {
+    let (other, here) = if cfg!(windows) { ("/", "\\") } else { ("\\", "/") };
+    conn.execute(
+        "UPDATE artwork_cache SET local_path = replace(local_path, ?1, ?2)
+          WHERE instr(local_path, ?1) > 0",
+        params![other, here],
+    )
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{extension, past_tmdb_age};
+    use super::{extension, past_tmdb_age, use_this_systems_separator};
     use crate::metadata::TMDB_MAX_AGE_SECS;
+
+    #[test]
+    fn artwork_paths_from_another_system_are_rewritten() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE artwork_cache (url TEXT PRIMARY KEY, local_path TEXT NOT NULL);
+             INSERT INTO artwork_cache VALUES ('w', 'artwork\\52.jpg'), ('l', 'artwork/53.jpg'), ('e', '');",
+        )
+        .unwrap();
+        let rewritten = use_this_systems_separator(&conn).unwrap();
+        assert_eq!(rewritten, 1, "only the other system's row changes");
+        let path = |url: &str| -> String {
+            conn.query_row("SELECT local_path FROM artwork_cache WHERE url = ?1", [url], |r| r.get(0))
+                .unwrap()
+        };
+        let sep = std::path::MAIN_SEPARATOR;
+        assert_eq!(path("w"), format!("artwork{sep}52.jpg"));
+        assert_eq!(path("l"), format!("artwork{sep}53.jpg"));
+        assert_eq!(path("e"), "");
+        assert_eq!(use_this_systems_separator(&conn).unwrap(), 0, "a second run does nothing");
+    }
 
     /// TMDB's images have an age limit; images from elsewhere do not.
     #[test]

@@ -17,13 +17,28 @@ concurrency:
 
 jobs:
   build:
-    # Windows only, deliberately. The player hard-codes the d3d11 mpv backend
-    # and the app targets WebView2; a green Linux job would prove nothing about
-    # what actually ships.
-    runs-on: windows-latest
+    # Every platform on every push, so a change made and checked on one cannot
+    # quietly break another. Linux does not ship yet; these jobs prove it still
+    # compiles and passes the same tests, on both x86 and ARM, while the port
+    # is built (see CONTRIBUTING, "Checking Linux from Windows"). One failing
+    # platform does not cancel the others: which ones fail is the information.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v5
+
+      # What Tauri needs to compile on Linux: WebKitGTK and its friends. The
+      # same list CONTRIBUTING gives, minus libmpv (loaded at runtime, as on
+      # Windows).
+      - name: Install Linux build libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
 
       - uses: actions/setup-node@v5
         with:

@@ -98,7 +98,9 @@ scripts\wsl.ps1 'cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets
 ```
 
 It builds a copy of your working tree, uncommitted changes included, inside
-the distribution — never edit that copy. The traps behind that design are in
+the distribution — never edit that copy. CI runs the same checks on Windows
+and on Linux for x86 and ARM on every push, so this is about finding out
+before pushing, not instead of it. The traps behind that design are in
 GOTCHAS ("Linux, and building it from Windows").
 
 ### Running the UI without the native app

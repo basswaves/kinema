@@ -112,6 +112,14 @@ way `selftest.ps1` does on Windows, on a copy of a library you put in the
 plan's `data/` folder; with `GDK_BACKEND=x11` it photographs Kinema's window,
 and only that.
 
+On Linux mpv plays in a window of its own, and the player's controls reach
+the screen as a picture mpv draws; which window is on top and which has the
+keyboard is the desktop's decision, and WSLg's own cannot show it. So
+`scripts/nested-selftest.sh <plan> kwin|gnome "<seconds>:<key> …"` runs the
+plan inside a real KDE or GNOME desktop nested as one window, sends it real
+key presses and photographs that window alone — the check for anything
+touching the Linux player (packages it needs are listed at its top).
+
 The interface itself is checked in both browser engines, keyboard only,
 against `dev:mock`: WebKit (Linux's) and Edge (the same Chromium as WebView2,
 already on Windows). Once, `npx playwright install webkit`; then:

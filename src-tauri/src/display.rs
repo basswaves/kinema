@@ -21,6 +21,10 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Whether this build can change the screen's refresh rate, resolution and
+/// HDR at all (`capabilities.rs`). Where it cannot, Settings does not offer to.
+pub const SWITCHES: bool = cfg!(windows);
+
 use crate::equipment::{HdrState, Mode};
 
 /// Settings key for [`Original`].

@@ -33,6 +33,7 @@ import ConfirmButton from './ConfirmButton';
 import EquipmentSection from './EquipmentSection';
 import SoundSection from './SoundSection';
 import ScreenSection from './ScreenSection';
+import { useCapabilities } from '../capabilities';
 import { useClaimFocus } from './focus';
 import { setTvMode, useTvMode } from './tv';
 import {
@@ -250,6 +251,7 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
   const [autoAnalyse, setAutoAnalyse] = useState(true);
 
   const tvMode = useTvMode();
+  const can = useCapabilities();
   const scan = useScanStatus();
 
   /** A newer release, if one is out; and whether looking for one is on. */
@@ -880,9 +882,23 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
 
             {section === 'picture' && (
               <>
-                <ScreenSection onError={setError} />
-                <SoundSection onError={setError} />
-                <EquipmentSection />
+                {/* Each part only where Kinema can do it (capabilities.ts):
+                    a control that does nothing is worse than none. */}
+                {can?.display_switching && <ScreenSection onError={setError} />}
+                {can?.equipment_detection && <SoundSection onError={setError} />}
+                {can?.equipment_detection && <EquipmentSection />}
+                {can && !(can.display_switching && can.equipment_detection) && (
+                  <section className="settings-section">
+                    <h2>Picture &amp; sound</h2>
+                    <p className="settings-intro">
+                      {can.equipment_detection
+                        ? `On ${can.system}, Kinema cannot change the screen's refresh rate, resolution or HDR yet.`
+                        : `On ${can.system}, Kinema cannot yet look at your screen and sound equipment${
+                            can.display_switching ? '' : " or change the screen's mode"
+                          }, so films play with ${can.system}'s own picture and sound settings.`}
+                    </p>
+                  </section>
+                )}
               </>
             )}
 

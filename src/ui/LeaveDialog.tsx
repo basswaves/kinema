@@ -4,8 +4,9 @@
  * In TV mode the app fills the screen, so there is no title bar and no close
  * button, and a remote has nothing else to reach for. Back on Home (with
  * nowhere further back to go) opens this instead: close Kinema, put the PC to
- * sleep, or shut it down. Back again, or Cancel, closes it and leaves Home as
- * it was, with the ring where it had been.
+ * sleep, or shut it down — the last two only where Kinema can do them
+ * (`capabilities.ts`). Back again, or Cancel, closes it and leaves Home as it
+ * was, with the ring where it had been.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -17,6 +18,7 @@ import {
 import FocusButton from './FocusButton';
 import { powerAction, type PowerAction } from './api';
 import { userError } from './errors';
+import { useCapabilities } from '../capabilities';
 
 const FIRST_KEY = 'leave-close';
 
@@ -29,6 +31,7 @@ export default function LeaveDialog({ onClose }: Props) {
   const { ref, focusKey } = useFocusable({ isFocusBoundary: true, trackChildren: true });
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const can = useCapabilities();
 
   // Where the ring was on Home, to put it back on Cancel. Taken before the
   // dialog claims focus, so it is Home's control and not one of these.
@@ -98,15 +101,22 @@ export default function LeaveDialog({ onClose }: Props) {
             >
               Close Kinema
             </FocusButton>
-            <FocusButton className="leave-choice" onSelect={() => run('sleep', 'Going to sleep…')}>
-              Put the PC to sleep
-            </FocusButton>
-            <FocusButton
-              className="leave-choice"
-              onSelect={() => run('shutdown', 'Shutting down…')}
-            >
-              Shut down the PC
-            </FocusButton>
+            {can?.sleep && (
+              <FocusButton
+                className="leave-choice"
+                onSelect={() => run('sleep', 'Going to sleep…')}
+              >
+                Put the PC to sleep
+              </FocusButton>
+            )}
+            {can?.shut_down && (
+              <FocusButton
+                className="leave-choice"
+                onSelect={() => run('shutdown', 'Shutting down…')}
+              >
+                Shut down the PC
+              </FocusButton>
+            )}
             <FocusButton className="leave-choice leave-cancel" onSelect={cancel}>
               Cancel
             </FocusButton>

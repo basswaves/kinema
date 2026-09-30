@@ -1,6 +1,7 @@
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { installDevLog } from './devlog';
+import { loadCapabilities } from './capabilities';
 
 /**
  * Deliberately NOT wrapped in React.StrictMode.
@@ -13,6 +14,8 @@ import { installDevLog } from './devlog';
 function start(): void {
   // Installed before anything else renders, so errors during startup are caught.
   installDevLog();
+  // Asked now, answered long before Leave or Settings can be opened.
+  void loadCapabilities();
   ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(<App />);
 }
 

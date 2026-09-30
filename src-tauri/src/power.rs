@@ -23,6 +23,11 @@ enum Action {
     ShutDown,
 }
 
+/// Whether this build can put the computer to sleep and shut it down
+/// (`capabilities.rs`). Where it cannot, Leave offers only to close Kinema.
+pub const CAN_SLEEP: bool = cfg!(windows);
+pub const CAN_SHUT_DOWN: bool = cfg!(windows);
+
 fn parse(action: &str) -> Result<Action, String> {
     match action {
         "close" => Ok(Action::Close),

@@ -2136,6 +2136,21 @@ Windows-only helpers that the Linux readers will reuse (channel layouts, rates,
 the bitstream list) are allowed to be unused outside Windows until those
 readers exist; Windows' clippy still reports anything genuinely unused.
 
+Then three seams, each so that a port changes one place rather than many:
+
+- **One file talks to mpv** (`engine.ts`). The player speaks in Kinema's
+  terms — open, pause, seek, stop, one stream of playback events — and the
+  parts that are about mpv itself say so. The full interface an Android
+  engine would implement was deliberately *not* written: designed around one
+  engine it would take that engine's shape, so it waits for the second.
+- **Capabilities, not system names.** Rust says what this build can do
+  (examine the equipment, switch the screen, sleep, shut down), each answer
+  stated by the module that does the work, and the interface shows only
+  that. On a system without them, Leave offers Close and Cancel, and Picture
+  & sound says in one sentence why it is empty — rather than offering
+  controls that would do nothing, or fail.
+- **Windows code in its own files** (`equipment/win.rs`, `display/win.rs`).
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

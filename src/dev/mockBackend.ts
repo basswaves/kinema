@@ -717,7 +717,9 @@ export function listenerCounts(): Record<string, number> {
  * Read once at load from `localStorage`, so they survive the reload a check
  * needs: `kinemaMockSlowMs` delays the library read (a real first read is not
  * instant), `kinemaMockEmpty` presents an empty library (a first run),
- * `kinemaMockSlowDetect` makes the scan's detection pass take 20 seconds.
+ * `kinemaMockSlowDetect` makes the scan's detection pass take 20 seconds,
+ * `kinemaMockSystem=linux` answers `capabilities` as a port without the
+ * optional parts (no equipment check, screen switching, sleep or shut down).
  */
 function flag(name: string): string | null {
   try {
@@ -891,6 +893,20 @@ const handlers: Record<string, Handler> = {
   analysis_backlog: () => [[1, 0]],
   detect_intros: () => mockDetection.run(),
   stop_detection: () => mockDetection.stop(),
+
+  // Windows' answers unless `kinemaMockSystem` is `linux`, which answers as a
+  // port does before it has any of the optional parts: nothing claimed.
+  capabilities: () => {
+    const full = flag('kinemaMockSystem') !== 'linux';
+    return {
+      system: full ? 'Windows' : 'Linux',
+      engine: 'mpv',
+      equipment_detection: full,
+      display_switching: full,
+      sleep: full,
+      shut_down: full,
+    };
+  },
 
   // Leaving from the sofa. Recorded, never done: `window.__powerActions` is
   // what a check reads, and `kinemaMockPowerFail` makes Windows refuse.

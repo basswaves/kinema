@@ -1,6 +1,7 @@
 mod analyse;
 mod applog;
 mod aspect;
+mod capabilities;
 mod artwork;
 mod backup;
 mod db;
@@ -94,6 +95,7 @@ fn open_library(app: &tauri::AppHandle) -> Result<(), String> {
         eprintln!("could not start the log in {}: {e}", dir.display());
     }
     log!("--- Kinema {} started ---", env!("CARGO_PKG_VERSION"));
+    log!("capabilities: {:?}", capabilities::current());
     if let Err(e) = util::keep_private(&dir) {
         log!("could not make {} private to this account: {e}", dir.display());
     }
@@ -255,6 +257,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             updates::latest_release,
+            capabilities::capabilities,
             library::add_library_root,
             library::remove_library_root,
             library::list_library_roots,

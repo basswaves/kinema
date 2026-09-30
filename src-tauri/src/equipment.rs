@@ -619,6 +619,10 @@ pub fn summary(view: &EquipmentView) -> Vec<String> {
 
 // ---- entry points ------------------------------------------------------------
 
+/// Whether this build can look at the screens and audio outputs at all
+/// (`capabilities.rs`). Where it cannot, `detect` says so as a problem.
+pub const DETECTS: bool = cfg!(windows);
+
 /// Look at everything, as Windows answers right now. Blocking, but quick —
 /// about a tenth of a second for three audio devices and two screens.
 pub fn detect() -> Equipment {

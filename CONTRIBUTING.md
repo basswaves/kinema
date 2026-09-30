@@ -178,6 +178,27 @@ never ran, or ran and silently did nothing. Check for both by reflex:
    app be reachable that way — **Developer tools in Settings is mouse-only by
    design**, and says so on screen. Please do not "fix" it.
 
+## More than one platform
+
+Kinema is being ported (Linux first, Android later) from one codebase, one
+`master` and one version. Three rules keep that from turning into several
+programs:
+
+- **Ask what the device can do, never which system it is.** The interface
+  reads `useCapabilities()` (`src/capabilities.ts`, answered by
+  `capabilities.rs`) and shows or hides by it. `system` is for wording only.
+  A module with a platform-only part states its own support beside its code
+  (`equipment::DETECTS`, `display::SWITCHES`, `power::CAN_SLEEP`), so a port
+  that implements it flips the answer in the same place.
+- **Platform code lives in its own file** — `equipment/win.rs`,
+  `display/win.rs` — not in `#[cfg]` branches spread through shared code.
+- **mpv is reached only through `src/player/engine.ts`.** The player uses its
+  Kinema-level calls (open, pause, seek, stop, the playback events); what is
+  about mpv itself says `mpv` in its name.
+
+CI builds and tests every push on Windows and on Linux for x86 and ARM; see
+"Checking Linux from Windows" above for doing the same before pushing.
+
 ## Debugging
 
 Two logs, both readable without a debugger. Read them instead of guessing; the

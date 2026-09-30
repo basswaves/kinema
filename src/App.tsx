@@ -44,9 +44,14 @@ export default function App() {
   // Ctrl+Shift+T toggles the layout without a trip to the settings screen.
   // Comparing the layouts means switching back and forth repeatedly, and doing
   // that through two menus tells you nothing about how either one feels.
+  // F11 does the same, because it is the key anyone reaches for to make a
+  // program fill the screen, and the TV layout is Kinema's full-screen mode.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 't') {
+      const toggle =
+        (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 't') ||
+        (e.key === 'F11' && !e.ctrlKey && !e.shiftKey && !e.altKey);
+      if (toggle) {
         e.preventDefault();
         setTvMode(!tv);
       }

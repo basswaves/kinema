@@ -991,6 +991,15 @@ is genuinely visible from the control that wrote it.
 
 ---
 
+### A standard scrollbar property switches the styled one off
+
+WebView2, like Chrome, ignores every `::-webkit-scrollbar` rule on an element
+that sets `scrollbar-width` or `scrollbar-color` — and only the pseudo-elements
+can round the thumb and drop the arrow buttons. Adding `scrollbar-color` to
+"help" brings Windows' grey bar straight back. The rails and cast rows set
+`scrollbar-width: none` on purpose, to stay hidden. **Do:** style scrollbars
+with the pseudo-elements only (`ui.css`, after `.browse`).
+
 ## quick-xml (NFO parsing)
 
 Two behaviours that both silently truncate text rather than failing. A

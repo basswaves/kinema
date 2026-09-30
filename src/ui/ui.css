@@ -74,6 +74,49 @@ html {
   color: #f5f5f7;
 }
 
+/*
+ * Scrollbars: a thin rounded bar on the dark page instead of Windows' grey
+ * one, which looked like a web page inside the app. The track is left clear
+ * and the thumb brightens under the pointer, so it is there when a mouse
+ * wants it and quiet otherwise.
+ *
+ * The -webkit- pseudo-elements rather than `scrollbar-color`: WebView2 (like
+ * Chrome) ignores the pseudo-elements on any element that sets the standard
+ * properties, and only the pseudo-elements can round the thumb and drop the
+ * arrow buttons. The rails and cast rows keep `scrollbar-width: none`, so
+ * they stay hidden.
+ */
+::-webkit-scrollbar {
+  width: 0.625rem;
+  height: 0.625rem;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(255 255 255 / 0.3);
+  background-clip: padding-box;
+  border: 0.1875rem solid transparent;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(255 255 255 / 0.5);
+}
+
+::-webkit-scrollbar-button {
+  display: none;
+}
+
+/* On a TV nothing is scrolled with a pointer; the page follows the focus. A
+   bar there is only something to look at across the room. */
+:root[data-tv='on'] ::-webkit-scrollbar {
+  display: none;
+}
+
 /* Where scrolling to a focused control stops, on every page. Without it a
    control scrolled to going up lands under the sticky top bar, which covers
    the top ~3.5rem, and one going down sits flush on the bottom edge with its

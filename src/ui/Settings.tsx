@@ -815,8 +815,8 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
                   note="On a TV, Kinema fills the whole screen, with bigger text and a margin that keeps clear of the edges some TVs cut off. At a desk it runs in a window and its text grows with the window."
                   hint={
                     <>
-                      Switch between them any time with <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+
-                      <kbd>T</kbd>.
+                      Switch between them any time with <kbd>F11</kbd>, or{' '}
+                      <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>.
                     </>
                   }
                 />

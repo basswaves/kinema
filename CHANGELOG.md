@@ -26,6 +26,15 @@ makes no stability promises.
   switch in Settings → Intro & credits; only which film or episode it is gets
   sent. It is a different service from TheIntroDB.
 
+- **F11** switches between the desk and TV layouts, as Ctrl+Shift+T does —
+  the TV layout is Kinema's full-screen mode.
+
+### Changed
+
+- **Scrollbars** are a thin dark bar that fits the app instead of Windows'
+  grey one, and there is none in the TV layout, where the page follows the
+  remote.
+
 ### Fixed
 
 - Switching TheIntroDB off did not take its times away from an episode that

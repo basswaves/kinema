@@ -21,7 +21,7 @@
  *
  * Two rules, both learned the hard way:
  *
- *  - **Scalars only.** Never `getProperty(x, 'node')`. The node format
+ *  - **Scalars only.** Never `mpvGet(x, 'node')`. The node format
  *    deserialises nested maps across the FFI boundary and takes the whole
  *    process down with STATUS_ACCESS_VIOLATION, silently, from JS. Every value
  *    here is a flat scalar or an indexed sub-key, exactly as `tracks.ts` reads
@@ -37,8 +37,7 @@
  */
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { getProperty } from 'tauri-plugin-libmpv-api';
-import { readProperty, type ScalarFormat } from './property';
+import { readProperty, type ScalarFormat, mpvGet } from './engine';
 import { outputCheck, type OutputFacts } from './outputCheck';
 import { readSwitchSettings } from './displaySwitch';
 import { readAudioSettings, targetDevice } from './audioOutput';
@@ -73,7 +72,7 @@ async function probe<T>(
   format: ScalarFormat
 ): Promise<{ value: T | null; error: string | null }> {
   try {
-    const value = await getProperty(name, format);
+    const value = await mpvGet(name, format);
     return { value: (value ?? null) as T | null, error: null };
   } catch (e) {
     return { value: null, error: e instanceof Error ? e.message : String(e) };

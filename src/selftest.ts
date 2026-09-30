@@ -22,8 +22,8 @@ import {
   PhysicalPosition,
   primaryMonitor,
 } from '@tauri-apps/api/window';
-import { command, getProperty, listenEvents } from 'tauri-plugin-libmpv-api';
-import { ensureMpvInitialised } from './player/mpv';
+import { listenMpvEvents, mpvCommand, mpvGet } from './player/engine';
+import { startEngine } from './player/engine';
 import { readTracks } from './player/tracks';
 import { readChapters } from './player/chapters';
 import { setTvMode } from './ui/tv';
@@ -242,7 +242,7 @@ export async function runSelfTest(plan: SelfTestPlan): Promise<void> {
     .then(() => note('on-top'))
     .catch((e) => note('on-top-failed', String(e)));
 
-  const unlisten = await listenEvents((event) => {
+  const unlisten = await listenMpvEvents((event) => {
     const e = event as { event: string; name?: string; data?: unknown; reason?: string };
     if (e.event === 'property-change') {
       if (e.name === 'eof-reached' && e.data === true) note('mpv:eof-reached');
@@ -264,9 +264,9 @@ export async function runSelfTest(plan: SelfTestPlan): Promise<void> {
 
   if (plan.mpv) {
     const options = plan.mpv;
-    void ensureMpvInitialised().then(async () => {
+    void startEngine().then(async () => {
       for (const [key, value] of Object.entries(options)) {
-        await command('set', [key, value]).then(
+        await mpvCommand('set', [key, value]).then(
           () => note('mpv:set', { key, value }),
           (e) => note('mpv:set-failed', { key, value, error: String(e) })
         );
@@ -275,8 +275,8 @@ export async function runSelfTest(plan: SelfTestPlan): Promise<void> {
   }
 
   if (plan.mute !== false) {
-    void ensureMpvInitialised()
-      .then(() => command('set', ['mute', 'yes']))
+    void startEngine()
+      .then(() => mpvCommand('set', ['mute', 'yes']))
       .then(() => note('muted'))
       .catch((e) => note('mute-failed', String(e)));
   }
@@ -306,7 +306,7 @@ export async function runSelfTest(plan: SelfTestPlan): Promise<void> {
       if (action.do === 'key' && action.key) {
         window.dispatchEvent(new KeyboardEvent('keydown', { key: action.key, bubbles: true }));
       } else if (action.do === 'seek' && action.to !== undefined) {
-        void command('seek', [action.to, 'absolute']).catch((e) => note('seek-failed', String(e)));
+        void mpvCommand('seek', [action.to, 'absolute']).catch((e) => note('seek-failed', String(e)));
       } else if (action.do === 'call' && action.fn) {
         const target = CALLABLE[action.fn];
         if (!target) note('call:unknown', action.fn);
@@ -317,14 +317,14 @@ export async function runSelfTest(plan: SelfTestPlan): Promise<void> {
           );
       } else if (action.do === 'mpv' && action.args?.length) {
         const [name, ...rest] = action.args.map(String);
-        void command(name, rest).then(
+        void mpvCommand(name, rest).then(
           () => note('mpv:done', action.args),
           (e) => note('mpv:failed', { args: action.args, error: String(e) })
         );
       } else if (action.do === 'probe' && action.args?.length) {
         void Promise.all(
           action.args.map(String).map((name) =>
-            getProperty(name, 'string').then(
+            mpvGet(name, 'string').then(
               (value) => [name, value] as const,
               () => [name, null] as const
             )
@@ -347,7 +347,7 @@ export async function runSelfTest(plan: SelfTestPlan): Promise<void> {
 
   const read = async (name: string) => {
     try {
-      return await getProperty(name, 'double');
+      return await mpvGet(name, 'double');
     } catch {
       return null;
     }
@@ -355,7 +355,7 @@ export async function runSelfTest(plan: SelfTestPlan): Promise<void> {
   const probed: Record<string, string | null> = {};
   for (const name of plan.probe ?? []) {
     try {
-      probed[name] = await getProperty(name, 'string');
+      probed[name] = await mpvGet(name, 'string');
     } catch {
       probed[name] = null;
     }

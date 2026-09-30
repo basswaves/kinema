@@ -8,8 +8,8 @@
  * fetched into mpv.
  */
 import { invoke } from '@tauri-apps/api/core';
-import { command } from 'tauri-plugin-libmpv-api';
 import { canonicalLang, languageName } from './language';
+import { mpvCommand } from './engine';
 
 /** Setting key: `'on'` fetches forced subtitles by themselves. Off by default. */
 export const AUTO_FORCED_KEY = 'opensubtitles_forced';
@@ -73,8 +73,8 @@ export async function loadSubtitle(
   forced: boolean,
   release?: string
 ): Promise<void> {
-  await command('sub-add', [path, 'select', subtitleTitle(forced, release), language]);
-  await command('set', ['sub-visibility', 'yes']);
+  await mpvCommand('sub-add', [path, 'select', subtitleTitle(forced, release), language]);
+  await mpvCommand('set', ['sub-visibility', 'yes']);
 }
 
 /**

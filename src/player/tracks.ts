@@ -1,13 +1,12 @@
 /**
  * Reading mpv's track list.
  *
- * Deliberately avoids `getProperty('track-list', 'node')`. The node format
+ * Deliberately avoids `mpvGet('track-list', 'node')`. The node format
  * deserialises a nested array-of-maps across the FFI boundary and reliably
  * crashed the process with STATUS_ACCESS_VIOLATION on file load. Every field is
  * available as an indexed scalar property, which is flat and safe.
  */
-import { command } from 'tauri-plugin-libmpv-api';
-import { readProperty } from './property';
+import { readProperty, mpvCommand } from './engine';
 import { languageName, sameLanguage } from './language';
 
 export interface MpvTrack {
@@ -89,17 +88,22 @@ export async function readTracks(): Promise<MpvTrack[]> {
 }
 
 /**
- * Selecting a track uses mpv's `set` input command, not setProperty(). The
+ * Selecting a track uses mpv's `set` input command, not mpvSet(). The
  * typed setter sends JS numbers as MPV_FORMAT_DOUBLE, and sid/aid are
  * choice-style properties ("auto" / "no" / an integer) whose handlers do not
  * implement that format — they return M_PROPERTY_NOT_IMPLEMENTED.
  */
 export async function selectTrack(kind: 'sid' | 'aid', id: number | 'no'): Promise<void> {
-  await command('set', [kind, String(id)]);
+  await mpvCommand('set', [kind, String(id)]);
 }
 
 export async function setSubtitleVisibility(visible: boolean): Promise<void> {
-  await command('set', ['sub-visibility', visible ? 'yes' : 'no']);
+  await mpvCommand('set', ['sub-visibility', visible ? 'yes' : 'no']);
+}
+
+/** Whether subtitles are showing, as mpv says; showing when it cannot say. */
+export async function readSubVisibility(): Promise<boolean> {
+  return (await readProperty<boolean>('sub-visibility', 'flag')) ?? true;
 }
 
 /** Codec names as they are printed on a disc box. */

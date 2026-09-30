@@ -15,8 +15,8 @@
  *   unknown       -> hint on, as before this existed: HDR stays possible.
  */
 import { invoke } from '@tauri-apps/api/core';
-import { setProperty } from 'tauri-plugin-libmpv-api';
 import type { HdrState } from './equipment';
+import { mpvSet } from './engine';
 
 interface WindowDisplay {
   gdi_name: string;
@@ -38,7 +38,7 @@ export async function matchHdrToDisplay(): Promise<void> {
     return;
   }
   const hint = hintFor(display.hdr);
-  await setProperty('target-colorspace-hint', hint);
+  await mpvSet('target-colorspace-hint', hint);
   // Once per change, not per file: an evening of episodes would otherwise
   // repeat the same line forty times.
   const line = `display: ${display.gdi_name || 'unknown screen'} HDR ${display.hdr} → colour-space hint ${hint}`;

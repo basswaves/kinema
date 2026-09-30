@@ -21,10 +21,10 @@
  * on a device that takes AC3 but not TrueHD means silence or noise at the
  * receiver (GOTCHAS → "mpv relabels a refused bitstream as AC3").
  */
-import { command, getProperty } from 'tauri-plugin-libmpv-api';
 import { getSetting } from '../metadata/api';
 import { getEquipment, type AudioDevice, type Equipment } from './equipment';
 import { readTracks } from './tracks';
+import { mpvCommand, mpvGet } from './engine';
 
 /** Setting keys. */
 export const AUDIO_DIRECT_KEY = 'audio_direct';
@@ -128,10 +128,10 @@ export async function readAudioSettings(): Promise<AudioSettings> {
 }
 
 async function setAll(plan: AudioPlan): Promise<void> {
-  await command('set', ['audio-device', plan.device]);
-  await command('set', ['audio-exclusive', plan.exclusive ? 'yes' : 'no']);
-  await command('set', ['audio-spdif', plan.spdif.join(',')]);
-  await command('set', ['audio-channels', plan.channels]);
+  await mpvCommand('set', ['audio-device', plan.device]);
+  await mpvCommand('set', ['audio-exclusive', plan.exclusive ? 'yes' : 'no']);
+  await mpvCommand('set', ['audio-spdif', plan.spdif.join(',')]);
+  await mpvCommand('set', ['audio-channels', plan.channels]);
 }
 
 export function describePlan(plan: AudioPlan): string {
@@ -182,7 +182,7 @@ export async function applyFallback(step: number, trackId: number): Promise<bool
   lastApplied = '';
   // Selecting the track again is what reopens the output with the new
   // settings; mpv dropped it when the first open failed.
-  await command('set', ['aid', String(trackId)]);
+  await mpvCommand('set', ['aid', String(trackId)]);
   console.warn(`audio: output failed to open; falling back to ${describePlan(plan)}`);
   return true;
 }
@@ -202,7 +202,7 @@ export async function silencedAudioTrack(preferred: number | null): Promise<numb
   if (audio.length === 0) return null;
   const selected = audio.find((t) => t.selected);
   if (selected) {
-    const ao = await getProperty('current-ao', 'string').catch(() => null);
+    const ao = await mpvGet('current-ao', 'string').catch(() => null);
     return ao ? null : selected.id;
   }
   return (

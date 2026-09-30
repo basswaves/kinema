@@ -104,7 +104,13 @@ src/
                  badges; seasonBadges.ts sums a series' season up and finds
                  the episodes unlike it; MediaBadges shows them, under the
                  buttons and never focusable
-  player/        Player, shared mpv lifecycle, track handling, mpv options.
+  player/        Player, track handling, mpv options. engine.ts is the only
+                 file that talks to mpv: open, pause, seek, stop and the
+                 playback events in Kinema's own terms (all Player.tsx
+                 uses), and mpvCommand/mpvGet/mpvSet for the parts that
+                 are about mpv itself — stats, output check, sound routing,
+                 HDR hint, frame timing — which another engine would
+                 replace rather than imitate.
                  chapters.ts and stats.ts read mpv as flat scalars only;
                  skip.ts continues the credits ladder past the marker Rust
                  supplies — a named chapter, then a fenced guess at the tail

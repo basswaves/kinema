@@ -31,13 +31,6 @@ import {
   setFocus,
   useFocusable,
 } from '@noriginmedia/norigin-spatial-navigation';
-import {
-  command,
-  getProperty,
-  listenEvents,
-  observeProperties,
-  setProperty,
-} from 'tauri-plugin-libmpv-api';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import FocusButton from '../ui/FocusButton';
 import { isTvMode, useTvMode } from '../ui/tv';
@@ -45,8 +38,22 @@ import StatsPanel from './StatsPanel';
 import TrackPanel, { TRACK_PANEL_KEY } from './TrackPanel';
 import UpNextCard from './UpNextCard';
 import { setShortcutsOpen } from '../ui/shortcutsState';
-import { ensureMpvInitialised, OBSERVED_PROPERTIES } from './mpv';
 import {
+  hasReachedEnd,
+  isPaused,
+  mpvCommand,
+  nowPlaying,
+  onPlaybackEvent,
+  openFile,
+  openPath,
+  seekBy,
+  seekTo,
+  setPaused,
+  startEngine,
+  stopPlayback,
+} from './engine';
+import {
+  readSubVisibility,
   readTracks,
   selectTrack,
   setSubtitleVisibility,
@@ -219,14 +226,6 @@ async function onlineChoice(
   }
 }
 
-/** Whether subtitles are showing, as mpv says; showing when it cannot say. */
-async function readSubVisibility(): Promise<boolean> {
-  try {
-    return ((await getProperty('sub-visibility', 'flag')) as boolean | null) ?? true;
-  } catch {
-    return true;
-  }
-}
 
 export default function Player({ target, onExit, onPlayTarget }: Props) {
   const tv = useTvMode();
@@ -456,7 +455,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
 
     (async () => {
       try {
-        await ensureMpvInitialised();
+        await startEngine();
         if (cancelled) return;
 
         pendingSeek.current = null;
@@ -484,24 +483,18 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         await applyAudioPlan().catch((e) => console.warn('audio: plan not applied', e));
         if (cancelled) return;
 
-        // `loadfile <url> <flags> <index> <options>`: the per-file `start`
-        // option opens the file at the resume point. The index argument
-        // (-1, "no playlist position") is required before options since
-        // mpv 0.38.
+        // Opened at the resume point, not opened and then seeked.
         const start = pendingSeek.current;
         // With display switching on and the window fullscreen, the film opens
         // paused and waits for the screen — see displaySwitch.ts.
         const hold = await mayswitch().catch(() => false);
-        if (hold) await setProperty('pause', true);
-        await command(
-          'loadfile',
-          start === null ? [target.path] : [target.path, 'replace', '-1', `start=${start}`]
-        );
+        if (hold) await setPaused(true);
+        await openFile(target.path, start);
         if (hold) {
           await matchScreen();
           if (cancelled) return;
         }
-        await setProperty('pause', false);
+        await setPaused(false);
       } catch (e) {
         if (!cancelled) fail(e);
       }
@@ -561,7 +554,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           const path = await forcedSubtitle(fileId, target.path, spoken);
           if (!path) return;
           // The same file still playing, or the subtitle would land on the next.
-          const playing = (await getProperty('path', 'string')) as string | null;
+          const playing = await openPath();
           if (!playing || !samePath(playing, target.path)) return;
           await loadSubtitle(path, spoken, true);
           const now = await readTracks();
@@ -713,12 +706,12 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     latestHandlers.current = { applyPrefs, handlePlaybackEnded };
   });
 
-  // ---- react to mpv events ------------------------------------------------
+  // ---- react to the engine ------------------------------------------------
   //
-  // One subscription for mpv's events, one for its observed properties, one
-  // poll — each registered once per player, each doing nothing but turning
-  // what mpv said into a session event. What that event *means* is decided in
-  // `session.ts`, which is where the rules about the outgoing file live.
+  // One subscription to the engine's events and one poll — each registered
+  // once per player, each doing nothing but turning what the engine said into
+  // a session event. What that event *means* is decided in `session.ts`, which
+  // is where the rules about the outgoing file live.
   useEffect(() => {
     let disposed = false;
     let unlisten: (() => void) | undefined;
@@ -750,13 +743,13 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         })();
       }, AUDIO_CHECK_MS);
 
-    listenEvents((event) => {
-      if (event.event === 'playback-restart') {
+    onPlaybackEvent((event) => {
+      if (event.type === 'restarted') {
         dispatch({ type: 'playback-restart' });
         checkAudioSoon();
       }
 
-      if (event.event === 'file-loaded') {
+      if (event.type === 'loaded') {
         dispatch({ type: 'file-loaded' });
         void (async () => {
           const wanted = sessionRef.current.path;
@@ -768,20 +761,16 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
            * after the new one's reset, and taking its position as the new
            * episode's is the bug GOTCHAS describes at length.
            */
-          let openPath: string | null = null;
+          let open: string | null = null;
           let pos: number | null = null;
           let len: number | null = null;
           try {
-            [openPath, pos, len] = await Promise.all([
-              (getProperty('path', 'string') as Promise<string | null>).catch(() => null),
-              getProperty('time-pos', 'double') as Promise<number | null>,
-              getProperty('duration', 'double') as Promise<number | null>,
-            ]);
+            ({ path: open, position: pos, duration: len } = await nowPlaying());
           } catch (e) {
             console.warn('could not read position after load', e);
           }
-          if (!samePath(openPath, wanted)) {
-            console.warn(`file-loaded for ${openPath}, not ${wanted}: left alone`);
+          if (!samePath(open, wanted)) {
+            console.warn(`file-loaded for ${open}, not ${wanted}: left alone`);
             return;
           }
           // The resume point went to mpv with the load; say so on screen.
@@ -790,14 +779,16 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           // Open *before* the rest, not after. Everything below is per-file
           // polish — track languages, frame timing, chapters — and any one of
           // them throwing must not leave the file unable to offer a Skip button.
-          dispatch({ type: 'opened', path: openPath, timePos: pos, duration: len, resumedFrom: resumed });
+          dispatch({ type: 'opened', path: open, timePos: pos, duration: len, resumedFrom: resumed });
 
           await latestHandlers.current.applyPrefs();
 
           // Applied per file rather than once at init, so changing it in
           // Settings takes effect on the next thing you play instead of on the
           // next launch. mpv is definitely up by the time a file has loaded.
-          await command('set', ['video-sync', videoSync.current]).catch((e) =>
+          // mpv's own setting, so mpv's own words: another engine times
+          // frames its own way.
+          await mpvCommand('set', ['video-sync', videoSync.current]).catch((e) =>
             console.warn('could not set video-sync', e)
           );
 
@@ -808,21 +799,19 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       }
 
       // Still handled for completeness: this fires when keep-open is off, or
-      // when a file ends for another reason. 'stop' is us tearing down or the
+      // when a file ends for another reason. `other` is us tearing down or the
       // user leaving, which must not roll on to the next episode.
-      if (event.event === 'end-file') {
-        const reason = (event as { reason?: string }).reason;
-        if (reason === 'eof') dispatch({ type: 'eof' });
-        // `loadfile` resolves as soon as mpv *accepts* the command, so a file
-        // that has been deleted, renamed or sits on a share that went away
-        // fails here and nowhere else — without this, a black screen reading
-        // `--:-- / --:--`, indistinguishable from a hang.
-        if (reason === 'error') {
-          const detail = (event as { file_error?: string }).file_error;
+      if (event.type === 'ended') {
+        if (event.reason === 'eof') dispatch({ type: 'eof' });
+        // `openFile` resolves as soon as the engine *accepts* the file, so a
+        // file that has been deleted, renamed or sits on a share that went
+        // away fails here and nowhere else — without this, a black screen
+        // reading `--:-- / --:--`, indistinguishable from a hang.
+        if (event.reason === 'error') {
           dispatch({
             type: 'error',
-            message: detail
-              ? `Could not play this file: ${detail}`
+            message: event.detail
+              ? `Could not play this file: ${event.detail}`
               : 'Could not play this file. It may have been moved or deleted, ' +
                 'or the drive it is on may be unavailable.',
           });
@@ -831,6 +820,12 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           setOsdVisible(true);
         }
       }
+
+      if (event.type === 'paused') dispatch({ type: 'pause', value: event.value });
+      if (event.type === 'position') dispatch({ type: 'time-pos', value: event.value });
+      if (event.type === 'duration') dispatch({ type: 'duration', value: event.value });
+      // The real end-of-playback signal while keep-open holds the last frame.
+      if (event.type === 'reached-end') dispatch({ type: 'eof' });
     }).then((fn) => {
       // Torn down before registration finished: remove it now, or it leaks
       // and keeps receiving every event with a stale closure.
@@ -838,35 +833,6 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       else unlisten = fn;
     });
 
-    return () => {
-      disposed = true;
-      unlisten?.();
-    };
-  }, []);
-
-  useEffect(() => {
-    let disposed = false;
-    let unlisten: (() => void) | undefined;
-    observeProperties(OBSERVED_PROPERTIES, ({ name, data }) => {
-      switch (name) {
-        case 'pause':
-          dispatch({ type: 'pause', value: data as boolean });
-          break;
-        case 'time-pos':
-          dispatch({ type: 'time-pos', value: data as number | null });
-          break;
-        case 'duration':
-          dispatch({ type: 'duration', value: data as number | null });
-          break;
-        // The real end-of-playback signal while keep-open holds the last frame.
-        case 'eof-reached':
-          if (data === true) dispatch({ type: 'eof' });
-          break;
-      }
-    }).then((fn) => {
-      if (disposed) fn();
-      else unlisten = fn;
-    });
     return () => {
       disposed = true;
       unlisten?.();
@@ -885,11 +851,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   useEffect(() => {
     const id = window.setInterval(async () => {
       if (sessionRef.current.ended) return;
-      try {
-        if ((await getProperty('eof-reached', 'flag')) === true) dispatch({ type: 'eof' });
-      } catch {
-        /* property unavailable while idle — nothing to do */
-      }
+      if (await hasReachedEnd()) dispatch({ type: 'eof' });
     }, 1000);
     return () => window.clearInterval(id);
   }, []);
@@ -1079,7 +1041,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       // so the button goes by itself — and seeking back into it brings it
       // back, which is what a remembered dismissal used to prevent. A scene
       // after the credits is a seek too: the film goes on to it.
-      await command('seek', [active.seekTo, 'absolute']).catch(fail);
+      await seekTo(active.seekTo).catch(fail);
       showOsd();
     } else {
       setDismissed(active.key);
@@ -1252,7 +1214,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   // give the screen its own mode back however the player was left.
   useEffect(() => {
     return () => {
-      void command('stop').catch(() => undefined);
+      void stopPlayback().catch(() => undefined);
       void restoreScreen();
     };
   }, []);
@@ -1312,8 +1274,8 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   /** Resolves to whether it is paused now, or null if mpv did not answer. */
   const togglePause = useCallback(async (): Promise<boolean | null> => {
     try {
-      const current = await getProperty('pause', 'flag');
-      await setProperty('pause', !current);
+      const current = await isPaused();
+      await setPaused(!current);
       showOsd();
       return !current;
     } catch (e) {
@@ -1334,7 +1296,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
 
   const seekRelative = useCallback(
     async (delta: number) => {
-      await command('seek', [delta, 'relative']).catch(fail);
+      await seekBy(delta).catch(fail);
       showOsd();
     },
     [showOsd, fail]
@@ -1343,7 +1305,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   /** Back to 0:00, from the "Resumed from" notice. */
   const startOver = useCallback(() => {
     dispatch({ type: 'resume-shown' });
-    void command('seek', [0, 'absolute']).catch(fail);
+    void seekTo(0).catch(fail);
     showOsd();
   }, [fail, showOsd]);
 
@@ -1362,7 +1324,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     scrubRef.current = null;
     lastScrub.current = s;
     dispatch({ type: 'scrub-end' });
-    void command('seek', [s.target, 'absolute']).catch(fail);
+    void seekTo(s.target).catch(fail);
     showOsd();
   }, [fail, showOsd]);
 
@@ -1483,9 +1445,9 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     // Going fullscreen mid-film: pause, switch, and carry on as it was.
     if (!(await mayswitch().catch(() => false))) return;
     const wasPaused = sessionRef.current.paused;
-    await setProperty('pause', true);
+    await setPaused(true);
     await matchScreen();
-    if (!wasPaused) await setProperty('pause', false);
+    if (!wasPaused) await setPaused(false);
   }, [matchScreen]);
 
   /**
@@ -1623,11 +1585,11 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           break;
         case 'MediaPlay':
           e.preventDefault();
-          void setProperty('pause', false).then(showOsd);
+          void setPaused(false).then(showOsd);
           break;
         case 'MediaPause':
           e.preventDefault();
-          void setProperty('pause', true).then(enterOsdFocus);
+          void setPaused(true).then(enterOsdFocus);
           break;
         // Stop means leave the player, the same way out as Back takes from
         // the top of its ladder — including out of fullscreen.
@@ -1976,7 +1938,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
                 dispatch({ type: 'scrub-end' });
                 const input = e.target as HTMLInputElement;
                 const pct = Number(input.value);
-                if (duration) void command('seek', [(pct / 100) * duration, 'absolute']);
+                if (duration) void seekTo((pct / 100) * duration);
                 // Keep the browser's own arrow-key handling off the slider, or
                 // the next Left would move it *and* seek.
                 input.blur();

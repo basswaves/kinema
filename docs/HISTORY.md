@@ -1547,7 +1547,7 @@ git log --oneline --diff-filter=D -- src/spike/PlayerSpike.tsx
 git checkout <that commit>~1 -- src/spike/ src/App.css
 ```
 
-It renders through the same `ensureMpvInitialised` as the real player, so what
+It renders through the same `startEngine` (then `ensureMpvInitialised`) as the real player, so what
 it reports is what the player gets.
 
 ## A TMDB key of Kinema's own, and what happens without one ✅

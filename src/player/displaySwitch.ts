@@ -11,7 +11,6 @@
  */
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { getProperty, setProperty } from 'tauri-plugin-libmpv-api';
 import { getSetting } from '../metadata/api';
 import {
   chooseTarget,
@@ -22,6 +21,7 @@ import {
   type SwitchSettings,
 } from './displayMode';
 import { formatRate } from './equipment';
+import { mpvGet, mpvSet } from './engine';
 
 export const SWITCH_REFRESH_KEY = 'display_switch_refresh';
 export const SWITCH_RESOLUTION_KEY = 'display_switch_resolution';
@@ -73,15 +73,15 @@ export async function mayswitch(): Promise<boolean> {
 /** The film as mpv decodes it. Waits for the first frame's parameters. */
 export async function filmNow(): Promise<Film | null> {
   const gamma = await poll(
-    () => getProperty('video-params/gamma', 'string') as Promise<string | null>,
+    () => mpvGet('video-params/gamma', 'string') as Promise<string | null>,
     (v) => v.length > 0,
     PARAMS_WAIT_MS
   );
   if (gamma === null) return null;
   const [width, height, fps] = await Promise.all([
-    getProperty('video-params/w', 'int64').catch(() => null) as Promise<number | null>,
-    getProperty('video-params/h', 'int64').catch(() => null) as Promise<number | null>,
-    getProperty('container-fps', 'double').catch(() => null) as Promise<number | null>,
+    mpvGet('video-params/w', 'int64').catch(() => null) as Promise<number | null>,
+    mpvGet('video-params/h', 'int64').catch(() => null) as Promise<number | null>,
+    mpvGet('container-fps', 'double').catch(() => null) as Promise<number | null>,
   ]);
   if (!width || !height) return null;
   return { width, height, fps: fps || null, hdr: gamma === 'pq' || gamma === 'hlg' };
@@ -119,7 +119,7 @@ export async function switchForFilm(film: Film): Promise<boolean> {
   // Its display-timed frame pacing and the stats panel's cadence both depend
   // on the number, so it is told — the exact rate Windows reports, since mpv
   // warns that even a slightly wrong one spoils display-sync.
-  await setProperty('display-fps-override', after.exact_rate).catch((e) =>
+  await mpvSet('display-fps-override', after.exact_rate).catch((e) =>
     console.warn('display: could not tell mpv the new refresh rate', e)
   );
   await sleep(SETTLE_MS);
@@ -134,5 +134,5 @@ export async function restoreScreen(): Promise<void> {
   });
   // Back to mpv's own detection, which never saw the switch and so still has
   // the desktop's rate.
-  if (restored) await setProperty('display-fps-override', 0).catch(() => undefined);
+  if (restored) await mpvSet('display-fps-override', 0).catch(() => undefined);
 }

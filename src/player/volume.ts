@@ -13,9 +13,8 @@
  * state it sets is the state there is — and an observed property would only
  * start arriving after a full restart (docs/GOTCHAS.md).
  */
-import { command } from 'tauri-plugin-libmpv-api';
 import { getSetting, setSetting } from '../metadata/api';
-import { readProperty } from './property';
+import { readProperty, mpvCommand } from './engine';
 
 export const VOLUME_KEY = 'volume';
 export const VOLUME_STEP = 5;
@@ -39,7 +38,7 @@ export async function savedVolume(): Promise<number> {
  * with the plugin (docs/GOTCHAS.md, `sid` / `aid`).
  */
 export async function applyVolume(level: number): Promise<void> {
-  await command('set', ['volume', String(level)]);
+  await mpvCommand('set', ['volume', String(level)]);
 }
 
 export async function persistVolume(level: number): Promise<void> {
@@ -47,7 +46,7 @@ export async function persistVolume(level: number): Promise<void> {
 }
 
 export async function applyMute(muted: boolean): Promise<void> {
-  await command('set', ['mute', muted ? 'yes' : 'no']);
+  await mpvCommand('set', ['mute', muted ? 'yes' : 'no']);
 }
 
 /**

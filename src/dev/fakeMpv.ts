@@ -39,6 +39,12 @@ export interface FakeMpvState {
   subVisible: boolean;
   /** Set to e.g. 'spdif-truehd' to stand in for sound going to a receiver. */
   audioOutFormat: string | null;
+  /**
+   * Set to mpv's words for a failure (e.g. 'no such file or directory') and
+   * the next `loadfile` fails with them, as a file on a share that went away
+   * does. Cleared once used.
+   */
+  failNextLoad: string | null;
 }
 
 /** How long each fixture file runs. Unknown paths get a TV-episode length. */
@@ -60,6 +66,7 @@ const state: FakeMpvState = {
   mute: false,
   subVisible: true,
   audioOutFormat: 'float',
+  failNextLoad: null,
 };
 
 let ticker: number | undefined;
@@ -108,6 +115,13 @@ function loadfile(args: unknown[]): void {
   // The outgoing file keeps reporting until the new one is open — the
   // behaviour that GOTCHAS "Clearing an observed property" is about.
   window.setTimeout(() => {
+    if (state.failNextLoad !== null) {
+      // mpv accepted the command; the failure only arrives as the file closes.
+      send({ event: 'start-file', playlist_entry_id: 1 });
+      send({ event: 'end-file', reason: 'error', error: -13, file_error: state.failNextLoad });
+      state.failNextLoad = null;
+      return;
+    }
     state.path = path;
     state.duration = lookupDuration(path);
     state.position = start ?? 0;

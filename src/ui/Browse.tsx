@@ -51,7 +51,7 @@ import OnScreenKeyboard from './OnScreenKeyboard';
 import { isTvMode, useTvMode } from './tv';
 import LeaveDialog from './LeaveDialog';
 import { runSelfTest, selfTestPlan } from '../selftest';
-import { ensureMpvInitialised } from '../player/mpv';
+import { startEngine } from '../player/engine';
 import './ui.css';
 
 // Enable native-like arrow-key navigation. `useGetBoundingClientRect` makes
@@ -349,7 +349,7 @@ export default function Browse() {
    */
   useEffect(() => {
     const id = window.setTimeout(() => {
-      void ensureMpvInitialised().catch((e) => console.warn('mpv: early start failed', e));
+      void startEngine().catch((e) => console.warn('mpv: early start failed', e));
     }, 0);
     return () => window.clearTimeout(id);
   }, []);

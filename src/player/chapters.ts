@@ -1,12 +1,12 @@
 /**
  * Reading mpv's chapter list.
  *
- * Same rule as `tracks.ts`: never `getProperty('chapter-list', 'node')`. The
+ * Same rule as `tracks.ts`: never `mpvGet('chapter-list', 'node')`. The
  * node format deserialises a nested array-of-maps across the FFI boundary and
  * takes the whole process down with STATUS_ACCESS_VIOLATION — silently, from
  * JS. Every field is available as a flat indexed scalar, which is safe.
  */
-import { readProperty } from './property';
+import { readProperty } from './engine';
 
 export interface Chapter {
   /** Seconds from the start of the file. */

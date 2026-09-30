@@ -26,6 +26,12 @@ makes no stability promises.
   count it twice. It only adds, as SIMKL does. A free Trakt account can be
   connected to only one app besides Trakt's own.
 
+### Fixed
+
+- **The cover on a title's page is no longer stretched.** Since the picture
+  and sound badges, the column beside it was often taller than the cover,
+  which pulled the picture taller to match.
+
 ## [0.6.0] — 2026-09-30
 
 Recaps and the scene after a film's credits can be skipped to, a second

@@ -890,8 +890,14 @@ html {
   margin-bottom: 2.125rem;
 }
 
+/* Top-aligned, not stretched: a flex row stretches its children to the
+   tallest, and since the badges the column beside it is often taller than the
+   poster, which pulled the picture out of shape. */
 .detail-poster {
+  align-self: flex-start;
+  flex-shrink: 0;
   width: 11.875rem;
+  height: auto;
   border-radius: 0.625rem;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6);
 }

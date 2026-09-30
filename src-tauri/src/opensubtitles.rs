@@ -915,9 +915,14 @@ mod tests {
     #[test]
     fn a_kept_password_reads_back() {
         let kept = protect("correct horse");
+        // Elsewhere it is kept as given, in a folder only this account can
+        // open (`util::keep_private`): the owner's "no extra work for the
+        // ports".
         #[cfg(windows)]
-        assert!(kept.starts_with("dpapi:"), "encrypted on Windows");
-        assert!(!kept.contains("correct horse"));
+        {
+            assert!(kept.starts_with("dpapi:"), "encrypted on Windows");
+            assert!(!kept.contains("correct horse"));
+        }
         assert_eq!(unprotect(&kept).as_deref(), Some("correct horse"));
         assert_eq!(unprotect("plain:abc").as_deref(), Some("abc"));
         assert_eq!(unprotect("dpapi:zz"), None);

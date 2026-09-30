@@ -75,9 +75,40 @@ pub fn existing_file(path: &Path) -> Option<PathBuf> {
     found.into_iter().next()
 }
 
+/// Make Kinema's data folder openable by this account only.
+///
+/// It holds the SIMKL and Trakt sign-ins and, outside Windows, a kept
+/// OpenSubtitles password. Windows gives app data that protection already; on
+/// Linux a new folder is readable by every account on the machine.
+pub fn keep_private(dir: &Path) -> std::io::Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))?;
+    }
+    #[cfg(not(unix))]
+    let _ = dir;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{count, existing_file, is_season_folder};
+    use super::{count, existing_file, is_season_folder, keep_private};
+
+    #[test]
+    fn keep_private_leaves_the_folder_usable() {
+        let dir = std::env::temp_dir().join(format!("kinema-private-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        keep_private(&dir).unwrap();
+        std::fs::write(dir.join("library.db"), "x").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = std::fs::metadata(&dir).unwrap().permissions().mode();
+            assert_eq!(mode & 0o777, 0o700);
+        }
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 
     #[test]
     fn existing_file_ignores_case_and_nothing_else() {

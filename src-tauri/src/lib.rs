@@ -94,6 +94,9 @@ fn open_library(app: &tauri::AppHandle) -> Result<(), String> {
         eprintln!("could not start the log in {}: {e}", dir.display());
     }
     log!("--- Kinema {} started ---", env!("CARGO_PKG_VERSION"));
+    if let Err(e) = util::keep_private(&dir) {
+        log!("could not make {} private to this account: {e}", dir.display());
+    }
 
     // Before anything opens the library: a restore asked for in Settings is
     // carried out here, as Kinema starts again. Its outcome is said in a dialog,

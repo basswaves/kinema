@@ -1467,3 +1467,22 @@ across `/mnt/c` is slow, and with `core.autocrlf` the files here have CRLF
 endings that no Linux checkout has. `scripts/wsl.ps1` snapshots the working
 tree through git (uncommitted work included) into `~/kinema` in the
 distribution and runs the command there. That copy is a mirror: never edit it.
+
+### A path stored in the library carries the separator of the system that wrote it
+
+Cached artwork is stored as `artwork` + the system's separator + a file name,
+and read by joining it onto the data folder. A Windows library opened on
+Linux said `artwork\52.jpg` — one file name there — and every picture
+"failed" and was quietly fetched from the network again; the only sign was a
+warning per picture in `app.log`. `artwork::use_this_systems_separator`
+rewrites them at every start. **Do:** store anything relative with `/` or
+rewrite it on open; never let a stored path depend on where it was written.
+
+### On Linux, mpv opens a window of its own
+
+`force-window=yes` keeps an idle surface for the transparent window to show,
+and on Windows that surface lives in Kinema's window through `--wid`. On
+Linux the plugin passed no window at all — under Wayland it cannot, and on
+the first X11 run it did not either — so mpv opened a separate window at
+start. Playback on Linux is its own step (notes: the player phase); until
+then, expect a second, black window.

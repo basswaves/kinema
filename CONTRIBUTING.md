@@ -101,6 +101,17 @@ It builds a copy of your working tree, uncommitted changes included, inside
 the distribution — never edit that copy. The traps behind that design are in
 GOTCHAS ("Linux, and building it from Windows").
 
+To run the app itself there (WSLg shows its window on the Windows desktop),
+build it with `scripts\wsl.ps1 'npm run tauri build -- --no-bundle'` and give
+it the libmpv plugin's wrapper, built from its source rather than downloaded
+— version v0.1.1 of github.com/nini22P/libmpv-wrapper, `cargo build
+--release`, then `target/release/libmpv_wrapper.so` copied to
+`src-tauri/target/release/lib/libmpv-wrapper.so` in the copy. libmpv itself
+is Ubuntu's (`libmpv-dev` above). `scripts/selftest.sh` then runs a plan the
+way `selftest.ps1` does on Windows, on a copy of a library you put in the
+plan's `data/` folder; with `GDK_BACKEND=x11` it photographs Kinema's window,
+and only that.
+
 The interface itself is checked in both browser engines, keyboard only,
 against `dev:mock`: WebKit (Linux's) and Edge (the same Chromium as WebView2,
 already on Windows). Once, `npx playwright install webkit`; then:

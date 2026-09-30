@@ -1528,3 +1528,18 @@ refused (`-2`). A plain string option nobody reads (`term-status-msg`, with
 
 `devlog.ts` forwards `log`, `warn` and `error`. A diagnostic written with
 `info` or `debug` vanishes, and its absence looks like the code never ran.
+
+### A covered WebKitGTK window stops producing snapshots
+
+On Linux the player's page reaches the screen as a snapshot mpv draws
+(`overlay.rs`), taken while mpv's window covers Kinema's. After about a
+second the snapshots simply stop arriving — no error, the callback never
+runs — because the compositor stops asking a covered window to draw, and
+WebKit's DMA-BUF renderer waits for it. `WEBKIT_DISABLE_DMABUF_RENDERER=1`,
+set in `run()` on Linux, keeps them coming (1–2 ms each).
+
+### `overlay-add` takes a size to scale to only from mpv 0.38
+
+Before that it has exactly nine arguments, and eleven are refused ("has only
+9 arguments"). `overlay.ts` tries with `dw`/`dh` and falls back once; the
+unscaled page then only lines up when Kinema's window is the screen's size.

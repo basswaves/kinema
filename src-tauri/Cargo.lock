@@ -2003,6 +2003,7 @@ name = "kinema"
 version = "0.7.0"
 dependencies = [
  "flate2",
+ "gtk",
  "log",
  "qrcode",
  "quick-xml 0.38.4",
@@ -2019,6 +2020,7 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tokio",
  "walkdir",
+ "webkit2gtk",
  "windows",
 ]
 

@@ -37,6 +37,8 @@ import { isTvMode, useTvMode } from '../ui/tv';
 import StatsPanel from './StatsPanel';
 import TrackPanel, { TRACK_PANEL_KEY } from './TrackPanel';
 import UpNextCard from './UpNextCard';
+import { startOverlay } from './overlay';
+import { capabilitiesNow } from '../capabilities';
 import { setShortcutsOpen } from '../ui/shortcutsState';
 import {
   hasReachedEnd,
@@ -1222,6 +1224,14 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       void stopPlayback().catch(() => undefined);
       void restoreScreen();
     };
+  }, []);
+
+  // Where mpv has a window of its own, this page reaches the screen only as
+  // a picture mpv draws over the video (overlay.ts), for as long as the
+  // player is open.
+  useEffect(() => {
+    if (!capabilitiesNow()?.mpv_video.own_window) return;
+    return startOverlay();
   }, []);
 
   // Countdown to the next episode.

@@ -52,7 +52,7 @@ tauri-plugin-single-instance = "2"
 qrcode = { version = "0.14", default-features = false, features = ["svg"] }
 # Already compiled in through Tauri's runtime; named for its timer, so the
 # SIMKL sender can wait between writes without holding a thread.
-tokio = { version = "1", features = ["time"] }
+tokio = { version = "1", features = ["time", "sync"] }
 # Already compiled in through Tauri and the libmpv plugin; named so their
 # warnings and errors can be sent to app.log (applog.rs, `Forward`).
 log = "0.4"
@@ -80,3 +80,9 @@ windows = { version = "0.61", features = [
   "Win32_UI_Shell_PropertiesSystem",
 ] }
 
+# Linux only: the page photographed for mpv to draw (overlay/linux.rs). The
+# same versions Tauri's own webview already compiles in, so nothing new is
+# built; named so their types can be used here.
+[target.'cfg(target_os = "linux")'.dependencies]
+webkit2gtk = "2.0"
+gtk = "0.18"

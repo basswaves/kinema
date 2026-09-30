@@ -174,6 +174,13 @@ equipment/win.rs, display/win.rs
                  file; shared rules and commands stay in equipment.rs and
                  display.rs
 player/engine.ts The only file that talks to mpv (see player/ above)
+overlay.rs, player/overlay.ts, player/mpvKeys.ts
+                 Where mpv has a window of its own (Linux, `own_window`):
+                 the page is photographed ten times a second and mpv draws
+                 it over the video, and the remote's keys reach mpv's window
+                 and are pressed on the page. One copy of the controls
+                 everywhere; Wayland allows no other way to keep them over
+                 mpv (GOTCHAS)
 ```
 
 CI builds and tests every push on Windows and on Linux for x86 and ARM, and

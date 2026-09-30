@@ -18,6 +18,7 @@ mod library;
 mod lifecycle;
 mod metadata;
 mod nfo;
+mod overlay;
 mod omdb;
 mod opensubtitles;
 mod playback;
@@ -193,6 +194,14 @@ pub fn run() {
     // First, so a panic anywhere after this, on any thread, is written down.
     applog::install_panic_hook();
     applog::forward_library_logs();
+    // The page is photographed for mpv while mpv's window covers it
+    // (overlay.rs), and a covered WebKitGTK window stops producing snapshots
+    // after about a second unless it draws without the DMA-BUF renderer.
+    // Before any window exists; left alone if set already.
+    #[cfg(target_os = "linux")]
+    if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
+        std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+    }
 
     let mut builder = tauri::Builder::default();
     // One Kinema at a time. Two would each switch the display and take the
@@ -265,6 +274,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             updates::latest_release,
             capabilities::capabilities,
+            overlay::overlay_frame,
+            overlay::overlay_reset,
             library::add_library_root,
             library::remove_library_root,
             library::list_library_roots,

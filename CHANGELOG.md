@@ -7,6 +7,13 @@ makes no stability promises.
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-09-30
+
+Recaps and the scene after a film's credits can be skipped to, a second
+collection of skip times fills gaps, and what you watch can go to your SIMKL
+account. The library is upgraded on first start (schema 18 to 20, with a
+safety copy first).
+
 ### Added
 
 - **Skip recap.** "Previously on…" gets a button of its own, from TheIntroDB
@@ -25,7 +32,6 @@ makes no stability promises.
   viewers, used where TheIntroDB has nothing. On by default, with its own
   switch in Settings → Intro & credits; only which film or episode it is gets
   sent. It is a different service from TheIntroDB.
-
 - **F11** switches between the desk and TV layouts, as Ctrl+Shift+T does —
   the TV layout is Kinema's full-screen mode.
 

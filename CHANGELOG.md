@@ -7,6 +7,12 @@ makes no stability promises.
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-09-30
+
+Subtitles from OpenSubtitles, forced subtitles that show with subtitles off,
+and Trakt beside SIMKL. The library is upgraded on first start (schema 20 to
+22, with a safety copy first).
+
 ### Added
 
 - **Subtitles from OpenSubtitles.** "Find subtitles online" in the player's

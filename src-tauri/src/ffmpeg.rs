@@ -315,8 +315,10 @@ mod tests {
     /// silently be paired with some other copy off `PATH`.
     #[test]
     fn ffprobe_is_found_beside_the_configured_ffmpeg() {
-        let probe = probe_binary(Path::new(r"C:\tools\ffmpeg\bin\ffmpeg.exe"));
-        assert_eq!(probe.parent().unwrap(), Path::new(r"C:\tools\ffmpeg\bin"));
+        // Built with `join`: `C:\tools\…` is one file name on Linux.
+        let bin = Path::new("tools").join("ffmpeg").join("bin");
+        let probe = probe_binary(&bin.join("ffmpeg.exe"));
+        assert_eq!(probe.parent().unwrap(), bin);
         assert!(probe.file_name().unwrap().to_string_lossy().starts_with("ffprobe"));
     }
 

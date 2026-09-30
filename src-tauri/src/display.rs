@@ -15,6 +15,10 @@
 //! desktop mode is never touched, and resetting to it is how the mode is put
 //! back.
 
+// The shared helpers here are used only by the Windows switcher until a Linux
+// one exists. Windows' clippy still reports anything that is genuinely unused.
+#![cfg_attr(not(windows), allow(dead_code))]
+
 use serde::{Deserialize, Serialize};
 
 use crate::equipment::{HdrState, Mode};
@@ -248,6 +252,8 @@ pub fn restore(app: &tauri::AppHandle) -> Result<bool, String> {
             describe_signal(now.signal)
         );
     }
+    #[cfg(not(windows))]
+    let _ = original;
     save_original(app, None)?;
     Ok(true)
 }

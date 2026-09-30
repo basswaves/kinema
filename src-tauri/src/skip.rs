@@ -852,7 +852,7 @@ mod tests {
 
     #[test]
     fn looks_for_both_sidecar_naming_conventions() {
-        let paths = candidate_paths(Path::new(r"C:\media\Show S01E01.mkv"));
+        let paths = candidate_paths(&Path::new("media").join("Show S01E01.mkv"));
         let names: Vec<String> = paths
             .iter()
             .map(|p| p.file_name().unwrap().to_string_lossy().into_owned())

@@ -78,6 +78,29 @@ actually produces are focus-tree and mpv-lifecycle problems, and a jsdom test
 cannot see either. **Testing D-pad navigation means using a D-pad**, not
 mounting a component. See the two failure modes below.
 
+### Checking Linux from Windows
+
+Kinema is being made to build on Linux too, and a change that breaks it should
+be caught before it is pushed. With Ubuntu 24.04 in WSL, once:
+
+```bash
+sudo apt install build-essential curl file pkg-config libssl-dev libxdo-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libmpv-dev
+```
+
+then Node 20 (from NodeSource — **not** Ubuntu's, and not Windows' own, which
+WSL otherwise finds first) and Rust with clippy (rustup). After that, from
+PowerShell in the project root:
+
+```powershell
+scripts\wsl.ps1 'npm run check'
+scripts\wsl.ps1 'cargo test --manifest-path src-tauri/Cargo.toml'
+scripts\wsl.ps1 'cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings'
+```
+
+It builds a copy of your working tree, uncommitted changes included, inside
+the distribution — never edit that copy. The traps behind that design are in
+GOTCHAS ("Linux, and building it from Windows").
+
 ### Running the UI without the native app
 
 ```bash

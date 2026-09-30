@@ -119,9 +119,7 @@ mod tests {
 
     #[test]
     fn the_copy_lives_beside_the_plan() {
-        assert_eq!(
-            data_dir_for(Path::new(r"C:\tmp\run1\plan.json")),
-            PathBuf::from(r"C:\tmp\run1\data")
-        );
+        let run = Path::new("tmp").join("run1");
+        assert_eq!(data_dir_for(&run.join("plan.json")), run.join("data"));
     }
 }

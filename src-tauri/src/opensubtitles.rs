@@ -107,6 +107,7 @@ fn unprotect(stored: &str) -> Option<String> {
     None
 }
 
+#[cfg_attr(not(windows), allow(dead_code))]
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }

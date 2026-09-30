@@ -21,6 +21,11 @@
 //! AC3 then accepts a TrueHD stream it cannot play — silence or noise at the
 //! receiver. Asking first, codec by codec, is the defence against that.
 
+// The shared helpers here (layouts, rates, the bitstream list) are used only
+// by the Windows reader until a Linux one exists (notes: PORTING, phase 4).
+// Windows' clippy still reports anything that is genuinely unused.
+#![cfg_attr(not(windows), allow(dead_code))]
+
 use serde::{Deserialize, Serialize};
 
 /// One look at the hardware, as Windows answers it right now.

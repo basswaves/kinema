@@ -1406,3 +1406,64 @@ file* — an installer that starts the app proves nothing.
 `cargo build` output is easy to misread when filtered. Compare the binary's mtime
 against the source file you just edited.
 
+
+## Linux, and building it from Windows
+
+### A Windows path in a test is one file name on Linux
+
+`Path::new(r"C:\tools\ffmpeg\bin\ffmpeg.exe").parent()` is `C:\tools\ffmpeg\bin`
+on Windows and **empty** on Linux, where a backslash is an ordinary character.
+Four Rust tests passed for months on Windows and failed on their first Linux
+run for that reason alone. **Do:** build test paths with `join`, never from a
+Windows literal, unless the test is about Windows paths.
+
+### Rebuilding a path from its parts loses its root
+
+Splitting on separators, dropping empty parts and joining with `/` turns
+`\\NAS\TV\Show` into `NAS/TV/Show` and `/media/TV/Show` into `media/TV/Show`.
+Compared with the library folder afterwards, nothing on a network share or on
+Linux was "inside" it, and no error said so. **Do:** cut a parent off the end
+of the string; never rebuild one.
+
+### File names are case-sensitive on Linux
+
+`tvshow.nfo` does not find `TVShow.nfo` there, and the result is simply "no
+NFO". Any file named by the user or by another tool is looked up through
+`util::existing_file`, which searches the folder when the exact name is
+missing (and does not on Windows, where the filesystem already ignores case).
+
+### Code only Windows uses is dead code to Linux's clippy
+
+Helpers shared by design but so far called only from a `#[cfg(windows)]`
+module fail `-D warnings` on Linux. `equipment.rs` and `display.rs` carry
+`#![cfg_attr(not(windows), allow(dead_code))]` until their Linux readers exist;
+remove it then. Windows' clippy still catches what is really unused.
+
+### New files on Linux are readable by every account
+
+Windows' app data is private to its user; a folder created on Linux with the
+default umask is not. Kinema's holds sign-in tokens, so `util::keep_private`
+makes it `0700` at every start.
+
+### Inside WSL, `npm` is Windows' npm until Linux has its own
+
+WSL appends Windows' `PATH` to Linux's. With no Linux Node installed, `npm`
+resolves to `/mnt/c/Program Files/nodejs/npm` and a build silently mixes the
+two systems. **Do:** install Node in the distribution before anything else.
+
+### `wsl` hands its arguments to a shell, and pipes gain a CR
+
+`wsl -d Ubuntu -- wslpath -a C:\x\y` passes the path through bash, which eats
+the backslashes — the repository's own path survived only because its spaces
+made PowerShell quote it. **Do:** use `wsl --exec`, which runs the program
+directly. And text piped from PowerShell into a native program ends in CRLF,
+so a script fed to `bash -s` ran `npm run check<CR>`. `scripts/wsl.ps1` writes
+the script to a file with LF endings instead.
+
+### One checkout cannot serve Windows and Linux
+
+`node_modules` and `src-tauri/target` hold one platform's binaries, building
+across `/mnt/c` is slow, and with `core.autocrlf` the files here have CRLF
+endings that no Linux checkout has. `scripts/wsl.ps1` snapshots the working
+tree through git (uncommitted work included) into `~/kinema` in the
+distribution and runs the command there. That copy is a mirror: never edit it.

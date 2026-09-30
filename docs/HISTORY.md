@@ -2108,6 +2108,34 @@ background chosen; `public/trakt.svg` is what that download gives for the
 dark one, rebuilt the same way because the page would not load outside a
 browser.
 
+## Groundwork for other platforms
+
+The first step towards Linux and Android was to build and test the Windows
+code on Linux as it stood, before restructuring anything, so the
+restructuring would be aimed at what actually breaks rather than at guesses.
+The frontend passed untouched. The Rust side compiled; four tests and
+clippy did not, and three things turned up that were real:
+
+- **The show-folder climb failed on every network share.** A file named only
+  by its numbering (`Season 1/S01E01.mkv`) takes its title from the folder
+  above, but only inside the library folder — and the check rebuilt the path
+  from its parts, dropping the leading `\\`, so nothing on a share was ever
+  "inside" its library. A Windows bug found by Linux, which has the same
+  problem with `/`. The parent is now cut from the string.
+- **Sidecars are found whatever their case.** `TVShow.nfo` and
+  `Film.SKIPTRO.json` were silent misses on Linux, where file names are
+  case-sensitive. On Windows the lookup is unchanged and never lists a folder:
+  most lookups are for a file that is not there, and a listing per file would
+  slow every scan of a NAS.
+- **Kinema's data folder is private to its account outside Windows.** It holds
+  the SIMKL and Trakt sign-ins and, outside Windows, the OpenSubtitles password
+  as typed (the "no extra work for the ports" decision). A new Linux folder is
+  readable by every account on the machine; Windows' app data never was.
+
+Windows-only helpers that the Linux readers will reuse (channel layouts, rates,
+the bitstream list) are allowed to be unused outside Windows until those
+readers exist; Windows' clippy still reports anything genuinely unused.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

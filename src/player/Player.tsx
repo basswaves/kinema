@@ -82,7 +82,17 @@ import { initialSession, reduce, samePath } from './session';
 import { COMMIT_IDLE_MS, scrubStep, type Scrub } from './scrub';
 import { endsAtLabel, formatTime } from '../ui/format';
 import { resumePoint } from './resume';
-import { chooseTracks, readLanguageDefaults } from './trackChoice';
+import { chooseTracks, forcedTrack, readLanguageDefaults, spokenTrack } from './trackChoice';
+import {
+  fetchSubtitle,
+  findSubtitles,
+  forcedSubtitle,
+  loadSubtitle,
+  searchLanguages,
+  subtitleStatus,
+  type Offer,
+} from './onlineSubtitles';
+import { canonicalLang, languageName, systemLanguage } from './language';
 import {
   BackTenIcon,
   ForwardTenIcon,
@@ -168,6 +178,56 @@ function labelFor(episode: EpisodeRef): string {
   return episodeLabel(episode.title, episode.season, episode.episode);
 }
 
+/**
+ * "Find subtitles online": search, show the best, and say what was shown —
+ * or why nothing was. Kept out of the component; see `findOnline`.
+ */
+async function onlineSearch(
+  fileId: number,
+  path: string,
+  language: string,
+  show: (path: string, language: string, release?: string) => Promise<void>
+): Promise<{ message: string; offers: Offer[] }> {
+  const name = languageName(language) ?? language;
+  try {
+    const found = await findSubtitles(fileId, path, language);
+    if (!found) return { message: `OpenSubtitles has no ${name} subtitles for this.`, offers: [] };
+    await show(found.path, language, found.chosen.release);
+    return {
+      message: found.chosen.matches_file
+        ? `Showing ${name} subtitles timed for this file.`
+        : `Showing the most used ${name} subtitles. If they are out of step, choose another.`,
+      offers: found.offers.filter((x) => x.file_id !== found.chosen.file_id),
+    };
+  } catch (e) {
+    return { message: userError(e), offers: [] };
+  }
+}
+
+/** "Choose another": fetch and show one, and say so. */
+async function onlineChoice(
+  fileId: number,
+  offer: Offer,
+  language: string,
+  show: (path: string, language: string, release?: string) => Promise<void>
+): Promise<string> {
+  try {
+    await show(await fetchSubtitle(fileId, offer.file_id, language), language, offer.release);
+    return `Showing: ${offer.release || 'the one chosen'}.`;
+  } catch (e) {
+    return userError(e);
+  }
+}
+
+/** Whether subtitles are showing, as mpv says; showing when it cannot say. */
+async function readSubVisibility(): Promise<boolean> {
+  try {
+    return ((await getProperty('sub-visibility', 'flag')) as boolean | null) ?? true;
+  } catch {
+    return true;
+  }
+}
+
 export default function Player({ target, onExit, onPlayTarget }: Props) {
   const tv = useTvMode();
   /**
@@ -195,6 +255,20 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   const [osdVisible, setOsdVisible] = useState(true);
   const [tracks, setTracks] = useState<MpvTrack[]>([]);
   const [showTracks, setShowTracks] = useState(false);
+  /**
+   * "Find subtitles online" in the track panel (onlineSubtitles.ts): whether
+   * this copy can, which of the offered languages is picked, and what the
+   * last search found.
+   */
+  const [online, setOnline] = useState<{
+    available: boolean;
+    langIndex: number;
+    finding: boolean;
+    message: string | null;
+    offers: Offer[];
+  }>({ available: false, langIndex: 0, finding: false, message: null, offers: [] });
+  /** The subtitle language from Settings, or Windows' when subtitles are off. */
+  const [wantedSubLang, setWantedSubLang] = useState<string | null>(null);
   const [showStats, setShowStats] = useState(false);
   const [stats, setStats] = useState<StatGroup[]>([]);
   const [sid, setSid] = useState<number | null>(null);
@@ -445,11 +519,15 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
 
     // This title's own choice if there is one, else the defaults in Settings
     // — see trackChoice.ts. A trailer (no title) takes the defaults too.
+    let showForced = true;
     try {
       const [prefs, defaults] = await Promise.all([
         target.titleId !== null ? getTitlePrefs(target.titleId) : Promise.resolve(null),
         readLanguageDefaults(),
       ]);
+      showForced = defaults.forced;
+      const [mode, lang] = defaults.subs.split(':');
+      setWantedSubLang(mode !== 'off' && lang ? lang : systemLanguage());
       const choice = chooseTracks(list, prefs, defaults);
       if (choice.aid !== null) await selectTrack('aid', choice.aid);
       if (choice.sid !== null) await selectTrack('sid', choice.sid);
@@ -466,12 +544,108 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     setAid(updated.find((t) => t.type === 'audio' && t.selected)?.id ?? null);
     setSid(updated.find((t) => t.type === 'sub' && t.selected)?.id ?? null);
 
-    try {
-      setSubVisible(((await getProperty('sub-visibility', 'flag')) as boolean | null) ?? true);
-    } catch {
-      setSubVisible(true);
+    const visible = await readSubVisibility();
+    setSubVisible(visible);
+
+    // Forced subtitles from OpenSubtitles, for a file with none of its own —
+    // only when switched on (Rust checks), never over full subtitles, and in
+    // the language being spoken. After the film has started: nothing waits
+    // for it.
+    const fileId = target.fileId;
+    const spoken = canonicalLang(spokenTrack(updated, null)?.lang);
+    const selectedSub = updated.find((t) => t.type === 'sub' && t.selected);
+    const fullSubsShowing = visible && selectedSub !== undefined && !selectedSub.forced;
+    if (fileId !== null && spoken && showForced && !fullSubsShowing && !forcedTrack(updated, spoken)) {
+      void (async () => {
+        try {
+          const path = await forcedSubtitle(fileId, target.path, spoken);
+          if (!path) return;
+          // The same file still playing, or the subtitle would land on the next.
+          const playing = (await getProperty('path', 'string')) as string | null;
+          if (!playing || !samePath(playing, target.path)) return;
+          await loadSubtitle(path, spoken, true);
+          const now = await readTracks();
+          setTracks(now);
+          setSid(now.find((t) => t.type === 'sub' && t.selected)?.id ?? null);
+          setSubVisible(true);
+          console.log(`forced ${spoken} subtitles from OpenSubtitles for ${target.path}`);
+        } catch (e) {
+          // Never fatal: the film plays on without them.
+          console.warn('forced subtitles unavailable', e);
+        }
+      })();
     }
-  }, [target.titleId]);
+  }, [target.titleId, target.fileId, target.path]);
+
+  /** The languages "Find subtitles online" can search in, first choice first. */
+  const onlineLanguages = useMemo(
+    () =>
+      searchLanguages(
+        wantedSubLang,
+        spokenTrack(
+          tracks,
+          tracks.find((t) => t.type === 'audio' && t.id === aid) ?? null
+        )?.lang ?? null
+      ),
+    [wantedSubLang, tracks, aid]
+  );
+  const onlineLanguage = onlineLanguages[online.langIndex % Math.max(1, onlineLanguages.length)];
+
+  // Whether this copy can search at all: asked when the panel opens, since a
+  // key can be entered in Settings while Kinema runs.
+  useEffect(() => {
+    if (!showTracks) return;
+    let live = true;
+    subtitleStatus()
+      .then((s) => live && setOnline((o) => ({ ...o, available: s.available })))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [showTracks]);
+
+  /** Put a fetched subtitle on screen and bring the track list up to date. */
+  const showFetched = useCallback(
+    async (path: string, language: string, release?: string) => {
+      await loadSubtitle(path, language, false, release);
+      const now = await readTracks();
+      setTracks(now);
+      setSid(now.find((t) => t.type === 'sub' && t.selected)?.id ?? null);
+      setSubVisible(true);
+    },
+    []
+  );
+
+  // No try/catch here: the React Compiler behind the react-hooks rules cannot
+  // follow a condition (?:, ||, ??) inside a try block, and gives up on the
+  // whole component without a word — every other rule in this file went
+  // quiet (GOTCHAS). The work is in `onlineSearch` / `onlineChoice` below
+  // the component, which return what to show.
+  const findOnline = useCallback(async () => {
+    const fileId = target.fileId;
+    const language = onlineLanguage;
+    if (fileId === null || !language) return;
+    setOnline((o) => ({ ...o, finding: true, message: null, offers: [] }));
+    const shown = await onlineSearch(fileId, target.path, language, showFetched);
+    setOnline((o) => ({ ...o, finding: false, ...shown }));
+  }, [target.fileId, target.path, onlineLanguage, showFetched]);
+
+  const chooseOffer = useCallback(
+    async (offer: Offer) => {
+      const fileId = target.fileId;
+      const language = onlineLanguage;
+      if (fileId === null || !language) return;
+      setOnline((o) => ({ ...o, finding: true, message: null }));
+      const message = await onlineChoice(fileId, offer, language, showFetched);
+      setOnline((o) => ({
+        ...o,
+        finding: false,
+        message,
+        offers: o.offers.filter((x) => x.file_id !== offer.file_id),
+      }));
+    },
+    [target.fileId, onlineLanguage, showFetched]
+  );
 
   /**
    * The only way out of the player, and the only place that gives the desktop
@@ -746,6 +920,8 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     // over would place a credits marker at a time that means nothing here.
     setChapters([]);
     autoHandled.current.clear();
+    // What was found online belongs to the file it was found for.
+    setOnline((o) => ({ ...o, langIndex: 0, finding: false, message: null, offers: [] }));
 
     void (async () => {
       try {
@@ -1750,6 +1926,26 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           sid={sid}
           subVisible={subVisible}
           onChoose={(kind, track) => void chooseTrack(kind, track)}
+          online={
+            online.available && target.fileId !== null && onlineLanguage
+              ? {
+                  language: onlineLanguage,
+                  canChangeLanguage: onlineLanguages.length > 1,
+                  onChangeLanguage: () =>
+                    setOnline((o) => ({
+                      ...o,
+                      langIndex: (o.langIndex + 1) % onlineLanguages.length,
+                      message: null,
+                      offers: [],
+                    })),
+                  onFind: () => void findOnline(),
+                  finding: online.finding,
+                  message: online.message,
+                  offers: online.offers,
+                  onOffer: (offer) => void chooseOffer(offer),
+                }
+              : null
+          }
           onClose={closeTracks}
         />
       )}

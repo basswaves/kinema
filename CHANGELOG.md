@@ -9,6 +9,16 @@ makes no stability promises.
 
 ### Added
 
+- **Subtitles from OpenSubtitles.** "Find subtitles online" in the player's
+  Audio & subtitles panel shows the best match at once — one made for your
+  exact file when there is one — and lists the rest under "Choose another".
+  5 downloads a day without an account, 20 with a free one (Settings →
+  Accounts). Subtitles are kept in Kinema's own folder, never beside your
+  videos, and a subtitle already fetched is used again.
+- **Forced subtitles with subtitles off.** The lines for what is said in
+  another language now show even with subtitles switched off, in the language
+  being spoken, as on a disc — and Kinema can fetch them from OpenSubtitles
+  for files without them (Settings → Playback, off unless you turn it on).
 - **Trakt.** Connect your Trakt account in Settings → Accounts, beside SIMKL —
   a code on screen and a QR code for your phone — and each film and episode you
   finish in Kinema is added to it. What you had already watched in Kinema is

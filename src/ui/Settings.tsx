@@ -28,6 +28,7 @@ import { count, formatBytes } from './format';
 import FocusInput from './FocusInput';
 import BackupSection from './BackupSection';
 import AccountSection, { AccountAppFields } from './AccountSection';
+import { ForcedSubtitleRows, OpenSubtitlesSection } from './SubtitlesSettings';
 import ConfirmButton from './ConfirmButton';
 import EquipmentSection from './EquipmentSection';
 import SoundSection from './SoundSection';
@@ -821,6 +822,7 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
                   }
                 />
                 <LanguageSection onError={setError} />
+                <ForcedSubtitleRows onError={setError} />
                 <ChoiceRow
                   label="Intros and credits"
                   choices={[
@@ -1176,6 +1178,7 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
               <>
                 <AccountSection service="simkl" />
                 <AccountSection service="trakt" />
+                <OpenSubtitlesSection />
               </>
             )}
 

@@ -61,7 +61,12 @@ audio and subtitles, volume. Back steps back to wherever you came from.
   the screen with bigger text.
 - **Speaks your language.** Subtitles in your language when the audio is in
   another, and none when it is not — set once, remembered per show when you
-  change it.
+  change it. Forced subtitles, for the lines in yet another language, show
+  even with subtitles off.
+- **Finds subtitles online** when a file has none in your language: one press
+  in the player takes the best from OpenSubtitles — one made for your exact
+  file when there is one — and the rest are a list away. It can also fetch
+  forced subtitles by itself.
 - **Gets the most out of your equipment.** If your TV or receiver can do better
   than Kinema is set to — Atmos and DTS:X untouched, 24p without judder, HDR —
   Home says so, and one press turns it on.
@@ -154,6 +159,12 @@ each film and episode you finish to your SIMKL account — and, once, everything
 you had already watched in Kinema. It only ever adds: nothing comes back, and
 marking something unwatched in Kinema leaves SIMKL alone. You approve Kinema on
 SIMKL's own page, so Kinema never sees your password.
+
+**OpenSubtitles** needs nothing to start: "Find subtitles online" in the
+player's Audio & subtitles panel allows 5 downloads a day, or 20 with a free
+OpenSubtitles account, signed in under Settings → Accounts. What is found is
+kept in Kinema's own folder, never beside your videos. Settings → Playback can
+also have Kinema fetch forced subtitles by itself for files without them.
 
 **Trakt** works the same way, beside SIMKL in Settings → Accounts, with one
 difference: Trakt keeps every play it is sent, so when you connect Kinema first

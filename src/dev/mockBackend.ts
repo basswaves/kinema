@@ -792,6 +792,9 @@ const accounts = {
   trakt: { connected: false, polls: 0, pending: false, user: 'example-trakt', code: '5055CC52', page: 'https://trakt.tv/activate' },
 };
 
+/** The stand-in OpenSubtitles account: none, and the free allowance. */
+const openSubs: { user: string | null; remaining: number } = { user: null, remaining: 5 };
+
 /** A small checkerboard in place of a QR code; the layout is what is tested. */
 const MOCK_QR =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8"><rect width="8" height="8" fill="#fff"/>' +
@@ -940,6 +943,49 @@ const handlers: Record<string, Handler> = {
   ],
   restore_backup: () => null,
   selftest_plan: () => null,
+
+  // OpenSubtitles (opensubtitles.rs): a stand-in that finds English and
+  // Norwegian subtitles for anything, and nothing forced.
+  opensubtitles_status: () => ({
+    available: true,
+    user: openSubs.user,
+    remaining: openSubs.remaining,
+    reset: null,
+    auto_forced: settings.get('opensubtitles_forced') === 'on',
+  }),
+  opensubtitles_sign_in: (a) => {
+    if (String(a.password) !== 'test') throw new Error('The OpenSubtitles username or password is wrong.');
+    openSubs.user = String(a.username);
+    openSubs.remaining = 20;
+    return null;
+  },
+  opensubtitles_sign_out: () => {
+    openSubs.user = null;
+    openSubs.remaining = 5;
+    return null;
+  },
+  find_subtitles: (a) => {
+    const lang = String(a.language);
+    if (lang !== 'en' && lang !== 'no') return null;
+    openSubs.remaining -= 1;
+    const offers = [1, 2, 3].map((n) => ({
+      file_id: n * 10 + (lang === 'no' ? 1 : 0),
+      language: lang,
+      release: `Example.Release.${n}.1080p.WEB-DL`,
+      downloads: 1000 - n,
+      matches_file: n === 1,
+      hearing_impaired: n === 3,
+      forced: false,
+      translated: false,
+      trusted: n === 1,
+    }));
+    return { path: `C:\\fixture\\subs\\${offers[0].file_id}.srt`, chosen: offers[0], offers };
+  },
+  fetch_subtitle: (a) => {
+    openSubs.remaining -= 1;
+    return `C:\\fixture\\subs\\${String(a.offerFileId)}.srt`;
+  },
+  forced_subtitle: () => null,
 
   // SIMKL and Trakt (simkl.rs, trakt.rs), with the stand-ins above
   ...Object.fromEntries(

@@ -68,14 +68,15 @@ foreach ($dll in $dlls) {
     }
 }
 
-# Kinema's SIMKL and Trakt apps are compiled into the Rust side (simkl.rs,
-# trakt.rs), so cargo has to see them as environment variables. Vite reads the
-# git-ignored .env.local by itself, but cargo does not - so KINEMA_SIMKL_* and
-# KINEMA_TRAKT_* lines there are passed on here. On CI they come from the
+# Kinema's SIMKL, Trakt and OpenSubtitles apps are compiled into the Rust side
+# (simkl.rs, trakt.rs, opensubtitles.rs), so cargo has to see them as environment variables. Vite reads the
+# git-ignored .env.local by itself, but cargo does not - so those KINEMA_* lines
+# there are passed on here. On CI they come from the
 # repository secrets instead (release.yml), and anything already set in the
 # environment wins.
 $envLocal = Join-Path $root '.env.local'
-$appVars = @('KINEMA_SIMKL_CLIENT_ID', 'KINEMA_TRAKT_CLIENT_ID', 'KINEMA_TRAKT_CLIENT_SECRET')
+$appVars = @('KINEMA_SIMKL_CLIENT_ID', 'KINEMA_TRAKT_CLIENT_ID', 'KINEMA_TRAKT_CLIENT_SECRET',
+    'KINEMA_OPENSUBTITLES_API_KEY')
 if (Test-Path $envLocal) {
     foreach ($line in Get-Content $envLocal) {
         foreach ($name in $appVars) {
@@ -90,6 +91,9 @@ if (-not $env:KINEMA_SIMKL_CLIENT_ID) {
 }
 if (-not ($env:KINEMA_TRAKT_CLIENT_ID -and $env:KINEMA_TRAKT_CLIENT_SECRET)) {
     Write-Host 'No KINEMA_TRAKT_CLIENT_ID and _SECRET: this build will have no Trakt.'
+}
+if (-not $env:KINEMA_OPENSUBTITLES_API_KEY) {
+    Write-Host 'No KINEMA_OPENSUBTITLES_API_KEY: this build will have no OpenSubtitles.'
 }
 
 Write-Host 'Building release binary (this takes a few minutes the first time)...'

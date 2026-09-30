@@ -127,6 +127,7 @@ export function command(name: string, args: unknown[]): null {
   state.commands.push({ name, args });
   switch (name) {
     case 'loadfile':
+      added.length = 0;
       loadfile(args);
       break;
     case 'seek': {
@@ -137,6 +138,15 @@ export function command(name: string, args: unknown[]): null {
     case 'set': {
       const [property, value] = args as [string, unknown];
       setProperty(property, value);
+      break;
+    }
+    case 'sub-add': {
+      // A subtitle file loaded from outside the video, as OpenSubtitles'
+      // are: a new track, selected when asked to be.
+      const [, flags, title, lang] = args as [string, string?, string?, string?];
+      const id = Math.max(0, ...tracks().filter((t) => t.type === 'sub').map((t) => t.id)) + 1;
+      added.push({ type: 'sub', id, lang: lang ?? null, codec: 'subrip', title: title ?? null, external: true });
+      if (flags === 'select') selectedTrack.sid = id;
       break;
     }
     case 'stop':
@@ -167,10 +177,17 @@ const TRACKS = [
 
 const selectedTrack = { aid: 1, sid: 1 };
 
+/** Subtitles added with `sub-add` while a file is open; gone with the file. */
+const added: Record<string, unknown>[] = [];
+
+function tracks(): { type: string; id: number }[] {
+  return [...TRACKS, ...added] as { type: string; id: number }[];
+}
+
 function trackField(name: string): unknown {
   const match = /^track-list\/(\d+)\/(.+)$/.exec(name);
   if (!match) return undefined;
-  const track = TRACKS[Number(match[1])] as Record<string, unknown> | undefined;
+  const track = tracks()[Number(match[1])] as Record<string, unknown> | undefined;
   if (!track) throw new Error(`property unavailable: ${name}`);
   switch (match[2]) {
     case 'selected':
@@ -235,7 +252,7 @@ export function getProperty(name: string): unknown {
     case 'current-ao':
       return state.path === null ? null : 'wasapi';
     case 'track-list/count':
-      return state.path === null ? 0 : TRACKS.length;
+      return state.path === null ? 0 : tracks().length;
     case 'chapters':
       return 0;
     default: {

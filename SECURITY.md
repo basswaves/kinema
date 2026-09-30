@@ -14,14 +14,22 @@ Worth stating up front, because it is unusually small:
   it and asks the service to end the sign-in.
 - **Outbound requests only, to seven services for metadata** — TMDB, TVmaze,
   OMDb, Wikidata (with Wikipedia), TheIntroDB, IntroDB and IMDb's ratings
-  file — **and
-  one to GitHub** per launch, asking for the latest
+  file — **one to GitHub** per launch, asking for the latest
   release's version number (`src-tauri/src/updates.rs`; Settings → Advanced
-  turns it off). No program is downloaded; the one file is IMDb's public
+  turns it off), **and three only when you use them**: SIMKL and Trakt once
+  connected, and OpenSubtitles when you ask for subtitles or switch on forced
+  subtitles. No program is downloaded; the files fetched are IMDb's public
   ratings table, fetched weekly at most, read as it arrives, and not kept
-  (`src-tauri/src/imdb.rs`). The frontend's list is enforced in
-  `src-tauri/capabilities/default.json` for the HTTP plugin; the four made
-  from Rust are TheIntroDB, IntroDB, IMDb and GitHub.
+  (`src-tauri/src/imdb.rs`), and subtitle text from OpenSubtitles. The
+  frontend's list is enforced in `src-tauri/capabilities/default.json` for the
+  HTTP plugin; the ones made from Rust are TheIntroDB, IntroDB, IMDb, GitHub,
+  SIMKL, Trakt and OpenSubtitles.
+- **One password is kept, if you give it: OpenSubtitles'.** OpenSubtitles
+  has no way to approve an app from a phone, and its sign-in lasts a day, so
+  to sign in again Kinema keeps the password — on Windows encrypted with
+  DPAPI to your Windows user, so only you on that PC can read it back, even
+  from Kinema's safety copies. It is sent only to OpenSubtitles
+  (`src-tauri/src/opensubtitles.rs`). Without an account, nothing is kept.
 - **Your API keys stay local.** TMDB and OMDb keys you enter are stored in
   the SQLite database in your app data folder, and sent only to the service they
   belong to. So are SIMKL's and Trakt's sign-ins, when you connect them: the
@@ -40,7 +48,8 @@ launched with user-editable argument templates), the XML parsing in
 `src-tauri/src/nfo.rs`, and the HTTP clients in `src/metadata/providers.ts`,
 `src-tauri/src/introdb.rs`, `src-tauri/src/introdb_app.rs` and
 `src-tauri/src/simkl.rs` and `src-tauri/src/trakt.rs` (which hold a user's
-tokens).
+tokens), and `src-tauri/src/opensubtitles.rs` (which keeps a password and
+reads the first and last 64 KiB of a video to match subtitles to it).
 
 ## Reporting a vulnerability
 

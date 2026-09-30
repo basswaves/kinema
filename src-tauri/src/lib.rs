@@ -18,6 +18,7 @@ mod lifecycle;
 mod metadata;
 mod nfo;
 mod omdb;
+mod opensubtitles;
 mod playback;
 mod power;
 mod probe;
@@ -276,6 +277,12 @@ pub fn run() {
             trakt::trakt_poll_connect,
             trakt::trakt_cancel_connect,
             trakt::trakt_disconnect,
+            opensubtitles::opensubtitles_status,
+            opensubtitles::opensubtitles_sign_in,
+            opensubtitles::opensubtitles_sign_out,
+            opensubtitles::find_subtitles,
+            opensubtitles::fetch_subtitle,
+            opensubtitles::forced_subtitle,
             backup::list_backups,
             backup::restore_backup,
             selftest::selftest_plan,

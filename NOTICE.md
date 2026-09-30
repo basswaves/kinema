@@ -165,6 +165,15 @@ under SIMKL's [terms](https://simkl.com/about/policies/terms/) and API rules.
 Nothing is read back and no SIMKL data is shown, beyond the account's name in
 Settings. Released builds carry Kinema's own SIMKL app ID, added at build time.
 
+### OpenSubtitles
+
+Subtitles from [OpenSubtitles.com](https://www.opensubtitles.com), through its
+REST API with Kinema's own app key, only when asked for in the player or when
+the user has switched on fetching forced subtitles. A file is identified to it
+by its title's ids and OpenSubtitles' file hash (the size and the first and
+last 64 KiB). What is fetched is stored in Kinema's app data. Attribution is
+shown in Settings.
+
 ### Trakt
 
 Only when a user connects their own [Trakt](https://trakt.tv) account: the

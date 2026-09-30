@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use std::path::Path;
 
 /// The schema this build understands. Bump it with every new `SCHEMA_V*`.
-pub const SCHEMA_VERSION: i64 = 21;
+pub const SCHEMA_VERSION: i64 = 22;
 
 /// What can go wrong opening the library.
 ///
@@ -666,6 +666,26 @@ SELECT 'simkl', key, kind, imdb_id, tmdb_id, season, episode, watched_at, queued
 DROP TABLE simkl_outbox;
 "#;
 
+/// Schema version 22: subtitles fetched from OpenSubtitles (`opensubtitles.rs`).
+///
+/// One row per subtitle fetched for a file, so a rewatch uses no download,
+/// and one row with no `path` when an automatic search for forced subtitles
+/// found none — believed for a month, so a file without them is not searched
+/// for at every play. The files themselves are in app data, never beside the
+/// video; a row whose file has gone is simply not offered.
+const SCHEMA_V22: &str = r#"
+CREATE TABLE subtitle_files (
+    id             INTEGER PRIMARY KEY,
+    media_file_id  INTEGER NOT NULL REFERENCES media_files(id) ON DELETE CASCADE,
+    language       TEXT    NOT NULL,
+    forced         INTEGER NOT NULL,
+    os_file_id     INTEGER,
+    path           TEXT,
+    fetched_at     INTEGER NOT NULL
+);
+CREATE INDEX idx_subtitle_files ON subtitle_files(media_file_id, language, forced);
+"#;
+
 /// How long a statement waits for the write lock before giving up.
 ///
 /// Load-bearing from the moment there is more than one connection. SQLite
@@ -858,7 +878,7 @@ pub(crate) const MIGRATIONS: [&str; SCHEMA_VERSION as usize] = [
     SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6, SCHEMA_V7, SCHEMA_V8,
     SCHEMA_V9, SCHEMA_V10, SCHEMA_V11, SCHEMA_V12, SCHEMA_V13, SCHEMA_V14,
     SCHEMA_V15, SCHEMA_V16, SCHEMA_V17, SCHEMA_V18, SCHEMA_V19,
-    SCHEMA_V20, SCHEMA_V21,
+    SCHEMA_V20, SCHEMA_V21, SCHEMA_V22,
 ];
 
 /// Bring the database up to [`SCHEMA_VERSION`].

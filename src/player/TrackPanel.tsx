@@ -4,6 +4,31 @@
 import { FocusContext, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import FocusButton from '../ui/FocusButton';
 import { describeTrack, type MpvTrack } from './tracks';
+import { languageName } from './language';
+import { describeOffer, type Offer } from './onlineSubtitles';
+
+/**
+ * "Find subtitles online" — present only when this copy of Kinema has an
+ * OpenSubtitles key and the file is in the library. The player does the
+ * work; this only shows it.
+ */
+export interface OnlineSubtitles {
+  /** The language to search in, two letters. */
+  language: string;
+  /** More than one language to choose from: show the switch. */
+  canChangeLanguage: boolean;
+  onChangeLanguage: () => void;
+  onFind: () => void;
+  finding: boolean;
+  /** What happened last, in a sentence. */
+  message: string | null;
+  /** The rest of what was found, for "Choose another". */
+  offers: Offer[];
+  onOffer: (offer: Offer) => void;
+}
+
+/** How many of the others to list; a remote scrolls a short list. */
+const MAX_OFFERS = 8;
 
 /** Focus is aimed at the panel the moment it opens — see Player. */
 export const TRACK_PANEL_KEY = 'player-track-panel';
@@ -30,6 +55,7 @@ export default function TrackPanel({
   subVisible,
   onChoose,
   onClose,
+  online,
 }: {
   audioTracks: MpvTrack[];
   subTracks: MpvTrack[];
@@ -38,6 +64,7 @@ export default function TrackPanel({
   subVisible: boolean;
   onChoose: (kind: 'sid' | 'aid', track: MpvTrack | null) => void;
   onClose: () => void;
+  online?: OnlineSubtitles | null;
 }) {
   const { ref, focusKey } = useFocusable({
     focusKey: TRACK_PANEL_KEY,
@@ -84,6 +111,48 @@ export default function TrackPanel({
             {describeTrack(track)}
           </FocusButton>
         ))}
+        {online && (
+          <>
+            <FocusButton
+              className="track-option track-online"
+              keepInView="nearest"
+              disabled={online.finding}
+              onSelect={online.onFind}
+            >
+              {online.finding
+                ? 'Looking on OpenSubtitles…'
+                : `Find ${languageName(online.language) ?? online.language} subtitles online`}
+            </FocusButton>
+            {online.canChangeLanguage && !online.finding && (
+              <FocusButton
+                className="track-option"
+                keepInView="nearest"
+                onSelect={online.onChangeLanguage}
+              >
+                Another language ›
+              </FocusButton>
+            )}
+            {online.message && <p className="track-note">{online.message}</p>}
+            {online.offers.length > 0 && (
+              <>
+                <div className="track-panel-head">
+                  <span>Choose another</span>
+                </div>
+                {online.offers.slice(0, MAX_OFFERS).map((offer) => (
+                  <FocusButton
+                    key={offer.file_id}
+                    className="track-option track-offer"
+                    keepInView="nearest"
+                    disabled={online.finding}
+                    onSelect={() => online.onOffer(offer)}
+                  >
+                    {describeOffer(offer)}
+                  </FocusButton>
+                ))}
+              </>
+            )}
+          </>
+        )}
         <p className="track-note">Remembered for this show.</p>
       </aside>
     </FocusContext.Provider>

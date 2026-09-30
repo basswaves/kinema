@@ -28,6 +28,7 @@ import { readTracks } from './player/tracks';
 import { readChapters } from './player/chapters';
 import { setTvMode } from './ui/tv';
 import { simklStatus, traktStatus } from './metadata/tracking';
+import { findSubtitles } from './player/onlineSubtitles';
 import { measurePictures, probeLibrary, refreshImdbRatings, scanLibrary } from './library/api';
 import { fileFacts } from './ui/badges';
 import { seasonFacts } from './ui/seasonBadges';
@@ -75,6 +76,8 @@ const CALLABLE: Record<string, (...args: never[]) => Promise<unknown>> = {
   // be "not available": a self-test never talks to either.
   simklStatus,
   traktStatus,
+  // OpenSubtitles end to end on the copy: search, download, the file on disk.
+  findSubtitles,
   cacheArtwork,
   upgradeWikidataFilms,
   // The scan's reading of files for the detail page's badges, on its own.

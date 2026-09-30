@@ -77,6 +77,11 @@ src-tauri/src/
                  can fail a scan; a missing tool is a sentence in the report.
                  Nothing is bundled; the command lines and both tool paths are
                  settings
+  opensubtitles.rs  Subtitles from OpenSubtitles: search by the title's ids
+                 and the file hash, ranked (timed for this file, made by a
+                 person, a release like this file's), downloaded into app data;
+                 forced subtitles fetched by themselves when switched on; the
+                 optional account, its password kept with DPAPI on Windows
   trailer.rs     Finds local trailer files by Jellyfin/Kodi convention; the
                  scanner shares its test so trailers never become titles
   settings.rs    Key/value settings (API keys) + the frontend log bridge
@@ -366,6 +371,20 @@ never happened. At connect, Kinema reads the account's watched films and
 episodes and queues only the rest; if the account cannot be read, the history
 waits rather than going blind. Its refresh tokens are single-use, so a new pair
 is stored the moment it arrives.
+
+**Forced subtitles are not "subtitles on."** Subtitles off means no full
+subtitles; it has never meant missing what is said in another language. So a
+forced track in the language being spoken shows whenever full subtitles do
+not, as on a disc, and when the file has none Kinema can fetch one from
+OpenSubtitles — the one thing it fetches by itself, off by default, each file
+asked about once.
+
+**Subtitles from the internet are a press away, never a guess made for you.**
+"Find subtitles online" takes the best and offers the rest. Best is, in order:
+timed for this exact file (OpenSubtitles' hash of the first and last 64 KiB),
+made by a person, from a release named like this file, from a trusted
+uploader, the most downloaded. What is fetched lives in app data; the media
+folders are still only read.
 
 **There is one notion of "watched."** Marking an episode by hand writes the same
 `completed` flag that playback sets at 94%, not a column beside it. Two of them

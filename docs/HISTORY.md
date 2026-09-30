@@ -2063,6 +2063,34 @@ The comparison now reads every page of films and asks each show for its
 progress; run read-only against the same account it finds all 80 and would
 send none. See GOTCHAS.
 
+## Subtitles from OpenSubtitles, and forced subtitles with subtitles off
+
+The owner wanted it before the next release, and added the part that mattered
+most to them: they watch with subtitles off, and still need the lines in
+another language. Planning found Kinema did not even show a forced track the
+file already had once subtitles were off — "off" returned no track at all. Now
+a forced track in the language being spoken shows whenever full subtitles do
+not (a switch turns it off), and OpenSubtitles can supply one for a file
+without (`foreign_parts_only=only`), off by default.
+
+Otherwise it is only when asked: "Find subtitles online" takes the best and
+offers the rest. The first real search showed why the ranking has a step for
+likeness to the file's own name: a trusted uploader's season pack for another
+source outranked one named for exactly this kind of file, and subtitles from
+the same kind of release are the ones likely to be in step.
+
+The account is optional (5 downloads a day without, 20 with). A sign-in lasts
+about a day and OpenSubtitles has no phone approval, so the password is kept to
+sign in again. The owner asked for the way others do it and nothing that makes
+the ports harder: Kodi and Jellyfin keep it in their settings; Kinema does the
+same on other platforms and, on Windows, encrypts it with DPAPI first, which
+needs no new dependency and keeps it unreadable in the safety copies.
+
+Two traps on the way, both silent (GOTCHAS): OpenSubtitles redirects any
+request carrying a value equal to its default; and a condition inside a `try`
+in the player made the React Compiler give up on the whole component, which
+switched every react-hooks rule in that file off without an error.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

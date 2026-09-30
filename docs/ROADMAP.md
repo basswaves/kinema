@@ -95,6 +95,10 @@ there is.
 - **Credits times from TheIntroDB** during real playback, and **chapters named
   for the credits** in a real file. Both paths are built; neither has met a
   file that has them.
+- **Subtitles from OpenSubtitles on more files**, and forced subtitles found
+  online. Search, ranking and download have been run against the real service
+  on one episode; whether the ranking picks subtitles in step with a file,
+  across many releases, is the question a report answers.
 - **Trakt with a real account.** Connecting, comparing the history with what
   the account has, and later finishes are built and tested against a stand-in
   and Trakt's documented answers. SIMKL has been used for real.

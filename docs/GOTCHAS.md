@@ -548,6 +548,18 @@ Every entry below is invisible with a mouse. Hovering re-establishes focus and
 clicking reaches anything, so the UI tests perfectly on a desk and is unusable
 from a sofa. **Test D-pad changes with the mouse physically untouched.**
 
+### A condition inside `try` switches the react-hooks rules off for the whole component
+
+The react-hooks rules run on the React Compiler, which cannot yet lower a
+condition — `?:`, `||`, `??`, `?.` — inside a `try` block. It does not report
+that; it skips the component. Every rule in the file goes quiet at once, and
+the only trace is a crop of "unused eslint-disable directive" warnings where
+disables that used to be needed no longer are. Found when adding "Find
+subtitles online" to the player. **Do:** keep `try` out of components and
+hooks — put the awaited work in a function outside that returns what to show
+(`onlineSearch`, `readSubVisibility` in Player.tsx) — and treat a sudden batch
+of unused-disable warnings as the compiler bailing out, not as tidying to do.
+
 ### A focus key that changes is never registered
 
 `useFocusable` registers a control with the spatial library **once**, when it
@@ -1095,6 +1107,24 @@ before refreshing; a self-test never talks to SIMKL.
 
 A typo in `scope` gets a working token that fails at the first write. **Do:**
 check the granted `scope` for `media:write` before storing a token.
+
+## OpenSubtitles
+
+### A value equal to the default is answered with a redirect
+
+`machine_translated=exclude` is OpenSubtitles' default, and sending it gets a
+301 to the same address without it — a second round trip per search, and
+redirects are where headers go missing. The same goes for names out of
+alphabetical order and upper-case values. **Do:** send only what differs from
+the default, names sorted, values in lower case (`query` in opensubtitles.rs).
+
+### A sign-in lasts about a day
+
+The JWT from `/login` expires in roughly 24 hours; OpenSubtitles' own Kodi
+add-on renews it after 20. There is no refresh token and no device approval,
+so renewing means the password. Kinema keeps it (DPAPI on Windows) and, when
+signing in again fails, carries on with the free allowance rather than
+failing the download.
 
 ## Trakt
 

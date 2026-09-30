@@ -222,6 +222,11 @@ reasoning is in [docs/DESIGN.md](docs/DESIGN.md) and [docs/HISTORY.md](docs/HIST
   live "Watching now". Both sign in with a device flow (a code and a phone).
   Trakt keeps duplicate plays, so what it already has is never sent to it
   again.
+- **Subtitles from OpenSubtitles only when asked**, with one exception the
+  user switches on: forced subtitles for a file that has none. Kept in app
+  data, never beside the video; each file asked about once.
+- **Forced subtitles show with subtitles off**, in the language being spoken,
+  as on a disc. A switch turns this off.
 - **No third-party binaries in the repo or the bundle.** The app may *invoke* a
   tool the user installed themselves, at a path they chose. It ships nothing,
   downloads nothing, and depends on nothing being present.

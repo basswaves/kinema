@@ -68,6 +68,8 @@ jobs:
           # anyone holding the app. Optional, as SIMKL's is.
           KINEMA_TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
           KINEMA_TRAKT_CLIENT_SECRET: ${{ secrets.TRAKT_CLIENT_SECRET }}
+          # Kinema's OpenSubtitles app key (opensubtitles.rs). Optional too.
+          KINEMA_OPENSUBTITLES_API_KEY: ${{ secrets.OPENSUBTITLES_API_KEY }}
         run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-app.ps1 -NoShortcut
 
       - name: Package

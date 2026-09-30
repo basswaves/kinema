@@ -17,6 +17,8 @@ import { useSyncExternalStore } from 'react';
 export interface Capabilities {
   system: string;
   engine: string;
+  /** mpv's `gpu-api` and `hwdec` for this system (see capabilities.rs). */
+  mpv_video: { gpu_api: string; hwdec: string };
   equipment_detection: boolean;
   display_switching: boolean;
   sleep: boolean;
@@ -46,6 +48,11 @@ export function loadCapabilities(): Promise<void> {
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
+}
+
+/** The answer as it stands, for code outside React; null until it arrives. */
+export function capabilitiesNow(): Capabilities | null {
+  return current;
 }
 
 /** The answer, or null until it has arrived. */

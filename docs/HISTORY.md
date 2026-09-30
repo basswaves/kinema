@@ -2150,6 +2150,12 @@ Then three seams, each so that a port changes one place rather than many:
   & sound says in one sentence why it is empty — rather than offering
   controls that would do nothing, or fail.
 - **Windows code in its own files** (`equipment/win.rs`, `display/win.rs`).
+- **mpv's graphics interface comes from Rust.** `gpu-api=d3d11` and
+  `hwdec=d3d11va` abort mpv's start anywhere but Windows, so they now arrive
+  with the capabilities: unchanged on Windows, mpv's own choice elsewhere.
+  The on-screen sentences that name Windows ("Windows cannot send a Dolby
+  Vision signal") are left for when Linux's own behaviour is known — "Linux"
+  pasted in would make claims nobody has checked.
 
 ## Open items
 

@@ -18,6 +18,8 @@ pub struct Capabilities {
     pub system: &'static str,
     /// Which player engine plays the films.
     pub engine: &'static str,
+    /// How mpv reaches the graphics card on this system.
+    pub mpv_video: MpvVideo,
     /// Screens and audio outputs can be examined (Settings → Equipment).
     pub equipment_detection: bool,
     /// The screen's refresh rate, resolution and HDR can be switched.
@@ -26,10 +28,32 @@ pub struct Capabilities {
     pub shut_down: bool,
 }
 
+/// mpv's `gpu-api` and `hwdec`, which name the system's own graphics
+/// interface and so cannot be the same everywhere. Both abort mpv's start if
+/// refused, so each system gets only what it has.
+#[derive(Serialize, Debug, Clone, PartialEq, Eq)]
+pub struct MpvVideo {
+    pub gpu_api: &'static str,
+    pub hwdec: &'static str,
+}
+
+/// On Windows, d3d11 and d3d11va: the vendor-neutral path, the same on
+/// NVIDIA, AMD and Intel (docs/DESIGN.md). Elsewhere mpv chooses for itself —
+/// Vulkan or OpenGL, and only the hardware decoders it knows to be safe —
+/// until a port has a reason to name one.
+fn mpv_video() -> MpvVideo {
+    if cfg!(windows) {
+        MpvVideo { gpu_api: "d3d11", hwdec: "d3d11va" }
+    } else {
+        MpvVideo { gpu_api: "auto", hwdec: "auto-safe" }
+    }
+}
+
 pub fn current() -> Capabilities {
     Capabilities {
         system: system_name(),
         engine: "mpv",
+        mpv_video: mpv_video(),
         equipment_detection: crate::equipment::DETECTS,
         display_switching: crate::display::SWITCHES,
         sleep: crate::power::CAN_SLEEP,
@@ -64,6 +88,8 @@ mod tests {
         let c = current();
         assert_eq!(c.system, "Windows");
         assert!(c.equipment_detection && c.display_switching && c.sleep && c.shut_down);
+        // The rendering path the whole of docs/DESIGN.md is written about.
+        assert_eq!(c.mpv_video, MpvVideo { gpu_api: "d3d11", hwdec: "d3d11va" });
     }
 
     /// Elsewhere, nothing is claimed that has no implementation behind it.

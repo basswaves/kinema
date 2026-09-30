@@ -29,6 +29,7 @@ import {
 } from 'tauri-plugin-libmpv-api';
 import { BASE_MPV_OPTIONS, IDLE_SURFACE_OPTIONS, TONE_MAPPING_OPTIONS } from './mpvOptions';
 import { logPaths } from '../metadata/api';
+import { capabilitiesNow, loadCapabilities } from '../capabilities';
 
 // ---- starting mpv ------------------------------------------------------------
 //
@@ -52,12 +53,19 @@ import { logPaths } from '../metadata/api';
  * load-bearing: a later rejected option must still be logged.
  */
 async function initialOptions(): Promise<MpvConfig['initialOptions']> {
+  // The graphics interface this system has (capabilities.rs). Without an
+  // answer mpv chooses for itself, which is safe everywhere.
+  await loadCapabilities();
+  const video = capabilitiesNow()?.mpv_video;
+  const graphics: Record<string, string> = video
+    ? { 'gpu-api': video.gpu_api, hwdec: video.hwdec }
+    : {};
   try {
     const { mpv_log } = await logPaths();
-    return { ...BASE_MPV_OPTIONS, 'log-file': mpv_log };
+    return { ...BASE_MPV_OPTIONS, 'log-file': mpv_log, ...graphics };
   } catch (e) {
     console.warn('mpv: could not resolve the log folder, logging beside the exe', e);
-    return BASE_MPV_OPTIONS;
+    return { ...BASE_MPV_OPTIONS, ...graphics };
   }
 }
 

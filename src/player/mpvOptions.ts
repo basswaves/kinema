@@ -32,11 +32,11 @@ export const BASE_MPV_OPTIONS: Record<string, string | boolean | number> = {
   'msg-level': 'all=v',
 
   // ---- Rendering path ---------------------------------------------------
-  // gpu-next is the modern renderer (libplacebo). d3d11 + d3d11va is the
-  // vendor-neutral Windows path: NVIDIA, AMD and Intel all use it.
+  // gpu-next is the modern renderer (libplacebo). `gpu-api` and `hwdec` name
+  // the system's own graphics interface, so they come from Rust with the
+  // capabilities (capabilities.rs) and are added by `engine.ts`: on Windows
+  // d3d11 + d3d11va, the vendor-neutral path NVIDIA, AMD and Intel all use.
   vo: 'gpu-next',
-  'gpu-api': 'd3d11',
-  hwdec: 'd3d11va',
 
   // ---- Scaling: classical resampling only -------------------------------
   // spline36 upscales neutrally — no sharpening halo, low ringing, and much

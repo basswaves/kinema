@@ -60,6 +60,9 @@ async function initialOptions(): Promise<MpvConfig['initialOptions']> {
   const graphics: Record<string, string> = video
     ? { 'gpu-api': video.gpu_api, hwdec: video.hwdec }
     : {};
+  // A window of its own (capabilities.rs, `own_window`): full screen, and
+  // only while something plays — no idle surface waiting over the library.
+  if (video?.own_window) Object.assign(graphics, { 'force-window': 'no', fs: 'yes' });
   try {
     const { mpv_log } = await logPaths();
     return { ...BASE_MPV_OPTIONS, 'log-file': mpv_log, ...graphics };

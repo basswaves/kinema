@@ -18,7 +18,7 @@ export interface Capabilities {
   system: string;
   engine: string;
   /** mpv's `gpu-api` and `hwdec` for this system (see capabilities.rs). */
-  mpv_video: { gpu_api: string; hwdec: string };
+  mpv_video: { gpu_api: string; hwdec: string; own_window: boolean };
   equipment_detection: boolean;
   display_switching: boolean;
   sleep: boolean;

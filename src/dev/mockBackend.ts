@@ -902,8 +902,8 @@ const handlers: Record<string, Handler> = {
       system: full ? 'Windows' : 'Linux',
       engine: 'mpv',
       mpv_video: full
-        ? { gpu_api: 'd3d11', hwdec: 'd3d11va' }
-        : { gpu_api: 'auto', hwdec: 'auto-safe' },
+        ? { gpu_api: 'd3d11', hwdec: 'd3d11va', own_window: false }
+        : { gpu_api: 'auto', hwdec: 'auto-safe', own_window: true },
       equipment_detection: full,
       display_switching: full,
       sleep: full,

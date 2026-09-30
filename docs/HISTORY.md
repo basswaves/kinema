@@ -2157,6 +2157,41 @@ Then three seams, each so that a port changes one place rather than many:
   Vision signal") are left for when Linux's own behaviour is known — "Linux"
   pasted in would make claims nobody has checked.
 
+## The Linux player
+
+On Windows mpv draws into Kinema's window, beneath the transparent page. On
+Linux that cannot be done: Wayland has no `--wid`, and under X11 mpv draws
+*over* its parent and gives up HDR. What other players do was looked at
+first: drawing through mpv's render API (Jellyfin Media Player, Plex HTPC,
+Celluloid) uses mpv's older renderer and has no HDR; newer clients draw
+their interface inside mpv; making mpv's window a sub-surface of the app's
+needs a Wayland go-between of one's own and an mpv option not yet released.
+Nothing quick.
+
+**Two windows** — mpv full screen, Kinema's transparent window above it with
+the controls — was tried first, with a stand-in, in real KDE (KWin 5.27) and
+GNOME (Shell 46) nested inside WSL. It does not work, and cannot: when mpv's
+window appears it takes the keyboard and the top, and a program asking for
+its own window back is refused (KDE) or turned into a "…is ready"
+notification (GNOME). That is Wayland's rule against focus stealing, not a
+bug to work around.
+
+**The controls drawn inside mpv** is what Kinema does. mpv plays in a
+full-screen window of its own, open only while something plays
+(`own_window`). The remote's keys reach mpv's window; mpv binds each key
+Kinema uses and Kinema presses it on its page, so every key handler is the
+Windows one. The page is photographed ten times a second and mpv draws the
+photo over the video, so the controls are the Windows ones too — one copy of
+each, as the porting rules want. HDR stays mpv's, in its own window.
+
+Four things had to be found on the way, each silent: the libmpv wrapper
+crashes on a client message (keys therefore come through an observed
+property); `user-data` values come back as JSON; a covered WebKitGTK window
+stops producing snapshots unless it avoids the DMA-BUF renderer; and a
+Kinema that quit with mpv still running crashed in mpv's video thread. All
+four are in GOTCHAS. `scripts/nested-selftest.sh` checks the whole of it
+inside KDE and GNOME with real key presses.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

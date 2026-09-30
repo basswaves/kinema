@@ -68,8 +68,9 @@ reasons in full.
 ## Other platforms
 
 **Linux is under way**, then **Android**. Linux builds and passes its tests on
-every push; next is playing video there, with HDR, then packaging, then the
-equipment check, passthrough and screen switching. Android comes after, with
+every push, and plays with Kinema's own controls in development; next is a
+package with a recent mpv (for HDR on Wayland), then the equipment check,
+passthrough and screen switching. Android comes after, with
 its own player engine (Media3) for Dolby Vision and passthrough on TV boxes.
 macOS is not planned by the author; a port is welcome. See
 [Platform support](../README.md#platform-support).

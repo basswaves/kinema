@@ -186,8 +186,8 @@ pub fn movie_hash(path: &Path) -> Option<String> {
     for offset in [0, size - CHUNK] {
         file.seek(SeekFrom::Start(offset)).ok()?;
         file.read_exact(&mut buffer).ok()?;
-        for word in buffer.chunks_exact(8) {
-            sum = sum.wrapping_add(u64::from_le_bytes(word.try_into().ok()?));
+        for word in buffer.as_chunks::<8>().0 {
+            sum = sum.wrapping_add(u64::from_le_bytes(*word));
         }
     }
     Some(format!("{sum:016x}"))

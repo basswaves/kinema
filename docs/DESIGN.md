@@ -155,6 +155,30 @@ Each stage is independently re-runnable. Re-parsing never re-reads the filesyste
 re-matching never re-parses. This matters when iterating on rules against a library on
 a NAS.
 
+### Platforms
+
+Windows is what ships; the code is being arranged so that other systems are
+additions beside it, not branches through it. Three seams:
+
+```
+capabilities.rs  What this build can do where it runs — examine equipment,
+                 switch the screen, sleep, shut down, mpv's graphics
+                 interface — each answer stated by the module that does the
+                 work (equipment::DETECTS, display::SWITCHES, power::CAN_*).
+capabilities.ts  Asked once at startup; the interface shows or hides by the
+                 answers, never by the system's name, which is for wording
+                 only. Leave and Picture & sound are the two screens that
+                 depend on it today
+equipment/win.rs, display/win.rs
+                 The Windows halves. A Linux half goes beside each as its own
+                 file; shared rules and commands stay in equipment.rs and
+                 display.rs
+player/engine.ts The only file that talks to mpv (see player/ above)
+```
+
+CI builds and tests every push on Windows and on Linux for x86 and ARM, and
+runs the keyboard tests (`e2e/`) in WebKit, the engine of Linux's window.
+
 ## Key decisions
 
 **No quality selector, ever.** The correct rendering settings don't depend on taste —

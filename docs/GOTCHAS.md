@@ -1543,3 +1543,13 @@ set in `run()` on Linux, keeps them coming (1–2 ms each).
 Before that it has exactly nine arguments, and eleven are refused ("has only
 9 arguments"). `overlay.ts` tries with `dw`/`dh` and falls back once; the
 unscaled page then only lines up when Kinema's window is the screen's size.
+
+### Quitting with mpv still running crashes on Linux
+
+The plugin shuts mpv down only when a window's close button is pressed.
+Kinema also quits by itself — Leave → Close, sleep, shut down, the end of a
+self-test — through `app.exit`, and mpv was left running. On Linux the
+graphics library then unloads its driver while mpv's video thread is still
+drawing with it: a segfault in the `vo` thread during `exit()`, after
+everything else had worked (seen in a nested KWin under gdb; WSLg happened
+to survive it). `RunEvent::Exit` now destroys mpv first, on every system.

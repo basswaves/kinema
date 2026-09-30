@@ -375,6 +375,17 @@ pub fn run() {
             // Skiptro started by the scan goes on scanning after the window
             // has closed, where nobody can see it or stop it.
             if let tauri::RunEvent::Exit = event {
+                // mpv is shut down before the process ends. The plugin does
+                // that only when a window's close button is used; Leave, the
+                // power actions and a self-test all end with `app.exit`, and
+                // left mpv's video thread drawing while the graphics driver
+                // was unloaded under it — a crash on every such exit on Linux.
+                {
+                    use tauri_plugin_libmpv::MpvExt;
+                    if let Err(e) = app.mpv().destroy("main") {
+                        log!("mpv: could not shut down on exit: {e}");
+                    }
+                }
                 app.state::<jobs::Jobs>().stop_detection();
                 // The screen goes back to the desktop's own mode however the
                 // app is closed; a crash is caught at the next launch instead.

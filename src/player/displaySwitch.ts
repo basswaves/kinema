@@ -33,8 +33,14 @@ export const SWITCH_HDR_KEY = 'display_switch_hdr';
  * into a blank screen has lost its first moment.
  */
 const SETTLE_MS = 2000;
-/** The longest to wait for the first frame's video parameters. */
-const PARAMS_WAIT_MS = 5000;
+/**
+ * The longest to wait for the first frame's video parameters. The film is
+ * held paused for the switch meanwhile, so waiting costs only a later start;
+ * giving up costs the switch. 5 s was too short: a test machine whose mpv
+ * first tried a graphics decoder for a card no longer in it took 5.05 s to its
+ * first frame, and the film played in the wrong mode with nothing said.
+ */
+const PARAMS_WAIT_MS = 15000;
 
 const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 

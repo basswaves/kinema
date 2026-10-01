@@ -309,7 +309,11 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
    */
   const matchScreen = useCallback(async () => {
     const film = await filmNow().catch(() => null);
-    if (!film) return;
+    if (!film) {
+      // Said, because the film then plays in whatever mode the screen is in.
+      console.warn('display: the first frame did not arrive in time; the screen is left as it is');
+      return;
+    }
     setNotice('Matching the screen to the video…');
     try {
       if (await switchForFilm(film)) await matchHdrToDisplay();

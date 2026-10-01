@@ -2391,6 +2391,21 @@ card's generation, and the display engine of Polaris and Vega sends the
 HDR signal (read in the kernel source), so those cards are expected to work
 with a recent Mesa — confirmed once a card is in the test PC.
 
+**On the real TV (2026-10-01, a Radeon RX Vega 64 on Mesa 26.0, Kubuntu
+26.04).** Plasma: the screen switched to 3840×2160 at 23.976 Hz with HDR
+on, and when Kinema turned mpv's colour-space hint on, mpv rebuilt its
+output as HDR10 (`VK_COLOR_SPACE_HDR10_ST2084_EXT` — the format NVIDIA's
+580 never offered); restored afterwards; all five sound formats untouched
+through the card's own HDMI sound. Sway 1.11 and Hyprland 0.53.3, each
+started on the TV: the screen read through wlr-output-management with its
+film rates, switched to 3840×2160 at 23.976 Hz for the film and put back
+(both desktops' own reports agree), TrueHD to the receiver untouched. Sway
+1.11 has no HDR to switch. Hyprland received the film as HDR10 (mpv's target
+PQ, BT.2020, 1000 nits) but did not switch the TV to HDR by itself: during
+the film it still told mpv the screen was SDR and showed its 8-bit sRGB
+set-up, so it converted the film back to SDR. Why its automatic HDR did not
+act is not known yet — its own log is off by default.
+
 ## Words for each system, and TV mode at 4K
 
 **What each sentence says is true where it is read.** The on-screen texts

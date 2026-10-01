@@ -141,7 +141,8 @@ is one, and you install it when you choose.
   26.04 installs 580 unless you choose a newer one under Additional Drivers,
   and GTX 10 cards and older stop at 580, so they cannot show HDR on Linux.
   AMD and Intel: Mesa 25.1 or later — Ubuntu 26.04, Fedora 43 and Arch have
-  it; Debian 13 has it in its backports.
+  it; Debian 13 has it in its backports. (Checked with an AMD Radeon RX Vega
+  on Mesa 26.0: HDR10 reaches the TV on KDE Plasma.)
 
 Without the driver part the desktop shows HDR, but each film is converted to
 SDR before it reaches it.
@@ -217,8 +218,9 @@ Linux's window. Playback works in development: Wayland offers no way to put
 Kinema's page over mpv, so on Linux mpv plays in a full-screen window of its
 own and draws Kinema's controls over the video itself (docs/HISTORY.md, "The
 Linux player"). The equipment check, sound straight to a receiver and screen
-switching (GNOME and KDE Plasma) have been checked on a real TV and
-receiver. Nothing is released for Linux yet.
+switching (GNOME, KDE Plasma, Sway and Hyprland) have been checked on a real
+TV and receiver, with an NVIDIA and an AMD card. Nothing is released for
+Linux yet.
 
 An Android version is planned after it. macOS is not planned by the author;
 a port is welcome, and [CONTRIBUTING.md](CONTRIBUTING.md) ("More than one
@@ -230,7 +232,7 @@ platform") says how the code is arranged for one.
 | Library, matching, artwork, accounts | ✓ | ✓ untested as an app |
 | Playback, controls, remote keys | ✓ | ✓ in development |
 | Equipment check, sound straight to a receiver | ✓ | ✓ in development |
-| Screen switching (refresh rate, HDR) | ✓ | ✓ in development, on GNOME and KDE Plasma; Sway and Hyprland written, not yet checked on a real screen |
+| Screen switching (refresh rate, HDR) | ✓ | ✓ in development: refresh rate on GNOME, KDE Plasma, Sway and Hyprland; HDR on GNOME and KDE Plasma (Sway 1.12 and Hyprland not yet confirmed) |
 | Sleep / shut down | ✓ | not yet — hidden rather than offered |
 
 ## Building from source

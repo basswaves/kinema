@@ -2215,6 +2215,36 @@ runtimes want updating yearly.
 a pinned commit in the release job, never downloaded, and installed to
 `/usr/lib/kinema`; the program's run path is how the plugin finds it there.
 
+## What a Linux PC is connected to
+
+Settings → Your equipment, and the log lines behind it, on Linux. Each part
+comes from whoever actually knows it, and nothing is opened or changed to
+find out (`equipment/linux.rs`).
+
+**The receiver's own list, not a test.** On Windows, Kinema asks the driver
+whether it would accept each format. On Linux, every HDMI sound device keeps
+the list the TV or receiver announced (its ELD), and that list *is* the
+answer: it is what a driver would have consulted. It is read from ALSA's
+`ELD` control of each sound device rather than from the files under
+`/proc/asound`, because those belong to the graphics card's ports, and which
+port feeds which sound device is decided at run time — only the control
+names the device mpv will play to. Reading a control needs ALSA's library,
+which libmpv already brings to every system that can run Kinema.
+
+**GNOME for the screens, the kernel for the facts.** The current mode, the
+refresh rates on offer and whether HDR is on belong to the desktop, which
+owns the screens on Wayland; GNOME answers over D-Bus with a library two of
+Kinema's plugins already compile in. Name, maker and HDR brightness come
+from each screen's EDID, which the kernel hands over as it is. Other
+desktops are not asked yet: their screens are listed from the kernel, with
+the mode left unsaid, and the log says why.
+
+**Checked against real equipment where it could be.** The EDID reader was
+run on the EDID a 4K HDR TV gave on the Linux test stick and agreed with
+`edid-decode`; the GNOME path ran in a nested GNOME Shell; the ELD reader is
+tested on descriptors built from what the test stick's receiver announced.
+What the receiver says through Kinema itself is for the next stick run.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

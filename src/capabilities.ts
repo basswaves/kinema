@@ -20,6 +20,8 @@ export interface Capabilities {
   /** mpv's `gpu-api` and `hwdec` for this system (see capabilities.rs). */
   mpv_video: { gpu_api: string; hwdec: string; own_window: boolean };
   equipment_detection: boolean;
+  /** Sound can go straight to the receiver (Settings → Sound). */
+  audio_direct: boolean;
   display_switching: boolean;
   sleep: boolean;
   shut_down: boolean;

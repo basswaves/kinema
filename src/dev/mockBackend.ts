@@ -150,6 +150,32 @@ function mockEquipment() {
   };
 }
 
+/**
+ * The same equipment as the Linux reader reports it (equipment/linux.rs):
+ * there is no Windows mixer, so no mix layout, default or spatial sound, and
+ * the notes about them are not made.
+ */
+function mockEquipmentOnLinux() {
+  const e = mockEquipment();
+  return {
+    ...e,
+    displays: e.displays.map((d) => ({
+      ...d,
+      gdi_name: d.gdi_name ? 'HDMI-1' : '',
+      notes: d.notes.map((n) => n.replace('Windows has', 'the desktop has')),
+    })),
+    audio: e.audio.map((a) => ({
+      ...a,
+      id: `alsa/hdmi:CARD=Mock,DEV=${a.id === 'mock-avr' ? 0 : 1}`,
+      is_default: false,
+      mix_channels: 0,
+      mix_layout: '',
+      mix_rate: 0,
+      notes: a.notes.filter((n) => !n.startsWith('Windows')),
+    })),
+  };
+}
+
 // ---- the library -------------------------------------------------------
 
 interface FixtureFile {
@@ -718,8 +744,9 @@ export function listenerCounts(): Record<string, number> {
  * needs: `kinemaMockSlowMs` delays the library read (a real first read is not
  * instant), `kinemaMockEmpty` presents an empty library (a first run),
  * `kinemaMockSlowDetect` makes the scan's detection pass take 20 seconds,
- * `kinemaMockSystem=linux` answers `capabilities` as a port without the
- * optional parts (no equipment check, screen switching, sleep or shut down).
+ * `kinemaMockSystem=linux` answers `capabilities` and the equipment check as
+ * the Linux build does (the check, but no direct sound, screen switching,
+ * sleep or shut down).
  */
 function flag(name: string): string | null {
   try {
@@ -731,6 +758,7 @@ function flag(name: string): string | null {
 const SLOW_MS = Number(flag('kinemaMockSlowMs') ?? 0) || 0;
 const EMPTY = flag('kinemaMockEmpty') === '1';
 const SLOW_DETECT = flag('kinemaMockSlowDetect') === '1';
+const ON_LINUX = flag('kinemaMockSystem') === 'linux';
 /** `kinemaMockReview` pretends that many videos wait in the review queue. */
 const REVIEW_COUNT = Number(flag('kinemaMockReview') ?? 0) || 0;
 /** `kinemaMockUpdate` pretends that version is out on GitHub. */
@@ -894,17 +922,19 @@ const handlers: Record<string, Handler> = {
   detect_intros: () => mockDetection.run(),
   stop_detection: () => mockDetection.stop(),
 
-  // Windows' answers unless `kinemaMockSystem` is `linux`, which answers as a
-  // port does before it has any of the optional parts: nothing claimed.
+  // Windows' answers unless `kinemaMockSystem` is `linux`, which answers as
+  // the Linux build does today: the equipment check, and nothing else
+  // optional (capabilities.rs).
   capabilities: () => {
-    const full = flag('kinemaMockSystem') !== 'linux';
+    const full = !ON_LINUX;
     return {
       system: full ? 'Windows' : 'Linux',
       engine: 'mpv',
       mpv_video: full
         ? { gpu_api: 'd3d11', hwdec: 'd3d11va', own_window: false }
         : { gpu_api: 'auto', hwdec: 'auto-safe', own_window: true },
-      equipment_detection: full,
+      equipment_detection: true,
+      audio_direct: full,
       display_switching: full,
       sleep: full,
       shut_down: full,
@@ -925,8 +955,8 @@ const handlers: Record<string, Handler> = {
   refresh_imdb_ratings: () => ({ fetched: false, rated: 0 }),
   list_titles_needing_scores: () => [],
   save_omdb_scores: () => null,
-  get_equipment: () => mockEquipment(),
-  check_equipment: () => mockEquipment(),
+  get_equipment: () => (ON_LINUX ? mockEquipmentOnLinux() : mockEquipment()),
+  check_equipment: () => (ON_LINUX ? mockEquipmentOnLinux() : mockEquipment()),
   window_display: () => ({ gdi_name: '', hdr: 'unknown' }),
   screen_now: () => ({
     gdi_name: 'mock',

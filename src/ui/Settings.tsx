@@ -33,7 +33,7 @@ import ConfirmButton from './ConfirmButton';
 import EquipmentSection from './EquipmentSection';
 import SoundSection from './SoundSection';
 import ScreenSection from './ScreenSection';
-import { useCapabilities } from '../capabilities';
+import { useCapabilities, type Capabilities } from '../capabilities';
 import { useClaimFocus } from './focus';
 import { setTvMode, useTvMode } from './tv';
 import {
@@ -128,6 +128,27 @@ function summaryLine(s: ScanSummary): string {
  * Capped, because one unreachable root fails once per file it should have had
  * and a thousand identical lines say nothing the first three did not.
  */
+/** Picture & sound, on a system that cannot do all of it yet: what is missing. */
+function notYet(can: Capabilities): string {
+  const { system } = can;
+  if (!can.equipment_detection) {
+    return `On ${system}, Kinema cannot yet look at your screen and sound equipment${
+      can.display_switching ? '' : " or change the screen's mode"
+    }, so films play with ${system}'s own picture and sound settings.`;
+  }
+  const missing = [
+    can.audio_direct ? null : 'send sound straight to a receiver',
+    can.display_switching ? null : "change the screen's refresh rate, resolution or HDR",
+  ].filter(Boolean);
+  const meaning = [
+    can.audio_direct ? null : `sound goes through ${system}'s own sound settings`,
+    can.display_switching ? null : 'the screen stays as it is set',
+  ].filter(Boolean);
+  return `On ${system}, Kinema can see your equipment but cannot yet ${missing.join(
+    ', or '
+  )}: ${meaning.join(', and ')}.`;
+}
+
 function problemLine(errors: string[]): string {
   const shown = errors.slice(0, 3).join(' · ');
   return errors.length > 3 ? `${shown} · and ${errors.length - 3} more` : shown;
@@ -885,20 +906,16 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
                 {/* Each part only where Kinema can do it (capabilities.ts):
                     a control that does nothing is worse than none. */}
                 {can?.display_switching && <ScreenSection onError={setError} />}
-                {can?.equipment_detection && <SoundSection onError={setError} />}
-                {can?.equipment_detection && <EquipmentSection />}
-                {can && !(can.display_switching && can.equipment_detection) && (
+                {can?.equipment_detection && can.audio_direct && (
+                  <SoundSection onError={setError} />
+                )}
+                {can && !(can.display_switching && can.equipment_detection && can.audio_direct) && (
                   <section className="settings-section">
                     <h2>Picture &amp; sound</h2>
-                    <p className="settings-intro">
-                      {can.equipment_detection
-                        ? `On ${can.system}, Kinema cannot change the screen's refresh rate, resolution or HDR yet.`
-                        : `On ${can.system}, Kinema cannot yet look at your screen and sound equipment${
-                            can.display_switching ? '' : " or change the screen's mode"
-                          }, so films play with ${can.system}'s own picture and sound settings.`}
-                    </p>
+                    <p className="settings-intro">{notYet(can)}</p>
                   </section>
                 )}
+                {can?.equipment_detection && <EquipmentSection system={can.system} />}
               </>
             )}
 

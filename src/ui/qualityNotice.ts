@@ -24,6 +24,7 @@ import {
 import { cadenceRank, type SwitchSettings } from '../player/displayMode';
 import { readSwitchSettings, SWITCH_HDR_KEY, SWITCH_REFRESH_KEY } from '../player/displaySwitch';
 import { getEquipment, type Equipment } from '../player/equipment';
+import { capabilitiesNow, loadCapabilities, type Capabilities } from '../capabilities';
 
 export const NOTICE_DISMISSED_KEY = 'quality_notice_dismissed';
 
@@ -38,11 +39,15 @@ export interface Upgrade {
 
 const FILM_FPS = 24000 / 1001;
 
+/** What this system can switch (capabilities.ts): only that is offered. */
+export type Can = Pick<Capabilities, 'system' | 'audio_direct' | 'display_switching'>;
+
 export function upgradesFor(
   equipment: Equipment,
   audio: AudioSettings,
   screen: SwitchSettings,
-  oldOfferAnswered: boolean
+  oldOfferAnswered: boolean,
+  can: Can
 ): Upgrade[] {
   const out: Upgrade[] = [];
 
@@ -50,7 +55,7 @@ export function upgradesFor(
   // Someone who answered the old one-time question has decided, for the
   // equipment they had then; only equipment new since then is mentioned.
   const decided = oldOfferAnswered && device !== null && !device.new;
-  if (!audio.direct && device && !decided) {
+  if (can.audio_direct && !audio.direct && device && !decided) {
     const lossless = device.bitstream.some(
       (b) => (b.codec === 'truehd' || b.codec === 'dts-hd') && b.result === 'yes'
     );
@@ -58,12 +63,15 @@ export function upgradesFor(
       out.push({
         kind: 'sound',
         id: `sound:${device.id}`,
-        text: `${device.name} can take Dolby Atmos and DTS:X untouched. Through Windows the height channels are lost.`,
+        text: `${device.name} can take Dolby Atmos and DTS:X untouched. Through ${can.system} the height channels are lost.`,
         setting: AUDIO_DIRECT_KEY,
       });
     }
   }
 
+  // A switch this system does not have would be a "Turn on" that does
+  // nothing — on Linux until it can change the screen's mode.
+  if (!can.display_switching) return out;
   for (const display of equipment.displays.filter((d) => d.connected)) {
     const atItsSize = display.modes.filter(
       (m) => m.width === display.width && m.height === display.height
@@ -80,7 +88,7 @@ export function upgradesFor(
       out.push({
         kind: 'hdr',
         id: `hdr:${display.id}`,
-        text: `${display.name} can show HDR, but Windows has it switched off, so HDR videos play in SDR.`,
+        text: `${display.name} can show HDR, but ${can.system} has it switched off, so HDR videos play in SDR.`,
         setting: SWITCH_HDR_KEY,
       });
     }
@@ -104,6 +112,10 @@ async function dismissedIds(): Promise<string[]> {
 
 /** What to show on Home now; empty when the setup is already at its best. */
 export async function readUpgrades(): Promise<Upgrade[]> {
+  await loadCapabilities();
+  const can = capabilitiesNow();
+  // Nothing is offered until it is known what this system can switch.
+  if (!can) return [];
   const [equipment, audio, screen, answered, dismissed] = await Promise.all([
     getEquipment(),
     readAudioSettings(),
@@ -111,7 +123,7 @@ export async function readUpgrades(): Promise<Upgrade[]> {
     getSetting(AUDIO_DIRECT_OFFERED_KEY).catch(() => null),
     dismissedIds(),
   ]);
-  return pendingUpgrades(upgradesFor(equipment, audio, screen, Boolean(answered)), dismissed);
+  return pendingUpgrades(upgradesFor(equipment, audio, screen, Boolean(answered), can), dismissed);
 }
 
 /** "OK": not for this equipment again. */

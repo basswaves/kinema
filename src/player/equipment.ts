@@ -102,12 +102,13 @@ export function refreshRate(d: Display): number {
   return d.refresh_den > 0 ? d.refresh_num / d.refresh_den : 0;
 }
 
-export function hdrLabel(d: Display): string {
+/** `system` names where HDR is switched: "off in Windows", "off in Linux". */
+export function hdrLabel(d: Display, system: string): string {
   switch (d.hdr) {
     case 'on':
       return d.peak_nits ? `HDR on · ${Math.round(d.peak_nits)} nits peak` : 'HDR on';
     case 'off':
-      return 'HDR capable · off in Windows';
+      return `HDR capable · off in ${system}`;
     case 'unsupported':
       return 'SDR';
     default:

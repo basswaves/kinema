@@ -63,36 +63,47 @@ const kit = (displays: Display[], audio: AudioDevice[]): Equipment => ({
 
 const off = { refresh: false, resolution: 'auto' as const, hdr: false };
 const soundOff = { direct: false, deviceId: null, overrides: {} };
+const windows = { system: 'Windows', audio_direct: true, display_switching: true };
 
 describe('upgradesFor', () => {
   it('says nothing on a setup that can take nothing better', () => {
-    expect(upgradesFor(kit([monitor], [speakers]), soundOff, off, false)).toEqual([]);
+    expect(upgradesFor(kit([monitor], [speakers]), soundOff, off, false, windows)).toEqual([]);
   });
 
   it('names what a TV and a receiver could do that is switched off', () => {
-    const kinds = upgradesFor(kit([monitor, tv], [receiver]), soundOff, off, false).map((u) => u.id);
+    const kinds = upgradesFor(kit([monitor, tv], [receiver]), soundOff, off, false, windows).map((u) => u.id);
     expect(kinds).toEqual(['sound:avr', 'motion:tv', 'hdr:tv']);
   });
 
   it('says nothing about what is already on', () => {
     const all = { refresh: true, resolution: 'auto' as const, hdr: true };
     const direct = { ...soundOff, direct: true };
-    expect(upgradesFor(kit([tv], [receiver]), direct, all, false)).toEqual([]);
+    expect(upgradesFor(kit([tv], [receiver]), direct, all, false, windows)).toEqual([]);
   });
 
   it('leaves out a receiver whose owner already answered the old question', () => {
-    const ids = upgradesFor(kit([], [receiver]), soundOff, off, true).map((u) => u.id);
+    const ids = upgradesFor(kit([], [receiver]), soundOff, off, true, windows).map((u) => u.id);
     expect(ids).toEqual([]);
     const newReceiver = { ...receiver, new: true };
-    expect(upgradesFor(kit([], [newReceiver]), soundOff, off, true).map((u) => u.id)).toEqual([
+    expect(upgradesFor(kit([], [newReceiver]), soundOff, off, true, windows).map((u) => u.id)).toEqual([
       'sound:avr',
     ]);
   });
 
+  it('offers only what the system can switch', () => {
+    // Linux today: the equipment is seen, nothing can be switched yet.
+    const linux = { system: 'Linux', audio_direct: false, display_switching: false };
+    expect(upgradesFor(kit([tv], [receiver]), soundOff, off, false, linux)).toEqual([]);
+    const soundOnly = { ...linux, audio_direct: true };
+    const offered = upgradesFor(kit([tv], [receiver]), soundOff, off, false, soundOnly);
+    expect(offered.map((u) => u.id)).toEqual(['sound:avr']);
+    expect(offered[0].text).toContain('Through Linux');
+  });
+
   it('stays away for dismissed equipment, and speaks up for new equipment', () => {
-    const upgrades = upgradesFor(kit([tv], [receiver]), soundOff, off, false);
+    const upgrades = upgradesFor(kit([tv], [receiver]), soundOff, off, false, windows);
     expect(pendingUpgrades(upgrades, ['sound:avr', 'motion:tv', 'hdr:tv'])).toEqual([]);
-    const later = upgradesFor(kit([tv, { ...tv, id: 'tv2' }], [receiver]), soundOff, off, false);
+    const later = upgradesFor(kit([tv, { ...tv, id: 'tv2' }], [receiver]), soundOff, off, false, windows);
     expect(pendingUpgrades(later, ['sound:avr', 'motion:tv', 'hdr:tv']).map((u) => u.id)).toEqual([
       'motion:tv2',
       'hdr:tv2',

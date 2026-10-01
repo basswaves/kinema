@@ -162,17 +162,20 @@ additions beside it, not branches through it. Three seams:
 
 ```
 capabilities.rs  What this build can do where it runs — examine equipment,
-                 switch the screen, sleep, shut down, mpv's graphics
-                 interface — each answer stated by the module that does the
-                 work (equipment::DETECTS, display::SWITCHES, power::CAN_*).
+                 send sound straight to a receiver, switch the screen,
+                 sleep, shut down, mpv's graphics interface — each answer
+                 stated by the module that does the work (equipment::DETECTS,
+                 equipment::DIRECT_AUDIO, display::SWITCHES, power::CAN_*).
 capabilities.ts  Asked once at startup; the interface shows or hides by the
                  answers, never by the system's name, which is for wording
                  only. Leave and Picture & sound are the two screens that
                  depend on it today
-equipment/win.rs, display/win.rs
-                 The Windows halves. A Linux half goes beside each as its own
-                 file; shared rules and commands stay in equipment.rs and
-                 display.rs
+equipment/win.rs, equipment/linux.rs, display/win.rs
+                 Each system's half, as its own file; shared rules and
+                 commands stay in equipment.rs and display.rs. Linux reads
+                 the screens from GNOME and the kernel, and each receiver's
+                 own format list (equipment/eld.rs, equipment/edid.rs: pure
+                 parsers, tested on every system)
 player/engine.ts The only file that talks to mpv (see player/ above)
 overlay.rs, player/overlay.ts, player/mpvKeys.ts
                  Where mpv has a window of its own (Linux, `own_window`):

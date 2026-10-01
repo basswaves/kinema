@@ -84,7 +84,7 @@ Kinema is being made to build on Linux too, and a change that breaks it should
 be caught before it is pushed. With Ubuntu 24.04 in WSL, once:
 
 ```bash
-sudo apt install build-essential curl file pkg-config libssl-dev libxdo-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libmpv-dev
+sudo apt install build-essential curl file pkg-config libssl-dev libxdo-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev libmpv-dev
 ```
 
 then Node 20 (from NodeSource — **not** Ubuntu's, and not Windows' own, which

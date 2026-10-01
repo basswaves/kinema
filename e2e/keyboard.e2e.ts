@@ -110,7 +110,8 @@ for (const [system, choices] of [
 
 for (const [system, sections] of [
   ['windows', ['Screen', 'Sound', 'Your equipment']],
-  ['linux', ['Picture & sound']],
+  // Linux: what it cannot do yet, then the equipment it can see.
+  ['linux', ['Picture & sound', 'Your equipment']],
 ] as const) {
   test(`Picture & sound shows what ${system} can do`, async ({ page }) => {
     await open(page, system);
@@ -126,5 +127,11 @@ for (const [system, sections] of [
     await expect.poll(() => focused(page)).toBe('Picture & sound');
     await press(page, 'Enter');
     await expect(page.locator('.settings-section h2')).toHaveText([...sections]);
+    // Nothing about Windows' mixer where there is none.
+    const equipment = page
+      .locator('.settings-section')
+      .filter({ has: page.locator('h2', { hasText: 'Your equipment' }) });
+    await expect(equipment).toContainText(system === 'linux' ? 'What Linux reports' : 'What Windows reports');
+    if (system === 'linux') await expect(equipment).not.toContainText('Windows');
   });
 }

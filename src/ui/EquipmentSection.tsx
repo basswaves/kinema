@@ -33,7 +33,8 @@ const day = (secs: number) =>
     year: 'numeric',
   });
 
-export default function EquipmentSection() {
+/** `system` is for the wording only: "What Windows reports", "What Linux reports". */
+export default function EquipmentSection({ system }: { system: string }) {
   const [equipment, setEquipment] = useState<Equipment | null>(null);
   // Starts true: the saved answer is fetched as soon as the section mounts.
   const [checking, setChecking] = useState(true);
@@ -73,9 +74,9 @@ export default function EquipmentSection() {
     <section className="settings-section">
       <h2>Your equipment</h2>
       <p className="settings-intro">
-        What Windows reports about the screens and sound devices connected to this PC. Kinema checks
-        every time it starts and bases its playback choices on this. Nothing here is a setting: if
-        something looks wrong, the cause is in Windows or the cables, not in Kinema.
+        What {system} reports about the screens and sound devices connected to this PC. Kinema
+        checks every time it starts and bases its playback choices on this. Nothing here is a
+        setting: if something looks wrong, the cause is in {system} or the cables, not in Kinema.
       </p>
       <div className="settings-toggle-row">
         <FocusButton keepInView="nearest" className="btn-secondary" onSelect={() => void check()}>
@@ -85,8 +86,8 @@ export default function EquipmentSection() {
           {equipment
             ? `Last checked ${new Date(equipment.checked_at * 1000).toLocaleTimeString()}. `
             : ''}
-          Only needed if a TV or receiver was switched on, or a Windows sound or display setting was
-          changed, after Kinema started.
+          Only needed if a TV or receiver was switched on, or a {system} sound or display setting
+          was changed, after Kinema started.
         </span>
       </div>
       {error && <p className="equipment-problem">Could not check: {error}</p>}
@@ -101,8 +102,10 @@ export default function EquipmentSection() {
                 <strong>{d.name}</strong>
                 {d.new && <span className="equipment-new">new</span>}
                 <span className="muted">
-                  {d.connection} · {d.width}×{d.height} at {formatRate(refreshRate(d))} Hz ·{' '}
-                  {hdrLabel(d)}
+                  {d.connection} ·{' '}
+                  {/* A mode of 0×0 is one the desktop did not report (Linux off GNOME). */}
+                  {d.width > 0 ? `${d.width}×${d.height} at ${formatRate(refreshRate(d))} Hz · ` : ''}
+                  {hdrLabel(d, system)}
                 </span>
               </div>
               <ul className="equipment-notes">
@@ -122,7 +125,9 @@ export default function EquipmentSection() {
                 {a.new && <span className="equipment-new">new</span>}
                 <span className="muted">
                   {a.connection}
-                  {a.is_default ? ' · Windows default' : ''} · Windows mixes to {a.mix_layout}
+                  {a.is_default ? ` · ${system} default` : ''}
+                  {/* The Windows mixer and spatial sound: Windows only (an empty layout elsewhere). */}
+                  {a.mix_layout ? ` · Windows mixes to ${a.mix_layout}` : ''}
                   {a.spatial_objects ? ' · Windows spatial sound on' : ''}
                   {a.max_pcm_channels
                     ? ` · takes up to ${a.max_pcm_channels} channels directly`

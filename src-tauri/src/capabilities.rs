@@ -22,6 +22,9 @@ pub struct Capabilities {
     pub mpv_video: MpvVideo,
     /// Screens and audio outputs can be examined (Settings → Equipment).
     pub equipment_detection: bool,
+    /// Sound can be sent straight to the receiver, passing through the
+    /// formats the equipment check found (Settings → Sound).
+    pub audio_direct: bool,
     /// The screen's refresh rate, resolution and HDR can be switched.
     pub display_switching: bool,
     pub sleep: bool,
@@ -61,6 +64,7 @@ pub fn current() -> Capabilities {
         engine: "mpv",
         mpv_video: mpv_video(),
         equipment_detection: crate::equipment::DETECTS,
+        audio_direct: crate::equipment::DIRECT_AUDIO,
         display_switching: crate::display::SWITCHES,
         sleep: crate::power::CAN_SLEEP,
         shut_down: crate::power::CAN_SHUT_DOWN,
@@ -93,7 +97,7 @@ mod tests {
     fn windows_can_do_everything() {
         let c = current();
         assert_eq!(c.system, "Windows");
-        assert!(c.equipment_detection && c.display_switching && c.sleep && c.shut_down);
+        assert!(c.equipment_detection && c.audio_direct && c.display_switching && c.sleep && c.shut_down);
         // The rendering path the whole of docs/DESIGN.md is written about.
         assert_eq!(
             c.mpv_video,
@@ -102,10 +106,12 @@ mod tests {
     }
 
     /// Elsewhere, nothing is claimed that has no implementation behind it.
+    /// Linux has the equipment check (equipment/linux.rs) and nothing else yet.
     #[cfg(not(windows))]
     #[test]
     fn nothing_is_claimed_without_an_implementation() {
         let c = current();
-        assert!(!c.equipment_detection && !c.display_switching && !c.sleep && !c.shut_down);
+        assert_eq!(c.equipment_detection, cfg!(target_os = "linux"));
+        assert!(!c.audio_direct && !c.display_switching && !c.sleep && !c.shut_down);
     }
 }

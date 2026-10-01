@@ -1565,6 +1565,16 @@ mode. Asking for 2 is accepted, and reading the state back says 2, while the
 TV stays in SDR and the compositor goes on telling clients "gamma 2.2, 80
 nits" — nothing reports an error. Ask for 1 by number.
 
+### The ELD files in /proc belong to ports, not to sound devices
+
+`/proc/asound/cardN/eld#C.P` is one file per graphics-card pin, and on many
+cards (NVIDIA's among them) the kernel attaches a pin to a PCM device only
+when something is plugged in. The receiver on the TV PC was `eld#0.4` and played
+on PCM device 3 ("HDMI 0", `hdmi:CARD=…,DEV=0`); nothing in the file says so.
+Matching by position works until a second screen is connected. ALSA's `ELD`
+control (interface PCM, `device` = the PCM number) holds the same bytes for
+the device it is attached to — read that.
+
 ### NVIDIA's Vulkan fails if its device files were never made
 
 The driver needs `/dev/nvidia-modeset` and `/dev/nvidia-uvm` besides

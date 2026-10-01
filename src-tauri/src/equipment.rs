@@ -21,9 +21,13 @@
 //! AC3 then accepts a TrueHD stream it cannot play — silence or noise at the
 //! receiver. Asking first, codec by codec, is the defence against that.
 
-// The shared helpers here (layouts, rates, the bitstream list) are used only
-// by the Windows reader until a Linux one exists (notes: PORTING, phase 4).
-// Windows' clippy still reports anything that is genuinely unused.
+//!
+//! On Linux (`linux.rs`) the same picture comes from the kernel, GNOME and
+//! ALSA, and the bitstream answers from the receiver's own list (`eld.rs`)
+//! rather than from a driver being asked.
+
+// Some shared helpers (layouts, the exact WASAPI shapes) serve only the
+// Windows reader. Windows' clippy still reports anything genuinely unused.
 #![cfg_attr(not(windows), allow(dead_code))]
 
 use serde::{Deserialize, Serialize};
@@ -262,6 +266,10 @@ pub fn film_modes(modes: &[Mode]) -> Vec<&Mode> {
     out
 }
 
+/// Who sets the screens up, for the notes: Windows, or on Linux the desktop
+/// (GNOME, KDE…), which is where HDR and the mode are switched.
+const SCREEN_OWNER: &str = if cfg!(windows) { "Windows" } else { "the desktop" };
+
 pub fn display_notes(d: &Display) -> Vec<String> {
     let mut notes = Vec::new();
     match d.hdr {
@@ -269,13 +277,18 @@ pub fn display_notes(d: &Display) -> Vec<String> {
             Some(p) => format!("HDR is on. The screen reports a peak of {p:.0} nits."),
             None => "HDR is on.".into(),
         }),
-        HdrState::Off => notes.push(
-            "Supports HDR, but Windows has it switched off, so HDR videos are converted to SDR \
-             on this screen until it is on."
-                .into(),
-        ),
+        HdrState::Off => notes.push(format!(
+            "Supports HDR, but {SCREEN_OWNER} has it switched off, so HDR videos are converted \
+             to SDR on this screen until it is on."
+        )),
         HdrState::Unsupported => notes.push("SDR screen: HDR videos are converted to SDR.".into()),
-        HdrState::Unknown => notes.push("Windows did not say whether this screen does HDR.".into()),
+        // On Linux "unknown" is a screen whose EDID offers HDR on a desktop
+        // that is not asked (linux.rs).
+        HdrState::Unknown => notes.push(if cfg!(windows) {
+            "Windows did not say whether this screen does HDR.".into()
+        } else {
+            "The screen can show HDR; whether it is switched on, the desktop did not say.".into()
+        }),
     }
 
     let native = d.modes.iter().any(|m| m.width == d.width && m.height == d.height);
@@ -293,12 +306,30 @@ pub fn display_notes(d: &Display) -> Vec<String> {
             d.height
         ));
     } else if let Some(best) = film.first() {
-        notes.push(format!(
-            "A 24 Hz mode is only offered at a lower resolution: {} Hz at {}×{}.",
-            format_rate(best.rate),
-            best.width,
-            best.height
-        ));
+        let rates: Vec<String> = film
+            .iter()
+            .filter(|m| (m.width, m.height) == (best.width, best.height))
+            .map(|m| format_rate(m.rate))
+            .collect();
+        notes.push(if best.width * best.height > d.width * d.height {
+            // A 4K TV the desktop left at 1080p, as GNOME does by default.
+            format!(
+                "Can show movies without judder at {} Hz at {}×{}, above the {}×{} the screen \
+                 is set to now.",
+                rates.join(" / "),
+                best.width,
+                best.height,
+                d.width,
+                d.height
+            )
+        } else {
+            format!(
+                "A 24 Hz mode is only offered at a lower resolution: {} Hz at {}×{}.",
+                rates.join(" / "),
+                best.width,
+                best.height
+            )
+        });
     } else if native {
         notes.push(
             "No 24 Hz mode: movies play with 3:2 judder on this screen, whatever the setting."
@@ -365,8 +396,10 @@ pub fn audio_notes(a: &AudioDevice) -> Vec<String> {
         );
     }
 
+    // A mixer setting of 0 is one that was not read (Linux: PipeWire's own
+    // layout is not asked yet).
     if let (Some(max), "HDMI") = (a.max_pcm_channels, a.connection.as_str()) {
-        if a.mix_channels < max && a.mix_channels <= 2 {
+        if a.mix_channels > 0 && a.mix_channels < max && a.mix_channels <= 2 {
             notes.push(format!(
                 "Windows is set to {} for this device, though it takes {} channels directly. \
                  Anything mixed by Windows is folded down to {}.",
@@ -594,16 +627,25 @@ pub fn summary(view: &EquipmentView) -> Vec<String> {
                 )
             })
             .collect();
+        // The Windows mixer and spatial sound exist only there; elsewhere the
+        // device's id says what mpv will call it.
+        let mixer = if a.mix_channels > 0 {
+            format!(
+                "Windows mixes to {} @ {} Hz; spatial sound {} [{}]",
+                a.mix_layout,
+                a.mix_rate,
+                a.spatial_objects.map_or("off".to_string(), |n| format!("on ({n} objects)")),
+                a.spatial_detail,
+            )
+        } else {
+            format!("device {}", a.id)
+        };
         lines.push(format!(
-            "audio \"{}\"{}{} via {}: Windows mixes to {} @ {} Hz; spatial sound {} [{}]; direct PCM up to {}; bitstream {}",
+            "audio \"{}\"{}{} via {}: {mixer}; direct PCM up to {}; bitstream {}",
             a.name,
             if seen.new { " (new)" } else { "" },
             if a.is_default { " (default)" } else { "" },
             a.connection,
-            a.mix_layout,
-            a.mix_rate,
-            a.spatial_objects.map_or("off".to_string(), |n| format!("on ({n} objects)")),
-            a.spatial_detail,
             a.max_pcm_channels.map(|c| format!("{c} ch")).unwrap_or_else(|| "unknown".into()),
             formats.join(" "),
         ));
@@ -621,15 +663,22 @@ pub fn summary(view: &EquipmentView) -> Vec<String> {
 
 /// Whether this build can look at the screens and audio outputs at all
 /// (`capabilities.rs`). Where it cannot, `detect` says so as a problem.
-pub const DETECTS: bool = cfg!(windows);
+pub const DETECTS: bool = cfg!(any(windows, target_os = "linux"));
 
-/// Look at everything, as Windows answers right now. Blocking, but quick —
+/// Whether sound can be sent straight to the receiver with the formats found
+/// here (Settings → Sound). Windows only until Linux has its own way
+/// (notes: PORTING, phase 4 step 2): the plan names WASAPI devices.
+pub const DIRECT_AUDIO: bool = cfg!(windows);
+
+/// Look at everything, as the system answers right now. Blocking, but quick —
 /// about a tenth of a second for three audio devices and two screens.
 pub fn detect() -> Equipment {
     #[cfg(windows)]
     return win::detect();
-    #[cfg(not(windows))]
-    Equipment { problems: vec!["equipment detection is Windows only".into()], ..Default::default() }
+    #[cfg(target_os = "linux")]
+    return linux::detect();
+    #[cfg(not(any(windows, target_os = "linux")))]
+    Equipment { problems: vec!["equipment detection is not written for this system".into()], ..Default::default() }
 }
 
 /// On a thread of its own, so COM can be initialised the way the audio API
@@ -742,10 +791,19 @@ pub async fn check_equipment(app: tauri::AppHandle) -> Result<EquipmentView, Str
     crate::jobs::off_main(move || check_in_turn(&app)).await
 }
 
-// ---- Windows -----------------------------------------------------------------
+// ---- the systems ---------------------------------------------------------------
 
 #[cfg(windows)]
 pub(crate) mod win;
+
+#[cfg(target_os = "linux")]
+pub(crate) mod linux;
+
+/// What screens and receivers say about themselves, read where the system
+/// hands over the raw bytes (Linux). Compiled everywhere so their tests run on
+/// every machine.
+mod edid;
+mod eld;
 
 #[cfg(test)]
 mod tests {

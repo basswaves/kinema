@@ -34,6 +34,15 @@ If you build a GPL configuration of mpv into a distribution of this app
 instead, that distribution becomes subject to the GPL. The default path does
 not do this.
 
+**On Linux** no libmpv is shipped at all: the `.deb`, `.rpm` and folder use
+the system's own, installed and updated by its package manager, under
+whatever licence the distribution builds it with. What they do carry is the
+plugin's wrapper, `libmpv-wrapper.so` (**LGPL-2.1**), built unmodified from
+its source by `scripts/build-mpv-wrapper.sh` — the commit is named there —
+from [nini22P/libmpv-wrapper](https://github.com/nini22P/libmpv-wrapper). It
+is a separate file (`/usr/lib/kinema/` in the packages, `lib/` in the folder)
+loaded at runtime, and may be replaced with a build of your own.
+
 ## Audio fingerprinting — rusty-chromaprint
 
 [`rusty-chromaprint`](https://crates.io/crates/rusty-chromaprint) (MIT), a pure

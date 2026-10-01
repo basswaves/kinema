@@ -1,11 +1,23 @@
-# Builds the portable ZIP attached to a GitHub release.
+# Builds everything attached to a GitHub release: the portable Windows ZIP,
+# and for Linux a .deb, an .rpm and a .tar.gz folder, for x86-64 and ARM.
 #
-# Deliberately not an installer. `scripts/build-app.ps1` copies both native DLLs
-# *beside* the exe, because `libmpv-2.dll` is resolved by Windows' own search
-# order, which begins at the executable's directory and never looks in the
-# directory the wrapper was loaded from. The Tauri bundler puts them in `lib/`,
-# which loads the wrapper and then fails to find mpv — so the bundler is turned
-# off in tauri.conf.json and this is the only supported way to produce the app.
+# Each platform builds in its own job and hands its files on; one job at the
+# end puts them all on a single draft release. (Several jobs each creating the
+# draft is how releases end up duplicated.) Started by hand, it builds
+# everything and publishes nothing — the files are left as the run's
+# artifacts, to check a change to this workflow without a release.
+#
+# Windows: deliberately not an installer. `scripts/build-app.ps1` copies both
+# native DLLs *beside* the exe, because `libmpv-2.dll` is resolved by
+# Windows' own search order, which begins at the executable's directory and
+# never looks in the directory the wrapper was loaded from. The Tauri bundler
+# puts them in `lib/`, which loads the wrapper and then fails to find mpv — so
+# the bundler is off in tauri.conf.json, and on only for Linux
+# (tauri.linux.conf.json).
+#
+# Linux: the system's own mpv, declared as a dependency of the packages, so
+# there are no media libraries here to keep patched. See
+# scripts/package-linux.sh.
 name: Release
 
 on:
@@ -17,7 +29,7 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  windows:
     runs-on: windows-latest
 
     steps:
@@ -41,9 +53,6 @@ jobs:
       - name: Fetch the native playback libraries
         run: npx tauri-plugin-libmpv-api setup-lib
 
-      # Explicit switch as well as the CI guard inside the script: a runner has
-      # no desktop, and a COM call for a shortcut nobody will ever click is a
-      # failure point in exchange for nothing.
       # Kinema's own TMDB key (src/metadata/builtinKey.ts), from a repository
       # secret so it is never in the source. A release without it would still
       # run, as a build from source does, but would leave movies unidentified
@@ -55,13 +64,16 @@ jobs:
           VITE_TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
         run: if (-not $env:VITE_TMDB_API_KEY) { throw 'The TMDB_API_KEY repository secret is not set.' }
 
-      # Kinema's SIMKL app ID (src-tauri/src/simkl.rs), compiled in. Not a
-      # secret to SIMKL, but kept out of the source so the repository does not
-      # say whose account registered it. Unlike the TMDB key it is optional: a
-      # release without it simply has no SIMKL, as a build from source does.
+      # Explicit -NoShortcut as well as the CI guard inside the script: a
+      # runner has no desktop, and a COM call for a shortcut nobody will ever
+      # click is a failure point in exchange for nothing.
       - name: Build the portable app
         env:
           VITE_TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          # Kinema's SIMKL app ID (src-tauri/src/simkl.rs), compiled in. Not a
+          # secret to SIMKL, but kept out of the source so the repository does
+          # not say whose account registered it. Optional: a release without
+          # it simply has no SIMKL, as a build from source does.
           KINEMA_SIMKL_CLIENT_ID: ${{ secrets.SIMKL_CLIENT_ID }}
           # Kinema's Trakt app (trakt.rs). Trakt's device sign-in needs the
           # secret as well as the ID; like the TMDB key, it is readable by
@@ -75,31 +87,105 @@ jobs:
       - name: Package
         shell: pwsh
         run: |
-          $version = "${{ github.ref_name }}" -replace '^v', ''
+          $version = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
           $zip = "kinema-$version-windows-x64.zip"
-          Compress-Archive -Path dist-app\* -DestinationPath $zip
-          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
-          "$hash  $zip" | Out-File -Encoding ascii "$zip.sha256"
-          "ZIP=$zip"       | Out-File -Append -Encoding ascii $env:GITHUB_ENV
-          "SHA256=$hash"   | Out-File -Append -Encoding ascii $env:GITHUB_ENV
+          New-Item -ItemType Directory -Force out | Out-Null
+          Compress-Archive -Path dist-app\* -DestinationPath "out\$zip"
+          $hash = (Get-FileHash "out\$zip" -Algorithm SHA256).Hash.ToLower()
+          "$hash  $zip" | Out-File -Encoding ascii "out\$zip.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: out/*
+
+  linux:
+    # On the oldest Ubuntu the .deb should install on: a program built
+    # against a newer C library refuses to start on an older one.
+    strategy:
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Linux build libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check the TMDB key is set
+        env:
+          VITE_TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+        run: test -n "$VITE_TMDB_API_KEY" || { echo 'The TMDB_API_KEY repository secret is not set.'; exit 1; }
+
+      # The same built-in keys as the Windows build; see there.
+      - name: Build and package
+        env:
+          VITE_TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          KINEMA_SIMKL_CLIENT_ID: ${{ secrets.SIMKL_CLIENT_ID }}
+          KINEMA_TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
+          KINEMA_TRAKT_CLIENT_SECRET: ${{ secrets.TRAKT_CLIENT_SECRET }}
+          KINEMA_OPENSUBTITLES_API_KEY: ${{ secrets.OPENSUBTITLES_API_KEY }}
+        run: bash scripts/package-linux.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.os }}
+          path: dist-linux/*
+
+  publish:
+    # Only for a pushed tag; a run started by hand stops at the artifacts.
+    if: github.event_name == 'push'
+    needs: [windows, linux]
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: files
+          merge-multiple: true
+
+      - name: Read the checksums for the notes
+        run: |
+          cd files
+          version="${GITHUB_REF_NAME#v}"
+          {
+            echo "VERSION=$version"
+            echo "WIN_SHA=$(cut -d' ' -f1 kinema-$version-windows-x64.zip.sha256)"
+          } >> "$GITHUB_ENV"
 
       - name: Publish release
         uses: softprops/action-gh-release@v3
         with:
           draft: true
-          files: |
-            ${{ env.ZIP }}
-            ${{ env.ZIP }}.sha256
+          files: files/*
           body: |
-            ## Install
+            ## Windows
 
-            Download the ZIP, extract it anywhere, and run `kinema.exe`.
-            No installer, nothing written outside the folder and your app data.
+            Download `kinema-${{ env.VERSION }}-windows-x64.zip`, extract it
+            anywhere, and run `kinema.exe`. No installer, nothing written
+            outside the folder and your app data.
 
-            **Windows 11 only.** Needs the WebView2 runtime, which ships with
+            **Windows 11.** Needs the WebView2 runtime, which ships with
             Windows 11 — nothing to install separately.
 
-            ### Windows will ask once whether to run it
+            #### Windows will ask once whether to run it
 
             Kinema is not code-signed, so the first time you open it Windows
             shows *"Windows protected your PC"*. Click **More info**, then
@@ -107,12 +193,36 @@ jobs:
             workflow built, run this in PowerShell where you downloaded it:
 
             ```powershell
-            Get-FileHash .\${{ env.ZIP }} -Algorithm SHA256
+            Get-FileHash .\kinema-${{ env.VERSION }}-windows-x64.zip -Algorithm SHA256
             ```
 
-            Expected: `${{ env.SHA256 }}`
+            Expected: `${{ env.WIN_SHA }}`
 
-            ### First run
+            ## Linux
+
+            Kinema uses your system's mpv and WebKitGTK; the packages install
+            them for you. For x86-64 PCs take the `amd64` / `x86_64` files,
+            for ARM the `arm64` / `aarch64` ones.
+
+            **Ubuntu 24.04 or later, Debian 13:**
+
+            ```bash
+            sudo apt install ./kinema_${{ env.VERSION }}_amd64.deb
+            ```
+
+            **Fedora:**
+
+            ```bash
+            sudo dnf install ./kinema-${{ env.VERSION }}-1.x86_64.rpm
+            ```
+
+            **Anything else:** unpack `kinema-${{ env.VERSION }}-linux-x86_64.tar.gz`
+            and run `./kinema`; its README.txt names the two libraries to
+            install. HDR on Wayland needs mpv 0.40 or later — Ubuntu 26.04,
+            Debian 13, Fedora 43 and Arch have it. Each file has a `.sha256`
+            beside it to check the download with `sha256sum -c`.
+
+            ## First run
 
             Kinema opens on a setup panel: add your movies and TV folders, and
             scan. Posters and descriptions come from TMDB through a key Kinema
@@ -121,5 +231,6 @@ jobs:
 
             ---
 
-            Bundles an unmodified LGPL build of libmpv, which you may replace —
-            see [NOTICE.md](NOTICE.md).
+            The Windows ZIP bundles an unmodified LGPL build of libmpv, which
+            you may replace; on Linux the system's libmpv is used — see
+            [NOTICE.md](NOTICE.md).

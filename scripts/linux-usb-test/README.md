@@ -53,6 +53,24 @@ ventoy/ventoy.json                  (merge with an existing one)
 
 Nothing is written to the machine's own disks.
 
+### A later round: Kinema's own picture and sound
+
+```bash
+bash ~/kinema-kit/run.sh check
+```
+
+Installs the Kinema build in the kit over the earlier one, then lets Kinema
+do it all itself, each run on its own copy of an empty library with the
+settings the run needs: the equipment check it makes as it starts; sound
+straight to the receiver for a Dolby Digital, Dolby Digital Plus, DTS and
+TrueHD clip, with PipeWire's own list of outputs read during each (the card
+should be Kinema's) and after (given back); and the 4K HDR clip with
+refresh-rate and HDR switching on, the screen read during the film and after
+it. The screen is put back as it was at the end. The receiver plays short,
+quiet test tones; the TV goes black for a moment at each switch.
+`~/kinema-results/check-<time>/`: `equipment.txt`, `direct.txt`,
+`switch.txt` and `display.txt` are the overview.
+
 ### A later round: the picture path
 
 ```bash

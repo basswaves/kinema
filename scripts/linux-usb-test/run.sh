@@ -9,6 +9,10 @@
 #             the driver's Vulkan, HDR and the 4K film mode, mpv by itself
 #             and Kinema (the third round, after the second showed Vulkan
 #             failing and HDR not reaching mpv).
+# `run.sh check` on a later boot: Kinema's own Linux picture and sound — what
+#             the equipment check sees, sound straight to the receiver in
+#             each format, and the screen switched for a film and put back —
+#             with the build in the kit, installed over the earlier one.
 # Nothing is asked for on screen, and nothing outside the live session is
 # touched: Windows and its disks are left alone. Results are read back from
 # the persistence file (README.md).
@@ -85,10 +89,25 @@ kinema_plan() {   # name, clip, extra actions (JSON list items); env vars may pr
 {"path":"$2","fileId":null,"titleId":null,"seconds":18,"openAfter":2,
  "actions":[{"at":7,"do":"key","key":"ArrowUp"},
             {"at":8,"do":"mpv","args":["screenshot-to-file","$d/mpv-window.png","window"]},
-            {"at":9,"do":"probe","args":["current-vo","current-gpu-context","gpu-api","hwdec-current","video-params/gamma","video-params/primaries","video-target-params/gamma","video-target-params/primaries","video-target-params/max-luma","target-colorspace-hint","display-names","display-fps","estimated-vf-fps","osd-width","osd-height","current-ao","audio-out-params/format","audio-out-params/channel-count","audio-params/format","mpv-version"]}$3]}
+            {"at":9,"do":"probe","args":["current-vo","current-gpu-context","gpu-api","hwdec-current","video-params/gamma","video-params/primaries","video-target-params/gamma","video-target-params/primaries","video-target-params/max-luma","target-colorspace-hint","display-names","display-fps","estimated-vf-fps","osd-width","osd-height","current-ao","audio-device","audio-spdif","audio-out-params/format","audio-out-params/channel-count","audio-params/format","mpv-version"]}$3]}
 JSON
   bash "$home_kit/tools/selftest.sh" "$d/plan.json" /usr/bin/kinema 99 > "$d/selftest.out" 2>&1
   tail -n 1 "$d/selftest.out"
+}
+
+# The NVIDIA driver's device files, which nothing on the stick makes (the
+# third round): without them Vulkan cannot present and NVDEC cannot start.
+# What nvidia-modprobe would do.
+nvidia_nodes() {
+  sudo modprobe nvidia_uvm 2>&1
+  [ -e /dev/nvidia-modeset ] || sudo mknod -m 666 /dev/nvidia-modeset c 195 254
+  local uvm_major
+  uvm_major="$(awk '$2 == "nvidia-uvm" {print $1}' /proc/devices)"
+  if [ -n "$uvm_major" ] && [ ! -e /dev/nvidia-uvm ]; then
+    sudo mknod -m 666 /dev/nvidia-uvm c "$uvm_major" 0
+    sudo mknod -m 666 /dev/nvidia-uvm-tools c "$uvm_major" 1
+  fi
+  ls -l /dev/nvidia*
 }
 
 if [ "$stage" = setup ]; then
@@ -200,14 +219,7 @@ if [ "$stage" = graphics ]; then
   say "The driver's missing device files, made by hand, then Vulkan and the decoder again"
   { ls -l /usr/bin/nvidia-modprobe /lib/udev/rules.d/*nvidia* /usr/lib/udev/rules.d/*nvidia*
     grep -iE 'nvidia' /proc/devices; } > "$R/nodes.txt" 2>&1
-  sudo modprobe nvidia_uvm 2>&1 | tee -a "$R/nodes.txt"
-  [ -e /dev/nvidia-modeset ] || sudo mknod -m 666 /dev/nvidia-modeset c 195 254
-  uvm_major="$(awk '$2 == "nvidia-uvm" {print $1}' /proc/devices)"
-  if [ -n "$uvm_major" ] && [ ! -e /dev/nvidia-uvm ]; then
-    sudo mknod -m 666 /dev/nvidia-uvm c "$uvm_major" 0
-    sudo mknod -m 666 /dev/nvidia-uvm-tools c "$uvm_major" 1
-  fi
-  ls -l /dev/nvidia* | tee -a "$R/nodes.txt"
+  nvidia_nodes | tee -a "$R/nodes.txt"
   vk summary-nodes vulkaninfo --summary
   vk cube-wayland-nodes vkcube --wsi wayland --c 300
   vk cube-xcb-nodes vkcube --wsi xcb --c 300
@@ -267,6 +279,62 @@ LUA
   hdr off
   mode "$w0" "$h0" "$r0"
   python3 "$home_kit/tools/display.py" state > "$R/gnome-displays-after.json" 2>&1
+
+  copy_out
+  say "All done. You can shut down, take the stick out and plug it into the development PC."
+  exit 0
+fi
+
+if [ "$stage" = check ]; then
+  # Steps 1–3 of the Linux port on the real TV and receiver (notes: PORTING,
+  # phase 4 round 2). Kinema itself does the work here; the kit only sets
+  # its settings on each run's copy of the library and reads what it logged.
+  media="$home_kit/media"
+  lsmod | grep -q '^nvidia ' || { say "NVIDIA's driver is not loaded: run plain 'bash ~/kinema-kit/run.sh' first."; exit 1; }
+  display() { python3 "$home_kit/tools/display.py" "$@"; }
+
+  say "The driver's device files"
+  nvidia_nodes > "$R/nodes.txt" 2>&1
+  tail -n 3 "$R/nodes.txt"
+
+  say "Kinema, the build in the kit"
+  sudo dpkg -i "$home_kit"/kinema_*_amd64.deb 2>&1 | tee "$R/install.txt" > /dev/null
+  dpkg -l kinema | tail -n 1 | tee -a "$R/install.txt"
+  read -r w0 h0 r0 < <(display current)
+  echo "screen at the start: ${w0}x${h0}@${r0}" | tee "$R/display.txt"
+  display hdr off >> "$R/display.txt"
+
+  say "1 — what Kinema sees: the equipment check it makes as it starts"
+  kinema_plan equipment "$media/sound-ac3.mkv" ""
+  grep -h 'equipment:' "$R/kinema-equipment/data/logs/app.log" | tee "$R/equipment.txt"
+
+  say "2 — sound straight to the receiver, in each format"
+  # PipeWire's view during the film (Kinema should hold the card, so the HDMI
+  # sink is gone) and after it (given back, so it is there again).
+  direct=',{"at":0.5,"do":"call","fn":"setSetting","args":["audio_direct","on"]}'
+  for codec in ac3 eac3 dts truehd; do
+    ( sleep 9; pactl list short sinks > "$R/sinks-during-$codec.txt" 2>&1 ) &
+    kinema_plan "direct-$codec" "$media/sound-$codec.mkv" "$direct"
+    wait
+    sleep 3
+    pactl list short sinks > "$R/sinks-after-$codec.txt" 2>&1
+    echo "-- $codec" >> "$R/direct.txt"
+    grep -hE 'audio: |shown to the user' "$R/kinema-direct-$codec/data/logs/app.log" | tee -a "$R/direct.txt"
+  done
+
+  say "3 — the screen switched for a 4K HDR film, and put back"
+  switch=',{"at":0.5,"do":"call","fn":"setSetting","args":["display_switch_refresh","on"]},{"at":0.6,"do":"call","fn":"setSetting","args":["display_switch_hdr","on"]}'
+  ( sleep 12; display current > "$R/display-during.txt" 2>&1; display state > "$R/gnome-displays-during.json" 2>&1 ) &
+  kinema_plan switch "$media/hdr10-2160p23.976.mkv" "$switch"
+  wait
+  sleep 3
+  echo "during: $(cat "$R/display-during.txt")" | tee -a "$R/display.txt"
+  echo "after:  $(display current)" | tee -a "$R/display.txt"
+  grep -hE 'display: |shown to the user' "$R/kinema-switch/data/logs/app.log" | tee "$R/switch.txt"
+
+  say "The screen back as it was, whatever happened above"
+  display hdr off >> "$R/display.txt"
+  display mode "$w0" "$h0" "$r0" >> "$R/display.txt"
 
   copy_out
   say "All done. You can shut down, take the stick out and plug it into the development PC."

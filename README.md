@@ -230,7 +230,7 @@ platform") says how the code is arranged for one.
 | Library, matching, artwork, accounts | ✓ | ✓ untested as an app |
 | Playback, controls, remote keys | ✓ | ✓ in development |
 | Equipment check, sound straight to a receiver | ✓ | ✓ in development |
-| Screen switching (refresh rate, HDR) | ✓ | ✓ in development, on GNOME and KDE Plasma |
+| Screen switching (refresh rate, HDR) | ✓ | ✓ in development, on GNOME and KDE Plasma; Sway and Hyprland written, not yet checked on a real screen |
 | Sleep / shut down | ✓ | not yet — hidden rather than offered |
 
 ## Building from source

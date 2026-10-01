@@ -17,9 +17,11 @@
 
 //!
 //! On Linux the desktop is asked instead (`display/linux.rs` → `desktop.rs`:
-//! GNOME and KDE Plasma so far). GNOME takes it as a temporary configuration
-//! it never saves; Plasma may keep it as the screen's setup. Either way the
-//! restore below, at the end of the film or at the next launch, puts it back.
+//! GNOME, KDE Plasma, and Sway, Hyprland and the other wlroots desktops). GNOME
+//! takes it as a temporary configuration it never saves; Plasma may keep it
+//! as the screen's setup; the wlroots desktops keep it until their own
+//! configuration is reloaded. Either way the restore below, at the end of the
+//! film or at the next launch, puts it back.
 
 // Some shared helpers (the signal check) serve only the Windows switcher.
 // Windows' clippy still reports anything that is genuinely unused.

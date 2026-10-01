@@ -92,3 +92,8 @@ gtk = "0.18"
 # libmpv already needs on every Linux system.
 zbus = "5"
 alsa = "0.12"
+# Sway, Hyprland and the other wlroots desktops' screens (wlroots.rs): the
+# wlr-output-management protocol spoken directly. Pure Rust (Smithay's
+# crates, no libwayland to link); nothing to install alongside.
+wayland-client = "0.31"
+wayland-protocols-wlr = { version = "0.3", features = ["client"] }

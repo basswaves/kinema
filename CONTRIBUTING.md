@@ -115,8 +115,8 @@ and only that.
 On Linux mpv plays in a window of its own, and the player's controls reach
 the screen as a picture mpv draws; which window is on top and which has the
 keyboard is the desktop's decision, and WSLg's own cannot show it. So
-`scripts/nested-selftest.sh <plan> kwin|gnome "<seconds>:<key> …"` runs the
-plan inside a real KDE or GNOME desktop nested as one window, sends it real
+`scripts/nested-selftest.sh <plan> kwin|gnome|sway "<seconds>:<key> …"` runs the
+plan inside a real KDE, GNOME or Sway desktop nested as one window, sends it real
 key presses and photographs that window alone — the check for anything
 touching the Linux player (packages it needs are listed at its top).
 
@@ -127,7 +127,12 @@ or KWin (`cargo test -- --ignored` inside `dbus-run-session` with the
 nested desktop's `WAYLAND_DISPLAY`, and `XDG_CURRENT_DESKTOP=KDE` for KWin,
 which also needs `libkf5screen-bin` and `qtwayland5` on Ubuntu 24.04). A
 nested KWin offers one mode only, so a real Plasma mode change and HDR need
-a real Plasma 6 session.
+a real Plasma 6 session. Sway, Hyprland and the other wlroots desktops are
+asked through their shared protocol (`wlroots.rs`); its ignored test
+`reads_and_reapplies_through_the_protocol` runs inside a nested Sway (`sway`
+on Ubuntu 24.04, `WLR_BACKENDS=x11`, as `nested-selftest.sh sway` starts it),
+whose one output has no modes to choose — a real mode change, Sway's HDR
+(1.12 and later) and Hyprland need a real session.
 
 `scripts\wsl.ps1 'bash scripts/package-linux.sh'` builds what a release
 carries for Linux — `.deb`, `.rpm` and a `.tar.gz` folder — into

@@ -2353,6 +2353,44 @@ still converted to SDR: with HDR on, KWin asks for up to 800 nits, but
 NVIDIA's 580 driver offers its Vulkan windows no HDR colour space on Plasma
 either.
 
+## Sway, Hyprland, and when HDR stays out
+
+**One protocol for the wlroots desktops.** Sway, Hyprland, river, Wayfire,
+labwc and niri all offer wlr-output-management — the protocol `wlr-randr`
+and `kanshi` use — so one module (`wlroots.rs`) speaks it directly, with
+Smithay's pure-Rust Wayland crates: nothing to install, no library to link.
+Each desktop's own tool (`swaymsg`, `hyprctl`) was the other choice, as
+`kscreen-doctor` is on Plasma, and was not taken: it is two modules for two
+desktops, and Hyprland's syntax moves — 0.55 moved its configuration to Lua.
+The protocol requires every screen to be named in a change and promises
+nothing for a property left unset, so each enabled screen is restated as it
+is (mode, position, rotation, scale) and only the asked-for mode differs.
+
+**HDR is not in that protocol.** Sway 1.12 switches it through its own IPC
+(`output <name> hdr on|off`, its state in `get_outputs`), used when Sway
+reports it. Hyprland switches HDR by itself for a full-screen HDR video and
+does not report it, so a screen gained a third answer besides "on/off" and
+"not offered": *not said*. There the TV's EDID decides what the equipment
+check says, and the player's own question — which has no EDID at hand — gets
+"not known", which keeps mpv's colour-space hint on. That hint is what
+tells Hyprland the film is HDR; the first version answered "SDR" there and
+would have turned it off.
+
+**Saying which part kept HDR out.** On the test stick the desktop was in
+HDR and the film still left as SDR, and the stats panel said the screen
+could not show HDR. It could: NVIDIA's 580 driver offered the player's
+window only SDR formats. The output check now names the graphics driver
+when the desktop reports HDR on and mpv's target is still SDR, with what
+would supply it — NVIDIA 595 or later (GeForce RTX 20 / GTX 16 onwards;
+590 dropped the GTX 10 series), Mesa 25.1 or later for AMD and Intel — and
+says nothing about the screen when the desktop does not report HDR. The
+numbers are the drivers that first offered HDR to Wayland windows; nothing
+in Kinema picks a vendor. For AMD, the kernel's display driver attaches the
+HDR properties to every HDMI and DisplayPort output with no check of the
+card's generation, and the display engine of Polaris and Vega sends the
+HDR signal (read in the kernel source), so those cards are expected to work
+with a recent Mesa — confirmed once a card is in the test PC.
+
 ## Words for each system, and TV mode at 4K
 
 **What each sentence says is true where it is read.** The on-screen texts

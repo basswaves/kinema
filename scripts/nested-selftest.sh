@@ -3,7 +3,7 @@
 # one window on an X11 display (WSLg's, or any Linux desktop's), send it real
 # key presses, and photograph that window alone.
 #
-#   scripts/nested-selftest.sh <plan.json> [kwin|gnome] [keys] [shots]
+#   scripts/nested-selftest.sh <plan.json> [kwin|gnome|sway] [keys] [shots]
 #
 #   keys   "seconds:key ..." sent into the desktop, e.g. "9:shift 11:space
 #          20:Escape" — xdotool key names. The first press after the desktop
@@ -21,7 +21,7 @@
 # desktop's decisions, and WSLg's own compositor turns each Linux window into
 # a separate Windows one, so it cannot show them (docs/GOTCHAS.md).
 #
-# Needs: kwin-wayland kwin-wayland-backend-x11 (and/or gnome-shell), dbus-x11,
+# Needs: kwin-wayland kwin-wayland-backend-x11 (and/or gnome-shell, sway), dbus-x11,
 # xdotool, x11-apps, imagemagick. GNOME Shell 46 in WSL runs with --no-x11
 # (its Xwayland trips over WSL's /tmp/.X11-unix) and --unsafe-mode, so the
 # overview it opens at start can be closed; it still crashes now and then on
@@ -49,7 +49,17 @@ INNER
 # WSL's route to the real graphics card, as selftest.sh sets it (GOTCHAS).
 [ -d /usr/lib/wsl/lib ] && export GALLIUM_DRIVER="${GALLIUM_DRIVER:-d3d12}"
 
-if [ "$desktop" = kwin ]; then
+if [ "$desktop" = sway ]; then
+  # Sway on WSL's X server, one output the size of its window; its
+  # config only starts the plan and leaves when it ends. XDG_CURRENT_DESKTOP
+  # as a Sway session sets it.
+  cat > "$dir/sway.conf" <<SWAY
+output * resolution 1600x900
+exec "bash $inner; swaymsg exit"
+SWAY
+  XDG_CURRENT_DESKTOP=sway WLR_BACKENDS=x11 WLR_RENDERER=pixman \
+    dbus-run-session -- sway --unsupported-gpu -c "$dir/sway.conf" > "$dir/compositor.log" 2>&1 &
+elif [ "$desktop" = kwin ]; then
   dbus-run-session -- kwin_wayland --x11-display "$DISPLAY" --width 1600 --height 900 \
     --socket "$socket" --exit-with-session "bash $inner" > "$dir/compositor.log" 2>&1 &
 else
@@ -67,7 +77,7 @@ started=$(date +%s)
 
 window() {
   local pid
-  pid=$(pgrep -n -x kwin_wayland || pgrep -n -x gnome-shell) || return 1
+  pid=$(pgrep -n -x kwin_wayland || pgrep -n -x gnome-shell || pgrep -n -x sway) || return 1
   xdotool search --onlyvisible --pid "$pid" 2>/dev/null | head -1
 }
 photo() {

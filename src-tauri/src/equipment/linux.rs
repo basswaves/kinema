@@ -183,7 +183,10 @@ pub(crate) fn display_from(connector: Option<&str>, edid: Option<&edid::Edid>, o
     };
 
     let can_hdr = edid.and_then(|e| e.hdr.as_ref()).is_some_and(|h| h.pq);
-    d.hdr = match on_desktop.map(|m| m.hdr) {
+    // A desktop that does not say (Hyprland switches HDR by itself) is
+    // treated as no desktop answer: the screen's own EDID decides.
+    let said = on_desktop.filter(|m| !m.hdr_unreported);
+    d.hdr = match said.map(|m| m.hdr) {
         Some(Some(true)) => HdrState::On,
         Some(Some(false)) => HdrState::Off,
         Some(None) => HdrState::Unsupported,
@@ -501,6 +504,28 @@ mod tests {
         assert_eq!((d.width, d.modes.len()), (0, 0));
         let sdr = edid::parse(&edid::tests::sample(None)).unwrap();
         assert_eq!(display_from(Some("DP-1"), Some(&sdr), None).hdr, HdrState::Unsupported);
+    }
+
+    #[test]
+    fn a_desktop_that_does_not_report_hdr_leaves_it_to_the_edid() {
+        // Hyprland: the screen and its modes come from the desktop, HDR is
+        // switched by Hyprland itself and not reported — so an HDR TV is
+        // "not known", which keeps mpv's colour-space hint on, and not "SDR".
+        let on_hyprland = DesktopScreen {
+            connector: "HDMI-A-1".into(),
+            modes: vec![crate::desktop::tests::mode("3840x2160@60000", 3840, 2160, 60.0, true)],
+            hdr: None,
+            hdr_unreported: true,
+            ..Default::default()
+        };
+        let tv = edid::parse(&edid::tests::sample(Some(&[6, 0b0101, 1, 0x6E]))).unwrap();
+        let d = display_from(Some("HDMI-A-1"), Some(&tv), Some(&on_hyprland));
+        assert_eq!((d.hdr, d.width), (HdrState::Unknown, 3840));
+        let sdr = edid::parse(&edid::tests::sample(None)).unwrap();
+        assert_eq!(display_from(Some("HDMI-A-1"), Some(&sdr), Some(&on_hyprland)).hdr, HdrState::Unsupported);
+        // A desktop that reports and offers none still means none.
+        let says_none = DesktopScreen { hdr_unreported: false, ..on_hyprland };
+        assert_eq!(display_from(Some("HDMI-A-1"), Some(&tv), Some(&says_none)).hdr, HdrState::Unsupported);
     }
 
     #[test]

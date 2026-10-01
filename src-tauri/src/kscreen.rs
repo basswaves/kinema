@@ -151,6 +151,7 @@ pub(crate) fn parse(json: &str) -> Result<Vec<Screen>, String> {
             display_name: String::new(),
             primary: o.priority == 1,
             hdr: o.hdr,
+            hdr_unreported: false,
             colour_mode: None,
             modes: o
                 .modes

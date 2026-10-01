@@ -9,7 +9,7 @@
 use super::ScreenNow;
 use crate::desktop::{self, Colour, Screen, ScreenMode};
 use crate::equipment::linux::{display_from, whole_hz};
-use crate::equipment::rate_meaning;
+use crate::equipment::{rate_meaning, HdrState};
 
 /// Whether a desktop Kinema can ask is running.
 pub fn can_switch() -> bool {
@@ -29,7 +29,14 @@ pub(crate) fn pick<'a>(screens: &'a [Screen], name: Option<&str>) -> Result<&'a 
 }
 
 pub(crate) fn now_of(s: &Screen) -> ScreenNow {
-    let d = display_from(None, None, Some(s));
+    let mut d = display_from(None, None, Some(s));
+    // No EDID is at hand here, so a desktop that does not report HDR
+    // (Hyprland, which switches it by itself) leaves it not known — which
+    // keeps mpv's colour-space hint on, and that hint is what tells such a
+    // desktop the film is HDR.
+    if s.hdr_unreported {
+        d.hdr = HdrState::Unknown;
+    }
     let exact = s.current().map_or(0.0, |c| c.refresh);
     let hz = whole_hz(exact);
     ScreenNow {
@@ -110,6 +117,17 @@ pub fn set(connector: &str, mode: Option<(u32, u32, u32)>, colour: Option<Colour
 mod tests {
     use super::*;
     use crate::desktop::tests::two_screens;
+
+    #[test]
+    fn a_desktop_that_does_not_report_hdr_keeps_the_hint_on() {
+        // Hyprland: no HDR state from the desktop and no EDID here, so the
+        // player is told "not known" (colour-space hint on), never "SDR".
+        let mut s = two_screens().remove(1);
+        s.hdr_unreported = true;
+        assert_eq!(now_of(&s).hdr, HdrState::Unknown);
+        s.hdr_unreported = false;
+        assert_eq!(now_of(&s).hdr, HdrState::Unsupported);
+    }
 
     #[test]
     fn the_screen_mpv_is_on_wins_then_the_primary() {

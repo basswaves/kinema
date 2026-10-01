@@ -75,9 +75,10 @@ reasons in full.
 every push, plays with Kinema's own controls, and has packages that use the
 system's mpv, the equipment check, sound straight to the receiver and screen
 switching on GNOME and KDE Plasma — each checked on a real TV and receiver
-(Ubuntu and Kubuntu 26.04). Sway, Hyprland and other wlroots desktops are not asked
-yet: there Kinema plays and passes sound through, but does not switch the
-screen (help welcome: one module beside `kscreen.rs`).
+(Ubuntu and Kubuntu 26.04). Sway, Hyprland and the other wlroots desktops
+switch through the protocol they share — written and checked in a nested
+Sway, not yet on a real screen. Sleep and shut down on Linux are still to
+come.
 Android comes after, with
 its own player engine (Media3) for Dolby Vision and passthrough on TV boxes.
 macOS is not planned by the author; a port is welcome. See

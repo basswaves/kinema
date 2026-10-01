@@ -6,8 +6,8 @@
 //! ask the desktop to — and every desktop is asked its own way: GNOME over
 //! D-Bus (`mutter.rs`), KDE Plasma through its own `kscreen-doctor`
 //! (`kscreen.rs`). Each answers in its own shape; this is the one shape the
-//! rest of Kinema sees. A desktop added later (Sway, Hyprland: wlroots) is a
-//! module like those two and a variant here.
+//! rest of Kinema sees. Sway, Hyprland and the other wlroots desktops share
+//! one protocol for it (`wlroots.rs`).
 
 use std::sync::OnceLock;
 
@@ -24,6 +24,11 @@ pub struct Screen {
     /// `None`: the desktop does not offer HDR on this screen. Otherwise
     /// whether it is on.
     pub hdr: Option<bool>,
+    /// The desktop does not say whether HDR is on — it may switch it by
+    /// itself for HDR video, as Hyprland does — so `hdr`'s `None` means
+    /// "not said", not "not offered", and the screen's own EDID decides
+    /// whether it can.
+    pub hdr_unreported: bool,
     /// GNOME's own colour-mode number, kept so a restore puts back exactly
     /// what was there — sdr-native (2) is neither HDR nor the default.
     pub colour_mode: Option<u32>,
@@ -50,6 +55,8 @@ impl Screen {
 pub enum Desktop {
     Gnome,
     Kde,
+    /// Sway, Hyprland and the others sharing wlr-output-management.
+    Wlroots,
 }
 
 /// The colour change asked of a screen.
@@ -63,7 +70,8 @@ pub enum Colour {
 
 /// The desktop that answers, found once per launch: GNOME if Mutter answers
 /// on the session bus, else KDE Plasma if this is a Plasma session and its
-/// `kscreen-doctor` answers. Not taken from the desktop's name alone — a
+/// `kscreen-doctor` answers, else a desktop offering wlr-output-management
+/// (Sway, Hyprland…). Not taken from the desktop's name alone — a
 /// desktop Kinema cannot actually talk to must not be offered a switch.
 pub fn which() -> Option<Desktop> {
     static WHICH: OnceLock<Option<Desktop>> = OnceLock::new();
@@ -79,6 +87,10 @@ pub fn which() -> Option<Desktop> {
                 Err(e) => crate::log!("display: a Plasma session, but its screens could not be read: {e}"),
             }
         }
+        // Sway, Hyprland and the like: whoever offers the shared protocol.
+        if crate::wlroots::answers() {
+            return Some(Desktop::Wlroots);
+        }
         None
     })
 }
@@ -87,7 +99,8 @@ pub fn screens() -> Result<Vec<Screen>, String> {
     match which() {
         Some(Desktop::Gnome) => crate::mutter::screens(),
         Some(Desktop::Kde) => crate::kscreen::screens(),
-        None => Err("this desktop is not one Kinema can ask (GNOME and KDE Plasma so far)".into()),
+        Some(Desktop::Wlroots) => crate::wlroots::screens(),
+        None => Err("this desktop is not one Kinema can ask (GNOME, KDE Plasma, Sway, Hyprland and the other wlroots desktops so far)".into()),
     }
 }
 
@@ -97,6 +110,7 @@ pub fn set(connector: &str, mode_id: Option<&str>, colour: Option<Colour>) -> Re
     match which() {
         Some(Desktop::Gnome) => crate::mutter::set(connector, mode_id, colour),
         Some(Desktop::Kde) => crate::kscreen::set(connector, mode_id, colour),
+        Some(Desktop::Wlroots) => crate::wlroots::set(connector, mode_id, colour),
         None => Err("this desktop is not one Kinema can ask".into()),
     }
 }
@@ -122,6 +136,7 @@ pub(crate) mod tests {
                 ],
                 primary: true,
                 hdr: Some(false),
+                hdr_unreported: false,
                 colour_mode: Some(0),
             },
             Screen {
@@ -130,6 +145,7 @@ pub(crate) mod tests {
                 modes: vec![mode("2560x1440@59.951", 2560, 1440, 59.951, true)],
                 primary: false,
                 hdr: None,
+                hdr_unreported: false,
                 colour_mode: None,
             },
         ]

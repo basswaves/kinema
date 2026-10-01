@@ -76,6 +76,10 @@ export interface OutputFacts {
 
 const res = (s: { width: number; height: number }) => `${s.width}×${s.height}`;
 
+/** What a Linux graphics driver needs to offer the player HDR (README, "HDR on Linux"). */
+const LINUX_HDR_DRIVERS =
+  'NVIDIA needs driver 595 or newer, which supports GeForce RTX 20 and GTX 16 cards and later — older cards cannot show HDR on Linux. AMD and Intel need Mesa 25.1 or newer.';
+
 function sizeName(s: { width: number; height: number }): string {
   if (s.width >= 3800 || s.height >= 2000) return '4K';
   if (s.width >= 1900 || s.height >= 1000) return '1080p';
@@ -193,8 +197,23 @@ export function checkHdr(f: OutputFacts): Check {
               verdict: 'limited',
               value: 'HDR video shown in SDR',
               why: 'The desktop has HDR on, but the graphics driver offers the player no HDR output, so the video is converted to SDR.',
-              fix: 'NVIDIA needs driver 595 or newer, which supports GeForce RTX 20 and GTX 16 cards and later — older cards cannot show HDR on Linux. AMD and Intel need Mesa 25.1 or newer.',
+              fix: LINUX_HDR_DRIVERS,
             };
+      }
+      if (f.screen?.hdr === 'unknown') {
+        // The screen says it can (its EDID), the desktop does not say
+        // whether HDR is on — Hyprland switches it by itself — so which part
+        // kept it out is not known.
+        return {
+          label,
+          verdict: 'limited',
+          value: 'HDR video shown in SDR',
+          why: `The screen can show HDR, but HDR did not reach it, and ${owner} does not say whether its HDR is on.`,
+          fix:
+            owner === 'Windows'
+              ? 'Switch HDR on in Windows.'
+              : `Switch HDR on in the desktop’s display settings, or let it switch for a full-screen HDR video if it can. ${LINUX_HDR_DRIVERS}`,
+        };
       }
       return {
         label,

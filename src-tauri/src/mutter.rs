@@ -169,6 +169,7 @@ pub(crate) fn to_screens(state: &State) -> Vec<crate::desktop::Screen> {
             } else {
                 None
             },
+            hdr_unreported: false,
             colour_mode: m.color_mode,
         })
         .collect()

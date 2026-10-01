@@ -156,6 +156,22 @@ describe('outputCheck', () => {
     expect(windows?.fix).not.toMatch(/Mesa/);
   });
 
+  it('does not call a screen SDR when the desktop does not say whether HDR is on', () => {
+    // Hyprland: the TV's EDID says HDR, the desktop reports nothing.
+    const c = byLabel(
+      outputCheck({
+        ...base,
+        hdrOut: 'sdr',
+        system: 'Linux',
+        screen: { ...base.screen!, hdr: 'unknown' },
+      })
+    ).HDR;
+    expect(c).toMatchObject({ verdict: 'limited', value: 'HDR video shown in SDR' });
+    expect(c?.why).toMatch(/The screen can show HDR/);
+    expect(c?.why).not.toMatch(/cannot show HDR/);
+    expect(c?.fix).toMatch(/full-screen HDR video/);
+  });
+
   it('does not ask for a resolution drop to fix motion', () => {
     const monitor: OutputFacts = {
       ...base,

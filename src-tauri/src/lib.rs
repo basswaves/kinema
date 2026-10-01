@@ -24,6 +24,8 @@ mod desktop;
 mod kscreen;
 #[cfg(target_os = "linux")]
 mod mutter;
+#[cfg(target_os = "linux")]
+mod wlroots;
 mod nfo;
 mod overlay;
 mod omdb;

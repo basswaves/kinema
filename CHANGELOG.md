@@ -11,10 +11,11 @@ makes no stability promises.
 
 - **Linux: Picture & sound.** Settings → Your equipment lists the screens and
   what each receiver takes; Settings → Sound sends films straight to the
-  receiver, untouched, as on Windows; and on GNOME and KDE Plasma, Settings →
-  Screen switches the refresh rate, resolution and HDR for a film and puts
-  them back after. Screen switching on other desktops (Sway, Hyprland) is
-  still to come.
+  receiver, untouched, as on Windows; and on GNOME, KDE Plasma, Sway,
+  Hyprland and the other wlroots desktops, Settings → Screen switches the
+  refresh rate and resolution for a film and puts them back after — and HDR
+  on GNOME, Plasma and Sway 1.12 or later (Hyprland switches HDR by itself
+  for an HDR film).
 - **Linux: why an HDR film is shown in SDR.** When the desktop is in HDR but
   the graphics driver offers the player no HDR output, the stats panel now
   says so and names the driver that would — instead of calling the screen

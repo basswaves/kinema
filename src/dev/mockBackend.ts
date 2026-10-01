@@ -746,7 +746,9 @@ export function listenerCounts(): Record<string, number> {
  * `kinemaMockSlowDetect` makes the scan's detection pass take 20 seconds,
  * `kinemaMockSystem=linux` answers `capabilities` and the equipment check as
  * the Linux build does (the check and direct sound, but no screen
- * switching, sleep or shut down).
+ * switching, sleep or shut down), `kinemaMockScreenHdr=on` reports the
+ * screen in HDR (for the output check; the picture itself is the fake
+ * mpv's `extra`).
  */
 function flag(name: string): string | null {
   try {
@@ -759,6 +761,7 @@ const SLOW_MS = Number(flag('kinemaMockSlowMs') ?? 0) || 0;
 const EMPTY = flag('kinemaMockEmpty') === '1';
 const SLOW_DETECT = flag('kinemaMockSlowDetect') === '1';
 const ON_LINUX = flag('kinemaMockSystem') === 'linux';
+const SCREEN_HDR = flag('kinemaMockScreenHdr') === 'on';
 /** `kinemaMockReview` pretends that many videos wait in the review queue. */
 const REVIEW_COUNT = Number(flag('kinemaMockReview') ?? 0) || 0;
 /** `kinemaMockUpdate` pretends that version is out on GitHub. */
@@ -976,7 +979,7 @@ const handlers: Record<string, Handler> = {
     height: 2160,
     hz: 60,
     rate: 60,
-    hdr: 'off',
+    hdr: SCREEN_HDR ? 'on' : 'off',
     modes: [
       { width: 3840, height: 2160, hz: 60, rate: 60 },
       { width: 3840, height: 2160, hz: 23, rate: 23.976 },

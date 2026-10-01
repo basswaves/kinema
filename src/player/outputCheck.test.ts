@@ -140,6 +140,22 @@ describe('outputCheck', () => {
     expect(off.HDR?.fix).toMatch(/Turn HDR on for HDR videos/);
   });
 
+  it('blames the graphics driver, not the screen, when HDR is on and the video still left as SDR', () => {
+    // The test stick: GNOME and Plasma in HDR, NVIDIA's 580 driver offering
+    // the player's window only SDR formats.
+    const on = { ...base, hdrOut: 'sdr' as const, screen: { ...base.screen!, hdr: 'on' as const } };
+    const linux = byLabel(outputCheck({ ...on, system: 'Linux' })).HDR;
+    expect(linux).toMatchObject({ verdict: 'limited', value: 'HDR video shown in SDR' });
+    expect(linux?.why).toMatch(/graphics driver offers the player no HDR output/);
+    expect(linux?.why).not.toMatch(/cannot show HDR/);
+    expect(linux?.fix).toMatch(/NVIDIA needs driver 595 or newer/);
+    expect(linux?.fix).toMatch(/Mesa 25\.1 or newer/);
+    const windows = byLabel(outputCheck({ ...on, system: 'Windows' })).HDR;
+    expect(windows).toMatchObject({ verdict: 'limited' });
+    expect(windows?.why).toMatch(/Windows has HDR on/);
+    expect(windows?.fix).not.toMatch(/Mesa/);
+  });
+
   it('does not ask for a resolution drop to fix motion', () => {
     const monitor: OutputFacts = {
       ...base,

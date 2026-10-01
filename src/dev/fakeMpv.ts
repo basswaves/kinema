@@ -50,6 +50,13 @@ export interface FakeMpvState {
    * `fs=yes`). Unused where the page sits over the video.
    */
   fullscreen: boolean;
+  /**
+   * More answers by property name, for a check that needs mpv to describe
+   * a picture — e.g. an HDR film tone mapped to SDR for the stats panel:
+   * `{ 'video-params/gamma': 'pq', 'video-target-params/gamma': 'gamma2.2' }`.
+   * Answered only while a file is open, as mpv does.
+   */
+  extra: Record<string, unknown>;
 }
 
 /** How long each fixture file runs. Unknown paths get a TV-episode length. */
@@ -73,6 +80,7 @@ const state: FakeMpvState = {
   audioOutFormat: 'float',
   failNextLoad: null,
   fullscreen: true,
+  extra: {},
 };
 
 let ticker: number | undefined;
@@ -279,6 +287,7 @@ export function getProperty(name: string): unknown {
     case 'chapters':
       return 0;
     default: {
+      if (state.path !== null && name in state.extra) return state.extra[name];
       const field = trackField(name);
       if (field !== undefined) return field;
       throw new Error(`property unavailable: ${name}`);

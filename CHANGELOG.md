@@ -15,6 +15,10 @@ makes no stability promises.
   Screen switches the refresh rate, resolution and HDR for a film and puts
   them back after. Screen switching on other desktops (Sway, Hyprland) is
   still to come.
+- **Linux: why an HDR film is shown in SDR.** When the desktop is in HDR but
+  the graphics driver offers the player no HDR output, the stats panel now
+  says so and names the driver that would — instead of calling the screen
+  SDR. The README lists what HDR needs on Linux.
 
 ### Changed
 

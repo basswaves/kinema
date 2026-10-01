@@ -81,7 +81,17 @@ fn gpus() -> Vec<String> {
             };
             format!("{maker} {}", id.trim_start_matches("0x"))
         });
-        out.push(format!("{name} ({driver} driver, {}:{})", vendor.trim_start_matches("0x"), id.trim_start_matches("0x")));
+        // A module that states its version (NVIDIA's does; the kernel's own
+        // drivers do not) — whether HDR reaches a window can depend on it.
+        // Mesa's version is in mpv.log ("Driver info").
+        let version = read(format!("/sys/module/{driver}/version"))
+            .map(|v| format!(" {v}"))
+            .unwrap_or_default();
+        out.push(format!(
+            "{name} ({driver} driver{version}, {}:{})",
+            vendor.trim_start_matches("0x"),
+            id.trim_start_matches("0x")
+        ));
     }
     out
 }

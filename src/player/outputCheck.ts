@@ -175,6 +175,27 @@ export function checkHdr(f: OutputFacts): Check {
               }.`,
         };
       }
+      if (f.screen?.hdr === 'on') {
+        // The screen is in HDR and the film still left as SDR: the part in
+        // between offered nothing better. On Linux that is the graphics
+        // driver — it has to offer windows an HDR format, and older ones do
+        // not (NVIDIA's 580 does not, measured on a test stick; 595 does).
+        return owner === 'Windows'
+          ? {
+              label,
+              verdict: 'limited',
+              value: 'HDR video shown in SDR',
+              why: 'Windows has HDR on, but the video still reached the screen as SDR.',
+              fix: 'Update the graphics driver.',
+            }
+          : {
+              label,
+              verdict: 'limited',
+              value: 'HDR video shown in SDR',
+              why: 'The desktop has HDR on, but the graphics driver offers the player no HDR output, so the video is converted to SDR.',
+              fix: 'NVIDIA needs driver 595 or newer, which supports GeForce RTX 20 and GTX 16 cards and later — older cards cannot show HDR on Linux. AMD and Intel need Mesa 25.1 or newer.',
+            };
+      }
       return {
         label,
         verdict: 'info',

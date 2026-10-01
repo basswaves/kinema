@@ -403,8 +403,10 @@ export function describeHdr(f: HdrFacts, system?: string | null): StatRow {
     label: 'HDR pipeline',
     value: `tone mapped to SDR (${f.targetGamma}) · ${text(f.toneMapping)}`,
     note: `this screen is SDR, or HDR is off in ${owner}${
-      f.computePeak ? '; measured frame peak' : ''
-    }`,
+      // A Linux graphics driver may also offer windows no HDR format at all
+      // (the output check above says which, from the screen's own state).
+      owner === 'Windows' ? '' : ', or the graphics driver offers no HDR output'
+    }${f.computePeak ? '; measured frame peak' : ''}`,
   };
 }
 

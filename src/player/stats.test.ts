@@ -26,6 +26,10 @@ describe('describeHdr', () => {
   it('calls SDR out tone mapping', () => {
     const row = describeHdr({ ...hdr10, targetGamma: 'srgb', targetPeak: 203 });
     expect(row.value).toMatch(/^tone mapped to SDR \(srgb\)/);
+    expect(row.note).not.toMatch(/graphics driver/);
+    // On Linux the driver is one more possible cause.
+    const linux = describeHdr({ ...hdr10, targetGamma: 'gamma2.2', targetPeak: 203 }, 'Linux');
+    expect(linux.note).toMatch(/graphics driver offers no HDR output/);
   });
 
   it('says it does not know rather than guessing, when mpv has not answered', () => {

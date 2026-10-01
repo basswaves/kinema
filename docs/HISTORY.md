@@ -2401,10 +2401,27 @@ started on the TV: the screen read through wlr-output-management with its
 film rates, switched to 3840×2160 at 23.976 Hz for the film and put back
 (both desktops' own reports agree), TrueHD to the receiver untouched. Sway
 1.11 has no HDR to switch. Hyprland received the film as HDR10 (mpv's target
-PQ, BT.2020, 1000 nits) but did not switch the TV to HDR by itself: during
-the film it still told mpv the screen was SDR and showed its 8-bit sRGB
-set-up, so it converted the film back to SDR. Why its automatic HDR did not
-act is not known yet — its own log is off by default.
+PQ, BT.2020, 1000 nits), and its own report kept saying "srgb", 8-bit — which
+was read at first as Hyprland not switching. A second round with its log on
+and the kernel's connector state sampled showed otherwise: the TV was sent
+BT.2020 and HDR10 metadata, through Hyprland's passthrough of a full-screen
+HDR window by default (its report does not show that path) or through its
+automatic switch with passthrough off. By default it does so at 8 bits per
+colour, and warns about it; `bitdepth, 10` in its monitor rule gives 10.
+
+**On tiling desktops Kinema's own window is tiled.** Both rounds also showed
+the player's controls stretched and soft on Sway and Hyprland: those
+desktops tile Kinema's window beside mpv's (933 pixels wide once the film's
+window appears), and the controls are a photo of Kinema's window scaled to
+mpv's — the wrong shape, blown up. GNOME and Plasma float windows, so it
+never showed there.
+
+**A slow first frame cost the switch.** Kinema waited 5 s for the first
+frame's details before deciding a switch, then played the film in the mode
+the screen was in, saying nothing; with the AMD card in a test PC that had
+NVIDIA's driver installed, mpv spent 4 s trying NVIDIA's decoder first and
+the first frame came at 5.05 s. The film is held paused for the switch
+anyway, so the wait is now 15 s, and giving up is logged.
 
 ## Words for each system, and TV mode at 4K
 

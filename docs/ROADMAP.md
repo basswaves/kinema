@@ -76,10 +76,11 @@ every push, plays with Kinema's own controls, and has packages that use the
 system's mpv, the equipment check, sound straight to the receiver and screen
 switching on GNOME, KDE Plasma, Sway and Hyprland — each checked on a real
 TV and receiver, with an NVIDIA and an AMD card. HDR reaches the TV on GNOME
-and Plasma with a driver that offers it (AMD on Mesa, NVIDIA 595+); on
-Hyprland the film arrived as HDR10 but Hyprland showed it as SDR, which is
-being looked into; Sway's HDR (1.12) is untested. Sleep and shut down on
-Linux are still to come.
+and Plasma with a driver that offers it (AMD on Mesa, NVIDIA 595+), and on
+Hyprland, which switches it by itself (at 8 bits unless set to 10); Sway's
+HDR (1.12) is untested. On Sway and Hyprland the player's controls are drawn
+the wrong size, because those desktops tile Kinema's window — being fixed.
+Sleep and shut down on Linux are still to come.
 Android comes after, with
 its own player engine (Media3) for Dolby Vision and passthrough on TV boxes.
 macOS is not planned by the author; a port is welcome. See

@@ -232,7 +232,7 @@ platform") says how the code is arranged for one.
 | Library, matching, artwork, accounts | ✓ | ✓ untested as an app |
 | Playback, controls, remote keys | ✓ | ✓ in development |
 | Equipment check, sound straight to a receiver | ✓ | ✓ in development |
-| Screen switching (refresh rate, HDR) | ✓ | ✓ in development: refresh rate on GNOME, KDE Plasma, Sway and Hyprland; HDR on GNOME and KDE Plasma (Sway 1.12 and Hyprland not yet confirmed) |
+| Screen switching (refresh rate, HDR) | ✓ | ✓ in development: refresh rate on GNOME, KDE Plasma, Sway and Hyprland; HDR on GNOME and KDE Plasma, and by Hyprland itself (Sway 1.12 not yet confirmed); on Sway and Hyprland the controls are not yet drawn at the right size |
 | Sleep / shut down | ✓ | not yet — hidden rather than offered |
 
 ## Building from source

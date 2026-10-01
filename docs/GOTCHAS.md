@@ -1630,4 +1630,5 @@ no switching, and the equipment check saying it could not read the screens,
 with nothing else logged. `kscreen.rs` now asks once more when the program
 ended by a signal (an ordinary failure, such as an unknown mode, is not
 repeated), and `desktop.rs` logs why a Plasma session was not recognised.
-Whether Plasma 6's `kscreen-doctor` does the same is not known yet.
+Plasma 6.6's did not crash once in a full run on a real TV (six Kinema
+starts, a switch and a restore), so it may be 5.27's alone; the retry stays.

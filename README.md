@@ -203,8 +203,9 @@ and ARM, on every push), and the interface is tested in WebKit, the engine of
 Linux's window. Playback works in development: Wayland offers no way to put
 Kinema's page over mpv, so on Linux mpv plays in a full-screen window of its
 own and draws Kinema's controls over the video itself (docs/HISTORY.md, "The
-Linux player"). Next are a package with a recent mpv, and HDR and sound
-checked on real equipment. Nothing is released for Linux yet.
+Linux player"). The equipment check, sound straight to a receiver and screen
+switching (GNOME and KDE Plasma) have been checked on a real TV and
+receiver. Nothing is released for Linux yet.
 
 An Android version is planned after it. macOS is not planned by the author;
 a port is welcome, and [CONTRIBUTING.md](CONTRIBUTING.md) ("More than one
@@ -215,7 +216,9 @@ platform") says how the code is arranged for one.
 | Builds and passes its tests | ✓ | ✓ |
 | Library, matching, artwork, accounts | ✓ | ✓ untested as an app |
 | Playback, controls, remote keys | ✓ | ✓ in development |
-| Equipment check, screen switching, sleep / shut down | ✓ | not yet — hidden rather than offered |
+| Equipment check, sound straight to a receiver | ✓ | ✓ in development |
+| Screen switching (refresh rate, HDR) | ✓ | ✓ in development, on GNOME and KDE Plasma |
+| Sleep / shut down | ✓ | not yet — hidden rather than offered |
 
 ## Building from source
 

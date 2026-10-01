@@ -74,8 +74,8 @@ reasons in full.
 **Linux is under way**, then **Android**. Linux builds and passes its tests on
 every push, plays with Kinema's own controls, and has packages that use the
 system's mpv, the equipment check, sound straight to the receiver and screen
-switching on GNOME and KDE Plasma — checked on a real TV and receiver on
-GNOME; Plasma's next. Sway, Hyprland and other wlroots desktops are not asked
+switching on GNOME and KDE Plasma — each checked on a real TV and receiver
+(Ubuntu and Kubuntu 26.04). Sway, Hyprland and other wlroots desktops are not asked
 yet: there Kinema plays and passes sound through, but does not switch the
 screen (help welcome: one module beside `kscreen.rs`).
 Android comes after, with

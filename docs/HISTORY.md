@@ -2342,6 +2342,17 @@ mode applied through `kscreen-doctor`, an unknown mode refused; GNOME's
 switching unchanged; Plasma 6's JSON (with `hdr`) in unit tests. A real
 mode change and HDR on Plasma 6: a test stick with Kubuntu.
 
+On the real TV and receiver with Kubuntu 26.04 (Plasma 6.6, 2026-10-01):
+the TV found through Plasma with its film rates and "HDR off, capable"
+(the `hdr` key is there for it); a 4K film switched the screen from
+1920×1080 at 60 Hz to 3840×2160 at 23.976 Hz with HDR on, and Kinema's own
+restore put back both the mode and HDR off — Plasma kept nothing. Sound
+straight to the receiver behaved as on Ubuntu (WirePlumber gave the card
+up and took it back; all five formats untouched). The film itself was
+still converted to SDR: with HDR on, KWin asks for up to 800 nits, but
+NVIDIA's 580 driver offers its Vulkan windows no HDR colour space on Plasma
+either.
+
 ## Words for each system, and TV mode at 4K
 
 **What each sentence says is true where it is read.** The on-screen texts

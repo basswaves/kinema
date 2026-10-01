@@ -129,6 +129,19 @@ screen for itself while it runs:
 desktop's own view of its screens before, during and after the film
 (`screens-*.json`, from `swaymsg` and `hyprctl`).
 
+### Hyprland's HDR, three ways
+
+```bash
+bash ~/kinema-kit/run.sh hyprland
+```
+
+From a text console as above. Starts Hyprland three times with its own log
+on — its defaults, the screen at 10 bits, and passthrough off — and plays
+the 4K HDR film in each, recording every two seconds Hyprland's view of the
+screen and of the film's window, and the kernel's of what is sent to the
+TV (`modetest`: `Colorspace` and `HDR_OUTPUT_METADATA`). About five
+minutes. `~/kinema-results/hyprland-<time>/A`, `B`, `C`.
+
 ### A later round: the picture path
 
 ```bash

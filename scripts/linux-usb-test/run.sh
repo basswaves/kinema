@@ -16,6 +16,8 @@
 #             with the build in the kit, installed over the earlier one.
 # `run.sh wlroots` from a text console: the same Kinema check inside Sway and
 #             then Hyprland, each started on the real screen for the purpose.
+# `run.sh hyprland` from a text console: Hyprland three ways (defaults, 10-bit,
+#             no passthrough) with its log on, for its HDR path.
 # `check` and `wlroots` work with any graphics card: NVIDIA's needs the
 #             first boot's driver, AMD's and Intel's need nothing.
 # Nothing is asked for on screen, and nothing outside the live session is
@@ -458,6 +460,81 @@ CONF
   XDG_CURRENT_DESKTOP=Hyprland timeout 300 Hyprland -c "$d/hyprland.conf" > "$d/hyprland.log" 2>&1
   echo "Hyprland ended ($?)" | tee -a "$R/versions.txt"
 
+  copy_out
+  say "All done. Shut down (sudo poweroff), take the stick out and plug it into the development PC."
+  exit 0
+fi
+
+if [ "$stage" = hyprland-in ]; then
+  # Inside Hyprland, started by the hyprland stage below: one 4K HDR film
+  # with switching on, and every two seconds Hyprland's view of the screen
+  # and of mpv's window, and the kernel's of what goes down the cable —
+  # HDR_OUTPUT_METADATA on the connector is what the TV is actually told.
+  media="$home_kit/media"
+  for o in render:cm_auto_hdr render:cm_fs_passthrough render:cm_enabled debug:disable_logs; do
+    echo "$o: $(hyprctl getoption "$o" 2>&1 | head -n 1)"
+  done > "$R/options.txt"
+  sample() {
+    local t="$1"
+    hyprctl monitors -j > "$R/monitors-$t.json" 2>&1
+    hyprctl clients -j > "$R/clients-$t.json" 2>&1
+    sudo -n modetest -c > "$R/drm-$t.txt" 2>&1
+  }
+  sample before
+  ( for t in 04 06 08 10 12 14 16; do sleep 2; sample "$t"; done ) &
+  reading=$!   # waited for by number: a bare wait also waits for the log's tee
+  switch=',{"at":0.5,"do":"call","fn":"setSetting","args":["display_switch_refresh","on"]},{"at":0.6,"do":"call","fn":"setSetting","args":["display_switch_hdr","on"]},{"at":14,"do":"probe","args":["video-target-params/gamma","video-target-params/primaries","video-target-params/max-luma","target-colorspace-hint","display-fps","osd-width"]}'
+  kinema_plan switch "$media/hdr10-2160p23.976.mkv" "$switch"
+  wait "$reading"
+  sleep 3
+  sample after
+  grep -hE 'display: |shown to the user' "$R/kinema-switch/data/logs/app.log" > "$R/switch.txt"
+  # Hyprland's own log, with logging on: its [CM] lines say which HDR path it took.
+  cp "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/hypr/${HYPRLAND_INSTANCE_SIGNATURE:-none}/hyprland.log" "$R/hyprland-own.log" 2>> "$R/run.log"
+  exit 0
+fi
+
+if [ "$stage" = hyprland ]; then
+  # Why Hyprland did not seem to show the HDR film as HDR (the wlroots round,
+  # AMD card): its log was off, and its report cannot tell its two HDR paths
+  # apart. Three starts, each from a text console like wlroots:
+  #   A  its defaults (what a user has): full-screen HDR passed through;
+  #   B  the screen at 10 bits per colour;
+  #   C  passthrough off, so its automatic HDR switch is what acts.
+  # WAYLAND_DISPLAY points nowhere so it does not also open itself as a
+  # window in the Plasma session still running on another console.
+  if [ -n "${WAYLAND_DISPLAY:-}${DISPLAY:-}" ]; then
+    say "Run this from a text console, not a desktop window: Ctrl+Alt+F3, log in as $(id -un) (no password), then: bash ~/kinema-kit/run.sh hyprland"
+    exit 1
+  fi
+  graphics_ready || exit 1
+  command -v Hyprland > /dev/null || sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q hyprland > "$R/install.txt" 2>&1
+  sudo dpkg -i "$home_kit"/kinema_*_amd64.deb >> "$R/install.txt" 2>&1
+  { Hyprland --version | head -n 1; dpkg -l kinema | tail -n 1; } 2>&1 | tee "$R/versions.txt"
+  for v in A B C; do
+    d="$R/$v"; mkdir -p "$d"
+    case "$v" in
+      A) extra="" ;;
+      B) extra="monitor = , preferred, auto, 1, bitdepth, 10" ;;
+      C) extra="render {
+  cm_fs_passthrough = 0
+}" ;;
+    esac
+    cat > "$d/hyprland.conf" <<CONF
+exec-once = KIT_R=$d bash $home_kit/run.sh hyprland-in; hyprctl dispatch exit
+debug {
+  disable_logs = false
+}
+misc {
+  disable_hyprland_logo = true
+}
+$extra
+CONF
+    say "Hyprland $v of 3: the screen goes black for a moment, then the HDR test film plays"
+    WAYLAND_DISPLAY=kinema-none XDG_CURRENT_DESKTOP=Hyprland timeout 240 Hyprland -c "$d/hyprland.conf" > "$d/hyprland.out" 2>&1
+    echo "Hyprland $v ended ($?)" | tee -a "$R/versions.txt"
+    sleep 3
+  done
   copy_out
   say "All done. Shut down (sudo poweroff), take the stick out and plug it into the development PC."
   exit 0

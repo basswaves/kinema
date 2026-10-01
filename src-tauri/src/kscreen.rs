@@ -35,15 +35,36 @@ pub fn is_plasma() -> bool {
     std::env::var("XDG_CURRENT_DESKTOP").is_ok_and(|d| d.split(':').any(|p| p.eq_ignore_ascii_case("KDE")))
 }
 
-/// Run `kscreen-doctor` with `args`; its standard output, or why not.
+/// Run `kscreen-doctor` with `args`; its standard output, or why not. Once
+/// more if it crashed: Plasma 5.27's was seen to abort on its own heap
+/// corruption ("corrupted size vs. prev_size") now and then while a film
+/// was starting, and the same call a moment later worked. Asked at startup,
+/// one crash would otherwise leave Kinema unable to switch for the whole
+/// session. Asking for a change twice is harmless: the same mode or HDR
+/// state set again is the same.
 fn run(args: &[String], limit: Duration) -> Result<String, String> {
-    let mut child = Command::new(PROGRAM)
+    run_program(PROGRAM, args, limit)
+}
+
+fn run_program(program: &str, args: &[String], limit: Duration) -> Result<String, String> {
+    match run_once(program, args, limit) {
+        Err((true, why)) => {
+            crate::log!("display: {why}; asking once more");
+            run_once(program, args, limit).map_err(|(_, why)| why)
+        }
+        other => other.map_err(|(_, why)| why),
+    }
+}
+
+/// One run: its output, or (whether it crashed, why not).
+fn run_once(program: &str, args: &[String], limit: Duration) -> Result<String, (bool, String)> {
+    let mut child = Command::new(program)
         .args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| format!("{PROGRAM}: {e}"))?;
+        .map_err(|e| (false, format!("{program}: {e}")))?;
     // Read while it runs: a full pipe would otherwise stop it before it ends.
     let drain = |pipe: Option<Box<dyn Read + Send>>| {
         std::thread::spawn(move || {
@@ -58,13 +79,13 @@ fn run(args: &[String], limit: Duration) -> Result<String, String> {
     let err_reader = drain(child.stderr.take().map(|s| Box::new(s) as Box<dyn Read + Send>));
     let started = Instant::now();
     let status = loop {
-        if let Some(status) = child.try_wait().map_err(|e| e.to_string())? {
+        if let Some(status) = child.try_wait().map_err(|e| (false, e.to_string()))? {
             break status;
         }
         if started.elapsed() > limit {
             let _ = child.kill();
             let _ = child.wait();
-            return Err(format!("{PROGRAM} did not answer within {} s", limit.as_secs()));
+            return Err((false, format!("{program} did not answer within {} s", limit.as_secs())));
         }
         std::thread::sleep(Duration::from_millis(30));
     };
@@ -72,7 +93,9 @@ fn run(args: &[String], limit: Duration) -> Result<String, String> {
     let err = err_reader.join().unwrap_or_default();
     if !status.success() {
         let said = if err.trim().is_empty() { out.trim() } else { err.trim() };
-        return Err(format!("{PROGRAM} failed ({status}): {}", said.lines().last().unwrap_or("")));
+        // No exit code: ended by a signal — it crashed (Unix).
+        let crashed = status.code().is_none();
+        return Err((crashed, format!("{program} failed ({status}): {}", said.lines().last().unwrap_or(""))));
     }
     Ok(out)
 }
@@ -256,5 +279,44 @@ mod tests {
         );
         assert_eq!(change_args("HDMI-A-1", None, Some(Colour::Exactly(0))), ["output.HDMI-A-1.hdr.disable"]);
         assert!(change_args("HDMI-A-1", None, None).is_empty());
+    }
+
+    /// A stand-in for kscreen-doctor run through `sh`: it counts its runs in
+    /// `dir`/runs, then does what `script` says with `$n`, the run's number.
+    #[cfg(unix)]
+    fn stand_in(name: &str, script: &str) -> (std::path::PathBuf, Vec<String>) {
+        let dir = std::env::temp_dir().join(format!("kinema-kscreen-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let runs = dir.join("runs");
+        let body = format!("echo x >> '{}'; n=$(wc -l < '{}'); {script}", runs.display(), runs.display());
+        (runs, vec!["-c".into(), body])
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn asks_once_more_when_it_crashed() {
+        // Aborts (as the heap corruption did) the first time, answers the second.
+        let (runs, args) = stand_in("crash", r#"[ "$n" = 1 ] && kill -ABRT $$; echo '{"outputs": []}'"#);
+        let said = run_program("sh", &args, Duration::from_secs(5)).unwrap();
+        assert!(said.contains("outputs"));
+        assert_eq!(std::fs::read_to_string(&runs).unwrap().lines().count(), 2);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn an_ordinary_failure_is_not_asked_twice() {
+        let (runs, args) = stand_in("fails", "echo 'no such output' >&2; exit 1");
+        let err = run_program("sh", &args, Duration::from_secs(5)).unwrap_err();
+        assert!(err.contains("no such output"), "{err}");
+        assert_eq!(std::fs::read_to_string(&runs).unwrap().lines().count(), 1);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_second_crash_is_reported() {
+        let (runs, args) = stand_in("crash-twice", "kill -ABRT $$");
+        assert!(run_program("sh", &args, Duration::from_secs(5)).is_err());
+        assert_eq!(std::fs::read_to_string(&runs).unwrap().lines().count(), 2);
     }
 }

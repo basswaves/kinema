@@ -71,8 +71,13 @@ pub fn which() -> Option<Desktop> {
         if crate::mutter::state().is_ok() {
             return Some(Desktop::Gnome);
         }
-        if crate::kscreen::is_plasma() && crate::kscreen::screens().is_ok() {
-            return Some(Desktop::Kde);
+        if crate::kscreen::is_plasma() {
+            match crate::kscreen::screens() {
+                Ok(_) => return Some(Desktop::Kde),
+                // Said once: a Plasma session that does not answer is not
+                // switched for the whole launch.
+                Err(e) => crate::log!("display: a Plasma session, but its screens could not be read: {e}"),
+            }
         }
         None
     })

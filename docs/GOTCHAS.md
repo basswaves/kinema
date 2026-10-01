@@ -1617,3 +1617,17 @@ mpv has no colour-space hint there and targets BT.1886. This is the driver,
 not Kinema, and not fixable by an option: on such a machine HDR films play
 tone-mapped to SDR. (Mesa's Vulkan for AMD and Intel is meant to offer the
 HDR colour spaces through `wp_color_management`; not yet tried here.)
+
+### `kscreen-doctor` sometimes crashes, and one crash used to cost a session
+
+Plasma 5.27's `kscreen-doctor -j` aborted now and then on its own heap
+corruption (`corrupted size vs. prev_size in fastbins`, exit by SIGABRT) —
+twice in three Kinema starts under a nested KWin, both while a film was
+starting, and not once in 200 calls made one after another or in pairs
+under load. Kinema asks once per launch which desktop it is on, so one crash
+at that moment meant "not a desktop Kinema can ask" for the whole session:
+no switching, and the equipment check saying it could not read the screens,
+with nothing else logged. `kscreen.rs` now asks once more when the program
+ended by a signal (an ordinary failure, such as an unknown mode, is not
+repeated), and `desktop.rs` logs why a Plasma session was not recognised.
+Whether Plasma 6's `kscreen-doctor` does the same is not known yet.

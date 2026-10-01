@@ -145,7 +145,9 @@ is one, and you install it when you choose.
   on Mesa 26.0: HDR10 reaches the TV on KDE Plasma.)
 
 Without the driver part the desktop shows HDR, but each film is converted to
-SDR before it reaches it.
+SDR before it reaches it. On Hyprland, which switches HDR on by itself for a
+full-screen HDR film, add `bitdepth, 10` to the TV's monitor rule: without
+it HDR goes out at 8 bits per colour, and smooth gradients show bands.
 
 ## First run
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Kinema's Linux test, for an Ubuntu 26.04 live session with persistence.
+# Kinema's Linux test, for an Ubuntu or Kubuntu 26.04 live session with
+# persistence (GNOME or KDE Plasma; each has its own persistence file).
 # Run it once on each boot; it knows which boot it is:
 #   1st boot: records the hardware, installs NVIDIA's driver, Kinema and the
 #             tools, and asks for a restart;
@@ -22,6 +23,8 @@ kit="$(cd "$(dirname "$0")" && pwd)"
 home_kit="$HOME/kinema-kit"   # the kit, copied off /opt so later runs find it
 stamp="$(date +%Y%m%d-%H%M%S)"
 say() { printf '\n== %s\n' "$*"; }
+# KDE Plasma (Kubuntu) rather than GNOME (Ubuntu): display.py chooses the same way.
+is_plasma() { [[ ":${XDG_CURRENT_DESKTOP:-}:" == *:[Kk][Dd][Ee]:* ]]; }
 
 if lsmod | grep -q '^nvidia '; then stage='test'; else stage='setup'; fi
 # For a rehearsal on a development machine: KINEMA_KIT_STAGE=test.
@@ -39,11 +42,14 @@ system() {   # what the machine is, as this boot sees it
   mokutil --sb-state > "$out/secureboot.txt" 2>&1
   echo "XDG_SESSION_TYPE=${XDG_SESSION_TYPE:-} XDG_CURRENT_DESKTOP=${XDG_CURRENT_DESKTOP:-}" > "$out/session.txt"
   gnome-shell --version >> "$out/session.txt" 2>&1
+  plasmashell --version >> "$out/session.txt" 2>&1
+  command -v kscreen-doctor > /dev/null && kscreen-doctor -o > "$out/kscreen-doctor.txt" 2>&1
   command -v nvidia-smi > /dev/null && nvidia-smi > "$out/nvidia-smi.txt" 2>&1
   command -v glxinfo > /dev/null && glxinfo -B > "$out/glxinfo.txt" 2>&1
   command -v vulkaninfo > /dev/null && vulkaninfo --summary > "$out/vulkaninfo.txt" 2>&1
-  # Screens: GNOME's view, the kernel's, and each screen's own EDID.
-  python3 "$home_kit/tools/display.py" state > "$out/gnome-displays.json" 2>&1
+  # Screens: the desktop's view (GNOME or Plasma), the kernel's, and each
+  # screen's own EDID.
+  python3 "$home_kit/tools/display.py" state > "$out/screens.json" 2>&1
   for c in /sys/class/drm/card*-*; do
     n="$(basename "$c")"
     { echo "status: $(cat "$c/status")"; echo "enabled: $(cat "$c/enabled" 2>/dev/null)"; cat "$c/modes"; } > "$out/drm-$n.txt" 2>&1
@@ -168,9 +174,13 @@ if [ "$stage" = setup ]; then
     exit 1
   fi
   copy_out
-  say "Done. Restart now (top right, Power Off / Restart), choose Ubuntu in the Ventoy menu again, open a Terminal and run:"
+  # Ubuntu's stick went on to the survey (test); a later desktop goes
+  # straight to Kinema's own check, which is what is left to confirm there.
+  next='bash ~/kinema-kit/run.sh'
+  is_plasma && next="$next check"
+  say "Done. Restart now, choose the same system in the Ventoy menu again, open a Terminal and run:"
   echo
-  echo "    bash ~/kinema-kit/run.sh"
+  echo "    $next"
   echo
   exit 0
 fi
@@ -263,12 +273,12 @@ LUA
 
   say "The film's own mode, 3840x2160 at 23.976 Hz, HDR off"
   mode 3840 2160 23.976
-  python3 "$home_kit/tools/display.py" state > "$R/gnome-displays-4k.json" 2>&1
+  python3 "$home_kit/tools/display.py" state > "$R/screens-4k.json" 2>&1
   play 4k-sdr-auto
 
   say "3840x2160 at 23.976 Hz, HDR on"
   hdr on
-  python3 "$home_kit/tools/display.py" state > "$R/gnome-displays-4k-hdr.json" 2>&1
+  python3 "$home_kit/tools/display.py" state > "$R/screens-4k-hdr.json" 2>&1
   play 4k-hdr-auto
   play 4k-hdr-opengl --gpu-api=opengl
 
@@ -278,7 +288,7 @@ LUA
   say "The screen back as it was"
   hdr off
   mode "$w0" "$h0" "$r0"
-  python3 "$home_kit/tools/display.py" state > "$R/gnome-displays-after.json" 2>&1
+  python3 "$home_kit/tools/display.py" state > "$R/screens-after.json" 2>&1
 
   copy_out
   say "All done. You can shut down, take the stick out and plug it into the development PC."
@@ -296,6 +306,9 @@ if [ "$stage" = check ]; then
   say "The driver's device files"
   nvidia_nodes > "$R/nodes.txt" 2>&1
   tail -n 3 "$R/nodes.txt"
+
+  say "The hardware and the desktop, as this boot sees them"
+  system "$R/system"
 
   say "Kinema, the build in the kit"
   sudo dpkg -i "$home_kit"/kinema_*_amd64.deb 2>&1 | tee "$R/install.txt" > /dev/null
@@ -324,17 +337,21 @@ if [ "$stage" = check ]; then
 
   say "3 — the screen switched for a 4K HDR film, and put back"
   switch=',{"at":0.5,"do":"call","fn":"setSetting","args":["display_switch_refresh","on"]},{"at":0.6,"do":"call","fn":"setSetting","args":["display_switch_hdr","on"]}'
-  ( sleep 12; display current > "$R/display-during.txt" 2>&1; display state > "$R/gnome-displays-during.json" 2>&1 ) &
+  ( sleep 12; display current > "$R/display-during.txt" 2>&1; display state > "$R/screens-during.json" 2>&1 ) &
   kinema_plan switch "$media/hdr10-2160p23.976.mkv" "$switch"
   wait
   sleep 3
   echo "during: $(cat "$R/display-during.txt")" | tee -a "$R/display.txt"
   echo "after:  $(display current)" | tee -a "$R/display.txt"
+  # Kinema's own restore, HDR included: Plasma keeps a change made through
+  # kscreen-doctor, so this is the read that says whether it was undone.
+  display state > "$R/screens-after.json" 2>&1
   grep -hE 'display: |shown to the user' "$R/kinema-switch/data/logs/app.log" | tee "$R/switch.txt"
 
   say "The screen back as it was, whatever happened above"
   display hdr off >> "$R/display.txt"
   display mode "$w0" "$h0" "$r0" >> "$R/display.txt"
+  echo "end:    $(display current)" | tee -a "$R/display.txt"
 
   copy_out
   say "All done. You can shut down, take the stick out and plug it into the development PC."
@@ -383,7 +400,7 @@ kinema_plan hdr-off "$media/hdr10-2160p23.976.mkv" ""
 say "Kinema: the HDR10 film, HDR on"
 python3 "$home_kit/tools/display.py" hdr on | tee "$R/hdr-on.json"
 sleep 3
-python3 "$home_kit/tools/display.py" state > "$R/gnome-displays-hdr-on.json" 2>&1
+python3 "$home_kit/tools/display.py" state > "$R/screens-hdr-on.json" 2>&1
 kinema_plan hdr-on "$media/hdr10-2160p23.976.mkv" ""
 python3 "$home_kit/tools/display.py" hdr off > /dev/null
 

@@ -2,7 +2,8 @@
 
 How Kinema's Linux version is checked on a real TV and receiver: an Ubuntu
 26.04 live session booted from a Ventoy stick, nothing installed on the
-machine. The Windows counterpart is `scripts/usb-test`.
+machine — Ubuntu itself for GNOME, Kubuntu for KDE Plasma. The Windows
+counterpart is `scripts/usb-test`.
 
 The machine it was made for has an NVIDIA card, whose own driver a plain live
 session cannot use (it gets `nouveau`: no hardware decoding, no HDR). So the
@@ -16,17 +17,28 @@ On Linux (WSL is fine), from a checkout:
 
 ```bash
 bash scripts/package-linux.sh
-bash scripts/linux-usb-test/build-kit.sh
+bash scripts/linux-usb-test/build-kit.sh            # Ubuntu (GNOME)
+bash scripts/linux-usb-test/build-kit.sh kubuntu    # Kubuntu (KDE Plasma)
 ```
 
-That makes `~/kinema-usb/persistence.dat` (8 GB, mostly empty, the kit inside
-at `/opt/kinema-kit`) and `~/kinema-usb/ventoy.json`. On the Ventoy stick:
+That makes `~/kinema-usb/persistence.dat` — or `persistence-kubuntu.dat` —
+(8 GB, mostly empty, the kit inside at `/opt/kinema-kit`) and
+`~/kinema-usb/ventoy.json`. Each system needs its own persistence file: what
+one live session installs is not the other's system. On the Ventoy stick:
 
 ```
 ubuntu-26.04-desktop-amd64.iso      (any name starting ubuntu-26.04)
+kubuntu-26.04-desktop-amd64.iso     (any name starting kubuntu-26.04)
 kinema-linux-test/persistence.dat
+kinema-linux-test/persistence-kubuntu.dat
 ventoy/ventoy.json                  (merge with an existing one)
 ```
+
+The kit is the same for both: `run.sh` and `tools/display.py` tell GNOME and
+Plasma apart by `XDG_CURRENT_DESKTOP`, as Kinema does — Mutter's
+`DisplayConfig` on GNOME, `kscreen-doctor` on Plasma. Kubuntu's ISO carries
+the same NVIDIA 580 set for the same kernel as Ubuntu's, so the first boot is
+the same too.
 
 ## At the TV
 
@@ -52,6 +64,21 @@ ventoy/ventoy.json                  (merge with an existing one)
 5. Shut down and bring the stick back.
 
 Nothing is written to the machine's own disks.
+
+### Kubuntu (KDE Plasma)
+
+The same two boots, choosing the Kubuntu ISO in Ventoy's menu each time (it
+has its own persistence file, so the driver is installed again for it). If an
+installer window opens, close it or choose to try Kubuntu; Ctrl+Alt+T opens
+Konsole. The first boot is `bash /opt/kinema-kit/run.sh` as above; it ends by
+naming the second, which on Plasma goes straight to Kinema's own check:
+
+```bash
+bash ~/kinema-kit/run.sh check
+```
+
+The live user is `kubuntu` rather than `ubuntu` (casper names it after the
+ISO), which matters only when reading the results back.
 
 ### A later round: Kinema's own picture and sound
 
@@ -107,10 +134,14 @@ controls, nothing else on the screen), mpv's properties and both logs.
 On the development machine, without mounting the stick's file system:
 
 ```bash
+e2fsck -fy <stick>/kinema-linux-test/persistence.dat
 debugfs -R "rdump /upper/home/ubuntu/kinema-results /tmp" <stick>/kinema-linux-test/persistence.dat
 ```
 
-(The live session's changes sit under `upper/` in the persistence file.)
+(The live session's changes sit under `upper/` in the persistence file. It
+is never unmounted cleanly, so its journal needs replaying with `e2fsck`
+before reading or writing it. Kubuntu's: `persistence-kubuntu.dat` and
+`/upper/home/kubuntu/…`; `debugfs -R "ls /upper/home"` shows the name.)
 
 All test media is generated (`make-clips.sh`): a test pattern and a sine
 tone. Nothing personal goes on the stick.

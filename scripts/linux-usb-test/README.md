@@ -53,6 +53,24 @@ ventoy/ventoy.json                  (merge with an existing one)
 
 Nothing is written to the machine's own disks.
 
+### A later round: the picture path
+
+```bash
+bash ~/kinema-kit/run.sh graphics
+```
+
+On any boot after the two above (the driver is already installed). Records
+why the picture takes the path it does: the driver's Vulkan by itself
+(`vulkaninfo` with all drivers, NVIDIA's alone and without layers; `vkcube` on
+Wayland and X11), CUDA's helper module and NVIDIA's decoder, then mpv by
+itself full screen with each graphics API — at the desktop's own mode, and at
+3840x2160 at 23.976 Hz with HDR off and on — and Kinema at that mode with
+HDR on. The screen is put back as it was at the end. The TV goes black for a
+moment at each mode or HDR change, and Ubuntu's problem reporter may show
+crash windows from the Vulkan tests; they can be closed.
+`~/kinema-results/graphics-<time>/`: `vk-summary.txt` and `mpv-summary.txt`
+are the overview, the rest is the detail behind them.
+
 ## What it records
 
 `~/kinema-results/<stage>-<time>/` inside the persistence file: the

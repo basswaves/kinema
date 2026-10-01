@@ -5,6 +5,10 @@
 #             tools, and asks for a restart;
 #   2nd boot: records the hardware again with NVIDIA's driver and runs the
 #             tests. Results go to the stick, and to ~/kinema-results.
+# `run.sh graphics` on a later boot: why the picture took the path it did —
+#             the driver's Vulkan, HDR and the 4K film mode, mpv by itself
+#             and Kinema (the third round, after the second showed Vulkan
+#             failing and HDR not reaching mpv).
 # Nothing is asked for on screen, and nothing outside the live session is
 # touched: Windows and its disks are left alone. Results are read back from
 # the persistence file (README.md).
@@ -17,7 +21,7 @@ say() { printf '\n== %s\n' "$*"; }
 
 if lsmod | grep -q '^nvidia '; then stage='test'; else stage='setup'; fi
 # For a rehearsal on a development machine: KINEMA_KIT_STAGE=test.
-stage="${KINEMA_KIT_STAGE:-$stage}"
+stage="${1:-${KINEMA_KIT_STAGE:-$stage}}"
 R="$HOME/kinema-results/$stage-$stamp"
 mkdir -p "$R"
 exec > >(tee -a "$R/run.log") 2>&1
@@ -73,6 +77,18 @@ system() {   # what the machine is, as this boot sees it
 copy_out() {   # the results stay in the persistence file; say so
   sync
   say "Results kept in $R (inside the stick's persistence file)"
+}
+
+kinema_plan() {   # name, clip, extra actions (JSON list items); env vars may precede
+  local d="$R/kinema-$1"; mkdir -p "$d"
+  cat > "$d/plan.json" <<JSON
+{"path":"$2","fileId":null,"titleId":null,"seconds":18,"openAfter":2,
+ "actions":[{"at":7,"do":"key","key":"ArrowUp"},
+            {"at":8,"do":"mpv","args":["screenshot-to-file","$d/mpv-window.png","window"]},
+            {"at":9,"do":"probe","args":["current-vo","current-gpu-context","gpu-api","hwdec-current","video-params/gamma","video-params/primaries","video-target-params/gamma","video-target-params/primaries","video-target-params/max-luma","target-colorspace-hint","display-names","display-fps","estimated-vf-fps","osd-width","osd-height","current-ao","audio-out-params/format","audio-out-params/channel-count","audio-params/format","mpv-version"]}$3]}
+JSON
+  bash "$home_kit/tools/selftest.sh" "$d/plan.json" /usr/bin/kinema 99 > "$d/selftest.out" 2>&1
+  tail -n 1 "$d/selftest.out"
 }
 
 if [ "$stage" = setup ]; then
@@ -140,6 +156,116 @@ if [ "$stage" = setup ]; then
   exit 0
 fi
 
+if [ "$stage" = graphics ]; then
+  # Round 2 found NVIDIA's Vulkan failing (mpv: GetPhysicalDeviceSurface-
+  # PresentModesKHR -> VK_ERROR_UNKNOWN on Wayland and X11, then OpenGL;
+  # vulkaninfo crashing inside the driver), CUDA failing (no nvidia_uvm),
+  # and HDR on in GNOME while the compositor still told mpv "SDR, 80 nits",
+  # at 1920x1080@60. This stage narrows each down. Crash windows from
+  # Ubuntu's problem reporter are expected here and can be closed.
+  media="$home_kit/media"; clip="$media/hdr10-2160p23.976.mkv"
+  lsmod | grep -q '^nvidia ' || { say "NVIDIA's driver is not loaded: run plain 'bash ~/kinema-kit/run.sh' first."; exit 1; }
+
+  say "The driver, as the kernel and the system see it"
+  { lsmod | grep -E '^nvidia'
+    for p in /sys/module/nvidia_drm/parameters/*; do echo "${p##*/}=$(cat "$p")"; done
+    ls -l /dev/nvidia* /dev/dri; } > "$R/driver.txt" 2>&1
+  sudo journalctl -b -k --no-pager | grep -iE 'nvidia|NVRM|drm' > "$R/kernel.txt" 2>&1
+  sudo journalctl -b --no-pager | grep -iE 'gnome-shell|mutter' | grep -iE 'color|hdr|nvidia|egl|gbm|kms|vulkan|warn|crit|error' \
+    | tail -n 300 > "$R/compositor-journal.txt" 2>&1
+  { for d in /usr/share/vulkan/icd.d /etc/vulkan/icd.d /usr/share/vulkan/implicit_layer.d /etc/vulkan/implicit_layer.d; do
+      echo "### $d"; ls -l "$d" 2>&1
+    done
+    for f in /usr/share/vulkan/icd.d/nvidia* /etc/vulkan/icd.d/nvidia*; do [ -e "$f" ] && { echo "### $f"; cat "$f"; }; done
+    dpkg -l | grep -E 'nvidia|vulkan|egl|gbm|libmpv|libplacebo' | awk '{print $1, $2, $3}'
+  } > "$R/vulkan-setup.txt" 2>&1
+  cat "$R/driver.txt"
+
+  say "Vulkan by itself: all drivers, NVIDIA's alone, layers off, a spinning cube"
+  nv_icd="$(ls /usr/share/vulkan/icd.d/nvidia_icd*.json /etc/vulkan/icd.d/nvidia_icd*.json 2> /dev/null | head -1)"
+  vk() {   # name, then [VAR=value ...] command
+    local name="$1"; shift
+    timeout 40 env "$@" > "$R/vk-$name.txt" 2>&1
+    echo "$name: exit $?" | tee -a "$R/vk-summary.txt"
+  }
+  vk summary vulkaninfo --summary
+  vk nvidia-only VK_DRIVER_FILES="$nv_icd" vulkaninfo --summary
+  vk no-layers VK_LOADER_LAYERS_DISABLE='~implicit~' vulkaninfo --summary
+  vk loader-debug VK_LOADER_DEBUG=error,warn,driver vulkaninfo --summary
+  vk cube-wayland vkcube --wsi wayland --c 300
+  vk cube-xcb vkcube --wsi xcb --c 300
+  vk cube-wayland-nvidia-only VK_DRIVER_FILES="$nv_icd" vkcube --wsi wayland --c 300
+
+  say "CUDA's helper module (nvidia_uvm), then NVIDIA's own video decoder"
+  sudo modprobe nvidia_uvm 2>&1 | tee "$R/uvm.txt"
+  lsmod | grep -E '^nvidia_uvm' | tee -a "$R/uvm.txt"
+  ls -l /dev/nvidia-uvm* >> "$R/uvm.txt" 2>&1
+  timeout 30 mpv --no-config --vo=null --ao=null --hwdec=nvdec --length=3 --msg-level=all=v \
+    --log-file="$R/mpv-nvdec.log" "$clip" > /dev/null 2>&1
+  echo "nvdec: $(grep -m1 -E 'Using hardware decoding|Could not|failed' "$R/mpv-nvdec.log" || echo '?')" | tee -a "$R/uvm.txt"
+
+  # mpv by itself, full screen, the HDR10 clip: which GPU context it ends up
+  # with, what the compositor says the screen wants, and what mpv sends.
+  cat > "$R/probe.lua" <<'LUA'
+local u = require 'mp.utils'
+mp.add_timeout(5, function()
+  for _, p in ipairs({'current-gpu-context', 'gpu-api', 'hwdec-current', 'video-target-params',
+                      'display-names', 'display-fps', 'osd-width', 'osd-height'}) do
+    mp.msg.info('PROBE ' .. p .. ' = ' .. (u.format_json(mp.get_property_native(p)) or 'nil'))
+  end
+end)
+LUA
+  play() {   # name, then [VAR=value ...] and mpv options
+    local name="$1"; shift
+    local vars=(); while [ $# -gt 0 ] && [[ "$1" == *=* && "$1" != --* ]]; do vars+=("$1"); shift; done
+    timeout 40 env "${vars[@]}" mpv --no-config --vo=gpu-next --fs --length=8 --hwdec=auto-safe \
+      --target-colorspace-hint=yes --msg-level=all=v --script="$R/probe.lua" \
+      --log-file="$R/mpv-$name.log" "$@" "$clip" > /dev/null 2>&1
+    local rc=$? L="$R/mpv-$name.log"
+    {
+      echo "== $name (exit $rc)"
+      grep -E 'Initializing GPU context|\]\[e\]' "$L" | sed 's/^\[[^]]*\]//' | head -n 8
+      grep -A2 'Preferred surface feedback' "$L" | sed 's/^\[[^]]*\]//' | tail -n 2
+      grep -o 'PROBE .*' "$L"
+    } | tee -a "$R/mpv-summary.txt"
+  }
+  hdr() { python3 "$home_kit/tools/display.py" hdr "$1" | tee -a "$R/display.txt"; sleep 3; }
+  mode() { python3 "$home_kit/tools/display.py" mode "$@" | tee -a "$R/display.txt"; sleep 4; }
+  read -r w0 h0 r0 < <(python3 "$home_kit/tools/display.py" current)
+  echo "screen mode at the start: ${w0}x${h0}@${r0}" | tee "$R/display.txt"
+
+  say "mpv by itself, the desktop's own mode, HDR off"
+  hdr off
+  play desktop-sdr-auto
+  play desktop-sdr-opengl --gpu-api=opengl
+
+  say "The film's own mode, 3840x2160 at 23.976 Hz, HDR off"
+  mode 3840 2160 23.976
+  python3 "$home_kit/tools/display.py" state > "$R/gnome-displays-4k.json" 2>&1
+  play 4k-sdr-auto
+
+  say "3840x2160 at 23.976 Hz, HDR on"
+  hdr on
+  python3 "$home_kit/tools/display.py" state > "$R/gnome-displays-4k-hdr.json" 2>&1
+  play 4k-hdr-auto
+  play 4k-hdr-vulkan-nvidia-only VK_DRIVER_FILES="$nv_icd" --gpu-api=vulkan
+  play 4k-hdr-opengl --gpu-api=opengl
+  play 4k-hdr-vulkan-x11 --gpu-api=vulkan --gpu-context=x11vk
+
+  say "Kinema at 3840x2160 at 23.976 Hz, HDR on: as it is, and with NVIDIA's Vulkan alone"
+  kinema_plan 4k-hdr "$clip" ""
+  VK_DRIVER_FILES="$nv_icd" kinema_plan 4k-hdr-nvidia-only "$clip" ""
+
+  say "The screen back as it was"
+  hdr off
+  mode "$w0" "$h0" "$r0"
+  python3 "$home_kit/tools/display.py" state > "$R/gnome-displays-after.json" 2>&1
+
+  copy_out
+  say "All done. You can shut down, take the stick out and plug it into the development PC."
+  exit 0
+fi
+
 # ---- stage: test --------------------------------------------------------------
 media="$home_kit/media"
 say "The hardware with NVIDIA's driver"
@@ -174,18 +300,6 @@ for dev in $(aplay -L | grep -E '^hdmi:'); do
 done
 systemctl --user start pipewire.socket pipewire-pulse.socket wireplumber 2> /dev/null
 sleep 2
-
-kinema_plan() {   # name, clip, extra actions (JSON list items)
-  local d="$R/kinema-$1"; mkdir -p "$d"
-  cat > "$d/plan.json" <<JSON
-{"path":"$2","fileId":null,"titleId":null,"seconds":18,"openAfter":2,
- "actions":[{"at":7,"do":"key","key":"ArrowUp"},
-            {"at":8,"do":"mpv","args":["screenshot-to-file","$d/mpv-window.png","window"]},
-            {"at":9,"do":"probe","args":["current-vo","gpu-api","hwdec-current","video-params/gamma","video-params/primaries","video-target-params/gamma","video-target-params/primaries","video-target-params/max-luma","target-colorspace-hint","display-names","display-fps","estimated-vf-fps","osd-width","osd-height","current-ao","audio-out-params/format","audio-out-params/channel-count","audio-params/format","mpv-version"]}$3]}
-JSON
-  bash "$home_kit/tools/selftest.sh" "$d/plan.json" /usr/bin/kinema 99 > "$d/selftest.out" 2>&1
-  tail -n 1 "$d/selftest.out"
-}
 
 say "Kinema: the HDR10 film, HDR off"
 python3 "$home_kit/tools/display.py" hdr off | tee "$R/hdr-off.json"

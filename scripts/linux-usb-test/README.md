@@ -61,8 +61,9 @@ bash ~/kinema-kit/run.sh graphics
 
 On any boot after the two above (the driver is already installed). Records
 why the picture takes the path it does: the driver's Vulkan by itself
-(`vulkaninfo` with all drivers, NVIDIA's alone and without layers; `vkcube` on
-Wayland and X11), CUDA's helper module and NVIDIA's decoder, then mpv by
+(`vulkaninfo`, `vkcube` on Wayland and X11) before and after making the
+driver's device files that nothing else made (`/dev/nvidia-modeset`,
+`/dev/nvidia-uvm`), NVIDIA's decoder, then mpv by
 itself full screen with each graphics API — at the desktop's own mode, and at
 3840x2160 at 23.976 Hz with HDR off and on — and Kinema at that mode with
 HDR on. The screen is put back as it was at the end. The TV goes black for a

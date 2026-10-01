@@ -1,9 +1,8 @@
 """GNOME's view of the screens, and HDR on or off, through Mutter's DisplayConfig.
 
   python3 display.py state           -> JSON: every monitor, its modes, its properties
-  python3 display.py hdr on|off      -> asks Mutter for the HDR colour mode (its number varies by
-                                        GNOME version: 50 lists 2) or the default (0)
-                                        on every monitor that lists it as supported
+  python3 display.py hdr on|off      -> asks Mutter for the HDR colour mode (1, BT.2100) or the
+                                        default (0) on every monitor that lists it as supported
   python3 display.py mode W H HZ     -> the W x H mode nearest HZ, HDR mode kept
   python3 display.py current         -> "W H HZ" of the first screen's current mode
 
@@ -17,6 +16,7 @@ from gi.repository import Gio, GLib
 
 BUS = 'org.gnome.Mutter.DisplayConfig'
 PATH = '/org/gnome/Mutter/DisplayConfig'
+HDR = 1  # META_COLOR_MODE_BT2100
 
 
 def proxy():
@@ -77,11 +77,13 @@ def apply(hdr=None, size=None, refresh=None):
                     mode = min(fits, key=lambda x: abs(x['refresh'] - refresh))
             mprops = m['properties']
             props = {}
-            # The HDR mode is whichever non-default one the monitor lists:
-            # its number is not the same in every GNOME (50 says 2).
-            hdr_modes = [c for c in (mprops.get('supported-color-modes') or []) if c != 0]
-            if hdr_modes:
-                want = mprops.get('color-mode', 0) if hdr is None else (hdr_modes[0] if hdr else 0)
+            # Mutter's colour modes: 0 default, 1 BT.2100 (HDR), 2 sdr-native
+            # (GNOME 50: wide-gamut SDR from the EDID's primaries — not HDR,
+            # which the second round mistook for it).
+            supported = mprops.get('supported-color-modes') or []
+            if supported:
+                want = mprops.get('color-mode', 0) if hdr is None else (
+                    HDR if hdr and HDR in supported else 0)
                 props['color-mode'] = GLib.Variant('u', want)
             mons.append((connector, mode['id'], props))
         logical.append((lm['x'], lm['y'], lm['scale'], lm['transform'], lm['primary'], mons))

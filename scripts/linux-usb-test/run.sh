@@ -161,7 +161,9 @@ if [ "$stage" = graphics ]; then
   # PresentModesKHR -> VK_ERROR_UNKNOWN on Wayland and X11, then OpenGL;
   # vulkaninfo crashing inside the driver), CUDA failing (no nvidia_uvm),
   # and HDR on in GNOME while the compositor still told mpv "SDR, 80 nits",
-  # at 1920x1080@60. This stage narrows each down. Crash windows from
+  # at 1920x1080@60. Round 3 showed the same with NVIDIA's Vulkan driver
+  # alone and with layers off; the driver's device files missing; and that
+  # colour mode 2 is GNOME 50's sdr-native, not HDR (1). Crash windows from
   # Ubuntu's problem reporter are expected here and can be closed.
   media="$home_kit/media"; clip="$media/hdr10-2160p23.976.mkv"
   lsmod | grep -q '^nvidia ' || { say "NVIDIA's driver is not loaded: run plain 'bash ~/kinema-kit/run.sh' first."; exit 1; }
@@ -181,28 +183,37 @@ if [ "$stage" = graphics ]; then
   } > "$R/vulkan-setup.txt" 2>&1
   cat "$R/driver.txt"
 
-  say "Vulkan by itself: all drivers, NVIDIA's alone, layers off, a spinning cube"
-  nv_icd="$(ls /usr/share/vulkan/icd.d/nvidia_icd*.json /etc/vulkan/icd.d/nvidia_icd*.json 2> /dev/null | head -1)"
+  say "Vulkan by itself, and a spinning cube"
   vk() {   # name, then [VAR=value ...] command
     local name="$1"; shift
     timeout 40 env "$@" > "$R/vk-$name.txt" 2>&1
     echo "$name: exit $?" | tee -a "$R/vk-summary.txt"
   }
   vk summary vulkaninfo --summary
-  vk nvidia-only VK_DRIVER_FILES="$nv_icd" vulkaninfo --summary
-  vk no-layers VK_LOADER_LAYERS_DISABLE='~implicit~' vulkaninfo --summary
-  vk loader-debug VK_LOADER_DEBUG=error,warn,driver vulkaninfo --summary
   vk cube-wayland vkcube --wsi wayland --c 300
-  vk cube-xcb vkcube --wsi xcb --c 300
-  vk cube-wayland-nvidia-only VK_DRIVER_FILES="$nv_icd" vkcube --wsi wayland --c 300
 
-  say "CUDA's helper module (nvidia_uvm), then NVIDIA's own video decoder"
-  sudo modprobe nvidia_uvm 2>&1 | tee "$R/uvm.txt"
-  lsmod | grep -E '^nvidia_uvm' | tee -a "$R/uvm.txt"
-  ls -l /dev/nvidia-uvm* >> "$R/uvm.txt" 2>&1
+  # Round 3: the driver's device files /dev/nvidia-modeset and
+  # /dev/nvidia-uvm were missing — normally made by nvidia-modprobe or the
+  # driver's udev rules, neither of which did it here — and Vulkan's
+  # presenting and CUDA both open them. Made by hand (what nvidia-modprobe
+  # does), then the same tests again.
+  say "The driver's missing device files, made by hand, then Vulkan and the decoder again"
+  { ls -l /usr/bin/nvidia-modprobe /lib/udev/rules.d/*nvidia* /usr/lib/udev/rules.d/*nvidia*
+    grep -iE 'nvidia' /proc/devices; } > "$R/nodes.txt" 2>&1
+  sudo modprobe nvidia_uvm 2>&1 | tee -a "$R/nodes.txt"
+  [ -e /dev/nvidia-modeset ] || sudo mknod -m 666 /dev/nvidia-modeset c 195 254
+  uvm_major="$(awk '$2 == "nvidia-uvm" {print $1}' /proc/devices)"
+  if [ -n "$uvm_major" ] && [ ! -e /dev/nvidia-uvm ]; then
+    sudo mknod -m 666 /dev/nvidia-uvm c "$uvm_major" 0
+    sudo mknod -m 666 /dev/nvidia-uvm-tools c "$uvm_major" 1
+  fi
+  ls -l /dev/nvidia* | tee -a "$R/nodes.txt"
+  vk summary-nodes vulkaninfo --summary
+  vk cube-wayland-nodes vkcube --wsi wayland --c 300
+  vk cube-xcb-nodes vkcube --wsi xcb --c 300
   timeout 30 mpv --no-config --vo=null --ao=null --hwdec=nvdec --length=3 --msg-level=all=v \
     --log-file="$R/mpv-nvdec.log" "$clip" > /dev/null 2>&1
-  echo "nvdec: $(grep -m1 -E 'Using hardware decoding|Could not|failed' "$R/mpv-nvdec.log" || echo '?')" | tee -a "$R/uvm.txt"
+  echo "nvdec: $(grep -m1 -E 'Using hardware decoding|Could not|failed' "$R/mpv-nvdec.log" || echo '?')" | tee -a "$R/nodes.txt"
 
   # mpv by itself, full screen, the HDR10 clip: which GPU context it ends up
   # with, what the compositor says the screen wants, and what mpv sends.
@@ -229,7 +240,7 @@ LUA
       grep -o 'PROBE .*' "$L"
     } | tee -a "$R/mpv-summary.txt"
   }
-  hdr() { python3 "$home_kit/tools/display.py" hdr "$1" | tee -a "$R/display.txt"; sleep 3; }
+  hdr() { python3 "$home_kit/tools/display.py" hdr "$1" | tee -a "$R/display.txt"; sleep 6; }
   mode() { python3 "$home_kit/tools/display.py" mode "$@" | tee -a "$R/display.txt"; sleep 4; }
   read -r w0 h0 r0 < <(python3 "$home_kit/tools/display.py" current)
   echo "screen mode at the start: ${w0}x${h0}@${r0}" | tee "$R/display.txt"
@@ -237,7 +248,6 @@ LUA
   say "mpv by itself, the desktop's own mode, HDR off"
   hdr off
   play desktop-sdr-auto
-  play desktop-sdr-opengl --gpu-api=opengl
 
   say "The film's own mode, 3840x2160 at 23.976 Hz, HDR off"
   mode 3840 2160 23.976
@@ -248,13 +258,10 @@ LUA
   hdr on
   python3 "$home_kit/tools/display.py" state > "$R/gnome-displays-4k-hdr.json" 2>&1
   play 4k-hdr-auto
-  play 4k-hdr-vulkan-nvidia-only VK_DRIVER_FILES="$nv_icd" --gpu-api=vulkan
   play 4k-hdr-opengl --gpu-api=opengl
-  play 4k-hdr-vulkan-x11 --gpu-api=vulkan --gpu-context=x11vk
 
-  say "Kinema at 3840x2160 at 23.976 Hz, HDR on: as it is, and with NVIDIA's Vulkan alone"
+  say "Kinema at 3840x2160 at 23.976 Hz, HDR on"
   kinema_plan 4k-hdr "$clip" ""
-  VK_DRIVER_FILES="$nv_icd" kinema_plan 4k-hdr-nvidia-only "$clip" ""
 
   say "The screen back as it was"
   hdr off

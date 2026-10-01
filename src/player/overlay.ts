@@ -10,8 +10,12 @@
  *
  * The photo is the size of Kinema's window; mpv 0.38 and later scale it to
  * their own (`dw`/`dh`), so the controls land where they would on the screen.
+ * An older mpv cannot, so Kinema's window — hidden behind mpv's anyway — is
+ * made full screen for as long as the player is open, and the two sizes
+ * match; it is put back afterwards.
  */
 import { invoke } from '@tauri-apps/api/core';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { mpvCommand, readProperty } from './engine';
 
 interface OverlayFrame {
@@ -33,6 +37,8 @@ export function startOverlay(): () => void {
   let shown = false;
   let warned = false;
   let scaled = true;
+  // Whether this pump made Kinema's window full screen, to undo it.
+  let madeFullscreen = false;
 
   const tick = async () => {
     if (busy || stopped) return;
@@ -58,7 +64,16 @@ export function startOverlay(): () => void {
           // arguments"): drawn at the page's own size, which matches as
           // long as Kinema's window is the size of the screen.
           scaled = false;
-          console.warn('overlay: this mpv cannot scale the page; drawing it at its own size');
+          console.warn('overlay: this mpv cannot scale the page; matching the window to the screen');
+          const win = getCurrentWindow();
+          if (!(await win.isFullscreen())) {
+            await win.setFullscreen(true);
+            madeFullscreen = true;
+          }
+          // The next photo is taken at the new size, and counts as new even
+          // if the window already was full screen and nothing changed.
+          await invoke('overlay_reset');
+          return;
         }
       }
       await mpvCommand('overlay-add', picture);
@@ -79,6 +94,7 @@ export function startOverlay(): () => void {
     stopped = true;
     window.clearInterval(timer);
     if (shown) void mpvCommand('overlay-remove', [ID]).catch(() => undefined);
+    if (madeFullscreen) void getCurrentWindow().setFullscreen(false).catch(() => undefined);
     void invoke('overlay_reset').catch(() => undefined);
   };
 }

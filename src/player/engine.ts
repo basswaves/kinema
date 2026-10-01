@@ -28,6 +28,7 @@ import {
   type MpvConfig,
 } from 'tauri-plugin-libmpv-api';
 import { BASE_MPV_OPTIONS, IDLE_SURFACE_OPTIONS, TONE_MAPPING_OPTIONS } from './mpvOptions';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { logPaths } from '../metadata/api';
 import { capabilitiesNow, loadCapabilities } from '../capabilities';
 import { keyCommand, keyFromValue, KEY_PROPERTY, MPV_KEYS } from './mpvKeys';
@@ -274,6 +275,27 @@ export async function nowPlaying(): Promise<{
     getProperty('duration', 'double') as Promise<number | null>,
   ]);
   return { path, position, duration };
+}
+
+/**
+ * Whether the picture fills the screen. Where the engine has a window of its
+ * own (Linux), that window is the picture and Kinema's is hidden behind it —
+ * and may be full screen for reasons of its own (overlay.ts) — so the
+ * engine's window is the one asked. Elsewhere the picture is in Kinema's.
+ */
+export async function isPictureFullscreen(): Promise<boolean> {
+  if (capabilitiesNow()?.mpv_video.own_window) {
+    return (await getProperty('fullscreen', 'flag')) === true;
+  }
+  return getCurrentWindow().isFullscreen();
+}
+
+export async function setPictureFullscreen(on: boolean): Promise<void> {
+  if (capabilitiesNow()?.mpv_video.own_window) {
+    await setProperty('fullscreen', on);
+    return;
+  }
+  await getCurrentWindow().setFullscreen(on);
 }
 
 /** Whether the last frame has been reached; false while nothing is open. */

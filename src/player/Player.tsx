@@ -31,7 +31,6 @@ import {
   setFocus,
   useFocusable,
 } from '@noriginmedia/norigin-spatial-navigation';
-import { getCurrentWindow } from '@tauri-apps/api/window';
 import FocusButton from '../ui/FocusButton';
 import { isTvMode, useTvMode } from '../ui/tv';
 import StatsPanel from './StatsPanel';
@@ -43,6 +42,7 @@ import { setShortcutsOpen } from '../ui/shortcutsState';
 import {
   hasReachedEnd,
   isPaused,
+  isPictureFullscreen,
   mpvCommand,
   nowPlaying,
   onPlaybackEvent,
@@ -51,6 +51,7 @@ import {
   seekBy,
   seekTo,
   setPaused,
+  setPictureFullscreen,
   startEngine,
   stopPlayback,
 } from './engine';
@@ -654,10 +655,9 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
    * effect ordering.
    */
   const exit = useCallback(async () => {
-    const win = getCurrentWindow();
     // TV mode keeps the whole app fullscreen; the library goes on filling the
     // screen after the film, as a TV app would.
-    if (!isTvMode() && (await win.isFullscreen())) await win.setFullscreen(false);
+    if (!isTvMode() && (await isPictureFullscreen())) await setPictureFullscreen(false);
     await restoreScreen();
     onExit();
   }, [onExit]);
@@ -1450,9 +1450,8 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     // In TV mode the window is always fullscreen and has no other state to
     // toggle to — see tv.ts.
     if (isTvMode()) return;
-    const win = getCurrentWindow();
-    const entering = !(await win.isFullscreen());
-    await win.setFullscreen(entering);
+    const entering = !(await isPictureFullscreen());
+    await setPictureFullscreen(entering);
     if (!entering) {
       await restoreScreen();
       return;
@@ -1477,9 +1476,8 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
    * and a mirror would quietly disagree the first time it did.
    */
   const backOut = useCallback(async () => {
-    const win = getCurrentWindow();
-    if (!isTvMode() && (await win.isFullscreen())) {
-      await win.setFullscreen(false);
+    if (!isTvMode() && (await isPictureFullscreen())) {
+      await setPictureFullscreen(false);
       await restoreScreen();
       return;
     }

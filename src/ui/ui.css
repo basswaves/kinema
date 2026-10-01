@@ -65,6 +65,18 @@ html {
   font-size: clamp(16px, min(0.909vw, 1.55vh), 23.2px);
 }
 
+/*
+ * TV mode was drawn for a 1080p screen. On a bigger one the system does not
+ * scale up — a 4K TV on GNOME, which keeps a large TV at 100 % because its
+ * pixels are not dense, or on Windows at 100 % — the same 23.2px came out half
+ * the size it was drawn at (seen on the Linux test stick). So past 1080p it
+ * grows with the screen; at or below it nothing changes. 1.2083vw is 23.2px at
+ * 1,920 wide, 2.1481vh is 23.2px at 1,080 high.
+ */
+:root[data-tv='on'] {
+  font-size: max(calc(16px * var(--ui-scale)), min(1.2083vw, 2.1481vh));
+}
+
 .browse {
   position: absolute;
   inset: 0;

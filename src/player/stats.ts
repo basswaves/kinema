@@ -42,7 +42,7 @@ import { outputCheck, type OutputFacts } from './outputCheck';
 import { readSwitchSettings } from './displaySwitch';
 import { readAudioSettings, targetDevice } from './audioOutput';
 import { getEquipment, type DisplayMode } from './equipment';
-import { capabilitiesNow } from '../capabilities';
+import { capabilitiesNow, screenOwner } from '../capabilities';
 
 export interface StatRow {
   label: string;
@@ -267,10 +267,10 @@ function describeScaling(
  * case where the receiver gets exactly what is on the disc.
  */
 /**
- * What happens to a Dolby Vision track. Windows has no way to send a Dolby
- * Vision signal to a TV, so it is always shown as HDR10 — how depends on the
- * profile. `null` for a file that is not Dolby Vision (or whose container does
- * not say).
+ * What happens to a Dolby Vision track. A PC has no way to send a Dolby
+ * Vision signal to a TV — Windows and Linux alike — so it is always shown as
+ * HDR10; how depends on the profile. `null` for a file that is not Dolby
+ * Vision (or whose container does not say).
  */
 export function describeDolbyVision(profile: number | null): StatRow | null {
   if (profile === null || profile <= 0) return null;
@@ -280,25 +280,25 @@ export function describeDolbyVision(profile: number | null): StatRow | null {
       return {
         label,
         value: 'profile 5 → converted to HDR10',
-        note: 'no HDR10 layer in the file, so its own Dolby Vision metadata maps it; Windows cannot send Dolby Vision itself',
+        note: 'no HDR10 layer in the file, so its own Dolby Vision metadata maps it; Kinema cannot send Dolby Vision itself',
       };
     case 7:
       return {
         label,
         value: 'profile 7 → HDR10 base layer',
-        note: 'the disc’s HDR10 layer is shown and the enhancement layer is not used; Windows cannot send Dolby Vision itself',
+        note: 'the disc’s HDR10 layer is shown and the enhancement layer is not used; Kinema cannot send Dolby Vision itself',
       };
     case 8:
       return {
         label,
         value: 'profile 8 → HDR10 base layer',
-        note: 'made to fall back to HDR10 (or HLG), which is shown; Windows cannot send Dolby Vision itself',
+        note: 'made to fall back to HDR10 (or HLG), which is shown; Kinema cannot send Dolby Vision itself',
       };
     default:
       return {
         label,
         value: `profile ${profile} → HDR10`,
-        note: 'Windows cannot send Dolby Vision itself',
+        note: 'Kinema cannot send Dolby Vision itself',
       };
   }
 }
@@ -361,7 +361,9 @@ export function hdrOutcome(f: HdrFacts): OutputFacts['hdrOut'] {
   return source > 0 && target > 0 && target < source - 1 ? 'compressed' : 'passthrough';
 }
 
-export function describeHdr(f: HdrFacts): StatRow {
+/** `system` is for the wording: who reports the screen's peak, and owns HDR. */
+export function describeHdr(f: HdrFacts, system?: string | null): StatRow {
+  const owner = screenOwner(system);
   if (!isHdr(f.sourceGamma)) {
     return {
       label: 'HDR pipeline',
@@ -386,7 +388,7 @@ export function describeHdr(f: HdrFacts): StatRow {
       return {
         label: 'HDR pipeline',
         value: `HDR out, compressed · ${source.toFixed(0)} → ${target.toFixed(0)} nits`,
-        note: 'adapted to the peak Windows reports for the screen, not sent as mastered',
+        note: `adapted to the peak ${owner} reports for the screen, not sent as mastered`,
         warn: true,
       };
     }
@@ -400,9 +402,9 @@ export function describeHdr(f: HdrFacts): StatRow {
   return {
     label: 'HDR pipeline',
     value: `tone mapped to SDR (${f.targetGamma}) · ${text(f.toneMapping)}`,
-    note: f.computePeak
-      ? 'this screen is SDR, or Windows HDR is off; measured frame peak'
-      : 'this screen is SDR, or Windows HDR is off',
+    note: `this screen is SDR, or HDR is off in ${owner}${
+      f.computePeak ? '; measured frame peak' : ''
+    }`,
   };
 }
 
@@ -575,8 +577,8 @@ async function readOutputCheck(from: {
       outChannels: outCount,
       direct: audioSettings.direct,
       device: targetDevice(equipment, audioSettings.deviceId),
-      system: capabilitiesNow()?.system,
     },
+    system: capabilitiesNow()?.system,
   });
   if (checks.length === 0) return null;
   return {
@@ -843,14 +845,17 @@ export async function readPlaybackStats(): Promise<StatGroup[]> {
     {
       heading: 'Colour',
       rows: [
-        describeHdr({
-          sourceGamma: gamma,
-          targetGamma,
-          sourcePeak: maxLuma,
-          targetPeak,
-          toneMapping,
-          computePeak,
-        }),
+        describeHdr(
+          {
+            sourceGamma: gamma,
+            targetGamma,
+            sourcePeak: maxLuma,
+            targetPeak,
+            toneMapping,
+            computePeak,
+          },
+          capabilitiesNow()?.system
+        ),
         ...[describeDolbyVision(dolbyVision)].filter((r): r is StatRow => r !== null),
         { label: 'Transfer', value: text(gamma) },
         {
@@ -882,7 +887,7 @@ export async function readPlaybackStats(): Promise<StatGroup[]> {
             colorspaceHintMode === 'source'
               ? "an HDR display gets the video's own metadata"
               : colorspaceHintMode === 'target'
-                ? 'HDR is adapted to the peak Windows reports before it is sent'
+                ? `HDR is adapted to the peak ${screenOwner(capabilitiesNow()?.system)} reports before it is sent`
                 : undefined,
         },
       ],

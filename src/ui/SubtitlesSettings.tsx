@@ -18,6 +18,7 @@ import FocusInput from './FocusInput';
 import { userError } from './errors';
 import { useClaimFocus } from './focus';
 import { getSetting, setSetting } from '../metadata/api';
+import { useCapabilities } from '../capabilities';
 import { FORCED_KEY } from '../player/trackChoice';
 import {
   AUTO_FORCED_KEY,
@@ -81,6 +82,7 @@ const SIGN_OUT_KEY = 'opensubtitles-sign-out';
 const SIGN_IN_KEY = 'opensubtitles-sign-in';
 
 export function OpenSubtitlesSection() {
+  const can = useCapabilities();
   const [status, setStatus] = useState<SubtitleStatus | null>(null);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -207,8 +209,14 @@ export function OpenSubtitlesSection() {
           </div>
           <p className="settings-hint">
             OpenSubtitles has no way to approve Kinema from a phone, so the password is typed
-            here. Kinema keeps it encrypted to your Windows user, and sends it only to
-            OpenSubtitles, to sign in again each day.
+            here.{' '}
+            {/* Windows encrypts it to the user (DPAPI); elsewhere it sits in Kinema's
+                data folder, which only the user's account can open (util.rs →
+                keep_private). Said as it is (CLAUDE.md → OpenSubtitles). */}
+            {can?.system === 'Windows' || !can
+              ? 'Kinema keeps it encrypted to your Windows user'
+              : 'Kinema keeps it in its own data folder, which only your account can open,'}{' '}
+            and sends it only to OpenSubtitles, to sign in again each day.
           </p>
         </>
       )}

@@ -2309,6 +2309,28 @@ choice of mode and screen in unit tests. A real TV switching to 23.976 Hz
 through Kinema: the next stick run (the stick runs already showed GNOME
 switching that TV to 3840×2160 at 23.976 Hz and HDR through the same calls).
 
+## Words for each system, and TV mode at 4K
+
+**What each sentence says is true where it is read.** The on-screen texts
+that named Windows now follow the system — but not by putting "Linux" in
+its place. On Linux the screen and its HDR belong to the desktop, so it is
+"switched off in the desktop's display settings"; sound goes "through the
+Linux sound server"; the OpenSubtitles password is "in its own data folder,
+which only your account can open", because there it is not encrypted the
+way Windows does it. Some became true on every system instead: "Kinema
+cannot send a Dolby Vision signal" rather than "Windows cannot". Error
+messages had a quieter version of the same problem: Windows' error numbers
+are matched because its messages are in the user's language, and Linux uses
+the same numbers for other things — its 5 is a failed read, not "access
+denied" — so Linux is now read by its (English) words, first.
+
+**TV mode grows past 1080p.** TV mode's type was a fixed size drawn for a
+1080p TV. GNOME keeps a large 4K TV at 100 % — its pixels are not dense — so
+on the Linux test stick everything came out half the size it was drawn at,
+and Windows at 100 % would do the same. Past a 1080p window the type now
+grows with the screen; at or below it, nothing changes, so a Windows TV PC
+with scaling looks exactly as it did.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

@@ -26,6 +26,7 @@
 import type { AudioDevice, DisplayMode } from './equipment';
 import { cadenceRank, type SwitchSettings } from './displayMode';
 import { formatRate } from './equipment';
+import { screenOwner } from '../capabilities';
 
 export type Verdict = 'native' | 'limited' | 'info';
 
@@ -68,9 +69,9 @@ export interface OutputFacts {
     outChannels: number | null;
     direct: boolean;
     device: AudioDevice | null;
-    /** For the wording: what the ordinary path goes through. Windows unless said. */
-    system?: string;
   } | null;
+  /** For the wording only (capabilities `system`). Windows unless said. */
+  system?: string;
 }
 
 const res = (s: { width: number; height: number }) => `${s.width}×${s.height}`;
@@ -125,13 +126,16 @@ export function checkPicture(f: OutputFacts): Check | null {
     fix: canShow
       ? f.switches.resolution === 'off'
         ? 'Settings → Screen → Resolution → Auto switches up for videos like this.'
-        : 'Set the Windows desktop to the screen’s full resolution.'
+        : `Set the desktop to the screen’s full resolution${
+            screenOwner(f.system) === 'Windows' ? ' in Windows' : ''
+          }.`
       : undefined,
   };
 }
 
 export function checkHdr(f: OutputFacts): Check {
   const label = 'HDR';
+  const owner = screenOwner(f.system);
   if (!f.hdrSource) return { label, verdict: 'native', value: 'SDR film, shown as SDR' };
   const dv = f.dolbyVision && f.dolbyVision > 0 ? f.dolbyVision : null;
   switch (f.hdrOut) {
@@ -142,9 +146,11 @@ export function checkHdr(f: OutputFacts): Check {
           verdict: 'info',
           value: `Dolby Vision profile ${dv}, sent as HDR10`,
           why:
+            // True on every system: no PC playback path sends a Dolby
+            // Vision signal, mpv included.
             dv === 5
-              ? 'Windows cannot send a Dolby Vision signal, and this profile has no HDR10 layer, so it is converted to HDR10 with its own metadata.'
-              : 'Windows cannot send a Dolby Vision signal, so the video’s HDR10 layer is sent as mastered.',
+              ? 'Kinema cannot send a Dolby Vision signal, and this profile has no HDR10 layer, so it is converted to HDR10 with its own metadata.'
+              : 'Kinema cannot send a Dolby Vision signal, so the video’s HDR10 layer is sent as mastered.',
         };
       }
       return { label, verdict: 'native', value: 'HDR10 as mastered; the screen tone maps it' };
@@ -152,7 +158,7 @@ export function checkHdr(f: OutputFacts): Check {
       return {
         label,
         verdict: 'limited',
-        value: 'HDR, compressed to the peak Windows reports',
+        value: `HDR, compressed to the peak ${owner} reports`,
         why: 'The video is remapped before it reaches the screen.',
       };
     case 'sdr':
@@ -161,10 +167,12 @@ export function checkHdr(f: OutputFacts): Check {
           label,
           verdict: 'limited',
           value: 'HDR video shown in SDR',
-          why: 'The screen can show HDR, but Windows has it switched off.',
+          why: `The screen can show HDR, but ${owner} has it switched off.`,
           fix: f.switches.hdr
             ? 'Go fullscreen: HDR is switched on then (Settings → Screen).'
-            : 'Settings → Screen → Turn HDR on for HDR videos, or switch HDR on in Windows.',
+            : `Settings → Screen → Turn HDR on for HDR videos, or switch HDR on in ${
+                owner === 'Windows' ? 'Windows' : "the desktop's display settings"
+              }.`,
         };
       }
       return {
@@ -310,7 +318,7 @@ export function checkSound(f: OutputFacts): Check | null {
       why: 'The receiver decodes it, Atmos and DTS:X included.',
     };
   }
-  const system = a.system ?? 'Windows';
+  const system = f.system ?? 'Windows';
   const stream = bitstreamFor(a.codec, a.device);
   const couldPass =
     stream !== null &&

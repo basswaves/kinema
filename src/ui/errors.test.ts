@@ -13,6 +13,16 @@ describe('describeError', () => {
     expect(describeError('The network path was not found. (os error 53)')).toMatch(/network drive/);
   });
 
+  it('reads Linux errors by their words, not the numbers Windows uses for other things', () => {
+    // Linux's 5 is a failed read; on Windows 5 is "access denied".
+    expect(describeError('Input/output error (os error 5)')).toMatch(/did not answer/);
+    expect(describeError('Permission denied (os error 13)')).toMatch(/refused access/);
+    expect(describeError('No such file or directory (os error 2)')).toMatch(/isn’t there/);
+    expect(describeError('No route to host (os error 113)')).toMatch(/network drive/);
+    // Windows, in another language: the number is what is matched.
+    expect(describeError('Ingen tilgang. (os error 5)')).toMatch(/refused access/);
+  });
+
   it('reads an HTTP status', () => {
     expect(describeError(new Error('TMDB /search/movie failed: HTTP 401'))).toMatch(/TMDB key/);
     expect(describeError(new Error('TVmaze search failed: HTTP 503'))).toMatch(/its end/);

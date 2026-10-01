@@ -7,6 +7,21 @@ makes no stability promises.
 
 ## [Unreleased]
 
+### Added
+
+- **Linux: Picture & sound.** Settings → Your equipment lists the screens and
+  what each receiver takes; Settings → Sound sends films straight to the
+  receiver, untouched, as on Windows; and on GNOME, Settings → Screen
+  switches the refresh rate, resolution and HDR for a film and puts them back
+  after. Screen switching on KDE Plasma and other desktops is still to come.
+
+### Changed
+
+- **TV mode on a 4K screen the system does not scale** (GNOME's default for a
+  large TV, or Windows at 100 %) is no longer drawn at half its size: past a
+  1080p screen it now grows with the screen. At 1080p and below, and on any
+  screen Windows scales, it looks exactly as before.
+
 ### Fixed
 
 - **Episodes on a network share named only by their numbering** — a

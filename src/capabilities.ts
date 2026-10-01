@@ -27,6 +27,15 @@ export interface Capabilities {
   shut_down: boolean;
 }
 
+/**
+ * Who sets the screen up, for wording: "switched off in Windows", or on Linux
+ * "in the desktop" — HDR and the mode belong to GNOME, KDE and the rest there,
+ * not to "Linux". Windows when not known, as everything was written for it.
+ */
+export function screenOwner(system?: string | null): string {
+  return !system || system === 'Windows' ? 'Windows' : 'the desktop';
+}
+
 let current: Capabilities | null = null;
 let asked: Promise<void> | null = null;
 const listeners = new Set<() => void>();

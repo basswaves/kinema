@@ -128,7 +128,9 @@ sudo dnf install ./kinema-<version>-1.x86_64.rpm       # Fedora
 
 Anything else: unpack the folder and run `./kinema`; its README.txt names the
 two libraries to install. HDR on Wayland needs mpv 0.40 or later (Ubuntu
-26.04, Debian 13, Fedora 43, Arch). Updates are as on Windows: Kinema says
+26.04, Debian 13, Fedora 43, Arch), and a graphics driver that offers HDR to
+Vulkan windows: NVIDIA's 580 driver does not, so there mpv converts HDR films
+to SDR instead. Updates are as on Windows: Kinema says
 when there is one, and you install it when you choose.
 
 ## First run

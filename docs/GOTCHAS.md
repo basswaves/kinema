@@ -1564,3 +1564,29 @@ one with it `[0, 2, 1]`, so "the first one that isn't 0" picks the wrong
 mode. Asking for 2 is accepted, and reading the state back says 2, while the
 TV stays in SDR and the compositor goes on telling clients "gamma 2.2, 80
 nits" — nothing reports an error. Ask for 1 by number.
+
+### NVIDIA's Vulkan fails if its device files were never made
+
+The driver needs `/dev/nvidia-modeset` and `/dev/nvidia-uvm` besides
+`/dev/nvidia0` and `/dev/nvidiactl`. On Ubuntu its udev rule makes them
+(`ub-device-create`); on a live USB session with the driver added to the
+persistence that never happened, and the driver still loaded, GNOME ran on
+it and OpenGL worked — but every Vulkan window failed at
+`vkGetPhysicalDeviceSurfacePresentModesKHR` with `VK_ERROR_UNKNOWN`,
+`vulkaninfo` crashed inside the driver, and NVDEC could not start. Making the
+two files (`mknod`, as `nvidia-modprobe` would) fixed all three at once. mpv
+hides the failure by falling back to OpenGL and playing: two failed `…vk`
+contexts followed by `Initializing GPU context 'wayland'` in `mpv.log` is the
+sign. Check `ls /dev/nvidia*` before blaming mpv.
+
+### NVIDIA's Vulkan offers no HDR colour space on Wayland
+
+With GNOME in HDR, the compositor tells mpv "PQ, BT.2020" — and NVIDIA's 580
+driver still lists only `VK_COLOR_SPACE_SRGB_NONLINEAR_KHR` for the window's
+surface (mpv.log: "Available surface configurations"). With nothing HDR to
+pick, mpv converts the film to SDR and `video-target-params` says gamma 2.2,
+BT.709, 203 nits; nothing is logged as an error. OpenGL is no way round it:
+mpv has no colour-space hint there and targets BT.1886. This is the driver,
+not Kinema, and not fixable by an option: on such a machine HDR films play
+tone-mapped to SDR. (Mesa's Vulkan for AMD and Intel is meant to offer the
+HDR colour spaces through `wp_color_management`; not yet tried here.)

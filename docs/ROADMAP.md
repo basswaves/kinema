@@ -73,9 +73,10 @@ reasons in full.
 
 **Linux is under way**, then **Android**. Linux builds and passes its tests on
 every push, plays with Kinema's own controls, and has packages that use the
-system's mpv, the equipment check and sound straight to the receiver; next
-is screen switching on GNOME, then a check of all of it on a real TV and
-receiver. Android comes after, with
+system's mpv, the equipment check, sound straight to the receiver and screen
+switching on GNOME; next is a check of all of it on a real TV and receiver,
+then the other desktops (KDE Plasma first) for the screen's mode and HDR.
+Android comes after, with
 its own player engine (Media3) for Dolby Vision and passthrough on TV boxes.
 macOS is not planned by the author; a port is welcome. See
 [Platform support](../README.md#platform-support).

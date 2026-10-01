@@ -782,6 +782,12 @@ pub fn window_display(window: tauri::WebviewWindow) -> WindowDisplay {
     }
     #[cfg(not(windows))]
     let _ = window;
+    // Linux: the desktop's primary screen, where mpv's full-screen picture
+    // opens unless moved; unknown when the desktop is not one Kinema asks.
+    #[cfg(target_os = "linux")]
+    if let Ok((now, _)) = crate::display::linux::screen_now(None) {
+        return WindowDisplay { gdi_name: now.gdi_name, hdr: now.hdr };
+    }
     WindowDisplay { gdi_name: String::new(), hdr: HdrState::Unknown }
 }
 

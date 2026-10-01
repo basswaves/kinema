@@ -905,7 +905,9 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
               <>
                 {/* Each part only where Kinema can do it (capabilities.ts):
                     a control that does nothing is worse than none. */}
-                {can?.display_switching && <ScreenSection onError={setError} />}
+                {can?.display_switching && (
+                  <ScreenSection onError={setError} system={can.system} />
+                )}
                 {can?.equipment_detection && can.audio_direct && (
                   <SoundSection onError={setError} system={can.system} />
                 )}

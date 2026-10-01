@@ -6,7 +6,7 @@
 //! Windows?" would have to be found and changed everywhere it was asked.
 //!
 //! Each answer comes from the module that does the work, stated beside its own
-//! code (`equipment::DETECTS`, `display::SWITCHES`, `power::CAN_*`), so adding
+//! code (`equipment::DETECTS`, `display::switches`, `power::CAN_*`), so adding
 //! a platform's implementation and saying it exists happen in the same place.
 
 use serde::Serialize;
@@ -58,14 +58,22 @@ fn mpv_video() -> MpvVideo {
     }
 }
 
+/// Worked out once per launch: on Linux it asks the desktop over D-Bus
+/// (`display::switches`), which is quick but not free, and the answer does
+/// not change while Kinema runs.
 pub fn current() -> Capabilities {
+    static ONCE: std::sync::OnceLock<Capabilities> = std::sync::OnceLock::new();
+    ONCE.get_or_init(work_out).clone()
+}
+
+fn work_out() -> Capabilities {
     Capabilities {
         system: system_name(),
         engine: "mpv",
         mpv_video: mpv_video(),
         equipment_detection: crate::equipment::DETECTS,
         audio_direct: crate::equipment::DIRECT_AUDIO,
-        display_switching: crate::display::SWITCHES,
+        display_switching: crate::display::switches(),
         sleep: crate::power::CAN_SLEEP,
         shut_down: crate::power::CAN_SHUT_DOWN,
     }
@@ -106,14 +114,16 @@ mod tests {
     }
 
     /// Elsewhere, nothing is claimed that has no implementation behind it.
-    /// Linux has the equipment check (equipment/linux.rs) and direct sound
-    /// (audio_reserve.rs), and nothing else yet.
+    /// Linux has the equipment check (equipment/linux.rs), direct sound
+    /// (audio_reserve.rs), and switching where the desktop is one Kinema can
+    /// ask (display/linux.rs) — which depends on where the test runs.
     #[cfg(not(windows))]
     #[test]
     fn nothing_is_claimed_without_an_implementation() {
         let c = current();
         let linux = cfg!(target_os = "linux");
         assert_eq!((c.equipment_detection, c.audio_direct), (linux, linux));
-        assert!(!c.display_switching && !c.sleep && !c.shut_down);
+        assert_eq!(c.display_switching, crate::display::switches());
+        assert!(!c.sleep && !c.shut_down);
     }
 }

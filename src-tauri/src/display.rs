@@ -15,15 +15,28 @@
 //! desktop mode is never touched, and resetting to it is how the mode is put
 //! back.
 
-// The shared helpers here are used only by the Windows switcher until a Linux
-// one exists. Windows' clippy still reports anything that is genuinely unused.
+//!
+//! On Linux the desktop is asked instead (`display/linux.rs`; GNOME so far),
+//! as a temporary configuration the desktop never saves — the same promise.
+
+// Some shared helpers (the signal check) serve only the Windows switcher.
+// Windows' clippy still reports anything that is genuinely unused.
 #![cfg_attr(not(windows), allow(dead_code))]
 
 use serde::{Deserialize, Serialize};
 
 /// Whether this build can change the screen's refresh rate, resolution and
-/// HDR at all (`capabilities.rs`). Where it cannot, Settings does not offer to.
-pub const SWITCHES: bool = cfg!(windows);
+/// HDR at all (`capabilities.rs`). Where it cannot, Settings does not offer
+/// to. On Linux that depends on the desktop, so it is asked: only a desktop
+/// Kinema knows how to ask counts.
+pub fn switches() -> bool {
+    #[cfg(windows)]
+    return true;
+    #[cfg(target_os = "linux")]
+    return linux::desktop().is_some();
+    #[cfg(not(any(windows, target_os = "linux")))]
+    false
+}
 
 use crate::equipment::{HdrState, Mode};
 
@@ -75,6 +88,10 @@ pub struct Original {
     /// against: the desktop mode coming back is not proof the signal did.
     #[serde(default)]
     pub signal: Option<(u32, u32, f64)>,
+    /// Linux: GNOME's colour mode before, to put back exactly — it may be
+    /// sdr-native (2) rather than the default, which "HDR off" alone loses.
+    #[serde(default)]
+    pub color_mode: Option<u32>,
 }
 
 fn load_original(app: &tauri::AppHandle) -> Option<Original> {
@@ -120,23 +137,32 @@ fn same_signal(a: Option<(u32, u32, f64)>, b: Option<(u32, u32, f64)>) -> bool {
     }
 }
 
-/// The screen the window is on, now.
+/// The screen the picture is on, now. `screen` names it where the picture is
+/// mpv's own window (Linux: mpv's `display-names`); on Windows it is the
+/// screen Kinema's window is on, and `screen` is not needed.
 #[tauri::command]
-pub fn screen_now(window: tauri::WebviewWindow) -> Result<ScreenNow, String> {
+pub fn screen_now(window: tauri::WebviewWindow, screen: Option<String>) -> Result<ScreenNow, String> {
     #[cfg(windows)]
     {
+        let _ = screen;
         let hwnd = window.hwnd().map_err(|e| e.to_string())?;
         win::screen_now(&crate::equipment::win::monitor_of(hwnd))
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "linux")]
     {
         let _ = window;
-        Err("display switching is Windows only".into())
+        linux::screen_now(screen.as_deref()).map(|(now, _)| now)
+    }
+    #[cfg(not(any(windows, target_os = "linux")))]
+    {
+        let _ = (window, screen);
+        Err("display switching is not written for this system".into())
     }
 }
 
-/// Switch the screen the window is on. `hdr` is `None` to leave HDR alone.
+/// Switch the screen the picture is on. `hdr` is `None` to leave HDR alone.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn switch_screen(
     app: tauri::AppHandle,
     window: tauri::WebviewWindow,
@@ -144,9 +170,12 @@ pub async fn switch_screen(
     height: u32,
     hz: u32,
     hdr: Option<bool>,
+    screen: Option<String>,
 ) -> Result<ScreenNow, String> {
     crate::jobs::off_main(move || {
         let _turn = TURN.lock().unwrap_or_else(|e| e.into_inner());
+        #[cfg(not(target_os = "linux"))]
+        let _ = &screen;
         #[cfg(windows)]
         {
             let hwnd = window.hwnd().map_err(|e| e.to_string())?;
@@ -168,6 +197,7 @@ pub async fn switch_screen(
                 hz: before.hz,
                 hdr_on: None,
                 signal: before.signal,
+                color_mode: None,
             });
             if hdr_change.is_some() && original.hdr_on.is_none() {
                 original.hdr_on = Some(before.hdr == HdrState::On);
@@ -209,10 +239,59 @@ pub async fn switch_screen(
             }
             Ok(after)
         }
-        #[cfg(not(windows))]
+        #[cfg(target_os = "linux")]
+        {
+            let _ = window;
+            let (before, colour) = linux::screen_now(screen.as_deref())?;
+            let gdi = before.gdi_name.clone();
+            let hdr_change = hdr.filter(|&on| match before.hdr {
+                HdrState::On => !on,
+                HdrState::Off => on,
+                _ => false,
+            });
+            // Saved first, and only the first time, as on Windows.
+            let mut original = load_original(&app).unwrap_or(Original {
+                gdi_name: gdi.clone(),
+                width: before.width,
+                height: before.height,
+                hz: before.hz,
+                hdr_on: None,
+                signal: before.signal,
+                color_mode: colour,
+            });
+            if hdr_change.is_some() && original.hdr_on.is_none() {
+                original.hdr_on = Some(before.hdr == HdrState::On);
+            }
+            save_original(&app, Some(&original))?;
+
+            // Mode and HDR in one request: GNOME applies the whole layout at
+            // once, so Windows' "HDR first, or it moves the mode" does not
+            // arise.
+            let colour = hdr_change.map(|on| if on { crate::mutter::HDR } else { crate::mutter::DEFAULT_COLOUR });
+            linux::set(&gdi, Some((width, height, hz)), colour)?;
+            let (after, _) = linux::screen_now(Some(&gdi))?;
+            crate::log!(
+                "display: {} {} HDR {:?} → {} ({:.3} Hz) HDR {:?}",
+                gdi,
+                describe(before.width, before.height, before.hz),
+                before.hdr,
+                describe(after.width, after.height, after.hz),
+                after.exact_rate,
+                after.hdr
+            );
+            if (after.width, after.height, after.hz) != (width, height, hz) {
+                crate::log!(
+                    "display: asked for {} and the desktop kept {}",
+                    describe(width, height, hz),
+                    describe(after.width, after.height, after.hz)
+                );
+            }
+            Ok(after)
+        }
+        #[cfg(not(any(windows, target_os = "linux")))]
         {
             let _ = (app, window, width, height, hz, hdr);
-            Err("display switching is Windows only".into())
+            Err("display switching is not written for this system".into())
         }
     })
     .await
@@ -256,7 +335,25 @@ pub fn restore(app: &tauri::AppHandle) -> Result<bool, String> {
             describe_signal(now.signal)
         );
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "linux")]
+    {
+        let gdi = &original.gdi_name;
+        // The colour mode as it was — sdr-native included — when HDR was
+        // touched; left alone when it was not.
+        let colour = original.hdr_on.map(|on| {
+            original.color_mode.unwrap_or(if on { crate::mutter::HDR } else { crate::mutter::DEFAULT_COLOUR })
+        });
+        linux::set(gdi, Some((original.width, original.height, original.hz)), colour)?;
+        let (now, _) = linux::screen_now(Some(gdi))?;
+        crate::log!(
+            "display: restored {} to {} ({:.3} Hz) HDR {:?}",
+            gdi,
+            describe(now.width, now.height, now.hz),
+            now.exact_rate,
+            now.hdr
+        );
+    }
+    #[cfg(not(any(windows, target_os = "linux")))]
     let _ = original;
     save_original(app, None)?;
     Ok(true)
@@ -279,6 +376,9 @@ pub fn restore_after_crash(app: &tauri::AppHandle) {
 
 #[cfg(windows)]
 mod win;
+
+#[cfg(target_os = "linux")]
+pub(crate) mod linux;
 
 #[cfg(test)]
 mod signal_tests {

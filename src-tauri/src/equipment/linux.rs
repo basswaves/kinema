@@ -22,7 +22,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use zbus::zvariant::OwnedValue;
+use crate::mutter::{self, Monitor as MutterMonitor};
 
 use super::{
     eld, edid, AudioDevice, BitstreamSupport, Display, Equipment, HdrState, Mode, Probe,
@@ -136,67 +136,6 @@ fn connectors() -> Vec<Connector> {
     out
 }
 
-/// A monitor as Mutter describes it.
-#[derive(Debug, Clone, Default)]
-pub(crate) struct MutterMonitor {
-    pub connector: String,
-    pub display_name: String,
-    /// (width, height, refresh, current, interlaced)
-    pub modes: Vec<(u32, u32, f64, bool, bool)>,
-    pub color_mode: Option<u32>,
-    pub supported_color_modes: Vec<u32>,
-}
-
-/// Mutter's colour mode for HDR: BT.2100. GNOME 50 also lists 2, "sdr-native"
-/// (wide-gamut SDR) — not HDR (GOTCHAS → "GNOME's colour mode 2 is not HDR").
-pub(crate) const MUTTER_HDR: u32 = 1;
-
-type MutterMode = (String, i32, i32, f64, f64, Vec<f64>, HashMap<String, OwnedValue>);
-type MutterMonitorT = ((String, String, String, String), Vec<MutterMode>, HashMap<String, OwnedValue>);
-type MutterLogical =
-    (i32, i32, f64, u32, bool, Vec<(String, String, String, String)>, HashMap<String, OwnedValue>);
-type MutterState = (u32, Vec<MutterMonitorT>, Vec<MutterLogical>, HashMap<String, OwnedValue>);
-
-fn prop<T: TryFrom<OwnedValue>>(props: &HashMap<String, OwnedValue>, key: &str) -> Option<T> {
-    props.get(key).and_then(|v| v.try_clone().ok()).and_then(|v| T::try_from(v).ok())
-}
-
-fn mutter() -> Result<Vec<MutterMonitor>, String> {
-    let bus = zbus::blocking::Connection::session().map_err(|e| e.to_string())?;
-    let reply = bus
-        .call_method(
-            Some("org.gnome.Mutter.DisplayConfig"),
-            "/org/gnome/Mutter/DisplayConfig",
-            Some("org.gnome.Mutter.DisplayConfig"),
-            "GetCurrentState",
-            &(),
-        )
-        .map_err(|e| e.to_string())?;
-    let (_, monitors, _, _): MutterState = reply.body().deserialize().map_err(|e| e.to_string())?;
-    Ok(monitors
-        .into_iter()
-        .map(|((connector, _, _, _), modes, props)| MutterMonitor {
-            connector,
-            display_name: prop::<String>(&props, "display-name").unwrap_or_default(),
-            modes: modes
-                .into_iter()
-                .map(|(_, w, h, refresh, _, _, p)| {
-                    (
-                        w.max(0) as u32,
-                        h.max(0) as u32,
-                        refresh,
-                        prop::<bool>(&p, "is-current").unwrap_or(false),
-                        prop::<bool>(&p, "is-interlaced").unwrap_or(false),
-                    )
-                })
-                .collect(),
-            color_mode: prop::<u32>(&props, "color-mode"),
-            supported_color_modes: prop::<Vec<u32>>(&props, "supported-color-modes")
-                .unwrap_or_default(),
-        })
-        .collect())
-}
-
 /// The whole number a refresh rate is known by — 23 for 23.976, as Windows
 /// lists it, so `Mode` means the same on both.
 pub(crate) fn whole_hz(rate: f64) -> u32 {
@@ -230,8 +169,8 @@ pub(crate) fn display_from(connector: Option<&str>, edid: Option<&edid::Edid>, g
 
     let can_hdr = edid.and_then(|e| e.hdr.as_ref()).is_some_and(|h| h.pq);
     d.hdr = match gnome {
-        Some(m) if m.color_mode == Some(MUTTER_HDR) => HdrState::On,
-        Some(m) if m.supported_color_modes.contains(&MUTTER_HDR) => HdrState::Off,
+        Some(m) if m.color_mode == Some(mutter::HDR) => HdrState::On,
+        Some(m) if m.supported_color_modes.contains(&mutter::HDR) => HdrState::Off,
         Some(_) => HdrState::Unsupported,
         None if can_hdr => HdrState::Unknown,
         None => HdrState::Unsupported,
@@ -245,8 +184,9 @@ pub(crate) fn display_from(connector: Option<&str>, edid: Option<&edid::Edid>, g
     }
 
     if let Some(m) = gnome {
-        for &(w, h, rate, current, interlaced) in &m.modes {
-            if current {
+        for mm in &m.modes {
+            let (w, h, rate) = (mm.width, mm.height, mm.refresh);
+            if mm.current {
                 d.width = w;
                 d.height = h;
                 d.refresh_num = (rate * 1000.0).round() as u32;
@@ -254,7 +194,7 @@ pub(crate) fn display_from(connector: Option<&str>, edid: Option<&edid::Edid>, g
             }
             let mode = Mode { width: w, height: h, hz: whole_hz(rate), rate };
             let same = |o: &Mode| o.width == w && o.height == h && (o.rate - rate).abs() < 0.0005;
-            if !interlaced && !d.modes.iter().any(same) {
+            if !mm.interlaced && !d.modes.iter().any(same) {
                 d.modes.push(mode);
             }
         }
@@ -264,8 +204,8 @@ pub(crate) fn display_from(connector: Option<&str>, edid: Option<&edid::Edid>, g
 
 fn displays(problems: &mut Vec<String>) -> Vec<Display> {
     let kernel = connectors();
-    let gnome = match mutter() {
-        Ok(m) => m,
+    let gnome = match mutter::state() {
+        Ok(s) => s.monitors,
         Err(e) => {
             problems.push(format!(
                 "the screens' modes and HDR state (only GNOME is asked so far: {e})"
@@ -459,18 +399,28 @@ mod tests {
     }
 
     fn tv_on_gnome(color_mode: u32) -> MutterMonitor {
+        let mode = |w, h, refresh, current, interlaced| mutter::MonitorMode {
+            id: format!("{w}x{h}@{refresh}"),
+            width: w,
+            height: h,
+            refresh,
+            scales: vec![1.0],
+            current,
+            interlaced,
+        };
         MutterMonitor {
             connector: "HDMI-1".into(),
             display_name: "Maker TV".into(),
             modes: vec![
-                (3840, 2160, 60.0, false, false),
-                (3840, 2160, 23.976023, false, false),
-                (3840, 2160, 23.976023, false, false),
-                (1920, 1080, 60.0, true, false),
-                (1920, 1080, 59.940060, false, true),
+                mode(3840, 2160, 60.0, false, false),
+                mode(3840, 2160, 23.976023, false, false),
+                mode(3840, 2160, 23.976023, false, false),
+                mode(1920, 1080, 60.0, true, false),
+                mode(1920, 1080, 59.940060, false, true),
             ],
             color_mode: Some(color_mode),
             supported_color_modes: vec![0, 2, 1],
+            ..Default::default()
         }
     }
 
@@ -495,7 +445,7 @@ mod tests {
         // Colour mode 2 on, as the second stick round asked for by mistake.
         let d = display_from(Some("HDMI-A-1"), None, Some(&tv_on_gnome(2)));
         assert_eq!(d.hdr, HdrState::Off);
-        let on = display_from(Some("HDMI-A-1"), None, Some(&tv_on_gnome(MUTTER_HDR)));
+        let on = display_from(Some("HDMI-A-1"), None, Some(&tv_on_gnome(mutter::HDR)));
         assert_eq!(on.hdr, HdrState::On);
     }
 

@@ -33,7 +33,14 @@ const RESOLUTION_CHOICES: { value: ResolutionMode; label: string }[] = [
   { value: 'match', label: 'Match the video' },
 ];
 
-export default function ScreenSection({ onError }: { onError: (message: string) => void }) {
+/** `system` is for the wording only: "switched off in Windows". */
+export default function ScreenSection({
+  onError,
+  system,
+}: {
+  onError: (message: string) => void;
+  system: string;
+}) {
   const [settings, setSettings] = useState<SwitchSettings | null>(null);
 
   useEffect(() => {
@@ -85,7 +92,7 @@ export default function ScreenSection({ onError }: { onError: (message: string) 
         choices={ON_OFF}
         value={settings.hdr ? 'on' : 'off'}
         onChange={(v) => save(SWITCH_HDR_KEY, v, { ...settings, hdr: v === 'on' })}
-        note="For a screen that can show HDR but has it switched off in Windows. Kinema turns HDR on for an HDR video and off again afterwards."
+        note={`For a screen that can show HDR but has it switched off in ${system}. Kinema turns HDR on for an HDR video and off again afterwards.`}
         hint="With this off, HDR videos are shown in SDR on such a screen."
       />
     </section>

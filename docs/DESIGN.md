@@ -165,7 +165,8 @@ capabilities.rs  What this build can do where it runs — examine equipment,
                  send sound straight to a receiver, switch the screen,
                  sleep, shut down, mpv's graphics interface — each answer
                  stated by the module that does the work (equipment::DETECTS,
-                 equipment::DIRECT_AUDIO, display::SWITCHES, power::CAN_*).
+                 equipment::DIRECT_AUDIO, display::switches — on Linux, whether
+                 the desktop is one Kinema can ask — power::CAN_*).
 capabilities.ts  Asked once at startup; the interface shows or hides by the
                  answers, never by the system's name, which is for wording
                  only. Leave and Picture & sound are the two screens that

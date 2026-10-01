@@ -2278,6 +2278,37 @@ Checked: the reservation exchange against a stand-in for the sound server on
 a real session bus (`scripts/reserve-holder.py`); the whole path in the
 keyboard tests on the Linux mock. On real hardware: the next stick run.
 
+## Switching the screen on Linux
+
+The same three switches as on Windows (Settings → Screen) — refresh rate,
+resolution, HDR — with the same rules: only while the picture is full
+screen, off by default except Auto resolution, and put back when the player
+closes, the app exits, or at the next launch after a crash.
+
+**The desktop is asked.** On Wayland no program may set a screen's mode;
+the desktop does it when asked. GNOME is asked through the same D-Bus
+interface its own Settings uses, and every change is a *temporary*
+configuration GNOME never saves, so its own setup returns at the next login
+whatever becomes of Kinema. Mode and HDR go in one request: GNOME applies
+the whole layout at once, so Windows' trouble with HDR moving the mode does
+not arise. The other screens, and each screen's RGB range and underscan, are
+handed back exactly as they were.
+
+**One desktop at a time, and only where it answers.** KDE Plasma, Sway,
+Hyprland and the rest each have their own way of being asked. Each gets its
+own module beside GNOME's when it is added; until then Settings offers no
+switching on them at all, rather than a switch that does nothing. Which
+desktop answers is found out once per launch, not assumed from the system's
+name.
+
+**Which screen.** On Linux the picture is mpv's own window, so the screen is
+the one mpv reports it is on; failing that, the desktop's primary screen.
+
+Checked: a real mode change and its undoing in a nested GNOME Shell, the
+choice of mode and screen in unit tests. A real TV switching to 23.976 Hz
+through Kinema: the next stick run (the stick runs already showed GNOME
+switching that TV to 3840×2160 at 23.976 Hz and HDR through the same calls).
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

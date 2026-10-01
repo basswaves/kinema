@@ -10,8 +10,8 @@
  * loses the opening.
  */
 import { invoke } from '@tauri-apps/api/core';
-import { getCurrentWindow } from '@tauri-apps/api/window';
 import { getSetting } from '../metadata/api';
+import { capabilitiesNow } from '../capabilities';
 import {
   chooseTarget,
   DEFAULT_SWITCH_SETTINGS,
@@ -21,7 +21,7 @@ import {
   type SwitchSettings,
 } from './displayMode';
 import { formatRate } from './equipment';
-import { mpvGet, mpvSet } from './engine';
+import { isPictureFullscreen, mpvGet, mpvSet } from './engine';
 
 export const SWITCH_REFRESH_KEY = 'display_switch_refresh';
 export const SWITCH_RESOLUTION_KEY = 'display_switch_resolution';
@@ -65,9 +65,20 @@ export async function readSwitchSettings(): Promise<SwitchSettings> {
 export async function mayswitch(): Promise<boolean> {
   const s = await readSwitchSettings();
   if (!s.refresh && s.resolution === 'off' && !s.hdr) return false;
-  return getCurrentWindow()
-    .isFullscreen()
-    .catch(() => false);
+  // The picture's fullscreen, not necessarily this window's: on Linux the
+  // picture is mpv's own window (engine.ts).
+  return isPictureFullscreen().catch(() => false);
+}
+
+/**
+ * The screen mpv's picture is on, where the picture is mpv's own window
+ * (Linux): mpv's `display-names`, "HDMI-1". Null where the picture is in
+ * Kinema's window, whose screen the backend finds itself.
+ */
+async function pictureScreen(): Promise<string | null> {
+  if (!capabilitiesNow()?.mpv_video.own_window) return null;
+  const names = (await mpvGet('display-names', 'string').catch(() => null)) as string | null;
+  return names?.split(',')[0]?.trim() || null;
 }
 
 /** The film as mpv decodes it. Waits for the first frame's parameters. */
@@ -94,13 +105,9 @@ export async function filmNow(): Promise<Film | null> {
  */
 export async function switchForFilm(film: Film): Promise<boolean> {
   const settings = await readSwitchSettings();
-  if (
-    !(await getCurrentWindow()
-      .isFullscreen()
-      .catch(() => false))
-  )
-    return false;
-  const screen = await invoke<Screen>('screen_now');
+  if (!(await isPictureFullscreen().catch(() => false))) return false;
+  const name = await pictureScreen();
+  const screen = await invoke<Screen>('screen_now', { screen: name });
   const target = chooseTarget(screen, film, settings);
   if (!target) return false;
   console.log(
@@ -113,6 +120,7 @@ export async function switchForFilm(film: Film): Promise<boolean> {
     height: target.height,
     hz: target.hz,
     hdr: target.hdr,
+    screen: name,
   });
   // mpv does not notice the change: its window is a child of ours, and it kept
   // reporting 59.972 Hz for a monitor switched to 23.976 (selftest, 2026-09-25).

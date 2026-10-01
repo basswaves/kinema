@@ -18,6 +18,8 @@ mod jobs;
 mod library;
 mod lifecycle;
 mod metadata;
+#[cfg(target_os = "linux")]
+mod mutter;
 mod nfo;
 mod overlay;
 mod omdb;

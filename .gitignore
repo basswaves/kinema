@@ -60,3 +60,4 @@ src-tauri/app.log
 /CLAUDE.md
 test-results/
 playwright-report/
+__pycache__/

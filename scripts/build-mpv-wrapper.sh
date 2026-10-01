@@ -16,12 +16,13 @@ REPO=https://github.com/nini22P/libmpv-wrapper.git
 COMMIT=7b986564c051c6188ed187787481f6bc99ae8b5a   # v0.1.1
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
-work="${WRAPPER_BUILD_DIR:-$root/src-tauri/target/libmpv-wrapper-src}"
+# A fresh clone every time, in a folder of its own. Kept inside target/ it
+# was half restored by CI's build cache — a .git without its objects — and
+# the next release failed with "unable to read tree".
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
 
-if [ ! -d "$work/.git" ]; then
-  git clone --quiet "$REPO" "$work"
-fi
-git -C "$work" fetch --quiet origin "$COMMIT" 2>/dev/null || true
+git clone --quiet "$REPO" "$work"
 git -C "$work" -c advice.detachedHead=false checkout --quiet "$COMMIT"
 
 cargo build --release --manifest-path "$work/Cargo.toml"

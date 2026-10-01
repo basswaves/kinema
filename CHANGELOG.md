@@ -11,9 +11,10 @@ makes no stability promises.
 
 - **Linux: Picture & sound.** Settings → Your equipment lists the screens and
   what each receiver takes; Settings → Sound sends films straight to the
-  receiver, untouched, as on Windows; and on GNOME, Settings → Screen
-  switches the refresh rate, resolution and HDR for a film and puts them back
-  after. Screen switching on KDE Plasma and other desktops is still to come.
+  receiver, untouched, as on Windows; and on GNOME and KDE Plasma, Settings →
+  Screen switches the refresh rate, resolution and HDR for a film and puts
+  them back after. Screen switching on other desktops (Sway, Hyprland) is
+  still to come.
 
 ### Changed
 

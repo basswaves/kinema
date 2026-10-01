@@ -19,6 +19,10 @@ mod library;
 mod lifecycle;
 mod metadata;
 #[cfg(target_os = "linux")]
+mod desktop;
+#[cfg(target_os = "linux")]
+mod kscreen;
+#[cfg(target_os = "linux")]
 mod mutter;
 mod nfo;
 mod overlay;

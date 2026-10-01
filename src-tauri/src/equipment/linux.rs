@@ -3,12 +3,11 @@
 //!
 //! - **The kernel** (`/sys/class/drm`): which screens are connected, on what
 //!   kind of port, and each one's EDID — its name and its HDR brightness.
-//! - **GNOME** (Mutter's `org.gnome.Mutter.DisplayConfig` on the session bus):
-//!   the current mode, every mode the desktop can drive with its exact rate,
-//!   and whether HDR is on. The kernel knows the modes too, but not which one
-//!   the desktop chose, nor anything about HDR, which the compositor owns.
-//!   Other desktops are not asked yet; their screens are still listed, from
-//!   the kernel, with the mode left unknown.
+//! - **The desktop** (`desktop.rs`: GNOME or KDE Plasma so far): the current
+//!   mode, every mode it can drive with its exact rate, and whether HDR is on.
+//!   The kernel knows the modes too, but not which one the desktop chose, nor
+//!   anything about HDR, which the compositor owns. On other desktops the
+//!   screens are still listed, from the kernel, with the mode left unknown.
 //! - **ALSA**: each HDMI/DisplayPort sound device's `ELD` control, which holds
 //!   the list of formats the TV or receiver on that output announced
 //!   (`eld.rs`). Read per PCM device, not from `/proc/asound/card*/eld#*`:
@@ -22,7 +21,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::mutter::{self, Monitor as MutterMonitor};
+use crate::desktop::{self, Screen as DesktopScreen};
 
 use super::{
     eld, edid, AudioDevice, BitstreamSupport, Display, Equipment, HdrState, Mode, Probe,
@@ -145,10 +144,16 @@ pub(crate) fn whole_hz(rate: f64) -> u32 {
         .unwrap_or(rate.round() as u32)
 }
 
-/// One screen: the kernel's connector, Mutter's monitor, or both.
-pub(crate) fn display_from(connector: Option<&str>, edid: Option<&edid::Edid>, gnome: Option<&MutterMonitor>) -> Display {
+/// Whether the desktop's name for an output is this kernel connector: GNOME
+/// says "HDMI-1" for `HDMI-A-1`, KDE says "HDMI-A-1".
+pub(crate) fn same_connector(kernel: &str, on_desktop: &str) -> bool {
+    on_desktop == kernel || on_desktop == desktop_name(kernel)
+}
+
+/// One screen: the kernel's connector, the desktop's screen, or both.
+pub(crate) fn display_from(connector: Option<&str>, edid: Option<&edid::Edid>, on_desktop: Option<&DesktopScreen>) -> Display {
     let kernel_name = connector.map(str::to_string);
-    let name_on_desktop = gnome
+    let name_on_desktop = on_desktop
         .map(|m| m.connector.clone())
         .or_else(|| kernel_name.as_deref().map(desktop_name))
         .unwrap_or_default();
@@ -160,7 +165,7 @@ pub(crate) fn display_from(connector: Option<&str>, edid: Option<&edid::Edid>, g
         ),
         name: edid
             .and_then(|e| e.name.clone())
-            .or_else(|| gnome.map(|m| m.display_name.clone()).filter(|n| !n.is_empty()))
+            .or_else(|| on_desktop.map(|m| m.display_name.clone()).filter(|n| !n.is_empty()))
             .unwrap_or_else(|| name_on_desktop.clone()),
         connection: connection_of(kernel_name.as_deref().unwrap_or(&name_on_desktop)),
         gdi_name: name_on_desktop,
@@ -168,10 +173,10 @@ pub(crate) fn display_from(connector: Option<&str>, edid: Option<&edid::Edid>, g
     };
 
     let can_hdr = edid.and_then(|e| e.hdr.as_ref()).is_some_and(|h| h.pq);
-    d.hdr = match gnome {
-        Some(m) if m.color_mode == Some(mutter::HDR) => HdrState::On,
-        Some(m) if m.supported_color_modes.contains(&mutter::HDR) => HdrState::Off,
-        Some(_) => HdrState::Unsupported,
+    d.hdr = match on_desktop.map(|m| m.hdr) {
+        Some(Some(true)) => HdrState::On,
+        Some(Some(false)) => HdrState::Off,
+        Some(None) => HdrState::Unsupported,
         None if can_hdr => HdrState::Unknown,
         None => HdrState::Unsupported,
     };
@@ -183,7 +188,7 @@ pub(crate) fn display_from(connector: Option<&str>, edid: Option<&edid::Edid>, g
         }
     }
 
-    if let Some(m) = gnome {
+    if let Some(m) = on_desktop {
         for mm in &m.modes {
             let (w, h, rate) = (mm.width, mm.height, mm.refresh);
             if mm.current {
@@ -204,26 +209,24 @@ pub(crate) fn display_from(connector: Option<&str>, edid: Option<&edid::Edid>, g
 
 fn displays(problems: &mut Vec<String>) -> Vec<Display> {
     let kernel = connectors();
-    let gnome = match mutter::state() {
-        Ok(s) => s.monitors,
+    let screens = match desktop::screens() {
+        Ok(s) => s,
         Err(e) => {
-            problems.push(format!(
-                "the screens' modes and HDR state (only GNOME is asked so far: {e})"
-            ));
+            problems.push(format!("the screens' modes and HDR state ({e})"));
             Vec::new()
         }
     };
     let mut out: Vec<Display> = kernel
         .iter()
         .map(|c| {
-            let m = gnome.iter().find(|m| m.connector == desktop_name(&c.name));
+            let m = screens.iter().find(|m| same_connector(&c.name, &m.connector));
             display_from(Some(&c.name), c.edid.as_ref(), m)
         })
         .collect();
     // A screen the desktop drives that the kernel did not list — a nested or
     // virtual one — is still a screen.
-    for m in &gnome {
-        if !kernel.iter().any(|c| desktop_name(&c.name) == m.connector) {
+    for m in &screens {
+        if !kernel.iter().any(|c| same_connector(&c.name, &m.connector)) {
             out.push(display_from(None, None, Some(m)));
         }
     }
@@ -398,7 +401,9 @@ mod tests {
         assert_eq!(whole_hz(50.0), 50);
     }
 
-    fn tv_on_gnome(color_mode: u32) -> MutterMonitor {
+    /// A TV as GNOME describes it, through the same conversion the check uses.
+    fn tv_on_gnome(color_mode: u32) -> DesktopScreen {
+        use crate::mutter;
         let mode = |w, h, refresh, current, interlaced| mutter::MonitorMode {
             id: format!("{w}x{h}@{refresh}"),
             width: w,
@@ -408,20 +413,32 @@ mod tests {
             current,
             interlaced,
         };
-        MutterMonitor {
-            connector: "HDMI-1".into(),
-            display_name: "Maker TV".into(),
-            modes: vec![
-                mode(3840, 2160, 60.0, false, false),
-                mode(3840, 2160, 23.976023, false, false),
-                mode(3840, 2160, 23.976023, false, false),
-                mode(1920, 1080, 60.0, true, false),
-                mode(1920, 1080, 59.940060, false, true),
-            ],
-            color_mode: Some(color_mode),
-            supported_color_modes: vec![0, 2, 1],
-            ..Default::default()
-        }
+        let state = mutter::State {
+            serial: 1,
+            monitors: vec![mutter::Monitor {
+                connector: "HDMI-1".into(),
+                display_name: "Maker TV".into(),
+                modes: vec![
+                    mode(3840, 2160, 60.0, false, false),
+                    mode(3840, 2160, 23.976023, false, false),
+                    mode(3840, 2160, 23.976023, false, false),
+                    mode(1920, 1080, 60.0, true, false),
+                    mode(1920, 1080, 59.940060, false, true),
+                ],
+                color_mode: Some(color_mode),
+                supported_color_modes: vec![0, 2, 1],
+                ..Default::default()
+            }],
+            logical: vec![mutter::Logical {
+                x: 0,
+                y: 0,
+                scale: 1.0,
+                transform: 0,
+                primary: true,
+                connectors: vec!["HDMI-1".into()],
+            }],
+        };
+        mutter::to_screens(&state).remove(0)
     }
 
     #[test]
@@ -445,8 +462,25 @@ mod tests {
         // Colour mode 2 on, as the second stick round asked for by mistake.
         let d = display_from(Some("HDMI-A-1"), None, Some(&tv_on_gnome(2)));
         assert_eq!(d.hdr, HdrState::Off);
-        let on = display_from(Some("HDMI-A-1"), None, Some(&tv_on_gnome(mutter::HDR)));
+        let on = display_from(Some("HDMI-A-1"), None, Some(&tv_on_gnome(crate::mutter::HDR)));
         assert_eq!(on.hdr, HdrState::On);
+    }
+
+    #[test]
+    fn plasma_names_outputs_as_the_kernel_does() {
+        // GNOME says HDMI-1 for the kernel's HDMI-A-1; Plasma says HDMI-A-1.
+        assert!(same_connector("HDMI-A-1", "HDMI-1"));
+        assert!(same_connector("HDMI-A-1", "HDMI-A-1"));
+        assert!(!same_connector("HDMI-A-1", "HDMI-A-2"));
+        let tv = DesktopScreen {
+            connector: "HDMI-A-1".into(),
+            modes: vec![crate::desktop::tests::mode("2", 1920, 1080, 60.0, true)],
+            primary: true,
+            hdr: Some(true),
+            ..Default::default()
+        };
+        let d = display_from(Some("HDMI-A-1"), None, Some(&tv));
+        assert_eq!((d.gdi_name.as_str(), d.hdr, d.width), ("HDMI-A-1", HdrState::On, 1920));
     }
 
     #[test]

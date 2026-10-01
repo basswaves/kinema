@@ -2309,6 +2309,39 @@ choice of mode and screen in unit tests. A real TV switching to 23.976 Hz
 through Kinema: the next stick run (the stick runs already showed GNOME
 switching that TV to 3840×2160 at 23.976 Hz and HDR through the same calls).
 
+## KDE Plasma, and one shape for every desktop
+
+The owner asked for Kinema to behave alike on Ubuntu, Debian, Fedora and
+Arch. Sound already did: it goes to ALSA, which every system has, and asks
+for the card through a protocol PipeWire and PulseAudio both honour. The
+screens did not — only GNOME was asked — and KDE Plasma, the other large
+desktop, is the default on Kubuntu and Fedora KDE and common on Arch.
+
+**Plasma's own program.** Plasma has no small D-Bus interface for screens
+the way GNOME has; its screen library speaks to KWin through an internal one
+it does not promise to keep. What it does ship, with Plasma itself, is
+`kscreen-doctor`: `-j` prints the screens as JSON, and
+`output.<name>.mode.<id>` and `output.<name>.hdr.enable` change them — what
+streaming tools such as Sunshine use on Plasma too. Kinema runs it, bounded
+in time, and only in a Plasma session (`XDG_CURRENT_DESKTOP`), since the
+program can be installed elsewhere and would then answer for a desktop it
+cannot change.
+
+**One shape.** GNOME and Plasma each answer in their own way;
+`desktop.rs` turns both into the same list of screens, which the equipment
+check and the switcher read without knowing which desktop it was. The next
+desktop (Sway, Hyprland) is one more module and one more line there.
+
+**Plasma may keep the change.** GNOME is told a change is temporary and
+never saves it; Plasma has no such flag and may remember it as the screen's
+setup. Kinema's own restore — when the film ends, or at the next launch after
+a crash — is what puts it back, as it already was on Windows.
+
+Checked: a nested KWin (Plasma 5.27) found as Plasma, its screen read and a
+mode applied through `kscreen-doctor`, an unknown mode refused; GNOME's
+switching unchanged; Plasma 6's JSON (with `hdr`) in unit tests. A real
+mode change and HDR on Plasma 6: a test stick with Kubuntu.
+
 ## Words for each system, and TV mode at 4K
 
 **What each sentence says is true where it is read.** The on-screen texts

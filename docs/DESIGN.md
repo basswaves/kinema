@@ -174,9 +174,14 @@ capabilities.ts  Asked once at startup; the interface shows or hides by the
 equipment/win.rs, equipment/linux.rs, display/win.rs
                  Each system's half, as its own file; shared rules and
                  commands stay in equipment.rs and display.rs. Linux reads
-                 the screens from GNOME and the kernel, and each receiver's
+                 the screens from the desktop and the kernel, and each receiver's
                  own format list (equipment/eld.rs, equipment/edid.rs: pure
                  parsers, tested on every system)
+desktop.rs       Linux: the screens as the desktop has them, in one shape
+                 whichever desktop answers — GNOME (mutter.rs, D-Bus) or KDE
+                 Plasma (kscreen.rs, its kscreen-doctor). Read by the
+                 equipment check, changed by display/linux.rs. Another
+                 desktop is another module beside those two
 audio_reserve.rs Linux's half of "straight to the receiver": asks the sound
                  server for the receiver's card for the film (device
                  reservation over D-Bus) and gives it back after; the plan

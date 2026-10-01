@@ -120,6 +120,15 @@ plan inside a real KDE or GNOME desktop nested as one window, sends it real
 key presses and photographs that window alone — the check for anything
 touching the Linux player (packages it needs are listed at its top).
 
+Screen switching on Linux asks the desktop (`desktop.rs`). The ignored tests
+`switches_a_desktops_screen_and_puts_it_back` and, for Plasma,
+`reads_and_applies_through_kscreen_doctor` run against a nested GNOME Shell
+or KWin (`cargo test -- --ignored` inside `dbus-run-session` with the
+nested desktop's `WAYLAND_DISPLAY`, and `XDG_CURRENT_DESKTOP=KDE` for KWin,
+which also needs `libkf5screen-bin` and `qtwayland5` on Ubuntu 24.04). A
+nested KWin offers one mode only, so a real Plasma mode change and HDR need
+a real Plasma 6 session.
+
 `scripts\wsl.ps1 'bash scripts/package-linux.sh'` builds what a release
 carries for Linux — `.deb`, `.rpm` and a `.tar.gz` folder — into
 `dist-linux/` in the copy, with the wrapper built from its pinned source

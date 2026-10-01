@@ -138,6 +138,54 @@ pub fn state() -> Result<State, String> {
     })
 }
 
+/// GNOME's screens in the shape the rest of Kinema reads (`desktop.rs`).
+pub fn screens() -> Result<Vec<crate::desktop::Screen>, String> {
+    Ok(to_screens(&state()?))
+}
+
+pub(crate) fn to_screens(state: &State) -> Vec<crate::desktop::Screen> {
+    let primary = state.logical.iter().find(|l| l.primary).map(|l| l.connectors.clone()).unwrap_or_default();
+    state
+        .monitors
+        .iter()
+        .map(|m| crate::desktop::Screen {
+            connector: m.connector.clone(),
+            display_name: m.display_name.clone(),
+            modes: m
+                .modes
+                .iter()
+                .map(|x| crate::desktop::ScreenMode {
+                    id: x.id.clone(),
+                    width: x.width,
+                    height: x.height,
+                    refresh: x.refresh,
+                    current: x.current,
+                    interlaced: x.interlaced,
+                })
+                .collect(),
+            primary: primary.contains(&m.connector),
+            hdr: if m.supported_color_modes.contains(&HDR) {
+                Some(m.color_mode == Some(HDR))
+            } else {
+                None
+            },
+            colour_mode: m.color_mode,
+        })
+        .collect()
+}
+
+/// `desktop::set` for GNOME.
+pub fn set(connector: &str, mode_id: Option<&str>, colour: Option<crate::desktop::Colour>) -> Result<(), String> {
+    use crate::desktop::Colour;
+    let state = state()?;
+    let color_mode = colour.map(|c| match c {
+        Colour::Hdr(true) => HDR,
+        Colour::Hdr(false) => DEFAULT_COLOUR,
+        Colour::Exactly(n) => n,
+    });
+    apply(&state, &Change { connector: connector.into(), mode_id: mode_id.map(str::to_string), color_mode })
+}
+
 /// One screen's new mode and/or colour mode; everything else stays.
 #[derive(Debug, Clone)]
 pub struct Change {

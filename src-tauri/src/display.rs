@@ -16,8 +16,10 @@
 //! back.
 
 //!
-//! On Linux the desktop is asked instead (`display/linux.rs`; GNOME so far),
-//! as a temporary configuration the desktop never saves — the same promise.
+//! On Linux the desktop is asked instead (`display/linux.rs` → `desktop.rs`:
+//! GNOME and KDE Plasma so far). GNOME takes it as a temporary configuration
+//! it never saves; Plasma may keep it as the screen's setup. Either way the
+//! restore below, at the end of the film or at the next launch, puts it back.
 
 // Some shared helpers (the signal check) serve only the Windows switcher.
 // Windows' clippy still reports anything that is genuinely unused.
@@ -33,7 +35,7 @@ pub fn switches() -> bool {
     #[cfg(windows)]
     return true;
     #[cfg(target_os = "linux")]
-    return linux::desktop().is_some();
+    return linux::can_switch();
     #[cfg(not(any(windows, target_os = "linux")))]
     false
 }
@@ -267,8 +269,7 @@ pub async fn switch_screen(
             // Mode and HDR in one request: GNOME applies the whole layout at
             // once, so Windows' "HDR first, or it moves the mode" does not
             // arise.
-            let colour = hdr_change.map(|on| if on { crate::mutter::HDR } else { crate::mutter::DEFAULT_COLOUR });
-            linux::set(&gdi, Some((width, height, hz)), colour)?;
+            linux::set(&gdi, Some((width, height, hz)), hdr_change.map(crate::desktop::Colour::Hdr))?;
             let (after, _) = linux::screen_now(Some(&gdi))?;
             crate::log!(
                 "display: {} {} HDR {:?} → {} ({:.3} Hz) HDR {:?}",
@@ -340,9 +341,10 @@ pub fn restore(app: &tauri::AppHandle) -> Result<bool, String> {
         let gdi = &original.gdi_name;
         // The colour mode as it was — sdr-native included — when HDR was
         // touched; left alone when it was not.
-        let colour = original.hdr_on.map(|on| {
-            original.color_mode.unwrap_or(if on { crate::mutter::HDR } else { crate::mutter::DEFAULT_COLOUR })
-        });
+        use crate::desktop::Colour;
+        let colour = original
+            .hdr_on
+            .map(|on| original.color_mode.map_or(Colour::Hdr(on), Colour::Exactly));
         linux::set(gdi, Some((original.width, original.height, original.hz)), colour)?;
         let (now, _) = linux::screen_now(Some(gdi))?;
         crate::log!(

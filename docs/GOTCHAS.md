@@ -1553,3 +1553,14 @@ graphics library then unloads its driver while mpv's video thread is still
 drawing with it: a segfault in the `vo` thread during `exit()`, after
 everything else had worked (seen in a nested KWin under gdb; WSLg happened
 to survive it). `RunEvent::Exit` now destroys mpv first, on every system.
+
+### GNOME's colour mode 2 is not HDR
+
+Mutter's `DisplayConfig` lists a screen's `supported-color-modes` as
+numbers: 0 is the default, **1 is BT.2100 (HDR)**, and GNOME 50 added **2,
+"sdr-native"** — wide-gamut SDR from the EDID's primaries, offered on screens
+that cannot do HDR as well. A screen without HDR therefore lists `[0, 2]` and
+one with it `[0, 2, 1]`, so "the first one that isn't 0" picks the wrong
+mode. Asking for 2 is accepted, and reading the state back says 2, while the
+TV stays in SDR and the compositor goes on telling clients "gamma 2.2, 80
+nits" — nothing reports an error. Ask for 1 by number.

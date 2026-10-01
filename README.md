@@ -111,6 +111,26 @@ Kinema asks GitHub for the latest version number when it starts, and says in
 Settings when a newer one is out. It never downloads or installs anything by
 itself — you download the new ZIP when you choose to.
 
+### Linux
+
+From the first release that carries them (none does yet — see
+[Platform support](#platform-support)), each release has a `.deb`, an `.rpm`
+and a `.tar.gz` folder, for x86-64 and for ARM. Kinema uses your system's mpv
+and WebKitGTK; the packages have the package manager install them:
+
+```bash
+sudo apt install ./kinema_<version>_amd64.deb          # Ubuntu 24.04 or later, Debian 13
+```
+
+```bash
+sudo dnf install ./kinema-<version>-1.x86_64.rpm       # Fedora
+```
+
+Anything else: unpack the folder and run `./kinema`; its README.txt names the
+two libraries to install. HDR on Wayland needs mpv 0.40 or later (Ubuntu
+26.04, Debian 13, Fedora 43, Arch). Updates are as on Windows: Kinema says
+when there is one, and you install it when you choose.
+
 ## First run
 
 The app opens on a setup panel that asks one thing: **where your videos are.**

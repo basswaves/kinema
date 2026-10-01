@@ -120,6 +120,13 @@ plan inside a real KDE or GNOME desktop nested as one window, sends it real
 key presses and photographs that window alone — the check for anything
 touching the Linux player (packages it needs are listed at its top).
 
+`scripts\wsl.ps1 'bash scripts/package-linux.sh'` builds what a release
+carries for Linux — `.deb`, `.rpm` and a `.tar.gz` folder — into
+`dist-linux/` in the copy, with the wrapper built from its pinned source
+(`scripts/build-mpv-wrapper.sh`). `sudo apt install ./dist-linux/<the .deb>`
+inside the distribution, then `KINEMA_EXE=/usr/bin/kinema` in front of
+either self-test script, checks the installed program.
+
 The interface itself is checked in both browser engines, keyboard only,
 against `dev:mock`: WebKit (Linux's) and Edge (the same Chromium as WebView2,
 already on Windows). Once, `npx playwright install webkit`; then:

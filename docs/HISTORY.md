@@ -2192,6 +2192,29 @@ Kinema that quit with mpv still running crashed in mpv's video thread. All
 four are in GOTCHAS. `scripts/nested-selftest.sh` checks the whole of it
 inside KDE and GNOME with real key presses.
 
+## Linux packages
+
+**The system's mpv, not one of Kinema's.** Bundling mpv, as the Windows ZIP
+does, would mean building and patching a media toolkit (mpv, ffmpeg,
+libplacebo) for as long as Kinema exists — the upkeep the settled decisions
+rule out. Every current distribution ships a recent enough one (Ubuntu
+26.04 has 0.41; Debian 13 and Fedora 43 have 0.40, the first with HDR on
+Wayland), and its security fixes arrive with the system's. An older one
+still plays: below 0.38 mpv cannot scale the page it draws, so Kinema's
+hidden window is made full screen for the length of the film instead.
+
+**A .deb, an .rpm and a folder.** The owner asked for what Linux users
+expect, as long as it adds no upkeep. Packages in the system's own format,
+installable from a terminal with one command that also fetches mpv, are
+that; a folder covers every other distribution, as the ZIP does on Windows.
+All three come from one build. Flatpak and Snap were not chosen: neither can
+use the system's mpv, so both would bring back the bundling above, and their
+runtimes want updating yearly.
+
+**The wrapper from source.** The plugin's `libmpv-wrapper.so` is built from
+a pinned commit in the release job, never downloaded, and installed to
+`/usr/lib/kinema`; the program's run path is how the plugin finds it there.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

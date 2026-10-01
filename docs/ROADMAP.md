@@ -60,8 +60,12 @@ reasons in full.
   installed them; Kinema never ships or downloads them.
 - **Looking up a whole library in TheIntroDB at once.** It is asked about one
   episode at a time, when that episode is played, on its terms.
-- **An installer or automatic updates.** Kinema is a folder; it says when a new
-  version is out and you download it when you choose.
+- **An installer or automatic updates.** On Windows Kinema is a folder; it
+  says when a new version is out and you download it when you choose. On
+  Linux the `.deb` and `.rpm` are the system's own package format, which is
+  how Linux users expect to install a program and what fetches mpv for them —
+  not an installer of Kinema's — and a folder is there too. No automatic
+  updates there either.
 
 ---
 

@@ -39,9 +39,13 @@ system() {   # what the machine is, as this boot sees it
   for c in /sys/class/drm/card*-*; do
     n="$(basename "$c")"
     { echo "status: $(cat "$c/status")"; echo "enabled: $(cat "$c/enabled" 2>/dev/null)"; cat "$c/modes"; } > "$out/drm-$n.txt" 2>&1
-    if [ -s "$c/edid" ]; then
-      cp "$c/edid" "$out/edid-$n.bin"
-      command -v edid-decode > /dev/null && edid-decode "$c/edid" > "$out/edid-$n.txt" 2>&1
+    # Copied first, then checked: sysfs reports a size of 0 for every edid
+    # file, so testing the original for content skips them all.
+    cat "$c/edid" > "$out/edid-$n.bin" 2> /dev/null
+    if [ -s "$out/edid-$n.bin" ]; then
+      command -v edid-decode > /dev/null && edid-decode "$out/edid-$n.bin" > "$out/edid-$n.txt" 2>&1
+    else
+      rm -f "$out/edid-$n.bin"
     fi
   done
   command -v modetest > /dev/null && modetest -c > "$out/modetest-connectors.txt" 2>&1
@@ -86,11 +90,48 @@ if [ "$stage" = setup ]; then
   system "$R/nouveau"
   say "Kinema"
   sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q "$home_kit"/kinema_*_amd64.deb
-  say "NVIDIA's driver"
+  say "NVIDIA's driver, from the ISO, for the kernel this stick runs"
+  # Not `ubuntu-drivers install`: it takes the newest module from the
+  # archive, which is built for a newer kernel, and pulls that kernel in —
+  # which a live session cannot install (the first attempt failed exactly
+  # so). The ISO carries the module for its own kernel and the driver parts
+  # of the same version, for offline installs: a matching set.
   ubuntu-drivers list > "$R/ubuntu-drivers-list.txt" 2>&1
-  cat "$R/ubuntu-drivers-list.txt"
-  sudo DEBIAN_FRONTEND=noninteractive ubuntu-drivers install
-  dpkg -l | grep -E '^ii +(nvidia-driver|linux-modules-nvidia)' | tee "$R/nvidia-installed.txt"
+  kernel="$(uname -r)"
+  iso=""
+  for d in /cdrom $(findmnt -rn -t iso9660 -o TARGET); do
+    [ -d "$d/pool/restricted" ] && { iso="$d"; break; }
+  done
+  echo "kernel $kernel, ISO at ${iso:-not found}" | tee "$R/nvidia-source.txt"
+  if [ -n "$iso" ]; then
+    mapfile -t debs < <(ls "$iso"/pool/restricted/n/nvidia-graphics-drivers-580/*.deb \
+      "$iso"/pool/restricted/l/linux-restricted-modules/linux-modules-nvidia-580-"$kernel"_*.deb \
+      "$iso"/pool/restricted/l/linux-restricted-modules/linux-modules-nvidia-580-generic-hwe-26.04_*.deb \
+      "$iso"/pool/restricted/l/linux-restricted-modules/linux-objects-nvidia-580-"$kernel"_*.deb \
+      "$iso"/pool/restricted/l/linux-restricted-signatures/linux-signatures-nvidia-"$kernel"_*.deb \
+      "$iso"/pool/main/e/egl-wayland/*.deb 2> /dev/null)
+    printf '%s\n' "${debs[@]}" >> "$R/nvidia-source.txt"
+    # The generic-hwe module package is in the set because it is what
+    # provides nvidia-dkms-580 at exactly this version, which the driver
+    # requires; without it apt reaches for the archive's newer one.
+    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q "${debs[@]}"
+    # Held, so nothing later swaps them for the archive's newer versions.
+    sudo apt-mark hold nvidia-driver-580 linux-modules-nvidia-580-generic-hwe-26.04 > /dev/null
+  else
+    echo "No ISO to take the driver from; the module for $kernel from the archive instead."
+    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q "linux-modules-nvidia-580-$kernel" nvidia-driver-580
+  fi
+  # nouveau must not take the card first at the next boot. It is not in the
+  # live system's boot image, so this file, kept by the persistence, is read
+  # in time.
+  printf 'blacklist nouveau\noptions nouveau modeset=0\n' | sudo tee /etc/modprobe.d/kinema-no-nouveau.conf > /dev/null
+  sudo depmod "$kernel"
+  dpkg -l | grep -E '^(ii|iF|iU) +(nvidia-driver|linux-modules-nvidia|linux-image)' | tee "$R/nvidia-installed.txt"
+  if ! ls "/lib/modules/$kernel"/kernel/nvidia-580*/nvidia.ko* > /dev/null 2>&1 \
+     && ! find "/lib/modules/$kernel" -name 'nvidia.ko*' | grep -q .; then
+    say "PROBLEM: no NVIDIA module for $kernel was installed. Shut down and bring the stick back."
+    exit 1
+  fi
   copy_out
   say "Done. Restart now (top right, Power Off / Restart), choose Ubuntu in the Ventoy menu again, open a Terminal and run:"
   echo

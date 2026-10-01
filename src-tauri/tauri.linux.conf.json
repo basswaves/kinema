@@ -1,0 +1,29 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "bundle": {
+    "active": true,
+    "targets": ["deb", "rpm"],
+    "category": "Video",
+    "shortDescription": "A local, serverless media library for movies and TV shows",
+    "longDescription": "Kinema shows the films and series on your own drives and network shares as a library, and plays them with mpv. It runs no server and needs no account. Made for a TV and a remote as much as for a desk.",
+    "publisher": "Basswaves",
+    "homepage": "https://github.com/basswaves/kinema",
+    "license": "MIT",
+    "linux": {
+      "deb": {
+        "depends": ["libmpv2"],
+        "recommends": ["ffmpeg"],
+        "files": {
+          "/usr/lib/kinema/libmpv-wrapper.so": "lib/libmpv-wrapper.so"
+        }
+      },
+      "rpm": {
+        "depends": ["mpv-libs"],
+        "recommends": ["ffmpeg"],
+        "files": {
+          "/usr/lib/kinema/libmpv-wrapper.so": "lib/libmpv-wrapper.so"
+        }
+      }
+    }
+  }
+}

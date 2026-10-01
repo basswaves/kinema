@@ -10,7 +10,7 @@
 # pictures, its artwork folder) in <plan folder>/data first. A copy of a
 # Windows library works — its artwork paths are rewritten at start.
 #
-# exe defaults to src-tauri/target/release/kinema, which needs
+# exe defaults to $KINEMA_EXE, else src-tauri/target/release/kinema, which needs
 # libmpv-wrapper.so beside it or in lib/ beside it (built from its source:
 # CONTRIBUTING, "Checking Linux from Windows").
 #
@@ -22,11 +22,12 @@ set -euo pipefail
 
 plan="$(realpath "$1")"
 root="$(cd "$(dirname "$0")/.." && pwd)"
-exe="${2:-$root/src-tauri/target/release/kinema}"
+exe="${2:-${KINEMA_EXE:-$root/src-tauri/target/release/kinema}}"
 shots="${3:-6,14,24}"
 dir="$(dirname "$plan")"
 
-if [ ! -e "$(dirname "$exe")/libmpv-wrapper.so" ] && [ ! -e "$(dirname "$exe")/lib/libmpv-wrapper.so" ]; then
+if [ ! -e "$(dirname "$exe")/libmpv-wrapper.so" ] && [ ! -e "$(dirname "$exe")/lib/libmpv-wrapper.so" ] \
+  && [ ! -e /usr/lib/kinema/libmpv-wrapper.so ]; then
   echo "No libmpv-wrapper.so beside $exe or in lib/ beside it; the player will not start." >&2
 fi
 [ -f "$dir/data/library.db" ] || echo "No $dir/data/library.db: the app will start with an empty library." >&2

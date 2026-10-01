@@ -35,6 +35,9 @@ src-tauri/target/
 # native libraries, all of it reproducible from source.
 dist-app/
 
+# Linux packages assembled by scripts/package-linux.sh.
+dist-linux/
+
 # Diagnostic logs
 mpv.log
 src-tauri/mpv.log

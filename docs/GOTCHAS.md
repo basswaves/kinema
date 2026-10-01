@@ -1544,6 +1544,14 @@ Before that it has exactly nine arguments, and eleven are refused ("has only
 9 arguments"). `overlay.ts` tries with `dw`/`dh` and falls back once; the
 unscaled page then only lines up when Kinema's window is the screen's size.
 
+Decide that by `mpv-version`, not by the failure. The error that reaches the
+page is the plugin's generic "error running command" — the "9 arguments" is
+only in `mpv.log` — and the same error comes from an mpv shutting down as the
+player closes. The first version took any failure for an old mpv: on the test
+stick, mpv 0.41 logged "cannot scale the page" as each run ended, and in use
+that path would have made Kinema's window full screen after the player had
+gone.
+
 ### Quitting with mpv still running crashes on Linux
 
 The plugin shuts mpv down only when a window's close button is pressed.

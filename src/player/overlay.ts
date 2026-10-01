@@ -30,6 +30,22 @@ interface OverlayFrame {
 const INTERVAL_MS = 100;
 const ID = 0;
 
+/**
+ * Whether this mpv's `overlay-add` takes a size to scale to (0.38 and later).
+ * True when the version cannot be read: a failure is then not blamed on age.
+ */
+export function scalesOverlays(version: string | null): boolean {
+  const m = version?.match(/(\d+)\.(\d+)/);
+  if (!m) return true;
+  const [major, minor] = [Number(m[1]), Number(m[2])];
+  return major > 0 || minor >= 38;
+}
+
+async function canScale(): Promise<boolean> {
+  const version = await readProperty<string>('mpv-version', 'string').catch(() => null);
+  return scalesOverlays(version);
+}
+
 /** Start drawing the page into mpv; returns the function that stops it. */
 export function startOverlay(): () => void {
   let stopped = false;
@@ -59,10 +75,16 @@ export function startOverlay(): () => void {
           await mpvCommand('overlay-add', [...picture, w, h]);
           shown = true;
           return;
-        } catch {
+        } catch (e) {
           // mpv before 0.38 takes no size to scale to ("has only 9
-          // arguments"): drawn at the page's own size, which matches as
-          // long as Kinema's window is the size of the screen.
+          // arguments" in mpv.log; the error itself just says the command
+          // failed): drawn at the page's own size, which matches as long as
+          // Kinema's window is the size of the screen. Decided by mpv's
+          // version, not by the failure: mpv shutting down as the player
+          // closes fails it too (seen on the test stick with mpv 0.41), and
+          // concluding "old mpv" from that would make Kinema's window full
+          // screen after the player had gone.
+          if (stopped || (await canScale())) throw e;
           scaled = false;
           console.warn('overlay: this mpv cannot scale the page; matching the window to the screen');
           const win = getCurrentWindow();

@@ -98,6 +98,37 @@ quiet test tones; the TV goes black for a moment at each switch.
 `~/kinema-results/check-<time>/`: `equipment.txt`, `direct.txt`,
 `switch.txt` and `display.txt` are the overview.
 
+### Another graphics card, and Sway and Hyprland
+
+`check` works with any card: NVIDIA's needs the first boot's driver, while
+an AMD or Intel card needs nothing (the live system's own Mesa drives it),
+so with an AMD card in, the same persistence file and the same command
+check HDR on Plasma through Mesa.
+
+Sway and Hyprland are checked from a text console, since each takes the
+screen for itself while it runs:
+
+1. In the desktop, `bash ~/kinema-kit/run.sh check` as above (optional).
+2. Ctrl+Alt+F3, log in as the live user (`kubuntu`, no password — just
+   Enter), then:
+
+   ```bash
+   bash ~/kinema-kit/run.sh wlroots
+   ```
+
+   It installs Sway and Hyprland from Ubuntu's archive (network needed),
+   then starts Sway on the screen, lets Kinema run its check inside it (the
+   equipment check, TrueHD straight to the receiver, the 4K HDR film with
+   the screen switched for it) and leaves; then the same in Hyprland, with
+   Hyprland's own defaults — which switch HDR on by themselves for a
+   full-screen HDR film. Each has a five-minute limit. Afterwards
+   `sudo poweroff`.
+
+`~/kinema-results/wlroots-<time>/`: `versions.txt`, then per desktop
+(`sway/`, `hyprland/`) `equipment.txt`, `direct.txt`, `switch.txt` and the
+desktop's own view of its screens before, during and after the film
+(`screens-*.json`, from `swaymsg` and `hyprctl`).
+
 ### A later round: the picture path
 
 ```bash

@@ -14,6 +14,10 @@
 #             the equipment check sees, sound straight to the receiver in
 #             each format, and the screen switched for a film and put back —
 #             with the build in the kit, installed over the earlier one.
+# `run.sh wlroots` from a text console: the same Kinema check inside Sway and
+#             then Hyprland, each started on the real screen for the purpose.
+# `check` and `wlroots` work with any graphics card: NVIDIA's needs the
+#             first boot's driver, AMD's and Intel's need nothing.
 # Nothing is asked for on screen, and nothing outside the live session is
 # touched: Windows and its disks are left alone. Results are read back from
 # the persistence file (README.md).
@@ -29,7 +33,9 @@ is_plasma() { [[ ":${XDG_CURRENT_DESKTOP:-}:" == *:[Kk][Dd][Ee]:* ]]; }
 if lsmod | grep -q '^nvidia '; then stage='test'; else stage='setup'; fi
 # For a rehearsal on a development machine: KINEMA_KIT_STAGE=test.
 stage="${1:-${KINEMA_KIT_STAGE:-$stage}}"
-R="$HOME/kinema-results/$stage-$stamp"
+# The part of a stage that runs inside a desktop it started writes into
+# the folder that stage made (KIT_R).
+R="${KIT_R:-$HOME/kinema-results/$stage-$stamp}"
 mkdir -p "$R"
 exec > >(tee -a "$R/run.log") 2>&1
 say "Kinema Linux test, stage: $stage ($(date))"
@@ -114,6 +120,24 @@ nvidia_nodes() {
     sudo mknod -m 666 /dev/nvidia-uvm-tools c "$uvm_major" 1
   fi
   ls -l /dev/nvidia*
+}
+
+# Whichever card is in: NVIDIA's needs its own driver (installed by the
+# first boot) and its device files; AMD and Intel need nothing — the live
+# system's own Mesa drives them (the AMD round: a Polaris or Vega card in
+# the test PC). Records what the picture runs on either way.
+graphics_ready() {
+  if lspci -n | grep -qE ' 03[0-9]{2}: 10de:'; then
+    lsmod | grep -q '^nvidia ' || { say "NVIDIA's driver is not loaded: run plain 'bash ~/kinema-kit/run.sh' first."; return 1; }
+    say "The NVIDIA driver's device files"
+    nvidia_nodes > "$R/nodes.txt" 2>&1
+    tail -n 3 "$R/nodes.txt"
+  fi
+  { lspci -nnk | grep -A3 -E 'VGA|3D|Display'
+    command -v vulkaninfo > /dev/null && vulkaninfo --summary 2>/dev/null | grep -E 'deviceName|driverName|driverInfo|apiVersion'
+  } > "$R/graphics.txt" 2>&1
+  grep -E 'deviceName|driverInfo' "$R/graphics.txt" | sort -u
+  return 0
 }
 
 if [ "$stage" = setup ]; then
@@ -300,12 +324,8 @@ if [ "$stage" = check ]; then
   # phase 4 round 2). Kinema itself does the work here; the kit only sets
   # its settings on each run's copy of the library and reads what it logged.
   media="$home_kit/media"
-  lsmod | grep -q '^nvidia ' || { say "NVIDIA's driver is not loaded: run plain 'bash ~/kinema-kit/run.sh' first."; exit 1; }
+  graphics_ready || exit 1
   display() { python3 "$home_kit/tools/display.py" "$@"; }
-
-  say "The driver's device files"
-  nvidia_nodes > "$R/nodes.txt" 2>&1
-  tail -n 3 "$R/nodes.txt"
 
   say "The hardware and the desktop, as this boot sees them"
   system "$R/system"
@@ -327,8 +347,9 @@ if [ "$stage" = check ]; then
   direct=',{"at":0.5,"do":"call","fn":"setSetting","args":["audio_direct","on"]}'
   for codec in ac3 eac3 dts truehd; do
     ( sleep 9; pactl list short sinks > "$R/sinks-during-$codec.txt" 2>&1 ) &
+    reading=$!   # waited for by number: a bare wait also waits for the log's tee
     kinema_plan "direct-$codec" "$media/sound-$codec.mkv" "$direct"
-    wait
+    wait "$reading"
     sleep 3
     pactl list short sinks > "$R/sinks-after-$codec.txt" 2>&1
     echo "-- $codec" >> "$R/direct.txt"
@@ -338,8 +359,9 @@ if [ "$stage" = check ]; then
   say "3 — the screen switched for a 4K HDR film, and put back"
   switch=',{"at":0.5,"do":"call","fn":"setSetting","args":["display_switch_refresh","on"]},{"at":0.6,"do":"call","fn":"setSetting","args":["display_switch_hdr","on"]}'
   ( sleep 12; display current > "$R/display-during.txt" 2>&1; display state > "$R/screens-during.json" 2>&1 ) &
+  reading=$!   # waited for by number: a bare wait also waits for the log's tee
   kinema_plan switch "$media/hdr10-2160p23.976.mkv" "$switch"
-  wait
+  wait "$reading"
   sleep 3
   echo "during: $(cat "$R/display-during.txt")" | tee -a "$R/display.txt"
   echo "after:  $(display current)" | tee -a "$R/display.txt"
@@ -355,6 +377,89 @@ if [ "$stage" = check ]; then
 
   copy_out
   say "All done. You can shut down, take the stick out and plug it into the development PC."
+  exit 0
+fi
+
+if [ "$stage" = wlroots-in ]; then
+  # Inside Sway or Hyprland, started by the wlroots stage below: Kinema's own
+  # check there — the screen read through wlr-output-management, a film
+  # switching it, sound straight to the receiver — with the desktop's own
+  # view of its screens beside it (swaymsg / hyprctl: the kit's tools only).
+  desk="${2:?which desktop}"
+  media="$home_kit/media"
+  outputs() {
+    case "$desk" in
+      sway) swaymsg -t get_outputs -r ;;
+      hyprland) hyprctl monitors -j ;;
+    esac
+  }
+  { echo "WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-} XDG_CURRENT_DESKTOP=${XDG_CURRENT_DESKTOP:-}"
+    case "$desk" in sway) sway --version ;; hyprland) hyprctl version ;; esac
+  } > "$R/session.txt" 2>&1
+  outputs > "$R/screens-before.json" 2>&1
+
+  say "$desk 1 — what Kinema sees"
+  kinema_plan equipment "$media/sound-ac3.mkv" ""
+  grep -hE 'capabilities: |equipment: |display: ' "$R/kinema-equipment/data/logs/app.log" > "$R/equipment.txt"
+
+  say "$desk 2 — TrueHD straight to the receiver"
+  direct=',{"at":0.5,"do":"call","fn":"setSetting","args":["audio_direct","on"]}'
+  kinema_plan direct-truehd "$media/sound-truehd.mkv" "$direct"
+  grep -hE 'audio: |shown to the user' "$R/kinema-direct-truehd/data/logs/app.log" > "$R/direct.txt"
+
+  say "$desk 3 — the 4K HDR film, the screen switched for it and put back"
+  switch=',{"at":0.5,"do":"call","fn":"setSetting","args":["display_switch_refresh","on"]},{"at":0.6,"do":"call","fn":"setSetting","args":["display_switch_hdr","on"]}'
+  ( sleep 12; outputs > "$R/screens-during.json" 2>&1 ) &
+  reading=$!   # waited for by number: a bare wait also waits for the log's tee
+  kinema_plan switch "$media/hdr10-2160p23.976.mkv" "$switch"
+  wait "$reading"
+  sleep 3
+  outputs > "$R/screens-after.json" 2>&1
+  grep -hE 'display: |shown to the user' "$R/kinema-switch/data/logs/app.log" > "$R/switch.txt"
+  exit 0
+fi
+
+if [ "$stage" = wlroots ]; then
+  # Sway and Hyprland on the real screen, one after the other, each started
+  # from a text console (they take the screen from Plasma while they run;
+  # back to Plasma afterwards with Ctrl+Alt+F1 or F2). Each runs the
+  # wlroots-in part above and leaves by itself; a time limit ends either if
+  # it does not.
+  if [ -n "${WAYLAND_DISPLAY:-}${DISPLAY:-}" ]; then
+    say "Run this from a text console, not a desktop window: Ctrl+Alt+F3, log in as $(id -un) (no password), then: bash ~/kinema-kit/run.sh wlroots"
+    exit 1
+  fi
+  graphics_ready || exit 1
+  say "Sway and Hyprland from Ubuntu's archive, and the Kinema build in the kit"
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q sway hyprland > "$R/install.txt" 2>&1
+  sudo dpkg -i "$home_kit"/kinema_*_amd64.deb >> "$R/install.txt" 2>&1
+  { sway --version; Hyprland --version; dpkg -l kinema | tail -n 1; } 2>&1 | tee "$R/versions.txt"
+  nvidia=""
+  lspci -n | grep -qE ' 03[0-9]{2}: 10de:' && nvidia="--unsupported-gpu"
+
+  say "Sway: the screen goes black for a moment, then Kinema plays three short clips"
+  d="$R/sway"; mkdir -p "$d"
+  cat > "$d/sway.conf" <<CONF
+exec "KIT_R=$d bash $home_kit/run.sh wlroots-in sway; swaymsg exit"
+CONF
+  XDG_CURRENT_DESKTOP=sway timeout 300 sway $nvidia -c "$d/sway.conf" > "$d/sway.log" 2>&1
+  echo "sway ended ($?)" | tee -a "$R/versions.txt"
+
+  say "Hyprland: the same again"
+  d="$R/hyprland"; mkdir -p "$d"
+  # Hyprland's defaults otherwise: HDR switched on by itself for a
+  # full-screen HDR film (render:cm_auto_hdr = 1) is part of what is checked.
+  cat > "$d/hyprland.conf" <<CONF
+exec-once = KIT_R=$d bash $home_kit/run.sh wlroots-in hyprland; hyprctl dispatch exit
+misc {
+  disable_hyprland_logo = true
+}
+CONF
+  XDG_CURRENT_DESKTOP=Hyprland timeout 300 Hyprland -c "$d/hyprland.conf" > "$d/hyprland.log" 2>&1
+  echo "Hyprland ended ($?)" | tee -a "$R/versions.txt"
+
+  copy_out
+  say "All done. Shut down (sudo poweroff), take the stick out and plug it into the development PC."
   exit 0
 fi
 

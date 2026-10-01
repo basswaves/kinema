@@ -85,7 +85,13 @@ import { readChapters, type Chapter } from './chapters';
 import { VIDEO_SYNC_KEY, VIDEO_SYNC_MODES } from './mpvOptions';
 import { readPlaybackStats, type StatGroup } from './stats';
 import { matchHdrToDisplay } from './displayHdr';
-import { applyAudioPlan, applyFallback, FALLBACKS, silencedAudioTrack } from './audioOutput';
+import {
+  applyAudioPlan,
+  applyFallback,
+  FALLBACKS,
+  releaseAudioDevice,
+  silencedAudioTrack,
+} from './audioOutput';
 import { filmNow, mayswitch, restoreScreen, switchForFilm } from './displaySwitch';
 import { getSetting } from '../metadata/api';
 import { initialSession, reduce, samePath } from './session';
@@ -727,19 +733,22 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           const track = await silencedAudioTrack(lastAid.current);
           if (track === null) return;
           const step = audioFallback.current++;
+          const system = capabilitiesNow()?.system ?? 'The system';
           if (await applyFallback(step, track).catch(() => false)) {
             setNotice(
               FALLBACKS[step]?.channels === 'stereo'
-                ? 'Windows would not take surround sound, so this is playing in stereo.'
-                : 'The sound could not be sent the chosen way, so it is going through Windows instead.'
+                ? `${system} would not take surround sound, so this is playing in stereo.`
+                : `The sound could not be sent the chosen way, so it is going through ${system} instead.`
             );
             checkAudioSoon();
           } else {
             console.error('audio: no output could be opened for this file');
             setNotice(
-              'No sound: Windows would not open the audio device. If Windows spatial sound ' +
-                '(Atmos or DTS:X for home theater) is on, switch it off, or turn on ' +
-                '"Send sound straight to the receiver" in Settings.'
+              system === 'Windows'
+                ? 'No sound: Windows would not open the audio device. If Windows spatial sound ' +
+                    '(Atmos or DTS:X for home theater) is on, switch it off, or turn on ' +
+                    '"Send sound straight to the receiver" in Settings.'
+                : `No sound: ${system} would not open the audio device.`
             );
           }
         })();
@@ -1221,7 +1230,11 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   // give the screen its own mode back however the player was left.
   useEffect(() => {
     return () => {
-      void stopPlayback().catch(() => undefined);
+      // Stopped first, so mpv has let go of the receiver's card before the
+      // sound server is given it back (audioOutput.ts → holdDevice).
+      void stopPlayback()
+        .catch(() => undefined)
+        .then(() => releaseAudioDevice());
       void restoreScreen();
     };
   }, []);

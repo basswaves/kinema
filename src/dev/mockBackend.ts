@@ -745,8 +745,8 @@ export function listenerCounts(): Record<string, number> {
  * instant), `kinemaMockEmpty` presents an empty library (a first run),
  * `kinemaMockSlowDetect` makes the scan's detection pass take 20 seconds,
  * `kinemaMockSystem=linux` answers `capabilities` and the equipment check as
- * the Linux build does (the check, but no direct sound, screen switching,
- * sleep or shut down).
+ * the Linux build does (the check and direct sound, but no screen
+ * switching, sleep or shut down).
  */
 function flag(name: string): string | null {
   try {
@@ -923,8 +923,8 @@ const handlers: Record<string, Handler> = {
   stop_detection: () => mockDetection.stop(),
 
   // Windows' answers unless `kinemaMockSystem` is `linux`, which answers as
-  // the Linux build does today: the equipment check, and nothing else
-  // optional (capabilities.rs).
+  // the Linux build does today: the equipment check and direct sound, and
+  // nothing else optional (capabilities.rs).
   capabilities: () => {
     const full = !ON_LINUX;
     return {
@@ -934,7 +934,7 @@ const handlers: Record<string, Handler> = {
         ? { gpu_api: 'd3d11', hwdec: 'd3d11va', own_window: false }
         : { gpu_api: 'auto', hwdec: 'auto-safe', own_window: true },
       equipment_detection: true,
-      audio_direct: full,
+      audio_direct: true,
       display_switching: full,
       sleep: full,
       shut_down: full,
@@ -955,6 +955,18 @@ const handlers: Record<string, Handler> = {
   refresh_imdb_ratings: () => ({ fetched: false, rated: 0 }),
   list_titles_needing_scores: () => [],
   save_omdb_scores: () => null,
+  // Asking the sound server to let go of a card (Linux, audio_reserve.rs):
+  // recorded for a check to read, never more.
+  reserve_audio_device: (a) => {
+    const w = window as unknown as { __reserved?: unknown[] };
+    (w.__reserved ??= []).push(a.device);
+    return `${String(a.device)}: the card was free`;
+  },
+  release_audio_device: () => {
+    const w = window as unknown as { __reserved?: unknown[] };
+    (w.__reserved ??= []).push('released');
+    return null;
+  },
   get_equipment: () => (ON_LINUX ? mockEquipmentOnLinux() : mockEquipment()),
   check_equipment: () => (ON_LINUX ? mockEquipmentOnLinux() : mockEquipment()),
   window_display: () => ({ gdi_name: '', hdr: 'unknown' }),

@@ -1575,6 +1575,15 @@ Matching by position works until a second screen is connected. ALSA's `ELD`
 control (interface PCM, `device` = the PCM number) holds the same bytes for
 the device it is attached to — read that.
 
+### zbus reports a taken bus name as an error
+
+`request_name_with_flags` with `DoNotQueue` on a name someone else owns
+returns `Err(zbus::Error::NameTaken)`, not `Ok(RequestNameReply::Exists)` as
+the D-Bus reply would suggest. Code that matches on the reply never reaches
+its "ask the owner" branch — the device reservation (`audio_reserve.rs`)
+gave up on every card the sound server held until a stand-in holder
+(`scripts/reserve-holder.py`) showed it. Map `NameTaken` to `Exists`.
+
 ### NVIDIA's Vulkan fails if its device files were never made
 
 The driver needs `/dev/nvidia-modeset` and `/dev/nvidia-uvm` besides

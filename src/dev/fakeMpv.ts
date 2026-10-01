@@ -45,6 +45,11 @@ export interface FakeMpvState {
    * does. Cleared once used.
    */
   failNextLoad: string | null;
+  /**
+   * mpv's own window is full screen (Linux, `own_window`: it starts so,
+   * `fs=yes`). Unused where the page sits over the video.
+   */
+  fullscreen: boolean;
 }
 
 /** How long each fixture file runs. Unknown paths get a TV-episode length. */
@@ -67,6 +72,7 @@ const state: FakeMpvState = {
   subVisible: true,
   audioOutFormat: 'float',
   failNextLoad: null,
+  fullscreen: true,
 };
 
 let ticker: number | undefined;
@@ -234,6 +240,7 @@ export function setProperty(name: string, value: unknown): null {
   if (name === 'aid' || name === 'sid') selectedTrack[name] = Number(value);
   if (name === 'sub-visibility') state.subVisible = value === true || value === 'yes';
   if (name === 'mute') state.mute = value === true || value === 'yes';
+  if (name === 'fullscreen') state.fullscreen = value === true || value === 'yes';
   return null;
 }
 
@@ -251,6 +258,8 @@ export function getProperty(name: string): unknown {
       return state.duration;
     case 'pause':
       return state.paused;
+    case 'fullscreen':
+      return state.fullscreen;
     case 'eof-reached':
       return state.eof;
     case 'sub-visibility':

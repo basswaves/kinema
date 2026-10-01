@@ -81,6 +81,44 @@ test('an episode plays, pauses and rolls on to the next', async ({ page }) => {
   await expect.poll(async () => (await mpv(page)).path).toContain('S01E02');
 });
 
+test('Linux: straight to the receiver takes its card for the film and gives it back', async ({
+  page,
+}) => {
+  await open(page, 'linux');
+  await page.evaluate(async () => {
+    const path = '/src/metadata/api.ts';
+    const api = await import(/* @vite-ignore */ path);
+    await api.setSetting('audio_direct', 'on');
+  });
+  await press(page, 'Enter');
+  await expect.poll(async () => (await mpv(page)).path).toContain('S01E01');
+
+  // The receiver the Linux check found, by its ALSA name — not the sound
+  // server — with what it takes passed through.
+  const device = 'alsa/hdmi:CARD=Mock,DEV=0';
+  const sets = () =>
+    page.evaluate(() =>
+      (window as unknown as { __fakeMpv: { commands: { name: string; args: unknown[] }[] } })
+        .__fakeMpv.commands.filter((c) => c.name === 'set')
+        .map((c) => c.args.join('='))
+    );
+  await expect.poll(sets).toContain(`audio-device=${device}`);
+  expect(await sets()).toContain('audio-spdif=ac3,eac3,dts,dts-hd,truehd');
+  const reserved = () =>
+    page.evaluate(() => (window as unknown as { __reserved?: unknown[] }).__reserved ?? []);
+  // Asked for before the file opened…
+  expect(await reserved()).toContain(device);
+
+  // …and given back when the player is left. Back steps out one layer at a
+  // time (a prompt, full screen, the player), so it is pressed until out.
+  for (let i = 0; i < 5 && (await page.locator('.player').count()) > 0; i++) {
+    await press(page, 'Escape');
+    await page.waitForTimeout(300);
+  }
+  await expect(page.locator('.player')).toHaveCount(0);
+  await expect.poll(reserved).toContain('released');
+});
+
 test('a file that cannot be opened says so, and Back still works', async ({ page }) => {
   await open(page, 'windows');
   await page.evaluate(() => {
@@ -110,8 +148,8 @@ for (const [system, choices] of [
 
 for (const [system, sections] of [
   ['windows', ['Screen', 'Sound', 'Your equipment']],
-  // Linux: what it cannot do yet, then the equipment it can see.
-  ['linux', ['Picture & sound', 'Your equipment']],
+  // Linux: sound, what it cannot do yet, then the equipment it can see.
+  ['linux', ['Sound', 'Picture & sound', 'Your equipment']],
 ] as const) {
   test(`Picture & sound shows what ${system} can do`, async ({ page }) => {
     await open(page, system);

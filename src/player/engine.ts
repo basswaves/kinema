@@ -285,7 +285,9 @@ export async function nowPlaying(): Promise<{
  */
 export async function isPictureFullscreen(): Promise<boolean> {
   if (capabilitiesNow()?.mpv_video.own_window) {
-    return (await getProperty('fullscreen', 'flag')) === true;
+    // Unreadable counts as not fullscreen: Back asks this first, and an error
+    // here would otherwise leave Back doing nothing at all.
+    return (await getProperty('fullscreen', 'flag').catch(() => false)) === true;
   }
   return getCurrentWindow().isFullscreen();
 }

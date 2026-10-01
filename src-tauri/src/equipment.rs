@@ -666,9 +666,10 @@ pub fn summary(view: &EquipmentView) -> Vec<String> {
 pub const DETECTS: bool = cfg!(any(windows, target_os = "linux"));
 
 /// Whether sound can be sent straight to the receiver with the formats found
-/// here (Settings → Sound). Windows only until Linux has its own way
-/// (notes: PORTING, phase 4 step 2): the plan names WASAPI devices.
-pub const DIRECT_AUDIO: bool = cfg!(windows);
+/// here (Settings → Sound): WASAPI's exclusive mode on Windows; on Linux the
+/// HDMI device itself, after the sound server has been asked to let go of it
+/// (`audio_reserve.rs`).
+pub const DIRECT_AUDIO: bool = cfg!(any(windows, target_os = "linux"));
 
 /// Look at everything, as the system answers right now. Blocking, but quick —
 /// about a tenth of a second for three audio devices and two screens.

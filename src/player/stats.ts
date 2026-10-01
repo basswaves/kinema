@@ -42,6 +42,7 @@ import { outputCheck, type OutputFacts } from './outputCheck';
 import { readSwitchSettings } from './displaySwitch';
 import { readAudioSettings, targetDevice } from './audioOutput';
 import { getEquipment, type DisplayMode } from './equipment';
+import { capabilitiesNow } from '../capabilities';
 
 export interface StatRow {
   label: string;
@@ -302,7 +303,13 @@ export function describeDolbyVision(profile: number | null): StatRow | null {
   }
 }
 
-export function describeAudioPath(format: string | null, exclusive: boolean | null): StatRow {
+/** `system` names the ordinary path: "the Windows mixer", "the Linux sound server". */
+export function describeAudioPath(
+  format: string | null,
+  exclusive: boolean | null,
+  system = 'Windows'
+): StatRow {
+  const mixer = system === 'Windows' ? 'the Windows mixer' : `the ${system} sound server`;
   if (format?.startsWith('spdif-')) {
     return {
       label: 'Path',
@@ -315,12 +322,13 @@ export function describeAudioPath(format: string | null, exclusive: boolean | nu
     ? {
         label: 'Path',
         value: 'decoded · straight to the device',
-        note: 'Windows mixer and spatial sound bypassed',
+        note:
+          system === 'Windows' ? 'Windows mixer and spatial sound bypassed' : `${mixer} bypassed`,
       }
     : {
         label: 'Path',
-        value: 'decoded · through the Windows mixer',
-        note: "mixed to Windows' speaker setup; no Atmos or DTS:X",
+        value: `decoded · through ${mixer}`,
+        note: `mixed to ${system}'s speaker setup; no Atmos or DTS:X`,
       };
 }
 
@@ -567,6 +575,7 @@ async function readOutputCheck(from: {
       outChannels: outCount,
       direct: audioSettings.direct,
       device: targetDevice(equipment, audioSettings.deviceId),
+      system: capabilitiesNow()?.system,
     },
   });
   if (checks.length === 0) return null;
@@ -895,7 +904,7 @@ export async function readPlaybackStats(): Promise<StatGroup[]> {
             : 'matches the source layout',
           warn: downmixed,
         },
-        describeAudioPath(outFormat, exclusive),
+        describeAudioPath(outFormat, exclusive, capabilitiesNow()?.system),
         { label: 'Output', value: text(ao) },
       ],
     },

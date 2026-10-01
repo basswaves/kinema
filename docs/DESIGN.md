@@ -176,6 +176,10 @@ equipment/win.rs, equipment/linux.rs, display/win.rs
                  the screens from GNOME and the kernel, and each receiver's
                  own format list (equipment/eld.rs, equipment/edid.rs: pure
                  parsers, tested on every system)
+audio_reserve.rs Linux's half of "straight to the receiver": asks the sound
+                 server for the receiver's card for the film (device
+                 reservation over D-Bus) and gives it back after; the plan
+                 itself is player/audioOutput.ts, the same on every system
 player/engine.ts The only file that talks to mpv (see player/ above)
 overlay.rs, player/overlay.ts, player/mpvKeys.ts
                  Where mpv has a window of its own (Linux, `own_window`):

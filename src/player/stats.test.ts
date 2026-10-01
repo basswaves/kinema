@@ -56,6 +56,12 @@ describe('describeAudioPath', () => {
     expect(describeAudioPath('s32', true).value).toBe('decoded · straight to the device');
     expect(describeAudioPath('float', false).value).toBe('decoded · through the Windows mixer');
   });
+  it('names Linux’s sound server on Linux', () => {
+    expect(describeAudioPath('float', false, 'Linux').value).toBe(
+      'decoded · through the Linux sound server'
+    );
+    expect(describeAudioPath('s32', true, 'Linux').note).toBe('the Linux sound server bypassed');
+  });
 });
 
 describe('describeDolbyVision', () => {

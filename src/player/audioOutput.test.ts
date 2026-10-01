@@ -123,5 +123,39 @@ describe('targetDevice', () => {
     expect(targetDevice(eq, 'c')?.id).toBe('b');
     expect(targetDevice(eq, null)?.id).toBe('b');
   });
+
+  it('with no default (Linux), takes the one device that takes a bitstream', () => {
+    const avr = device(['yes', 'yes'], { id: 'alsa/hdmi:CARD=NVidia,DEV=0', is_default: false });
+    const analog = device([], { id: 'alsa/plughw:CARD=PCH,DEV=0', is_default: false });
+    const linux = { gpus: [], displays: [], audio: [analog, avr], problems: [], checked_at: 0 };
+    expect(targetDevice(linux as Equipment, null)?.id).toBe(avr.id);
+    // Two receivers: no guess; the user chooses.
+    const second = { ...avr, id: 'alsa/hdmi:CARD=NVidia,DEV=1' };
+    const two = { ...linux, audio: [analog, avr, second] };
+    expect(targetDevice(two as Equipment, null)).toBeNull();
+  });
+});
+
+describe('on Linux', () => {
+  const avr = device(['yes', 'yes', 'yes', 'yes', 'yes'], {
+    id: 'alsa/hdmi:CARD=NVidia,DEV=0',
+    is_default: false,
+    mix_channels: 0,
+    mix_layout: '',
+  });
+
+  it('sends straight to the receiver by its ALSA name, not to the sound server', () => {
+    const plan = planAudio(on, avr);
+    expect(plan.device).toBe('alsa/hdmi:CARD=NVidia,DEV=0');
+    expect(plan.spdif).toEqual(['ac3', 'eac3', 'dts', 'dts-hd', 'truehd']);
+  });
+
+  it('through the sound server when off, whatever the receiver takes', () => {
+    expect(planAudio(off, avr).device).toBe('auto');
+  });
+
+  it('keeps an ALSA name as it is', () => {
+    expect(mpvDeviceName('alsa/hdmi:CARD=NVidia,DEV=0')).toBe('alsa/hdmi:CARD=NVidia,DEV=0');
+  });
 });
 

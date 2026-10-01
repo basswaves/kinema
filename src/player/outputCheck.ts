@@ -68,6 +68,8 @@ export interface OutputFacts {
     outChannels: number | null;
     direct: boolean;
     device: AudioDevice | null;
+    /** For the wording: what the ordinary path goes through. Windows unless said. */
+    system?: string;
   } | null;
 }
 
@@ -308,6 +310,7 @@ export function checkSound(f: OutputFacts): Check | null {
       why: 'The receiver decodes it, Atmos and DTS:X included.',
     };
   }
+  const system = a.system ?? 'Windows';
   const stream = bitstreamFor(a.codec, a.device);
   const couldPass =
     stream !== null &&
@@ -318,7 +321,7 @@ export function checkSound(f: OutputFacts): Check | null {
       label,
       verdict: 'limited',
       value: `decoded by Kinema${folded ? `, folded from ${a.inChannels} to ${a.outChannels} channels` : ''}`,
-      why: `${a.device?.name ?? 'The device'} takes ${CODEC_NAME[stream!] ?? stream} untouched, but the sound goes through Windows, so any Atmos or DTS:X height sound is lost.`,
+      why: `${a.device?.name ?? 'The device'} takes ${CODEC_NAME[stream!] ?? stream} untouched, but the sound goes through ${system}, so any Atmos or DTS:X height sound is lost.`,
       fix: 'Settings → Sound → Send sound straight to the receiver.',
     };
   }
@@ -329,10 +332,10 @@ export function checkSound(f: OutputFacts): Check | null {
       value: `folded from ${a.inChannels} to ${a.outChannels} channels`,
       why: a.direct
         ? `${a.device?.name ?? 'The device'} takes only ${a.outChannels} channels.`
-        : 'Windows’ speaker setup for this device has fewer channels than the soundtrack.',
+        : `${system}’s speaker setup for this device has fewer channels than the soundtrack.`,
       fix: a.direct
         ? undefined
-        : 'Settings → Sound → Send sound straight to the receiver, or set the speaker setup in Windows.',
+        : `Settings → Sound → Send sound straight to the receiver, or set the speaker setup in ${system}.`,
     };
   }
   return {

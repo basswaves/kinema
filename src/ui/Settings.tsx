@@ -907,7 +907,7 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
                     a control that does nothing is worse than none. */}
                 {can?.display_switching && <ScreenSection onError={setError} />}
                 {can?.equipment_detection && can.audio_direct && (
-                  <SoundSection onError={setError} />
+                  <SoundSection onError={setError} system={can.system} />
                 )}
                 {can && !(can.display_switching && can.equipment_detection && can.audio_direct) && (
                   <section className="settings-section">

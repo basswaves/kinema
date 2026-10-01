@@ -2245,6 +2245,39 @@ run on the EDID a 4K HDR TV gave on the Linux test stick and agreed with
 tested on descriptors built from what the test stick's receiver announced.
 What the receiver says through Kinema itself is for the next stick run.
 
+## Sound straight to the receiver on Linux
+
+The same switch as on Windows (Settings → Sound), with the same meaning: for
+the length of the film mpv has the receiver's HDMI device to itself and
+passes through every format the receiver listed. Both ways Linux offers were
+tried on the test stick and both carried TrueHD to the receiver; the owner
+chose this one over the other.
+
+**Not through the sound server.** PipeWire can pass bitstreams through too,
+but only once its list of allowed formats for the HDMI output has them
+ticked — a lasting system setting Ubuntu shows nowhere, so Kinema would have
+had to change it behind the user's back, which it does not do on Windows
+either. Its 7.1 also depends on the output's profile being set to 7.1. Going
+round the sound server changes nothing in the system and gives full 7.1
+whatever the profile says.
+
+**Asked for, not taken.** The sound server keeps the device open while
+anything plays, so mpv alone would often find it busy. Kinema asks for the
+card the way pro-audio programs do — the device reservation protocol on the
+session bus, which WirePlumber and PulseAudio honour (`audio_reserve.rs`) —
+and lets go when the player closes or the fallback to ordinary sound kicks
+in; if Kinema crashes, the bus frees the card by itself. A refusal leaves
+the existing fallback to say so and play the ordinary way.
+
+**Which device.** Linux names no default sound *device* (programs play to
+the sound server), so with nothing chosen Kinema sends to the one connected
+device whose ELD lists a bitstream — the receiver. With two, it does not
+guess; Settings lists them.
+
+Checked: the reservation exchange against a stand-in for the sound server on
+a real session bus (`scripts/reserve-holder.py`); the whole path in the
+keyboard tests on the Linux mock. On real hardware: the next stick run.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

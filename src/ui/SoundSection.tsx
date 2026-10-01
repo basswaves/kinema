@@ -38,7 +38,14 @@ function detected(device: AudioDevice | null, codec: string): string {
   return result === 'yes' ? 'takes it' : result === 'no' ? 'does not take it' : 'not known';
 }
 
-export default function SoundSection({ onError }: { onError: (message: string) => void }) {
+/** `system` is for the wording only: "through Windows", "through Linux". */
+export default function SoundSection({
+  onError,
+  system,
+}: {
+  onError: (message: string) => void;
+  system: string;
+}) {
   const [settings, setSettings] = useState<AudioSettings | null>(null);
   const [equipment, setEquipment] = useState<Equipment | null>(null);
 
@@ -71,12 +78,15 @@ export default function SoundSection({ onError }: { onError: (message: string) =
     (b) => (b.codec === 'truehd' || b.codec === 'dts-hd') && b.result === 'yes'
   );
 
-  // Windows' default, then each connected device by name. The empty string
-  // is how "Windows default" is stored.
+  // The system's default, then each connected device by name. The empty
+  // string is how "default" is stored.
   const deviceChoices = [
-    { value: '', label: 'Windows default' },
+    { value: '', label: `${system} default` },
     ...connected.map((a) => ({ value: a.id, label: a.name })),
   ];
+  // Windows has a mixer setting and spatial sound that stop mattering; on
+  // Linux what stops mattering is the desktop's volume.
+  const onWindows = system === 'Windows';
 
   return (
     <section className="settings-section">
@@ -90,8 +100,12 @@ export default function SoundSection({ onError }: { onError: (message: string) =
         ]}
         value={settings.direct ? 'on' : 'off'}
         onChange={(v) => save(AUDIO_DIRECT_KEY, v, { ...settings, direct: v === 'on' })}
-        note="On sends the video's own soundtrack to your receiver untouched, as a disc player does, including Dolby TrueHD, Atmos, DTS-HD and DTS:X. Off sends sound through Windows like any other program, which mixes it to Windows' speaker setup and loses Atmos and DTS:X height sound."
-        hint="While a video plays with this on, other sounds from this PC are silent, and Windows' speaker and spatial sound settings make no difference."
+        note={`On sends the video's own soundtrack to your receiver untouched, as a disc player does, including Dolby TrueHD, Atmos, DTS-HD and DTS:X. Off sends sound through ${system} like any other program, which mixes it to ${system}'s speaker setup and loses Atmos and DTS:X height sound.`}
+        hint={
+          onWindows
+            ? "While a video plays with this on, other sounds from this PC are silent, and Windows' speaker and spatial sound settings make no difference."
+            : `While a video plays with this on, other sounds from this PC are silent, and ${system}'s own volume makes no difference: use Kinema's.`
+        }
       />
 
       {device && (
@@ -108,7 +122,9 @@ export default function SoundSection({ onError }: { onError: (message: string) =
                 } sound.`
             : takesLossless
               ? `${device.name} can take the lossless formats untouched. Turn this on to use that.`
-              : `Sound goes through Windows to ${device.name}, mixed to ${device.mix_layout}.`}
+              : `Sound goes through ${system} to ${device.name}${
+                  device.mix_layout ? `, mixed to ${device.mix_layout}` : ''
+                }.`}
           {!settings.direct && device.spatial_objects
             ? " Windows spatial sound is on for this device. The receiver may show Atmos, but that is Windows re-wrapping decoded 7.1: a movie's own Atmos or DTS:X height sound is lost unless this is on."
             : ''}
@@ -120,14 +136,18 @@ export default function SoundSection({ onError }: { onError: (message: string) =
         choices={deviceChoices}
         value={settings.deviceId ?? ''}
         onChange={(v) => save(AUDIO_DEVICE_KEY, v, { ...settings, deviceId: v || null })}
-        note="Windows default follows whatever Windows is set to. If a device chosen here is unplugged, Kinema uses the Windows default until it is back."
+        note={
+          onWindows
+            ? 'Windows default follows whatever Windows is set to. If a device chosen here is unplugged, Kinema uses the Windows default until it is back.'
+            : `${system} default plays wherever ${system} plays; sent straight to the receiver, it is the one device that takes surround formats. If a device chosen here is unplugged, Kinema uses the ${system} default until it is back.`
+        }
       />
 
       {settings.direct && (
         <>
           <h3>Formats</h3>
           <p className="settings-intro">
-            Auto uses what the receiver told Windows it can play. Only force a format on if you
+            Auto uses what the receiver told {system} it can play. Only force a format on if you
             know better: a format the receiver cannot play comes out as silence or noise.
           </p>
           {BITSTREAM_CODECS.map((codec) => {

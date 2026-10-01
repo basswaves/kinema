@@ -106,12 +106,14 @@ mod tests {
     }
 
     /// Elsewhere, nothing is claimed that has no implementation behind it.
-    /// Linux has the equipment check (equipment/linux.rs) and nothing else yet.
+    /// Linux has the equipment check (equipment/linux.rs) and direct sound
+    /// (audio_reserve.rs), and nothing else yet.
     #[cfg(not(windows))]
     #[test]
     fn nothing_is_claimed_without_an_implementation() {
         let c = current();
-        assert_eq!(c.equipment_detection, cfg!(target_os = "linux"));
-        assert!(!c.audio_direct && !c.display_switching && !c.sleep && !c.shut_down);
+        let linux = cfg!(target_os = "linux");
+        assert_eq!((c.equipment_detection, c.audio_direct), (linux, linux));
+        assert!(!c.display_switching && !c.sleep && !c.shut_down);
     }
 }

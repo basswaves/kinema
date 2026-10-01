@@ -16,6 +16,11 @@
  *    `equipment.rs`, with a per-format override. Anything not passed through
  *    goes as multichannel PCM, up to what the device takes.
  *
+ * On Linux the same two ways: through the sound server (PipeWire), or
+ * straight to the receiver's HDMI device by its ALSA name, after the sound
+ * server has been asked to let go of the card (`holdDevice`,
+ * audio_reserve.rs) — the counterpart of WASAPI's exclusive mode.
+ *
  * Only formats the device accepted *in their own right* go into
  * `--audio-spdif`: mpv relabels a refused bitstream as AC3 and retries, which
  * on a device that takes AC3 but not TrueHD means silence or noise at the
@@ -25,6 +30,8 @@ import { getSetting } from '../metadata/api';
 import { getEquipment, type AudioDevice, type Equipment } from './equipment';
 import { readTracks } from './tracks';
 import { mpvCommand, mpvGet } from './engine';
+import { invoke } from '@tauri-apps/api/core';
+import { capabilitiesNow } from '../capabilities';
 
 /** Setting keys. */
 export const AUDIO_DIRECT_KEY = 'audio_direct';
@@ -56,23 +63,31 @@ export interface AudioPlan {
  * mpv names a WASAPI device by the part of the endpoint id after its first
  * dot: `{0.0.0.00000000}.{aaaaaaaa-…}` is `wasapi/{aaaaaaaa-…}` (both forms
  * are in the same mpv.log, "Monitoring changes in device" and "Selecting
- * device").
+ * device"). The Linux check already names each device as mpv does
+ * (`alsa/hdmi:CARD=…,DEV=…`, equipment/linux.rs).
  */
 export function mpvDeviceName(endpointId: string): string {
+  if (endpointId.startsWith('alsa/')) return endpointId;
   const dot = endpointId.indexOf('}.');
   return `wasapi/${dot >= 0 ? endpointId.slice(dot + 2) : endpointId}`;
 }
 
-/** The device the sound will go to: the chosen one if present, else Windows' default. */
+/**
+ * The device the sound will go to: the chosen one if present, else the
+ * system's default. Where the system names no default (Linux: the sound
+ * server, not a sound device, is what programs play to), the one connected
+ * device that takes any bitstream — the receiver — if there is exactly one.
+ */
 export function targetDevice(
   equipment: Equipment | null,
   deviceId: string | null
 ): AudioDevice | null {
   const connected = equipment?.audio.filter((a) => a.connected) ?? [];
+  const receivers = connected.filter((a) => a.bitstream.some((b) => b.result === 'yes'));
   return (
     (deviceId ? connected.find((a) => a.id === deviceId) : undefined) ??
     connected.find((a) => a.is_default) ??
-    null
+    (receivers.length === 1 ? receivers[0] : null)
   );
 }
 
@@ -89,9 +104,14 @@ export function channelsFor(maxChannels: number | null): string {
 }
 
 export function planAudio(settings: AudioSettings, device: AudioDevice | null): AudioPlan {
-  const name = settings.deviceId && device?.id === settings.deviceId
-    ? mpvDeviceName(device.id)
-    : 'auto';
+  const chosen = Boolean(settings.deviceId) && device?.id === settings.deviceId;
+  // Straight to a device that is not the system's default — on Linux, the
+  // receiver found by targetDevice — has to be named: `auto` would be the
+  // sound server.
+  const name =
+    device && (chosen || (settings.direct && !device.is_default))
+      ? mpvDeviceName(device.id)
+      : 'auto';
   if (!settings.direct) {
     return { device: name, exclusive: false, spdif: [], channels: 'auto-safe' };
   }
@@ -137,10 +157,33 @@ async function setAll(plan: AudioPlan): Promise<void> {
 export function describePlan(plan: AudioPlan): string {
   return plan.exclusive
     ? `straight to ${plan.device}, passthrough ${plan.spdif.join(',') || 'none'}, PCM ${plan.channels}`
-    : `through Windows (${plan.device}), ${plan.channels}`;
+    : `through ${capabilitiesNow()?.system ?? 'the system'} (${plan.device}), ${plan.channels}`;
 }
 
 let lastApplied = '';
+
+/**
+ * Straight to an ALSA device (Linux): ask the sound server to let go of its
+ * card first, or mpv finds it busy (audio_reserve.rs). Every file, not only
+ * when the plan changes — leaving the player gives the card back. Anything
+ * else gives back a card still held.
+ */
+async function holdDevice(plan: AudioPlan): Promise<void> {
+  if (!plan.exclusive || !plan.device.startsWith('alsa/')) {
+    await releaseAudioDevice();
+    return;
+  }
+  const said = await invoke<string>('reserve_audio_device', { device: plan.device }).catch(
+    (e: unknown) => `${plan.device} not reserved (${String(e)}); mpv may find it busy`
+  );
+  if (!said.endsWith('already held')) console.log(`audio: ${said}`);
+}
+
+/** Give a reserved card back to the sound server; nothing when none is held. */
+export async function releaseAudioDevice(): Promise<void> {
+  const name = await invoke<string | null>('release_audio_device').catch(() => null);
+  if (name) console.log(`audio: gave ${name} back`);
+}
 
 /**
  * Settings + equipment → mpv, before each file. Only when something changed,
@@ -153,6 +196,7 @@ export async function applyAudioPlan(): Promise<AudioPlan> {
   const settings = await readAudioSettings();
   const equipment = await getEquipment().catch(() => null);
   const plan = planAudio(settings, targetDevice(equipment, settings.deviceId));
+  await holdDevice(plan);
   const key = JSON.stringify(plan);
   if (key !== lastApplied) {
     await setAll(plan);
@@ -177,6 +221,8 @@ export const FALLBACKS: AudioPlan[] = [
 export async function applyFallback(step: number, trackId: number): Promise<boolean> {
   const plan = FALLBACKS[step];
   if (!plan) return false;
+  // The ordinary path is the sound server's: it needs its card back.
+  await releaseAudioDevice();
   await setAll(plan);
   // Forget what was applied, so the next file puts the real plan back.
   lastApplied = '';

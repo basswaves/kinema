@@ -1,6 +1,7 @@
 mod analyse;
 mod applog;
 mod aspect;
+mod audio_reserve;
 mod capabilities;
 mod artwork;
 mod backup;
@@ -181,6 +182,7 @@ fn open_library(app: &tauri::AppHandle) -> Result<(), String> {
     app.manage(ScanDb(Mutex::new(scanner)));
     app.manage(jobs::Jobs::default());
     app.manage(equipment::EquipmentState::default());
+    app.manage(audio_reserve::Reserved::default());
     app.manage(simkl::SimklState::default());
     app.manage(trakt::TraktState::default());
     Ok(())
@@ -357,6 +359,8 @@ pub fn run() {
             equipment::get_equipment,
             equipment::check_equipment,
             equipment::window_display,
+            audio_reserve::reserve_audio_device,
+            audio_reserve::release_audio_device,
             display::screen_now,
             display::switch_screen,
             display::restore_screen,

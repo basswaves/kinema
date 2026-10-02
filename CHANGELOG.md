@@ -7,6 +7,12 @@ makes no stability promises.
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-10-03
+
+Picture and sound set per device and asked about at the first run, and a
+short setup while the first scan reads the library. The library is not
+upgraded (schema 22, as in 0.8.0).
+
 ### Added
 
 - **A short setup while the first scan runs.** The welcome screen asks where

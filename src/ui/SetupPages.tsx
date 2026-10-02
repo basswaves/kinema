@@ -17,7 +17,12 @@
  * — the app closed half-way — opens them again (`SETUP_PAGES_KEY`). Settings →
  * Library → Run setup again brings them back at any time.
  */
-import { useFocusable, FocusContext, setFocus } from '@noriginmedia/norigin-spatial-navigation';
+import {
+  useFocusable,
+  FocusContext,
+  setFocus,
+  updateAllLayouts,
+} from '@noriginmedia/norigin-spatial-navigation';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useCapabilities } from '../capabilities';
 import { useScanStatus } from '../library/pipeline';
@@ -27,7 +32,7 @@ import IntrosSetup from './IntrosSetup';
 import AccountSection from './AccountSection';
 import { OpenSubtitlesSection } from './SubtitlesSettings';
 import ExtrasSetup from './ExtrasSetup';
-import { useClaimFocus } from './focus';
+import { scrollPageToTop, useClaimFocus } from './focus';
 
 /** 'open' while the pages are up, 'done' once finished or left. */
 export const SETUP_PAGES_KEY = 'setup_pages';
@@ -127,25 +132,46 @@ export default function SetupPages({ onClose }: Props) {
    * Some pages ask the system something before their questions exist (is
    * ffmpeg there?), and focus given before then lands on whatever happened to
    * be there first. So it waits, briefly, for the new page to have a control.
+   *
+   * Then the page goes to its top and every control is measured again before
+   * focus is given. "First" is the control nearest the top-left corner by
+   * the positions the spatial library last measured, and those can date from
+   * before the page moved: the first page opens with the welcome page's
+   * scroll, and on CI's Linux WebKit the ring landed a row down.
    */
   const landing = useRef(0);
+  const landOn = useCallback((id: string) => {
+    const started = Date.now();
+    const attempt = ++landing.current;
+    const land = () => {
+      if (attempt !== landing.current) return;
+      const root = document.querySelector<HTMLElement>(`.setup-page[data-page="${id}"]`);
+      const ready = root?.querySelector(':is(button:not(:disabled), input)');
+      if (!ready && Date.now() - started <= LANDING_WAIT_MS) {
+        window.setTimeout(land, 50);
+        return;
+      }
+      scrollPageToTop(root ?? null, 'auto');
+      void Promise.resolve(updateAllLayouts()).then(() => {
+        if (attempt === landing.current) void setFocus(SETUP_FOCUS_KEY);
+      });
+    };
+    window.setTimeout(land, 0);
+  }, []);
+
+  // The first page, once there is one.
+  const firstId = pages[0]?.id;
+  useEffect(() => {
+    if (firstId) landOn(firstId);
+  }, [firstId, landOn]);
+
   const go = useCallback(
     (next: number) => {
       setIndex(next);
       const id = pages[next]?.id;
-      const started = Date.now();
-      const attempt = ++landing.current;
-      const land = () => {
-        if (attempt !== landing.current) return;
-        const ready = document.querySelector(
-          `.setup-page[data-page="${id}"] :is(button:not(:disabled), input)`
-        );
-        if (ready || Date.now() - started > LANDING_WAIT_MS) void setFocus(SETUP_FOCUS_KEY);
-        else window.setTimeout(land, 50);
-      };
-      window.setTimeout(land, 0);
+      if (id) landOn(id);
     },
-    [pages]
+    [landOn, pages]
   );
 
   const forward = useCallback(() => {

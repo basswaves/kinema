@@ -221,8 +221,11 @@ function scrollParent(node: HTMLElement | null): HTMLElement | null {
  * cropped and the nav floating over half an image. The top row is the one place
  * where the correct scroll position is absolute rather than relative.
  */
-export function scrollPageToTop(node: HTMLElement | null): void {
-  scrollParent(node)?.scrollTo({ top: 0, behavior: 'smooth' });
+export function scrollPageToTop(
+  node: HTMLElement | null,
+  behavior: ScrollBehavior = 'smooth'
+): void {
+  scrollParent(node)?.scrollTo({ top: 0, behavior });
 }
 
 /**

@@ -191,6 +191,10 @@ for (const [system, sections] of [
 }
 
 test('first run: where to watch, a folder, then the setup pages, all by remote', async ({ page }) => {
+  // A short window, so the welcome page is scrolled when Scan opens the
+  // pages: the first page's focus landed a row down from stale positions
+  // that way (CI's Linux WebKit at full height; here, anywhere under ~560).
+  await page.setViewportSize({ width: 1280, height: 480 });
   await page.addInitScript(() => localStorage.setItem('kinemaMockEmpty', '1'));
   await page.goto('/');
   const setting = (key: string) =>

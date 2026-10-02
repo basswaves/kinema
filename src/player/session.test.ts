@@ -3,7 +3,14 @@
  * screen. See docs/GOTCHAS.md, libmpv section, for the stories behind them.
  */
 import { describe, expect, it } from 'vitest';
-import { initialSession, reduce, samePath, type Event, type Session } from './session';
+import {
+  initialSession,
+  loadFailedMessage,
+  reduce,
+  samePath,
+  type Event,
+  type Session,
+} from './session';
 
 const A = 'C:\\tv\\Show.S01E01.mkv';
 const B = 'C:\\tv\\Show.S01E02.mkv';
@@ -157,5 +164,18 @@ describe('samePath', () => {
 
   it('gives an unreadable path the benefit of the doubt', () => {
     expect(samePath(null, A)).toBe(true);
+  });
+});
+
+describe('loadFailedMessage', () => {
+  it("passes on the engine's own words", () => {
+    expect(loadFailedMessage('no such file or directory')).toBe(
+      'Could not play this file: no such file or directory'
+    );
+  });
+
+  it('says what usually causes it when the engine gave none', () => {
+    expect(loadFailedMessage()).toContain('may have been moved or deleted');
+    expect(loadFailedMessage('')).toContain('may have been moved or deleted');
   });
 });

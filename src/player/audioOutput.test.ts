@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import type { AudioDevice, Equipment, Probe } from './equipment';
 import {
   channelsFor,
+  fallbackNotice,
   goesDirect,
   mpvDeviceName,
+  noSoundNotice,
   planAudio,
   targetDevice,
   type AudioSettings,
@@ -177,3 +179,20 @@ describe('on Linux', () => {
   });
 });
 
+
+describe('the notices when the sound will not open', () => {
+  it('says which way the sound went once a fallback worked', () => {
+    expect(fallbackNotice(0, 'Windows')).toBe(
+      'The sound could not be sent the chosen way, so it is going through Windows instead.'
+    );
+    expect(fallbackNotice(1, 'Linux')).toBe(
+      'Linux would not take surround sound, so this is playing in stereo.'
+    );
+  });
+
+  it('gives Windows the spatial-sound advice, and names any other system plainly', () => {
+    expect(noSoundNotice('Windows')).toContain('Windows spatial sound');
+    expect(noSoundNotice('Windows')).toContain('"Send sound straight to the receiver"');
+    expect(noSoundNotice('Linux')).toBe('No sound: Linux would not open the audio device.');
+  });
+});

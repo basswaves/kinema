@@ -64,7 +64,7 @@ import {
   type MpvTrack,
 } from './tracks';
 import {
-  episodeLabel,
+  episodeRefLabel,
   getProgress,
   getSkipMarkers,
   getTitlePrefs,
@@ -78,6 +78,8 @@ import {
 import {
   activeSkip,
   checkedAgainstFile,
+  skipLabel,
+  skipPromptFor,
   withResolvedCredits,
   CREDITS_TAIL_KEY,
   DEFAULT_CREDITS_TAIL_SECS,
@@ -89,13 +91,14 @@ import { matchHdrToDisplay } from './displayHdr';
 import {
   applyAudioPlan,
   applyFallback,
-  FALLBACKS,
+  fallbackNotice,
+  noSoundNotice,
   releaseAudioDevice,
   silencedAudioTrack,
 } from './audioOutput';
 import { filmNow, mayswitch, restoreScreen, switchForFilm } from './displaySwitch';
 import { getSetting } from '../metadata/api';
-import { initialSession, reduce, samePath } from './session';
+import { initialSession, loadFailedMessage, reduce, samePath } from './session';
 import { COMMIT_IDLE_MS, scrubStep, type Scrub } from './scrub';
 import { endsAtLabel, formatTime } from '../ui/format';
 import { resumePoint } from './resume';
@@ -189,11 +192,6 @@ const PLAYER_SHELL_KEY = 'player-shell';
 const PLAYER_PLAY_KEY = 'player-play';
 const PLAYER_TRACKS_KEY = 'player-tracks-button';
 const PLAYER_SEEK_KEY = 'player-seek';
-
-/** The label an episode carries into the player, shared with the browsing UI. */
-function labelFor(episode: EpisodeRef): string {
-  return episodeLabel(episode.title, episode.season, episode.episode);
-}
 
 /**
  * "Find subtitles online": search, show the best, and say what was shown —
@@ -745,21 +743,11 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           const step = audioFallback.current++;
           const system = capabilitiesNow()?.system ?? 'The system';
           if (await applyFallback(step, track).catch(() => false)) {
-            setNotice(
-              FALLBACKS[step]?.channels === 'stereo'
-                ? `${system} would not take surround sound, so this is playing in stereo.`
-                : `The sound could not be sent the chosen way, so it is going through ${system} instead.`
-            );
+            setNotice(fallbackNotice(step, system));
             checkAudioSoon();
           } else {
             console.error('audio: no output could be opened for this file');
-            setNotice(
-              system === 'Windows'
-                ? 'No sound: Windows would not open the audio device. If Windows spatial sound ' +
-                    '(Atmos or DTS:X for home theater) is on, switch it off, or turn on ' +
-                    '"Send sound straight to the receiver" in Settings.'
-                : `No sound: ${system} would not open the audio device.`
-            );
+            setNotice(noSoundNotice(system));
           }
         })();
       }, AUDIO_CHECK_MS);
@@ -829,13 +817,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         // away fails here and nowhere else — without this, a black screen
         // reading `--:-- / --:--`, indistinguishable from a hang.
         if (event.reason === 'error') {
-          dispatch({
-            type: 'error',
-            message: event.detail
-              ? `Could not play this file: ${event.detail}`
-              : 'Could not play this file. It may have been moved or deleted, ' +
-                'or the drive it is on may be unavailable.',
-          });
+          dispatch({ type: 'error', message: loadFailedMessage(event.detail) });
           // Reveal the controls and leave them up: nothing is playing, so there
           // is nothing for them to cover, and Back is the way out.
           setOsdVisible(true);
@@ -1159,26 +1141,19 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   // remove it before the intro had even begun; it now stays until the intro is
   // over, and the seek that skipping performs is what removes it.
 
-  // In automatic mode the button still shows during a cold open, where
-  // nothing will happen by itself until the intro begins — and over credits
-  // with a scene after them, which automatic mode never jumps to.
-  const promptAllowed =
-    active !== null && (!autoSkip || !active.inSegment || active.toScene);
-  const skipPrompt =
-    active && promptAllowed && !upNext && dismissed !== active.key
-      ? // A credits prompt with nothing to move on to would be a button that
-        // does nothing useful.
-        active.kind !== 'credits' || active.toScene || neighbours.next !== null
-        ? active
-        : null
-      : null;
+  const skipPrompt = skipPromptFor(active, {
+    autoSkip,
+    upNextShown: upNext !== null,
+    dismissed,
+    hasNext: neighbours.next !== null,
+  });
 
   /** Jump straight to a neighbouring episode, keeping the show's identity. */
   const playNeighbour = useCallback(
     (episode: EpisodeRef) => {
       onPlayTarget({
         path: episode.path,
-        label: labelFor(episode),
+        label: episodeRefLabel(episode),
         fileId: episode.file_id,
         episodeName: episode.name,
         titleId: target.titleId,
@@ -1267,7 +1242,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       if (upNext) {
         onPlayTarget({
           path: upNext.path,
-          label: labelFor(upNext),
+          label: episodeRefLabel(upNext),
           fileId: upNext.file_id,
           titleId: target.titleId,
         });
@@ -1902,13 +1877,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
 
       {skipPrompt && (
         <FocusButton className="skip-button" onSelect={() => void performSkip()}>
-          {skipPrompt.kind === 'intro'
-            ? 'Skip intro'
-            : skipPrompt.kind === 'recap'
-              ? 'Skip recap'
-              : skipPrompt.toScene
-                ? 'Skip to the scene after the credits'
-                : 'Next episode ›'}
+          {skipLabel(skipPrompt)}
         </FocusButton>
       )}
 
@@ -2008,8 +1977,8 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
             {neighbours.prev && (
               <FocusButton
                 className="icon-button"
-                label={`Previous episode: ${labelFor(neighbours.prev)}`}
-                title={`Previous: ${labelFor(neighbours.prev)} (P)`}
+                label={`Previous episode: ${episodeRefLabel(neighbours.prev)}`}
+                title={`Previous: ${episodeRefLabel(neighbours.prev)} (P)`}
                 onSelect={() => playNeighbour(neighbours.prev as EpisodeRef)}
               >
                 <PreviousIcon />
@@ -2043,8 +2012,8 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
             {neighbours.next && (
               <FocusButton
                 className="icon-button"
-                label={`Next episode: ${labelFor(neighbours.next)}`}
-                title={`Next: ${labelFor(neighbours.next)} (N)`}
+                label={`Next episode: ${episodeRefLabel(neighbours.next)}`}
+                title={`Next: ${episodeRefLabel(neighbours.next)} (N)`}
                 onSelect={() => playNeighbour(neighbours.next as EpisodeRef)}
               >
                 <NextIcon />

@@ -16,7 +16,11 @@ import {
   checkedAgainstFile,
   creditsFromChapters,
   hasAnyMarkers,
+  skipLabel,
+  skipPromptFor,
   withResolvedCredits,
+  type ActiveSkip,
+  type PromptInputs,
 } from './skip';
 import type { SkipMarkers } from './api';
 
@@ -384,5 +388,78 @@ describe('withResolvedCredits and the new segments', () => {
     expect(result.creditsSource).toBe('chapter');
     expect(result.markers?.recap_source).toBe('introdb');
     expect(result.markers?.post_credits?.start).toBe(7500);
+  });
+});
+
+describe('skipPromptFor', () => {
+  const intro = (over: Partial<ActiveSkip> = {}): ActiveSkip => ({
+    kind: 'intro',
+    seekTo: 46,
+    key: 'intro:10',
+    inSegment: true,
+    toScene: false,
+    ...over,
+  });
+  const credits = (over: Partial<ActiveSkip> = {}): ActiveSkip =>
+    intro({ kind: 'credits', seekTo: 1430, key: 'credits:1430', ...over });
+  const asking: PromptInputs = { autoSkip: false, upNextShown: false, dismissed: null, hasNext: true };
+
+  it('shows nothing when nothing is active', () => {
+    expect(skipPromptFor(null, asking)).toBeNull();
+  });
+
+  it('shows the active segment when asking', () => {
+    const active = intro();
+    expect(skipPromptFor(active, asking)).toBe(active);
+  });
+
+  it('leaves the intro itself to automatic mode', () => {
+    expect(skipPromptFor(intro(), { ...asking, autoSkip: true })).toBeNull();
+  });
+
+  it('still offers a cold open in automatic mode, which waits for the intro', () => {
+    const active = intro({ inSegment: false });
+    expect(skipPromptFor(active, { ...asking, autoSkip: true })).toBe(active);
+  });
+
+  it('still offers a scene after the credits in automatic mode, which never jumps to it', () => {
+    const active = credits({ toScene: true });
+    expect(skipPromptFor(active, { ...asking, autoSkip: true })).toBe(active);
+  });
+
+  it('gives way to the Up next card', () => {
+    expect(skipPromptFor(credits(), { ...asking, upNextShown: true })).toBeNull();
+  });
+
+  it('stays away once turned down', () => {
+    expect(skipPromptFor(intro(), { ...asking, dismissed: 'intro:10' })).toBeNull();
+    const active = intro();
+    expect(skipPromptFor(active, { ...asking, dismissed: 'credits:1430' })).toBe(active);
+  });
+
+  it('offers credits only with somewhere to go', () => {
+    expect(skipPromptFor(credits(), { ...asking, hasNext: false })).toBeNull();
+    const scene = credits({ toScene: true });
+    expect(skipPromptFor(scene, { ...asking, hasNext: false })).toBe(scene);
+    // An intro needs no next episode.
+    const active = intro();
+    expect(skipPromptFor(active, { ...asking, hasNext: false })).toBe(active);
+  });
+});
+
+describe('skipLabel', () => {
+  const at = (kind: ActiveSkip['kind'], toScene = false): ActiveSkip => ({
+    kind,
+    seekTo: 0,
+    key: kind,
+    inSegment: true,
+    toScene,
+  });
+
+  it('names what pressing it does', () => {
+    expect(skipLabel(at('intro'))).toBe('Skip intro');
+    expect(skipLabel(at('recap'))).toBe('Skip recap');
+    expect(skipLabel(at('credits', true))).toBe('Skip to the scene after the credits');
+    expect(skipLabel(at('credits'))).toBe('Next episode ›');
   });
 });

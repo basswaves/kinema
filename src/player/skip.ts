@@ -147,6 +147,51 @@ export function activeSkip(
   return null;
 }
 
+/** What decides whether the active segment gets a Skip button. */
+export interface PromptInputs {
+  /** Automatic mode: skips without asking where it is allowed to. */
+  autoSkip: boolean;
+  /** The Up next card is showing, and stands in for a credits prompt. */
+  upNextShown: boolean;
+  /** The segment key the viewer (or the timer) has already turned down. */
+  dismissed: string | null;
+  /** There is a next episode to move on to. */
+  hasNext: boolean;
+}
+
+/**
+ * The Skip button to show, or null for none.
+ *
+ * In automatic mode the button still shows during a cold open, where
+ * nothing will happen by itself until the intro begins — and over credits
+ * with a scene after them, which automatic mode never jumps to.
+ */
+export function skipPromptFor(
+  active: ActiveSkip | null,
+  { autoSkip, upNextShown, dismissed, hasNext }: PromptInputs
+): ActiveSkip | null {
+  const promptAllowed =
+    active !== null && (!autoSkip || !active.inSegment || active.toScene);
+  return active && promptAllowed && !upNextShown && dismissed !== active.key
+    ? // A credits prompt with nothing to move on to would be a button that
+      // does nothing useful.
+      active.kind !== 'credits' || active.toScene || hasNext
+      ? active
+      : null
+    : null;
+}
+
+/** What the Skip button says. */
+export function skipLabel(prompt: ActiveSkip): string {
+  return prompt.kind === 'intro'
+    ? 'Skip intro'
+    : prompt.kind === 'recap'
+      ? 'Skip recap'
+      : prompt.toScene
+        ? 'Skip to the scene after the credits'
+        : 'Next episode ›';
+}
+
 /** Whether markers are worth acting on at all. */
 export function hasAnyMarkers(markers: SkipMarkers | null): boolean {
   return Boolean(

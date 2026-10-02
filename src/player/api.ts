@@ -104,6 +104,11 @@ export function episodeLabel(
   return `${showTitle} · S${s}E${e}`;
 }
 
+/** The label an episode carries into the player, shared with the browsing UI. */
+export function episodeRefLabel(episode: EpisodeRef): string {
+  return episodeLabel(episode.title, episode.season, episode.episode);
+}
+
 /**
  * Store a resume point. `creditsStart` is where the credits begin when that is
  * known from a marker or a named chapter — never from the tail guess — so a

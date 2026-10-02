@@ -98,6 +98,17 @@ export function initialSession(path: string): Session {
 }
 
 /**
+ * What the player says when the engine could not play the file. `detail` is
+ * the engine's own words, when it gave any.
+ */
+export function loadFailedMessage(detail?: string): string {
+  return detail
+    ? `Could not play this file: ${detail}`
+    : 'Could not play this file. It may have been moved or deleted, ' +
+        'or the drive it is on may be unavailable.';
+}
+
+/**
  * Whether mpv's idea of the open file is this session's. Separators and case
  * are ignored — Windows paths compare that way — and an unknown path (the
  * read failed) is given the benefit of the doubt, because refusing it would

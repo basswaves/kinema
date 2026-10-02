@@ -252,6 +252,25 @@ export async function applyFallback(step: number, trackId: number): Promise<bool
 }
 
 /**
+ * What the player says once fallback `step` has got the sound playing.
+ * `system` is the operating system's name, from the capabilities.
+ */
+export function fallbackNotice(step: number, system: string): string {
+  return FALLBACKS[step]?.channels === 'stereo'
+    ? `${system} would not take surround sound, so this is playing in stereo.`
+    : `The sound could not be sent the chosen way, so it is going through ${system} instead.`;
+}
+
+/** What the player says when no way of playing the sound would open. */
+export function noSoundNotice(system: string): string {
+  return system === 'Windows'
+    ? 'No sound: Windows would not open the audio device. If Windows spatial sound ' +
+        '(Atmos or DTS:X for home theater) is on, switch it off, or turn on ' +
+        '"Send sound straight to the receiver" in Settings.'
+    : `No sound: ${system} would not open the audio device.`;
+}
+
+/**
  * The audio track to bring back when a file's sound failed to open, or null
  * when nothing is wrong. Asked a moment after playback (re)starts, since the
  * output opens as the file does.

@@ -20,7 +20,6 @@ import {
   useReducer,
   useRef,
   useState,
-  type ReactNode,
 } from 'react';
 import {
   doesFocusableExist,
@@ -38,7 +37,6 @@ import TrackPanel, { TRACK_PANEL_KEY } from './TrackPanel';
 import UpNextCard from './UpNextCard';
 import { startOverlay } from './overlay';
 import { capabilitiesNow } from '../capabilities';
-import { setShortcutsOpen } from '../ui/shortcutsState';
 import {
   fitWindowForPlayer,
   hasReachedEnd,
@@ -78,7 +76,6 @@ import {
 import {
   activeSkip,
   checkedAgainstFile,
-  skipLabel,
   skipPromptFor,
   withResolvedCredits,
   CREDITS_TAIL_KEY,
@@ -100,7 +97,7 @@ import { filmNow, mayswitch, restoreScreen, switchForFilm } from './displaySwitc
 import { getSetting } from '../metadata/api';
 import { initialSession, loadFailedMessage, reduce, samePath } from './session';
 import { COMMIT_IDLE_MS, scrubStep, type Scrub } from './scrub';
-import { endsAtLabel, formatTime } from '../ui/format';
+import { endsAtLabel } from '../ui/format';
 import { resumePoint } from './resume';
 import { chooseTracks, forcedTrack, readLanguageDefaults, spokenTrack } from './trackChoice';
 import {
@@ -113,17 +110,10 @@ import {
   type Offer,
 } from './onlineSubtitles';
 import { canonicalLang, languageName, systemLanguage } from './language';
-import {
-  BackTenIcon,
-  ForwardTenIcon,
-  FullscreenIcon,
-  NextIcon,
-  PauseIcon,
-  PlayIcon,
-  PreviousIcon,
-  SubtitlesIcon,
-} from './icons';
-import VolumeControl from './VolumeControl';
+import PlayerControls from './PlayerControls';
+import ResumeToast from './ResumeToast';
+import SkipButton from './SkipButton';
+import { PLAYER_PLAY_KEY, PLAYER_SHELL_KEY, PLAYER_TRACKS_KEY } from './focusKeys';
 import {
   applyMute,
   applyVolume,
@@ -182,16 +172,6 @@ const TRANSPORT_SKIP_SECS = 30;
 const AUDIO_CHECK_MS = 1500;
 /** How long a notice about the sound stays on screen. */
 const AUDIO_NOTICE_MS = 12000;
-
-/**
- * Focus keys for the two places focus is aimed at explicitly: the control the
- * OSD opens on, and the track panel, which should take focus the moment it
- * appears rather than making you arrow back up to it.
- */
-const PLAYER_SHELL_KEY = 'player-shell';
-const PLAYER_PLAY_KEY = 'player-play';
-const PLAYER_TRACKS_KEY = 'player-tracks-button';
-const PLAYER_SEEK_KEY = 'player-seek';
 
 /**
  * "Find subtitles online": search, show the best, and say what was shown —
@@ -1796,7 +1776,6 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     neighbours.next,
   ]);
 
-  const progress = duration && timePos !== null ? (timePos / duration) * 100 : 0;
   const endsAt = endsAtLabel(timePos, duration, now);
   const subTracks = tracks.filter((t) => t.type === 'sub');
   const audioTracks = tracks.filter((t) => t.type === 'audio');
@@ -1836,12 +1815,11 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       {/* Resuming is automatic, so this is where starting over is offered —
           for as long as the notice shows, OK means "from the beginning". */}
       {session.resumedFrom !== null && (
-        <div className="resume-toast" onAnimationEnd={() => dispatch({ type: 'resume-shown' })}>
-          <span>Resumed from {formatTime(session.resumedFrom)}</span>
-          <FocusButton className="resume-start-over" onSelect={startOver}>
-            Start over <span className="resume-key">OK</span>
-          </FocusButton>
-        </div>
+        <ResumeToast
+          resumedFrom={session.resumedFrom}
+          onShown={() => dispatch({ type: 'resume-shown' })}
+          onStartOver={startOver}
+        />
       )}
 
       <div className="player-top">
@@ -1875,11 +1853,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         />
       )}
 
-      {skipPrompt && (
-        <FocusButton className="skip-button" onSelect={() => void performSkip()}>
-          {skipLabel(skipPrompt)}
-        </FocusButton>
-      )}
+      {skipPrompt && <SkipButton prompt={skipPrompt} onSkip={() => void performSkip()} />}
 
       {/* Deliberately outside the OSD: the panel is for watching numbers move
           while the video plays, so hiding it with the idle timer would defeat
@@ -1918,203 +1892,42 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         />
       )}
 
-      <div className="player-controls">
-        <div className="player-seek-row">
-          <span className="player-time">{formatTime(timePos)}</span>
-          <SeekBar
-            progress={progress}
-            onScrub={scrubBy}
-            onRelease={commitScrub}
-            onEnter={() => void togglePauseByKey()}
-          >
-            <input
-              className="player-seek"
-              type="range"
-              min={0}
-              max={100}
-              step={0.05}
-              value={progress}
-              tabIndex={-1}
-              onMouseDown={() => dispatch({ type: 'scrub-start' })}
-              onChange={(e) => {
-                const pct = Number(e.target.value);
-                if (duration) dispatch({ type: 'scrub', timePos: (pct / 100) * duration });
-              }}
-              onMouseUp={(e) => {
-                dispatch({ type: 'scrub-end' });
-                const input = e.target as HTMLInputElement;
-                const pct = Number(input.value);
-                if (duration) void seekTo((pct / 100) * duration);
-                // Keep the browser's own arrow-key handling off the slider, or
-                // the next Left would move it *and* seek.
-                input.blur();
-              }}
-            />
-          </SeekBar>
-          <span className="player-time">{formatTime(duration)}</span>
-        </div>
-
-        {/* Three groups: help at the left, the transport in the middle where the
-            eye goes, and the settings of the moment at the right. Icons rather
-            than words for the transport, as on every player; each carries its
-            name for a screen reader and a tooltip for the mouse. Stats is not
-            here any more — it is a diagnostic, on `i` and in the key list, not
-            something to walk past on the way to the subtitles. */}
-        <div className="player-buttons">
-          <div className="player-group player-group-left">
-            <FocusButton
-              className="icon-button"
-              label="Keyboard and remote controls"
-              title="Keyboard and remote controls (?)"
-              onSelect={() => setShortcutsOpen(true)}
-            >
-              <span className="help-glyph">?</span>
-            </FocusButton>
-          </div>
-          <div className="player-group player-group-centre">
-            {/* Rendered only for episodes that genuinely have a neighbour, so
-                these never appear on a film or at the ends of a run. */}
-            {neighbours.prev && (
-              <FocusButton
-                className="icon-button"
-                label={`Previous episode: ${episodeRefLabel(neighbours.prev)}`}
-                title={`Previous: ${episodeRefLabel(neighbours.prev)} (P)`}
-                onSelect={() => playNeighbour(neighbours.prev as EpisodeRef)}
-              >
-                <PreviousIcon />
-              </FocusButton>
-            )}
-            <FocusButton
-              className="icon-button"
-              label="Back 10 seconds"
-              title="Back 10 seconds (←)"
-              onSelect={() => void seekRelative(-10)}
-            >
-              <BackTenIcon />
-            </FocusButton>
-            <FocusButton
-              focusKey={PLAYER_PLAY_KEY}
-              className="icon-button play-button"
-              label={paused ? 'Play' : 'Pause'}
-              title={paused ? 'Play (OK / Space)' : 'Pause (OK / Space)'}
-              onSelect={() => void togglePause()}
-            >
-              {paused ? <PlayIcon /> : <PauseIcon />}
-            </FocusButton>
-            <FocusButton
-              className="icon-button"
-              label="Forward 10 seconds"
-              title="Forward 10 seconds (→)"
-              onSelect={() => void seekRelative(10)}
-            >
-              <ForwardTenIcon />
-            </FocusButton>
-            {neighbours.next && (
-              <FocusButton
-                className="icon-button"
-                label={`Next episode: ${episodeRefLabel(neighbours.next)}`}
-                title={`Next: ${episodeRefLabel(neighbours.next)} (N)`}
-                onSelect={() => playNeighbour(neighbours.next as EpisodeRef)}
-              >
-                <NextIcon />
-              </FocusButton>
-            )}
-          </div>
-          <div className="player-group player-group-right">
-            <FocusButton
-              focusKey={PLAYER_TRACKS_KEY}
-              className={`labelled-button ${showTracks ? 'active' : ''}`}
-              onSelect={() => {
-                if (showTracks) {
-                  closeTracks();
-                  return;
-                }
-                setShowTracks(true);
-                void readTracks().then(setTracks);
-              }}
-            >
-              <SubtitlesIcon />
-              <span>Audio &amp; subtitles</span>
-            </FocusButton>
-            <VolumeControl
-              level={volume}
-              muted={muted}
-              receiver={receiver}
-              onChange={changeVolume}
-              onSet={setVolumeLevel}
-              onToggleMute={toggleMute}
-            />
-            {!tv && (
-              <FocusButton
-                className="icon-button"
-                label="Fullscreen"
-                title="Fullscreen (F)"
-                onSelect={() => void toggleFullscreen()}
-              >
-                <FullscreenIcon />
-              </FocusButton>
-            )}
-          </div>
-        </div>
-      </div>
+      <PlayerControls
+        timePos={timePos}
+        duration={duration}
+        paused={paused}
+        neighbours={neighbours}
+        showTracks={showTracks}
+        volume={volume}
+        muted={muted}
+        receiver={receiver}
+        tv={tv}
+        onScrub={scrubBy}
+        onScrubRelease={commitScrub}
+        onSeekBarEnter={() => void togglePauseByKey()}
+        onDragStart={() => dispatch({ type: 'scrub-start' })}
+        onDrag={(seconds) => dispatch({ type: 'scrub', timePos: seconds })}
+        onDragEnd={(seconds) => {
+          dispatch({ type: 'scrub-end' });
+          if (seconds !== null) void seekTo(seconds);
+        }}
+        onSeekBy={(seconds) => void seekRelative(seconds)}
+        onTogglePause={() => void togglePause()}
+        onPlayNeighbour={playNeighbour}
+        onTracks={() => {
+          if (showTracks) {
+            closeTracks();
+            return;
+          }
+          setShowTracks(true);
+          void readTracks().then(setTracks);
+        }}
+        onVolumeChange={changeVolume}
+        onVolumeSet={setVolumeLevel}
+        onToggleMute={toggleMute}
+        onFullscreen={() => void toggleFullscreen()}
+      />
     </div>
     </FocusContext.Provider>
-  );
-}
-
-/**
- * The seek bar, as something a remote can land on.
- *
- * It was a bare range input — absent from the focus tree, so a remote could
- * only ever move in ten-second steps. On the bar, Left/Right steer the same
- * accelerating seek as in watching mode, through the spatial library's own
- * arrow callbacks: returning `false` keeps the press from also moving the
- * ring, so exactly one handler acts on it. Up and Down still leave the bar.
- */
-function SeekBar({
-  progress,
-  onScrub,
-  onRelease,
-  onEnter,
-  children,
-}: {
-  progress: number;
-  onScrub: (dir: 1 | -1, repeat: boolean) => void;
-  onRelease: () => void;
-  onEnter: () => void;
-  children: ReactNode;
-}) {
-  const { ref, focused } = useFocusable<object, HTMLDivElement>({
-    focusKey: PLAYER_SEEK_KEY,
-    onEnterPress: onEnter,
-    onArrowPress: (direction, _props, details) => {
-      // Down lands on Play/Pause, the control under the middle of the bar.
-      // Left to the spatial library it went to whatever sat nearest the bar's
-      // left end, which was the key list.
-      if (direction === 'down') {
-        void setFocus(PLAYER_PLAY_KEY);
-        return false;
-      }
-      if (direction !== 'left' && direction !== 'right') return true;
-      onScrub(direction === 'left' ? -1 : 1, (details.pressedKeys[direction] ?? 1) > 1);
-      return false;
-    },
-    onArrowRelease: (direction) => {
-      if (direction === 'left' || direction === 'right') onRelease();
-    },
-  });
-
-  return (
-    <div
-      ref={ref}
-      className={`player-seek-wrap ${focused ? 'focused' : ''}`}
-      role="slider"
-      aria-label="Position"
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-valuenow={Math.round(progress)}
-    >
-      {children}
-    </div>
   );
 }

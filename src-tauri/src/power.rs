@@ -12,8 +12,17 @@
 //! `shutdown.exe` from System32, named by its full path so nothing on the PATH
 //! can stand in for it, and without `/f`: a program holding unsaved work can
 //! still ask the user, as it would from the Start menu.
+//!
+//! On Linux both go through logind (`org.freedesktop.login1`), the service
+//! systemd distributions have and elogind provides on the rest: the same
+//! `Suspend` and `PowerOff` a desktop's own menu uses. Offered only where
+//! logind says this session may without a password (`CanSuspend` /
+//! `CanPowerOff` answer "yes") — on a sofa there is nothing to type one
+//! with — and otherwise Leave offers to close Kinema only, as before.
 
+#[cfg(not(target_os = "linux"))]
 use std::path::PathBuf;
+#[cfg(not(target_os = "linux"))]
 use std::process::Command;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -23,10 +32,26 @@ enum Action {
     ShutDown,
 }
 
-/// Whether this build can put the computer to sleep and shut it down
-/// (`capabilities.rs`). Where it cannot, Leave offers only to close Kinema.
-pub const CAN_SLEEP: bool = cfg!(windows);
-pub const CAN_SHUT_DOWN: bool = cfg!(windows);
+/// Whether this computer can be put to sleep and shut down from here
+/// (`capabilities.rs`, asked once per launch). Where it cannot, Leave offers
+/// only to close Kinema.
+pub fn can_sleep() -> bool {
+    #[cfg(windows)]
+    return true;
+    #[cfg(target_os = "linux")]
+    return logind::may("CanSuspend");
+    #[cfg(not(any(windows, target_os = "linux")))]
+    false
+}
+
+pub fn can_shut_down() -> bool {
+    #[cfg(windows)]
+    return true;
+    #[cfg(target_os = "linux")]
+    return logind::may("CanPowerOff");
+    #[cfg(not(any(windows, target_os = "linux")))]
+    false
+}
 
 fn parse(action: &str) -> Result<Action, String> {
     match action {
@@ -38,6 +63,7 @@ fn parse(action: &str) -> Result<Action, String> {
 }
 
 /// `shutdown.exe` in System32, or the bare name if Windows' folder is unknown.
+#[cfg(not(target_os = "linux"))]
 fn shutdown_exe() -> PathBuf {
     std::env::var_os("SystemRoot")
         .map(|root| PathBuf::from(root).join("System32").join("shutdown.exe"))
@@ -45,6 +71,7 @@ fn shutdown_exe() -> PathBuf {
 }
 
 /// What `shutdown.exe` is given: shut down, now.
+#[cfg(not(target_os = "linux"))]
 fn shutdown_args() -> [&'static str; 3] {
     ["/s", "/t", "0"]
 }
@@ -64,11 +91,22 @@ fn sleep() -> Result<(), String> {
     }
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "linux")]
+fn sleep() -> Result<(), String> {
+    logind::ask("Suspend")
+}
+
+#[cfg(not(any(windows, target_os = "linux")))]
 fn sleep() -> Result<(), String> {
     Err("sleep is only available on Windows".into())
 }
 
+#[cfg(target_os = "linux")]
+fn shut_down() -> Result<(), String> {
+    logind::ask("PowerOff")
+}
+
+#[cfg(not(target_os = "linux"))]
 fn shut_down() -> Result<(), String> {
     let exe = shutdown_exe();
     let mut command = Command::new(&exe);
@@ -110,6 +148,52 @@ pub fn power_action(app: tauri::AppHandle, action: String) -> Result<(), String>
     }
 }
 
+/// logind on the system bus. A missing logind, a refusal and a time-out all
+/// come out as "cannot", so a system without it simply keeps Leave to closing
+/// Kinema.
+#[cfg(target_os = "linux")]
+mod logind {
+    use std::time::Duration;
+
+    use zbus::blocking::{connection, Connection};
+
+    const BUS: &str = "org.freedesktop.login1";
+    const PATH: &str = "/org/freedesktop/login1";
+    const MANAGER: &str = "org.freedesktop.login1.Manager";
+
+    fn bus() -> Result<Connection, String> {
+        connection::Builder::system()
+            .and_then(|b| b.method_timeout(Duration::from_secs(5)).build())
+            .map_err(|e| format!("logind: {e}"))
+    }
+
+    /// `CanSuspend` / `CanPowerOff`: "yes" only. "challenge" means a password
+    /// would be asked for, which a remote cannot give.
+    pub fn may(question: &str) -> bool {
+        let answer = bus()
+            .and_then(|c| {
+                c.call_method(Some(BUS), PATH, Some(MANAGER), question, &())
+                    .map_err(|e| e.to_string())
+            })
+            .and_then(|reply| reply.body().deserialize::<String>().map_err(|e| e.to_string()));
+        crate::log!("power: logind {question} → {}", answer.as_deref().unwrap_or_else(|e| e));
+        answer.is_ok_and(|a| allowed(&a))
+    }
+
+    /// Only "yes": "challenge" would ask for a password, "no" and "na" refuse.
+    pub(super) fn allowed(answer: &str) -> bool {
+        answer == "yes"
+    }
+
+    /// `Suspend` / `PowerOff`, interactive as a desktop's own menu is.
+    pub fn ask(action: &str) -> Result<(), String> {
+        bus()?
+            .call_method(Some(BUS), PATH, Some(MANAGER), action, &(true,))
+            .map(|_| ())
+            .map_err(|e| format!("the system would not {}: {e}", if action == "Suspend" { "go to sleep" } else { "shut down" }))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -123,6 +207,17 @@ mod tests {
         assert!(parse("").is_err());
     }
 
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn only_a_plain_yes_from_logind_offers_it() {
+        assert!(logind::allowed("yes"));
+        // A password prompt is not something a remote can answer.
+        for answer in ["challenge", "no", "na", ""] {
+            assert!(!logind::allowed(answer), "{answer}");
+        }
+    }
+
+    #[cfg(not(target_os = "linux"))]
     #[test]
     fn shutdown_is_windows_own_and_never_forced() {
         let exe = shutdown_exe();

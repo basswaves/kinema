@@ -6,7 +6,7 @@
 //! Windows?" would have to be found and changed everywhere it was asked.
 //!
 //! Each answer comes from the module that does the work, stated beside its own
-//! code (`equipment::DETECTS`, `display::switches`, `power::CAN_*`), so adding
+//! code (`equipment::DETECTS`, `display::switches`, `power::can_*`), so adding
 //! a platform's implementation and saying it exists happen in the same place.
 
 use serde::Serialize;
@@ -74,8 +74,8 @@ fn work_out() -> Capabilities {
         equipment_detection: crate::equipment::DETECTS,
         audio_direct: crate::equipment::DIRECT_AUDIO,
         display_switching: crate::display::switches(),
-        sleep: crate::power::CAN_SLEEP,
-        shut_down: crate::power::CAN_SHUT_DOWN,
+        sleep: crate::power::can_sleep(),
+        shut_down: crate::power::can_shut_down(),
     }
 }
 
@@ -124,6 +124,10 @@ mod tests {
         let linux = cfg!(target_os = "linux");
         assert_eq!((c.equipment_detection, c.audio_direct), (linux, linux));
         assert_eq!(c.display_switching, crate::display::switches());
-        assert!(!c.sleep && !c.shut_down);
+        // Wherever logind says this session may (power.rs); never elsewhere.
+        assert_eq!((c.sleep, c.shut_down), (crate::power::can_sleep(), crate::power::can_shut_down()));
+        if !linux {
+            assert!(!c.sleep && !c.shut_down);
+        }
     }
 }

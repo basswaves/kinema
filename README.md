@@ -235,7 +235,7 @@ platform") says how the code is arranged for one.
 | Playback, controls, remote keys | ✓ | ✓ in development |
 | Equipment check, sound straight to a receiver | ✓ | ✓ in development |
 | Screen switching (refresh rate, HDR) | ✓ | ✓ in development: refresh rate on GNOME, KDE Plasma, Sway and Hyprland; HDR on GNOME and KDE Plasma, and by Hyprland itself (Sway 1.12 not yet confirmed) |
-| Sleep / shut down | ✓ | not yet — hidden rather than offered |
+| Sleep / shut down | ✓ | ✓ in development, where the system allows it without a password (logind) |
 
 ## Building from source
 

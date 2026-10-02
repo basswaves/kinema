@@ -241,7 +241,7 @@ programs:
   reads `useCapabilities()` (`src/capabilities.ts`, answered by
   `capabilities.rs`) and shows or hides by it. `system` is for wording only.
   A module with a platform-only part states its own support beside its code
-  (`equipment::DETECTS`, `display::SWITCHES`, `power::CAN_SLEEP`), so a port
+  (`equipment::DETECTS`, `display::switches`, `power::can_sleep`), so a port
   that implements it flips the answer in the same place.
 - **Platform code lives in its own file** — `equipment/win.rs`,
   `display/win.rs` — not in `#[cfg]` branches spread through shared code.

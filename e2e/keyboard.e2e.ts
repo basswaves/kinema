@@ -144,11 +144,14 @@ test('a file that cannot be opened says so, and Back still works', async ({ page
   await expect.poll(() => focused(page)).toContain('Play');
 });
 
-for (const [system, choices] of [
-  ['windows', ['Close Kinema', 'Put the PC to sleep', 'Shut down the PC', 'Cancel']],
-  ['linux', ['Close Kinema', 'Cancel']],
+for (const [label, system, noPower, choices] of [
+  ['windows', 'windows', false, ['Close Kinema', 'Put the PC to sleep', 'Shut down the PC', 'Cancel']],
+  ['linux', 'linux', false, ['Close Kinema', 'Put the PC to sleep', 'Shut down the PC', 'Cancel']],
+  // A system whose logind will not let Kinema, or has none (power.rs).
+  ['linux without logind', 'linux', true, ['Close Kinema', 'Cancel']],
 ] as const) {
-  test(`Leave offers what ${system} can do`, async ({ page }) => {
+  test(`Leave offers what ${label} can do`, async ({ page }) => {
+    if (noPower) await page.addInitScript(() => localStorage.setItem('kinemaMockNoPower', '1'));
     await open(page, system);
     await tvMode(page);
     await press(page, 'Escape');

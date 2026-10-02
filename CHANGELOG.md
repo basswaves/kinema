@@ -16,6 +16,9 @@ makes no stability promises.
   refresh rate and resolution for a film and puts them back after — and HDR
   on GNOME, Plasma and Sway 1.12 or later (Hyprland switches HDR by itself
   for an HDR film).
+- **Linux: sleep and shut down from Leave**, through the system's own
+  logind, wherever it lets this session do so without a password — as a
+  desktop's own menu does. Elsewhere Leave offers to close Kinema only.
 - **Linux: why an HDR film is shown in SDR.** When the desktop is in HDR but
   the graphics driver offers the player no HDR output, the stats panel now
   says so and names the driver that would — instead of calling the screen

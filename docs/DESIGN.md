@@ -166,7 +166,8 @@ capabilities.rs  What this build can do where it runs — examine equipment,
                  sleep, shut down, mpv's graphics interface — each answer
                  stated by the module that does the work (equipment::DETECTS,
                  equipment::DIRECT_AUDIO, display::switches — on Linux, whether
-                 the desktop is one Kinema can ask — power::CAN_*).
+                 the desktop is one Kinema can ask — power::can_* — on
+                 Linux, whether logind lets this session without a password).
 capabilities.ts  Asked once at startup; the interface shows or hides by the
                  answers, never by the system's name, which is for wording
                  only. Leave and Picture & sound are the two screens that

@@ -78,7 +78,7 @@ switching on GNOME, KDE Plasma, Sway and Hyprland — each checked on a real
 TV and receiver, with an NVIDIA and an AMD card. HDR reaches the TV on GNOME
 and Plasma with a driver that offers it (AMD on Mesa, NVIDIA 595+), and on
 Hyprland, which switches it by itself (at 8 bits unless set to 10); Sway's
-HDR (1.12) is untested. Sleep and shut down on Linux are still to come.
+HDR (1.12) is used where Sway reports it.
 Android comes after, with
 its own player engine (Media3) for Dolby Vision and passthrough on TV boxes.
 macOS is not planned by the author; a port is welcome. See

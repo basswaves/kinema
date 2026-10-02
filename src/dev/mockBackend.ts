@@ -745,10 +745,11 @@ export function listenerCounts(): Record<string, number> {
  * instant), `kinemaMockEmpty` presents an empty library (a first run),
  * `kinemaMockSlowDetect` makes the scan's detection pass take 20 seconds,
  * `kinemaMockSystem=linux` answers `capabilities` and the equipment check as
- * the Linux build does (the check and direct sound, but no screen
- * switching, sleep or shut down), `kinemaMockScreenHdr=on` reports the
- * screen in HDR (for the output check; the picture itself is the fake
- * mpv's `extra`).
+ * the Linux build does on a typical desktop (the check, direct sound, sleep
+ * and shut down, but no screen switching), `kinemaMockNoPower=1` is a system
+ * that will not sleep or shut down from Kinema, `kinemaMockScreenHdr=on`
+ * reports the screen in HDR (for the output check; the picture itself is the
+ * fake mpv's `extra`).
  */
 function flag(name: string): string | null {
   try {
@@ -762,6 +763,7 @@ const EMPTY = flag('kinemaMockEmpty') === '1';
 const SLOW_DETECT = flag('kinemaMockSlowDetect') === '1';
 const ON_LINUX = flag('kinemaMockSystem') === 'linux';
 const SCREEN_HDR = flag('kinemaMockScreenHdr') === 'on';
+const NO_POWER = flag('kinemaMockNoPower') === '1';
 /** `kinemaMockReview` pretends that many videos wait in the review queue. */
 const REVIEW_COUNT = Number(flag('kinemaMockReview') ?? 0) || 0;
 /** `kinemaMockUpdate` pretends that version is out on GitHub. */
@@ -926,8 +928,10 @@ const handlers: Record<string, Handler> = {
   stop_detection: () => mockDetection.stop(),
 
   // Windows' answers unless `kinemaMockSystem` is `linux`, which answers as
-  // the Linux build does today: the equipment check and direct sound, and
-  // nothing else optional (capabilities.rs).
+  // the Linux build does on a typical desktop: the equipment check, direct
+  // sound, sleep and shut down (logind), and no screen switching — the mock
+  // stands for a desktop Kinema cannot ask. `kinemaMockNoPower` is a system
+  // whose logind will not, or is missing (capabilities.rs, power.rs).
   capabilities: () => {
     const full = !ON_LINUX;
     return {
@@ -939,8 +943,8 @@ const handlers: Record<string, Handler> = {
       equipment_detection: true,
       audio_direct: true,
       display_switching: full,
-      sleep: full,
-      shut_down: full,
+      sleep: !NO_POWER,
+      shut_down: !NO_POWER,
     };
   },
 

@@ -46,6 +46,12 @@ export interface FakeMpvState {
    */
   failNextLoad: string | null;
   /**
+   * What `current-ao` answers while a file is open. Null stands in for a
+   * sound output that would not open — mpv then plays the film mute — so the
+   * player's fallbacks and their notices can be driven.
+   */
+  currentAo: string | null;
+  /**
    * mpv's own window is full screen (Linux, `own_window`: it starts so,
    * `fs=yes`). Unused where the page sits over the video.
    */
@@ -79,6 +85,7 @@ const state: FakeMpvState = {
   subVisible: true,
   audioOutFormat: 'float',
   failNextLoad: null,
+  currentAo: 'wasapi',
   fullscreen: true,
   extra: {},
 };
@@ -281,7 +288,7 @@ export function getProperty(name: string): unknown {
       return state.path === null ? null : state.audioOutFormat;
     // Answered, or the player's never-silent check reads a playing file as mute.
     case 'current-ao':
-      return state.path === null ? null : 'wasapi';
+      return state.path === null ? null : state.currentAo;
     case 'track-list/count':
       return state.path === null ? 0 : tracks().length;
     case 'chapters':

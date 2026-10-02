@@ -189,3 +189,39 @@ for (const [system, sections] of [
     if (system === 'linux') await expect(equipment).not.toContainText('Windows');
   });
 }
+
+test('first run: where to watch, then picture and sound, all by remote', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('kinemaMockEmpty', '1'));
+  await page.goto('/');
+  const setting = (key: string) =>
+    page.evaluate(async (k) => {
+      const path = '/src/metadata/api.ts';
+      const api = await import(/* @vite-ignore */ path);
+      return api.getSetting(k) as Promise<string | null>;
+    }, key);
+
+  // Asked first, and nothing chosen for the person.
+  await expect.poll(() => focused(page)).toBe('A TV, from the sofa');
+  await press(page, 'Enter');
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.tv)).toBe('on');
+
+  // Down through the folders to the picture-and-sound step: its Skip first.
+  for (let i = 0; i < 8 && (await focused(page)) !== 'Skip this'; i++) await press(page, 'ArrowDown');
+  await expect.poll(() => focused(page)).toBe('Skip this');
+  expect(await setting('audio_direct')).toBeNull();
+
+  // An answer is saved as it is given, and only that one.
+  await press(page, 'ArrowDown');
+  await expect.poll(() => focused(page)).toBe('Every receiver');
+  await press(page, 'Enter');
+  await expect.poll(() => setting('audio_direct')).toBe('on');
+  expect(await setting('display_switch_refresh')).toBeNull();
+
+  // Skipping the rest folds the step away and hands the ring on.
+  await press(page, 'ArrowUp');
+  await expect.poll(() => focused(page)).toBe('Skip this');
+  await press(page, 'Enter');
+  await expect(page.locator('.first-run-skipped')).toBeVisible();
+  await expect.poll(() => focused(page)).toBe('Scan my library');
+  expect(await setting('display_switch_refresh')).toBeNull();
+});

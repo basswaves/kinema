@@ -20,14 +20,23 @@
  * the key step is gone: a folder is the one thing left to ask. A build from
  * source has no key, and keeps the step, since without it movies stay
  * unidentified.
+ *
+ * Two more steps since 2026-10-02, both answered in a press: where Kinema
+ * will be watched (TV mode — big text and full screen, which screen
+ * switching needs), asked first so the rest is already readable from a sofa;
+ * and picture and sound (`PictureSoundSetup.tsx`), which can be skipped and
+ * then changes nothing.
  */
 import { describeError, userError } from './errors';
-import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
+import { useFocusable, FocusContext, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import FocusButton from './FocusButton';
 import FocusInput from './FocusInput';
+import ChoiceRow from './ChoiceRow';
+import PictureSoundSetup from './PictureSoundSetup';
+import { setTvMode, TV_MODE_KEY } from './tv';
 import { useClaimFocus } from './focus';
 import { addLibraryRoot, listLibraryRoots, type LibraryKind, type LibraryRoot } from '../library/api';
 import { runScanPipeline, useScanStatus } from '../library/pipeline';
@@ -38,6 +47,10 @@ import { BUILTIN_TMDB_KEY } from '../metadata/builtinKey';
 const TMDB_KEY_URL = 'https://www.themoviedb.org/settings/api';
 
 const FIRST_RUN_FOCUS_KEY = 'first-run';
+const SCAN_FOCUS_KEY = 'first-run-scan';
+const ADD_MOVIES_FOCUS_KEY = 'first-run-add-movies';
+
+type Seat = 'tv' | 'desk' | '';
 
 /** Whether to ask for a TMDB key at all: only a build without one of its own. */
 const ASK_FOR_KEY = !BUILTIN_TMDB_KEY;
@@ -59,13 +72,21 @@ export default function FirstRun({ onDone }: Props) {
   const [tmdbKey, setTmdbKey] = useState('');
   const [savedKey, setSavedKey] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [seat, setSeat] = useState<Seat>('');
+  const [skipped, setSkipped] = useState(false);
   const scan = useScanStatus();
 
   useEffect(() => {
     void (async () => {
       try {
-        const [list, key] = await Promise.all([listLibraryRoots(), getSetting('tmdb_api_key')]);
+        const [list, key, tv] = await Promise.all([
+          listLibraryRoots(),
+          getSetting('tmdb_api_key'),
+          getSetting(TV_MODE_KEY),
+        ]);
         setRoots(list);
+        // Asked, not assumed: an answer only once one has been given.
+        setSeat(tv === 'on' ? 'tv' : tv === 'off' ? 'desk' : '');
         if (key) {
           setTmdbKey(key);
           setSavedKey(true);
@@ -113,15 +134,25 @@ export default function FirstRun({ onDone }: Props) {
 
   const hasRoots = roots.length > 0;
 
+  const chooseSeat = useCallback((next: Seat) => {
+    setSeat(next);
+    if (next) setTvMode(next === 'tv');
+  }, []);
+
+  // Skipping removes the button that was pressed: the ring goes on to what
+  // comes next, never to nothing.
+  const skip = useCallback(() => {
+    setSkipped(true);
+    window.setTimeout(() => void setFocus(hasRoots ? SCAN_FOCUS_KEY : ADD_MOVIES_FOCUS_KEY), 0);
+  }, [hasRoots]);
+
   return (
     <FocusContext.Provider value={focusKey}>
       <div className="first-run" ref={ref}>
         <h1>Welcome to Kinema</h1>
         <p className="first-run-lede">
-          {ASK_FOR_KEY
-            ? 'Two things to set up. Neither takes long, and both can be changed later in Settings.'
-            : 'Show Kinema where your movies and shows are, and it does the rest: posters, ' +
-              'descriptions and all. Folders can be changed later in Settings.'}
+          A few questions, then Kinema does the rest: posters, descriptions and all. Every answer
+          can be changed later in Settings.
         </p>
 
         {error && (
@@ -132,15 +163,34 @@ export default function FirstRun({ onDone }: Props) {
 
         <section className="first-run-step">
           <h2>
-            {ASK_FOR_KEY && <span className="first-run-num">1</span>} Where are your movies and
-            shows?
+            <span className="first-run-num">1</span> Where will you watch?
+          </h2>
+          <ChoiceRow<Seat>
+            label="This PC is for"
+            choices={[
+              { value: 'tv', label: 'A TV, from the sofa' },
+              { value: 'desk', label: 'A desk' },
+            ]}
+            value={seat}
+            onChange={chooseSeat}
+            note="On a TV, Kinema fills the screen with bigger text, made for a remote. At a desk it is a window like any other program."
+          />
+        </section>
+
+        <section className="first-run-step">
+          <h2>
+            <span className="first-run-num">2</span> Where are your movies and shows?
           </h2>
           <p className="muted">
             Pick the folder you keep them in. A local drive or a network share both work.
             Nothing is moved, renamed or written to; the files are only read.
           </p>
           <div className="settings-row">
-            <FocusButton className="btn-primary" onSelect={() => void pickFolder('movies')}>
+            <FocusButton
+              className="btn-primary"
+              focusKey={ADD_MOVIES_FOCUS_KEY}
+              onSelect={() => void pickFolder('movies')}
+            >
               Add movies folder
             </FocusButton>
             <FocusButton className="btn-primary" onSelect={() => void pickFolder('tv')}>
@@ -164,7 +214,7 @@ export default function FirstRun({ onDone }: Props) {
         {ASK_FOR_KEY && (
           <section className="first-run-step">
             <h2>
-              <span className="first-run-num">2</span> Posters and descriptions{' '}
+              <span className="first-run-num">3</span> Posters and descriptions{' '}
               <span className="first-run-optional">optional</span>
             </h2>
             <p className="muted">
@@ -199,10 +249,19 @@ export default function FirstRun({ onDone }: Props) {
           </section>
         )}
 
+        {skipped ? (
+          <p className="muted first-run-skipped">
+            Picture and sound left as they are. It is all in Settings → Picture &amp; sound.
+          </p>
+        ) : (
+          <PictureSoundSetup num={ASK_FOR_KEY ? 4 : 3} onSkip={skip} />
+        )}
+
         <section className="first-run-step">
           <div className="settings-row">
             <FocusButton
               className="btn-primary"
+              focusKey={SCAN_FOCUS_KEY}
               disabled={!hasRoots || scan !== null}
               onSelect={() => void scanNow()}
             >

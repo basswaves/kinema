@@ -18,7 +18,7 @@
  * Library → Run setup again brings them back at any time.
  */
 import { useFocusable, FocusContext, setFocus } from '@noriginmedia/norigin-spatial-navigation';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useCapabilities } from '../capabilities';
 import { useScanStatus } from '../library/pipeline';
 import FocusButton from './FocusButton';
@@ -26,6 +26,7 @@ import PictureSoundSetup from './PictureSoundSetup';
 import IntrosSetup from './IntrosSetup';
 import AccountSection from './AccountSection';
 import { OpenSubtitlesSection } from './SubtitlesSettings';
+import ExtrasSetup from './ExtrasSetup';
 import { useClaimFocus } from './focus';
 
 /** 'open' while the pages are up, 'done' once finished or left. */
@@ -34,6 +35,8 @@ export const SETUP_PAGES_KEY = 'setup_pages';
 const SETUP_FOCUS_KEY = 'setup-pages';
 const PAGE_FOCUS_KEY = 'setup-page';
 const FORWARD_FOCUS_KEY = 'setup-forward';
+/** The longest a new page's first question is waited for. */
+const LANDING_WAIT_MS = 2000;
 
 interface Page {
   id: string;
@@ -94,6 +97,11 @@ export default function SetupPages({ onClose }: Props) {
           </>
         ),
       },
+      {
+        id: 'extras',
+        title: 'Extras',
+        body: (onAnswer) => <ExtrasSetup onAnswer={onAnswer} />,
+      },
     ];
     return all.filter((p): p is Page => Boolean(p));
   }, [can]);
@@ -115,11 +123,30 @@ export default function SetupPages({ onClose }: Props) {
    * A new page starts at its first question, never on the button pressed to
    * get there: OK held a moment too long would otherwise skip the next page
    * unread.
+   *
+   * Some pages ask the system something before their questions exist (is
+   * ffmpeg there?), and focus given before then lands on whatever happened to
+   * be there first. So it waits, briefly, for the new page to have a control.
    */
-  const go = useCallback((next: number) => {
-    setIndex(next);
-    window.setTimeout(() => void setFocus(SETUP_FOCUS_KEY), 0);
-  }, []);
+  const landing = useRef(0);
+  const go = useCallback(
+    (next: number) => {
+      setIndex(next);
+      const id = pages[next]?.id;
+      const started = Date.now();
+      const attempt = ++landing.current;
+      const land = () => {
+        if (attempt !== landing.current) return;
+        const ready = document.querySelector(
+          `.setup-page[data-page="${id}"] :is(button:not(:disabled), input)`
+        );
+        if (ready || Date.now() - started > LANDING_WAIT_MS) void setFocus(SETUP_FOCUS_KEY);
+        else window.setTimeout(land, 50);
+      };
+      window.setTimeout(land, 0);
+    },
+    [pages]
+  );
 
   const forward = useCallback(() => {
     if (last) onClose();
@@ -182,7 +209,7 @@ export default function SetupPages({ onClose }: Props) {
           )}
         </div>
 
-        <PageBody key={page.id}>
+        <PageBody key={page.id} id={page.id}>
           {page.body(() => setAnswered((a) => (a.has(page.id) ? a : new Set(a).add(page.id))))}
         </PageBody>
 
@@ -201,7 +228,7 @@ export default function SetupPages({ onClose }: Props) {
  * The page's own questions, as a container of their own, so arriving on a
  * page lands on its first question rather than on the buttons above it.
  */
-function PageBody({ children }: { children: ReactNode }) {
+function PageBody({ id, children }: { id: string; children: ReactNode }) {
   const { ref, focusKey } = useFocusable({
     focusKey: PAGE_FOCUS_KEY,
     trackChildren: true,
@@ -209,7 +236,7 @@ function PageBody({ children }: { children: ReactNode }) {
   });
   return (
     <FocusContext.Provider value={focusKey}>
-      <section className="first-run-step setup-page" ref={ref}>
+      <section className="first-run-step setup-page" data-page={id} ref={ref}>
         {children}
       </section>
     </FocusContext.Provider>

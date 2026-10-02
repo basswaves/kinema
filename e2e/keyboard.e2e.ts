@@ -233,7 +233,7 @@ test('first run: where to watch, a folder, then the setup pages, all by remote',
   // The way on is one press up, and says Next once something is chosen.
   await press(page, 'ArrowUp');
   await expect.poll(() => focused(page)).toBe('Next');
-  await expect(page.locator('.setup-progress')).toContainText('1 of 3');
+  await expect(page.locator('.setup-progress')).toContainText('1 of 4');
   await press(page, 'Enter');
 
   // Intros and credits: the current answers shown, the ring on the first.
@@ -266,9 +266,25 @@ test('first run: where to watch, a folder, then the setup pages, all by remote',
   await expect(page.locator('.setup-pages h1')).toHaveText('Accounts');
   await expect(page.locator('.setup-page h2')).toHaveCount(3);
   await expect.poll(() => focused(page)).toBe('Connect SIMKL');
+  await press(page, 'ArrowUp');
+  await expect.poll(() => focused(page)).toBe('Next');
+  await press(page, 'Enter');
+
+  // Extras: the mock has no ffmpeg, so where to get it and where it is.
+  await expect(page.locator('.setup-pages h1')).toHaveText('Extras');
+  await expect(page.locator('.setup-page')).toContainText('ffmpeg is not installed');
+  await expect.poll(() => focused(page)).toBe('Open the ffmpeg download page ↗');
+  await press(page, 'ArrowDown');
+  await page.keyboard.type('/opt/ffmpeg/bin/ffmpeg');
+  await expect.poll(() => setting('ffmpeg_path')).toBe('/opt/ffmpeg/bin/ffmpeg');
+  for (let i = 0; i < 4 && (await focused(page)) !== 'Get a free key ↗'; i++) await press(page, 'ArrowDown');
+  await press(page, 'ArrowDown');
+  await page.keyboard.type('abc123');
+  await expect.poll(() => setting('omdb_api_key')).toBe('abc123');
+  await expect(page.locator('.setup-page')).toContainText('Saved.');
 
   // On the last page the way on finishes, to the library.
-  await press(page, 'ArrowUp');
+  for (let i = 0; i < 6 && (await focused(page)) !== 'Finish'; i++) await press(page, 'ArrowUp');
   await expect.poll(() => focused(page)).toBe('Finish');
   await press(page, 'Enter');
   await expect.poll(() => focused(page)).toContain('Play');

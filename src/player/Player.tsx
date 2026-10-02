@@ -16,7 +16,6 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
-  useMemo,
   useReducer,
   useRef,
   useState,
@@ -53,25 +52,9 @@ import {
   startEngine,
   stopPlayback,
 } from './engine';
-import {
-  episodeRefLabel,
-  getProgress,
-  getSkipMarkers,
-  nextEpisode,
-  previousEpisode,
-  saveProgress,
-  type EpisodeRef,
-  type SkipMarkers,
-} from './api';
-import {
-  activeSkip,
-  checkedAgainstFile,
-  skipPromptFor,
-  withResolvedCredits,
-  CREDITS_TAIL_KEY,
-  DEFAULT_CREDITS_TAIL_SECS,
-} from './skip';
-import { readChapters, type Chapter } from './chapters';
+import { getProgress, saveProgress } from './api';
+import { skipPromptFor } from './skip';
+import { readChapters } from './chapters';
 import { VIDEO_SYNC_KEY, VIDEO_SYNC_MODES } from './mpvOptions';
 import { matchHdrToDisplay } from './displayHdr';
 import {
@@ -93,9 +76,12 @@ import SkipButton from './SkipButton';
 import { PLAYER_PLAY_KEY, PLAYER_SHELL_KEY } from './focusKeys';
 import { VOLUME_STEP } from './volume';
 import { useOnlineSubtitles } from './useOnlineSubtitles';
+import { useNeighbours } from './useNeighbours';
 import { usePanels } from './usePanels';
 import { useScrub } from './useScrub';
+import { useSkipMarkers } from './useSkipMarkers';
 import { useTracks } from './useTracks';
+import { useUpNext } from './useUpNext';
 import { useVolume } from './useVolume';
 
 export interface PlaybackTarget {
@@ -119,16 +105,6 @@ const OSD_HIDE_MS = 3200;
 /** With the ring on the controls and nothing pressed, this long hands the arrows back. */
 const OSD_FOCUS_IDLE_MS = 6000;
 const PROGRESS_SAVE_MS = 5000;
-const NEXT_EPISODE_COUNTDOWN = 12;
-/** Setting key: 'auto' skips without asking, anything else shows the button. */
-const SKIP_MODE_KEY = 'skip_mode';
-/**
- * How long the resolved marker sources must hold still before they are
- * logged. Chapters are read a moment after the file opens and can move the
- * credits source from `tail` to `chapter`; one line with the final answer is
- * worth more than two where the first is already wrong.
- */
-const MARKER_LOG_SETTLE_MS = 3000;
 /**
  * The longest the black cover may stay up waiting for a first frame. A file
  * with no video, or an mpv event that never comes, must not leave the picture
@@ -144,8 +120,6 @@ const TRANSPORT_SKIP_SECS = 30;
 const AUDIO_CHECK_MS = 1500;
 /** How long a notice about the sound stays on screen. */
 const AUDIO_NOTICE_MS = 12000;
-
-
 
 export default function Player({ target, onExit, onPlayTarget }: Props) {
   const tv = useTvMode();
@@ -184,8 +158,6 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     chooseTrack,
     refreshTracks,
   } = useTracks({ target, fail });
-  const [upNext, setUpNext] = useState<EpisodeRef | null>(null);
-  const [countdown, setCountdown] = useState<number | null>(null);
   /**
    * Something the viewer should know that is not an error: the screen being
    * matched to the film, or the sound not opening the way it was asked to (the
@@ -216,23 +188,6 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     }
     setNotice(null);
   }, []);
-  const [markers, setMarkers] = useState<SkipMarkers | null>(null);
-  /**
-   * The path the current `markers` were fetched for, once the fetch has
-   * finished — including when it found nothing or failed. Until it equals
-   * `target.path`, `markers` describe the previous file (or nothing yet).
-   */
-  const [markersFor, setMarkersFor] = useState<string | null>(null);
-  const [chapters, setChapters] = useState<Chapter[]>([]);
-  const [autoSkip, setAutoSkip] = useState(false);
-  const [creditsTailSecs, setCreditsTailSecs] = useState(DEFAULT_CREDITS_TAIL_SECS);
-  /** The episodes either side of this file, or null where there is none. */
-  const [neighbours, setNeighbours] = useState<{
-    prev: EpisodeRef | null;
-    next: EpisodeRef | null;
-  }>({ prev: null, next: null });
-  /** Prompt occurrences the user (or the timer) has already dismissed. */
-  const [dismissed, setDismissed] = useState<string | null>(null);
   /**
    * Whether the OSD holds focus.
    *
@@ -259,8 +214,6 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   });
   /** The resume point handed to mpv with the load, for the toast once it opens. */
   const pendingSeek = useRef<number | null>(null);
-  /** Segments already acted on automatically, so each is skipped once only. */
-  const autoHandled = useRef(new Set<string>());
   /**
    * Frame-timing mode, in a ref rather than state because it is applied inside
    * the mpv event listener — reading it from a closure would apply whatever the
@@ -331,15 +284,8 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
      * already written the outgoing file's position by this point.
      */
     dispatch({ type: 'load', path: target.path });
-    /* eslint-disable react-hooks/set-state-in-effect */
-    setMarkers(null);
-    // A card offering the *previous* file's next episode has no business
-    // surviving into this one. Nothing else clears these: the countdown path
-    // clears them when it advances, and every other route out left them set.
-    setUpNext(null);
-    setCountdown(null);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setNotice(null);
-    /* eslint-enable react-hooks/set-state-in-effect */
     audioFallback.current = 0;
 
     (async () => {
@@ -408,10 +354,6 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     showFetched,
   });
 
-
-
-
-
   /**
    * The only way out of the player, and the only place that gives the desktop
    * back. Nothing in the browsing views can leave fullscreen, so landing on a
@@ -419,9 +361,8 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
    * video — which is why every exit path goes through here, including the ones
    * nobody pressed a key for.
    *
-   * Declared up here with `handlePlaybackEnded` for the same reason that one is:
-   * it is called from below, and defining it below only worked by accident of
-   * effect ordering.
+   * Declared up here because Up next, below, needs it — and, like the end-of-
+   * file handling, defining it below only worked by accident of effect ordering.
    */
   const exit = useCallback(async () => {
     // TV mode keeps the whole app fullscreen; the library goes on filling the
@@ -431,34 +372,48 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     onExit();
   }, [onExit]);
 
+  // ---- the episodes either side, skipping, and Up next ---------------------
+  const neighbours = useNeighbours(target.fileId);
+  const {
+    active,
+    activeKey,
+    activeKind,
+    activeToScene,
+    guessedCredits,
+    autoSkip,
+    dismissed,
+    dismiss,
+    performSkip,
+    setChapters,
+    countedCreditsStart,
+  } = useSkipMarkers({ target, session, neighbours, showOsd, fail, dispatch });
+  const { upNext, countdown, playNow, leave, keepWatching, playNeighbour, handlePlaybackEnded } =
+    useUpNext({
+      target,
+      onPlayTarget,
+      exit,
+      sessionRef,
+      neighbours,
+      autoSkip,
+      guessedCredits,
+      activeKind,
+      activeKey,
+      activeToScene,
+      dismissed,
+      dismiss,
+    });
 
-  /**
-   * End of file. Declared above the listener that calls it — defining it below
-   * only worked by accident of effect ordering.
-   */
-  const handlePlaybackEnded = useCallback(async () => {
-    if (target.fileId === null) {
-      await exit();
-      return;
-    }
+  // There is deliberately no timer taking the Skip intro button away. It used
+  // to leave after ten seconds, which on an intro offered from 0:00 would
+  // remove it before the intro had even begun; it now stays until the intro is
+  // over, and the seek that skipping performs is what removes it.
 
-    // Mark it finished so it leaves Continue Watching rather than sitting
-    // there at 99%.
-    const total = sessionRef.current.duration;
-    if (total) await saveProgress(target.fileId, total, total).catch(() => undefined);
-
-    try {
-      const next = await nextEpisode(target.fileId);
-      if (next) {
-        setUpNext(next);
-        setCountdown(NEXT_EPISODE_COUNTDOWN);
-      } else {
-        await exit();
-      }
-    } catch {
-      await exit();
-    }
-  }, [target.fileId, exit]);
+  const skipPrompt = skipPromptFor(active, {
+    autoSkip,
+    upNextShown: upNext !== null,
+    dismissed,
+    hasNext: neighbours.next !== null,
+  });
 
   /**
    * The newest versions of the callbacks the mpv listeners call.
@@ -600,9 +555,9 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       disposed = true;
       unlisten?.();
     };
-    // `lastAid` is a ref: the same object for the player's life, so this is
-    // still registered once.
-  }, [lastAid]);
+    // `lastAid` is a ref and `setChapters` a state setter: the same objects
+    // for the player's life, so this is still registered once.
+  }, [lastAid, setChapters]);
 
   /**
    * End-of-file detection by polling as well.
@@ -629,87 +584,9 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     if (session.ended) void latestHandlers.current.handlePlaybackEnded();
   }, [session.ended, session.seq]);
 
-  // ---- intro / credits skip ------------------------------------------------
-
-  /**
-   * Read the sidecar once per file. Deliberately not polled: it sits on the
-   * same share as the video, and markers do not change mid-episode.
-   */
+  // Frame timing, read at playback time rather than held in the shell, so
+  // changing the setting takes effect on the next episode without a restart.
   useEffect(() => {
-    let cancelled = false;
-
-    // A new file means the previous file's prompts are meaningless. Two
-    // episodes commonly share an intro start, so these must be cleared by file
-    // rather than left to the segment keys to distinguish.
-    /* eslint-disable-next-line react-hooks/set-state-in-effect */
-    setDismissed(null);
-    // Chapters belong to the file that is open. Carrying the previous file's
-    // over would place a credits marker at a time that means nothing here.
-    setChapters([]);
-    autoHandled.current.clear();
-
-    void (async () => {
-      try {
-        const found = await getSkipMarkers(target.path, target.fileId);
-        if (!cancelled) setMarkers(found);
-      } catch (e) {
-        // Never fatal — no markers simply means no skip button.
-        console.warn('skip markers unavailable', e);
-      } finally {
-        if (!cancelled) setMarkersFor(target.path);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [target.path, target.fileId]);
-
-  /**
-   * What is either side of this episode.
-   *
-   * Fetched once per file rather than on demand, because it decides whether the
-   * previous/next buttons are drawn at all — a button that appears and then
-   * turns out to lead nowhere is worse than one that was never offered.
-   */
-  useEffect(() => {
-    const fileId = target.fileId;
-
-    // Cleared first: until the answer for *this* file arrives, the previous
-    // file's neighbours are wrong, and a button that jumps somewhere unrelated
-    // is worse than one that appears a moment late.
-    /* eslint-disable-next-line react-hooks/set-state-in-effect */
-    setNeighbours({ prev: null, next: null });
-    if (fileId === null) return;
-
-    let cancelled = false;
-    void Promise.all([previousEpisode(fileId), nextEpisode(fileId)])
-      .then(([prev, next]) => {
-        if (!cancelled) setNeighbours({ prev, next });
-      })
-      .catch((e) => console.warn('neighbouring episodes unavailable', e));
-
-    return () => {
-      cancelled = true;
-    };
-  }, [target.fileId]);
-
-  // Read at playback time rather than held in the shell, so changing the
-  // setting takes effect on the next episode without a restart.
-  useEffect(() => {
-    void getSetting(SKIP_MODE_KEY)
-      .then((mode) => setAutoSkip(mode === 'auto'))
-      .catch((e) => console.warn('could not read skip mode', e));
-
-    void getSetting(CREDITS_TAIL_KEY)
-      .then((raw) => {
-        const secs = raw === null ? NaN : Number(raw);
-        // An unset or unparsable value keeps the default; 0 is a real value
-        // meaning "never guess", so it must not be treated as absent.
-        if (Number.isFinite(secs) && secs >= 0) setCreditsTailSecs(secs);
-      })
-      .catch((e) => console.warn('could not read credits tail', e));
-
     void getSetting(VIDEO_SYNC_KEY)
       .then((mode) => {
         videoSync.current =
@@ -717,205 +594,6 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       })
       .catch((e) => console.warn('could not read video sync mode', e));
   }, []);
-
-  /**
-   * The markers actually acted on: whatever `skip.rs` ranked highest, with a
-   * credits segment folded in from a chapter or from the tail guess when no
-   * source supplied one.
-   *
-   * The guess is gated on there being a next episode. Without one, "skip the
-   * credits" can only mean ending the film early, which is not a skip.
-   *
-   * Then a community-timed recap, or scene after the credits, that does not
-   * fit this file's length is dropped here, where the length is known.
-   */
-  const resolved = useMemo(() => {
-    const withCredits = withResolvedCredits(markers, {
-      chapters,
-      duration,
-      tailSecs: creditsTailSecs,
-      allowTailGuess: neighbours.next !== null,
-    });
-    return { ...withCredits, markers: checkedAgainstFile(withCredits.markers, duration) };
-  }, [markers, chapters, duration, creditsTailSecs, neighbours.next]);
-
-  /**
-   * Where the credits start, for deciding what counts as watched — or null
-   * when that is only the tail guess. A ref, because the progress save runs on
-   * an interval and in an unmount cleanup, neither of which should be rebuilt
-   * every time the markers settle.
-   */
-  const countedCreditsStart = useRef<number | null>(null);
-  useEffect(() => {
-    countedCreditsStart.current =
-      resolved.creditsSource && resolved.creditsSource !== 'tail'
-        ? (resolved.markers?.credits?.start ?? null)
-        : null;
-  }, [resolved]);
-
-  /*
-   * One line per file in app.log saying which source won each segment — the
-   * first thing worth knowing when a skip fires somewhere surprising.
-   *
-   * Written only once this file is open *and* its own markers have arrived,
-   * and only after the answer has held still for a moment. It used to log on
-   * every change, keyed on the path: on an episode change the path moved
-   * first, so the outgoing episode's markers were logged under the incoming
-   * episode's name, followed by a `tail` line from the instant before the real
-   * markers landed. The log then contradicted the database, which is the one
-   * thing a diagnostic must never do.
-   */
-  const introSource = resolved.markers?.intro_source ?? null;
-  const recapSource = resolved.markers?.recap_source ?? null;
-  const creditsSource = resolved.creditsSource;
-  const sceneSource = resolved.markers?.post_credits_source ?? null;
-  useEffect(() => {
-    if (!session.open || markersFor !== target.path) return;
-    const id = window.setTimeout(() => {
-      console.log(
-        `markers for ${target.path}: intro from ${introSource ?? 'none'}, ` +
-          `recap from ${recapSource ?? 'none'}, ` +
-          `credits from ${creditsSource ?? 'none'}` +
-          (sceneSource ? `, scene after the credits from ${sceneSource}` : '')
-      );
-    }, MARKER_LOG_SETTLE_MS);
-    return () => window.clearTimeout(id);
-  }, [session.open, markersFor, target.path, introSource, recapSource, creditsSource, sceneSource]);
-
-  // Gated on the file being open, which is the whole defence against acting on
-  // the outgoing file's position. One check here covers everything downstream:
-  // the Skip button, automatic mode, and the Up next offer all derive from
-  // `active`.
-  const active = useMemo(
-    () => (session.open ? activeSkip(resolved.markers, timePos) : null),
-    [session.open, resolved.markers, timePos]
-  );
-  const activeKey = active?.key ?? null;
-  /** The credits segment is the tail guess, not a marker or a chapter. */
-  const guessedCredits = resolved.creditsSource === 'tail';
-  const activeKind = active?.kind ?? null;
-  /** The credits skip lands on a scene after them rather than ending the file. */
-  const activeToScene = active?.toScene ?? false;
-
-  const performSkip = useCallback(async () => {
-    if (!active) return;
-    if (active.kind !== 'credits' || active.toScene) {
-      // Not dismissed: the seek itself takes the position past the segment,
-      // so the button goes by itself — and seeking back into it brings it
-      // back, which is what a remembered dismissal used to prevent. A scene
-      // after the credits is a seek too: the film goes on to it.
-      await seekTo(active.seekTo).catch(fail);
-      showOsd();
-    } else {
-      setDismissed(active.key);
-      // Credits: end the episode early rather than seeking. That routes into
-      // the same up-next flow as a natural end, so there is one path to the
-      // next episode instead of two that can disagree.
-      dispatch({ type: 'end-early' });
-    }
-  }, [active, showOsd, fail]);
-
-  // Automatic mode. The guard set makes this idempotent, which matters because
-  // `active` is a fresh object on every position tick.
-  useEffect(() => {
-    if (!autoSkip || !active) return;
-    // A scene after a film's credits is offered, never jumped to by itself:
-    // see `ActiveSkip.toScene`.
-    if (active.toScene) return;
-    // Taking a credits segment *ends the file*. With nothing to move on to that
-    // is not a skip, it is quitting a film a minute before the end. The prompt
-    // path has always refused this; automatic mode did not, and the two new
-    // credits sources make it reachable in a way a measured sidecar never was.
-    if (active.kind === 'credits' && !neighbours.next) return;
-    // A guessed credits start (`duration − N`) may offer, never decide — in
-    // automatic mode too. It raises the Up next card below instead of ending
-    // the file, so a wrong guess costs a card, not the end of the episode.
-    if (active.kind === 'credits' && guessedCredits) return;
-    // The intro is offered from 0:00, through any cold open. Pressing the
-    // button there skips the cold open too, which is a person's choice to
-    // make; automatic mode waits until the intro itself has begun.
-    if (!active.inSegment) return;
-    if (autoHandled.current.has(active.key)) return;
-    autoHandled.current.add(active.key);
-    void performSkip();
-  }, [autoSkip, active, performSkip, neighbours.next, guessedCredits]);
-
-  /**
-   * Offer the next episode as soon as the credits start, without ending the
-   * file.
-   *
-   * The card sits over the still-running video and carries **no countdown**:
-   * the marker behind it may be a guess, and a guess is not entitled to make
-   * the decision. A natural end still starts the countdown, as it always did.
-   */
-  useEffect(() => {
-    /* eslint-disable react-hooks/set-state-in-effect */
-    // Automatic mode acts on measured credits by itself; a guess still only
-    // gets to offer, so it falls through to the card.
-    if (autoSkip && !guessedCredits) return;
-
-    // An offer with no countdown is tied to *being in the credits*. When the
-    // credits are no longer where we are — the file changed, the user seeked
-    // back, or it was raised in error — the offer is stale and comes down.
-    //
-    // This effect used to only ever raise the card, which made every spurious
-    // raise permanent: it sat over the next episode for its whole duration,
-    // hiding the Skip intro button behind it. Being able to lower it again is
-    // what makes the whole path self-correcting rather than one-way.
-    //
-    // A countdown means the file has genuinely ended and the next episode is
-    // coming regardless, so that card is not an offer and must not be withdrawn.
-    if (countdown !== null) return;
-
-    // Credits with a scene after them are not the end of anything yet.
-    if (
-      activeKind !== 'credits' ||
-      activeToScene ||
-      !neighbours.next ||
-      dismissed === activeKey
-    ) {
-      if (upNext) setUpNext(null);
-      return;
-    }
-    if (!upNext) setUpNext(neighbours.next);
-    /* eslint-enable react-hooks/set-state-in-effect */
-  }, [
-    autoSkip,
-    guessedCredits,
-    activeKind,
-    activeKey,
-    activeToScene,
-    countdown,
-    dismissed,
-    neighbours.next,
-    upNext,
-  ]);
-
-  // There is deliberately no timer taking the Skip intro button away. It used
-  // to leave after ten seconds, which on an intro offered from 0:00 would
-  // remove it before the intro had even begun; it now stays until the intro is
-  // over, and the seek that skipping performs is what removes it.
-
-  const skipPrompt = skipPromptFor(active, {
-    autoSkip,
-    upNextShown: upNext !== null,
-    dismissed,
-    hasNext: neighbours.next !== null,
-  });
-
-  /** Jump straight to a neighbouring episode, keeping the show's identity. */
-  const playNeighbour = useCallback(
-    (episode: EpisodeRef) => {
-      onPlayTarget({
-        path: episode.path,
-        label: episodeRefLabel(episode),
-        fileId: episode.file_id,
-        episodeName: episode.name,
-        titleId: target.titleId,
-      });
-    },
-    [onPlayTarget, target.titleId]
-  );
 
   // ---- persist progress ---------------------------------------------------
   useEffect(() => {
@@ -925,15 +603,17 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     // Only a file that is open has a position of its own worth saving.
     const current = () => {
       const { open, timePos: position, duration: total } = sessionRef.current;
-      return { position: open ? (position ?? 0) : 0, total };
+      return {
+        position: open ? (position ?? 0) : 0,
+        total,
+        creditsStart: countedCreditsStart.current,
+      };
     };
 
     const id = window.setInterval(() => {
-      const { position, total } = current();
+      const { position, total, creditsStart } = current();
       if (position > 0) {
-        void saveProgress(fileId, position, total, countedCreditsStart.current).catch(
-          () => undefined
-        );
+        void saveProgress(fileId, position, total, creditsStart).catch(() => undefined);
       }
     }, PROGRESS_SAVE_MS);
 
@@ -942,14 +622,12 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       // Reading the ref's *latest* value at cleanup is the point here: the
       // session has not been reset for the next file yet, so this is still the
       // outgoing file's position. Copying it into the effect would be stale.
-      const { position, total } = current();
+      const { position, total, creditsStart } = current();
       if (position > 0) {
-        void saveProgress(fileId, position, total, countedCreditsStart.current).catch(
-          () => undefined
-        );
+        void saveProgress(fileId, position, total, creditsStart).catch(() => undefined);
       }
     };
-  }, [target.fileId]);
+  }, [target.fileId, countedCreditsStart]);
 
   // The cover never outstays its purpose: if no first frame is reported in
   // time — a file with no video, an event that never comes — it goes anyway.
@@ -987,29 +665,6 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     if (!capabilitiesNow()?.mpv_video.own_window) return;
     return startOverlay();
   }, []);
-
-  // Countdown to the next episode.
-  useEffect(() => {
-    if (countdown === null) return;
-    if (countdown <= 0) {
-      /* Timer-driven state machine, not state derived from render. */
-      /* eslint-disable react-hooks/set-state-in-effect */
-      if (upNext) {
-        onPlayTarget({
-          path: upNext.path,
-          label: episodeRefLabel(upNext),
-          fileId: upNext.file_id,
-          titleId: target.titleId,
-        });
-      }
-      setCountdown(null);
-      setUpNext(null);
-      /* eslint-enable react-hooks/set-state-in-effect */
-      return;
-    }
-    const id = window.setTimeout(() => setCountdown((c) => (c === null ? null : c - 1)), 1000);
-    return () => window.clearTimeout(id);
-  }, [countdown, upNext, onPlayTarget, target.titleId]);
 
   // ---- controls -----------------------------------------------------------
   /** Resolves to whether it is paused now, or null if mpv did not answer. */
@@ -1107,7 +762,6 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     // the screen's mode while fullscreen, and exit is what puts it back.
     await exit();
   }, [exit]);
-
 
   // ---- keyboard -----------------------------------------------------------
   useEffect(() => {
@@ -1244,7 +898,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           } else if (skipPrompt) {
             void performSkip();
           } else if (upNext) {
-            setCountdown(0);
+            playNow();
           } else {
             void togglePauseByKey();
           }
@@ -1281,6 +935,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     changeVolume,
     session.resumedFrom,
     startOver,
+    playNow,
   ]);
 
   /**
@@ -1422,19 +1077,9 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         <UpNextCard
           episode={upNext}
           countdown={countdown}
-          onPlay={() => setCountdown(0)}
-          onLeave={() => {
-            setCountdown(null);
-            setUpNext(null);
-            void exit();
-          }}
-          onKeepWatching={() => {
-            // Refuse the offer for the rest of this file. Dismissing by
-            // segment rather than by a flag also silences the small credits
-            // prompt, which would otherwise take its place.
-            setUpNext(null);
-            if (activeKey) setDismissed(activeKey);
-          }}
+          onPlay={playNow}
+          onLeave={leave}
+          onKeepWatching={keepWatching}
         />
       )}
 

@@ -39,8 +39,8 @@ import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { readProperty, type ScalarFormat, mpvGet } from './engine';
 import { outputCheck, type OutputFacts } from './outputCheck';
-import { readSwitchSettings } from './displaySwitch';
-import { readAudioSettings, targetDevice } from './audioOutput';
+import { readSwitchPolicies, screenIdOf, switchSettingsFor } from './displaySwitch';
+import { goesDirect, readAudioSettings, targetDevice } from './audioOutput';
 import { getEquipment, type DisplayMode } from './equipment';
 import { capabilitiesNow, screenOwner } from '../capabilities';
 
@@ -516,6 +516,7 @@ function displayGroup(
 }
 
 interface ScreenNowRaw {
+  gdi_name: string;
   width: number;
   height: number;
   hdr: 'unknown' | 'unsupported' | 'off' | 'on';
@@ -542,18 +543,21 @@ async function readOutputCheck(from: {
   codec: string | null;
   outFormat: string | null;
 }): Promise<StatGroup | null> {
-  const [fullscreen, screen, switches, audioSettings, equipment, inCount, outCount] =
+  const [fullscreen, screen, policies, audioSettings, equipment, inCount, outCount] =
     await Promise.all([
       getCurrentWindow()
         .isFullscreen()
         .catch(() => false),
       invoke<ScreenNowRaw>('screen_now').catch(() => null),
-      readSwitchSettings(),
+      readSwitchPolicies(),
       readAudioSettings(),
       getEquipment().catch(() => null),
       readProperty<number>('audio-params/channel-count', 'int64'),
       readProperty<number>('audio-out-params/channel-count', 'int64'),
     ]);
+  // The settings as they apply to this screen and this sound device.
+  const switches = switchSettingsFor(policies, screen && screenIdOf(equipment, screen.gdi_name));
+  const device = targetDevice(equipment, audioSettings.deviceId);
   const checks = outputCheck({
     fullscreen,
     source: from.source,
@@ -577,8 +581,8 @@ async function readOutputCheck(from: {
       outFormat: from.outFormat,
       inChannels: inCount,
       outChannels: outCount,
-      direct: audioSettings.direct,
-      device: targetDevice(equipment, audioSettings.deviceId),
+      direct: goesDirect(audioSettings, device),
+      device,
     },
     system: capabilitiesNow()?.system,
   });

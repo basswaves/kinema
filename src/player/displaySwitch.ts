@@ -8,6 +8,10 @@
  * switched and the TV is showing a picture again — a TV re-syncing its HDMI
  * input is blank for a second or two, and starting on time into a black screen
  * loses the opening.
+ *
+ * Refresh matching and HDR each apply to every screen, to the screens listed,
+ * or to none (`devicePolicy.ts`); the screen is known by the name the system
+ * gives it now, matched to the stable id the equipment check found for it.
  */
 import { invoke } from '@tauri-apps/api/core';
 import { getSetting } from '../metadata/api';
@@ -20,7 +24,8 @@ import {
   type Screen,
   type SwitchSettings,
 } from './displayMode';
-import { formatRate } from './equipment';
+import { formatRate, getEquipment, type Equipment } from './equipment';
+import { covers, readPolicy, type DevicePolicy } from './devicePolicy';
 import { isPictureFullscreen, mpvGet, mpvSet } from './engine';
 
 export const SWITCH_REFRESH_KEY = 'display_switch_refresh';
@@ -54,23 +59,57 @@ async function poll<T>(read: () => Promise<T | null>, ok: (value: T) => boolean,
   }
 }
 
-export async function readSwitchSettings(): Promise<SwitchSettings> {
+/** The screen settings as stored: two of them per screen. */
+export interface SwitchPolicies {
+  refresh: DevicePolicy;
+  resolution: ResolutionMode;
+  hdr: DevicePolicy;
+}
+
+export async function readSwitchPolicies(): Promise<SwitchPolicies> {
   const [refresh, resolution, hdr] = await Promise.all([
-    getSetting(SWITCH_REFRESH_KEY),
+    readPolicy(SWITCH_REFRESH_KEY),
     getSetting(SWITCH_RESOLUTION_KEY),
-    getSetting(SWITCH_HDR_KEY),
+    readPolicy(SWITCH_HDR_KEY),
   ]);
   const res: ResolutionMode =
     resolution === 'off' || resolution === 'match' || resolution === 'auto'
       ? resolution
       : DEFAULT_SWITCH_SETTINGS.resolution;
-  return { refresh: refresh === 'on', resolution: res, hdr: hdr === 'on' };
+  return { refresh, resolution: res, hdr };
+}
+
+/** The settings for one screen, by its equipment id (null: not known). */
+export function switchSettingsFor(p: SwitchPolicies, screenId: string | null): SwitchSettings {
+  return {
+    refresh: covers(p.refresh, screenId),
+    resolution: p.resolution,
+    hdr: covers(p.hdr, screenId),
+  };
+}
+
+/**
+ * The equipment id of the connected screen the system now calls `name`.
+ * Null for a screen plugged in since the check: "only these" then leaves it
+ * as it is, which is the safe way to be unsure.
+ */
+export function screenIdOf(equipment: Equipment | null, name: string): string | null {
+  return equipment?.displays.find((d) => d.connected && d.gdi_name === name)?.id ?? null;
+}
+
+/** The settings for the screen the picture is on now. */
+export async function switchSettingsHere(screen: { gdi_name: string }): Promise<SwitchSettings> {
+  const [policies, equipment] = await Promise.all([
+    readSwitchPolicies(),
+    getEquipment().catch(() => null),
+  ]);
+  return switchSettingsFor(policies, screenIdOf(equipment, screen.gdi_name));
 }
 
 /** Whether a switch could happen at all right now — before a file is opened. */
 export async function mayswitch(): Promise<boolean> {
-  const s = await readSwitchSettings();
-  if (!s.refresh && s.resolution === 'off' && !s.hdr) return false;
+  const s = await readSwitchPolicies();
+  if (s.refresh.policy === 'off' && s.resolution === 'off' && s.hdr.policy === 'off') return false;
   // The picture's fullscreen, not necessarily this window's: on Linux the
   // picture is mpv's own window (engine.ts).
   return isPictureFullscreen().catch(() => false);
@@ -110,10 +149,10 @@ export async function filmNow(): Promise<Film | null> {
  * hint when it did, since HDR may now be on.
  */
 export async function switchForFilm(film: Film): Promise<boolean> {
-  const settings = await readSwitchSettings();
   if (!(await isPictureFullscreen().catch(() => false))) return false;
   const name = await pictureScreen();
   const screen = await invoke<Screen>('screen_now', { screen: name });
+  const settings = await switchSettingsHere(screen);
   const target = chooseTarget(screen, film, settings);
   if (!target) return false;
   console.log(

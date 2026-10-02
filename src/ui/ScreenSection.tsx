@@ -12,14 +12,16 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { setSetting } from '../metadata/api';
+import { savePolicy, type DevicePolicy } from '../player/devicePolicy';
 import { userError } from './errors';
 import ChoiceRow from './ChoiceRow';
-import type { ResolutionMode, SwitchSettings } from '../player/displayMode';
+import type { ResolutionMode } from '../player/displayMode';
 import {
-  readSwitchSettings,
+  readSwitchPolicies,
   SWITCH_HDR_KEY,
   SWITCH_REFRESH_KEY,
   SWITCH_RESOLUTION_KEY,
+  type SwitchPolicies,
 } from '../player/displaySwitch';
 
 const ON_OFF = [
@@ -41,20 +43,28 @@ export default function ScreenSection({
   onError: (message: string) => void;
   system: string;
 }) {
-  const [settings, setSettings] = useState<SwitchSettings | null>(null);
+  const [settings, setSettings] = useState<SwitchPolicies | null>(null);
 
   useEffect(() => {
     let live = true;
-    void readSwitchSettings().then((s) => live && setSettings(s));
+    void readSwitchPolicies().then((s) => live && setSettings(s));
     return () => {
       live = false;
     };
   }, []);
 
   const save = useCallback(
-    (key: string, value: string, next: SwitchSettings) => {
+    (key: string, value: string, next: SwitchPolicies) => {
       setSettings(next);
       void setSetting(key, value).catch((e) => onError(userError(e)));
+    },
+    [onError]
+  );
+
+  const savePolicyOf = useCallback(
+    (key: string, p: DevicePolicy, next: SwitchPolicies) => {
+      setSettings(next);
+      void savePolicy(key, p).catch((e) => onError(userError(e)));
     },
     [onError]
   );
@@ -72,8 +82,11 @@ export default function ScreenSection({
       <ChoiceRow
         label="Match the refresh rate"
         choices={ON_OFF}
-        value={settings.refresh ? 'on' : 'off'}
-        onChange={(v) => save(SWITCH_REFRESH_KEY, v, { ...settings, refresh: v === 'on' })}
+        value={settings.refresh.policy === 'off' ? 'off' : 'on'}
+        onChange={(v) => {
+          const refresh: DevicePolicy = { ...settings.refresh, policy: v === 'on' ? 'all' : 'off' };
+          savePolicyOf(SWITCH_REFRESH_KEY, refresh, { ...settings, refresh });
+        }}
         note="Switches the screen to a refresh rate that fits the video's frame rate, so camera pans move smoothly instead of juddering: 23.976 Hz for most movies, for example, or 50 Hz for a show made for European TV."
         hint="Only rates the screen offers at the resolution it is using count, and Kinema never lowers the resolution to get one. The screen goes black for a second or two while it switches, and the video waits."
       />
@@ -90,8 +103,11 @@ export default function ScreenSection({
       <ChoiceRow
         label="Turn HDR on for HDR videos"
         choices={ON_OFF}
-        value={settings.hdr ? 'on' : 'off'}
-        onChange={(v) => save(SWITCH_HDR_KEY, v, { ...settings, hdr: v === 'on' })}
+        value={settings.hdr.policy === 'off' ? 'off' : 'on'}
+        onChange={(v) => {
+          const hdr: DevicePolicy = { ...settings.hdr, policy: v === 'on' ? 'all' : 'off' };
+          savePolicyOf(SWITCH_HDR_KEY, hdr, { ...settings, hdr });
+        }}
         note={`For a screen that can show HDR but has it switched off in ${system}. Kinema turns HDR on for an HDR video and off again afterwards.`}
         hint="With this off, HDR videos are shown in SDR on such a screen."
       />

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { AudioDevice, Equipment, Probe } from './equipment';
 import {
   channelsFor,
+  goesDirect,
   mpvDeviceName,
   planAudio,
   targetDevice,
@@ -37,8 +38,8 @@ function device(results: Probe[], extra: Partial<AudioDevice> = {}): AudioDevice
   };
 }
 
-const off: AudioSettings = { direct: false, deviceId: null, overrides: {} };
-const on: AudioSettings = { direct: true, deviceId: null, overrides: {} };
+const off: AudioSettings = { direct: { policy: 'off', devices: [] }, deviceId: null, overrides: {} };
+const on: AudioSettings = { direct: { policy: 'all', devices: [] }, deviceId: null, overrides: {} };
 
 describe('planAudio', () => {
   it('through Windows: shared, nothing passed through, Windows decides the layout', () => {
@@ -68,20 +69,37 @@ describe('planAudio', () => {
     expect(planAudio(on, device(['busy', 'unknown', 'not_allowed', 'no', 'no'])).spdif).toEqual([]);
   });
 
+  it('every device that can: speakers that take nothing untouched keep the system mixer', () => {
+    // Straight to laptop speakers would silence the PC's other sounds for nothing.
+    const speakers = device(['no', 'no', 'no', 'no', 'no']);
+    expect(planAudio(on, speakers)).toMatchObject({ exclusive: false, spdif: [] });
+    expect(goesDirect(on, speakers)).toBe(false);
+  });
+
+  it('only these: the listed device goes direct whatever it takes, another does not', () => {
+    const listed = device(['no', 'no', 'no', 'no', 'no']);
+    const these: AudioSettings = { ...off, direct: { policy: 'these', devices: [listed.id] } };
+    expect(planAudio(these, listed).exclusive).toBe(true);
+    const receiver = device(['yes', 'yes', 'yes', 'yes', 'yes'], { id: 'another-receiver' });
+    expect(planAudio(these, receiver).exclusive).toBe(false);
+  });
+
   it('lets an override force a format either way', () => {
     const plan = planAudio(
       { ...on, overrides: { truehd: 'on', ac3: 'off' } },
       device(['yes', 'no', 'no', 'no', 'no'])
     );
     expect(plan.spdif).toEqual(['truehd']);
+    // A format forced on counts as one the device takes.
+    expect(goesDirect({ ...on, overrides: { dts: 'on' } }, device(['no', 'no', 'no', 'no', 'no']))).toBe(true);
   });
 
-  it('still goes direct with no equipment answer, as stereo and no passthrough', () => {
+  it('with no equipment answer, sound goes through the system rather than exclusive stereo', () => {
     expect(planAudio(on, null)).toEqual({
       device: 'auto',
-      exclusive: true,
+      exclusive: false,
       spdif: [],
-      channels: 'stereo',
+      channels: 'auto-safe',
     });
   });
 

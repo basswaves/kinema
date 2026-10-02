@@ -61,8 +61,10 @@ const kit = (displays: Display[], audio: AudioDevice[]): Equipment => ({
   checked_at: 0,
 });
 
-const off = { refresh: false, resolution: 'auto' as const, hdr: false };
-const soundOff = { direct: false, deviceId: null, overrides: {} };
+const none = { policy: 'off' as const, devices: [] };
+const every = { policy: 'all' as const, devices: [] };
+const off = { refresh: none, resolution: 'auto' as const, hdr: none };
+const soundOff = { direct: none, deviceId: null, overrides: {} };
 const windows = { system: 'Windows', audio_direct: true, display_switching: true };
 
 describe('upgradesFor', () => {
@@ -76,9 +78,18 @@ describe('upgradesFor', () => {
   });
 
   it('says nothing about what is already on', () => {
-    const all = { refresh: true, resolution: 'auto' as const, hdr: true };
-    const direct = { ...soundOff, direct: true };
+    const all = { refresh: every, resolution: 'auto' as const, hdr: every };
+    const direct = { ...soundOff, direct: every };
     expect(upgradesFor(kit([tv], [receiver]), direct, all, false, windows)).toEqual([]);
+  });
+
+  it('with only these, speaks up for equipment that is not on the list', () => {
+    const these = (devices: string[]) => ({ policy: 'these' as const, devices });
+    const screens = { refresh: these(['tv']), resolution: 'auto' as const, hdr: these(['tv']) };
+    const sound = { ...soundOff, direct: these(['avr']) };
+    const second = { ...tv, id: 'tv2' };
+    const ids = upgradesFor(kit([tv, second], [receiver]), sound, screens, false, windows).map((u) => u.id);
+    expect(ids).toEqual(['motion:tv2', 'hdr:tv2']);
   });
 
   it('leaves out a receiver whose owner already answered the old question', () => {

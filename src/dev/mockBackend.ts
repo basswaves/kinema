@@ -161,7 +161,7 @@ function mockEquipmentOnLinux() {
     ...e,
     displays: e.displays.map((d) => ({
       ...d,
-      gdi_name: d.gdi_name ? 'HDMI-1' : '',
+      gdi_name: d.id === 'mock-tv' ? 'HDMI-1' : d.gdi_name ? 'DP-1' : '',
       notes: d.notes.map((n) => n.replace('Windows has', 'the desktop has')),
     })),
     audio: e.audio.map((a) => ({
@@ -977,8 +977,10 @@ const handlers: Record<string, Handler> = {
   get_equipment: () => (ON_LINUX ? mockEquipmentOnLinux() : mockEquipment()),
   check_equipment: () => (ON_LINUX ? mockEquipmentOnLinux() : mockEquipment()),
   window_display: () => ({ gdi_name: '', hdr: 'unknown' }),
+  // The mock TV, by the name its equipment entry carries: the screen the
+  // picture is on, as "only these" looks it up.
   screen_now: () => ({
-    gdi_name: 'mock',
+    gdi_name: ON_LINUX ? 'HDMI-1' : String.raw`\\.\DISPLAY1`,
     width: 3840,
     height: 2160,
     hz: 60,

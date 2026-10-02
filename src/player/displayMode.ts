@@ -46,6 +46,9 @@ export interface Film {
 }
 
 export interface Screen {
+  /** The system's name for it now — Windows' `\\.\DISPLAY1`, Linux's
+   * `HDMI-A-1` — as the equipment check also records it. */
+  gdi_name: string;
   width: number;
   height: number;
   hz: number;

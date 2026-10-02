@@ -18,20 +18,22 @@ const mode = (width: number, height: number, hz: number): Mode => ({
 });
 
 /** the test TV, as its equipment line reads. */
-const lgModes = [3840, 1920].flatMap((w) =>
+const tvModes = [3840, 1920].flatMap((w) =>
   [60, 59, 50, 30, 24, 23].map((hz) => mode(w, w === 3840 ? 2160 : 1080, hz))
 );
-const lg = (width: number, height: number, hz: number, hdr: Screen['hdr'] = 'off'): Screen => ({
+const tv = (width: number, height: number, hz: number, hdr: Screen['hdr'] = 'off'): Screen => ({
+  gdi_name: 'HDMI-1',
   width,
   height,
   hz,
   rate: rateOf(hz),
   hdr,
-  modes: lgModes,
+  modes: tvModes,
 });
 
 /** The development monitor here: 23.976 only at 1080p and below. */
 const devMonitor: Screen = {
+  gdi_name: 'DP-1',
   width: 2560,
   height: 1600,
   hz: 60,
@@ -62,28 +64,28 @@ describe('cadenceRank', () => {
 
 describe('chooseResolution', () => {
   it('Auto switches a 1080p desktop up for a 4K film', () => {
-    expect(chooseResolution(lg(1920, 1080, 60), film4k, 'auto')).toEqual({
+    expect(chooseResolution(tv(1920, 1080, 60), film4k, 'auto')).toEqual({
       width: 3840,
       height: 2160,
     });
   });
 
   it('Auto never switches down', () => {
-    expect(chooseResolution(lg(3840, 2160, 60), film1080, 'auto')).toEqual({
+    expect(chooseResolution(tv(3840, 2160, 60), film1080, 'auto')).toEqual({
       width: 3840,
       height: 2160,
     });
   });
 
   it("Match content uses the film's own resolution, for the TV to upscale", () => {
-    expect(chooseResolution(lg(3840, 2160, 60), film1080, 'match')).toEqual({
+    expect(chooseResolution(tv(3840, 2160, 60), film1080, 'match')).toEqual({
       width: 1920,
       height: 1080,
     });
   });
 
   it('Off never changes anything', () => {
-    expect(chooseResolution(lg(1920, 1080, 60), film4k, 'off')).toEqual({
+    expect(chooseResolution(tv(1920, 1080, 60), film4k, 'off')).toEqual({
       width: 1920,
       height: 1080,
     });
@@ -98,11 +100,11 @@ describe('chooseTarget', () => {
   const refresh = { ...DEFAULT_SWITCH_SETTINGS, refresh: true };
 
   it("defaults do nothing on the test TV at 4K", () => {
-    expect(chooseTarget(lg(3840, 2160, 60), film4k, DEFAULT_SWITCH_SETTINGS)).toBeNull();
+    expect(chooseTarget(tv(3840, 2160, 60), film4k, DEFAULT_SWITCH_SETTINGS)).toBeNull();
   });
 
   it('with refresh on, a 23.976 film gets 23.976 Hz at the same resolution', () => {
-    expect(chooseTarget(lg(3840, 2160, 60), film4k, refresh)).toEqual({
+    expect(chooseTarget(tv(3840, 2160, 60), film4k, refresh)).toEqual({
       width: 3840,
       height: 2160,
       hz: 23,
@@ -116,7 +118,7 @@ describe('chooseTarget', () => {
   });
 
   it('keeps the current rate when only the resolution changes', () => {
-    expect(chooseTarget(lg(1920, 1080, 60), film4k, DEFAULT_SWITCH_SETTINGS)).toMatchObject({
+    expect(chooseTarget(tv(1920, 1080, 60), film4k, DEFAULT_SWITCH_SETTINGS)).toMatchObject({
       width: 3840,
       height: 2160,
       hz: 60,
@@ -125,13 +127,13 @@ describe('chooseTarget', () => {
 
   it('turns HDR on for an HDR film only when asked and only if the screen can', () => {
     const hdr = { ...DEFAULT_SWITCH_SETTINGS, hdr: true };
-    expect(chooseTarget(lg(3840, 2160, 60), film4k, hdr)).toMatchObject({ hdr: true, hz: 60 });
-    expect(chooseTarget(lg(3840, 2160, 60, 'on'), film4k, hdr)).toBeNull();
-    expect(chooseTarget(lg(3840, 2160, 60), { ...film4k, hdr: false }, hdr)).toBeNull();
+    expect(chooseTarget(tv(3840, 2160, 60), film4k, hdr)).toMatchObject({ hdr: true, hz: 60 });
+    expect(chooseTarget(tv(3840, 2160, 60, 'on'), film4k, hdr)).toBeNull();
+    expect(chooseTarget(tv(3840, 2160, 60), { ...film4k, hdr: false }, hdr)).toBeNull();
     expect(chooseTarget(devMonitor, film4k, hdr)).toBeNull();
   });
 
   it('does nothing when the frame rate is unknown and nothing else applies', () => {
-    expect(chooseTarget(lg(3840, 2160, 60), { ...film4k, fps: null }, refresh)).toBeNull();
+    expect(chooseTarget(tv(3840, 2160, 60), { ...film4k, fps: null }, refresh)).toBeNull();
   });
 });

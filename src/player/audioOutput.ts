@@ -1,8 +1,9 @@
 /**
  * How sound leaves the app — step 3 of the native-output plan.
  *
- * Two ways, one switch, and the switch is the user's (see docs/HISTORY.md → Native
- * output):
+ * Two ways, and which one is the user's choice (see docs/HISTORY.md → Native
+ * output) — for every device that can take a film's sound untouched, for the
+ * devices they listed, or for none (`devicePolicy.ts`):
  *
  *  - **Through Windows** (the default). mpv plays in shared mode and Windows
  *    mixes to whatever its speaker setup says. Nothing is passed through
@@ -27,6 +28,7 @@
  * receiver (GOTCHAS → "mpv relabels a refused bitstream as AC3").
  */
 import { getSetting } from '../metadata/api';
+import { covers, readPolicy, type DevicePolicy } from './devicePolicy';
 import { getEquipment, type AudioDevice, type Equipment } from './equipment';
 import { readTracks } from './tracks';
 import { mpvCommand, mpvGet } from './engine';
@@ -43,7 +45,8 @@ export type Override = 'auto' | 'on' | 'off';
 export const BITSTREAM_CODECS = ['ac3', 'eac3', 'dts', 'dts-hd', 'truehd'] as const;
 
 export interface AudioSettings {
-  direct: boolean;
+  /** Straight to the receiver: for which devices. */
+  direct: DevicePolicy;
   /** Endpoint id from the equipment check, or null for Windows' default. */
   deviceId: string | null;
   overrides: Partial<Record<string, Override>>;
@@ -103,23 +106,38 @@ export function channelsFor(maxChannels: number | null): string {
   return 'stereo';
 }
 
-export function planAudio(settings: AudioSettings, device: AudioDevice | null): AudioPlan {
-  const chosen = Boolean(settings.deviceId) && device?.id === settings.deviceId;
-  // Straight to a device that is not the system's default — on Linux, the
-  // receiver found by targetDevice — has to be named: `auto` would be the
-  // sound server.
-  const name =
-    device && (chosen || (settings.direct && !device.is_default))
-      ? mpvDeviceName(device.id)
-      : 'auto';
-  if (!settings.direct) {
-    return { device: name, exclusive: false, spdif: [], channels: 'auto-safe' };
-  }
-  const spdif = BITSTREAM_CODECS.filter((codec) => {
+/** The formats `device` gets untouched when sound goes straight to it. */
+function passthrough(settings: AudioSettings, device: AudioDevice | null): string[] {
+  return BITSTREAM_CODECS.filter((codec) => {
     const override = settings.overrides[codec] ?? 'auto';
     if (override !== 'auto') return override === 'on';
     return device?.bitstream.some((b) => b.codec === codec && b.result === 'yes') ?? false;
   });
+}
+
+/**
+ * Whether sound goes straight to `device`. "Every device that can" means one
+ * that takes some of a film's own formats untouched: going straight to
+ * laptop speakers would only silence the PC's other sounds for nothing. A
+ * device listed by hand under "only these" gets it whatever it takes.
+ */
+export function goesDirect(settings: AudioSettings, device: AudioDevice | null): boolean {
+  if (!covers(settings.direct, device?.id)) return false;
+  return settings.direct.policy === 'these' || passthrough(settings, device).length > 0;
+}
+
+export function planAudio(settings: AudioSettings, device: AudioDevice | null): AudioPlan {
+  const chosen = Boolean(settings.deviceId) && device?.id === settings.deviceId;
+  const direct = goesDirect(settings, device);
+  // Straight to a device that is not the system's default — on Linux, the
+  // receiver found by targetDevice — has to be named: `auto` would be the
+  // sound server.
+  const name =
+    device && (chosen || (direct && !device.is_default)) ? mpvDeviceName(device.id) : 'auto';
+  if (!direct) {
+    return { device: name, exclusive: false, spdif: [], channels: 'auto-safe' };
+  }
+  const spdif = passthrough(settings, device);
   return {
     device: name,
     exclusive: true,
@@ -132,7 +150,7 @@ export function planAudio(settings: AudioSettings, device: AudioDevice | null): 
 
 export async function readAudioSettings(): Promise<AudioSettings> {
   const [direct, deviceId, ...overrides] = await Promise.all([
-    getSetting(AUDIO_DIRECT_KEY),
+    readPolicy(AUDIO_DIRECT_KEY),
     getSetting(AUDIO_DEVICE_KEY),
     ...BITSTREAM_CODECS.map((codec) => getSetting(bitstreamKey(codec))),
   ]);
@@ -141,7 +159,7 @@ export async function readAudioSettings(): Promise<AudioSettings> {
     return [codec, value === 'on' || value === 'off' ? value : 'auto'] as const;
   });
   return {
-    direct: direct === 'on',
+    direct,
     deviceId: deviceId || null,
     overrides: Object.fromEntries(entries),
   };

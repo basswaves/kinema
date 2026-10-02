@@ -21,6 +21,7 @@ import {
   AUDIO_DIRECT_KEY,
   BITSTREAM_CODECS,
   bitstreamKey,
+  goesDirect,
   planAudio,
   readAudioSettings,
   targetDevice,
@@ -74,6 +75,7 @@ export default function SoundSection({
   const connected = equipment?.audio.filter((a) => a.connected) ?? [];
   const device = targetDevice(equipment, settings.deviceId);
   const plan = planAudio(settings, device);
+  const direct = goesDirect(settings, device);
   const takesLossless = device?.bitstream.some(
     (b) => (b.codec === 'truehd' || b.codec === 'dts-hd') && b.result === 'yes'
   );
@@ -98,8 +100,13 @@ export default function SoundSection({
           { value: 'off', label: 'Off' },
           { value: 'on', label: 'On' },
         ]}
-        value={settings.direct ? 'on' : 'off'}
-        onChange={(v) => save(AUDIO_DIRECT_KEY, v, { ...settings, direct: v === 'on' })}
+        value={settings.direct.policy === 'off' ? 'off' : 'on'}
+        onChange={(v) =>
+          save(AUDIO_DIRECT_KEY, v, {
+            ...settings,
+            direct: { ...settings.direct, policy: v === 'on' ? 'all' : 'off' },
+          })
+        }
         note={`On sends the video's own soundtrack to your receiver untouched, as a disc player does, including Dolby TrueHD, Atmos, DTS-HD and DTS:X. Off sends sound through ${system} like any other program, which mixes it to ${system}'s speaker setup and loses Atmos and DTS:X height sound.`}
         hint={
           onWindows
@@ -110,7 +117,7 @@ export default function SoundSection({
 
       {device && (
         <p className="muted">
-          {settings.direct
+          {direct
             ? plan.spdif.length > 0
               ? `${device.name} gets these untouched: ${plan.spdif
                   .map((c) => formatLabel(device, c))
@@ -125,7 +132,7 @@ export default function SoundSection({
               : `Sound goes through ${system} to ${device.name}${
                   device.mix_layout ? `, mixed to ${device.mix_layout}` : ''
                 }.`}
-          {!settings.direct && device.spatial_objects
+          {!direct && device.spatial_objects
             ? " Windows spatial sound is on for this device. The receiver may show Atmos, but that is Windows re-wrapping decoded 7.1: a movie's own Atmos or DTS:X height sound is lost unless this is on."
             : ''}
         </p>
@@ -143,7 +150,7 @@ export default function SoundSection({
         }
       />
 
-      {settings.direct && (
+      {settings.direct.policy !== 'off' && (
         <>
           <h3>Formats</h3>
           <p className="settings-intro">

@@ -17,12 +17,19 @@ import { getSetting, setSetting } from '../metadata/api';
 import {
   AUDIO_DIRECT_KEY,
   AUDIO_DIRECT_OFFERED_KEY,
+  goesDirect,
   readAudioSettings,
   targetDevice,
   type AudioSettings,
 } from '../player/audioOutput';
-import { cadenceRank, type SwitchSettings } from '../player/displayMode';
-import { readSwitchSettings, SWITCH_HDR_KEY, SWITCH_REFRESH_KEY } from '../player/displaySwitch';
+import { cadenceRank } from '../player/displayMode';
+import { covers } from '../player/devicePolicy';
+import {
+  readSwitchPolicies,
+  SWITCH_HDR_KEY,
+  SWITCH_REFRESH_KEY,
+  type SwitchPolicies,
+} from '../player/displaySwitch';
 import { getEquipment, type Equipment } from '../player/equipment';
 import { capabilitiesNow, loadCapabilities, type Capabilities } from '../capabilities';
 
@@ -45,7 +52,7 @@ export type Can = Pick<Capabilities, 'system' | 'audio_direct' | 'display_switch
 export function upgradesFor(
   equipment: Equipment,
   audio: AudioSettings,
-  screen: SwitchSettings,
+  screen: SwitchPolicies,
   oldOfferAnswered: boolean,
   can: Can
 ): Upgrade[] {
@@ -55,7 +62,7 @@ export function upgradesFor(
   // Someone who answered the old one-time question has decided, for the
   // equipment they had then; only equipment new since then is mentioned.
   const decided = oldOfferAnswered && device !== null && !device.new;
-  if (can.audio_direct && !audio.direct && device && !decided) {
+  if (can.audio_direct && !goesDirect(audio, device) && device && !decided) {
     const lossless = device.bitstream.some(
       (b) => (b.codec === 'truehd' || b.codec === 'dts-hd') && b.result === 'yes'
     );
@@ -76,7 +83,7 @@ export function upgradesFor(
     const atItsSize = display.modes.filter(
       (m) => m.width === display.width && m.height === display.height
     );
-    if (!screen.refresh && atItsSize.some((m) => cadenceRank(m.rate, FILM_FPS) === 0)) {
+    if (!covers(screen.refresh, display.id) && atItsSize.some((m) => cadenceRank(m.rate, FILM_FPS) === 0)) {
       out.push({
         kind: 'motion',
         id: `motion:${display.id}`,
@@ -84,7 +91,7 @@ export function upgradesFor(
         setting: SWITCH_REFRESH_KEY,
       });
     }
-    if (!screen.hdr && display.hdr === 'off') {
+    if (!covers(screen.hdr, display.id) && display.hdr === 'off') {
       out.push({
         kind: 'hdr',
         id: `hdr:${display.id}`,
@@ -119,7 +126,7 @@ export async function readUpgrades(): Promise<Upgrade[]> {
   const [equipment, audio, screen, answered, dismissed] = await Promise.all([
     getEquipment(),
     readAudioSettings(),
-    readSwitchSettings(),
+    readSwitchPolicies(),
     getSetting(AUDIO_DIRECT_OFFERED_KEY).catch(() => null),
     dismissedIds(),
   ]);

@@ -9,11 +9,16 @@ makes no stability promises.
 
 ### Added
 
-- **Picture and sound at the first run.** The welcome screen asks where
-  Kinema will be watched (a TV from the sofa turns TV mode on at once), and —
-  skippable — whether to send sound straight to a receiver, match the screen
-  to the film and turn HDR on for HDR films: each with what it gives and
-  costs, whatever is connected now.
+- **A short setup while the first scan runs.** The welcome screen asks where
+  Kinema will be watched (a TV from the sofa turns TV mode on at once) and
+  where the videos are. Scan then opens a few pages, each skippable, while
+  the library is read: picture and sound (sound straight to a receiver, the
+  screen matched to the film, HDR on for HDR films, each with what it gives
+  and costs, whatever is connected now); intros and credits (skip them or
+  show a button, and whether to ask TheIntroDB and IntroDB; Skiptro when it
+  is installed); accounts (SIMKL, Trakt, OpenSubtitles); and extras (ffmpeg,
+  and an OMDb key for Rotten Tomatoes). Finish later goes straight to the
+  library; Settings → Library → Run setup again brings the pages back.
 - **Picture and sound per device.** Each of those three now applies to every
   device that can, only the devices you choose, or none — in Settings →
   Picture & sound, with the list of every screen and sound device Kinema has

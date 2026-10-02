@@ -112,9 +112,13 @@ src-tauri/src/
 
 src/
   ui/            Browse shell, Home, rails, cards, detail page, search, the
-                 "See all" grid, Settings. tv.ts holds the 10-foot scale switch;
-                 focus.ts recovers focus after a view change;
-                 FocusButton/FocusInput are the D-pad-reachable controls
+                 "See all" grid, Settings. FirstRun is the welcome panel;
+                 SetupPages the pages shown while the first scan runs, which
+                 Home keeps up until finished or left (the setup_pages
+                 setting reopens them after a restart), one *Setup.tsx per
+                 page plus Settings' own account sections. tv.ts holds the
+                 10-foot scale switch; focus.ts recovers focus after a view
+                 change; FocusButton/FocusInput are the D-pad-reachable controls
                  everything else is built from. Rail.tsx owns the one cap on
                  how long a rail gets. badges.ts turns what the scan read
                  from a file into the detail page's picture / sound / file

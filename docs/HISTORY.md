@@ -2506,6 +2506,52 @@ question never answered sends the person to Settings → Picture & sound;
 "only these" brings up only equipment not on the list, and adds it in a
 press; every device, or off, is an answer and there is nothing to say.
 
+## Setup pages while the first scan runs ✅
+
+**The owner asked whether the first run should bring up everything that can
+be set (2026-10-02).** Not everything: the filter agreed was *would someone
+otherwise never learn it exists, or does answering now change the first
+day*. That let in four subjects — picture and sound, intros and credits,
+accounts, and the two extras Kinema uses but cannot bring along (ffmpeg, an
+OMDb key) — and left out picture quality (the app decides, a settled rule),
+storage and backups, NFO sharing, the update check, languages and the
+developer tools, none of which anyone misses on day one.
+
+**The welcome page stayed short, and the rest waits for the scan.** It asks
+only what a library needs to exist: where it will be watched, where the
+films are, and a TMDB key in a build from source. Scan then opens the pages
+at once, while the library is read — minutes the first time, which used to
+be spent watching it fill in. Each page is one subject, can be skipped, and
+saves an answer as it is given; Finish later goes to the library.
+
+**Home keeps the pages until they are finished or left.** The welcome
+panel used to unmount the moment the first title arrived, which would have
+taken the questions away mid-answer. A launch that finds them unfinished —
+the app closed half-way — opens them again, and Settings → Library → Run
+setup again brings them back whenever.
+
+**Smaller decisions on the way:**
+
+- The way on says **Skip** until something on the page is chosen, then
+  **Next**; two buttons that did the same thing would have been a question
+  with no difference. Accounts is Settings' own sections, unchanged, which do
+  not say when something was done there, so it says Next throughout.
+- The buttons sit at the top, as the picture-and-sound step's Skip did, and a
+  new page lands on its first question rather than on the button pressed to
+  get there. Extras asks whether ffmpeg is there before its questions exist,
+  so a page waits, briefly, for its first control before taking focus.
+- **TheIntroDB and IntroDB are one answer** on the page: what matters on
+  day one is that playing tells them which film or episode it is, and that
+  they are on unless switched off. Settings keeps them apart.
+- **Skiptro comes up only when its database is on the PC** (`skiptro_found`);
+  to anyone else it is a name they have never heard, and one line says where
+  it goes in Settings.
+- **What the Extras page says about adding ffmpeg later was checked first.**
+  Without it, intro analysis (`detect.rs`), the badges' ffprobe (`probe.rs`)
+  and the picture measurement (`aspect.rs`) each stop before storing
+  anything, and each picks its work by what is not stored — so the next scan,
+  which runs at every start, does what was skipped. The page says so.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

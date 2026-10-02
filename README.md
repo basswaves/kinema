@@ -156,7 +156,8 @@ it HDR goes out at 8 bits per colour, and smooth gradients show bands.
 
 ## First run
 
-The app opens on a setup panel with a few questions, each answered in a press:
+The app opens on a welcome panel that asks two things, each answered in a
+press:
 
 - **Where you will watch** — a TV from the sofa gives big text and the whole
   screen, made for a remote; a desk gives a window.
@@ -164,15 +165,26 @@ The app opens on a setup panel with a few questions, each answered in a press:
   another at your TV shows if they live somewhere else. Local drives and
   network shares both work. Nothing is moved, renamed or written to — the
   files are only read.
-- **Picture and sound**, which you can skip: sound straight to a receiver,
-  the screen matched to the film, HDR switched on for HDR films — each with
-  what it gives and what it costs, for every device that can, only the ones
-  connected now, or off. Skipped, everything stays off; it is all in
-  Settings → Picture & sound.
 
 Then press **Scan my library**. The first scan takes a few minutes on a large
-library; you can watch it fill in. After that it scans once at every start and
-only looks at what changed.
+library, and while it runs Kinema asks the rest on a few short pages, each
+one skippable, with **Finish later** to go straight to the library:
+
+- **Picture and sound:** sound straight to a receiver, the screen matched to
+  the film, HDR switched on for HDR films — each with what it gives and what
+  it costs, for every device that can, only the ones connected now, or off.
+  Skipped, everything stays off.
+- **Intros and credits:** skip them, or show a Skip button; and whether to
+  ask TheIntroDB and IntroDB, which know them from other viewers.
+- **Accounts:** SIMKL or Trakt, to keep a record of what you finish, and
+  OpenSubtitles.
+- **Extras:** [ffmpeg](https://ffmpeg.org), which Kinema uses for intros,
+  credits and a title's picture and sound details but does not include, and
+  an OMDb key for Rotten Tomatoes scores.
+
+Everything on them is in Settings too, and Settings → Library → **Run setup
+again** brings the pages back. After the first scan, Kinema scans once at
+every start and only looks at what changed.
 
 Posters, descriptions and artwork come from [TMDB](https://www.themoviedb.org),
 through a key Kinema carries — there is nothing to sign up for. If you would

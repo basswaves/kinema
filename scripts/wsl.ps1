@@ -60,7 +60,12 @@ $commit = git -C $root commit-tree $tree -p HEAD -m 'WSL snapshot of the working
 git -C $root update-ref $ref $commit
 
 try {
-    $src = (wsl -d $Distro --exec wslpath -a "$root").Trim()
+    # Fetched from the repository's own .git folder, not the working tree: in
+    # a git worktree, .git is a file naming the repository by its Windows
+    # path, which git inside the distribution cannot follow. The snapshot ref
+    # lives there either way.
+    $common = git -C $root rev-parse --path-format=absolute --git-common-dir
+    $src = (wsl -d $Distro --exec wslpath -a "$common").Trim()
     if ($LASTEXITCODE -ne 0) { throw "WSL distribution '$Distro' is not available" }
 
     # Written to a file with LF endings and run from there, not piped: piping

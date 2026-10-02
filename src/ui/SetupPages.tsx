@@ -23,6 +23,7 @@ import { useCapabilities } from '../capabilities';
 import { useScanStatus } from '../library/pipeline';
 import FocusButton from './FocusButton';
 import PictureSoundSetup from './PictureSoundSetup';
+import IntrosSetup from './IntrosSetup';
 import { useClaimFocus } from './focus';
 
 /** 'open' while the pages are up, 'done' once finished or left. */
@@ -62,6 +63,11 @@ export default function SetupPages({ onClose }: Props) {
         id: 'picture',
         title: 'Picture and sound',
         body: (onAnswer) => <PictureSoundSetup onAnswer={onAnswer} />,
+      },
+      {
+        id: 'intros',
+        title: 'Intros and credits',
+        body: (onAnswer) => <IntrosSetup onAnswer={onAnswer} />,
       },
     ];
     return all.filter((p): p is Page => Boolean(p));

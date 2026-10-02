@@ -750,7 +750,7 @@ export function listenerCounts(): Record<string, number> {
  * and shut down, but no screen switching), `kinemaMockNoPower=1` is a system
  * that will not sleep or shut down from Kinema, `kinemaMockScreenHdr=on`
  * reports the screen in HDR (for the output check; the picture itself is the
- * fake mpv's `extra`).
+ * fake mpv's `extra`), `kinemaMockSkiptro=1` has Skiptro's database on this PC.
  */
 function flag(name: string): string | null {
   try {
@@ -765,6 +765,8 @@ const SLOW_DETECT = flag('kinemaMockSlowDetect') === '1';
 const ON_LINUX = flag('kinemaMockSystem') === 'linux';
 const SCREEN_HDR = flag('kinemaMockScreenHdr') === 'on';
 const NO_POWER = flag('kinemaMockNoPower') === '1';
+/** `kinemaMockSkiptro=1`: Skiptro's database is on this PC. */
+const SKIPTRO = flag('kinemaMockSkiptro') === '1';
 /** Under `kinemaMockEmpty`: whether a folder has been added, then scanned. */
 const emptyLibrary = { hasRoot: !EMPTY, scanned: false };
 /** `kinemaMockReview` pretends that many videos wait in the review queue. */
@@ -971,6 +973,7 @@ const handlers: Record<string, Handler> = {
     return null;
   },
   ffmpeg_status: () => ({ resolved: 'ffmpeg', available: false }),
+  skiptro_found: () => SKIPTRO,
   probe_library: () => ({ read: 0, failed: 0, unavailable: true }),
   measure_pictures: () => ({ measured: 0, unavailable: true }),
   refresh_imdb_ratings: () => ({ fetched: false, rated: 0 }),

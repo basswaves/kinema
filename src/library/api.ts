@@ -124,6 +124,10 @@ export interface FfmpegStatus {
 export const ffmpegStatus = (configured: string) =>
   invoke<FfmpegStatus>('ffmpeg_status', { configured });
 
+/** Whether Skiptro's database is where Kinema would read it (skiptro.rs). */
+export const skiptroFound = (configured: string) =>
+  invoke<boolean>('skiptro_found', { configured });
+
 export interface DetectStepReport {
   step: string;
   exit_code: number | null;

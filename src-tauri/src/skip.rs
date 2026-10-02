@@ -683,9 +683,7 @@ pub async fn get_skip_markers(
         let db = app.state::<Db>();
         let conn = db.0.lock().map_err(to_string_err)?;
 
-        let skiptro_db = setting(&conn, skiptro::DB_PATH_KEY)
-            .map(PathBuf::from)
-            .or_else(skiptro::default_db_path);
+        let skiptro_db = skiptro::db_path(setting(&conn, skiptro::DB_PATH_KEY).as_deref());
 
         let theintrodb_on = setting(&conn, introdb::ENABLED_KEY).as_deref() != Some("off");
         let introdb_app_on = setting(&conn, introdb_app::ENABLED_KEY).as_deref() != Some("off");

@@ -35,11 +35,32 @@ const TYPE_INTRO: i64 = 0;
 
 /// Where Skiptro keeps its database when it has not been told otherwise.
 ///
-/// Windows only, because that is the only platform this app ships on. The
-/// user can point at any path from Settings if they moved it.
+/// Skiptro is a Windows program and keeps it under `%APPDATA%`. Where there is
+/// no `APPDATA` — Linux — there is no usual place, and only a path set in
+/// Settings is read. The user can point at any path there if they moved it.
 pub fn default_db_path() -> Option<PathBuf> {
     let appdata = std::env::var_os("APPDATA")?;
     Some(Path::new(&appdata).join("Skiptro").join("skiptro.db"))
+}
+
+/// The database Kinema reads: the one set in Settings, else the usual place.
+pub fn db_path(configured: Option<&str>) -> Option<PathBuf> {
+    configured
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .map(PathBuf::from)
+        .or_else(default_db_path)
+}
+
+/// Whether Skiptro's database is where Kinema would read it — the sign that
+/// Skiptro is installed and has been used. The setup pages bring Skiptro up
+/// only then: to anyone else it is a program they have never heard of.
+#[tauri::command]
+pub async fn skiptro_found(configured: Option<String>) -> Result<bool, String> {
+    crate::jobs::off_main(move || {
+        Ok(db_path(configured.as_deref()).is_some_and(|p| p.is_file()))
+    })
+    .await
 }
 
 /// The size and mtime of a file, as a short string, or `""` when it is absent.
@@ -249,6 +270,17 @@ mod tests {
         let dir = temp_dir("case");
         let db = fixture(&dir, &[(r"C:\Media\Show S01E01.mkv", 0, 1.0, 40.0, 1.0)]);
         assert!(detection_for(&db, Path::new(r"c:\media\show s01e01.mkv")).is_some());
+    }
+
+    /// A path set in Settings is the one used; blank means the usual place.
+    #[test]
+    fn the_database_set_in_settings_comes_first() {
+        let dir = temp_dir("configured");
+        let db = fixture(&dir, &[]);
+        let set = db.to_string_lossy().into_owned();
+        assert_eq!(db_path(Some(&set)), Some(db));
+        assert_eq!(db_path(Some("  ")), default_db_path());
+        assert_eq!(db_path(None), default_db_path());
     }
 
     #[test]

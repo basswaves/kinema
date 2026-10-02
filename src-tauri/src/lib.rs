@@ -357,6 +357,7 @@ pub fn run() {
             detect::auto_detect,
             detect::analysis_backlog,
             ffmpeg::ffmpeg_status,
+            skiptro::skiptro_found,
             probe::probe_library,
             imdb::refresh_imdb_ratings,
             omdb::list_titles_needing_scores,

@@ -230,7 +230,35 @@ test('first run: where to watch, a folder, then the setup pages, all by remote',
   await expect(page.locator('.setup-progress')).toContainText('Your library is ready.');
   await expect(page.locator('.setup-pages h1')).toHaveText('Picture and sound');
 
-  // The way on is one press up; on the last page it finishes, to the library.
+  // The way on is one press up, and says Next once something is chosen.
+  await press(page, 'ArrowUp');
+  await expect.poll(() => focused(page)).toBe('Next');
+  await expect(page.locator('.setup-progress')).toContainText('1 of 2');
+  await press(page, 'Enter');
+
+  // Intros and credits: the current answers shown, the ring on the first.
+  await expect(page.locator('.setup-pages h1')).toHaveText('Intros and credits');
+  await expect.poll(() => focused(page)).toBe('✓Show a Skip button');
+  // Skiptro is not on this PC: one line, nothing to press.
+  await expect(page.locator('.setup-page')).toContainText('Already use Skiptro');
+  // One answer covers both services.
+  await press(page, 'ArrowDown');
+  await press(page, 'ArrowRight');
+  await expect.poll(() => focused(page)).toBe('Off');
+  await press(page, 'Enter');
+  await expect.poll(() => setting('introdb_enabled')).toBe('off');
+  await expect.poll(() => setting('introdb_app_enabled')).toBe('off');
+  expect(await setting('skip_mode')).toBeNull();
+
+  // Back returns to the page before, as it was left.
+  await press(page, 'Escape');
+  await expect(page.locator('.setup-pages h1')).toHaveText('Picture and sound');
+  await expect.poll(() => focused(page)).toBe('✓Every receiver');
+  await press(page, 'ArrowUp');
+  await press(page, 'Enter');
+  await expect(page.locator('.setup-pages h1')).toHaveText('Intros and credits');
+
+  // On the last page the way on finishes, to the library.
   await press(page, 'ArrowUp');
   await expect.poll(() => focused(page)).toBe('Finish');
   await press(page, 'Enter');
@@ -253,6 +281,15 @@ test('first run: where to watch, a folder, then the setup pages, all by remote',
   // An answer given before is shown as given (the tick).
   await expect.poll(() => focused(page)).toBe('✓Every receiver');
   await expect.poll(() => setting('setup_pages')).toBe('open');
+
+  // Skip, then Finish later: straight back to the library.
+  await press(page, 'ArrowUp');
+  await expect.poll(() => focused(page)).toBe('Skip');
+  await press(page, 'ArrowRight');
+  await expect.poll(() => focused(page)).toBe('Finish later');
+  await press(page, 'Enter');
+  await expect.poll(() => focused(page)).toContain('Play');
+  await expect.poll(() => setting('setup_pages')).toBe('done');
 });
 
 test('the equipment notice: Choose when never asked, Use it too for only these', async ({ page }) => {

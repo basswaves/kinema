@@ -31,7 +31,10 @@
 
 use crate::library::Db;
 use crate::settings::setting;
-use crate::tracking::{self, iso8601, qr_svg, DeviceCode, PollOutcome, Status, Waiting, TRAKT};
+use crate::tracking::{
+    self, clear, http, qr_svg, read_tokens, save_tokens, store, user_agent, DeviceCode, PollOutcome,
+    Sent, Status, Tokens, Waiting, TRAKT,
+};
 use crate::util::{now_secs, to_string_err};
 use rusqlite::Connection;
 use serde_json::{json, Value};
@@ -50,12 +53,6 @@ const BUILTIN_CLIENT_SECRET: Option<&str> = option_env!("KINEMA_TRAKT_CLIENT_SEC
 pub const CLIENT_ID_KEY: &str = "trakt_client_id";
 pub const CLIENT_SECRET_KEY: &str = "trakt_client_secret";
 
-const ACCESS_KEY: &str = "trakt_access_token";
-const REFRESH_KEY: &str = "trakt_refresh_token";
-const EXPIRES_KEY: &str = "trakt_access_expires_at";
-const USER_KEY: &str = "trakt_user";
-const RECONNECT_KEY: &str = "trakt_needs_reconnect";
-const LAST_SENT_KEY: &str = "trakt_last_sent_at";
 /// Set at connect: the history is still to be compared with Trakt's and sent.
 const HISTORY_DUE_KEY: &str = "trakt_history_due";
 
@@ -73,12 +70,6 @@ const WRITE_GAP: Duration = Duration::from_millis(1500);
 /// Between reads. Trakt allows 500 in five minutes; this keeps a large first
 /// comparison well inside that.
 const READ_GAP: Duration = Duration::from_millis(400);
-const REFRESH_MARGIN_SECS: i64 = 24 * 60 * 60;
-const TIMEOUT: Duration = Duration::from_secs(20);
-
-fn user_agent() -> String {
-    format!("kinema/{}", env!("CARGO_PKG_VERSION"))
-}
 
 fn nonblank(s: Option<&str>) -> Option<String> {
     s.map(str::trim).filter(|s| !s.is_empty()).map(String::from)
@@ -91,31 +82,6 @@ fn app(conn: &Connection) -> Option<(String, String)> {
         return Some((id.trim().to_string(), secret.trim().to_string()));
     }
     Some((nonblank(BUILTIN_CLIENT_ID)?, nonblank(BUILTIN_CLIENT_SECRET)?))
-}
-
-fn allowed() -> bool {
-    crate::selftest::plan_path().is_none()
-}
-
-pub(crate) fn connected(conn: &Connection) -> bool {
-    setting(conn, REFRESH_KEY).is_some() && setting(conn, RECONNECT_KEY).is_none()
-}
-
-fn store(conn: &Connection, key: &str, value: &str) -> Result<(), String> {
-    crate::settings::store(conn, key, value)
-}
-
-fn clear(conn: &Connection, key: &str) -> Result<(), String> {
-    conn.execute("DELETE FROM settings WHERE key = ?1", [key])
-        .map(|_| ())
-        .map_err(to_string_err)
-}
-
-fn http() -> Option<tauri_plugin_http::reqwest::Client> {
-    tauri_plugin_http::reqwest::Client::builder()
-        .timeout(TIMEOUT)
-        .build()
-        .ok()
 }
 
 /// A request with the headers Trakt requires on every call.
@@ -198,13 +164,6 @@ async fn get_all(client_id: &str, path: &str, access: &str) -> Result<Vec<Value>
 
 // ---- tokens -------------------------------------------------------------------
 
-#[derive(Debug, PartialEq, Clone)]
-struct Tokens {
-    access: String,
-    refresh: String,
-    expires_at: i64,
-}
-
 /// Read a token answer. Both tokens must be there: Trakt's refresh tokens are
 /// single-use, so a missing new one would leave nothing to refresh with.
 fn parse_tokens(body: &Value) -> Result<Tokens, String> {
@@ -219,26 +178,6 @@ fn parse_tokens(body: &Value) -> Result<Tokens, String> {
     })
 }
 
-fn save_tokens(conn: &Connection, tokens: &Tokens) -> Result<(), String> {
-    store(conn, ACCESS_KEY, &tokens.access)?;
-    store(conn, REFRESH_KEY, &tokens.refresh)?;
-    store(conn, EXPIRES_KEY, &tokens.expires_at.to_string())?;
-    clear(conn, RECONNECT_KEY)
-}
-
-fn read_tokens(conn: &Connection) -> Option<Tokens> {
-    Some(Tokens {
-        access: setting(conn, ACCESS_KEY)?,
-        refresh: setting(conn, REFRESH_KEY)?,
-        expires_at: setting(conn, EXPIRES_KEY).and_then(|s| s.parse().ok()).unwrap_or(0),
-    })
-}
-
-fn mark_needs_reconnect(conn: &Connection, why: &str) -> Result<(), String> {
-    crate::log!("trakt: needs connecting again — {why}; watched items stay queued");
-    store(conn, RECONNECT_KEY, "1")
-}
-
 /// An access token worth sending: the stored one, or a fresh one when it is
 /// due. `None` when Trakt is out of reach or the person must connect again.
 async fn usable_access(
@@ -246,7 +185,7 @@ async fn usable_access(
     (client_id, secret): &(String, String),
     tokens: Tokens,
 ) -> Result<Option<String>, String> {
-    if tokens.expires_at - now_secs() >= REFRESH_MARGIN_SECS {
+    if !tokens.due_for_refresh(now_secs()) {
         return Ok(Some(tokens.access));
     }
     let answer = post(
@@ -269,7 +208,7 @@ async fn usable_access(
             Ok(fresh) => {
                 let conn = db.0.lock().map_err(to_string_err)?;
                 // Stored at once: the refresh token just used is dead.
-                save_tokens(&conn, &fresh)?;
+                save_tokens(&conn, TRAKT, &fresh)?;
                 Ok(Some(fresh.access))
             }
             Err(e) => {
@@ -281,11 +220,11 @@ async fn usable_access(
             let conn = db.0.lock().map_err(to_string_err)?;
             // Another Kinema on this library may have refreshed first, which
             // ends the token this one used. Then the stored pair is newer.
-            match read_tokens(&conn) {
+            match read_tokens(&conn, TRAKT) {
                 Some(stored) if stored.refresh != tokens.refresh => Ok(Some(stored.access)),
                 _ => {
                     crate::log!("trakt: Trakt refused the refresh token: {body}");
-                    mark_needs_reconnect(&conn, "Trakt refused the refresh token")?;
+                    tracking::mark_needs_reconnect(&conn, TRAKT, "Trakt refused the refresh token")?;
                     Ok(None)
                 }
             }
@@ -315,59 +254,10 @@ fn ids(imdb_id: &Option<String>, tmdb_id: &Option<String>) -> Value {
     Value::Object(ids)
 }
 
-type ShowIds = (Option<String>, Option<String>);
-type Season = (i64, Vec<Value>);
-
-/// The body for `POST /sync/history`: films as they are, episodes gathered
-/// under their show and season, each with when it was watched.
+/// The body for `POST /sync/history`, in the shape both services share
+/// (`tracking::history_body`).
 fn history_body(rows: &[Waiting]) -> Value {
-    let mut movies = Vec::new();
-    let mut shows: Vec<(ShowIds, Vec<Season>)> = Vec::new();
-    for row in rows {
-        if row.is_film {
-            movies.push(json!({
-                "ids": ids(&row.imdb_id, &row.tmdb_id),
-                "watched_at": iso8601(row.watched_at),
-            }));
-            continue;
-        }
-        let (Some(season), Some(episode)) = (row.season, row.episode) else { continue };
-        let show_key = (row.imdb_id.clone(), row.tmdb_id.clone());
-        let at = match shows.iter().position(|(k, _)| *k == show_key) {
-            Some(i) => i,
-            None => {
-                shows.push((show_key, Vec::new()));
-                shows.len() - 1
-            }
-        };
-        let entry = json!({ "number": episode, "watched_at": iso8601(row.watched_at) });
-        match shows[at].1.iter_mut().find(|(n, _)| *n == season) {
-            Some((_, episodes)) => episodes.push(entry),
-            None => shows[at].1.push((season, vec![entry])),
-        }
-    }
-    let shows: Vec<Value> = shows
-        .into_iter()
-        .map(|((imdb, tmdb), seasons)| {
-            json!({
-                "ids": ids(&imdb, &tmdb),
-                "seasons": seasons
-                    .into_iter()
-                    .map(|(number, episodes)| json!({ "number": number, "episodes": episodes }))
-                    .collect::<Vec<_>>(),
-            })
-        })
-        .collect();
-    json!({ "movies": movies, "shows": shows })
-}
-
-/// What Trakt could not place, as a line for the log. Not retried — it would
-/// not know them next time either.
-fn not_found_summary(response: &Value) -> Option<String> {
-    let nf = response.get("not_found")?;
-    let count = |k: &str| nf.get(k).and_then(Value::as_array).map_or(0, Vec::len);
-    let total = count("movies") + count("shows") + count("seasons") + count("episodes");
-    (total > 0).then(|| format!("{total} item(s) not found: {nf}"))
+    tracking::history_body(rows, ids)
 }
 
 /// A title's ids as comparable keys — `imdb:tt…` and `tmdb:…` — so a match on
@@ -443,7 +333,7 @@ static SENDING: AtomicBool = AtomicBool::new(false);
 static SEND_SCHEDULED: AtomicBool = AtomicBool::new(false);
 
 pub fn send_soon(app: &tauri::AppHandle) {
-    if !allowed() || SEND_SCHEDULED.swap(true, Ordering::SeqCst) {
+    if !tracking::allowed() || SEND_SCHEDULED.swap(true, Ordering::SeqCst) {
         return;
     }
     let app = app.clone();
@@ -455,7 +345,7 @@ pub fn send_soon(app: &tauri::AppHandle) {
 }
 
 pub async fn send_waiting(app: &tauri::AppHandle) {
-    if !allowed() || SENDING.swap(true, Ordering::SeqCst) {
+    if !tracking::allowed() || SENDING.swap(true, Ordering::SeqCst) {
         return;
     }
     let result = send_all(app).await;
@@ -463,13 +353,6 @@ pub async fn send_waiting(app: &tauri::AppHandle) {
     if let Err(e) = result {
         crate::log!("trakt: {e}");
     }
-}
-
-enum Sent {
-    Accepted(Value),
-    Unauthorised,
-    Later(String),
-    Rejected(String),
 }
 
 fn classify(result: Result<(u16, Value), String>) -> Sent {
@@ -490,11 +373,11 @@ async fn send_all(app: &tauri::AppHandle) -> Result<(), String> {
         let (keys, tokens, history_due, batch) = {
             let db = app.state::<Db>();
             let conn = db.0.lock().map_err(to_string_err)?;
-            if !connected(&conn) {
+            if !tracking::connected(&conn, TRAKT) {
                 return Ok(());
             }
             let Some(keys) = self::app(&conn) else { return Ok(()) };
-            let Some(tokens) = read_tokens(&conn) else { return Ok(()) };
+            let Some(tokens) = read_tokens(&conn, TRAKT) else { return Ok(()) };
             let history_due = setting(&conn, HISTORY_DUE_KEY).is_some();
             let batch = tracking::waiting(&conn, TRAKT, BATCH).map_err(to_string_err)?;
             (keys, tokens, history_due, batch)
@@ -528,7 +411,7 @@ async fn send_all(app: &tauri::AppHandle) -> Result<(), String> {
             let stored = {
                 let db = app.state::<Db>();
                 let conn = db.0.lock().map_err(to_string_err)?;
-                read_tokens(&conn)
+                read_tokens(&conn, TRAKT)
             };
             let retry_with = match stored {
                 Some(t) if t.access != access => Some(t.access),
@@ -542,26 +425,8 @@ async fn send_all(app: &tauri::AppHandle) -> Result<(), String> {
 
         let db = app.state::<Db>();
         let conn = db.0.lock().map_err(to_string_err)?;
-        match outcome {
-            Sent::Accepted(response) => {
-                if let Some(missing) = not_found_summary(&response) {
-                    crate::log!("trakt: {missing}");
-                }
-                tracking::forget_sent(&conn, &batch).map_err(to_string_err)?;
-                store(&conn, LAST_SENT_KEY, &now_secs().to_string())?;
-                crate::log!("trakt: sent {} watched item(s)", batch.len());
-            }
-            Sent::Unauthorised => {
-                mark_needs_reconnect(&conn, "the access token was refused twice")?;
-                return Ok(());
-            }
-            Sent::Later(why) => {
-                return Err(format!("could not send {} item(s), kept for later: {why}", batch.len()));
-            }
-            Sent::Rejected(why) => {
-                crate::log!("trakt: Trakt rejected a batch ({why}); it was {body}");
-                tracking::forget_sent(&conn, &batch).map_err(to_string_err)?;
-            }
+        if !tracking::settle(&conn, TRAKT, outcome, &batch, &body)? {
+            return Ok(());
         }
     }
 }
@@ -674,14 +539,7 @@ pub struct TraktState(Mutex<Option<Pending>>);
 #[tauri::command]
 pub fn trakt_status(db: tauri::State<Db>) -> Result<Status, String> {
     let conn = db.0.lock().map_err(to_string_err)?;
-    Ok(Status {
-        available: allowed() && app(&conn).is_some(),
-        connected: connected(&conn),
-        needs_reconnect: setting(&conn, RECONNECT_KEY).is_some(),
-        user: setting(&conn, USER_KEY),
-        waiting: tracking::waiting_count(&conn, TRAKT),
-        last_sent_at: setting(&conn, LAST_SENT_KEY).and_then(|s| s.parse().ok()),
-    })
+    Ok(tracking::status(&conn, TRAKT, app(&conn).is_some()))
 }
 
 fn parse_device(body: &Value) -> Option<(String, DeviceCode, u64)> {
@@ -706,7 +564,7 @@ fn parse_device(body: &Value) -> Option<(String, DeviceCode, u64)> {
 
 #[tauri::command]
 pub async fn trakt_start_connect(app: tauri::AppHandle) -> Result<DeviceCode, String> {
-    if !allowed() {
+    if !tracking::allowed() {
         return Err("Trakt is not used during a self-test".into());
     }
     let (client_id, secret) = {
@@ -825,11 +683,8 @@ pub async fn trakt_poll_connect(app: tauri::AppHandle) -> Result<PollOutcome, St
     {
         let db = app.state::<Db>();
         let conn = db.0.lock().map_err(to_string_err)?;
-        save_tokens(&conn, &tokens)?;
-        match &user {
-            Some(name) => store(&conn, USER_KEY, name)?,
-            None => clear(&conn, USER_KEY)?,
-        }
+        save_tokens(&conn, TRAKT, &tokens)?;
+        tracking::save_user(&conn, TRAKT, user.as_deref())?;
         // Compared with the account and sent by the sender, not here: see
         // `queue_missing_history`.
         store(&conn, HISTORY_DUE_KEY, "1")?;
@@ -857,9 +712,9 @@ pub async fn trakt_disconnect(app: tauri::AppHandle) -> Result<(), String> {
     let (keys, access) = {
         let db = app.state::<Db>();
         let conn = db.0.lock().map_err(to_string_err)?;
-        (self::app(&conn), setting(&conn, ACCESS_KEY))
+        (self::app(&conn), read_tokens(&conn, TRAKT).map(|t| t.access))
     };
-    if let (Some((id, secret)), Some(token), true) = (keys, access, allowed()) {
+    if let (Some((id, secret)), Some(token), true) = (keys, access, tracking::allowed()) {
         let body = json!({ "token": token, "client_id": id, "client_secret": secret });
         if let Err(e) = post(&id, "/oauth/revoke", None, &body).await {
             crate::log!("trakt: could not reach Trakt to end the sign-in: {e}");
@@ -867,10 +722,8 @@ pub async fn trakt_disconnect(app: tauri::AppHandle) -> Result<(), String> {
     }
     let db = app.state::<Db>();
     let conn = db.0.lock().map_err(to_string_err)?;
-    for key in [ACCESS_KEY, REFRESH_KEY, EXPIRES_KEY, USER_KEY, RECONNECT_KEY, LAST_SENT_KEY, HISTORY_DUE_KEY] {
-        clear(&conn, key)?;
-    }
-    tracking::forget_all(&conn, TRAKT).map_err(to_string_err)?;
+    tracking::forget_sign_in(&conn, TRAKT)?;
+    clear(&conn, HISTORY_DUE_KEY)?;
     crate::log!("trakt: disconnected");
     Ok(())
 }
@@ -994,11 +847,5 @@ mod tests {
         assert_eq!(shown.user_code, "5055CC52");
         assert_eq!(interval, 5);
         assert!(shown.qr_svg.unwrap().starts_with("<?xml"));
-    }
-
-    #[test]
-    fn not_found_items_are_summarised() {
-        assert_eq!(not_found_summary(&json!({ "not_found": { "movies": [], "shows": [], "episodes": [] } })), None);
-        assert!(not_found_summary(&json!({ "not_found": { "episodes": [{}] } })).unwrap().starts_with("1 item"));
     }
 }

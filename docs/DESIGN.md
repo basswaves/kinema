@@ -89,9 +89,11 @@ src-tauri/src/
   trailer.rs     Finds local trailer files by Jellyfin/Kodi convention; the
                  scanner shares its test so trailers never become titles
   settings.rs    Key/value settings (API keys) + the frontend log bridge
-  tracking.rs    What SIMKL and Trakt share: the queue of finished films and
-                 episodes (watch_outbox, one row per service), filled from
-                 history.rs, and the sign-in page's shapes
+  tracking.rs    What SIMKL and Trakt share, written once: the queue of
+                 finished films and episodes (watch_outbox, one row per
+                 service), filled from history.rs; how a sign-in is kept;
+                 the history body both take; what an answer to a batch
+                 means for the queue; and the sign-in page's shapes
   simkl.rs       SIMKL, one way: the device sign-in, token refresh, sending
                  the queue in batches. Nothing is read back
   trakt.rs       Trakt, the same, except that it reads the account's watched

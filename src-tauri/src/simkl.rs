@@ -40,10 +40,13 @@
 //! the real Kinema's token off (SIMKL's "one grant, one live access token").
 
 use crate::library::Db;
-use crate::tracking::{self, iso8601, qr_svg, DeviceCode, PollOutcome, Status, Waiting, SIMKL};
 use crate::settings::setting;
+use crate::tracking::{
+    self, http, qr_svg, read_tokens, save_tokens, user_agent, DeviceCode, PollOutcome, Sent, Status,
+    Tokens, Waiting, SIMKL,
+};
 use crate::util::{now_secs, to_string_err};
-use rusqlite::{params, Connection};
+use rusqlite::Connection;
 use serde_json::{json, Value};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
@@ -61,17 +64,6 @@ const BUILTIN_CLIENT_ID: Option<&str> = option_env!("KINEMA_SIMKL_CLIENT_ID");
 /// Entered under Developer tools, for source builds.
 pub const CLIENT_ID_KEY: &str = "simkl_client_id";
 
-const ACCESS_KEY: &str = "simkl_access_token";
-const REFRESH_KEY: &str = "simkl_refresh_token";
-/// When the access token runs out, in Unix seconds.
-const EXPIRES_KEY: &str = "simkl_access_expires_at";
-/// The account's name, to say who Kinema is connected as.
-const USER_KEY: &str = "simkl_user";
-/// Set when SIMKL refused the refresh token: the person has to connect again.
-const RECONNECT_KEY: &str = "simkl_needs_reconnect";
-/// When SIMKL last accepted a batch, in Unix seconds.
-const LAST_SENT_KEY: &str = "simkl_last_sent_at";
-
 const API: &str = "https://api.simkl.com";
 const APP_NAME: &str = "kinema";
 
@@ -87,15 +79,6 @@ const SEND_DELAY: Duration = Duration::from_secs(10);
 
 /// Between two requests that write. SIMKL allows one a second.
 const WRITE_GAP: Duration = Duration::from_millis(1500);
-
-/// Refresh the access token when it has less than this left.
-const REFRESH_MARGIN_SECS: i64 = 24 * 60 * 60;
-
-const TIMEOUT: Duration = Duration::from_secs(20);
-
-fn user_agent() -> String {
-    format!("{APP_NAME}/{}", env!("CARGO_PKG_VERSION"))
-}
 
 /// The app ID in effect: one entered by hand, else the built-in one.
 fn client_id(conn: &Connection) -> Option<String> {
@@ -127,39 +110,9 @@ fn url(path: &str, client_id: &str) -> String {
     )
 }
 
-fn http() -> Option<tauri_plugin_http::reqwest::Client> {
-    tauri_plugin_http::reqwest::Client::builder()
-        .timeout(TIMEOUT)
-        .build()
-        .ok()
-}
-
-fn store(conn: &Connection, key: &str, value: &str) -> Result<(), String> {
-    crate::settings::store(conn, key, value)
-}
-
-fn clear(conn: &Connection, key: &str) -> rusqlite::Result<()> {
-    conn.execute("DELETE FROM settings WHERE key = ?1", params![key])?;
-    Ok(())
-}
-
-/// Whether SIMKL may be used at all in this process.
-fn allowed() -> bool {
-    crate::selftest::plan_path().is_none()
-}
-
-/// Connected means holding a refresh token that SIMKL has not refused.
-pub(crate) fn connected(conn: &Connection) -> bool {
-    setting(conn, REFRESH_KEY).is_some() && setting(conn, RECONNECT_KEY).is_none()
-}
-
 // ---- the request ------------------------------------------------------------
 
-/// A show's IMDb and TMDB ids, which together say which show an episode is of.
-type ShowIds = (Option<String>, Option<String>);
-/// A season's number and its episodes, as they will be sent.
-type Season = (i64, Vec<Value>);
-
+/// SIMKL's ids: IMDb and TMDB, both as text.
 fn ids(imdb_id: &Option<String>, tmdb_id: &Option<String>) -> Value {
     let mut ids = serde_json::Map::new();
     if let Some(imdb) = imdb_id {
@@ -171,85 +124,22 @@ fn ids(imdb_id: &Option<String>, tmdb_id: &Option<String>) -> Value {
     Value::Object(ids)
 }
 
-/// The body for `POST /sync/history`: films as they are, episodes gathered
-/// under their show and season, each with the time it was watched.
+/// The body for `POST /sync/history` (`tracking::history_body`), with
+/// `use_tvdb_anime_seasons` on every show.
 ///
 /// A TMDB id means different things for films and shows; the list it sits in
 /// (`movies` or `shows`) is what tells SIMKL which. `use_tvdb_anime_seasons`
 /// says the season numbers are per season, as TMDB counts them — SIMKL
 /// otherwise counts anime as one long season, and it changes nothing else.
 fn history_body(rows: &[Waiting]) -> Value {
-    let mut movies = Vec::new();
-    // Shows in the order first seen, each with its seasons in the order seen.
-    let mut shows: Vec<(ShowIds, Vec<Season>)> = Vec::new();
-
-    for row in rows {
-        if row.is_film {
-            movies.push(json!({
-                "ids": ids(&row.imdb_id, &row.tmdb_id),
-                "watched_at": iso8601(row.watched_at),
-            }));
-            continue;
-        }
-        let (Some(season), Some(episode)) = (row.season, row.episode) else {
-            continue;
-        };
-        let show_key = (row.imdb_id.clone(), row.tmdb_id.clone());
-        let at = match shows.iter().position(|(k, _)| *k == show_key) {
-            Some(i) => i,
-            None => {
-                shows.push((show_key, Vec::new()));
-                shows.len() - 1
-            }
-        };
-        let seasons = &mut shows[at].1;
-        let entry = json!({ "number": episode, "watched_at": iso8601(row.watched_at) });
-        match seasons.iter_mut().find(|(n, _)| *n == season) {
-            Some((_, episodes)) => episodes.push(entry),
-            None => seasons.push((season, vec![entry])),
-        }
+    let mut body = tracking::history_body(rows, ids);
+    for show in body["shows"].as_array_mut().into_iter().flatten() {
+        show["use_tvdb_anime_seasons"] = json!(true);
     }
-
-    let shows: Vec<Value> = shows
-        .into_iter()
-        .map(|((imdb, tmdb), seasons)| {
-            json!({
-                "ids": ids(&imdb, &tmdb),
-                "use_tvdb_anime_seasons": true,
-                "seasons": seasons
-                    .into_iter()
-                    .map(|(number, episodes)| json!({ "number": number, "episodes": episodes }))
-                    .collect::<Vec<_>>(),
-            })
-        })
-        .collect();
-
-    json!({ "movies": movies, "shows": shows })
-}
-
-/// What SIMKL could not place, as a line for the log. A title SIMKL does not
-/// know is not a failure worth retrying — it would not know it next time
-/// either — so these are logged and let go.
-fn not_found_summary(response: &Value) -> Option<String> {
-    let nf = response.get("not_found")?;
-    let count = |k: &str| nf.get(k).and_then(Value::as_array).map_or(0, Vec::len);
-    let (movies, shows, episodes) = (count("movies"), count("shows"), count("episodes"));
-    if movies + shows + episodes == 0 {
-        return None;
-    }
-    Some(format!(
-        "{movies} film(s), {shows} show(s) and {episodes} episode(s) not found: {nf}"
-    ))
+    body
 }
 
 // ---- tokens -----------------------------------------------------------------
-
-#[derive(Debug, PartialEq)]
-struct Tokens {
-    access: String,
-    refresh: String,
-    expires_at: i64,
-}
 
 /// Read a token response. Refuses one without the right to write: SIMKL turns
 /// an unrecognised scope into read-only access without saying so, and a
@@ -276,27 +166,6 @@ fn parse_tokens(body: &Value, previous_refresh: Option<&str>) -> Result<Tokens, 
         refresh: refresh.to_string(),
         expires_at: now_secs() + lifetime,
     })
-}
-
-fn save_tokens(conn: &Connection, tokens: &Tokens) -> Result<(), String> {
-    store(conn, ACCESS_KEY, &tokens.access)?;
-    store(conn, REFRESH_KEY, &tokens.refresh)?;
-    store(conn, EXPIRES_KEY, &tokens.expires_at.to_string())?;
-    clear(conn, RECONNECT_KEY).map_err(to_string_err)
-}
-
-fn read_tokens(conn: &Connection) -> Option<Tokens> {
-    Some(Tokens {
-        access: setting(conn, ACCESS_KEY)?,
-        refresh: setting(conn, REFRESH_KEY)?,
-        expires_at: setting(conn, EXPIRES_KEY)
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(0),
-    })
-}
-
-fn due_for_refresh(tokens: &Tokens, now: i64) -> bool {
-    tokens.expires_at - now < REFRESH_MARGIN_SECS
 }
 
 /// How a refresh ended.
@@ -361,7 +230,7 @@ static SEND_SCHEDULED: AtomicBool = AtomicBool::new(false);
 
 /// Send what is waiting, a little later — see [`SEND_DELAY`].
 pub fn send_soon(app: &tauri::AppHandle) {
-    if !allowed() || SEND_SCHEDULED.swap(true, Ordering::SeqCst) {
+    if !tracking::allowed() || SEND_SCHEDULED.swap(true, Ordering::SeqCst) {
         return;
     }
     let app = app.clone();
@@ -374,16 +243,6 @@ pub fn send_soon(app: &tauri::AppHandle) {
 
 async fn tokio_sleep(d: Duration) {
     tokio::time::sleep(d).await;
-}
-
-enum Sent {
-    Accepted(Value),
-    /// The access token is not accepted.
-    Unauthorised,
-    /// Try again later: SIMKL is busy, down or out of reach.
-    Later(String),
-    /// SIMKL refused the request itself. Retrying the same bytes will not help.
-    Rejected(String),
 }
 
 async fn post_history(client_id: &str, access: &str, body: &Value) -> Sent {
@@ -414,7 +273,7 @@ async fn post_history(client_id: &str, access: &str, body: &Value) -> Sent {
 /// cannot be reached. Every failure is logged and leaves the queue as it was,
 /// except a request SIMKL rejects outright, which would be rejected again.
 pub async fn send_waiting(app: &tauri::AppHandle) {
-    if !allowed() || SENDING.swap(true, Ordering::SeqCst) {
+    if !tracking::allowed() || SENDING.swap(true, Ordering::SeqCst) {
         return;
     }
     let result = send_all(app).await;
@@ -430,11 +289,11 @@ async fn send_all(app: &tauri::AppHandle) -> Result<(), String> {
         let (client_id, tokens, batch) = {
             let db = app.state::<Db>();
             let conn = db.0.lock().map_err(to_string_err)?;
-            if !connected(&conn) {
+            if !tracking::connected(&conn, SIMKL) {
                 return Ok(());
             }
             let Some(client_id) = client_id(&conn) else { return Ok(()) };
-            let Some(tokens) = read_tokens(&conn) else { return Ok(()) };
+            let Some(tokens) = read_tokens(&conn, SIMKL) else { return Ok(()) };
             let batch = tracking::waiting(&conn, SIMKL, BATCH).map_err(to_string_err)?;
             (client_id, tokens, batch)
         };
@@ -461,7 +320,7 @@ async fn send_all(app: &tauri::AppHandle) -> Result<(), String> {
             let stored = {
                 let db = app.state::<Db>();
                 let conn = db.0.lock().map_err(to_string_err)?;
-                read_tokens(&conn)
+                read_tokens(&conn, SIMKL)
             };
             let retry_with = match stored {
                 Some(t) if t.access != access => Some(t.access),
@@ -478,36 +337,10 @@ async fn send_all(app: &tauri::AppHandle) -> Result<(), String> {
 
         let db = app.state::<Db>();
         let conn = db.0.lock().map_err(to_string_err)?;
-        match outcome {
-            Sent::Accepted(response) => {
-                if let Some(missing) = not_found_summary(&response) {
-                    crate::log!("simkl: {missing}");
-                }
-                tracking::forget_sent(&conn, &batch).map_err(to_string_err)?;
-                store(&conn, LAST_SENT_KEY, &now_secs().to_string())?;
-                crate::log!("simkl: sent {} watched item(s)", batch.len());
-            }
-            Sent::Unauthorised => {
-                mark_needs_reconnect(&conn, "the access token was refused twice")?;
-                return Ok(());
-            }
-            Sent::Later(why) => {
-                return Err(format!("could not send {} item(s), kept for later: {why}", batch.len()));
-            }
-            Sent::Rejected(why) => {
-                // Logged whole, with what was sent, so the reason can be read
-                // and fixed; the rows go, or the same refusal would block
-                // everything queued behind them for good.
-                crate::log!("simkl: SIMKL rejected a batch ({why}); it was {body}");
-                tracking::forget_sent(&conn, &batch).map_err(to_string_err)?;
-            }
+        if !tracking::settle(&conn, SIMKL, outcome, &batch, &body)? {
+            return Ok(());
         }
     }
-}
-
-fn mark_needs_reconnect(conn: &Connection, why: &str) -> Result<(), String> {
-    crate::log!("simkl: needs connecting again — {why}; watched items stay queued");
-    store(conn, RECONNECT_KEY, "1")
 }
 
 /// An access token worth sending: the stored one, or a fresh one when it is
@@ -517,20 +350,20 @@ async fn usable_access(
     client_id: &str,
     tokens: Tokens,
 ) -> Result<Option<String>, String> {
-    if !due_for_refresh(&tokens, now_secs()) {
+    if !tokens.due_for_refresh(now_secs()) {
         return Ok(Some(tokens.access));
     }
     match refresh(client_id, &tokens.refresh).await {
         Refreshed::Tokens(fresh) => {
             let db = app.state::<Db>();
             let conn = db.0.lock().map_err(to_string_err)?;
-            save_tokens(&conn, &fresh)?;
+            save_tokens(&conn, SIMKL, &fresh)?;
             Ok(Some(fresh.access))
         }
         Refreshed::Refused => {
             let db = app.state::<Db>();
             let conn = db.0.lock().map_err(to_string_err)?;
-            mark_needs_reconnect(&conn, "SIMKL refused the refresh token")?;
+            tracking::mark_needs_reconnect(&conn, SIMKL, "SIMKL refused the refresh token")?;
             Ok(None)
         }
         Refreshed::Unreachable => Ok(None),
@@ -555,14 +388,7 @@ pub struct SimklState(Mutex<Option<Pending>>);
 #[tauri::command]
 pub fn simkl_status(db: tauri::State<Db>) -> Result<Status, String> {
     let conn = db.0.lock().map_err(to_string_err)?;
-    Ok(Status {
-        available: allowed() && client_id(&conn).is_some(),
-        connected: connected(&conn),
-        needs_reconnect: setting(&conn, RECONNECT_KEY).is_some(),
-        user: setting(&conn, USER_KEY),
-        waiting: tracking::waiting_count(&conn, SIMKL),
-        last_sent_at: setting(&conn, LAST_SENT_KEY).and_then(|s| s.parse().ok()),
-    })
+    Ok(tracking::status(&conn, SIMKL, client_id(&conn).is_some()))
 }
 
 /// Parse SIMKL's answer to the first step of signing in.
@@ -590,7 +416,7 @@ fn parse_device(body: &Value) -> Option<(String, DeviceCode, u64)> {
 
 #[tauri::command]
 pub async fn simkl_start_connect(app: tauri::AppHandle) -> Result<DeviceCode, String> {
-    if !allowed() {
+    if !tracking::allowed() {
         return Err("SIMKL is not used during a self-test".into());
     }
     let client_id = {
@@ -707,11 +533,8 @@ pub async fn simkl_poll_connect(app: tauri::AppHandle) -> Result<PollOutcome, St
         {
             let db = app.state::<Db>();
             let conn = db.0.lock().map_err(to_string_err)?;
-            save_tokens(&conn, &tokens)?;
-            match &user {
-                Some(name) => store(&conn, USER_KEY, name)?,
-                None => clear(&conn, USER_KEY).map_err(to_string_err)?,
-            }
+            save_tokens(&conn, SIMKL, &tokens)?;
+            tracking::save_user(&conn, SIMKL, user.as_deref())?;
             // Everything already watched, once — decided 2026-09-30. SIMKL
             // ignores a watch it already has, so connecting again is harmless.
             let history = tracking::finished_history(&conn).map_err(to_string_err)?;
@@ -776,10 +599,10 @@ pub async fn simkl_disconnect(app: tauri::AppHandle) -> Result<(), String> {
     let (client_id, refresh_token) = {
         let db = app.state::<Db>();
         let conn = db.0.lock().map_err(to_string_err)?;
-        (client_id(&conn), setting(&conn, REFRESH_KEY))
+        (client_id(&conn), read_tokens(&conn, SIMKL).map(|t| t.refresh))
     };
     if let (Some(client_id), Some(token), Some(http)) = (client_id, refresh_token, http()) {
-        if allowed() {
+        if tracking::allowed() {
             let revoked = http
                 .post(url("/oauth2/revoke", &client_id))
                 .header("User-Agent", user_agent())
@@ -793,10 +616,7 @@ pub async fn simkl_disconnect(app: tauri::AppHandle) -> Result<(), String> {
     }
     let db = app.state::<Db>();
     let conn = db.0.lock().map_err(to_string_err)?;
-    for key in [ACCESS_KEY, REFRESH_KEY, EXPIRES_KEY, USER_KEY, RECONNECT_KEY, LAST_SENT_KEY] {
-        clear(&conn, key).map_err(to_string_err)?;
-    }
-    tracking::forget_all(&conn, SIMKL).map_err(to_string_err)?;
+    tracking::forget_sign_in(&conn, SIMKL)?;
     crate::log!("simkl: disconnected");
     Ok(())
 }
@@ -814,6 +634,7 @@ mod tests {
     fn connect(conn: &Connection) {
         save_tokens(
             conn,
+            SIMKL,
             &Tokens {
                 access: "a".into(),
                 refresh: "r".into(),
@@ -830,13 +651,13 @@ mod tests {
         let conn = db();
         connect(&conn);
         tracking::queue_finished(&conn, "movie", Some("tt0000001"), None, None, None, 1).unwrap();
-        mark_needs_reconnect(&conn, "test").unwrap();
-        assert!(!connected(&conn));
+        tracking::mark_needs_reconnect(&conn, SIMKL, "test").unwrap();
+        assert!(!tracking::connected(&conn, SIMKL));
         tracking::queue_finished(&conn, "movie", Some("tt0000003"), None, None, None, 1).unwrap();
         assert_eq!(tracking::waiting_count(&conn, SIMKL), 1);
         // Connecting again clears it.
         connect(&conn);
-        assert!(connected(&conn));
+        assert!(tracking::connected(&conn, SIMKL));
     }
 
     #[test]
@@ -890,14 +711,6 @@ mod tests {
     }
 
     #[test]
-    fn a_token_is_refreshed_a_day_before_it_runs_out() {
-        let t = |expires_at| Tokens { access: "a".into(), refresh: "r".into(), expires_at };
-        assert!(!due_for_refresh(&t(1_000_000 + 2 * 86_400), 1_000_000));
-        assert!(due_for_refresh(&t(1_000_000 + 3_600), 1_000_000));
-        assert!(due_for_refresh(&t(0), 1_000_000));
-    }
-
-    #[test]
     fn the_sign_in_answer_is_read_and_a_qr_code_made() {
         let body = json!({"device_code": "dc", "user_code": "BDWP-HQPK",
                           "verification_uri": "https://simkl.com/pin",
@@ -908,14 +721,6 @@ mod tests {
         assert_eq!(shown.user_code, "BDWP-HQPK");
         assert_eq!(interval, 5);
         assert!(shown.qr_svg.unwrap().starts_with("<?xml"));
-    }
-
-    #[test]
-    fn not_found_items_are_summarised_and_an_empty_list_is_not() {
-        let none = json!({"added": {"movies": 1}, "not_found": {"movies": [], "shows": [], "episodes": []}});
-        assert_eq!(not_found_summary(&none), None);
-        let some = json!({"not_found": {"movies": [{"ids": {"tmdb": "1"}}], "shows": [], "episodes": []}});
-        assert!(not_found_summary(&some).unwrap().starts_with("1 film(s)"));
     }
 
     #[test]

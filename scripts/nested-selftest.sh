@@ -77,6 +77,11 @@ started=$(date +%s)
 
 window() {
   local pid
+  # Sway's output window carries no process id; wlroots names it.
+  if [ "$desktop" = sway ]; then
+    xdotool search --onlyvisible --name "^wlroots" 2>/dev/null | head -1
+    return
+  fi
   pid=$(pgrep -n -x kwin_wayland || pgrep -n -x gnome-shell || pgrep -n -x sway) || return 1
   xdotool search --onlyvisible --pid "$pid" 2>/dev/null | head -1
 }

@@ -28,6 +28,7 @@ import {
   type MpvConfig,
 } from 'tauri-plugin-libmpv-api';
 import { BASE_MPV_OPTIONS, IDLE_SURFACE_OPTIONS, TONE_MAPPING_OPTIONS } from './mpvOptions';
+import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { logPaths } from '../metadata/api';
 import { capabilitiesNow, loadCapabilities } from '../capabilities';
@@ -294,10 +295,28 @@ export async function isPictureFullscreen(): Promise<boolean> {
 
 export async function setPictureFullscreen(on: boolean): Promise<void> {
   if (capabilitiesNow()?.mpv_video.own_window) {
+    // Kinema's window floats only while the picture is full screen: over a
+    // windowed film it would sit on top of it (seen in a nested Sway).
+    if (!on) await fitWindowForPlayer('tile');
     await setProperty('fullscreen', on);
+    if (on) await fitWindowForPlayer('float');
     return;
   }
   await getCurrentWindow().setFullscreen(on);
+}
+
+/**
+ * Where mpv has a window of its own, keep Kinema's window the screen's size
+ * while the picture is full screen — its photo is the player's controls — by
+ * floating it on a tiling desktop (Sway, Hyprland), where it would otherwise
+ * be squeezed beside the film's window (`display.rs` → `player_window`).
+ * Nothing happens elsewhere; never throws.
+ */
+export async function fitWindowForPlayer(how: 'float' | 'tile' | 'close'): Promise<void> {
+  if (!capabilitiesNow()?.mpv_video.own_window) return;
+  await invoke('player_window', { how }).catch((e) =>
+    console.warn('display: Kinema’s window not fitted for the player', e)
+  );
 }
 
 /** Whether the last frame has been reached; false while nothing is open. */

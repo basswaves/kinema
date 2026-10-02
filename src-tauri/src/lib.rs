@@ -372,6 +372,7 @@ pub fn run() {
             display::screen_now,
             display::switch_screen,
             display::restore_screen,
+            display::player_window,
             trailer::find_local_trailer,
             nfo::read_nfo,
             nfo::read_show_nfo,

@@ -987,6 +987,7 @@ const handlers: Record<string, Handler> = {
   }),
   switch_screen: () => null,
   restore_screen: () => false,
+  player_window: () => null,
 
   // settings and logs
   get_setting: (a) => settings.get(String(a.key)) ?? null,

@@ -1632,3 +1632,29 @@ ended by a signal (an ordinary failure, such as an unknown mode, is not
 repeated), and `desktop.rs` logs why a Plasma session was not recognised.
 Plasma 6.6's did not crash once in a full run on a real TV (six Kinema
 starts, a switch and a restore), so it may be 5.27's alone; the retry stays.
+
+### Tiling desktops tile Kinema's window beside the film's
+
+On Linux the player's controls are a photo of Kinema's window drawn over
+mpv's. Sway and Hyprland tile windows, so when mpv's window appears Kinema's
+is squeezed beside it (933 of 1920 pixels on Hyprland) and the photo is
+scaled to the film's shape — stretched and soft, with no error anywhere; on
+GNOME and Plasma windows float and it never showed. Both float a window
+whose minimum and maximum size are equal *when it appears*, so
+`display.rs` → `player_window` hides Kinema's window and shows it again
+undecorated at the screen's size, fixed, while the film is full screen.
+Undecorated matters: GTK's invisible shadow margins and title bar made a
+"1600×900" window 1560×860 of page. It must stop floating when the film
+leaves full screen (it would sit over the windowed film) and get its own
+full screen back only when the player closes (or it covers the film).
+`app.log` says `overlay: page W×H on mpv's W×H`; the two should match.
+
+### Hyprland's report does not show HDR it passes through
+
+With its defaults, a full-screen HDR window takes Hyprland's passthrough
+path: the window's HDR metadata goes to the screen and the screen's own
+colour setting is untouched, so `hyprctl monitors` keeps saying `srgb` and
+an 8-bit format while the TV is in HDR. The connector says what is sent:
+`modetest -c` shows `Colorspace` and `HDR_OUTPUT_METADATA` (empty when
+SDR); Hyprland's log (`debug:disable_logs = false`) says `[CM] Updating HDR
+metadata from surface`.

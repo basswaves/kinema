@@ -368,6 +368,28 @@ pub async fn restore_screen(app: tauri::AppHandle) -> Result<bool, String> {
     crate::jobs::off_main(move || restore(&app)).await
 }
 
+/// Kinema's window while the player is open, on a tiling desktop.
+///
+/// Where mpv has a window of its own, the player's controls are a photo of
+/// Kinema's window drawn over the film at mpv's size. Sway and Hyprland tile
+/// windows, so when the film's window appears Kinema's is squeezed beside it
+/// and the photo comes out the wrong shape, blown up (seen on the test TV).
+/// Both float a window whose size is fixed when it appears (sway
+/// `wants_floating`, Hyprland `shouldBeFloated`), so for the player Kinema's
+/// window is shown again — hidden first, which is what makes it a new window
+/// to them — at the screen's size and not resizable, and put back as it was
+/// when the player closes. Elsewhere (GNOME, Plasma, Windows) nothing is done:
+/// their windows float already.
+#[tauri::command]
+pub fn player_window(window: tauri::WebviewWindow, how: String) -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    if crate::desktop::which() == Some(crate::desktop::Desktop::Wlroots) {
+        return linux::player_window(&window, &how);
+    }
+    let _ = (window, how);
+    Ok(())
+}
+
 /// A switched screen left behind by a session that never got to restore it —
 /// a crash, a power cut, a killed process.
 pub fn restore_after_crash(app: &tauri::AppHandle) {

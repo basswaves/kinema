@@ -53,6 +53,10 @@ export function startOverlay(): () => void {
   let shown = false;
   let warned = false;
   let scaled = true;
+  // The page's size against mpv's, said whenever either changes: a page of
+  // another shape is drawn stretched (a tiling desktop squeezing Kinema's
+  // window — display.rs `player_window`), and app.log is where that shows.
+  let lastSizes = '';
   // Whether this pump made Kinema's window full screen, to undo it.
   let madeFullscreen = false;
 
@@ -68,9 +72,14 @@ export function startOverlay(): () => void {
         return;
       }
       const picture = [ID, 0, 0, frame.path, 0, 'bgra', frame.width, frame.height, frame.stride];
+      const w = (await readProperty<number>('osd-width', 'int64')) || frame.width;
+      const h = (await readProperty<number>('osd-height', 'int64')) || frame.height;
+      const sizes = `${frame.width}×${frame.height} on mpv's ${w}×${h}`;
+      if (sizes !== lastSizes) {
+        lastSizes = sizes;
+        console.log(`overlay: page ${sizes}`);
+      }
       if (scaled) {
-        const w = (await readProperty<number>('osd-width', 'int64')) || frame.width;
-        const h = (await readProperty<number>('osd-height', 'int64')) || frame.height;
         try {
           await mpvCommand('overlay-add', [...picture, w, h]);
           shown = true;

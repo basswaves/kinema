@@ -40,6 +40,7 @@ import { startOverlay } from './overlay';
 import { capabilitiesNow } from '../capabilities';
 import { setShortcutsOpen } from '../ui/shortcutsState';
 import {
+  fitWindowForPlayer,
   hasReachedEnd,
   isPaused,
   isPictureFullscreen,
@@ -494,6 +495,11 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         // Likewise the sound: through Windows, or straight to the receiver
         // with whatever it takes passed through untouched. See audioOutput.ts.
         await applyAudioPlan().catch((e) => console.warn('audio: plan not applied', e));
+        if (cancelled) return;
+
+        // On a tiling desktop Kinema's window would be squeezed beside the
+        // film's, and the controls drawn from it with it (displaySwitch.ts).
+        if (await isPictureFullscreen().catch(() => false)) await fitWindowForPlayer('float');
         if (cancelled) return;
 
         // Opened at the resume point, not opened and then seeked.
@@ -1240,6 +1246,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         .catch(() => undefined)
         .then(() => releaseAudioDevice());
       void restoreScreen();
+      void fitWindowForPlayer('close');
     };
   }, []);
 

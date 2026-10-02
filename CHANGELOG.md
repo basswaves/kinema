@@ -30,6 +30,10 @@ makes no stability promises.
 
 ### Fixed
 
+- **A film slow to show its first frame no longer misses the screen
+  switch.** Kinema waited five seconds for it, then played the film in
+  whatever mode the screen was in without a word; it now waits fifteen (the
+  film is held paused meanwhile anyway) and logs it if it still gives up.
 - **Episodes on a network share named only by their numbering** — a
   `Season 1\S01E01.mkv` with nothing else in its name — now take their show's
   name from the folder above, as they already did on a local drive.

@@ -113,6 +113,79 @@ pub fn set(connector: &str, mode: Option<(u32, u32, u32)>, colour: Option<Colour
     desktop::set(connector, mode_id.as_deref(), colour)
 }
 
+/// Kinema's window as it was when the player first floated it — full screen,
+/// decorated — kept until the player closes; and whether it floats now.
+struct Fitted {
+    was_fullscreen: bool,
+    was_decorated: bool,
+    floating: bool,
+}
+
+static FITTED: std::sync::Mutex<Option<Fitted>> = std::sync::Mutex::new(None);
+
+/// `display::player_window` on a wlroots desktop. `float`: Kinema's window at
+/// the screen's size, fixed (hidden and shown again so the desktop sees a
+/// new, fixed-size window, which it floats); `tile`: an ordinary window
+/// again, as the film leaves full screen — but not full screen itself, which
+/// would cover the windowed film; `close`: as it was before the player,
+/// full screen included.
+pub fn player_window(window: &tauri::WebviewWindow, how: &str) -> Result<(), String> {
+    let mut fitted = FITTED.lock().map_err(|e| e.to_string())?;
+    let err = |e: tauri::Error| format!("Kinema's window: {e}");
+    match how {
+        "float" => {
+            if fitted.as_ref().is_some_and(|f| f.floating) {
+                return Ok(());
+            }
+            let monitor = window.current_monitor().map_err(err)?.ok_or("no screen for Kinema's window")?;
+            let size = monitor.size().to_logical::<f64>(monitor.scale_factor());
+            let before = fitted.take().unwrap_or(Fitted {
+                was_fullscreen: window.is_fullscreen().unwrap_or(false),
+                was_decorated: window.is_decorated().unwrap_or(true),
+                floating: false,
+            });
+            window.hide().map_err(err)?;
+            if window.is_fullscreen().unwrap_or(false) {
+                window.set_fullscreen(false).map_err(err)?;
+            }
+            // Without its title bar and the invisible shadow margins GTK draws
+            // round a decorated window, the page is the size asked for:
+            // decorated, a nested Sway gave it 1560×860 of a 1600×900 screen,
+            // less the bar.
+            window.set_decorations(false).map_err(err)?;
+            window.set_size(size).map_err(err)?;
+            window.set_min_size(Some(size)).map_err(err)?;
+            window.set_max_size(Some(size)).map_err(err)?;
+            window.set_resizable(false).map_err(err)?;
+            window.show().map_err(err)?;
+            *fitted = Some(Fitted { floating: true, ..before });
+            crate::log!("display: Kinema's window floated at {}×{} for the player", size.width, size.height);
+        }
+        "tile" | "close" => {
+            let Some(before) = fitted.take() else { return Ok(()) };
+            if before.floating {
+                window.hide().map_err(err)?;
+                window.set_decorations(before.was_decorated).map_err(err)?;
+                window.set_resizable(true).map_err(err)?;
+                window.set_min_size(None::<tauri::Size>).map_err(err)?;
+                window.set_max_size(None::<tauri::Size>).map_err(err)?;
+                window.show().map_err(err)?;
+            }
+            if how == "close" {
+                if before.was_fullscreen {
+                    window.set_fullscreen(true).map_err(err)?;
+                }
+                crate::log!("display: Kinema's window back as it was");
+            } else {
+                *fitted = Some(Fitted { floating: false, ..before });
+                crate::log!("display: Kinema's window tiled again beside the windowed film");
+            }
+        }
+        other => return Err(format!("player_window: no such request '{other}'")),
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

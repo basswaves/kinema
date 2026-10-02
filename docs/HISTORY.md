@@ -2414,7 +2414,15 @@ the player's controls stretched and soft on Sway and Hyprland: those
 desktops tile Kinema's window beside mpv's (933 pixels wide once the film's
 window appears), and the controls are a photo of Kinema's window scaled to
 mpv's — the wrong shape, blown up. GNOME and Plasma float windows, so it
-never showed there.
+never showed there. Both tiling desktops float a window whose size is fixed
+when it appears, so while the film is full screen Kinema's window is shown
+again undecorated at the screen's size, fixed, and put back afterwards
+(`player_window`). On the TV: Hyprland gave it exactly 1920×1080 and the
+page matched the film's shape before and after the 4K switch; Sway 1.11
+floated it but at 2010×1170 while reporting its geometry as 1920×1080, so the
+controls there are about 3.5 % squashed — visible on a ruler, not by eye. A
+nested Sway 1.9 gave the exact size; why 1.11 adds 90 pixels is not known
+yet.
 
 **A slow first frame cost the switch.** Kinema waited 5 s for the first
 frame's details before deciding a switch, then played the film in the mode

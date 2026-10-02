@@ -24,6 +24,8 @@ import { useScanStatus } from '../library/pipeline';
 import FocusButton from './FocusButton';
 import PictureSoundSetup from './PictureSoundSetup';
 import IntrosSetup from './IntrosSetup';
+import AccountSection from './AccountSection';
+import { OpenSubtitlesSection } from './SubtitlesSettings';
 import { useClaimFocus } from './focus';
 
 /** 'open' while the pages are up, 'done' once finished or left. */
@@ -37,6 +39,11 @@ interface Page {
   id: string;
   title: string;
   body: (onAnswer: () => void) => ReactNode;
+  /**
+   * The way on says Next from the start: a page made of Settings' own
+   * sections, which do not say when something was done on them.
+   */
+  alwaysNext?: boolean;
 }
 
 interface Props {
@@ -68,6 +75,24 @@ export default function SetupPages({ onClose }: Props) {
         id: 'intros',
         title: 'Intros and credits',
         body: (onAnswer) => <IntrosSetup onAnswer={onAnswer} />,
+      },
+      // Settings → Accounts as it is: connecting is the same job here.
+      {
+        id: 'accounts',
+        title: 'Accounts',
+        alwaysNext: true,
+        body: () => (
+          <>
+            <p className="muted">
+              All optional, and each works without the others: SIMKL or Trakt keep a record of
+              what you finish in Kinema, and OpenSubtitles is where Kinema looks for subtitles a
+              film does not come with.
+            </p>
+            <AccountSection service="simkl" />
+            <AccountSection service="trakt" />
+            <OpenSubtitlesSection />
+          </>
+        ),
       },
     ];
     return all.filter((p): p is Page => Boolean(p));
@@ -148,7 +173,7 @@ export default function SetupPages({ onClose }: Props) {
             keepInView="nearest"
             onSelect={forward}
           >
-            {last ? 'Finish' : answered.has(page.id) ? 'Next' : 'Skip'}
+            {last ? 'Finish' : page.alwaysNext || answered.has(page.id) ? 'Next' : 'Skip'}
           </FocusButton>
           {!last && (
             <FocusButton className="btn-secondary" keepInView="nearest" onSelect={onClose}>

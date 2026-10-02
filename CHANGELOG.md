@@ -7,8 +7,23 @@ makes no stability promises.
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-10-02
+
+Kinema on Linux, alongside Windows. Packages for Ubuntu and Debian (`.deb`),
+Fedora (`.rpm`) and a folder for anything else (`.tar.gz`), for x86-64 and
+ARM. The library is not upgraded (schema 22, as in 0.7.0).
+
 ### Added
 
+- **Kinema for Linux.** The whole app — library, matching, artwork,
+  accounts, the player with its own controls, remote keys, intro skipping —
+  using the system's own mpv and WebKitGTK, which the packages install.
+  Checked on a real TV and AV receiver with GNOME, KDE Plasma, Sway and
+  Hyprland, on an NVIDIA and an AMD card. It is built to work the same
+  everywhere rather than tested on every desktop and version: where it
+  cannot ask a desktop to switch the screen, or a driver offers no HDR, the
+  film still plays. A setup that still misbehaves is a bug report (README,
+  "When something goes wrong").
 - **Linux: Picture & sound.** Settings → Your equipment lists the screens and
   what each receiver takes; Settings → Sound sends films straight to the
   receiver, untouched, as on Windows; and on GNOME, KDE Plasma, Sway,

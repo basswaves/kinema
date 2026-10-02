@@ -115,9 +115,9 @@ in the stats panel was checked against it first.
 
 ### Clearing an observed property in React does not clear it
 
-`Player.tsx` nulls `timePos` and `duration` when the target changes, with a
-comment explaining that it stops the previous file's position leaking into the
-new one. It does not, and cannot: **both are observed properties**, so mpv pushes
+The player used to null `timePos` and `duration` when the target changed,
+with a comment explaining that this stopped the previous file's position
+leaking into the new one. It does not, and cannot: **both are observed properties**, so mpv pushes
 the outgoing file's values straight back in — `loadfile` has not taken effect
 yet, so the old file is still open and still reporting. The React state is
 correct for a few milliseconds and then overwritten by the thing it was
@@ -557,8 +557,18 @@ the only trace is a crop of "unused eslint-disable directive" warnings where
 disables that used to be needed no longer are. Found when adding "Find
 subtitles online" to the player. **Do:** keep `try` out of components and
 hooks — put the awaited work in a function outside that returns what to show
-(`onlineSearch`, `readSubVisibility` in Player.tsx) — and treat a sudden batch
-of unused-disable warnings as the compiler bailing out, not as tidying to do.
+(`onlineSearch` in useOnlineSubtitles.ts, `readSubVisibility` in tracks.ts) —
+and treat a sudden batch of unused-disable warnings as the compiler bailing
+out, not as tidying to do.
+
+**To check rather than infer:** `npx eslint --rule '{"react-hooks/todo":"error"}'
+src` names every function the compiler could not lower. Not every entry there
+switches the rules off: the `try … finally` in useSkipMarkers.ts is listed,
+yet a setState put in an effect in that hook is still reported. Before
+concluding the rules have gone quiet, put a known violation in and see. And an
+unused disable can also mean the code moved: a state setter passed into a hook
+as a plain function is no longer known as a setter, so the disable that its
+call needed in the component is not needed there.
 
 ### A focus key that changes is never registered
 
@@ -648,7 +658,7 @@ a remote has no equivalent of a hover to bootstrap it.
 the opener *after* the panel closes loses — the library's own restore fires
 300 ms after the unmount and lands on the parent's preferred child. The
 player's track panel sent the ring to Pause this way. `closeTracks` and
-`closeStats` in `Player.tsx` aim at the opener while the panel still exists,
+`closeStats` in `usePanels.ts` aim at the opener while the panel still exists,
 so there is nothing left for the library to restore.
 
 ### …and a claim that succeeds can still be overwritten
@@ -976,6 +986,34 @@ app can still be shipped. `check` is `tsc + eslint` and never invokes the bundle
 
 A parser that throws on every file looks *identical* to one that works and finds
 nothing. Surface failures; the `catch` that hides them costs more than it saves.
+
+### Moving effects into hooks moves them in React's order
+
+A component's effects run in the order they are written; a hook's run where
+the hook is called. Splitting Player.tsx into hooks (October 2026) grouped
+effects that had been spread through one file, so within a commit they ran
+in a different order. Usually that changes nothing — React runs every cleanup
+before any effect, and state set in one batch renders once. Against
+`dev:mock` it changed something: the mock backend answers at once rather
+than a round trip later, so the request for the episodes either side, now
+sent earlier in the batch, was answered before React drew the cleared state,
+and the previous/next buttons were updated in place instead of disappearing
+for a frame. Moving only that one effect earlier in the unsplit file did the
+same, which is how it was told apart from a real change.
+
+**Do:** when moving effects between components or hooks, compare the DOM in
+fixed states before and after, not only the behaviour, and write down which
+effects changed place and why that is safe. A difference that appears is
+either a real change or the mock's instant answers; moving the one effect in
+the old code tells which.
+
+### The spatial library marks every control it ever focused
+
+norigin sets `data-focused="true"` on a control when it focuses it, and takes
+it off again only when `shouldFocusDOMNode` is on — which Kinema leaves off.
+So the attribute means "was focused at some point while it was mounted", not
+"is focused". **Do:** read the `focused` class that FocusButton sets, never
+`[data-focused]`, in tests and styles alike.
 
 ### Stale closures silently use old values
 

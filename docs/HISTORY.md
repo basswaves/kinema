@@ -2552,6 +2552,54 @@ setup again brings them back whenever.
   anything, and each picks its work by what is not stored — so the next scan,
   which runs at every start, does what was skipped. The page says so.
 
+## Player.tsx split into its parts ✅
+
+**Asked for before Android (2026-10-02), and asked to be done methodically.**
+Player.tsx had grown to 2,151 lines: one component holding the file's life,
+mpv's events, skip markers, Up next, tracks, online subtitles, who has the
+arrow keys, the volume, seeking, both panels, the screen, every key and the
+layout. Each moved to its own file — hooks for what the player does
+(usePlaybackEngine, useSkipMarkers, useUpNext, useTracks, useOsd and the
+rest) and components for what it draws (PlayerControls, SeekBar, ResumeToast,
+SkipButton). Player.tsx keeps the layout and which part feeds which: 439
+lines.
+
+**A move, not a rewrite.** The rule for every step was no change in what the
+player does and none in the DOM it draws, which the styles and the keyboard
+tests depend on. Four small decisions came out as tested functions on the
+way — whether the active segment gets a Skip button and what it says, the
+words when the sound will not open, the message for a file that could not be
+played, an episode's label. Everything else moved word for word; what is new
+is the wiring between the parts, and dependency lists that now name the refs
+and setters a hook receives (all the same object for the player's life, so
+the mpv listener is still attached once).
+
+**Hooks rather than a store or smaller components.** The parts have to agree
+on one file's life and on who has the arrow keys. Hooks called from one
+component keep that agreement visible in one place, in the order things
+happen, with no new library and no change to how state flows. A store would
+have changed both; child components owning their own state would have
+spread the order across the tree.
+
+**How it was checked.** Before anything moved, ten new keyboard flows
+(`e2e/player.e2e.ts`) — everything a sofa does in the player — passed against
+the unsplit file in WebKit and Edge, and two deliberate breakages were each
+caught. After every step: the unit tests, the build, all twenty keyboard
+flows in both engines, the player's DOM in ten fixed states compared with the
+unsplit one, and a list of every line that was not a pure move, read one by
+one. Grouping effects into hooks changes the order React runs them in; each
+step's commit says which moved and why that is safe. One difference turned
+up, against the mock backend only, and is in GOTCHAS ("Moving effects into
+hooks moves them in React's order").
+
+**Found on the way and left as it was:** OK pressed in the very instant a
+prompt appears can reach the key handler from the moment before, which does
+not know the prompt yet and pauses instead — the handler is attached again
+after each render. Nobody presses that fast; the tests read a prompt before
+answering it, as they already did for Up next. A handler that reads the
+newest state through a ref would close the gap, and would be a change in
+behaviour, so it was not made here.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

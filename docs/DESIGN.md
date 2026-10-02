@@ -125,15 +125,24 @@ src/
                  badges; seasonBadges.ts sums a series' season up and finds
                  the episodes unlike it; MediaBadges shows them, under the
                  buttons and never focusable
-  player/        Player, track handling, mpv options. devicePolicy.ts says
+  player/        Player.tsx is the layout and which part feeds which; the
+                 parts are hooks — the file's life and the engine
+                 (usePlaybackSession, usePlaybackEngine, useProgressSave),
+                 tracks and online subtitles, skip markers, Up next and
+                 the episodes either side, the controls and panels
+                 (useOsd, usePanels), the screen and the way out
+                 (useScreen), seeking, volume and keys (usePlayerKeys) —
+                 and the pieces drawn (PlayerControls, SeekBar, TrackPanel,
+                 UpNextCard…). Track handling, mpv options. devicePolicy.ts says
                  which devices a picture-and-sound setting covers — every
                  one that can, only those listed, or none — and the sound
                  and screen rules ask it about the device in use (a screen
                  by the name the system gives it, matched to the equipment
                  check's stable id). engine.ts is the only
                  file that talks to mpv: open, pause, seek, stop and the
-                 playback events in Kinema's own terms (all Player.tsx
-                 uses), and mpvCommand/mpvGet/mpvSet for the parts that
+                 playback events in Kinema's own terms (all the player's
+                 own files use, but for frame timing), and
+                 mpvCommand/mpvGet/mpvSet for the parts that
                  are about mpv itself — stats, output check, sound routing,
                  HDR hint, frame timing — which another engine would
                  replace rather than imitate.

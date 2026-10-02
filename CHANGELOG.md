@@ -27,6 +27,9 @@ makes no stability promises.
 
 ### Changed
 
+- **The player's code is split into its parts.** Nothing changes in use: the
+  same controls, keys, prompts and screen. Ten new keyboard tests cover
+  everything the player does from a sofa, and passed before and after.
 - **Home's equipment notice never repeats an answer.** For a question never
   answered, Choose opens Picture & sound instead of switching everything on
   in one press; with only some devices chosen, it mentions only new

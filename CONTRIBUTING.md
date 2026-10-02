@@ -154,7 +154,9 @@ npm run test:ui
 ```
 
 The tests are in `e2e/`. They press keys the way a remote does — and wait as
-a person would, since two presses 25 ms apart are one (GOTCHAS).
+a person would, since two presses 25 ms apart are one (GOTCHAS), and a prompt
+is read before it is answered. `e2e/player.e2e.ts` covers everything a sofa
+does in the player; a change there should leave all of it passing.
 
 CI runs all of this on every push — Windows, and Linux for x86 and ARM, with
 the WebKit tests on x86 Linux — so checking here is about finding out before
@@ -175,6 +177,8 @@ keyboard-only in an ordinary browser. From DevTools:
 - `__fakeMpv.speed = 20` — play twenty times faster
 - `__fakeMpv.position = 1335` — jump somewhere, as a seek from outside would
 - `__fakeMpv.commands` — every command the player sent
+- `__fakeMpv.currentAo = null` — the sound output will not open, so the
+  player's fallbacks and their notices can be driven
 - `__kinemaMock.playback` — the resume and watched rows it has written
 
 It is a fixture, not a second backend: Rust's rules are tested in Rust. None

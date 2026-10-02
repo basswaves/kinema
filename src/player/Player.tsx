@@ -33,7 +33,7 @@ import {
 import FocusButton from '../ui/FocusButton';
 import { isTvMode, useTvMode } from '../ui/tv';
 import StatsPanel from './StatsPanel';
-import TrackPanel, { TRACK_PANEL_KEY } from './TrackPanel';
+import TrackPanel from './TrackPanel';
 import UpNextCard from './UpNextCard';
 import { startOverlay } from './overlay';
 import { capabilitiesNow } from '../capabilities';
@@ -83,7 +83,6 @@ import {
 } from './skip';
 import { readChapters, type Chapter } from './chapters';
 import { VIDEO_SYNC_KEY, VIDEO_SYNC_MODES } from './mpvOptions';
-import { readPlaybackStats, type StatGroup } from './stats';
 import { matchHdrToDisplay } from './displayHdr';
 import {
   applyAudioPlan,
@@ -96,7 +95,6 @@ import {
 import { filmNow, mayswitch, restoreScreen, switchForFilm } from './displaySwitch';
 import { getSetting } from '../metadata/api';
 import { initialSession, loadFailedMessage, reduce, samePath } from './session';
-import { COMMIT_IDLE_MS, scrubStep, type Scrub } from './scrub';
 import { endsAtLabel } from '../ui/format';
 import { resumePoint } from './resume';
 import { chooseTracks, forcedTrack, readLanguageDefaults, spokenTrack } from './trackChoice';
@@ -113,16 +111,11 @@ import { canonicalLang, languageName, systemLanguage } from './language';
 import PlayerControls from './PlayerControls';
 import ResumeToast from './ResumeToast';
 import SkipButton from './SkipButton';
-import { PLAYER_PLAY_KEY, PLAYER_SHELL_KEY, PLAYER_TRACKS_KEY } from './focusKeys';
-import {
-  applyMute,
-  applyVolume,
-  bitstreaming,
-  clampVolume,
-  persistVolume,
-  savedVolume,
-  VOLUME_STEP,
-} from './volume';
+import { PLAYER_PLAY_KEY, PLAYER_SHELL_KEY } from './focusKeys';
+import { VOLUME_STEP } from './volume';
+import { usePanels } from './usePanels';
+import { useScrub } from './useScrub';
+import { useVolume } from './useVolume';
 
 export interface PlaybackTarget {
   path: string;
@@ -146,8 +139,6 @@ const OSD_HIDE_MS = 3200;
 const OSD_FOCUS_IDLE_MS = 6000;
 const PROGRESS_SAVE_MS = 5000;
 const NEXT_EPISODE_COUNTDOWN = 12;
-/** Stats refresh. Fast enough to watch a drop counter, slow enough to be free. */
-const STATS_REFRESH_MS = 1000;
 /** Setting key: 'auto' skips without asking, anything else shows the button. */
 const SKIP_MODE_KEY = 'skip_mode';
 /**
@@ -241,7 +232,6 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   );
   const [osdVisible, setOsdVisible] = useState(true);
   const [tracks, setTracks] = useState<MpvTrack[]>([]);
-  const [showTracks, setShowTracks] = useState(false);
   /**
    * "Find subtitles online" in the track panel (onlineSubtitles.ts): whether
    * this copy can, which of the offered languages is picked, and what the
@@ -256,8 +246,6 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   }>({ available: false, langIndex: 0, finding: false, message: null, offers: [] });
   /** The subtitle language from Settings, or Windows' when subtitles are off. */
   const [wantedSubLang, setWantedSubLang] = useState<string | null>(null);
-  const [showStats, setShowStats] = useState(false);
-  const [stats, setStats] = useState<StatGroup[]>([]);
   const [sid, setSid] = useState<number | null>(null);
   const [aid, setAid] = useState<number | null>(null);
   const [subVisible, setSubVisible] = useState(true);
@@ -380,26 +368,8 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     void setFocus(PLAYER_PLAY_KEY);
   }, []);
 
-  /**
-   * Close a panel with the focus ring landing on the button that opened it.
-   *
-   * Focus moves **first**, while the panel is still there. Closing it with the
-   * ring inside lets the spatial library restore focus by itself 300 ms after
-   * the unmount — to the shell's preferred child, Pause — which overrode
-   * anything set in the meantime (docs/GOTCHAS.md, "focus parked on an
-   * unmounted component"). With the ring already outside, there is nothing to
-   * restore.
-   */
-  const closeTracks = useCallback(() => {
-    if (osdFocusRef.current) void setFocus(PLAYER_TRACKS_KEY);
-    setShowTracks(false);
-  }, []);
-  // The stats panel has no button on the bar any more (it opens on `i`), so
-  // closing it hands the ring to Play rather than to a button that is gone.
-  const closeStats = useCallback(() => {
-    if (osdFocusRef.current) void setFocus(PLAYER_PLAY_KEY);
-    setShowStats(false);
-  }, []);
+  const { showTracks, openTracks, closeTracks, showStats, openStats, closeStats, stats } =
+    usePanels({ osdFocus, osdFocusRef });
 
   /** Give them back to seeking, and let the OSD start timing out again. */
   const leaveOsdFocus = useCallback(() => {
@@ -1236,34 +1206,6 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     return () => window.clearTimeout(id);
   }, [countdown, upNext, onPlayTarget, target.titleId]);
 
-  /**
-   * Poll the pipeline while the stats panel is open, and only then.
-   *
-   * Polling rather than observing, for the reason in GOTCHAS: observed
-   * properties are registered when mpv initialises, which happens once per
-   * window — a panel that added its own would show nothing until the whole app
-   * restarted, and would look exactly like a panel that was simply wrong.
-   */
-  useEffect(() => {
-    if (!showStats) return;
-
-    let cancelled = false;
-    const read = () => {
-      void readPlaybackStats()
-        .then((groups) => {
-          if (!cancelled) setStats(groups);
-        })
-        .catch((e) => console.warn('stats read failed', e));
-    };
-
-    read();
-    const id = window.setInterval(read, STATS_REFRESH_MS);
-    return () => {
-      cancelled = true;
-      window.clearInterval(id);
-    };
-  }, [showStats]);
-
   // ---- controls -----------------------------------------------------------
   /** Resolves to whether it is paused now, or null if mpv did not answer. */
   const togglePause = useCallback(async (): Promise<boolean | null> => {
@@ -1304,47 +1246,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   }, [fail, showOsd]);
 
   // ---- seeking with Left/Right --------------------------------------------
-  /** The seek being steered right now, shown on the bar until committed. */
-  const scrubRef = useRef<Scrub | null>(null);
-  /** The last committed one, so quick taps keep accelerating across commits. */
-  const lastScrub = useRef<Scrub | null>(null);
-  const scrubTimer = useRef<number | undefined>(undefined);
-
-  /** Send the seek to mpv. Called on key release, or when presses stop. */
-  const commitScrub = useCallback(() => {
-    window.clearTimeout(scrubTimer.current);
-    const s = scrubRef.current;
-    if (!s) return;
-    scrubRef.current = null;
-    lastScrub.current = s;
-    dispatch({ type: 'scrub-end' });
-    void seekTo(s.target).catch(fail);
-    showOsd();
-  }, [fail, showOsd]);
-
-  const scrubBy = useCallback(
-    (dir: 1 | -1, repeat: boolean) => {
-      const { timePos: position, duration: length } = sessionRef.current;
-      if (!scrubRef.current) dispatch({ type: 'scrub-start' });
-      const next = scrubStep(
-        scrubRef.current ?? lastScrub.current,
-        performance.now(),
-        dir,
-        repeat,
-        position ?? 0,
-        length
-      );
-      scrubRef.current = next;
-      dispatch({ type: 'scrub', timePos: next.target });
-      showOsd();
-      // A remote that never sends a key release still gets its seek.
-      window.clearTimeout(scrubTimer.current);
-      scrubTimer.current = window.setTimeout(commitScrub, COMMIT_IDLE_MS);
-    },
-    [commitScrub, showOsd]
-  );
-
-  useEffect(() => () => window.clearTimeout(scrubTimer.current), []);
+  const { scrubBy, commitScrub } = useScrub({ sessionRef, dispatch, fail, showOsd });
 
   /**
    * The clock, for "Ends at". Ticked rather than read during render, which
@@ -1358,72 +1260,8 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   }, []);
 
   // ---- volume -------------------------------------------------------------
-  const [volume, setVolume] = useState(100);
-  const [muted, setMuted] = useState(false);
-  /** Sound bitstreamed to a receiver: this volume would do nothing. */
-  const [receiver, setReceiver] = useState(false);
-
-  // The remembered level, applied once per player; mpv keeps it across files.
-  useEffect(() => {
-    let live = true;
-    void savedVolume().then((level) => {
-      if (!live) return;
-      setVolume(level);
-      void applyVolume(level).catch((e) => console.warn('volume: could not apply', e));
-    });
-    return () => {
-      live = false;
-    };
-  }, []);
-
-  /**
-   * Set the level outright. `save` is false while a mouse drags the bar, so a
-   * drag is one saved setting when it is let go, not one per pixel.
-   */
-  const setVolumeLevel = useCallback(
-    (value: number, save = true) => {
-      const level = clampVolume(value);
-      setVolume(level);
-      void applyVolume(level).catch(fail);
-      if (save) void persistVolume(level).catch((e) => console.warn('volume: could not save', e));
-      // Turning it up is a clear enough request to hear something.
-      if (muted && level > volume) {
-        setMuted(false);
-        void applyMute(false).catch(fail);
-      }
-      showOsd();
-    },
-    [volume, muted, fail, showOsd]
-  );
-
-  const changeVolume = useCallback(
-    (delta: number) => setVolumeLevel(volume + delta),
-    [volume, setVolumeLevel]
-  );
-
-  const toggleMute = useCallback(() => {
-    const next = !muted;
-    setMuted(next);
-    void applyMute(next).catch(fail);
-    showOsd();
-  }, [muted, fail, showOsd]);
-
-  /**
-   * A volume key, asked of the sound path at the moment it is pressed rather
-   * than of the last answer: a fallback part-way through a file can change it,
-   * and a key that silently did nothing because of a stale answer is the kind
-   * of failure nobody can report.
-   */
-  const volumeKey = useCallback(
-    (act: () => void) => {
-      void bitstreaming().then((yes) => {
-        setReceiver(yes);
-        if (yes) showOsd();
-        else act();
-      });
-    },
-    [showOsd]
-  );
+  const { volume, muted, receiver, setVolumeLevel, changeVolume, toggleMute, volumeKey } =
+    useVolume({ fail, showOsd, osdVisible, path: target.path, frameShown: session.frameShown });
 
   const toggleFullscreen = useCallback(async () => {
     // In TV mode the window is always fullscreen and has no other state to
@@ -1615,7 +1453,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         case 'i':
           e.preventDefault();
           if (showStats) closeStats();
-          else setShowStats(true);
+          else openStats();
           break;
         // OK on a remote. While the OSD holds focus this belongs entirely to
         // the spatial system, which activates whichever control the ring is on
@@ -1663,6 +1501,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     showStats,
     closeTracks,
     closeStats,
+    openStats,
     scrubBy,
     volumeKey,
     toggleMute,
@@ -1670,21 +1509,6 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     session.resumedFrom,
     startOver,
   ]);
-
-  /**
-   * Whether the receiver has the volume, asked whenever the controls come up
-   * — the only time the answer is on screen, and a cheap scalar read — and
-   * again at the first frame: the controls are often already up while a file
-   * opens, before its sound output exists, and the answer asked then was "no".
-   */
-  useEffect(() => {
-    if (!osdVisible) return;
-    let live = true;
-    void bitstreaming().then((yes) => live && setReceiver(yes));
-    return () => {
-      live = false;
-    };
-  }, [osdVisible, target.path, session.frameShown]);
 
   /**
    * Letting go of Left/Right is what sends the seek. Only in watching mode:
@@ -1733,18 +1557,6 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     showOsd();
     return () => window.clearTimeout(hideTimer.current);
   }, [showOsd]);
-
-  /**
-   * Follow the track panel with the focus ring when it opens.
-   *
-   * Opening a panel and leaving focus on the button that opened it means the
-   * first thing a remote has to do is work out which direction the new panel is
-   * in. Only once the OSD holds focus — with a mouse, nothing should move on
-   * its own. Closing is `closeTracks`, which has to act *before* the panel goes.
-   */
-  useEffect(() => {
-    if (osdFocus && showTracks) void setFocus(TRACK_PANEL_KEY);
-  }, [showTracks, osdFocus]);
 
   /**
    * Catch the ring when a control disappears from under it.
@@ -1919,7 +1731,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
             closeTracks();
             return;
           }
-          setShowTracks(true);
+          openTracks();
           void readTracks().then(setTracks);
         }}
         onVolumeChange={changeVolume}

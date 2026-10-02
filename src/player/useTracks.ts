@@ -5,11 +5,10 @@
  * in the track panel, which is remembered for the whole title.
  */
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
-import { getTitlePrefs, setTitlePrefs } from './api';
+import { getTitlePrefs, setTitlePrefs, type PlaybackTarget } from './api';
 import { openPath } from './engine';
 import { canonicalLang, systemLanguage } from './language';
 import { forcedSubtitle, loadSubtitle } from './onlineSubtitles';
-import type { PlaybackTarget } from './Player';
 import { samePath } from './session';
 import { chooseTracks, forcedTrack, readLanguageDefaults, spokenTrack } from './trackChoice';
 import {

@@ -5,6 +5,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { userError } from '../ui/errors';
+import type { PlaybackTarget } from './api';
 import { languageName } from './language';
 import {
   fetchSubtitle,
@@ -13,7 +14,6 @@ import {
   subtitleStatus,
   type Offer,
 } from './onlineSubtitles';
-import type { PlaybackTarget } from './Player';
 import { spokenTrack } from './trackChoice';
 import type { MpvTrack } from './tracks';
 import type { OnlineSubtitles } from './TrackPanel';

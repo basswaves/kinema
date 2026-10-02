@@ -1,10 +1,23 @@
 /**
- * Playback view.
+ * Playback view: the player's layout, and which of its parts feeds which.
  *
- * Responsibilities beyond playing a file:
- *  - resume from a stored position, and keep that position current
- *  - remember audio/subtitle language per title and re-apply it per file
- *  - offer the next episode when one finishes
+ * The work is in the parts, each in its own file:
+ *  - usePlaybackSession: the file's life as one state machine (session.ts)
+ *  - usePlaybackEngine: loading the file, mpv's events, the sound check, the
+ *    end of the file, and stopping when the player closes
+ *  - useProgressSave: the resume point, kept current
+ *  - useTracks, useOnlineSubtitles: audio and subtitles, remembered per title
+ *  - useNeighbours, useSkipMarkers, useUpNext: the episodes either side,
+ *    skipping the intro, a recap and the credits, and the next episode
+ *  - useOsd, usePanels: the controls and who has the arrow keys; the track
+ *    and stats panels
+ *  - useScreen: matching the screen, full screen, and the way out
+ *  - useScrub, useVolume, usePlayerKeys: seeking, the volume, every key
+ *  - PlayerControls, SeekBar, ResumeToast, SkipButton, UpNextCard,
+ *    TrackPanel, StatsPanel: what is drawn
+ *
+ * Hooks run their effects in the order they are called here; where that
+ * order matters, it is said beside the call.
  *
  * The window is transparent and mpv renders behind the webview, so nothing here
  * may paint an opaque background **over a video frame**. The one opaque thing
@@ -22,6 +35,7 @@ import {
 import FocusButton from '../ui/FocusButton';
 import { endsAtLabel } from '../ui/format';
 import { useTvMode } from '../ui/tv';
+import type { PlaybackTarget } from './api';
 import { isPaused, seekBy, seekTo, setPaused } from './engine';
 import { PLAYER_PLAY_KEY, PLAYER_SHELL_KEY } from './focusKeys';
 import PlayerControls from './PlayerControls';
@@ -45,17 +59,6 @@ import { useSkipMarkers } from './useSkipMarkers';
 import { useTracks } from './useTracks';
 import { useUpNext } from './useUpNext';
 import { useVolume } from './useVolume';
-
-export interface PlaybackTarget {
-  path: string;
-  label: string;
-  fileId: number | null;
-  titleId: number | null;
-  /** Shown after the label at the top, where the caller knows it. */
-  episodeName?: string | null;
-  /** Ignore the stored position: "Play from start". */
-  fromStart?: boolean;
-}
 
 interface Props {
   target: PlaybackTarget;
@@ -163,6 +166,8 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   });
 
   // ---- the file itself ----------------------------------------------------
+  // The progress save before the engine: leaving the player, the position is
+  // read for saving before playback is stopped.
   useProgressSave({ fileId: target.fileId, sessionRef, countedCreditsStart });
   usePlaybackEngine({
     target,

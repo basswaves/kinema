@@ -4,9 +4,11 @@
  * Everything else in Kinema reaches the player through here, in two layers.
  *
  * **Kinema's own terms** — open a file, pause, seek, stop, and the events that
- * say what happened. This is what any engine has to provide; Player.tsx uses
- * nothing else. On Android the engine will be Media3, not mpv (see the porting
- * notes), and this layer is what it will implement.
+ * say what happened. This is what any engine has to provide; the player's own
+ * files (Player.tsx and its `use…` hooks) use nothing else, but for frame
+ * timing, which is mpv's own setting and says so where it is set. On Android
+ * the engine will be Media3, not mpv (see the porting notes), and this layer
+ * is what it will implement.
  *
  * **mpv's terms** — `mpvCommand`, `mpvGet`, `mpvSet`, `readProperty`. For the
  * parts that are about this engine rather than about playing: the stats

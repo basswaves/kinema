@@ -80,7 +80,7 @@ test('an episode plays, pauses and rolls on to the next', async ({ page }) => {
 
   // To the very end — past the credits offer, which a few seconds earlier
   // would ask first — and the next episode is offered. With the controls
-  // hidden OK takes whatever prompt is showing, no ring needed (Player.tsx).
+  // hidden OK takes whatever prompt is showing, no ring needed (usePlayerKeys.ts).
   await page.evaluate(() => {
     (window as unknown as { __fakeMpv: FakeMpv }).__fakeMpv.position = 2999.9;
   });

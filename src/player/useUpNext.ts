@@ -4,8 +4,13 @@
  * and moving to an episode either side.
  */
 import { useCallback, useEffect, useState, type RefObject } from 'react';
-import { episodeRefLabel, nextEpisode, saveProgress, type EpisodeRef } from './api';
-import type { PlaybackTarget } from './Player';
+import {
+  episodeRefLabel,
+  nextEpisode,
+  saveProgress,
+  type EpisodeRef,
+  type PlaybackTarget,
+} from './api';
 import type { Session } from './session';
 import type { SkipKind } from './skip';
 

@@ -5,10 +5,9 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch } from 'react';
 import { getSetting } from '../metadata/api';
-import { getSkipMarkers, type EpisodeRef, type SkipMarkers } from './api';
+import { getSkipMarkers, type EpisodeRef, type PlaybackTarget, type SkipMarkers } from './api';
 import type { Chapter } from './chapters';
 import { seekTo } from './engine';
-import type { PlaybackTarget } from './Player';
 import type { Event, Session } from './session';
 import {
   activeSkip,

@@ -8,7 +8,7 @@
 import { useEffect, useLayoutEffect, useRef, type Dispatch, type RefObject } from 'react';
 import { capabilitiesNow } from '../capabilities';
 import { getSetting } from '../metadata/api';
-import { getProgress } from './api';
+import { getProgress, type PlaybackTarget } from './api';
 import {
   applyAudioPlan,
   applyFallback,
@@ -34,7 +34,6 @@ import {
 } from './engine';
 import { VIDEO_SYNC_KEY, VIDEO_SYNC_MODES } from './mpvOptions';
 import { startOverlay } from './overlay';
-import type { PlaybackTarget } from './Player';
 import { resumePoint } from './resume';
 import { loadFailedMessage, samePath, type Event, type Session } from './session';
 

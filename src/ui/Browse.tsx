@@ -30,13 +30,14 @@ import {
 } from './focus';
 import { back, current, navigate, open, replace, type Entry } from './history';
 import { setShortcutsOpen } from './shortcutsState';
-import Player, { type PlaybackTarget } from '../player/Player';
+import Player from '../player/Player';
 import {
   continueWatching,
   episodeLabel,
   firstUnwatchedEpisode,
   dismissContinue,
   type ContinueItem,
+  type PlaybackTarget,
 } from '../player/api';
 import { cacheArtwork, getSetting, setSetting } from '../metadata/api';
 import { countNeedsReview } from '../metadata/api';

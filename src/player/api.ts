@@ -31,6 +31,18 @@ export interface ContinueItem {
   is_next_up: boolean;
 }
 
+/** What the player is asked to play: a file, its label, and where it belongs. */
+export interface PlaybackTarget {
+  path: string;
+  label: string;
+  fileId: number | null;
+  titleId: number | null;
+  /** Shown after the label at the top, where the caller knows it. */
+  episodeName?: string | null;
+  /** Ignore the stored position: "Play from start". */
+  fromStart?: boolean;
+}
+
 /** Enough to play a neighbouring episode and label it, in either direction. */
 export interface EpisodeRef {
   file_id: number;

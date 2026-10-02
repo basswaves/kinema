@@ -46,6 +46,44 @@ async function canScale(): Promise<boolean> {
   return scalesOverlays(version);
 }
 
+/**
+ * The largest box of the film's shape (`aspect`, width ÷ height) that fits in
+ * a page of `width` × `height`, at its top left.
+ *
+ * Kinema's window is whatever size the desktop gives it — floated at the
+ * screen's size where that works (display.rs `player_window`), but a tiling
+ * desktop may squeeze it beside the film's window, and Sway 1.11 floated it
+ * 90 pixels larger than asked. Scaling a page of another shape to mpv's
+ * stretches the controls, so the player is laid out in this box instead and
+ * only the box is drawn: the controls keep their shape on any desktop, and
+ * the only thing a desktop can cost is sharpness.
+ */
+export function stageFor(width: number, height: number, aspect: number): { width: number; height: number } {
+  if (!(aspect > 0) || width <= 0 || height <= 0) return { width, height };
+  return width / height > aspect
+    ? { width: Math.round(height * aspect), height }
+    : { width, height: Math.round(width / aspect) };
+}
+
+/**
+ * Lay the player out in `stage` (device pixels), or across the whole page
+ * when null. The box is in CSS pixels on the root; ui.css sizes `.player`
+ * from it.
+ */
+function setStage(stage: { width: number; height: number } | null): void {
+  const root = document.documentElement;
+  if (!stage) {
+    delete root.dataset.stage;
+    root.style.removeProperty('--stage-w');
+    root.style.removeProperty('--stage-h');
+    return;
+  }
+  const ratio = window.devicePixelRatio || 1;
+  root.dataset.stage = 'fit';
+  root.style.setProperty('--stage-w', `${stage.width / ratio}px`);
+  root.style.setProperty('--stage-h', `${stage.height / ratio}px`);
+}
+
 /** Start drawing the page into mpv; returns the function that stops it. */
 export function startOverlay(): () => void {
   let stopped = false;
@@ -74,14 +112,20 @@ export function startOverlay(): () => void {
       const picture = [ID, 0, 0, frame.path, 0, 'bgra', frame.width, frame.height, frame.stride];
       const w = (await readProperty<number>('osd-width', 'int64')) || frame.width;
       const h = (await readProperty<number>('osd-height', 'int64')) || frame.height;
-      const sizes = `${frame.width}×${frame.height} on mpv's ${w}×${h}`;
+      // Laid out in the film's shape, and only that drawn — the same rows
+      // (stride) of the same photo, fewer of them, narrower.
+      const box = stageFor(frame.width, frame.height, w / h);
+      const whole = Math.abs(box.width - frame.width) <= 1 && Math.abs(box.height - frame.height) <= 1;
+      if (scaled) setStage(whole ? null : box);
+      const sizes = `${frame.width}×${frame.height}${whole ? '' : `, drawn ${box.width}×${box.height}`} on mpv's ${w}×${h}`;
       if (sizes !== lastSizes) {
         lastSizes = sizes;
         console.log(`overlay: page ${sizes}`);
       }
       if (scaled) {
+        const drawn = whole ? picture : [ID, 0, 0, frame.path, 0, 'bgra', box.width, box.height, frame.stride];
         try {
-          await mpvCommand('overlay-add', [...picture, w, h]);
+          await mpvCommand('overlay-add', [...drawn, w, h]);
           shown = true;
           return;
         } catch (e) {
@@ -95,6 +139,7 @@ export function startOverlay(): () => void {
           // screen after the player had gone.
           if (stopped || (await canScale())) throw e;
           scaled = false;
+          setStage(null);
           console.warn('overlay: this mpv cannot scale the page; matching the window to the screen');
           const win = getCurrentWindow();
           if (!(await win.isFullscreen())) {
@@ -124,6 +169,7 @@ export function startOverlay(): () => void {
   return () => {
     stopped = true;
     window.clearInterval(timer);
+    setStage(null);
     if (shown) void mpvCommand('overlay-remove', [ID]).catch(() => undefined);
     if (madeFullscreen) void getCurrentWindow().setFullscreen(false).catch(() => undefined);
     void invoke('overlay_reset').catch(() => undefined);

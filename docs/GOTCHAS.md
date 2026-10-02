@@ -1647,7 +1647,11 @@ Undecorated matters: GTK's invisible shadow margins and title bar made a
 "1600×900" window 1560×860 of page. It must stop floating when the film
 leaves full screen (it would sit over the windowed film) and get its own
 full screen back only when the player closes (or it covers the film).
-`app.log` says `overlay: page W×H on mpv's W×H`; the two should match.
+Floating is for sharpness only, not for shape: no desktop's size is trusted.
+Sway 1.11 floated it 90 pixels larger than asked, so the page is laid out in
+the largest box of the film screen's shape that fits the window
+(`overlay.ts` `stageFor`, `#root` sized from `--stage-w/h`) and only that
+box is drawn; `app.log` says `overlay: page W×H, drawn W×H on mpv's W×H`.
 
 ### Hyprland's report does not show HDR it passes through
 

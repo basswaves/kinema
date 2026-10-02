@@ -12,6 +12,21 @@ body,
   background: transparent;
 }
 
+/*
+ * Linux, while a film plays: the page reaches the screen as a photo mpv
+ * scales to its own size, so everything is laid out in a box of the film's
+ * shape at the top left (player/overlay.ts, `stageFor`) and only that box is
+ * drawn — the controls keep their shape whatever size the desktop gave the
+ * window. `contain` makes the box the frame for fixed-position dialogs too.
+ */
+:root[data-stage='fit'] #root {
+  position: relative;
+  width: var(--stage-w);
+  height: var(--stage-h);
+  overflow: hidden;
+  contain: layout;
+}
+
 * {
   box-sizing: border-box;
 }

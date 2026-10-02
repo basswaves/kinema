@@ -7,6 +7,9 @@
  * what the equipment check found — which formats it takes. Each format
  * defaults to Auto, the detected answer, so the common case is one switch.
  *
+ * Straight to the receiver applies to every device that takes a film's
+ * formats untouched, only the devices listed, or none (`devicePolicy.ts`).
+ *
  * The rules themselves are in `player/audioOutput.ts`; this only reads and
  * writes the settings it reads, and says in words what they will do with the
  * device that is actually connected.
@@ -14,6 +17,9 @@
 import { userError } from './errors';
 import { useCallback, useEffect, useState } from 'react';
 import ChoiceRow from './ChoiceRow';
+import DeviceChoice from './DeviceChoice';
+import { soundOptions } from './deviceOptions';
+import { savePolicy, type DevicePolicy } from '../player/devicePolicy';
 import { setSetting } from '../metadata/api';
 import { getEquipment, type AudioDevice, type Equipment } from '../player/equipment';
 import {
@@ -70,6 +76,14 @@ export default function SoundSection({
     [onError]
   );
 
+  const saveDirect = useCallback(
+    (direct: DevicePolicy, next: AudioSettings) => {
+      setSettings(next);
+      void savePolicy(AUDIO_DIRECT_KEY, direct).catch((e) => onError(userError(e)));
+    },
+    [onError]
+  );
+
   if (!settings) return null;
 
   const connected = equipment?.audio.filter((a) => a.connected) ?? [];
@@ -94,25 +108,18 @@ export default function SoundSection({
     <section className="settings-section">
       <h2>Sound</h2>
 
-      <ChoiceRow
+      <DeviceChoice
         label="Send sound straight to the receiver"
-        choices={[
-          { value: 'off', label: 'Off' },
-          { value: 'on', label: 'On' },
-        ]}
-        value={settings.direct.policy === 'off' ? 'off' : 'on'}
-        onChange={(v) =>
-          save(AUDIO_DIRECT_KEY, v, {
-            ...settings,
-            direct: { ...settings.direct, policy: v === 'on' ? 'all' : 'off' },
-          })
-        }
-        note={`On sends the video's own soundtrack to your receiver untouched, as a disc player does, including Dolby TrueHD, Atmos, DTS-HD and DTS:X. Off sends sound through ${system} like any other program, which mixes it to ${system}'s speaker setup and loses Atmos and DTS:X height sound.`}
-        hint={
+        allLabel="Every device that can"
+        policy={settings.direct}
+        devices={soundOptions(equipment)}
+        onChange={(direct) => saveDirect(direct, { ...settings, direct })}
+        note={`Straight to the receiver sends the video's own soundtrack to your receiver untouched, as a disc player does, including Dolby TrueHD, Atmos, DTS-HD and DTS:X. Otherwise sound goes through ${system} like any other program, which mixes it to ${system}'s speaker setup and loses Atmos and DTS:X height sound.`}
+        hint={`${
           onWindows
-            ? "While a video plays with this on, other sounds from this PC are silent, and Windows' speaker and spatial sound settings make no difference."
-            : `While a video plays with this on, other sounds from this PC are silent, and ${system}'s own volume makes no difference: use Kinema's.`
-        }
+            ? "While a video plays straight to the receiver, other sounds from this PC are silent, and Windows' speaker and spatial sound settings make no difference."
+            : `While a video plays straight to the receiver, other sounds from this PC are silent, and ${system}'s own volume makes no difference: use Kinema's.`
+        } Every device that can means one that takes some of a film's formats untouched; speakers that take none keep working as usual. Only these is for a PC that is not always at the same receiver.`}
       />
 
       {device && (

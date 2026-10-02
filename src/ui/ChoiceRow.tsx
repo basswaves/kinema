@@ -28,6 +28,8 @@ interface Props<V extends string> {
   note?: ReactNode;
   /** When to pick the other choice, and what it costs. Quieter, under `note`. */
   hint?: ReactNode;
+  /** More to choose, under the choices — the devices "only these" means. */
+  children?: ReactNode;
 }
 
 export default function ChoiceRow<V extends string>({
@@ -37,6 +39,7 @@ export default function ChoiceRow<V extends string>({
   onChange,
   note,
   hint,
+  children,
 }: Props<V>) {
   return (
     <div className="choice-row">
@@ -54,6 +57,7 @@ export default function ChoiceRow<V extends string>({
           </FocusButton>
         ))}
       </div>
+      {children}
       {note && <p className="choice-note">{note}</p>}
       {hint && <p className="choice-hint">{hint}</p>}
     </div>

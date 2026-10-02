@@ -9,12 +9,19 @@
  * reads to decide whether to switch this on: any frame rate, not only film's;
  * only modes the screen itself offers; never a lower resolution for a better
  * rate.
+ *
+ * Refresh matching and HDR each apply to every screen, only the screens
+ * listed, or none (`devicePolicy.ts`) — for a PC that is not always at the
+ * same screen.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { setSetting } from '../metadata/api';
 import { savePolicy, type DevicePolicy } from '../player/devicePolicy';
 import { userError } from './errors';
 import ChoiceRow from './ChoiceRow';
+import DeviceChoice from './DeviceChoice';
+import { hdrOptions, refreshOptions } from './deviceOptions';
+import { getEquipment, type Equipment } from '../player/equipment';
 import type { ResolutionMode } from '../player/displayMode';
 import {
   readSwitchPolicies,
@@ -23,11 +30,6 @@ import {
   SWITCH_RESOLUTION_KEY,
   type SwitchPolicies,
 } from '../player/displaySwitch';
-
-const ON_OFF = [
-  { value: 'off' as const, label: 'Off' },
-  { value: 'on' as const, label: 'On' },
-];
 
 const RESOLUTION_CHOICES: { value: ResolutionMode; label: string }[] = [
   { value: 'off', label: 'Never change it' },
@@ -44,10 +46,14 @@ export default function ScreenSection({
   system: string;
 }) {
   const [settings, setSettings] = useState<SwitchPolicies | null>(null);
+  const [equipment, setEquipment] = useState<Equipment | null>(null);
 
   useEffect(() => {
     let live = true;
     void readSwitchPolicies().then((s) => live && setSettings(s));
+    void getEquipment()
+      .then((e) => live && setEquipment(e))
+      .catch(() => undefined);
     return () => {
       live = false;
     };
@@ -79,14 +85,12 @@ export default function ScreenSection({
         Kinema only uses modes the screen offers, as listed under Your equipment below.
       </p>
 
-      <ChoiceRow
+      <DeviceChoice
         label="Match the refresh rate"
-        choices={ON_OFF}
-        value={settings.refresh.policy === 'off' ? 'off' : 'on'}
-        onChange={(v) => {
-          const refresh: DevicePolicy = { ...settings.refresh, policy: v === 'on' ? 'all' : 'off' };
-          savePolicyOf(SWITCH_REFRESH_KEY, refresh, { ...settings, refresh });
-        }}
+        allLabel="Every screen"
+        policy={settings.refresh}
+        devices={refreshOptions(equipment)}
+        onChange={(refresh) => savePolicyOf(SWITCH_REFRESH_KEY, refresh, { ...settings, refresh })}
         note="Switches the screen to a refresh rate that fits the video's frame rate, so camera pans move smoothly instead of juddering: 23.976 Hz for most movies, for example, or 50 Hz for a show made for European TV."
         hint="Only rates the screen offers at the resolution it is using count, and Kinema never lowers the resolution to get one. The screen goes black for a second or two while it switches, and the video waits."
       />
@@ -100,16 +104,14 @@ export default function ScreenSection({
         hint="Match the video always uses the video's own resolution, for a TV or video processor (such as a madVR Envy) that should do the upscaling instead of Kinema."
       />
 
-      <ChoiceRow
+      <DeviceChoice
         label="Turn HDR on for HDR videos"
-        choices={ON_OFF}
-        value={settings.hdr.policy === 'off' ? 'off' : 'on'}
-        onChange={(v) => {
-          const hdr: DevicePolicy = { ...settings.hdr, policy: v === 'on' ? 'all' : 'off' };
-          savePolicyOf(SWITCH_HDR_KEY, hdr, { ...settings, hdr });
-        }}
+        allLabel="Every screen"
+        policy={settings.hdr}
+        devices={hdrOptions(equipment)}
+        onChange={(hdr) => savePolicyOf(SWITCH_HDR_KEY, hdr, { ...settings, hdr })}
         note={`For a screen that can show HDR but has it switched off in ${system}. Kinema turns HDR on for an HDR video and off again afterwards.`}
-        hint="With this off, HDR videos are shown in SDR on such a screen."
+        hint="With this off, HDR videos are shown in SDR on such a screen. Only these is for a PC that is not always at the same screen: a screen not on the list is left as it is."
       />
     </section>
   );

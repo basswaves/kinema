@@ -727,6 +727,21 @@ unbroken press. The first attempt at this fix set `throttle` alone and changed
 nothing in the mock, whose key repeat — like many remotes' — is a stream of
 separate down/up presses.
 
+### Focusing a container picks its "first" child by stale positions
+
+`setFocus` on a container with no remembered child goes to the child nearest
+the top-left corner — by `|left| + |top|` of the positions norigin last
+measured, not where the children are now. The first setup page mounts while
+the page is still scrolled the way the welcome page left it, and its rows
+were measured at different scroll offsets: on CI's Linux WebKit, and here in
+any window shorter than about 560 px, the ring landed on the second row. It
+passed every time at full height on Windows.
+
+**Do:** when focus has to land on a container's first control, put the page
+where it will be first, call `updateAllLayouts()`, and only then `setFocus`
+(`SetupPages.tsx`, `landOn`). And run a keyboard flow that lands this way in
+a short window (`page.setViewportSize`), where the scroll makes it fail.
+
 ### A hidden browser pane never scrolls smoothly
 
 When testing `dev:mock` in a browser pane embedded in another program: while the pane is hidden,

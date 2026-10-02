@@ -27,9 +27,11 @@ makes no stability promises.
 
 ### Changed
 
-- **The player's code is split into its parts.** Nothing changes in use: the
-  same controls, keys, prompts and screen. Ten new keyboard tests cover
-  everything the player does from a sofa, and passed before and after.
+- **Behind the scenes: the player's code is split into its parts, and SIMKL
+  and Trakt share what they do alike.** Nothing changes in use: the same
+  controls, keys, prompts and screen, and the same history sent to each
+  service. Ten new keyboard tests cover everything the player does from a
+  sofa, and passed before and after.
 - **Home's equipment notice never repeats an answer.** For a question never
   answered, Choose opens Picture & sound instead of switching everything on
   in one press; with only some devices chosen, it mentions only new

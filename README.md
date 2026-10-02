@@ -274,8 +274,9 @@ player or D-pad navigation.
 
 ## When something goes wrong
 
-Kinema writes two logs to `%APPDATA%\com.kinema.app\logs\`. The quickest way
-there is **Settings → Developer tools → Open log folder**:
+Kinema writes two logs to `%APPDATA%\com.kinema.app\logs\` on Windows and
+`~/.local/share/com.kinema.app/logs/` on Linux. The quickest way there is
+**Settings → Developer tools → Open log folder**:
 
 - **`app.log`** — the app's own messages. The WebView2 console is invisible from
   outside the app, so this is where its errors go.
@@ -286,6 +287,13 @@ there is **Settings → Developer tools → Open log folder**:
 Attach both to a [bug report](https://github.com/Basswaves/kinema/issues/new/choose).
 They are the most useful thing you can send, and most problems here produce no
 visible error at all — only a log line.
+
+On Linux, Kinema is built to work the same everywhere rather than tested on
+every desktop, version and driver — there are too many for one person. It
+uses the shared standards first and falls back safely: where it cannot ask a
+desktop to switch the screen, or a driver offers no HDR, the film still
+plays. If your setup still misbehaves, a bug report with the logs, your
+distribution, desktop and graphics card is how it gets fixed.
 
 `F12` opens WebView2 DevTools in the app window.
 

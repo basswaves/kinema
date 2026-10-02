@@ -11,10 +11,17 @@ body:
         visible error at all, only a log line.
 
         Open them from **Settings → Developer tools → Open log folder**, or go
-        to `%APPDATA%\com.kinema.app\logs\`:
+        to `%APPDATA%\com.kinema.app\logs\` (Windows) or
+        `~/.local/share/com.kinema.app/logs/` (Linux):
 
-        - `app.log` — the app's own messages
+        - `app.log` — the app's own messages, including what it found about
+          your screen, receiver and graphics card at start
         - `mpv.log` — the player's, and the authority on anything about video
+
+        On Linux there are more desktops, versions and drivers than one person
+        can test, so Kinema aims for a base that works everywhere and falls
+        back safely where something is missing. A setup where it still
+        misbehaves is exactly what this form is for.
 
   - type: textarea
     id: what
@@ -42,10 +49,27 @@ body:
       required: true
 
   - type: input
-    id: windows
+    id: system
     attributes:
-      label: Windows version
-      description: 'Run `winver`. For example: Windows 11 Pro 24H2 (26100.2314)'
+      label: System and version
+      description: >
+        Windows: run `winver`, e.g. "Windows 11 Pro 24H2 (26100.2314)". Linux:
+        the distribution and version, e.g. "Fedora 43", "Ubuntu 26.04", "Arch".
+    validations:
+      required: true
+
+  - type: dropdown
+    id: desktop
+    attributes:
+      label: Desktop (Linux only)
+      description: Screen switching and HDR go through the desktop, and each is asked its own way.
+      options:
+        - Not Linux
+        - GNOME
+        - KDE Plasma
+        - Sway
+        - Hyprland
+        - Another (say which under "What happened")
     validations:
       required: true
 
@@ -54,9 +78,11 @@ body:
     attributes:
       label: GPU and driver version
       description: >
-        Task Manager → Performance → GPU, or `dxdiag`. Playback behaviour
-        differs between AMD, Intel and NVIDIA, and driver version matters more
-        than you would think.
+        Windows: Task Manager → Performance → GPU, or `dxdiag`. Linux: the
+        "Driver info" line in `mpv.log` gives it (NVIDIA's version, or Mesa's).
+        Playback behaviour differs between AMD, Intel and NVIDIA, and driver
+        version matters more than you would think — on Linux, HDR needs NVIDIA
+        595 or Mesa 25.1 or later.
     validations:
       required: true
 

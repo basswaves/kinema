@@ -2391,7 +2391,7 @@ card's generation, and the display engine of Polaris and Vega sends the
 HDR signal (read in the kernel source), so those cards are expected to work
 with a recent Mesa — confirmed once a card is in the test PC.
 
-**On the real TV (2026-10-01, a Radeon RX Vega 64 on Mesa 26.0, Kubuntu
+**On the real TV (2026-10-01, an AMD card on Mesa 26.0, Kubuntu
 26.04).** Plasma: the screen switched to 3840×2160 at 23.976 Hz with HDR
 on, and when Kinema turned mpv's colour-space hint on, mpv rebuilt its
 output as HDR10 (`VK_COLOR_SPACE_HDR10_ST2084_EXT` — the format NVIDIA's

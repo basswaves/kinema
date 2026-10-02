@@ -9,7 +9,7 @@ interface into skin XML, and every good-looking option (Jellyfin Media Player)
 is a thin client that does nothing without a Jellyfin server running somewhere.
 Kinema is one program: close it and nothing is left running.
 
-**Windows 11.** A Linux port has begun; see [Platform support](#platform-support).
+**Windows 11 and Linux**; see [Platform support](#platform-support).
 
 ![Kinema's home screen: a full-width backdrop for a title from the library, with rails of posters beneath it](docs/images/home.jpg)
 
@@ -83,9 +83,11 @@ tinyMediaManager or Kodi, and treats them as authoritative.
 
 ## Install
 
-Download the ZIP from [Releases](https://github.com/Basswaves/kinema/releases),
-extract it anywhere, and run `kinema.exe`. There is no installer — it is a
-folder, and deleting the folder uninstalls it.
+Everything is on the [Releases](https://github.com/Basswaves/kinema/releases)
+page: a ZIP for Windows, and packages for Linux ([below](#linux)).
+
+On Windows, download the ZIP, extract it anywhere, and run `kinema.exe`.
+There is no installer — it is a folder, and deleting the folder uninstalls it.
 
 ### Windows will ask once whether to run it
 
@@ -113,10 +115,10 @@ itself — you download the new ZIP when you choose to.
 
 ### Linux
 
-From the first release that carries them (none does yet — see
-[Platform support](#platform-support)), each release has a `.deb`, an `.rpm`
-and a `.tar.gz` folder, for x86-64 and for ARM. Kinema uses your system's mpv
-and WebKitGTK; the packages have the package manager install them:
+Since 0.8.0, each release has a `.deb`, an `.rpm` and a `.tar.gz` folder,
+for x86-64 and for ARM, each with a checksum beside it. Kinema uses your
+system's mpv and WebKitGTK; the packages have the package manager install
+them:
 
 ```bash
 sudo apt install ./kinema_<version>_amd64.deb          # Ubuntu 24.04 or later, Debian 13
@@ -135,14 +137,15 @@ is one, and you install it when you choose.
 
 - **mpv 0.40 or later** — Ubuntu 26.04, Debian 13, Fedora 43, Arch.
 - **A desktop with HDR switched on**, or switched on by Kinema for the film
-  (Settings → Screen): GNOME 48 or later, KDE Plasma 6.4 or later.
+  (Settings → Picture & sound → Screen): GNOME 48 or later, KDE Plasma 6.4
+  or later, Sway 1.12 or later; Hyprland switches it on by itself.
 - **A graphics driver that offers HDR to windows.** NVIDIA: driver 595 or
   later, which supports GeForce RTX 20 and GTX 16 cards onwards; Ubuntu
   26.04 installs 580 unless you choose a newer one under Additional Drivers,
   and GTX 10 cards and older stop at 580, so they cannot show HDR on Linux.
   AMD and Intel: Mesa 25.1 or later — Ubuntu 26.04, Fedora 43 and Arch have
-  it; Debian 13 has it in its backports. (Checked with an AMD Radeon RX Vega
-  on Mesa 26.0: HDR10 reaches the TV on KDE Plasma.)
+  it; Debian 13 has it in its backports. (Checked with an AMD card on Mesa
+  26.0: HDR10 reaches the TV on KDE Plasma.)
 
 Without the driver part the desktop shows HDR, but each film is converted to
 SDR before it reaches it. On Hyprland, which switches HDR on by itself for a
@@ -211,36 +214,40 @@ account can be connected to only one app besides Trakt's own.
 
 ## Platform support
 
-Windows 11, using the WebView2 runtime that ships with it. Nothing else to
+**Windows 11**, using the WebView2 runtime that ships with it. Nothing else to
 install.
 
-**A Linux port has begun.** Kinema builds and passes its tests on Linux (x86
-and ARM, on every push), and the interface is tested in WebKit, the engine of
-Linux's window. Playback works in development: Wayland offers no way to put
+**Linux**, since 0.8.0: Ubuntu 24.04 or later, Debian 13 and Fedora through
+the packages, other distributions through the folder, on x86-64 and ARM.
+Kinema uses the system's own mpv and WebKitGTK. Wayland offers no way to put
 Kinema's page over mpv, so on Linux mpv plays in a full-screen window of its
 own and draws Kinema's controls over the video itself (docs/HISTORY.md, "The
 Linux player"). The equipment check, sound straight to a receiver and screen
-switching (GNOME, KDE Plasma, Sway and Hyprland) have been checked on a real
-TV and receiver, with an NVIDIA and an AMD card. Nothing is released for
-Linux yet.
+switching have been checked on a real TV and receiver with GNOME, KDE Plasma,
+Sway and Hyprland, on an NVIDIA and an AMD card. Kinema is built to work the
+same on any desktop and fall back safely, rather than tested on every one —
+see [When something goes wrong](#when-something-goes-wrong).
 
-An Android version is planned after it. macOS is not planned by the author;
-a port is welcome, and [CONTRIBUTING.md](CONTRIBUTING.md) ("More than one
+An Android version is planned next. macOS is not planned by the author; a
+port is welcome, and [CONTRIBUTING.md](CONTRIBUTING.md) ("More than one
 platform") says how the code is arranged for one.
 
 | | Windows 11 | Linux |
 |---|---|---|
 | Builds and passes its tests | ✓ | ✓ |
-| Library, matching, artwork, accounts | ✓ | ✓ in development |
-| Playback, controls, remote keys | ✓ | ✓ in development |
-| Equipment check, sound straight to a receiver | ✓ | ✓ in development |
-| Screen switching (refresh rate, HDR) | ✓ | ✓ in development: refresh rate on GNOME, KDE Plasma, Sway and Hyprland; HDR on GNOME and KDE Plasma, and by Hyprland itself (Sway 1.12 not yet confirmed) |
-| Sleep / shut down | ✓ | ✓ in development, where the system allows it without a password (logind) |
+| Library, matching, artwork, accounts | ✓ | ✓ |
+| Playback, controls, remote keys | ✓ | ✓ |
+| Equipment check, sound straight to a receiver | ✓ | ✓ |
+| Screen switching (refresh rate, resolution) | ✓ | ✓ on GNOME, KDE Plasma, Sway, Hyprland and the other wlroots desktops |
+| HDR switched on for an HDR film | ✓ | ✓ on GNOME and KDE Plasma, by Hyprland itself, and on Sway 1.12 or later (not yet tried on a real TV); needs a driver that offers HDR ([above](#linux)) |
+| Sleep / shut down | ✓ | ✓ where the system allows it without a password (logind) |
 
 ## Building from source
 
-Windows 11, [Node](https://nodejs.org) 20+, [Rust](https://rustup.rs) with the
-MSVC toolchain, and Microsoft C++ Build Tools.
+On Windows 11: [Node](https://nodejs.org) 20+, [Rust](https://rustup.rs) with
+the MSVC toolchain, and Microsoft C++ Build Tools. (On Linux, the packages to
+install and how the playback wrapper is built are in
+[CONTRIBUTING.md](CONTRIBUTING.md#building).)
 
 ```bash
 npm install
@@ -276,10 +283,10 @@ player or D-pad navigation.
 
 Kinema writes two logs to `%APPDATA%\com.kinema.app\logs\` on Windows and
 `~/.local/share/com.kinema.app/logs/` on Linux. The quickest way there is
-**Settings → Developer tools → Open log folder**:
+**Settings → Advanced → Developer tools → Open log folder**:
 
-- **`app.log`** — the app's own messages. The WebView2 console is invisible from
-  outside the app, so this is where its errors go.
+- **`app.log`** — the app's own messages. The window's own console is
+  invisible from outside the app, so this is where its errors go.
 - **`mpv.log`** — the player's. This is the authority on anything about video:
   it records what actually happened in the render pipeline, not what was asked
   for.
@@ -295,17 +302,16 @@ desktop to switch the screen, or a driver offers no HDR, the film still
 plays. If your setup still misbehaves, a bug report with the logs, your
 distribution, desktop and graphics card is how it gets fixed.
 
-`F12` opens WebView2 DevTools in the app window.
-
 ## Known limitations
 
-- **Windows 11 only, for now** — Linux is under way; see [Platform support](#platform-support).
+- **Windows and Linux only.** Android is planned next; macOS is not planned
+  (see [Platform support](#platform-support)).
 - **Tested on a small number of setups.** HDR passthrough, bitstreaming to a
   receiver and display switching have been confirmed on a 4K HDR TV with an AV
   receiver; TV overscan, intro detection on many different shows, and libraries
   of several hundred movies have had less exposure. The roadmap lists what is
   unverified. If something behaves strangely on your equipment, the log files
-  (below) are the most useful thing you can send.
+  (above) are the most useful thing you can send.
 
 ## Documentation
 

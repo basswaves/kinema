@@ -6,11 +6,11 @@ body:
     attributes:
       value: |
         **The two logs are the most useful thing you can attach.** Kinema
-        forwards its own console to a file, because the WebView2 console is
+        forwards its own console to a file, because the window's own console is
         otherwise invisible from outside the app — most bugs here produce no
         visible error at all, only a log line.
 
-        Open them from **Settings → Developer tools → Open log folder**, or go
+        Open them from **Settings → Advanced → Developer tools → Open log folder**, or go
         to `%APPDATA%\com.kinema.app\logs\` (Windows) or
         `~/.local/share/com.kinema.app/logs/` (Linux):
 

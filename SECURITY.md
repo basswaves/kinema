@@ -28,7 +28,9 @@ Worth stating up front, because it is unusually small:
   has no way to approve an app from a phone, and its sign-in lasts a day, so
   to sign in again Kinema keeps the password — on Windows encrypted with
   DPAPI to your Windows user, so only you on that PC can read it back, even
-  from Kinema's safety copies. It is sent only to OpenSubtitles
+  from Kinema's safety copies. On Linux it is kept as it is, in Kinema's
+  database, as Kodi and Jellyfin keep theirs; Kinema's data folder is made
+  readable by your account only. It is sent only to OpenSubtitles
   (`src-tauri/src/opensubtitles.rs`). Without an account, nothing is kept.
 - **Your API keys stay local.** TMDB and OMDb keys you enter are stored in
   the SQLite database in your app data folder, and sent only to the service they
@@ -41,6 +43,11 @@ Worth stating up front, because it is unusually small:
   gives access to anyone's account: that needs the person's own approval.
 - **Media files are read, never modified** — with one explicit exception you
   have to press: NFO export writes `.nfo` sidecars beside your videos.
+- **On Linux, Kinema also talks to the desktop it runs on** — over D-Bus and
+  Wayland, on the same machine only — to read and switch the screen's mode
+  (GNOME, KDE Plasma's `kscreen-doctor`, the wlroots protocol), to borrow the
+  receiver's sound device for a film, and to ask logind for sleep or shut
+  down (`src-tauri/src/desktop.rs`, `audio_reserve.rs`, `power.rs`).
 
 The parts most worth scrutiny are the ones that cross a trust boundary: the
 external process invocation in `src-tauri/src/detect.rs` (Skiptro and ffmpeg,
@@ -74,7 +81,7 @@ The latest release, and `master`. There are no backports.
 
 ## Things that are not vulnerabilities
 
-- **SmartScreen warns on the downloaded executable.** It is not code-signed.
+- **SmartScreen warns on the downloaded executable** (Windows). It is not code-signed.
   This is expected and documented in the README; verify the SHA-256 published
   with the release instead.
 - **API keys are readable in the local database.** They are stored in plain text

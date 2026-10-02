@@ -71,18 +71,18 @@ reasons in full.
 
 ## Other platforms
 
-**Linux is under way**, then **Android**. Linux builds and passes its tests on
-every push, plays with Kinema's own controls, and has packages that use the
-system's mpv, the equipment check, sound straight to the receiver and screen
-switching on GNOME, KDE Plasma, Sway and Hyprland — each checked on a real
-TV and receiver, with an NVIDIA and an AMD card. HDR reaches the TV on GNOME
-and Plasma with a driver that offers it (AMD on Mesa, NVIDIA 595+), and on
-Hyprland, which switches it by itself (at 8 bits unless set to 10); Sway's
-HDR (1.12) is used where Sway reports it.
-Android comes after, with
-its own player engine (Media3) for Dolby Vision and passthrough on TV boxes.
-macOS is not planned by the author; a port is welcome. See
-[Platform support](../README.md#platform-support).
+**Linux** shipped in 0.8.0: packages that use the system's mpv, Kinema's
+own controls over the video, the equipment check, sound straight to the
+receiver and screen switching on GNOME, KDE Plasma, Sway and Hyprland — each
+checked on a real TV and receiver, with an NVIDIA and an AMD card. HDR
+reaches the TV on GNOME and Plasma with a driver that offers it (AMD on Mesa,
+NVIDIA 595+), and on Hyprland, which switches it by itself (at 8 bits unless
+set to 10); Sway's HDR (1.12) is used where Sway reports it, and has not yet
+been tried on a real TV.
+
+**Android** is next, with its own player engine (Media3) for Dolby Vision and
+passthrough on TV boxes. macOS is not planned by the author; a port is
+welcome. See [Platform support](../README.md#platform-support).
 
 ---
 
@@ -90,8 +90,13 @@ macOS is not planned by the author; a port is welcome. See
 
 Everything below is built and works where it has been tried, but has only been
 tried on a small number of setups. Reports — from `app.log` and `mpv.log`
-(Settings → Advanced → Open log folder) — are the most useful contribution
-there is.
+(Settings → Advanced → Developer tools → Open log folder) — are the most
+useful contribution there is.
+
+- **Linux on more desktops, distributions and graphics cards.** Kinema is
+  built to work the same everywhere and fall back safely rather than tested
+  on each; a setup where it still misbehaves is exactly what the bug report
+  form is for.
 
 - **HDR, bitstreaming and display switching on more setups.** Confirmed on one
   4K HDR TV with an AV receiver. Other TVs, receivers, graphics cards (AMD,
@@ -103,8 +108,9 @@ there is.
 - **The picture and sound badges on more files.** DTS:X, DD+ Atmos, HDR10+,
   HLG and Auro-3D names have been checked only against sample output; the
   aspect-ratio measurement has not yet met a film with IMAX scenes or a remux
-  with black bars. Settings → Advanced → Open log folder, and a note of what
-  the badge said against what the disc box says, is a useful report.
+  with black bars. The logs (Settings → Advanced → Developer tools → Open log
+  folder) and a note of what the badge said against what the disc box says
+  make a useful report.
 - **Intro and credits detection on more shows.** The thresholds were tuned
   against one programme. Shows with a quiet intro, a spoken cold open, no
   closing theme, or credits over live picture rather than black are the

@@ -19,7 +19,11 @@ single most useful file in this repository.
 
 ## Building
 
-Windows 11, Node 20+, Rust with the MSVC toolchain, and Microsoft C++ Build
+On Linux, see [Checking Linux from Windows](#checking-linux-from-windows)
+below: the packages and steps there are the same on a Linux machine, run
+directly rather than through `scripts\wsl.ps1`.
+
+On Windows 11: Node 20+, Rust with the MSVC toolchain, and Microsoft C++ Build
 Tools.
 
 ```bash
@@ -80,8 +84,8 @@ mounting a component. See the two failure modes below.
 
 ### Checking Linux from Windows
 
-Kinema is being made to build on Linux too, and a change that breaks it should
-be caught before it is pushed. With Ubuntu 24.04 in WSL, once:
+Kinema ships for Linux too, and a change that breaks it should be caught
+before it is pushed. With Ubuntu 24.04 in WSL, once:
 
 ```bash
 sudo apt install build-essential curl file pkg-config libssl-dev libxdo-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev libmpv-dev
@@ -103,9 +107,9 @@ GOTCHAS ("Linux, and building it from Windows").
 
 To run the app itself there (WSLg shows its window on the Windows desktop),
 build it with `scripts\wsl.ps1 'npm run tauri build -- --no-bundle'` and give
-it the libmpv plugin's wrapper, built from its source rather than downloaded
-— version v0.1.1 of github.com/nini22P/libmpv-wrapper, `cargo build
---release`, then `target/release/libmpv_wrapper.so` copied to
+it the libmpv plugin's wrapper, built from its source rather than downloaded:
+`scripts\wsl.ps1 'bash scripts/build-mpv-wrapper.sh'` builds the pinned
+version into `src-tauri/lib/libmpv-wrapper.so`, to be copied to
 `src-tauri/target/release/lib/libmpv-wrapper.so` in the copy. libmpv itself
 is Ubuntu's (`libmpv-dev` above). `scripts/selftest.sh` then runs a plan the
 way `selftest.ps1` does on Windows, on a copy of a library you put in the
@@ -233,7 +237,7 @@ never ran, or ran and silently did nothing. Check for both by reflex:
 
 ## More than one platform
 
-Kinema is being ported (Linux first, Android later) from one codebase, one
+Kinema runs on Windows and Linux, with Android next, from one codebase, one
 `master` and one version. Three rules keep that from turning into several
 programs:
 
@@ -255,9 +259,11 @@ CI builds and tests every push on Windows and on Linux for x86 and ARM; see
 ## Debugging
 
 Two logs, both readable without a debugger. Read them instead of guessing; the
-WebView2 console is otherwise invisible from outside the app. Both are in
-`%APPDATA%\com.kinema.app\logs\` whichever way the app was started, and
-Settings → Developer tools → **Open log folder** opens it.
+window's own console is otherwise invisible from outside the app. Both are in
+`%APPDATA%\com.kinema.app\logs\` on Windows and
+`~/.local/share/com.kinema.app/logs/` on Linux, whichever way the app was
+started, and Settings → Advanced → Developer tools → **Open log folder**
+opens it.
 
 - `app.log` — the frontend's `console.*`, uncaught errors, rejections, and
   Rust's `crate::log!` lines (use it rather than `eprintln!`, which a release
@@ -270,7 +276,8 @@ Each launch starts both fresh; the four sessions before are kept as
 
 `mpv.log` is the authority on anything about rendering: it records what
 libplacebo *did*, not what it was asked to do. Read it before theorising about
-the pipeline. `F12` opens WebView2 DevTools in the app window.
+the pipeline. In a development build (`npm run tauri dev`), `F12` opens the
+browser's developer tools in the app window; a release build has none.
 
 ## Settled decisions — please do not re-open
 

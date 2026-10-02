@@ -24,9 +24,13 @@ paint over a video frame. Its one opaque surface is the black cover shown
 *before* a file's first frame (`.player-cover`), because a transparent window
 with no frame up shows the desktop.
 
+That is Windows. On Linux, Wayland has no way to put one program's surface
+under another's window, so mpv plays in a full-screen window of its own and
+draws Kinema's page over the video as a picture ([Platforms](#platforms)).
+
 ```
 src-tauri/src/
-  db.rs          SQLite schema + migrations (user_version, currently 9).
+  db.rs          SQLite schema + migrations (user_version, SCHEMA_VERSION).
                  busy_timeout is load-bearing: two connections exist
   scanner.rs     Filesystem walk. NAS-aware: identity is (path, size, mtime),
                  never a content hash — never read file bytes during a scan.
@@ -92,6 +96,17 @@ src-tauri/src/
                  the queue in batches. Nothing is read back
   trakt.rs       Trakt, the same, except that it reads the account's watched
                  list once at connect — Trakt keeps duplicate plays
+  nfo.rs         Reads NFO sidecars (MediaElch, tinyMediaManager, Kodi) and
+                 writes them only on the explicit export
+  lifecycle.rs   Every status a media file can have and every way between
+                 them — the only place match_status / match_hold are written
+  backup.rs      Putting a safety copy of the library back (the copies are
+                 made in db.rs, before an upgrade and weekly)
+  updates.rs     Asks GitHub whether a newer release exists; never downloads
+  power.rs       Leave: close, sleep, shut down
+  jobs.rs        Keeps slow commands off the window's thread
+  applog.rs      app.log and where mpv.log goes; util.rs, small shared
+                 helpers; selftest.rs, the scripted run on a library copy
 
 src/
   ui/            Browse shell, Home, rails, cards, detail page, search, the
@@ -157,8 +172,9 @@ a NAS.
 
 ### Platforms
 
-Windows is what ships; the code is being arranged so that other systems are
-additions beside it, not branches through it. Three seams:
+Windows and Linux ship from the same code; each system is an addition beside
+the rest, not a branch through it, and Android is meant to be the next. Three
+seams:
 
 ```
 capabilities.rs  What this build can do where it runs — examine equipment,
@@ -179,10 +195,12 @@ equipment/win.rs, equipment/linux.rs, display/win.rs
                  own format list (equipment/eld.rs, equipment/edid.rs: pure
                  parsers, tested on every system)
 desktop.rs       Linux: the screens as the desktop has them, in one shape
-                 whichever desktop answers — GNOME (mutter.rs, D-Bus) or KDE
-                 Plasma (kscreen.rs, its kscreen-doctor). Read by the
-                 equipment check, changed by display/linux.rs. Another
-                 desktop is another module beside those two
+                 whichever desktop answers — GNOME (mutter.rs, D-Bus), KDE
+                 Plasma (kscreen.rs, its kscreen-doctor), or Sway, Hyprland
+                 and the other wlroots desktops (wlroots.rs, their shared
+                 Wayland protocol). Read by the equipment check, changed by
+                 display/linux.rs. Another desktop is another module beside
+                 those
 audio_reserve.rs Linux's half of "straight to the receiver": asks the sound
                  server for the receiver's card for the film (device
                  reservation over D-Bus) and gives it back after; the plan

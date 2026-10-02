@@ -128,6 +128,14 @@ async function controlsHidden(page: Page): Promise<void> {
 
 const osdFocused = (page: Page) => page.locator('.player.osd-focused');
 
+/**
+ * A person reads a prompt before answering it. Pressed in the instant it
+ * appears, OK can reach the key handler from the moment before, which did
+ * not know about the prompt yet and pauses instead (one run in two, in
+ * WebKit) — the same as the Up next card in keyboard.e2e.ts.
+ */
+const readIt = (page: Page) => page.waitForTimeout(500);
+
 test('the controls by remote: the ring, the seek bar, Back, and handing the arrows back', async ({
   page,
 }) => {
@@ -275,6 +283,7 @@ test('Skip intro, then the episodes either side, and resuming with Start over', 
   await expect(page.locator('.resume-toast')).toContainText('Resumed from 10:0');
   expect((await mpv(page)).position).toBeGreaterThanOrEqual(600);
   // While the notice shows, OK means "from the beginning".
+  await readIt(page);
   await press(page, 'Enter');
   await expect.poll(async () => (await mpv(page)).position).toBeLessThan(10);
   await expect(page.locator('.resume-toast')).toHaveCount(0);
@@ -344,6 +353,7 @@ test('the film: the scene after the credits is offered, and the end goes back to
   await playheadTo(page, 5610);
   await expect(page.locator('.skip-button')).toHaveText('Skip to the scene after the credits');
   await expect(page.locator('.up-next')).toHaveCount(0);
+  await readIt(page);
   await press(page, 'Enter');
   await expect.poll(async () => (await mpv(page)).position).toBeGreaterThanOrEqual(5880);
   await expect(page.locator('.player')).toBeAttached();
@@ -362,6 +372,7 @@ test('a recap and then an intro: two prompts, one after the other', async ({ pag
   await press(page, 'Enter');
   await expect.poll(async () => (await mpv(page)).position).toBeGreaterThanOrEqual(40);
   await expect(page.locator('.skip-button')).toHaveText('Skip intro');
+  await readIt(page);
   await press(page, 'Enter');
   await expect.poll(async () => (await mpv(page)).position).toBeGreaterThanOrEqual(70);
   await expect(page.locator('.skip-button')).toHaveCount(0);

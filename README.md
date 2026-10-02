@@ -67,9 +67,11 @@ audio and subtitles, volume. Back steps back to wherever you came from.
   in the player takes the best from OpenSubtitles — one made for your exact
   file when there is one — and the rest are a list away. It can also fetch
   forced subtitles by itself.
-- **Gets the most out of your equipment.** If your TV or receiver can do better
-  than Kinema is set to — Atmos and DTS:X untouched, 24p without judder, HDR —
-  Home says so, and one press turns it on.
+- **Gets the most out of your equipment.** Atmos and DTS:X untouched, 24p
+  without judder, HDR switched on for an HDR film — for every TV and receiver
+  that can, only the ones you choose, or none, so a laptop can behave one way
+  at a home cinema and another at a desk. The first run asks; Home says when
+  something connected can do more than you have chosen.
 
 ![The playback statistics panel, listing resolution, codec, cadence, scaling and colour information](docs/images/stats.png)
 
@@ -154,10 +156,19 @@ it HDR goes out at 8 bits per colour, and smooth gradients show bands.
 
 ## First run
 
-The app opens on a setup panel that asks one thing: **where your videos are.**
-Point it at where you keep your movies, and another at your TV shows if they
-live somewhere else. Local drives and network shares both work. Nothing is
-moved, renamed or written to — the files are only read.
+The app opens on a setup panel with a few questions, each answered in a press:
+
+- **Where you will watch** — a TV from the sofa gives big text and the whole
+  screen, made for a remote; a desk gives a window.
+- **Where your videos are.** Point it at where you keep your movies, and
+  another at your TV shows if they live somewhere else. Local drives and
+  network shares both work. Nothing is moved, renamed or written to — the
+  files are only read.
+- **Picture and sound**, which you can skip: sound straight to a receiver,
+  the screen matched to the film, HDR switched on for HDR films — each with
+  what it gives and what it costs, for every device that can, only the ones
+  connected now, or off. Skipped, everything stays off; it is all in
+  Settings → Picture & sound.
 
 Then press **Scan my library**. The first scan takes a few minutes on a large
 library; you can watch it fill in. After that it scans once at every start and

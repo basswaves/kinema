@@ -296,6 +296,9 @@ reasoning is in [docs/DESIGN.md](docs/DESIGN.md) and [docs/HISTORY.md](docs/HIST
   takes, and whether the app may switch the screen's mode are allowed because
   each depends on equipment the code cannot always see — and each is detected
   where it can be, so the setting is an override rather than a question.
+  Sound straight to the receiver, refresh matching and HDR each apply to every
+  device that can, only the devices listed, or none, and are off until
+  someone chooses.
 - **Vendor-neutral.** Must behave identically on AMD, Intel and NVIDIA.
 - **On Linux, a stable base rather than a matrix.** Kinema is made by one
   person and Linux has more desktops, versions and drivers than one person

@@ -11,13 +11,7 @@ Ideas and reports are welcome as [issues](https://github.com/Basswaves/kinema/is
 
 ## Next
 
-### A first-run setup for picture and sound
-
-A short walk-through the first time Kinema starts — sending sound straight to a
-receiver, matching the TV's refresh rate, turning HDR on — with what each gains
-and costs, based on what Kinema can see of the equipment. Home already says when
-the equipment can do better and turns it on in one press; this would ask the
-same questions up front.
+**Android**, below under [Other platforms](#other-platforms).
 
 ---
 

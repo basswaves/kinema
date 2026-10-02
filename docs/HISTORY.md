@@ -2466,6 +2466,46 @@ and Windows at 100 % would do the same. Past a 1080p window the type now
 grows with the screen; at or below it, nothing changes, so a Windows TV PC
 with scaling looks exactly as it did.
 
+## Picture and sound, asked at the first run ✅
+
+**The roadmap's one "Next" item, shaped by the owner (2026-10-02).** A
+walk-through had been planned that would ask, up front, the three questions
+Home's notice asked once equipment that could do better was connected:
+sound straight to the receiver, the refresh rate matched to the film, HDR
+switched on for an HDR film. The owner's point was that the questions do not
+depend on what is connected *now*: a PC set up at a desk should already
+know what to do at the home cinema, and a laptop moves between the two.
+
+**So each of the three became per device:** every device that can, only
+the devices listed, or off (`devicePolicy.ts`). They had been one switch
+each for the whole PC — the owner had assumed otherwise, and checking the
+code before building on the assumption is what showed it. A stored "on"
+still means every device, so no setup changed, and an older Kinema reading
+the new settings still understands that one. A screen is known to the
+switching code only by the name the system gives it now; it is matched to
+the stable id the equipment check found, and one plugged in since the check
+is left alone by "only these" — unsure is "leave it".
+
+**"Every device that can", for sound, gained a meaning.** Straight to the
+receiver takes the device for the film. On laptop speakers that silenced the
+PC's other sounds and gained nothing, so "every" now means a device that
+takes some of a film's own formats untouched; a device listed by hand gets
+it regardless. The receiver case is unchanged.
+
+**The first run asks; nothing is chosen for anyone.** Where Kinema will be
+watched comes first, so a TV answer turns TV mode on and the rest is read
+from the sofa. Picture and sound come after the folders, each with what it
+gives and what it costs in a line, whatever is connected; "only this setup"
+names the devices it means and is not offered where none can. Skipping saves
+nothing, which keeps screen switching off by default. The skip is at the top
+of the step: at the bottom, Down from a middle choice slid past it to Scan.
+
+**Home's notice no longer asks what has been answered.** It used to be the
+only place these were offered, with one press turning everything on. Now a
+question never answered sends the person to Settings → Picture & sound;
+"only these" brings up only equipment not on the list, and adds it in a
+press; every device, or off, is an answer and there is nothing to say.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

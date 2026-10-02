@@ -7,6 +7,33 @@ makes no stability promises.
 
 ## [Unreleased]
 
+### Added
+
+- **Picture and sound at the first run.** The welcome screen asks where
+  Kinema will be watched (a TV from the sofa turns TV mode on at once), and —
+  skippable — whether to send sound straight to a receiver, match the screen
+  to the film and turn HDR on for HDR films: each with what it gives and
+  costs, whatever is connected now.
+- **Picture and sound per device.** Each of those three now applies to every
+  device that can, only the devices you choose, or none — in Settings →
+  Picture & sound, with the list of every screen and sound device Kinema has
+  seen — so a laptop can behave one way at a home cinema and another at a
+  desk.
+
+### Changed
+
+- **Home's equipment notice never repeats an answer.** For a question never
+  answered, Choose opens Picture & sound instead of switching everything on
+  in one press; with only some devices chosen, it mentions only new
+  equipment that can do more, and Use it too adds it.
+- **"Every device", for sound, means one that takes some of a film's sound
+  untouched.** Laptop speakers and other devices that take none keep working
+  as usual during a film, rather than the PC's other sounds going silent for
+  nothing. A setup that sent sound straight to a receiver still does.
+- **Linux: the player rests while its controls are hidden.** The page drawn
+  over the film is no longer photographed ten times a second when nothing is
+  on it — most of a film — which costs a 4K PC noticeably less.
+
 ## [0.8.0] — 2026-10-02
 
 Kinema on Linux, alongside Windows. Packages for Ubuntu and Debian (`.deb`),

@@ -290,6 +290,16 @@ reasoning is in [docs/DESIGN.md](docs/DESIGN.md) and [docs/HISTORY.md](docs/HIST
   each depends on equipment the code cannot always see — and each is detected
   where it can be, so the setting is an override rather than a question.
 - **Vendor-neutral.** Must behave identically on AMD, Intel and NVIDIA.
+- **On Linux, a stable base rather than a matrix.** Kinema is made by one
+  person and Linux has more desktops, versions and drivers than one person
+  can test. So it uses the shared standards first — Wayland protocols,
+  logind, ALSA and the sound-device reservation, mpv's own detection — and a
+  desktop's own interface only where no standard exists, always behind a
+  check of what that desktop answers (never its name or version), falling
+  back to "leave it as it is and play the film". Nothing trusts a size, a mode
+  or a state it did not read back. There are no test rounds per desktop or
+  per version: something that fails safe ships, and a setup that still
+  misbehaves is a bug report (with the logs), not a release blocker.
 - **A wrong metadata match is worse than no match.** The 0.75 threshold and the
   0.05 runner-up margin stay. Refusing and surfacing for review beats guessing —
   which is only defensible because the **Needs attention** queue makes refusals

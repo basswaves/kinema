@@ -17,6 +17,9 @@
  * An answer is stored as the setting itself, so Settings → Picture & sound
  * shows it, and the Home notice knows the question has been answered
  * (`qualityNotice.ts`).
+ *
+ * One of the setup pages shown while the first scan runs (`SetupPages.tsx`),
+ * which gives it its heading and its Skip.
  */
 import { useEffect, useState } from 'react';
 import { getSetting } from '../metadata/api';
@@ -26,7 +29,6 @@ import { savePolicy, type Policy } from '../player/devicePolicy';
 import { SWITCH_HDR_KEY, SWITCH_REFRESH_KEY } from '../player/displaySwitch';
 import { getEquipment, type Equipment } from '../player/equipment';
 import ChoiceRow from './ChoiceRow';
-import FocusButton from './FocusButton';
 import { hdrOptions, refreshOptions, soundOptions } from './deviceOptions';
 import type { DeviceOption } from './DeviceChoice';
 import { userError } from './errors';
@@ -72,7 +74,7 @@ function items(system: string, sound: boolean, screen: boolean): Item[] {
 
 type Answer = Policy | '';
 
-export default function PictureSoundSetup({ num, onSkip }: { num: number; onSkip: () => void }) {
+export default function PictureSoundSetup({ onAnswer }: { onAnswer: () => void }) {
   const can = useCapabilities();
   const [equipment, setEquipment] = useState<Equipment | null>(null);
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
@@ -109,28 +111,19 @@ export default function PictureSoundSetup({ num, onSkip }: { num: number; onSkip
     const here = item.options(equipment).filter((d) => d.connected && d.able).map((d) => d.id);
     setAnswers((a) => ({ ...a, [item.key]: policy }));
     setError(null);
+    onAnswer();
     void savePolicy(item.key, { policy, devices: policy === 'these' ? here : [] }).catch((e) =>
       setError(userError(e))
     );
   };
 
   return (
-    <section className="first-run-step picture-sound-setup">
-      <h2>
-        <span className="first-run-num">{num}</span> Picture and sound{' '}
-        <span className="first-run-optional">optional</span>
-      </h2>
+    <>
       <p className="muted">
         Kinema can get the most out of a TV and an AV receiver, now or whenever this PC is
         connected to one. Choose for each, or skip this: everything then stays as it is, and all
         of it is in Settings → Picture &amp; sound at any time.
       </p>
-      {/* At the top, so not caring costs one press rather than three rows. */}
-      <div className="settings-row">
-        <FocusButton className="btn-secondary" keepInView="nearest" onSelect={onSkip}>
-          Skip this
-        </FocusButton>
-      </div>
       {error && <div className="settings-error">{error}</div>}
 
       {asked.map((item) => {
@@ -158,6 +151,6 @@ export default function PictureSoundSetup({ num, onSkip }: { num: number; onSkip
           />
         );
       })}
-    </section>
+    </>
   );
 }

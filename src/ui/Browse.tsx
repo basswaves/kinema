@@ -6,7 +6,7 @@
  * it keeps typing responsive on a TV remote.
  */
 import { describeError, userError } from './errors';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   init as initSpatial,
   getCurrentFocusKey,
@@ -20,6 +20,7 @@ import TitleDetailView from './TitleDetail';
 import Card from './Card';
 import FocusButton from './FocusButton';
 import Settings, { type SettingsTarget } from './Settings';
+import { SETUP_PAGES_KEY } from './SetupPages';
 import {
   hasPendingReturn,
   installFocusWatchdog,
@@ -177,6 +178,10 @@ export default function Browse() {
   const [ffmpegMissing, setFfmpegMissing] = useState(false);
   /** A newer Kinema, for the dot on Settings. */
   const [hasUpdate, setHasUpdate] = useState(false);
+  /** The setup pages are up on Home (SetupPages.tsx). */
+  const [setupOpen, setSetupOpen] = useState(false);
+  /** Whether a launch has looked for setup pages left unfinished. */
+  const setupLooked = useRef(false);
 
   // Once per launch, and never under a self-test, which must not touch the
   // network for anything it was not asked to.
@@ -215,7 +220,16 @@ export default function Browse() {
 
   const load = useCallback(async () => {
     try {
-      const [list, resume] = await Promise.all([listTitles(), continueWatching(20)]);
+      // Pages left half-way when the app was closed open again, read with the
+      // first list so Home never shows the library for a moment before them.
+      const setup = setupLooked.current ? null : getSetting(SETUP_PAGES_KEY).catch(() => null);
+      setupLooked.current = true;
+      const [list, resume, setupState] = await Promise.all([
+        listTitles(),
+        continueWatching(20),
+        setup,
+      ]);
+      if (setupState === 'open') setSetupOpen(true);
       // A title with no files left is not watchable — unlinking a wrong match
       // leaves the cached title row behind, and it should not show up as a
       // card that plays nothing.
@@ -241,6 +255,33 @@ export default function Browse() {
       setLoaded(true);
     }
   }, []);
+
+  const openSetup = useCallback(() => {
+    setSetupOpen(true);
+    void setSetting(SETUP_PAGES_KEY, 'open').catch((e) => console.warn('setup pages:', e));
+  }, []);
+
+  const closeSetup = useCallback(() => {
+    setSetupOpen(false);
+    void setSetting(SETUP_PAGES_KEY, 'done').catch((e) => console.warn('setup pages:', e));
+  }, []);
+
+  /**
+   * The first-run panel's Scan: the setup pages go up at once and the scan
+   * runs behind them. A failure is said the way a startup scan's is, since
+   * the panel that asked has gone by the time it ends.
+   */
+  const firstScan = useCallback(() => {
+    openSetup();
+    void runScanPipeline()
+      .then((outcome) => {
+        if (outcome.status === 'failed') {
+          setScanTrouble(`Could not read your library folders: ${describeError(outcome.error)}`);
+        }
+      })
+      .catch((e) => console.warn('first scan:', e))
+      .finally(() => void load());
+  }, [load, openSetup]);
 
   /**
    * Re-read whenever Home is shown, not only when the shell mounts.
@@ -563,7 +604,9 @@ export default function Browse() {
             onSelect={(title) => openView({ name: 'detail', title })}
             onPlay={(title) => void playTitle(title)}
             onRemoveResumable={(item) => void removeResumable(item)}
-            onLibraryChanged={() => void load()}
+            onFirstScan={firstScan}
+            setupOpen={setupOpen}
+            onSetupClosed={closeSetup}
             reviewCount={reviewCount}
             onReview={() => openView({ name: 'settings', section: 'review' })}
             keyRejected={keyRejected}
@@ -623,7 +666,15 @@ export default function Browse() {
           />
         )}
 
-        {view.name === 'settings' && <Settings openSection={view.section} />}
+        {view.name === 'settings' && (
+          <Settings
+            openSection={view.section}
+            onRunSetup={() => {
+              openSetup();
+              setStack(navigate<View>({ name: 'home' }, { name: 'home' }, true));
+            }}
+          />
+        )}
 
         {view.name === 'detail' && (
           <TitleDetailView

@@ -190,7 +190,7 @@ for (const [system, sections] of [
   });
 }
 
-test('first run: where to watch, then picture and sound, all by remote', async ({ page }) => {
+test('first run: where to watch, a folder, then the setup pages, all by remote', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('kinemaMockEmpty', '1'));
   await page.goto('/');
   const setting = (key: string) =>
@@ -205,25 +205,54 @@ test('first run: where to watch, then picture and sound, all by remote', async (
   await press(page, 'Enter');
   await expect.poll(() => page.evaluate(() => document.documentElement.dataset.tv)).toBe('on');
 
-  // Down through the folders to the picture-and-sound step: its Skip first.
-  for (let i = 0; i < 8 && (await focused(page)) !== 'Skip this'; i++) await press(page, 'ArrowDown');
-  await expect.poll(() => focused(page)).toBe('Skip this');
+  // A folder (the mock's picker answers at once), then Scan.
+  await press(page, 'ArrowDown');
+  await expect.poll(() => focused(page)).toBe('Add movies folder');
+  await press(page, 'ArrowRight');
+  await press(page, 'Enter');
+  await expect(page.locator('.first-run-roots li')).toHaveCount(1);
+  for (let i = 0; i < 4 && (await focused(page)) !== 'Scan my library'; i++) await press(page, 'ArrowDown');
+  await expect.poll(() => focused(page)).toBe('Scan my library');
+  await press(page, 'Enter');
+
+  // The setup pages, at once, landing on the first question.
+  await expect(page.locator('.setup-pages h1')).toHaveText('Picture and sound');
+  await expect.poll(() => focused(page)).toBe('Every receiver');
   expect(await setting('audio_direct')).toBeNull();
+  expect(await setting('setup_pages')).toBe('open');
 
   // An answer is saved as it is given, and only that one.
-  await press(page, 'ArrowDown');
-  await expect.poll(() => focused(page)).toBe('Every receiver');
   await press(page, 'Enter');
   await expect.poll(() => setting('audio_direct')).toBe('on');
   expect(await setting('display_switch_refresh')).toBeNull();
 
-  // Skipping the rest folds the step away and hands the ring on.
+  // The scan finishes behind the page, and the page stays.
+  await expect(page.locator('.setup-progress')).toContainText('Your library is ready.');
+  await expect(page.locator('.setup-pages h1')).toHaveText('Picture and sound');
+
+  // The way on is one press up; on the last page it finishes, to the library.
   await press(page, 'ArrowUp');
-  await expect.poll(() => focused(page)).toBe('Skip this');
+  await expect.poll(() => focused(page)).toBe('Finish');
   await press(page, 'Enter');
-  await expect(page.locator('.first-run-skipped')).toBeVisible();
-  await expect.poll(() => focused(page)).toBe('Scan my library');
+  await expect.poll(() => focused(page)).toContain('Play');
+  await expect.poll(() => setting('setup_pages')).toBe('done');
   expect(await setting('display_switch_refresh')).toBeNull();
+
+  // Settings → Library → Run setup again brings the pages back.
+  await press(page, 'ArrowUp', 2);
+  await expect.poll(() => focused(page)).toBe('Home');
+  await press(page, 'ArrowRight', 4);
+  await press(page, 'Enter');
+  await press(page, 'ArrowDown');
+  await expect.poll(() => focused(page)).toBe('Library');
+  await press(page, 'ArrowRight');
+  for (let i = 0; i < 30 && (await focused(page)) !== 'Run setup again'; i++) await press(page, 'ArrowDown');
+  await expect.poll(() => focused(page)).toBe('Run setup again');
+  await press(page, 'Enter');
+  await expect(page.locator('.setup-pages h1')).toHaveText('Picture and sound');
+  // An answer given before is shown as given (the tick).
+  await expect.poll(() => focused(page)).toBe('✓Every receiver');
+  await expect.poll(() => setting('setup_pages')).toBe('open');
 });
 
 test('the equipment notice: Choose when never asked, Use it too for only these', async ({ page }) => {

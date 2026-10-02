@@ -21,25 +21,26 @@
  * source has no key, and keeps the step, since without it movies stay
  * unidentified.
  *
- * Two more steps since 2026-10-02, both answered in a press: where Kinema
- * will be watched (TV mode — big text and full screen, which screen
- * switching needs), asked first so the rest is already readable from a sofa;
- * and picture and sound (`PictureSoundSetup.tsx`), which can be skipped and
- * then changes nothing.
+ * One more step since 2026-10-02, answered in a press: where Kinema will be
+ * watched (TV mode — big text and full screen, which screen switching
+ * needs), asked first so the rest is already readable from a sofa.
+ *
+ * Scan hands over to the setup pages (`SetupPages.tsx`) at once rather than
+ * waiting for the scan to end: the questions that can wait for a library are
+ * asked while it is being read.
  */
-import { describeError, userError } from './errors';
-import { useFocusable, FocusContext, setFocus } from '@noriginmedia/norigin-spatial-navigation';
+import { userError } from './errors';
+import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import FocusButton from './FocusButton';
 import FocusInput from './FocusInput';
 import ChoiceRow from './ChoiceRow';
-import PictureSoundSetup from './PictureSoundSetup';
 import { setTvMode, TV_MODE_KEY } from './tv';
 import { useClaimFocus } from './focus';
 import { addLibraryRoot, listLibraryRoots, type LibraryKind, type LibraryRoot } from '../library/api';
-import { runScanPipeline, useScanStatus } from '../library/pipeline';
+import { useScanStatus } from '../library/pipeline';
 import { getSetting, setSetting } from '../metadata/api';
 import { BUILTIN_TMDB_KEY } from '../metadata/builtinKey';
 
@@ -47,8 +48,6 @@ import { BUILTIN_TMDB_KEY } from '../metadata/builtinKey';
 const TMDB_KEY_URL = 'https://www.themoviedb.org/settings/api';
 
 const FIRST_RUN_FOCUS_KEY = 'first-run';
-const SCAN_FOCUS_KEY = 'first-run-scan';
-const ADD_MOVIES_FOCUS_KEY = 'first-run-add-movies';
 
 type Seat = 'tv' | 'desk' | '';
 
@@ -56,11 +55,11 @@ type Seat = 'tv' | 'desk' | '';
 const ASK_FOR_KEY = !BUILTIN_TMDB_KEY;
 
 interface Props {
-  /** Re-read the library. Called after a scan finishes. */
-  onDone: () => void;
+  /** Start the first scan, and the setup pages while it runs. */
+  onScan: () => void;
 }
 
-export default function FirstRun({ onDone }: Props) {
+export default function FirstRun({ onScan }: Props) {
   const { ref, focusKey } = useFocusable({
     focusKey: FIRST_RUN_FOCUS_KEY,
     trackChildren: true,
@@ -73,7 +72,6 @@ export default function FirstRun({ onDone }: Props) {
   const [savedKey, setSavedKey] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [seat, setSeat] = useState<Seat>('');
-  const [skipped, setSkipped] = useState(false);
   const scan = useScanStatus();
 
   useEffect(() => {
@@ -127,10 +125,8 @@ export default function FirstRun({ onDone }: Props) {
   const scanNow = useCallback(async () => {
     setError(null);
     if (tmdbKey.trim()) await saveKey();
-    const outcome = await runScanPipeline();
-    if (outcome.status === 'failed') setError(describeError(outcome.error));
-    onDone();
-  }, [onDone, saveKey, tmdbKey]);
+    onScan();
+  }, [onScan, saveKey, tmdbKey]);
 
   const hasRoots = roots.length > 0;
 
@@ -138,13 +134,6 @@ export default function FirstRun({ onDone }: Props) {
     setSeat(next);
     if (next) setTvMode(next === 'tv');
   }, []);
-
-  // Skipping removes the button that was pressed: the ring goes on to what
-  // comes next, never to nothing.
-  const skip = useCallback(() => {
-    setSkipped(true);
-    window.setTimeout(() => void setFocus(hasRoots ? SCAN_FOCUS_KEY : ADD_MOVIES_FOCUS_KEY), 0);
-  }, [hasRoots]);
 
   return (
     <FocusContext.Provider value={focusKey}>
@@ -186,11 +175,7 @@ export default function FirstRun({ onDone }: Props) {
             Nothing is moved, renamed or written to; the files are only read.
           </p>
           <div className="settings-row">
-            <FocusButton
-              className="btn-primary"
-              focusKey={ADD_MOVIES_FOCUS_KEY}
-              onSelect={() => void pickFolder('movies')}
-            >
+            <FocusButton className="btn-primary" onSelect={() => void pickFolder('movies')}>
               Add movies folder
             </FocusButton>
             <FocusButton className="btn-primary" onSelect={() => void pickFolder('tv')}>
@@ -249,19 +234,10 @@ export default function FirstRun({ onDone }: Props) {
           </section>
         )}
 
-        {skipped ? (
-          <p className="muted first-run-skipped">
-            Picture and sound left as they are. It is all in Settings → Picture &amp; sound.
-          </p>
-        ) : (
-          <PictureSoundSetup num={ASK_FOR_KEY ? 4 : 3} onSkip={skip} />
-        )}
-
         <section className="first-run-step">
           <div className="settings-row">
             <FocusButton
               className="btn-primary"
-              focusKey={SCAN_FOCUS_KEY}
               disabled={!hasRoots || scan !== null}
               onSelect={() => void scanNow()}
             >
@@ -269,7 +245,7 @@ export default function FirstRun({ onDone }: Props) {
             </FocusButton>
             <span className="muted">
               {hasRoots
-                ? 'This can take a few minutes the first time. You can watch it fill in.'
+                ? 'This can take a few minutes the first time. A few more questions meanwhile, each one skippable.'
                 : 'Add a folder above first.'}
             </span>
           </div>

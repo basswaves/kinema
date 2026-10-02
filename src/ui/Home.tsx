@@ -12,6 +12,7 @@ import Rail from './Rail';
 import ContinueRail from './ContinueRail';
 import FocusButton from './FocusButton';
 import FirstRun from './FirstRun';
+import SetupPages from './SetupPages';
 import HomeNotices from './HomeNotices';
 import type { Upgrade } from './qualityNotice';
 import { useClaimFocus } from './focus';
@@ -30,8 +31,11 @@ interface Props {
   onRemoveResumable: (item: ContinueItem) => void;
   /** Open a rail's full contents as a grid. */
   onSeeAll: (heading: string, titles: Title[]) => void;
-  /** Re-read the library, after the first-run panel has changed it. */
-  onLibraryChanged: () => void;
+  /** Start the first scan, from the first-run panel. */
+  onFirstScan: () => void;
+  /** The setup pages are up, in front of everything else here. */
+  setupOpen: boolean;
+  onSetupClosed: () => void;
   reviewCount: number;
   onReview: () => void;
   keyRejected: boolean;
@@ -70,7 +74,9 @@ export default function Home({
   onResume,
   onRemoveResumable,
   onSeeAll,
-  onLibraryChanged,
+  onFirstScan,
+  setupOpen,
+  onSetupClosed,
   reviewCount,
   onReview,
   keyRejected,
@@ -120,7 +126,11 @@ export default function Home({
       .slice(0, 8);
   }, [titles]);
 
-  useClaimFocus(HERO_PLAY_FOCUS_KEY, Boolean(hero));
+  useClaimFocus(HERO_PLAY_FOCUS_KEY, Boolean(hero) && !setupOpen);
+
+  // Until finished or left, however soon the first scan fills the library
+  // behind them: titles arriving must not take the questions away mid-answer.
+  if (setupOpen) return <SetupPages onClose={onSetupClosed} />;
 
   // An empty library is a first run far more often than it is a mistake, so it
   // gets the setup panel rather than a sentence pointing at Settings. It also
@@ -130,7 +140,7 @@ export default function Home({
     // Nothing rather than the setup panel while the first read is in flight:
     // the view behind is already opaque, and a blank moment is better than a
     // panel that flashes up at every launch and takes focus with it.
-    return loaded ? <FirstRun onDone={onLibraryChanged} /> : null;
+    return loaded ? <FirstRun onScan={onFirstScan} /> : null;
   }
 
   return (

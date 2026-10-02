@@ -742,7 +742,8 @@ export function listenerCounts(): Record<string, number> {
 /**
  * Read once at load from `localStorage`, so they survive the reload a check
  * needs: `kinemaMockSlowMs` delays the library read (a real first read is not
- * instant), `kinemaMockEmpty` presents an empty library (a first run),
+ * instant), `kinemaMockEmpty` presents an empty library (a first run) until a
+ * folder is added and scanned,
  * `kinemaMockSlowDetect` makes the scan's detection pass take 20 seconds,
  * `kinemaMockSystem=linux` answers `capabilities` and the equipment check as
  * the Linux build does on a typical desktop (the check, direct sound, sleep
@@ -764,6 +765,8 @@ const SLOW_DETECT = flag('kinemaMockSlowDetect') === '1';
 const ON_LINUX = flag('kinemaMockSystem') === 'linux';
 const SCREEN_HDR = flag('kinemaMockScreenHdr') === 'on';
 const NO_POWER = flag('kinemaMockNoPower') === '1';
+/** Under `kinemaMockEmpty`: whether a folder has been added, then scanned. */
+const emptyLibrary = { hasRoot: !EMPTY, scanned: false };
 /** `kinemaMockReview` pretends that many videos wait in the review queue. */
 const REVIEW_COUNT = Number(flag('kinemaMockReview') ?? 0) || 0;
 /** `kinemaMockUpdate` pretends that version is out on GitHub. */
@@ -841,20 +844,31 @@ let mockFullscreen = false;
 
 const handlers: Record<string, Handler> = {
   // library
-  list_library_roots: () => [{ id: 1, path: 'C:\\fixture', kind: 'tv', file_count: files.length }],
-  scan_library: () => ({
-    roots_scanned: 1, files_seen: files.length, files_added: 0, files_updated: 0,
-    files_unchanged: files.length, files_missing: 0, errors: [], duration_ms: 5,
-  }),
+  // An empty library has no folder until one is added; its first scan then
+  // finds the fixture, as a real first run would.
+  list_library_roots: () =>
+    emptyLibrary.hasRoot
+      ? [{ id: 1, path: 'C:\\fixture', kind: 'tv', file_count: files.length }]
+      : [],
+  scan_library: () => {
+    if (emptyLibrary.hasRoot) emptyLibrary.scanned = true;
+    return {
+      roots_scanned: 1, files_seen: files.length, files_added: 0, files_updated: 0,
+      files_unchanged: files.length, files_missing: 0, errors: [], duration_ms: 5,
+    };
+  },
   list_unparsed: () => [],
   save_parse_results: () => 0,
   library_stats: () => ({ total: files.length, unparsed: 0, parsed: 0, missing: 0, total_bytes: 0 }),
-  add_library_root: () => 1,
+  add_library_root: () => {
+    emptyLibrary.hasRoot = true;
+    return 1;
+  },
   remove_library_root: () => null,
   list_media_files: () => [],
 
   // metadata
-  list_titles: () => later(EMPTY ? [] : titles.map(withWatchState)),
+  list_titles: () => later(EMPTY && !emptyLibrary.scanned ? [] : titles.map(withWatchState)),
   get_title_detail: (a) => titleDetail(num(a, 'titleId')),
   file_facts: (a) => mockFileFacts(num(a, 'fileId')),
   season_facts: (a) =>
@@ -1133,6 +1147,8 @@ const handlers: Record<string, Handler> = {
   },
   'plugin:window|show': () => null,
   'plugin:opener|open_url': () => null,
+  // The folder picker answers at once, with the fixture's folder.
+  'plugin:dialog|open': () => 'C:\\fixture',
 };
 
 /**

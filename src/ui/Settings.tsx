@@ -179,7 +179,14 @@ const SECTIONS: [SectionId, string][] = [
 /** Coming back to Settings opens the section you were last in. */
 let lastSection: SectionId = 'library';
 
-export default function Settings({ openSection }: { openSection?: SettingsTarget }) {
+export default function Settings({
+  openSection,
+  onRunSetup,
+}: {
+  openSection?: SettingsTarget;
+  /** Back to Home, with the setup pages up (SetupPages.tsx). */
+  onRunSetup: () => void;
+}) {
   const { ref, focusKey } = useFocusable({
     focusKey: SETTINGS_FOCUS_KEY,
     trackChildren: true,
@@ -827,6 +834,18 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
                       CC BY-NC 4.0.
                     </p>
                   </div>
+                </section>
+
+                <section className="settings-section">
+                  <h2>Setup</h2>
+                  <p className="settings-intro">
+                    The short pages from the first scan, one subject each: what your TV and
+                    receiver can do, and more. Every page can be skipped, and nothing changes
+                    unless you choose it.
+                  </p>
+                  <FocusButton keepInView="nearest" className="btn-secondary" onSelect={onRunSetup}>
+                    Run setup again
+                  </FocusButton>
                 </section>
               </>
             )}

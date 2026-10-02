@@ -574,6 +574,7 @@ export default function Browse() {
                 .then(() => setUpgrades([]))
                 .catch((e) => setError(userError(e)))
             }
+            onChooseUpgrades={() => openView({ name: 'settings', section: 'picture' })}
             onDismissUpgrades={() =>
               void dismissUpgrades(upgrades)
                 .then(() => setUpgrades([]))

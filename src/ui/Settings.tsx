@@ -160,7 +160,7 @@ const TMDB_KEY_INPUT_KEY = 'settings-tmdb-key';
 const FFMPEG_INPUT_KEY = 'settings-ffmpeg';
 
 /** Where Home's notices can open Settings: the review queue, the TMDB key or ffmpeg. */
-export type SettingsTarget = 'review' | 'tmdb-key' | 'ffmpeg';
+export type SettingsTarget = 'review' | 'tmdb-key' | 'ffmpeg' | 'picture';
 
 type SectionId = 'library' | 'playback' | 'picture' | 'intros' | 'accounts' | 'advanced';
 
@@ -187,7 +187,13 @@ export default function Settings({ openSection }: { openSection?: SettingsTarget
   });
 
   const [section, setSection] = useState<SectionId>(
-    openSection === 'ffmpeg' ? 'intros' : openSection ? 'library' : lastSection
+    openSection === 'ffmpeg'
+      ? 'intros'
+      : openSection === 'picture'
+        ? 'picture'
+        : openSection
+          ? 'library'
+          : lastSection
   );
   const chooseSection = useCallback((id: SectionId) => {
     lastSection = id;

@@ -225,3 +225,44 @@ test('first run: where to watch, then picture and sound, all by remote', async (
   await expect.poll(() => focused(page)).toBe('Scan my library');
   expect(await setting('display_switch_refresh')).toBeNull();
 });
+
+test('the equipment notice: Choose when never asked, Use it too for only these', async ({ page }) => {
+  await open(page, 'windows');
+  const api = (name: string, ...args: string[]) =>
+    page.evaluate(
+      async ([n, a]) => {
+        const path = '/src/metadata/api.ts';
+        const mod = await import(/* @vite-ignore */ path);
+        return mod[n as string](...(a as string[])) as Promise<string | null>;
+      },
+      [name, args] as const
+    );
+  const toNotice = async (button: string) => {
+    for (let i = 0; i < 4 && (await focused(page)) !== button; i++) await press(page, 'ArrowDown');
+    await expect.poll(() => focused(page)).toBe(button);
+  };
+
+  // Never answered: the notice sends the question to Settings.
+  await toNotice('Choose');
+  await press(page, 'Enter');
+  await expect(page.locator('.settings-section h2').first()).toHaveText('Screen');
+
+  // Answered "only these" with the monitor alone, the rest off: only the TV
+  // is mentioned, and Use it too adds it.
+  await api('setSetting', 'display_switch_refresh', 'these');
+  await api('setSetting', 'display_switch_refresh_devices', JSON.stringify(['mock-monitor']));
+  await api('setSetting', 'display_switch_hdr', 'off');
+  await api('setSetting', 'audio_direct', 'off');
+  // Back lands on the button it left from, now asking the new question.
+  await press(page, 'Escape');
+  await expect.poll(() => focused(page)).toBe('Use it too');
+  await expect(page.locator('.home-notice').first()).toContainText('Something connected can do more');
+  await expect(page.locator('.home-notice li')).toHaveCount(1);
+  await press(page, 'Enter');
+  await expect
+    .poll(() => api('getSetting', 'display_switch_refresh_devices'))
+    .toBe(JSON.stringify(['mock-monitor', 'mock-tv']));
+  await expect(page.locator('.home-notice li')).toHaveCount(0);
+  // The button went with the notice; the ring goes somewhere, not nowhere.
+  await expect.poll(() => focused(page)).toBeTruthy();
+});

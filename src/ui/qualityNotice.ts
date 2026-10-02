@@ -12,6 +12,17 @@
  *
  * It replaces a dialog that stood between Play and the film the first time,
  * and whose "Not now" meant never. Settings still has every switch.
+ *
+ * Since the first run asks about picture and sound (2026-10-02), the notice
+ * never repeats a question that has been answered there or in Settings:
+ *
+ *  - **never answered** (nothing stored): as before, but Choose opens
+ *    Settings → Picture & sound, where each is every device, only some, or
+ *    off — rather than one press switching all of it on;
+ *  - **only these**: it speaks up only for equipment that can do it and is
+ *    not on the list — a laptop at a new TV — and Use it too adds it;
+ *  - **every device, or off**: it says nothing. The first already covers new
+ *    equipment, and the second is an answer.
  */
 import { getSetting, setSetting } from '../metadata/api';
 import {
@@ -22,8 +33,8 @@ import {
   targetDevice,
   type AudioSettings,
 } from '../player/audioOutput';
-import { cadenceRank } from '../player/displayMode';
-import { covers } from '../player/devicePolicy';
+import { covers, readPolicy, savePolicy, withDevice } from '../player/devicePolicy';
+import { filmRate } from './deviceOptions';
 import {
   readSwitchPolicies,
   SWITCH_HDR_KEY,
@@ -40,11 +51,19 @@ export interface Upgrade {
   /** What it is about, per piece of equipment — the unit of "dismissed". */
   id: string;
   text: string;
-  /** The setting that turns it on. */
+  /** The setting it is about. */
   setting: string;
+  /** Choose in Settings (never answered), or add `device` to "only these". */
+  action: 'choose' | 'add';
+  device: string;
 }
 
-const FILM_FPS = 24000 / 1001;
+/** Which of the three questions have an answer stored. */
+export interface Answered {
+  sound: boolean;
+  refresh: boolean;
+  hdr: boolean;
+}
 
 /** What this system can switch (capabilities.ts): only that is offered. */
 export type Can = Pick<Capabilities, 'system' | 'audio_direct' | 'display_switching'>;
@@ -53,25 +72,45 @@ export function upgradesFor(
   equipment: Equipment,
   audio: AudioSettings,
   screen: SwitchPolicies,
+  answered: Answered,
   oldOfferAnswered: boolean,
   can: Can
 ): Upgrade[] {
   const out: Upgrade[] = [];
 
+  // Whether to mention one piece of equipment that could do it: "add" when
+  // the answer was only these and it is not on the list, "choose" when there
+  // is no answer yet, nothing otherwise.
+  const ask = (
+    isAnswered: boolean,
+    policy: SwitchPolicies['hdr'],
+    id: string
+  ): Upgrade['action'] | null => {
+    if (covers(policy, id)) return null;
+    if (policy.policy === 'these') return 'add';
+    return isAnswered ? null : 'choose';
+  };
+
   const device = targetDevice(equipment, audio.deviceId);
   // Someone who answered the old one-time question has decided, for the
   // equipment they had then; only equipment new since then is mentioned.
   const decided = oldOfferAnswered && device !== null && !device.new;
-  if (can.audio_direct && !goesDirect(audio, device) && device && !decided) {
-    const lossless = device.bitstream.some(
-      (b) => (b.codec === 'truehd' || b.codec === 'dts-hd') && b.result === 'yes'
-    );
-    if (lossless) {
+  const lossless = device?.bitstream.some(
+    (b) => (b.codec === 'truehd' || b.codec === 'dts-hd') && b.result === 'yes'
+  );
+  if (can.audio_direct && device && lossless && !goesDirect(audio, device)) {
+    const action = ask(answered.sound, audio.direct, device.id);
+    if (action === 'add' || (action === 'choose' && !decided)) {
       out.push({
         kind: 'sound',
-        id: `sound:${device.id}`,
-        text: `${device.name} can take Dolby Atmos and DTS:X untouched. Through ${can.system} the height channels are lost.`,
+        id: `${action === 'add' ? 'add:' : ''}sound:${device.id}`,
+        text:
+          action === 'add'
+            ? `${device.name} can take Dolby Atmos and DTS:X untouched, but is not among the receivers Kinema sends sound straight to.`
+            : `${device.name} can take Dolby Atmos and DTS:X untouched. Through ${can.system} the height channels are lost.`,
         setting: AUDIO_DIRECT_KEY,
+        action,
+        device: device.id,
       });
     }
   }
@@ -80,23 +119,33 @@ export function upgradesFor(
   // nothing — on Linux until it can change the screen's mode.
   if (!can.display_switching) return out;
   for (const display of equipment.displays.filter((d) => d.connected)) {
-    const atItsSize = display.modes.filter(
-      (m) => m.width === display.width && m.height === display.height
-    );
-    if (!covers(screen.refresh, display.id) && atItsSize.some((m) => cadenceRank(m.rate, FILM_FPS) === 0)) {
+    const motion =
+      filmRate(display) !== null ? ask(answered.refresh, screen.refresh, display.id) : null;
+    if (motion) {
       out.push({
         kind: 'motion',
-        id: `motion:${display.id}`,
-        text: `${display.name} can show movies without judder, by switching to 23.976 Hz while one plays.`,
+        id: `${motion === 'add' ? 'add:' : ''}motion:${display.id}`,
+        text:
+          motion === 'add'
+            ? `${display.name} can show movies without judder, but is not among the screens Kinema switches to 23.976 Hz.`
+            : `${display.name} can show movies without judder, by switching to 23.976 Hz while one plays.`,
         setting: SWITCH_REFRESH_KEY,
+        action: motion,
+        device: display.id,
       });
     }
-    if (!covers(screen.hdr, display.id) && display.hdr === 'off') {
+    const hdr = display.hdr === 'off' ? ask(answered.hdr, screen.hdr, display.id) : null;
+    if (hdr) {
       out.push({
         kind: 'hdr',
-        id: `hdr:${display.id}`,
-        text: `${display.name} can show HDR, but ${can.system} has it switched off, so HDR videos play in SDR.`,
+        id: `${hdr === 'add' ? 'add:' : ''}hdr:${display.id}`,
+        text:
+          hdr === 'add'
+            ? `${display.name} can show HDR, but is not among the screens Kinema turns HDR on for, so HDR videos play in SDR there.`
+            : `${display.name} can show HDR, but ${can.system} has it switched off, so HDR videos play in SDR.`,
         setting: SWITCH_HDR_KEY,
+        action: hdr,
+        device: display.id,
       });
     }
   }
@@ -123,26 +172,37 @@ export async function readUpgrades(): Promise<Upgrade[]> {
   const can = capabilitiesNow();
   // Nothing is offered until it is known what this system can switch.
   if (!can) return [];
-  const [equipment, audio, screen, answered, dismissed] = await Promise.all([
+  const stored = (key: string) => getSetting(key).then((v) => v !== null).catch(() => false);
+  const [equipment, audio, screen, sound, refresh, hdr, oldOffer, dismissed] = await Promise.all([
     getEquipment(),
     readAudioSettings(),
     readSwitchPolicies(),
+    stored(AUDIO_DIRECT_KEY),
+    stored(SWITCH_REFRESH_KEY),
+    stored(SWITCH_HDR_KEY),
     getSetting(AUDIO_DIRECT_OFFERED_KEY).catch(() => null),
     dismissedIds(),
   ]);
-  return pendingUpgrades(upgradesFor(equipment, audio, screen, Boolean(answered), can), dismissed);
+  const answered = { sound, refresh, hdr };
+  return pendingUpgrades(
+    upgradesFor(equipment, audio, screen, answered, Boolean(oldOffer), can),
+    dismissed
+  );
 }
 
-/** "OK": not for this equipment again. */
+/** "Not now": not for this equipment again. */
 export async function dismissUpgrades(upgrades: Upgrade[]): Promise<void> {
   const ids = new Set([...(await dismissedIds()), ...upgrades.map((u) => u.id)]);
   await setSetting(NOTICE_DISMISSED_KEY, JSON.stringify([...ids]));
 }
 
-/** "Turn on": the switches, then the notice goes like a dismissal. */
+/**
+ * "Use it too": each device added to its setting's list, then the notice
+ * goes like a dismissal. Only for "add"; "choose" is answered in Settings.
+ */
 export async function applyUpgrades(upgrades: Upgrade[]): Promise<void> {
-  for (const setting of new Set(upgrades.map((u) => u.setting))) {
-    await setSetting(setting, 'on');
+  for (const u of upgrades.filter((x) => x.action === 'add')) {
+    await savePolicy(u.setting, withDevice(await readPolicy(u.setting), u.device));
   }
   await dismissUpgrades(upgrades);
 }

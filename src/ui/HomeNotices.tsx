@@ -28,7 +28,10 @@ interface Props {
   keyRejected: boolean;
   onAddKey: () => void;
   upgrades: Upgrade[];
+  /** Add each device to its "only these" list. */
   onApply: () => void;
+  /** Open Settings → Picture & sound, for questions never answered. */
+  onChoose: () => void;
   onDismiss: () => void;
   ffmpegMissing: boolean;
   onFfmpeg: () => void;
@@ -42,6 +45,7 @@ export default function HomeNotices({
   onAddKey,
   upgrades,
   onApply,
+  onChoose,
   onDismiss,
   ffmpegMissing,
   onFfmpeg,
@@ -49,6 +53,9 @@ export default function HomeNotices({
 }: Props) {
   const { ref, focusKey } = useFocusable({ trackChildren: true, saveLastFocusedChild: true });
   if (reviewCount === 0 && upgrades.length === 0 && !keyRejected && !ffmpegMissing) return null;
+  // Only additions to an "only these" list can be done here in a press; a
+  // question never answered is answered where all three answers are.
+  const onlyAdds = upgrades.every((u) => u.action === 'add');
 
   return (
     <FocusContext.Provider value={focusKey}>
@@ -112,14 +119,20 @@ export default function HomeNotices({
               ★
             </span>
             <div className="home-notice-text">
-              <strong>Your equipment can do better than it is set to</strong>
+              <strong>
+                {onlyAdds
+                  ? 'Something connected can do more than Kinema is set to use'
+                  : 'Your equipment can do better than it is set to'}
+              </strong>
               <ul>
                 {upgrades.map((u) => (
                   <li key={u.id}>{u.text}</li>
                 ))}
               </ul>
               <span className="muted">
-                Turning it on changes only what is listed; every switch is also in Settings.
+                {onlyAdds
+                  ? 'Using it too adds it to the devices you chose; Settings → Picture & sound has the lists.'
+                  : 'Choose decides each, for every device that can, only some, or none, in Settings → Picture & sound.'}
               </span>
             </div>
             <div className="home-notice-actions">
@@ -127,9 +140,9 @@ export default function HomeNotices({
                 focusKey="notice-apply"
                 className="btn-primary"
                 keepInView="nearest"
-                onSelect={onApply}
+                onSelect={onlyAdds ? onApply : onChoose}
               >
-                Turn on
+                {onlyAdds ? 'Use it too' : 'Choose'}
               </FocusButton>
               <FocusButton
                 focusKey="notice-dismiss"
@@ -137,7 +150,7 @@ export default function HomeNotices({
                 keepInView="nearest"
                 onSelect={onDismiss}
               >
-                OK
+                Not now
               </FocusButton>
             </div>
           </div>

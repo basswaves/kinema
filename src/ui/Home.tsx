@@ -38,6 +38,7 @@ interface Props {
   onAddKey: () => void;
   upgrades: Upgrade[];
   onApplyUpgrades: () => void;
+  onChooseUpgrades: () => void;
   onDismissUpgrades: () => void;
   ffmpegMissing: boolean;
   onFfmpeg: () => void;
@@ -76,6 +77,7 @@ export default function Home({
   onAddKey,
   upgrades,
   onApplyUpgrades,
+  onChooseUpgrades,
   onDismissUpgrades,
   ffmpegMissing,
   onFfmpeg,
@@ -143,6 +145,7 @@ export default function Home({
           onAddKey={onAddKey}
           upgrades={upgrades}
           onApply={onApplyUpgrades}
+          onChoose={onChooseUpgrades}
           onDismiss={onDismissUpgrades}
           ffmpegMissing={ffmpegMissing}
           onFfmpeg={onFfmpeg}

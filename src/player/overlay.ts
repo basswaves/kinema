@@ -8,6 +8,10 @@
  * visible removes the overlay instead. A photo takes a millisecond or two,
  * and never more than one is asked for at a time.
  *
+ * Once a photo has come back empty — the controls hidden, which is most of a
+ * film — no more are taken until the page changes (`watchForChanges`): at 4K
+ * each photo is 33 MB to copy and compare, for a picture of nothing.
+ *
  * The photo is the size of Kinema's window; mpv 0.38 and later scale it to
  * their own (`dw`/`dh`), so the controls land where they would on the screen.
  * An older mpv cannot, so Kinema's window — hidden behind mpv's anyway — is
@@ -84,6 +88,55 @@ function setStage(stage: { width: number; height: number } | null): void {
   root.style.setProperty('--stage-h', `${stage.height / ratio}px`);
 }
 
+/**
+ * The parts the player hides by fading them out rather than removing them.
+ * They go on changing while hidden — the seek bar and the clock follow the
+ * film — and nothing in them can be seen, so a change there needs no photo.
+ * The class that hides them changes on `.player` itself, outside this, so
+ * showing them again is always noticed.
+ */
+const HIDDEN = '.player.osd-hidden .player-top, .player.osd-hidden .player-controls';
+
+/**
+ * Call `changed` whenever the page may look different: anything added,
+ * removed or altered outside the hidden parts, focus moving, an animation or
+ * transition starting or ending, the window resizing. Events rather than a
+ * comparison, so it costs nothing while nothing happens. Returns the
+ * function that stops watching.
+ */
+function watchForChanges(changed: () => void): () => void {
+  const seen = (node: Node) => {
+    const el = node instanceof Element ? node : node.parentElement;
+    return !el?.closest(HIDDEN);
+  };
+  const observer = new MutationObserver((records) => {
+    if (records.some((r) => seen(r.target))) changed();
+  });
+  observer.observe(document.documentElement, {
+    subtree: true,
+    childList: true,
+    attributes: true,
+    characterData: true,
+  });
+  const events = [
+    'focusin',
+    'focusout',
+    'animationstart',
+    'animationend',
+    'animationcancel',
+    'transitionrun',
+    'transitionend',
+    'transitioncancel',
+  ];
+  for (const name of events) document.addEventListener(name, changed, true);
+  window.addEventListener('resize', changed);
+  return () => {
+    observer.disconnect();
+    for (const name of events) document.removeEventListener(name, changed, true);
+    window.removeEventListener('resize', changed);
+  };
+}
+
 /** Start drawing the page into mpv; returns the function that stops it. */
 export function startOverlay(): () => void {
   let stopped = false;
@@ -91,6 +144,16 @@ export function startOverlay(): () => void {
   let shown = false;
   let warned = false;
   let scaled = true;
+  // Whether the page may have changed since the last photo. While nothing is
+  // shown, a photo is only taken when it has.
+  let dirty = true;
+  const stopWatching = watchForChanges(() => {
+    dirty = true;
+  });
+  // How many photos were taken, said when the player closes: the measure of
+  // whether the pause above is working.
+  let photos = 0;
+  const opened = performance.now();
   // The page's size against mpv's, said whenever either changes: a page of
   // another shape is drawn stretched (a tiling desktop squeezing Kinema's
   // window — display.rs `player_window`), and app.log is where that shows.
@@ -100,8 +163,12 @@ export function startOverlay(): () => void {
 
   const tick = async () => {
     if (busy || stopped) return;
+    if (!shown && !dirty) return;
     busy = true;
+    // Cleared before the photo, so a change while it is taken asks for another.
+    dirty = false;
     try {
+      photos += 1;
       const frame = await invoke<OverlayFrame>('overlay_frame');
       if (stopped || !frame.changed) return;
       if (frame.empty) {
@@ -149,6 +216,7 @@ export function startOverlay(): () => void {
           // The next photo is taken at the new size, and counts as new even
           // if the window already was full screen and nothing changed.
           await invoke('overlay_reset');
+          dirty = true;
           return;
         }
       }
@@ -158,6 +226,8 @@ export function startOverlay(): () => void {
       // Once: a failure here repeats ten times a second.
       if (!warned) console.warn('overlay: the page could not be drawn over the video', e);
       warned = true;
+      // Tried again next tick, as if the page had changed.
+      dirty = true;
     } finally {
       busy = false;
     }
@@ -169,6 +239,9 @@ export function startOverlay(): () => void {
   return () => {
     stopped = true;
     window.clearInterval(timer);
+    stopWatching();
+    const secs = Math.round((performance.now() - opened) / 1000);
+    console.log(`overlay: ${photos} photos in ${secs} s`);
     setStage(null);
     if (shown) void mpvCommand('overlay-remove', [ID]).catch(() => undefined);
     if (madeFullscreen) void getCurrentWindow().setFullscreen(false).catch(() => undefined);

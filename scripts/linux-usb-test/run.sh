@@ -395,6 +395,12 @@ if [ "$stage" = wlroots-in ]; then
       hyprland) hyprctl monitors -j ;;
     esac
   }
+  windows() {   # where each window is, and whether Kinema's floats
+    case "$desk" in
+      sway) swaymsg -t get_tree -r ;;
+      hyprland) hyprctl clients -j ;;
+    esac
+  }
   { echo "WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-} XDG_CURRENT_DESKTOP=${XDG_CURRENT_DESKTOP:-}"
     case "$desk" in sway) sway --version ;; hyprland) hyprctl version ;; esac
   } > "$R/session.txt" 2>&1
@@ -410,14 +416,14 @@ if [ "$stage" = wlroots-in ]; then
   grep -hE 'audio: |shown to the user' "$R/kinema-direct-truehd/data/logs/app.log" > "$R/direct.txt"
 
   say "$desk 3 — the 4K HDR film, the screen switched for it and put back"
-  switch=',{"at":0.5,"do":"call","fn":"setSetting","args":["display_switch_refresh","on"]},{"at":0.6,"do":"call","fn":"setSetting","args":["display_switch_hdr","on"]}'
-  ( sleep 12; outputs > "$R/screens-during.json" 2>&1 ) &
+  switch=',{"at":0.5,"do":"call","fn":"setSetting","args":["display_switch_refresh","on"]},{"at":0.6,"do":"call","fn":"setSetting","args":["display_switch_hdr","on"]},{"at":13,"do":"key","key":"ArrowUp"},{"at":14,"do":"mpv","args":["screenshot-to-file","'"$R"'/kinema-switch/mpv-window-14s.png","window"]},{"at":15,"do":"probe","args":["video-target-params/gamma","display-fps","osd-width","osd-height"]}'
+  ( sleep 12; outputs > "$R/screens-during.json" 2>&1; windows > "$R/windows-during.json" 2>&1 ) &
   reading=$!   # waited for by number: a bare wait also waits for the log's tee
   kinema_plan switch "$media/hdr10-2160p23.976.mkv" "$switch"
   wait "$reading"
   sleep 3
   outputs > "$R/screens-after.json" 2>&1
-  grep -hE 'display: |shown to the user' "$R/kinema-switch/data/logs/app.log" > "$R/switch.txt"
+  grep -hE 'display: |overlay: page|shown to the user' "$R/kinema-switch/data/logs/app.log" > "$R/switch.txt"
   exit 0
 fi
 
@@ -457,7 +463,7 @@ misc {
   disable_hyprland_logo = true
 }
 CONF
-  XDG_CURRENT_DESKTOP=Hyprland timeout 300 Hyprland -c "$d/hyprland.conf" > "$d/hyprland.log" 2>&1
+  WAYLAND_DISPLAY=kinema-none XDG_CURRENT_DESKTOP=Hyprland timeout 300 Hyprland -c "$d/hyprland.conf" > "$d/hyprland.log" 2>&1
   echo "Hyprland ended ($?)" | tee -a "$R/versions.txt"
 
   copy_out

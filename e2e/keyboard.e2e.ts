@@ -41,6 +41,17 @@ async function tvMode(page: Page): Promise<void> {
   });
 }
 
+/**
+ * Home's hero is a different title each calendar day (hero.ts); the flows
+ * that press its Play need it to be the fixture show, so they run on a
+ * fixed day. Only those: with the date fixed, key presses all carry the
+ * same time, and the navigation the other flows rely on takes them for
+ * repeats.
+ */
+async function onFixtureDay(page: Page): Promise<void> {
+  await page.clock.setFixedTime(new Date('2026-10-01T12:00:00'));
+}
+
 /** Open the mock as a given system (`kinemaMockSystem`), Home focused. */
 async function open(page: Page, system: 'windows' | 'linux'): Promise<void> {
   await page.addInitScript((s) => {
@@ -52,6 +63,7 @@ async function open(page: Page, system: 'windows' | 'linux'): Promise<void> {
 }
 
 test('an episode plays, pauses and rolls on to the next', async ({ page }) => {
+  await onFixtureDay(page);
   await open(page, 'windows');
   await press(page, 'Enter');
 
@@ -84,6 +96,7 @@ test('an episode plays, pauses and rolls on to the next', async ({ page }) => {
 test('Linux: straight to the receiver takes its card for the film and gives it back', async ({
   page,
 }) => {
+  await onFixtureDay(page);
   await open(page, 'linux');
   await page.evaluate(async () => {
     const path = '/src/metadata/api.ts';

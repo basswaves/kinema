@@ -29,9 +29,17 @@ import { readChapters } from './player/chapters';
 import { setTvMode } from './ui/tv';
 import { simklStatus, traktStatus } from './metadata/tracking';
 import { findSubtitles } from './player/onlineSubtitles';
-import { measurePictures, probeLibrary, refreshImdbRatings, scanLibrary } from './library/api';
+import {
+  addLibraryRoot,
+  listLibraryRoots,
+  measurePictures,
+  probeLibrary,
+  refreshImdbRatings,
+  scanLibrary,
+} from './library/api';
 import { fileFacts } from './ui/badges';
 import { seasonFacts } from './ui/seasonBadges';
+import { runScanPipeline } from './library/pipeline';
 import { refreshTomatometer } from './metadata/scores';
 import {
   cacheArtwork,
@@ -58,6 +66,14 @@ import {
  * mock can. Read the copied library afterwards to check what they did.
  */
 const CALLABLE: Record<string, (...args: never[]) => Promise<unknown>> = {
+  // A library built from nothing: a folder added as Settings adds it, and a
+  // whole scan — so a plan on an empty copy checks the library side end to end:
+  // `runScanPipeline` is the app's own scan → parse → match → details →
+  // ratings → artwork → read files → intro detection.
+  addLibraryRoot,
+  listLibraryRoots,
+  scanLibrary,
+  runScanPipeline,
   ignoreFileIds,
   recordMatch,
   recordProviderFailure,

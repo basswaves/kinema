@@ -231,7 +231,7 @@ platform") says how the code is arranged for one.
 | | Windows 11 | Linux |
 |---|---|---|
 | Builds and passes its tests | ✓ | ✓ |
-| Library, matching, artwork, accounts | ✓ | ✓ untested as an app |
+| Library, matching, artwork, accounts | ✓ | ✓ in development |
 | Playback, controls, remote keys | ✓ | ✓ in development |
 | Equipment check, sound straight to a receiver | ✓ | ✓ in development |
 | Screen switching (refresh rate, HDR) | ✓ | ✓ in development: refresh rate on GNOME, KDE Plasma, Sway and Hyprland; HDR on GNOME and KDE Plasma, and by Hyprland itself (Sway 1.12 not yet confirmed) |

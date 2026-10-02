@@ -33,6 +33,10 @@ makes no stability promises.
 
 ### Fixed
 
+- **Folders and films linked into a library are scanned.** A folder linked
+  in from another drive (a symlink on Linux, a link or junction on Windows)
+  was skipped without a word, so its films were simply missing; links are now
+  followed, and one that loops back into the library is skipped.
 - **A film slow to show its first frame no longer misses the screen
   switch.** Kinema waited five seconds for it, then played the film in
   whatever mode the screen was in without a word; it now waits fifteen (the

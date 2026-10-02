@@ -160,8 +160,12 @@ fn scan_root(
     let mut seen_paths: HashSet<String> = HashSet::new();
     let mut pending: Vec<SeenFile> = Vec::with_capacity(WRITE_BATCH);
 
+    // Links are followed: a folder or film linked into the library from
+    // another drive is part of it, as people arrange libraries on Linux (and
+    // with links and junctions on Windows). A link that loops back on itself
+    // is skipped below, said once in the log, not reported every scan.
     let walker = WalkDir::new(root)
-        .follow_links(false)
+        .follow_links(true)
         .into_iter()
         .filter_entry(|e| {
             if e.depth() == 0 {
@@ -180,6 +184,10 @@ fn scan_root(
     for entry in walker {
         let entry = match entry {
             Ok(e) => e,
+            Err(e) if e.loop_ancestor().is_some() => {
+                crate::log!("scan: a link loops back into itself, skipped: {e}");
+                continue;
+            }
             Err(e) => {
                 report.errors.push(e.to_string());
                 continue;
@@ -521,5 +529,32 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM playback_state", [], |r| r.get(0))
             .unwrap();
         assert_eq!(rows, 0);
+    }
+
+    /// A folder linked into the library from elsewhere is scanned — what the
+    /// Linux test library showed missing — and a link that loops back into
+    /// the library neither hangs the scan nor counts as an error.
+    #[cfg(unix)]
+    #[test]
+    fn linked_folders_are_scanned_and_loops_skipped() {
+        let mut conn = database("links");
+        let root: String = conn
+            .query_row("SELECT path FROM library_roots WHERE id = 1", [], |r| r.get(0))
+            .unwrap();
+        let root = Path::new(&root);
+        let elsewhere = root.parent().unwrap().join("pn-scanner-links-elsewhere");
+        let _ = std::fs::remove_dir_all(&elsewhere);
+        std::fs::create_dir_all(elsewhere.join("Show/Season 1")).unwrap();
+        std::fs::write(elsewhere.join("Show/Season 1/Show.S01E01.mkv"), b"x").unwrap();
+        std::os::unix::fs::symlink(elsewhere.join("Show"), root.join("Show")).unwrap();
+        std::os::unix::fs::symlink(root, root.join("Loop")).unwrap();
+
+        let mut report = ScanReport::default();
+        scan_root(&mut conn, 1, &root.to_string_lossy(), &mut report).unwrap();
+        assert_eq!(report.files_seen, 1, "{report:?}");
+        assert!(report.errors.is_empty(), "{:?}", report.errors);
+        let path: String = conn.query_row("SELECT path FROM media_files", [], |r| r.get(0)).unwrap();
+        assert!(path.ends_with("Show/Season 1/Show.S01E01.mkv"), "{path}");
+        let _ = std::fs::remove_dir_all(&elsewhere);
     }
 }

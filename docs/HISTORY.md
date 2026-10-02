@@ -2421,8 +2421,21 @@ again undecorated at the screen's size, fixed, and put back afterwards
 page matched the film's shape before and after the 4K switch; Sway 1.11
 floated it but at 2010×1170 while reporting its geometry as 1920×1080, so the
 controls there are about 3.5 % squashed — visible on a ruler, not by eye. A
-nested Sway 1.9 gave the exact size; why 1.11 adds 90 pixels is not known
-yet.
+nested Sway 1.9 gave the exact size; why 1.11 adds 90 pixels was not worth
+knowing in the end: the page is now laid out in a box of the film screen's
+shape inside whatever window it gets, and only the box is drawn, so no
+desktop's size is trusted and none can stretch the controls.
+
+**The library side, as an app on Linux.** A test library built for what
+Linux libraries have — an accented title, an apostrophe, an uppercase
+`.MKV`, `movie.nfo` and a mixed-case `TVShow.nfo`, an episode named only by
+its number, a hidden folder, an unreadable file, a symlinked folder, and a
+root under a GNOME network mount (`smb-share:server=…,share=…`) — went
+through the app's own scan pipeline in WSL from an empty library (the
+self-test can now add roots and run it). Everything behaved as on Windows
+except one thing: **the symlinked folder was skipped without a word**, so its
+film was missing. The scanner did not follow links, for no recorded reason;
+it does now, and a link looping back into the library is skipped and logged.
 
 **A slow first frame cost the switch.** Kinema waited 5 s for the first
 frame's details before deciding a switch, then played the film in the mode

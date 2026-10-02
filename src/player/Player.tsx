@@ -35,6 +35,7 @@ import { useNeighbours } from './useNeighbours';
 import { useOnlineSubtitles } from './useOnlineSubtitles';
 import { useOsd, useOsdIdleLeave } from './useOsd';
 import { usePanels } from './usePanels';
+import { usePlayerKeys } from './usePlayerKeys';
 import { usePlaybackEngine } from './usePlaybackEngine';
 import { usePlaybackSession } from './usePlaybackSession';
 import { useProgressSave } from './useProgressSave';
@@ -44,7 +45,6 @@ import { useSkipMarkers } from './useSkipMarkers';
 import { useTracks } from './useTracks';
 import { useUpNext } from './useUpNext';
 import { useVolume } from './useVolume';
-import { VOLUME_STEP } from './volume';
 
 export interface PlaybackTarget {
   path: string;
@@ -63,11 +63,6 @@ interface Props {
   onPlayTarget: (target: PlaybackTarget) => void;
 }
 
-/**
- * How far a remote's fast-forward and rewind keys jump. Longer than the
- * arrows' 10 s: those are the fine control, these are for getting somewhere.
- */
-const TRANSPORT_SKIP_SECS = 30;
 /** How long a notice about the sound stays on screen. */
 const AUDIO_NOTICE_MS = 12000;
 
@@ -249,152 +244,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     useVolume({ fail, showOsd, osdVisible, path: target.path, frameShown: session.frameShown });
 
   // ---- keyboard -----------------------------------------------------------
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      switch (e.key) {
-        case ' ':
-          e.preventDefault();
-          void togglePauseByKey();
-          break;
-        case 'f':
-          void toggleFullscreen();
-          break;
-        // Back, one layer at a time: close whichever panel is open, then drop
-        // out of OSD focus, then leave fullscreen, then leave the player.
-        // Anything else would make the only way out of a panel a mouse click.
-        //
-        // Backspace is deliberately still the same key as Escape here: it is
-        // what a remote's Back button sends, and two Back keys that stop at
-        // different layers is the sort of split nobody remembers later.
-        //
-        // `BrowserBack` is what many remotes' Back button sends instead.
-        case 'Escape':
-        case 'Backspace':
-        case 'BrowserBack':
-          e.preventDefault();
-          if (showTracks) {
-            closeTracks();
-          } else if (showStats) {
-            closeStats();
-          } else if (osdFocus) {
-            leaveOsdFocus();
-          } else {
-            void backOut();
-          }
-          break;
-        // Up or Down brings up the controls with the ring on them, as on any
-        // streaming app. Once the OSD has the arrows, every one belongs to the
-        // spatial system and this handler must not touch them —
-        // `preventDefault` cannot stop the other listener, so acting on one
-        // here would seek *and* move the focus ring on the same press.
-        case 'ArrowUp':
-        case 'ArrowDown':
-          if (!osdFocus) {
-            e.preventDefault();
-            enterOsdFocus();
-          }
-          break;
-        // Seek, faster the longer it is held — see scrub.ts.
-        case 'ArrowLeft':
-        case 'ArrowRight':
-          if (osdFocus) break;
-          e.preventDefault();
-          scrubBy(e.key === 'ArrowLeft' ? -1 : 1, e.repeat);
-          break;
-        // Episode stepping. `n`/`p` for a keyboard; the media-key names are
-        // what the transport buttons on a TV remote actually send, and a remote
-        // has no letters to press instead.
-        case 'n':
-        case 'MediaTrackNext':
-          if (neighbours.next) {
-            e.preventDefault();
-            playNeighbour(neighbours.next);
-          }
-          break;
-        case 'p':
-        case 'MediaTrackPrevious':
-          if (neighbours.prev) {
-            e.preventDefault();
-            playNeighbour(neighbours.prev);
-          }
-          break;
-        // The transport keys on a remote or a keyboard's media row. Handled in
-        // both modes: they never move focus, so they cannot collide with the
-        // spatial system the way the arrows would.
-        case 'MediaPlayPause':
-          e.preventDefault();
-          void togglePauseByKey();
-          break;
-        case 'MediaPlay':
-          e.preventDefault();
-          void setPaused(false).then(showOsd);
-          break;
-        case 'MediaPause':
-          e.preventDefault();
-          void setPaused(true).then(enterOsdFocus);
-          break;
-        // Stop means leave the player, the same way out as Back takes from
-        // the top of its ladder — including out of fullscreen.
-        case 'MediaStop':
-          e.preventDefault();
-          void exit();
-          break;
-        case 'MediaFastForward':
-          e.preventDefault();
-          void seekRelative(TRANSPORT_SKIP_SECS);
-          break;
-        case 'MediaRewind':
-          e.preventDefault();
-          void seekRelative(-TRANSPORT_SKIP_SECS);
-          break;
-        // Volume, on mpv's keys and the obvious ones. While the receiver has
-        // the volume they do nothing but bring up the bar that says so.
-        case 'm':
-          volumeKey(toggleMute);
-          break;
-        case '-':
-        case '9':
-          volumeKey(() => changeVolume(-VOLUME_STEP));
-          break;
-        case '+':
-        case '=':
-        case '0':
-          volumeKey(() => changeVolume(VOLUME_STEP));
-          break;
-        // mpv's own key for its stats overlay, so the reflex transfers.
-        case 'i':
-          e.preventDefault();
-          if (showStats) closeStats();
-          else openStats();
-          break;
-        // OK on a remote. While the OSD holds focus this belongs entirely to
-        // the spatial system, which activates whichever control the ring is on
-        // — including the Skip and Up next buttons, which are focusable too.
-        // Acting here as well would fire both handlers on one press.
-        //
-        // Otherwise it takes whichever prompt is showing, and with none it
-        // pauses and resumes, which is what OK does on every streaming app.
-        // It used to only reveal the controls, so pausing took Up, OK, Back.
-        case 'Enter':
-          if (osdFocus) break;
-          e.preventDefault();
-          if (session.resumedFrom !== null) {
-            startOver();
-          } else if (skipPrompt) {
-            void performSkip();
-          } else if (upNext) {
-            playNow();
-          } else {
-            void togglePauseByKey();
-          }
-          break;
-        default:
-          showOsd();
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [
+  usePlayerKeys({
     togglePauseByKey,
     toggleFullscreen,
     backOut,
@@ -415,25 +265,14 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     closeStats,
     openStats,
     scrubBy,
+    commitScrub,
     volumeKey,
     toggleMute,
     changeVolume,
-    session.resumedFrom,
+    resumedFrom: session.resumedFrom,
     startOver,
     playNow,
-  ]);
-
-  /**
-   * Letting go of Left/Right is what sends the seek. Only in watching mode:
-   * on the controls, the seek bar's own release handler does it.
-   */
-  useEffect(() => {
-    const onKeyUp = (e: KeyboardEvent) => {
-      if (!osdFocus && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) commitScrub();
-    };
-    window.addEventListener('keyup', onKeyUp);
-    return () => window.removeEventListener('keyup', onKeyUp);
-  }, [osdFocus, commitScrub]);
+  });
 
   // The controls step back out of the way on their own (useOsd.ts).
   useOsdIdleLeave({

@@ -2210,6 +2210,20 @@ own. `scripts/headless-selftest.sh` checks it with mpv's own input commands
 in a windowless Sway: the shared pointer moved by `xdotool` is the one the
 person at the computer is using.
 
+**Sending mpv less of the picture did not make it cheaper.** Most of the
+page is transparent while the controls show, so sending mpv only the bands
+with something in them looked like the obvious saving (tried 2026-10-03,
+in the windowless Sway at 4K). It cut what was written by 91% and changed
+nothing that mattered: Kinema and its web process used the same processor
+time with the controls up (about half a core above playing alone, in that
+setup), and with two pictures to hand over instead of one, the controls were
+redrawn less often. The time is in WebKit drawing the 4K page for each
+photo and in mpv taking a picture in, whatever its size — so handing it
+over from memory instead of a file was not done either: it would remove a
+write that costs little, at the price of a crash if the address were ever
+wrong. Each close of the player now writes what the photos cost to
+app.log, for whatever is tried next.
+
 ## Linux packages
 
 **The system's mpv, not one of Kinema's.** Bundling mpv, as the Windows ZIP

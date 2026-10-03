@@ -12,7 +12,8 @@
 # actions with mpv's own input commands — `mouse X Y` moves it over mpv's
 # window, `keydown MBTN_LEFT` / `keyup MBTN_LEFT` press and release, `keypress
 # WHEEL_DOWN` turns the wheel — which reach Kinema's page the way a real mouse
-# on mpv's window does (src/player/pageMouse.ts). The screen is 1600×900.
+# on mpv's window does (src/player/pageMouse.ts). The screen is 1600×900,
+# or KINEMA_HEADLESS_SIZE (e.g. 3840x2160).
 #
 # Everything else is scripts/selftest.sh's: the plan's data/ folder is the
 # library copy, and report.json lands beside the plan.
@@ -34,7 +35,7 @@ for t in ${shots//,/ }; do
 done
 PHOTOS
 cat > "$dir/headless-sway.conf" <<SWAY
-output HEADLESS-1 resolution 1600x900
+output HEADLESS-1 resolution ${KINEMA_HEADLESS_SIZE:-1600x900}
 exec "bash $dir/headless-photos.sh"
 exec "GDK_BACKEND=wayland bash $root/scripts/selftest.sh $plan > $dir/headless-inner.log 2>&1; swaymsg exit"
 SWAY

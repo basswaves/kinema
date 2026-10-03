@@ -5,8 +5,8 @@
  * While the player is open, the page is photographed ten times a second —
  * enough for a clock and a moving focus ring — and each photo that differs
  * from the last is handed to mpv's `overlay-add`; a photo with nothing
- * visible removes the overlay instead. A photo takes a millisecond or two,
- * and never more than one is asked for at a time.
+ * visible removes the overlay instead. Never more than one is asked for at a
+ * time; app.log says what they cost when the player closes.
  *
  * Once a photo has come back empty — the controls hidden, which is most of a
  * film — no more are taken until the page changes (`watchForChanges`): at 4K
@@ -182,6 +182,15 @@ export function startOverlay(): () => void {
   // How many photos were taken, said when the player closes: the measure of
   // whether the pause above is working.
   let photos = 0;
+  // How long mpv took to take each picture in, said with the count.
+  let handing = 0;
+  let handed = 0;
+  const handTo = async (args: (string | number)[]) => {
+    const t0 = performance.now();
+    await mpvCommand('overlay-add', args);
+    handing += performance.now() - t0;
+    handed += 1;
+  };
   const opened = performance.now();
   // The page's size against mpv's, said whenever either changes: a page of
   // another shape is drawn stretched (a tiling desktop squeezing Kinema's
@@ -221,7 +230,7 @@ export function startOverlay(): () => void {
       if (scaled) {
         const drawn = whole ? picture : [ID, 0, 0, frame.path, 0, 'bgra', box.width, box.height, frame.stride];
         try {
-          await mpvCommand('overlay-add', [...drawn, w, h]);
+          await handTo([...drawn, w, h]);
           shown = true;
           drawnScale = videoToPageScale(box, { width: w, height: h }, window.devicePixelRatio || 1);
           return;
@@ -250,13 +259,14 @@ export function startOverlay(): () => void {
           return;
         }
       }
-      await mpvCommand('overlay-add', picture);
+      await handTo(picture);
       shown = true;
       // Drawn at its own size: one device pixel of the page per pixel of mpv's.
       drawnScale = videoToPageScale(frame, frame, window.devicePixelRatio || 1);
     } catch (e) {
-      // Once: a failure here repeats ten times a second.
-      if (!warned) console.warn('overlay: the page could not be drawn over the video', e);
+      // Once: a failure here repeats ten times a second. Not once the player
+      // has closed: mpv shutting down refuses the picture being handed to it.
+      if (!warned && !stopped) console.warn('overlay: the page could not be drawn over the video', e);
       warned = true;
       // Tried again next tick, as if the page had changed.
       dirty = true;
@@ -273,7 +283,8 @@ export function startOverlay(): () => void {
     window.clearInterval(timer);
     stopWatching();
     const secs = Math.round((performance.now() - opened) / 1000);
-    console.log(`overlay: ${photos} photos in ${secs} s`);
+    const each = handed ? ` (mpv took ${handed} in, ${(handing / handed).toFixed(1)} ms each)` : '';
+    console.log(`overlay: ${photos} photos in ${secs} s${each}`);
     setStage(null);
     drawnScale = null;
     if (shown) void mpvCommand('overlay-remove', [ID]).catch(() => undefined);

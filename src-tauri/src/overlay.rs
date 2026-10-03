@@ -20,6 +20,7 @@
 use serde::Serialize;
 use std::path::PathBuf;
 use std::sync::Mutex;
+use std::time::Duration;
 
 #[cfg(target_os = "linux")]
 mod linux;
@@ -39,9 +40,24 @@ pub struct OverlayFrame {
 struct Last {
     pixels: Vec<u8>,
     turn: usize,
+    costs: Costs,
 }
 
-static LAST: Mutex<Last> = Mutex::new(Last { pixels: Vec::new(), turn: 0 });
+/// What the pictures cost while the player was open, said in app.log when
+/// it closes: the measure for any change to how the page is drawn.
+#[derive(Default)]
+struct Costs {
+    photos: u32,
+    taking: Duration,
+    keeping: Duration,
+    written: u64,
+}
+
+static LAST: Mutex<Last> = Mutex::new(Last {
+    pixels: Vec::new(),
+    turn: 0,
+    costs: Costs { photos: 0, taking: Duration::ZERO, keeping: Duration::ZERO, written: 0 },
+});
 
 /// Where frame number `turn` (0 or 1) is written: memory-backed where the
 /// system has it, so ten frames a second never touch a disk.
@@ -68,6 +84,7 @@ fn store(width: i32, height: i32, stride: i32, pixels: Vec<u8>) -> Result<Overla
     let path = frame_path(last.turn);
     if changed && !empty {
         std::fs::write(&path, &pixels).map_err(crate::util::to_string_err)?;
+        last.costs.written += pixels.len() as u64;
     }
     if changed {
         last.pixels = pixels;
@@ -88,6 +105,17 @@ fn store(width: i32, height: i32, stride: i32, pixels: Vec<u8>) -> Result<Overla
 pub fn overlay_reset() {
     let mut last = LAST.lock().unwrap_or_else(|e| e.into_inner());
     last.pixels = Vec::new();
+    let costs = std::mem::take(&mut last.costs);
+    if costs.photos > 0 {
+        let each = |total: Duration| total.as_secs_f64() * 1000.0 / costs.photos as f64;
+        crate::log!(
+            "overlay: {} photos, {:.1} ms to take and {:.1} ms to keep each, {:.1} MB written",
+            costs.photos,
+            each(costs.taking),
+            each(costs.keeping),
+            costs.written as f64 / 1e6
+        );
+    }
     for turn in 0..2 {
         let _ = std::fs::remove_file(frame_path(turn));
     }
@@ -98,8 +126,15 @@ pub fn overlay_reset() {
 pub async fn overlay_frame(window: tauri::WebviewWindow) -> Result<OverlayFrame, String> {
     #[cfg(target_os = "linux")]
     {
+        let started = std::time::Instant::now();
         let (width, height, stride, pixels) = linux::snapshot(&window).await?;
-        store(width, height, stride, pixels)
+        let taken = std::time::Instant::now();
+        let frame = store(width, height, stride, pixels);
+        let mut last = LAST.lock().unwrap_or_else(|e| e.into_inner());
+        last.costs.photos += 1;
+        last.costs.taking += taken - started;
+        last.costs.keeping += taken.elapsed();
+        frame
     }
     #[cfg(not(target_os = "linux"))]
     {

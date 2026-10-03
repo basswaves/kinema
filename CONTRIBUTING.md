@@ -176,6 +176,26 @@ CI runs all of this on every push — Windows, and Linux for x86 and ARM, with
 the WebKit tests on x86 Linux — so checking here is about finding out before
 pushing, not instead of it.
 
+### The Android test bench
+
+Android is under way. `scripts/android-bench.sh` runs Google's Android TV
+emulator with no window — in WSL too, where `/dev/kvm` is available — and
+drives it from inside Android: the remote's buttons, typing, mouse clicks and
+the wheel, touches, photos of the screen and the system log. Nothing reaches
+the real keyboard or mouse. There are two TVs: `tv` (Android TV 16) and `tv9`
+(Android TV 9, the oldest Kinema aims at). What it needs, and every command,
+are at the top of the script. Once, after unpacking Android's command-line
+tools:
+
+```bash
+scripts\wsl.ps1 'bash scripts/android-bench.sh setup'
+```
+
+`setup` asks you to accept Google's SDK licences before it downloads. The
+same commands drive a phone or a box with network debugging on, through
+`KINEMA_ANDROID_SERIAL`. The emulator has no HDMI, so HDR, Dolby Vision and
+passthrough to a receiver need real hardware.
+
 ### Running the UI without the native app
 
 ```bash

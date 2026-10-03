@@ -22,7 +22,7 @@ import {
   PhysicalPosition,
   primaryMonitor,
 } from '@tauri-apps/api/window';
-import { listenMpvEvents, mpvCommand, mpvGet } from './player/engine';
+import { listenMpvEvents, mpvCommand, mpvGet, onPlaybackEvent, seekTo } from './player/engine';
 import { startEngine } from './player/engine';
 import { readTracks } from './player/tracks';
 import { readChapters } from './player/chapters';
@@ -268,6 +268,15 @@ export async function runSelfTest(plan: SelfTestPlan): Promise<void> {
     .then(() => note('on-top'))
     .catch((e) => note('on-top-failed', String(e)));
 
+  // The engine's events in Kinema's own terms, from whichever engine plays
+  // (Media3 on Android has none of mpv's below). Not the position: the clock
+  // entries already say where it is.
+  const offEngine = await onPlaybackEvent((event) => {
+    if (['position', 'duration', 'key', 'mouse'].includes(event.type)) return;
+    const { type, ...detail } = event;
+    note(`engine:${type}`, Object.keys(detail).length ? detail : undefined);
+  });
+
   const unlisten = await listenMpvEvents((event) => {
     const e = event as { event: string; name?: string; data?: unknown; reason?: string };
     if (e.event === 'property-change') {
@@ -332,7 +341,7 @@ export async function runSelfTest(plan: SelfTestPlan): Promise<void> {
       if (action.do === 'key' && action.key) {
         window.dispatchEvent(new KeyboardEvent('keydown', { key: action.key, bubbles: true }));
       } else if (action.do === 'seek' && action.to !== undefined) {
-        void mpvCommand('seek', [action.to, 'absolute']).catch((e) => note('seek-failed', String(e)));
+        void seekTo(action.to).catch((e) => note('seek-failed', String(e)));
       } else if (action.do === 'call' && action.fn) {
         const target = CALLABLE[action.fn];
         if (!target) note('call:unknown', action.fn);
@@ -370,6 +379,7 @@ export async function runSelfTest(plan: SelfTestPlan): Promise<void> {
   window.clearInterval(sampler);
   timers.forEach((id) => window.clearTimeout(id));
   unlisten();
+  offEngine();
 
   const read = async (name: string) => {
     try {

@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "player-media3",
+  "description": "The Media3 player, on Android (engine.rs)",
+  "windows": [
+    "main"
+  ],
+  "platforms": ["android"],
+  "permissions": [
+    "media3:default"
+  ]
+}

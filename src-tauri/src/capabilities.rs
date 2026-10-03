@@ -49,12 +49,14 @@ pub struct MpvVideo {
 /// On Windows, d3d11 and d3d11va: the vendor-neutral path, the same on
 /// NVIDIA, AMD and Intel (docs/DESIGN.md). Elsewhere mpv chooses for itself —
 /// Vulkan or OpenGL, and only the hardware decoders it knows to be safe —
-/// until a port has a reason to name one.
+/// until a port has a reason to name one. Android has no mpv; its player draws
+/// beneath the page as mpv does on Windows, so there is no window of its own
+/// and nothing to photograph the page for (overlay.rs).
 fn mpv_video() -> MpvVideo {
     if cfg!(windows) {
         MpvVideo { gpu_api: "d3d11", hwdec: "d3d11va", own_window: false }
     } else {
-        MpvVideo { gpu_api: "auto", hwdec: "auto-safe", own_window: true }
+        MpvVideo { gpu_api: "auto", hwdec: "auto-safe", own_window: cfg!(desktop) }
     }
 }
 

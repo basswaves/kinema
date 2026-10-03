@@ -19,6 +19,9 @@
  *
  * The plugin (`tauri-plugin-libmpv-api`) is imported here and nowhere else, so
  * replacing it would touch one file.
+ *
+ * **On Android the engine is Media3** (`media3.ts`, capabilities `engine`).
+ * Kinema's terms go to it instead; mpv's terms are not there to call.
  */
 import {
   command,
@@ -36,6 +39,10 @@ import { logPaths } from '../metadata/api';
 import { capabilitiesNow, loadCapabilities } from '../capabilities';
 import { keyCommand, keyFromValue, KEY_PROPERTY, MPV_KEYS } from './mpvKeys';
 import { MOUSE_PROPERTY, newEvents, parseMouse, type MouseKind } from './mpvMouse';
+import * as media3 from './media3';
+
+/** Whether this system plays through Media3 rather than mpv. */
+const isMedia3 = () => capabilitiesNow()?.engine === 'media3';
 
 // ---- starting mpv ------------------------------------------------------------
 //
@@ -110,37 +117,44 @@ export function startEngine(): Promise<string> {
   if (!host.__mpvInit) {
     host.__mpvInit = loadCapabilities()
       .then(() => {
-        // A build with no mpv in it (engine.rs: Android, until its own
-        // engine exists) says so instead of failing inside the plugin.
+        // Media3 starts with the first file; there is nothing to start here.
+        if (isMedia3()) return null;
+        // A build with no engine at all says so instead of failing inside
+        // the plugin.
         if (capabilitiesNow()?.engine === 'none') {
           throw new Error('This version of Kinema cannot play films on this device yet.');
         }
         return initialOptions();
       })
-      .then((options) => init({ initialOptions: options, observedProperties: OBSERVED }))
-      .then(async (label) => {
-        // Applied individually and after startup: if a build rejects one of these
-        // option names, we lose that refinement rather than the whole player.
-        // `tone-mapping-mode` is exactly such a case — this libplacebo build
-        // returns M_PROPERTY_UNKNOWN for it, and as an init option it aborted
-        // startup entirely.
-        const optional = { ...TONE_MAPPING_OPTIONS, ...IDLE_SURFACE_OPTIONS };
-        for (const [key, value] of Object.entries(optional)) {
-          try {
-            await setProperty(key, value);
-          } catch {
-            console.warn(`mpv rejected optional setting ${key}=${value}`);
-          }
-        }
-        if (capabilitiesNow()?.mpv_video.own_window) {
-          await bindKeys();
-          await watchMouse();
-        }
-        return label;
+      .then((options) => {
+        if (options === null) return 'main';
+        return startMpv(options);
       });
   }
 
   return host.__mpvInit;
+}
+
+async function startMpv(options: MpvConfig['initialOptions']): Promise<string> {
+  const label = await init({ initialOptions: options, observedProperties: OBSERVED });
+  // Applied individually and after startup: if a build rejects one of these
+  // option names, we lose that refinement rather than the whole player.
+  // `tone-mapping-mode` is exactly such a case — this libplacebo build
+  // returns M_PROPERTY_UNKNOWN for it, and as an init option it aborted
+  // startup entirely.
+  const optional = { ...TONE_MAPPING_OPTIONS, ...IDLE_SURFACE_OPTIONS };
+  for (const [key, value] of Object.entries(optional)) {
+    try {
+      await setProperty(key, value);
+    } catch {
+      console.warn(`mpv rejected optional setting ${key}=${value}`);
+    }
+  }
+  if (capabilitiesNow()?.mpv_video.own_window) {
+    await bindKeys();
+    await watchMouse();
+  }
+  return label;
 }
 
 /**
@@ -217,6 +231,8 @@ export type PlaybackEvent =
  * and the caller no longer needs to know which says what.
  */
 export async function onPlaybackEvent(handle: (event: PlaybackEvent) => void): Promise<() => void> {
+  await loadCapabilities();
+  if (isMedia3()) return media3.listen(handle);
   const offEvents = await listenEvents((event) => {
     switch (event.event) {
       case 'file-loaded':
@@ -279,6 +295,7 @@ export async function onPlaybackEvent(handle: (event: PlaybackEvent) => void): P
  * reason `error`.
  */
 export async function openFile(path: string, start: number | null): Promise<void> {
+  if (isMedia3()) return media3.open(path, start);
   // `loadfile <url> <flags> <index> <options>`: the per-file `start` option
   // opens the file at the resume point. The index argument (-1, "no playlist
   // position") is required before options since mpv 0.38.
@@ -287,28 +304,34 @@ export async function openFile(path: string, start: number | null): Promise<void
 
 /** Close the file. Nothing plays afterwards; the engine stays up. */
 export async function stopPlayback(): Promise<void> {
+  if (isMedia3()) return media3.stop();
   await command('stop');
 }
 
 export async function setPaused(paused: boolean): Promise<void> {
+  if (isMedia3()) return media3.setPaused(paused);
   await setProperty('pause', paused);
 }
 
 /** Whether it is paused, as the engine says; throws if it cannot say. */
 export async function isPaused(): Promise<boolean> {
+  if (isMedia3()) return (await media3.state()).paused;
   return (await getProperty('pause', 'flag')) as boolean;
 }
 
 export async function seekTo(seconds: number): Promise<void> {
+  if (isMedia3()) return media3.seek(seconds, false);
   await command('seek', [seconds, 'absolute']);
 }
 
 export async function seekBy(seconds: number): Promise<void> {
+  if (isMedia3()) return media3.seek(seconds, true);
   await command('seek', [seconds, 'relative']);
 }
 
 /** The file that is open, or null. */
 export async function openPath(): Promise<string | null> {
+  if (isMedia3()) return (await media3.state()).path;
   return ((await getProperty('path', 'string')) as string | null) ?? null;
 }
 
@@ -321,6 +344,10 @@ export async function nowPlaying(): Promise<{
   position: number | null;
   duration: number | null;
 }> {
+  if (isMedia3()) {
+    const { path, position, duration } = await media3.state();
+    return { path, position, duration };
+  }
   const [path, position, duration] = await Promise.all([
     openPath().catch(() => null),
     getProperty('time-pos', 'double') as Promise<number | null>,
@@ -336,6 +363,9 @@ export async function nowPlaying(): Promise<{
  * engine's window is the one asked. Elsewhere the picture is in Kinema's.
  */
 export async function isPictureFullscreen(): Promise<boolean> {
+  // Android has no windows: the picture always fills the screen, and there is
+  // no smaller size for Back to step down to first.
+  if (isMedia3()) return false;
   if (capabilitiesNow()?.mpv_video.own_window) {
     // Unreadable counts as not fullscreen: Back asks this first, and an error
     // here would otherwise leave Back doing nothing at all.
@@ -345,6 +375,7 @@ export async function isPictureFullscreen(): Promise<boolean> {
 }
 
 export async function setPictureFullscreen(on: boolean): Promise<void> {
+  if (isMedia3()) return;
   if (capabilitiesNow()?.mpv_video.own_window) {
     // Kinema's window floats only while the picture is full screen: over a
     // windowed film it would sit on top of it (seen in a nested Sway).
@@ -373,6 +404,7 @@ export async function fitWindowForPlayer(how: 'float' | 'tile' | 'close'): Promi
 /** Whether the last frame has been reached; false while nothing is open. */
 export async function hasReachedEnd(): Promise<boolean> {
   try {
+    if (isMedia3()) return (await media3.state()).ended;
     return (await getProperty('eof-reached', 'flag')) === true;
   } catch {
     return false;

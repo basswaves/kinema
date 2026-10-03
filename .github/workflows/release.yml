@@ -224,8 +224,9 @@ jobs:
 
             ## First run
 
-            Kinema opens on a setup panel: add your movies and TV folders, and
-            scan. Posters and descriptions come from TMDB through a key Kinema
+            Kinema asks where it will be watched and where your movies and TV
+            folders are, then scans — with a few skippable setup pages while it
+            does. Posters and descriptions come from TMDB through a key Kinema
             carries, so there is nothing to sign up for; a free key of your own
             can be entered in Settings instead.
 

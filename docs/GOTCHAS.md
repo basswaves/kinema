@@ -1577,6 +1577,38 @@ current value and a key pressed twice is one change; `add` on them is
 refused (`-2`). A plain string option nobody reads (`term-status-msg`, with
 `terminal=no`) behaves as expected.
 
+### mpv runs a mouse button's binding when the button is released
+
+An ordinary binding on `MBTN_LEFT` (`keybind`, input.conf) runs on the
+*release* — mpv marks mouse buttons "emit on up" so a double click can be
+told from a click — so nothing bound that way ever hears the press, and a
+seek bar cannot be dragged. Only a script's binding with `complex = true`
+is told both. That is why the mouse on mpv's own window goes through a Lua
+script (`pointer/mouse.lua`), and the keys do not.
+
+The script reports through a property, and Kinema hears a property's latest
+value, not every value it had: a quick click's press and release can fall
+between two readings. Each report therefore carries the last several
+events, numbered (`mpvMouse.ts`).
+
+### mpv can know of a click on its window and not where it was
+
+A window opened under a pointer that has not moved since may be told of a
+button but never where the pointer is: mpv then says 0,0, and `mouse-pos`'s
+`hover` still says true (seen in a nested GNOME). 0,0 is the corner Back
+sits in. The script acts on a click only after a move since the window
+opened; the first move puts it right.
+
+### Made-up DOM events cannot drag a slider; GDK events can
+
+`dispatchEvent(new MouseEvent(…))` runs the page's handlers but not the
+browser's own: no `:hover`, and a range input's thumb does not move. A GDK
+event built in Rust and handed to `gtk_main_do_event` — what WebKit's own
+test runner does — is taken by WebKitGTK as the user's, covered window or
+not: hover, dragging, its own double-click counting from the event times
+(`pointer/linux.rs`). Build it with the C functions: `gdk::Event::new`
+copies the new event and leaks the original, one per mouse move.
+
 ### `console.info` never reaches app.log
 
 `devlog.ts` forwards `log`, `warn` and `error`. A diagnostic written with

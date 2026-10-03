@@ -27,6 +27,12 @@ makes no stability promises.
   over. The screen is now put back before the film's window leaves full
   screen, so the desktop never squeezes the paused picture to a single
   pixel. Found and checked in a nested GNOME desktop.
+- **The mouse works in the player on Linux.** Until now only the keyboard
+  and a remote did: the film plays in mpv's own window there, and the mouse
+  on it never reached the controls. Now moving it brings the controls up,
+  clicking the film pauses and plays, a double click switches full screen,
+  the buttons click, the seek bar and the volume drag, the wheel turns the
+  volume, and the pointer hides with the controls — as on Windows.
 
 ## [0.9.0] — 2026-10-03
 

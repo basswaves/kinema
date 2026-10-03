@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { scalesOverlays, stageFor } from './overlay';
+import { scalesOverlays, stageFor, videoToPageScale } from './overlay';
 
 describe('scalesOverlays', () => {
   it('reads the versions that take a size to scale to', () => {
@@ -40,5 +40,24 @@ describe('stageFor', () => {
   it('leaves the page alone when there is no shape to fit', () => {
     expect(stageFor(1600, 900, 0)).toEqual({ width: 1600, height: 900 });
     expect(stageFor(1600, 900, NaN)).toEqual({ width: 1600, height: 900 });
+  });
+});
+
+describe('videoToPageScale', () => {
+  it('places a point of a 4K film window on a 1080p page drawn across it', () => {
+    const s = videoToPageScale({ width: 1920, height: 1080 }, { width: 3840, height: 2160 }, 1);
+    expect([1920 * s.x, 1080 * s.y]).toEqual([960, 540]);
+  });
+
+  it('counts the page in CSS pixels on a scaled screen', () => {
+    // A 4K page at 200 %: 1920 × 1080 CSS pixels, drawn 1:1 on mpv's 4K window.
+    const s = videoToPageScale({ width: 3840, height: 2160 }, { width: 3840, height: 2160 }, 2);
+    expect([3840 * s.x, 2160 * s.y]).toEqual([1920, 1080]);
+  });
+
+  it('follows a page laid out in a box of the film’s shape', () => {
+    // Sway's oversized float: the page drawn from a 1600 × 900 box across 1920 × 1080.
+    const s = videoToPageScale({ width: 1600, height: 900 }, { width: 1920, height: 1080 }, 1);
+    expect([1920 * s.x, 1080 * s.y]).toEqual([1600, 900]);
   });
 });

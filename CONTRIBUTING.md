@@ -124,6 +124,16 @@ plan inside a real KDE, GNOME or Sway desktop nested as one window, sends it rea
 key presses and photographs that window alone — the check for anything
 touching the Linux player (packages it needs are listed at its top).
 
+`scripts/headless-selftest.sh <plan>` runs a plan in a Sway with no window
+at all, photographed from inside: nothing the person at the computer types
+or does with the mouse can reach it. The mouse there comes from the plan, as
+`mpv` actions with mpv's own input commands (`mouse X Y`, `keydown
+MBTN_LEFT`, `keyup MBTN_LEFT`, `keypress WHEEL_DOWN`), which reach the page
+the way a real mouse on mpv's window does — the check for the mouse in the
+Linux player. Never drive the shared pointer with `xdotool` for a check: in
+WSLg it is the same pointer the person is using, and every move of theirs
+shifts the test's clicks.
+
 Screen switching on Linux asks the desktop (`desktop.rs`). The ignored tests
 `switches_a_desktops_screen_and_puts_it_back` and, for Plasma,
 `reads_and_applies_through_kscreen_doctor` run against a nested GNOME Shell

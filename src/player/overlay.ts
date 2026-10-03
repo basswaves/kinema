@@ -35,6 +35,35 @@ const INTERVAL_MS = 100;
 const ID = 0;
 
 /**
+ * Page (CSS) pixels per pixel of mpv's window, as the page was last drawn —
+ * what `pageFromVideo` needs. Null before the first drawing.
+ */
+let drawnScale: { x: number; y: number } | null = null;
+
+/**
+ * Where on the page a point of mpv's window is, in CSS pixels: the mouse
+ * lands on mpv's window, and is handed on to the page there (pageMouse.ts).
+ * Before anything has been drawn, the two are taken to be the same size.
+ */
+export function pageFromVideo(x: number, y: number): { x: number; y: number } {
+  const ratio = window.devicePixelRatio || 1;
+  const scale = drawnScale ?? { x: 1 / ratio, y: 1 / ratio };
+  return { x: x * scale.x, y: y * scale.y };
+}
+
+/**
+ * The scale `pageFromVideo` uses, for a picture `drawn` device pixels of the
+ * page shown across `shown` pixels of mpv's window.
+ */
+export function videoToPageScale(
+  drawn: { width: number; height: number },
+  shown: { width: number; height: number },
+  ratio: number
+): { x: number; y: number } {
+  return { x: drawn.width / ratio / shown.width, y: drawn.height / ratio / shown.height };
+}
+
+/**
  * Whether this mpv's `overlay-add` takes a size to scale to (0.38 and later).
  * True when the version cannot be read: a failure is then not blamed on age.
  */
@@ -194,6 +223,7 @@ export function startOverlay(): () => void {
         try {
           await mpvCommand('overlay-add', [...drawn, w, h]);
           shown = true;
+          drawnScale = videoToPageScale(box, { width: w, height: h }, window.devicePixelRatio || 1);
           return;
         } catch (e) {
           // mpv before 0.38 takes no size to scale to ("has only 9
@@ -222,6 +252,8 @@ export function startOverlay(): () => void {
       }
       await mpvCommand('overlay-add', picture);
       shown = true;
+      // Drawn at its own size: one device pixel of the page per pixel of mpv's.
+      drawnScale = videoToPageScale(frame, frame, window.devicePixelRatio || 1);
     } catch (e) {
       // Once: a failure here repeats ten times a second.
       if (!warned) console.warn('overlay: the page could not be drawn over the video', e);
@@ -243,6 +275,7 @@ export function startOverlay(): () => void {
     const secs = Math.round((performance.now() - opened) / 1000);
     console.log(`overlay: ${photos} photos in ${secs} s`);
     setStage(null);
+    drawnScale = null;
     if (shown) void mpvCommand('overlay-remove', [ID]).catch(() => undefined);
     if (madeFullscreen) void getCurrentWindow().setFullscreen(false).catch(() => undefined);
     void invoke('overlay_reset').catch(() => undefined);

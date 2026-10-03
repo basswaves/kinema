@@ -34,6 +34,7 @@ import {
 } from './engine';
 import { VIDEO_SYNC_KEY, VIDEO_SYNC_MODES } from './mpvOptions';
 import { startOverlay } from './overlay';
+import { handMouseToPage, startPointerFollowingControls } from './pageMouse';
 import { resumePoint } from './resume';
 import { loadFailedMessage, samePath, type Event, type Session } from './session';
 
@@ -294,6 +295,9 @@ export function usePlaybackEngine({
       if (event.type === 'key') {
         window.dispatchEvent(new KeyboardEvent('keydown', { key: event.key, bubbles: true }));
       }
+      // The mouse on mpv's own window (Linux): done again on this page, as
+      // real mouse input where the picture of the page shows that point.
+      if (event.type === 'mouse') handMouseToPage(event.kind, event.x, event.y, event.time);
     }).then((fn) => {
       // Torn down before registration finished: remove it now, or it leaks
       // and keeps receiving every event with a stale closure.
@@ -371,9 +375,15 @@ export function usePlaybackEngine({
 
   // Where mpv has a window of its own, this page reaches the screen only as
   // a picture mpv draws over the video (overlay.ts), for as long as the
-  // player is open.
+  // player is open, and mpv's pointer shows only while the controls do
+  // (pageMouse.ts).
   useEffect(() => {
     if (!capabilitiesNow()?.mpv_video.own_window) return;
-    return startOverlay();
+    const stopOverlay = startOverlay();
+    const stopPointer = startPointerFollowingControls();
+    return () => {
+      stopPointer();
+      stopOverlay();
+    };
   }, []);
 }

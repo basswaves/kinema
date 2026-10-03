@@ -231,6 +231,16 @@ function screen(): Record<string, string | null> {
     // Where the remote's ring is: its label, or its text when it has none.
     focus:
       document.querySelector('.focused')?.getAttribute('aria-label') ?? text('.focused'),
+    // What the mouse is over, as the page itself sees it: its label, else its
+    // class. On Linux this proves the mouse on mpv's window reached the page
+    // (pageMouse.ts), since only real mouse input sets `:hover`.
+    hover: (() => {
+      const all = document.querySelectorAll(':hover');
+      const el = all[all.length - 1];
+      if (!el) return null;
+      // getAttribute, not className, which an SVG icon gives as an object.
+      return el.getAttribute('aria-label') ?? el.getAttribute('class') ?? el.tagName.toLowerCase();
+    })(),
     // The Close / Sleep / Shut down dialog on Home, in TV mode.
     leave: document.querySelector('.leave') ? 'open' : null,
     controls: document.querySelector('.player')

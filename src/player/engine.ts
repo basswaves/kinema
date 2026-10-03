@@ -35,6 +35,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { logPaths } from '../metadata/api';
 import { capabilitiesNow, loadCapabilities } from '../capabilities';
 import { keyCommand, keyFromValue, KEY_PROPERTY, MPV_KEYS } from './mpvKeys';
+import { MOUSE_PROPERTY, newEvents, parseMouse, type MouseKind } from './mpvMouse';
 
 // ---- starting mpv ------------------------------------------------------------
 //
@@ -97,6 +98,9 @@ const OBSERVED = [
   // A key pressed on mpv's own window (mpvKeys.ts). Never changes where mpv
   // has no window of its own.
   [KEY_PROPERTY, 'string', 'none'],
+  // The mouse on mpv's own window (mpvMouse.ts), written by Kinema's script
+  // there. Never changes where mpv has no window of its own.
+  [MOUSE_PROPERTY, 'string', 'none'],
 ] as const;
 
 /** Start the engine, or wait for the start already under way. */
@@ -120,7 +124,10 @@ export function startEngine(): Promise<string> {
             console.warn(`mpv rejected optional setting ${key}=${value}`);
           }
         }
-        if (capabilitiesNow()?.mpv_video.own_window) await bindKeys();
+        if (capabilitiesNow()?.mpv_video.own_window) {
+          await bindKeys();
+          await watchMouse();
+        }
         return label;
       });
   }
@@ -143,6 +150,26 @@ async function bindKeys(): Promise<void> {
     }
   }
 }
+
+/**
+ * Load Kinema's mouse script into mpv (mpvMouse.ts), and keep mpv from
+ * moving its window when the film is dragged on: a drag there is the seek
+ * bar's. Either failing costs that part only, and says so in app.log.
+ */
+async function watchMouse(): Promise<void> {
+  try {
+    const script = await invoke<string>('pointer_script');
+    await command('load-script', [script]);
+  } catch (e) {
+    console.warn('mpv: the mouse script did not load; the mouse will do nothing in the player', e);
+  }
+  await setProperty('window-dragging', 'no').catch((e) =>
+    console.warn('mpv: window-dragging could not be switched off', e)
+  );
+}
+
+/** The last mouse event handed on (mpvMouse.ts → `newEvents`). */
+let lastMouseSeq = 0;
 
 // ---- Kinema's terms ----------------------------------------------------------
 
@@ -167,7 +194,13 @@ export type PlaybackEvent =
    * A key pressed on the engine's own window, by its DOM name — only where
    * the engine has one (capabilities `own_window`).
    */
-  | { type: 'key'; key: string };
+  | { type: 'key'; key: string }
+  /**
+   * The mouse on the engine's own window, at `x`, `y` in that window's
+   * pixels, `time` on the engine's clock in milliseconds — only where the
+   * engine has one (capabilities `own_window`).
+   */
+  | { type: 'mouse'; kind: MouseKind; x: number; y: number; time: number };
 
 /**
  * Hear every `PlaybackEvent`, until the returned function is called.
@@ -212,6 +245,14 @@ export async function onPlaybackEvent(handle: (event: PlaybackEvent) => void): P
       case KEY_PROPERTY: {
         const key = keyFromValue(data);
         if (key !== null) handle({ type: 'key', key });
+        break;
+      }
+      case MOUSE_PROPERTY: {
+        const events = newEvents(parseMouse(data), lastMouseSeq);
+        for (const { seq, kind, x, y, time } of events) {
+          lastMouseSeq = seq;
+          handle({ type: 'mouse', kind, x, y, time });
+        }
         break;
       }
     }

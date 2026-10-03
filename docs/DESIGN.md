@@ -234,6 +234,12 @@ overlay.rs, player/overlay.ts, player/mpvKeys.ts
                  and are pressed on the page. One copy of the controls
                  everywhere; Wayland allows no other way to keep them over
                  mpv (GOTCHAS)
+pointer.rs, pointer/mouse.lua, player/mpvMouse.ts, player/pageMouse.ts
+                 The mouse on that window: a script in mpv reports each
+                 press, release, move and wheel turn, and Rust does it again
+                 on the page as real mouse input (GDK events), where the
+                 picture shows that point. Every mouse handler is the
+                 Windows one; mpv's pointer hides with the controls
 ```
 
 CI builds and tests every push on Windows and on Linux for x86 and ARM, and

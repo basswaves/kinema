@@ -2192,6 +2192,24 @@ Kinema that quit with mpv still running crashed in mpv's video thread. All
 four are in GOTCHAS. `scripts/nested-selftest.sh` checks the whole of it
 inside KDE and GNOME with real key presses.
 
+**The mouse, after the fact.** The player shipped on Linux (0.8.0, 0.9.0)
+with the mouse doing nothing: it lands on mpv's window, and only keys were
+handed on. Every check had been keyboard-only, so nothing showed it; mouse
+and keyboard matter as much as a remote, and the player now has mouse tests
+on both systems. The other ways were weighed first (2026-10-03): mpv drawing
+the controls itself would be a second copy of them, since Android will not
+play through mpv; video inside Kinema's own window, as on Windows, is the
+clean answer, but on Linux it needs an mpv that can draw into another
+program's window on Wayland, which no released mpv can yet (that is the
+point to look again). So the picture stays, and the mouse is handed on: a
+Lua script in mpv reports presses, releases, moves and the wheel — a script
+because an ordinary binding on a mouse button runs only on its release —
+and Rust replays each on the page as a GDK event, which WebKitGTK takes as
+the user's own, so hover, dragging and double clicks need nothing of their
+own. `scripts/headless-selftest.sh` checks it with mpv's own input commands
+in a windowless Sway: the shared pointer moved by `xdotool` is the one the
+person at the computer is using.
+
 ## Linux packages
 
 **The system's mpv, not one of Kinema's.** Bundling mpv, as the Windows ZIP

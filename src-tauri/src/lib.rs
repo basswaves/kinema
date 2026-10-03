@@ -28,6 +28,7 @@ mod mutter;
 mod wlroots;
 mod nfo;
 mod overlay;
+mod pointer;
 mod omdb;
 mod opensubtitles;
 mod playback;
@@ -286,6 +287,8 @@ pub fn run() {
             capabilities::capabilities,
             overlay::overlay_frame,
             overlay::overlay_reset,
+            pointer::pointer_script,
+            pointer::pointer_event,
             library::add_library_root,
             library::remove_library_root,
             library::list_library_roots,

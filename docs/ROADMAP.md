@@ -72,7 +72,9 @@ checked on a real TV and receiver, with an NVIDIA and an AMD card. HDR
 reaches the TV on GNOME and Plasma with a driver that offers it (AMD on Mesa,
 NVIDIA 595+), and on Hyprland, which switches it by itself (at 8 bits unless
 set to 10); Sway's HDR (1.12) is used where Sway reports it, and has not yet
-been tried on a real TV.
+been tried on a real TV. Since 0.9.1 the screen is switched on Cinnamon
+too (refresh rate and resolution; Cinnamon has no HDR), and the mouse works
+in the Linux player as it does on Windows.
 
 **Android** is next, with its own player engine (Media3) for Dolby Vision and
 passthrough on TV boxes. macOS is not planned by the author; a port is

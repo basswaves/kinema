@@ -7,6 +7,12 @@ makes no stability promises.
 
 ## [Unreleased]
 
+## [0.9.1] — 2026-10-03
+
+For Linux: the mouse in the player, screen switching on Cinnamon, and a
+player that no longer freezes after leaving a paused film. Windows is
+unchanged. The library is not upgraded (schema 22, as in 0.9.0).
+
 ### Added
 
 - **Screen switching on Cinnamon** (Linux Mint's desktop). Cinnamon's window

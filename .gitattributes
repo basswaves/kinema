@@ -1,3 +1,6 @@
 # Shell scripts run on Linux, including from a Windows checkout through WSL:
 # a CR at a line end becomes part of the last word.
 *.sh text eol=lf
+# The same for Gradle's wrapper in the Android project, run from the WSL copy
+# and on CI's Linux runner.
+gradlew text eol=lf

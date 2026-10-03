@@ -27,7 +27,6 @@ tauri = { version = "2", features = ["protocol-asset"] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tauri-plugin-libmpv = "0.3.2"
 rusqlite = { version = "0.40.1", features = ["bundled"] }
 walkdir = "2.5.0"
 # NFO sidecars are XML. Event-based rather than deserialised into a struct:
@@ -44,9 +43,6 @@ rusty-chromaprint = "0.3.0"
 # Decompresses IMDb's ratings file (imdb.rs). Already compiled in through the
 # PNG decoder Tauri uses, so naming it adds no new code to the build.
 flate2 = "1"
-# Tauri's own plugin, so that starting Kinema twice brings the first window
-# forward instead of opening a second one (see `run` in lib.rs).
-tauri-plugin-single-instance = "2"
 # The QR code on the SIMKL sign-in screen (simkl.rs), so a phone can scan it
 # from the sofa. Pure Rust, no image library: it writes SVG text.
 qrcode = { version = "0.14", default-features = false, features = ["svg"] }
@@ -56,6 +52,15 @@ tokio = { version = "1", features = ["time", "sync"] }
 # Already compiled in through Tauri and the libmpv plugin; named so their
 # warnings and errors can be sent to app.log (applog.rs, `Forward`).
 log = "0.4"
+
+# Computers only (Windows, Linux). On Android the player is Media3 and the
+# system keeps one Kinema by itself; neither plugin has a mobile side.
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+# The player engine (engine.rs).
+tauri-plugin-libmpv = "0.3.2"
+# Tauri's own plugin, so that starting Kinema twice brings the first window
+# forward instead of opening a second one (see `run` in lib.rs).
+tauri-plugin-single-instance = "2"
 
 # Microsoft's own bindings, already compiled in through Tauri at this version.
 # Used read-only by equipment.rs to ask Windows what the screens and audio

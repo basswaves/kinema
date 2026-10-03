@@ -7,6 +7,10 @@
 #   scripts/android-bench.sh setup            install the SDK pieces below, make the TVs
 #   scripts/android-bench.sh start [tv|tv9]   boot a TV (default tv) and wait for it
 #   scripts/android-bench.sh stop [tv|tv9]
+#   scripts/android-bench.sh build [x86_64|aarch64]   Kinema's debug APK (default x86_64,
+#                                             the emulator's; aarch64 for boxes and phones)
+#   scripts/android-bench.sh launch [--fresh] install the last build and start Kinema;
+#                                             --fresh forgets its library and settings first
 #   scripts/android-bench.sh info             Android version, screen, WebView
 #   scripts/android-bench.sh key UP DOWN OK BACK HOME ...   the remote's buttons
 #   scripts/android-bench.sh text 'words'     typing, as a keyboard would
@@ -40,17 +44,21 @@ set -eu
 export ANDROID_HOME="${ANDROID_HOME:-$HOME/Android}"
 export ANDROID_SDK_ROOT="$ANDROID_HOME"
 export JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/java-17-openjdk-amd64}"
+# What `build` makes and `launch` installs.
+apk_dir="$(cd "$(dirname "$0")/.." && pwd)/src-tauri/gen/android/app/build/outputs/apk/universal/debug"
 # Where avdmanager puts the TVs (it does not follow ANDROID_AVD_HOME into a
 # folder that does not exist yet, so the default stays).
 avd_home="${ANDROID_AVD_HOME:-$HOME/.android/avd}"
 state="$ANDROID_HOME/bench"
 
-# Pinned, so every run of the bench — and CI later — tests the same systems.
+# Pinned, so every run of the bench tests the same systems. CI builds with
+# the same NDK (NDK_VERSION in .github/workflows/ci.yml).
 NDK='ndk;28.2.13676358'
 PLATFORM='platforms;android-36'
 BUILD_TOOLS='build-tools;36.0.0'
 TV_IMAGE='system-images;android-36;android-tv;x86_64'
 TV9_IMAGE='system-images;android-28;android-tv;x86'
+export NDK_HOME="${NDK_HOME:-$ANDROID_HOME/ndk/${NDK#ndk;}}"
 
 sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
 avdmanager="$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
@@ -67,10 +75,14 @@ image_of() { case "${1:-tv}" in tv) echo "$TV_IMAGE" ;; tv9) echo "$TV9_IMAGE" ;
 
 serial() {
   if [ -n "${KINEMA_ANDROID_SERIAL:-}" ]; then echo "$KINEMA_ANDROID_SERIAL"; return; fi
-  # The one bench TV that is running, tv first.
-  for t in tv tv9; do
-    s="emulator-$(port_of $t)"
-    if "$adb_bin" -s "$s" get-state >/dev/null 2>&1; then echo "$s"; return; fi
+  # The one bench TV that is running, tv first. A busy emulator can drop out
+  # of adb's sight for a few seconds ("offline"), so it gets ten.
+  for _ in $(seq 1 10); do
+    for t in tv tv9; do
+      s="emulator-$(port_of $t)"
+      if "$adb_bin" -s "$s" get-state >/dev/null 2>&1; then echo "$s"; return; fi
+    done
+    sleep 1
   done
   die "no TV is running (scripts/android-bench.sh start) and KINEMA_ANDROID_SERIAL is not set"
 }
@@ -145,6 +157,24 @@ case "$cmd" in
       kill "$pid" 2>/dev/null || true
       rm -f "$state/$t.pid"
     fi
+    ;;
+
+  build)
+    # Run from the repository's root, so npx finds the project's Tauri CLI.
+    cd "$(dirname "$0")/.."
+    npx tauri android build --debug --target "${1:-x86_64}" --apk
+    echo "$apk_dir/app-universal-debug.apk"
+    ;;
+
+  launch)
+    [ -f "$apk_dir/app-universal-debug.apk" ] || die "nothing built yet (scripts/android-bench.sh build)"
+    adb_dev install -r "$apk_dir/app-universal-debug.apk" >/dev/null
+    adb_dev shell am force-stop com.kinema.app
+    [ "${1:-}" = --fresh ] && adb_dev shell pm clear com.kinema.app >/dev/null
+    adb_dev shell monkey -p com.kinema.app -c android.intent.category.LEANBACK_LAUNCHER 1 >/dev/null 2>&1
+    # Kinema's own log is beside its library; a debug build lets adb read it:
+    #   scripts/android-bench.sh adb shell run-as com.kinema.app cat logs/app.log
+    echo started
     ;;
 
   info)

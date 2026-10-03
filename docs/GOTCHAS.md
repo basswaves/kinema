@@ -1782,3 +1782,43 @@ an 8-bit format while the TV is in HDR. The connector says what is sent:
 `modetest -c` shows `Colorspace` and `HDR_OUTPUT_METADATA` (empty when
 SDR); Hyprland's log (`debug:disable_logs = false`) says `[CM] Updating HDR
 metadata from surface`.
+
+## Android
+
+### A plugin with no Android side breaks the build twice
+
+`tauri-plugin-libmpv` and `tauri-plugin-single-instance` have no mobile
+code. Moving them under a target-specific dependency
+(`cfg(not(any(target_os = "android", target_os = "ios")))` in Cargo.toml)
+is not enough: `capabilities/default.json` still names `libmpv:default`,
+and tauri-build stops on Android with "Permission libmpv:default not
+found" and a list of hundreds of others. **Do:** put such a plugin's
+permissions in a capability file of its own with `"platforms"` limited to
+the desktop systems (`capabilities/player-mpv.json`). In Rust, `#[cfg(desktop)]`
+and `#[cfg(mobile)]` come from tauri-build; `engine.rs` is the one place
+the player plugin is named.
+
+### Android's Back closes the app from any screen
+
+The system's Back — a remote's Back button, a phone's gesture — is not a
+key the page receives. Tauri's activity sends it to the WebView's own
+history, and Kinema has none, so Back in the middle of Settings left the
+app for the TV's home screen. **Do:** listen with `onBackButtonPress`
+(`@tauri-apps/api/app`); with a listener present Tauri leaves the press to
+it. `backButton.ts` passes it on as a `BrowserBack` key press to whatever
+has focus, which every screen already handles.
+
+### OK does nothing until an arrow has been pressed
+
+At start the WebView does not have Android's focus. An arrow key goes
+looking for something to focus and finds it; the remote's OK (DPAD_CENTER)
+does not, so on a fresh start OK on the first-run page did nothing, twice.
+**Do:** request focus for the WebView when it is created
+(`MainActivity.onWebViewCreate`).
+
+### Tauri's folder picker does not exist on Android
+
+`open({ directory: true })` from the dialog plugin rejects with "Folder
+picker is not implemented on mobile". Android TV 11 and later often has no
+system folder picker either. How Kinema reaches folders on Android is its
+own decision (the porting notes); until then Add folder says so.

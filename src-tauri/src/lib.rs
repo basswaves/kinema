@@ -8,6 +8,7 @@ mod backup;
 mod db;
 mod detect;
 mod display;
+mod engine;
 mod equipment;
 mod ffmpeg;
 mod history;
@@ -198,6 +199,7 @@ fn open_library(app: &tauri::AppHandle) -> Result<(), String> {
 }
 
 /// How long the page gets to show the window itself before the backend does.
+#[cfg(desktop)]
 const REVEAL_FALLBACK: std::time::Duration = std::time::Duration::from_secs(4);
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -214,6 +216,7 @@ pub fn run() {
         std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
     }
 
+    #[cfg_attr(mobile, allow(unused_mut))]
     let mut builder = tauri::Builder::default();
     // One Kinema at a time. Two would each switch the display and take the
     // sound device, and the second player would either fail or fight the
@@ -224,6 +227,10 @@ pub fn run() {
     // copy of the library and must be able to run while Kinema is open. Both
     // are decided here rather than in the plugin because it registers itself
     // for the whole process. It has to come before the other plugins.
+    //
+    // A desktop matter: Android keeps one Kinema by itself (the activity's
+    // `singleTask`), and the plugin has no mobile side.
+    #[cfg(desktop)]
     if !cfg!(debug_assertions) && selftest::plan_path().is_none() {
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             log!("a second Kinema was started; bringing this one forward");
@@ -235,8 +242,7 @@ pub fn run() {
         }));
     }
 
-    builder
-        .plugin(tauri_plugin_libmpv::init())
+    engine::register(builder)
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_http::init())
@@ -271,6 +277,9 @@ pub fn run() {
             // something to paint (App.tsx). If that never happens — a script
             // error before the first render — an app that never appears is a
             // far worse failure than a white flash, so show it anyway.
+            // On Android the window is always shown and cannot say whether it
+            // is, so there is nothing to wait for.
+            #[cfg(desktop)]
             if let Some(window) = app.get_webview_window("main") {
                 std::thread::spawn(move || {
                     std::thread::sleep(REVEAL_FALLBACK);
@@ -392,17 +401,8 @@ pub fn run() {
             // Skiptro started by the scan goes on scanning after the window
             // has closed, where nobody can see it or stop it.
             if let tauri::RunEvent::Exit = event {
-                // mpv is shut down before the process ends. The plugin does
-                // that only when a window's close button is used; Leave, the
-                // power actions and a self-test all end with `app.exit`, and
-                // left mpv's video thread drawing while the graphics driver
-                // was unloaded under it — a crash on every such exit on Linux.
-                {
-                    use tauri_plugin_libmpv::MpvExt;
-                    if let Err(e) = app.mpv().destroy("main") {
-                        log!("mpv: could not shut down on exit: {e}");
-                    }
-                }
+                // The player before the process ends (engine.rs says why).
+                engine::shut_down(app);
                 app.state::<jobs::Jobs>().stop_detection();
                 // The screen goes back to the desktop's own mode however the
                 // app is closed; a crash is caught at the next launch instead.

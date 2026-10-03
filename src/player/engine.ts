@@ -108,7 +108,15 @@ export function startEngine(): Promise<string> {
   const host = window as unknown as { __mpvInit?: Promise<string> };
 
   if (!host.__mpvInit) {
-    host.__mpvInit = initialOptions()
+    host.__mpvInit = loadCapabilities()
+      .then(() => {
+        // A build with no mpv in it (engine.rs: Android, until its own
+        // engine exists) says so instead of failing inside the plugin.
+        if (capabilitiesNow()?.engine === 'none') {
+          throw new Error('This version of Kinema cannot play films on this device yet.');
+        }
+        return initialOptions();
+      })
       .then((options) => init({ initialOptions: options, observedProperties: OBSERVED }))
       .then(async (label) => {
         // Applied individually and after startup: if a build rejects one of these

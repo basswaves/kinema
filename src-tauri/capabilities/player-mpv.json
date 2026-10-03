@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "player-mpv",
+  "description": "The mpv player, on the systems that have it (engine.rs)",
+  "windows": [
+    "main"
+  ],
+  "platforms": ["windows", "linux", "macOS"],
+  "permissions": [
+    "libmpv:default"
+  ]
+}

@@ -2,6 +2,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import { installDevLog } from './devlog';
 import { loadCapabilities } from './capabilities';
+import { installBackButton } from './backButton';
 
 /**
  * Deliberately NOT wrapped in React.StrictMode.
@@ -16,6 +17,7 @@ function start(): void {
   installDevLog();
   // Asked now, answered long before Leave or Settings can be opened.
   void loadCapabilities();
+  installBackButton();
   ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(<App />);
 }
 

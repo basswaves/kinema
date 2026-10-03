@@ -191,10 +191,19 @@ tools:
 scripts\wsl.ps1 'bash scripts/android-bench.sh setup'
 ```
 
-`setup` asks you to accept Google's SDK licences before it downloads. The
-same commands drive a phone or a box with network debugging on, through
-`KINEMA_ANDROID_SERIAL`. The emulator has no HDMI, so HDR, Dolby Vision and
-passthrough to a receiver need real hardware.
+`setup` asks you to accept Google's SDK licences before it downloads. Then
+Kinema itself, on the TV:
+
+```bash
+scripts\wsl.ps1 'bash scripts/android-bench.sh start && bash scripts/android-bench.sh build && bash scripts/android-bench.sh launch --fresh'
+```
+
+The Android project is `src-tauri/gen/android` (generated once by
+`tauri android init`, kept in the repository, edited by hand where
+`MainActivity.kt` says why). The same commands drive a phone or a box with
+network debugging on, through `KINEMA_ANDROID_SERIAL`. The emulator has no
+HDMI, so HDR, Dolby Vision and passthrough to a receiver need real hardware.
+On Android there is no player yet, and no way to add a folder.
 
 ### Running the UI without the native app
 

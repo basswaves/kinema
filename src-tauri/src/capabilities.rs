@@ -69,7 +69,7 @@ pub fn current() -> Capabilities {
 fn work_out() -> Capabilities {
     Capabilities {
         system: system_name(),
-        engine: "mpv",
+        engine: crate::engine::NAME,
         mpv_video: mpv_video(),
         equipment_detection: crate::equipment::DETECTS,
         audio_direct: crate::equipment::DIRECT_AUDIO,

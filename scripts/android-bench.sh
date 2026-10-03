@@ -11,6 +11,13 @@
 #                                             the emulator's; aarch64 for boxes and phones)
 #   scripts/android-bench.sh launch [--fresh] install the last build and start Kinema;
 #                                             --fresh forgets its library and settings first
+#   scripts/android-bench.sh selftest DIR [SHOTS]   a self-test plan (src/selftest.ts) on
+#                                             the installed build: DIR/plan.json and anything
+#                                             beside it go to Kinema's private selftest/
+#                                             folder (/data/data/com.kinema.app/selftest, the
+#                                             paths a plan names); report.json, app.log and
+#                                             photos at SHOTS seconds (default 6,14) come back
+#                                             into DIR
 #   scripts/android-bench.sh info             Android version, screen, WebView
 #   scripts/android-bench.sh key UP DOWN OK BACK HOME ...   the remote's buttons
 #   scripts/android-bench.sh text 'words'     typing, as a keyboard would
@@ -175,6 +182,34 @@ case "$cmd" in
     # Kinema's own log is beside its library; a debug build lets adb read it:
     #   scripts/android-bench.sh adb shell run-as com.kinema.app cat logs/app.log
     echo started
+    ;;
+
+  selftest)
+    dir="$(realpath "${1:?selftest DIR}")"; shots="${2:-6,14}"
+    [ -f "$dir/plan.json" ] || die "no plan.json in $dir"
+    seconds=$(python3 -c "import json,sys; print(int(json.load(open(sys.argv[1]))['seconds']))" "$dir/plan.json")
+    pkg=com.kinema.app
+    adb_dev shell am force-stop "$pkg"
+    # Into the app's private folder through run-as: a folder adb can write
+    # (/data/local/tmp) is one the app cannot list.
+    adb_dev shell run-as "$pkg" rm -rf selftest
+    tar -C "$dir" --exclude=report.json --exclude='*.log' --exclude='shot-*.png' -cf - .       | adb_dev exec-in run-as "$pkg" sh -c 'mkdir -p selftest && cd selftest && tar -xf -'
+    adb_dev shell monkey -p "$pkg" -c android.intent.category.LEANBACK_LAUNCHER 1 >/dev/null 2>&1
+    started=$(date +%s)
+    for t in ${shots//,/ }; do
+      while [ $(( $(date +%s) - started )) -lt "$t" ]; do sleep 0.2; done
+      adb_dev exec-out screencap -p > "$dir/shot-${t}s.png"
+    done
+    # The app writes the report and quits when the plan's time is up.
+    until adb_dev shell run-as "$pkg" test -f selftest/report.json; do
+      [ $(( $(date +%s) - started )) -lt $(( seconds + 90 )) ] || { echo "android-bench: no report after $(( seconds + 90 )) s" >&2; break; }
+      sleep 1
+    done
+    adb_dev exec-out run-as "$pkg" cat selftest/report.json > "$dir/report.json" 2>/dev/null || true
+    adb_dev exec-out run-as "$pkg" cat selftest/data/logs/app.log > "$dir/app.log" 2>/dev/null || true
+    # So the next start is an ordinary one; the copied library stays for reading.
+    adb_dev shell run-as "$pkg" rm -f selftest/plan.json
+    echo "$dir/report.json"
     ;;
 
   info)

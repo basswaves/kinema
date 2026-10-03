@@ -28,6 +28,25 @@ pub fn plan_path() -> Option<PathBuf> {
     std::env::var_os(ENV)
         .map(PathBuf::from)
         .filter(|p| !p.as_os_str().is_empty())
+        .or_else(private_plan)
+}
+
+/// Android starts an app with no environment anyone can set, so there the plan
+/// is `selftest/plan.json` in the app's private folder instead — which only the
+/// app itself can write, and adb's `run-as` for a debug build
+/// (`scripts/android-bench.sh selftest`).
+#[cfg(target_os = "android")]
+fn private_plan() -> Option<PathBuf> {
+    // The process is named after the package, which names the folder.
+    let cmdline = std::fs::read_to_string("/proc/self/cmdline").ok()?;
+    let package = cmdline.split('\0').next().filter(|p| !p.is_empty())?;
+    let plan = PathBuf::from(format!("/data/data/{package}/selftest/plan.json"));
+    plan.is_file().then_some(plan)
+}
+
+#[cfg(not(target_os = "android"))]
+fn private_plan() -> Option<PathBuf> {
+    None
 }
 
 /// Where the copied library lives for this plan.

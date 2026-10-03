@@ -1719,6 +1719,28 @@ the largest box of the film screen's shape that fits the window
 (`overlay.ts` `stageFor`, `#root` sized from `--stage-w/h`) and only that
 box is drawn; `app.log` says `overlay: page W×H, drawn W×H on mpv's W×H`.
 
+### Changing the screen under a window leaving full screen froze mpv for a minute
+
+On Linux, leaving full screen used to set mpv's `fullscreen=false` and then
+put the screen's mode back at once. In a nested GNOME Shell the desktop
+answered that pair with a window of **1×1** (`mpv.log`: `Resizing due to
+xdg from 1920x1080 to 1x1`). A paused film is redrawn at the new size, and
+with `correct-downscaling` shrinking 1920×1080 to one pixel takes a filter
+thousands of taps wide (`Required filter size 4320 exceeds the maximum
+allowed size of 4096`), which libplacebo writes out tap by tap: a 300 KB
+shader that took the graphics driver close to half a minute per pass. mpv
+answered nothing else meanwhile, so every property read, the stop and the
+next film waited 50–60 s and then all answered at once. No error anywhere;
+`mpv.log` just has a gap. It happened in every paused run tried (both
+the Back button and the Back key), depending only on which of the two
+requests the desktop handled first; while playing it never showed.
+
+**Do:** where the picture is mpv's own window, put the screen back *first*,
+while that window is still full screen and simply follows the screen
+(`useScreen.ts` → `leaveFullscreen`), and do not take it out of full screen
+at all when the player closes — the window closes with the film. Kinema's
+own window (Windows) keeps the old order.
+
 ### Hyprland's report does not show HDR it passes through
 
 With its defaults, a full-screen HDR window takes Hyprland's passthrough

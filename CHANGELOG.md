@@ -18,6 +18,16 @@ makes no stability promises.
   there. Checked against Cinnamon's own window manager on a test screen,
   not yet on a real TV.
 
+### Fixed
+
+- **Linux: leaving a paused film no longer freezes the player for a
+  minute.** With screen switching on, pausing and then pressing Back
+  (button or key) could leave Kinema waiting 50–60 seconds on mpv — the
+  film would not close, and the next one would not start, until it was
+  over. The screen is now put back before the film's window leaves full
+  screen, so the desktop never squeezes the paused picture to a single
+  pixel. Found and checked in a nested GNOME desktop.
+
 ## [0.9.0] — 2026-10-03
 
 Picture and sound set per device and asked about at the first run, and a

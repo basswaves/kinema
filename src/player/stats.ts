@@ -566,6 +566,9 @@ async function readOutputCheck(from: {
       width: screen.width,
       height: screen.height,
       hdr: screen.hdr,
+      screenHdr:
+        equipment?.displays.find((d) => d.connected && d.gdi_name === screen.gdi_name)
+          ?.screen_hdr === true,
       linkBits: screen.link_bits,
       linkEncoding: screen.link_encoding,
       modes: screen.modes,

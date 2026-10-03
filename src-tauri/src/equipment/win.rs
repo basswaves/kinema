@@ -411,6 +411,9 @@ fn displays(outputs: &HashMap<String, OutputInfo>, problems: &mut Vec<String>) -
             refresh_num: t.refreshRate.Numerator,
             refresh_den: t.refreshRate.Denominator,
             hdr,
+            // Windows reports a screen that offers HDR as on or off, never
+            // unsupported, so the state already says it.
+            screen_hdr: hdr_capable,
             peak_nits: lum.filter(|_| hdr_capable).map(|l| l.max),
             full_frame_nits: lum.filter(|_| hdr_capable).map(|l| l.full_frame),
             min_nits: lum.filter(|_| hdr_capable).map(|l| l.min),

@@ -194,6 +194,7 @@ pub(crate) fn display_from(connector: Option<&str>, edid: Option<&edid::Edid>, o
         None if can_hdr => HdrState::Unknown,
         None => HdrState::Unsupported,
     };
+    d.screen_hdr = can_hdr;
     if d.hdr != HdrState::Unsupported {
         if let Some(h) = edid.and_then(|e| e.hdr.as_ref()) {
             d.peak_nits = h.max_nits;
@@ -526,7 +527,14 @@ mod tests {
         assert_eq!(display_from(Some("HDMI-A-1"), Some(&sdr), Some(&on_hyprland)).hdr, HdrState::Unsupported);
         // A desktop that reports and offers none still means none.
         let says_none = DesktopScreen { hdr_unreported: false, ..on_hyprland };
-        assert_eq!(display_from(Some("HDMI-A-1"), Some(&tv), Some(&says_none)).hdr, HdrState::Unsupported);
+        let hdr_tv = display_from(Some("HDMI-A-1"), Some(&tv), Some(&says_none));
+        assert_eq!((hdr_tv.hdr, hdr_tv.screen_hdr), (HdrState::Unsupported, true));
+        // …but the TV is not called an SDR screen (Cinnamon, which has no HDR).
+        let notes = super::super::display_notes(&hdr_tv);
+        assert!(notes[0].starts_with("The screen can show HDR, but the desktop"), "{notes:?}");
+        let sdr_screen = display_from(Some("HDMI-A-1"), Some(&sdr), Some(&says_none));
+        assert!(!sdr_screen.screen_hdr);
+        assert!(super::super::display_notes(&sdr_screen)[0].starts_with("SDR screen"));
     }
 
     #[test]

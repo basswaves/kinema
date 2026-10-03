@@ -44,6 +44,11 @@ export interface Display extends SeenFields {
   refresh_num: number;
   refresh_den: number;
   hdr: HdrState;
+  /**
+   * The screen itself offers HDR (its EDID), whatever the system allows.
+   * Absent from equipment remembered before 0.9.1.
+   */
+  screen_hdr?: boolean;
   peak_nits: number | null;
   full_frame_nits: number | null;
   min_nits: number | null;
@@ -110,7 +115,10 @@ export function hdrLabel(d: Display, system: string): string {
     case 'off':
       return `HDR capable · off in ${system}`;
     case 'unsupported':
-      return 'SDR';
+      // An HDR TV on a desktop that offers no HDR (Linux only; Windows says
+      // on or off for such a screen): "SDR" is true of the picture, wrong
+      // about the TV.
+      return d.screen_hdr ? 'HDR capable · the desktop offers no HDR' : 'SDR';
     default:
       return 'HDR unknown';
   }

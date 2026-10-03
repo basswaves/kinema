@@ -63,6 +63,12 @@ pub struct Display {
     pub refresh_num: u32,
     pub refresh_den: u32,
     pub hdr: HdrState,
+    /// The screen itself offers HDR (its EDID), whatever the system lets
+    /// Kinema do with it. Linux only: tells an HDR TV on a desktop with no
+    /// HDR (Cinnamon, GNOME on an old driver) from an SDR screen, both
+    /// `Unsupported`. Absent from equipment remembered before 0.9.1.
+    #[serde(default)]
+    pub screen_hdr: bool,
     /// What the screen reports it can reach, in nits. Only filled in for a
     /// screen that supports HDR — an SDR panel reports a nominal figure that
     /// means nothing.
@@ -280,6 +286,10 @@ pub fn display_notes(d: &Display) -> Vec<String> {
         HdrState::Off => notes.push(format!(
             "Supports HDR, but {SCREEN_OWNER} has it switched off, so HDR videos are converted \
              to SDR on this screen until it is on."
+        )),
+        HdrState::Unsupported if d.screen_hdr => notes.push(format!(
+            "The screen can show HDR, but {SCREEN_OWNER} offers no way to switch it on, so HDR \
+             videos are converted to SDR on this screen."
         )),
         HdrState::Unsupported => notes.push("SDR screen: HDR videos are converted to SDR.".into()),
         // On Linux "unknown" is a screen whose EDID offers HDR on a desktop

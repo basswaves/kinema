@@ -47,6 +47,8 @@ export interface OutputFacts {
     width: number;
     height: number;
     hdr: 'unknown' | 'unsupported' | 'off' | 'on';
+    /** The screen itself offers HDR (equipment `screen_hdr`). */
+    screenHdr?: boolean;
     linkBits: number | null;
     linkEncoding: string | null;
     modes: DisplayMode[];
@@ -213,6 +215,16 @@ export function checkHdr(f: OutputFacts): Check {
             owner === 'Windows'
               ? 'Switch HDR on in Windows.'
               : `Switch HDR on in the desktop’s display settings, or let it switch for a full-screen HDR video if it can. ${LINUX_HDR_DRIVERS}`,
+        };
+      }
+      if (f.screen?.screenHdr) {
+        // An HDR TV on a desktop with no HDR at all (Cinnamon; GNOME on an
+        // old driver): nothing in Kinema or its settings can change that.
+        return {
+          label,
+          verdict: 'info',
+          value: 'HDR video tone mapped to SDR',
+          why: 'The screen can show HDR, but the desktop offers no HDR, so the video is converted to SDR, keeping its look as closely as SDR allows.',
         };
       }
       return {

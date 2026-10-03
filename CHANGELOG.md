@@ -32,7 +32,13 @@ makes no stability promises.
   on it never reached the controls. Now moving it brings the controls up,
   clicking the film pauses and plays, a double click switches full screen,
   the buttons click, the seek bar and the volume drag, the wheel turns the
-  volume, and the pointer hides with the controls — as on Windows.
+  volume, and the pointer hides with the controls — as on Windows. Checked
+  on GNOME, KDE Plasma and Sway, and in an X11 session with Cinnamon's
+  window manager (Linux Mint's default).
+- **An HDR TV is no longer called an "SDR screen"** on a Linux desktop that
+  offers no HDR (Cinnamon, or GNOME with an older driver). Settings → Your
+  equipment and the playback statistics now say the screen can show HDR but
+  the desktop offers none, which is why HDR films are converted to SDR there.
 
 ## [0.9.0] — 2026-10-03
 

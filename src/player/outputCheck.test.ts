@@ -133,6 +133,17 @@ describe('outputCheck', () => {
     );
     expect(sdr.HDR).toMatchObject({ verdict: 'info' });
     expect(sdr.HDR?.fix).toBeUndefined();
+    expect(sdr.HDR?.why).toMatch(/cannot show HDR/);
+    // An HDR TV on a desktop with no HDR is not called an SDR screen.
+    const noHdrDesktop = byLabel(
+      outputCheck({
+        ...base,
+        hdrOut: 'sdr',
+        screen: { ...base.screen!, hdr: 'unsupported', screenHdr: true },
+      })
+    );
+    expect(noHdrDesktop.HDR).toMatchObject({ verdict: 'info', value: 'HDR video tone mapped to SDR' });
+    expect(noHdrDesktop.HDR?.why).toMatch(/desktop offers no HDR/);
     const off = byLabel(
       outputCheck({ ...base, hdrOut: 'sdr', screen: { ...base.screen!, hdr: 'off' } })
     );

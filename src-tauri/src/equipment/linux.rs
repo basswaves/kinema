@@ -3,8 +3,9 @@
 //!
 //! - **The kernel** (`/sys/class/drm`): which screens are connected, on what
 //!   kind of port, and each one's EDID — its name and its HDR brightness.
-//! - **The desktop** (`desktop.rs`: GNOME or KDE Plasma so far): the current
-//!   mode, every mode it can drive with its exact rate, and whether HDR is on.
+//! - **The desktop** (`desktop.rs`: GNOME, Cinnamon, KDE Plasma, wlroots):
+//!   the current mode, every mode it can drive with its exact rate, and
+//!   whether HDR is on.
 //!   The kernel knows the modes too, but not which one the desktop chose, nor
 //!   anything about HDR, which the compositor owns. On other desktops the
 //!   screens are still listed, from the kernel, with the mode left unknown.

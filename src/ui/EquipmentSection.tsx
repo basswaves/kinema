@@ -103,7 +103,7 @@ export default function EquipmentSection({ system }: { system: string }) {
                 {d.new && <span className="equipment-new">new</span>}
                 <span className="muted">
                   {d.connection} ·{' '}
-                  {/* A mode of 0×0 is one the desktop did not report (Linux off GNOME). */}
+                  {/* A mode of 0×0 is one the desktop did not report (a Linux desktop Kinema cannot ask). */}
                   {d.width > 0 ? `${d.width}×${d.height} at ${formatRate(refreshRate(d))} Hz · ` : ''}
                   {hdrLabel(d, system)}
                 </span>

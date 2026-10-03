@@ -215,7 +215,8 @@ equipment/win.rs, equipment/linux.rs, display/win.rs
                  own format list (equipment/eld.rs, equipment/edid.rs: pure
                  parsers, tested on every system)
 desktop.rs       Linux: the screens as the desktop has them, in one shape
-                 whichever desktop answers — GNOME (mutter.rs, D-Bus), KDE
+                 whichever desktop answers — GNOME and Cinnamon (mutter.rs,
+                 D-Bus; Cinnamon's Muffin is a fork of Mutter), KDE
                  Plasma (kscreen.rs, its kscreen-doctor), or Sway, Hyprland
                  and the other wlroots desktops (wlroots.rs, their shared
                  Wayland protocol). Read by the equipment check, changed by

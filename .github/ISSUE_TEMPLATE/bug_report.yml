@@ -66,6 +66,7 @@ body:
       options:
         - Not Linux
         - GNOME
+        - Cinnamon
         - KDE Plasma
         - Sway
         - Hyprland

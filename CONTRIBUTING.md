@@ -129,7 +129,11 @@ Screen switching on Linux asks the desktop (`desktop.rs`). The ignored tests
 `reads_and_applies_through_kscreen_doctor` run against a nested GNOME Shell
 or KWin (`cargo test -- --ignored` inside `dbus-run-session` with the
 nested desktop's `WAYLAND_DISPLAY`, and `XDG_CURRENT_DESKTOP=KDE` for KWin,
-which also needs `libkf5screen-bin` and `qtwayland5` on Ubuntu 24.04). A
+which also needs `libkf5screen-bin` and `qtwayland5` on Ubuntu 24.04).
+Cinnamon is asked through `mutter.rs` under Muffin's name; the same ignored
+test runs against `muffin --x11 --replace` on Xorg's dummy driver with a
+few TV modelines in its config (Xvfb's one mode has no rate; GOTCHAS,
+"Cinnamon answers GNOME's questions under its own name"). A
 nested KWin offers one mode only, so a real Plasma mode change and HDR need
 a real Plasma 6 session. Sway, Hyprland and the other wlroots desktops are
 asked through their shared protocol (`wlroots.rs`); its ignored test

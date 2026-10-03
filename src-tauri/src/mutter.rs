@@ -7,6 +7,12 @@
 //! same one its own Settings → Displays uses. KDE Plasma and the wlroots
 //! desktops have their own (notes: PORTING, "other desktops"); each gets a
 //! module like this one when it is added.
+//!
+//! Cinnamon is asked here too. Its window manager, Muffin, is a fork of
+//! Mutter that kept these requests word for word and renamed the service
+//! (`org.cinnamon.Muffin.DisplayConfig`), and it answers in its X11 session
+//! — Linux Mint's default — as well as on Wayland. It has no colour modes, so
+//! no HDR: its screens list none, and none is ever sent.
 
 use std::collections::HashMap;
 use std::time::Duration;
@@ -14,8 +20,29 @@ use std::time::Duration;
 use zbus::blocking::{connection, Connection};
 use zbus::zvariant::{OwnedValue, Value};
 
-const BUS: &str = "org.gnome.Mutter.DisplayConfig";
-const PATH: &str = "/org/gnome/Mutter/DisplayConfig";
+/// Which Mutter answers: GNOME's own, or Cinnamon's Muffin.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Service {
+    Gnome,
+    Cinnamon,
+}
+
+impl Service {
+    /// The bus name, which is also the interface's name.
+    fn name(self) -> &'static str {
+        match self {
+            Service::Gnome => "org.gnome.Mutter.DisplayConfig",
+            Service::Cinnamon => "org.cinnamon.Muffin.DisplayConfig",
+        }
+    }
+
+    fn path(self) -> &'static str {
+        match self {
+            Service::Gnome => "/org/gnome/Mutter/DisplayConfig",
+            Service::Cinnamon => "/org/cinnamon/Muffin/DisplayConfig",
+        }
+    }
+}
 
 /// Mutter's colour mode for HDR: BT.2100. GNOME 50 also lists 2, "sdr-native"
 /// (wide-gamut SDR) — not HDR (GOTCHAS → "GNOME's colour mode 2 is not HDR").
@@ -92,9 +119,9 @@ fn bus() -> Result<Connection, String> {
         .map_err(|e| e.to_string())
 }
 
-pub fn state() -> Result<State, String> {
+pub fn state(service: Service) -> Result<State, String> {
     let reply = bus()?
-        .call_method(Some(BUS), PATH, Some(BUS), "GetCurrentState", &())
+        .call_method(Some(service.name()), service.path(), Some(service.name()), "GetCurrentState", &())
         .map_err(|e| e.to_string())?;
     let (serial, monitors, logical, _): StateT =
         reply.body().deserialize().map_err(|e| e.to_string())?;
@@ -138,9 +165,10 @@ pub fn state() -> Result<State, String> {
     })
 }
 
-/// GNOME's screens in the shape the rest of Kinema reads (`desktop.rs`).
-pub fn screens() -> Result<Vec<crate::desktop::Screen>, String> {
-    Ok(to_screens(&state()?))
+/// GNOME's or Cinnamon's screens in the shape the rest of Kinema reads
+/// (`desktop.rs`).
+pub fn screens(service: Service) -> Result<Vec<crate::desktop::Screen>, String> {
+    Ok(to_screens(&state(service)?))
 }
 
 pub(crate) fn to_screens(state: &State) -> Vec<crate::desktop::Screen> {
@@ -175,16 +203,21 @@ pub(crate) fn to_screens(state: &State) -> Vec<crate::desktop::Screen> {
         .collect()
 }
 
-/// `desktop::set` for GNOME.
-pub fn set(connector: &str, mode_id: Option<&str>, colour: Option<crate::desktop::Colour>) -> Result<(), String> {
+/// `desktop::set` for GNOME and Cinnamon.
+pub fn set(
+    service: Service,
+    connector: &str,
+    mode_id: Option<&str>,
+    colour: Option<crate::desktop::Colour>,
+) -> Result<(), String> {
     use crate::desktop::Colour;
-    let state = state()?;
+    let state = state(service)?;
     let color_mode = colour.map(|c| match c {
         Colour::Hdr(true) => HDR,
         Colour::Hdr(false) => DEFAULT_COLOUR,
         Colour::Exactly(n) => n,
     });
-    apply(&state, &Change { connector: connector.into(), mode_id: mode_id.map(str::to_string), color_mode })
+    apply(service, &state, &Change { connector: connector.into(), mode_id: mode_id.map(str::to_string), color_mode })
 }
 
 /// One screen's new mode and/or colour mode; everything else stays.
@@ -246,15 +279,15 @@ pub fn config_for(state: &State, change: &Change) -> Result<Vec<LogicalConfig>, 
 /// Apply `change`, temporarily: Mutter does not write it to `monitors.xml`,
 /// so the desktop's own configuration is never touched and comes back at the
 /// next login whatever happens to Kinema.
-pub fn apply(state: &State, change: &Change) -> Result<(), String> {
+pub fn apply(service: Service, state: &State, change: &Change) -> Result<(), String> {
     const TEMPORARY: u32 = 1;
     let layout = config_for(state, change)?;
     let props: HashMap<String, Value<'static>> = HashMap::new();
     bus()?
         .call_method(
-            Some(BUS),
-            PATH,
-            Some(BUS),
+            Some(service.name()),
+            service.path(),
+            Some(service.name()),
             "ApplyMonitorsConfig",
             &(state.serial, TEMPORARY, layout, props),
         )
@@ -334,6 +367,47 @@ pub(crate) mod tests {
         assert_eq!(desk.2.get("enable_underscanning"), Some(&Value::from(false)));
         // A screen that lists no colour modes is not given one.
         assert!(!desk.2.contains_key("color-mode"));
+    }
+
+    /// A screen as Cinnamon's Muffin describes it (its X11 session): no
+    /// colour modes, no RGB range. It has no HDR, and a change sends Muffin
+    /// nothing it does not know.
+    #[test]
+    fn a_cinnamon_screen_has_no_hdr_and_is_sent_only_what_muffin_knows() {
+        let s = State {
+            serial: 2,
+            monitors: vec![Monitor {
+                connector: "HDMI-1".into(),
+                display_name: "Maker TV".into(),
+                modes: vec![
+                    mode("1920x1080@60.000", 1920, 1080, 60.0, true),
+                    mode("1920x1080@24.000", 1920, 1080, 24.0, false),
+                ],
+                color_mode: None,
+                supported_color_modes: vec![],
+                rgb_range: None,
+                underscanning: None,
+            }],
+            logical: vec![Logical {
+                x: 0,
+                y: 0,
+                scale: 1.0,
+                transform: 0,
+                primary: true,
+                connectors: vec!["HDMI-1".into()],
+            }],
+        };
+        let screen = &to_screens(&s)[0];
+        assert_eq!((screen.hdr, screen.primary), (None, true));
+        let change = Change {
+            connector: "HDMI-1".into(),
+            mode_id: Some("1920x1080@24.000".into()),
+            color_mode: None,
+        };
+        let layout = config_for(&s, &change).unwrap();
+        let (_, _, _, _, _, tv) = &layout[0];
+        assert_eq!(tv[0].1, "1920x1080@24.000");
+        assert!(tv[0].2.is_empty(), "{:?}", tv[0].2);
     }
 
     #[test]

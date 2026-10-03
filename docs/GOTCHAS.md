@@ -1626,6 +1626,19 @@ mode. Asking for 2 is accepted, and reading the state back says 2, while the
 TV stays in SDR and the compositor goes on telling clients "gamma 2.2, 80
 nits" — nothing reports an error. Ask for 1 by number.
 
+### Cinnamon answers GNOME's questions under its own name
+
+Cinnamon's window manager, Muffin, is a fork of Mutter and kept
+`DisplayConfig` request for request — the same `GetCurrentState` and
+`ApplyMonitorsConfig`, the same shapes — but renamed the service to
+`org.cinnamon.Muffin.DisplayConfig` at `/org/cinnamon/Muffin/DisplayConfig`.
+Asked by GNOME's name, a Cinnamon session answers nothing, and Kinema used to
+offer no switching there at all. It answers in Cinnamon's X11 session (Linux
+Mint's default) as well as on Wayland, lists no colour modes and has no HDR.
+To test it without a Cinnamon machine, Xvfb is not enough: its one mode has
+no refresh rate (Muffin reports `1920x1080@-nan`), and it will not take new
+ones. Xorg's dummy driver with modelines in its config gives real modes.
+
 ### The ELD files in /proc belong to ports, not to sound devices
 
 `/proc/asound/cardN/eld#C.P` is one file per graphics-card pin, and on many

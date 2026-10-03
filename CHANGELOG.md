@@ -7,6 +7,17 @@ makes no stability promises.
 
 ## [Unreleased]
 
+### Added
+
+- **Screen switching on Cinnamon** (Linux Mint's desktop). Cinnamon's window
+  manager is a fork of GNOME's and answers the same questions under its own
+  name, which Kinema did not ask, so switching was never offered there. It
+  now is: the refresh rate and resolution for a film, in Cinnamon's X11
+  session (Mint's default) and on Wayland, and the equipment check shows the
+  screen's modes. Cinnamon has no HDR, so HDR films are converted to SDR
+  there. Checked against Cinnamon's own window manager on a test screen,
+  not yet on a real TV.
+
 ## [0.9.0] — 2026-10-03
 
 Picture and sound set per device and asked about at the first run, and a

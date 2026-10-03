@@ -2,7 +2,8 @@
 //! display.rs.
 //!
 //! On Wayland only the desktop may change a screen, so this asks it, through
-//! `desktop.rs`: GNOME and KDE Plasma so far, each in its own way. Where no
+//! `desktop.rs`: GNOME, Cinnamon, KDE Plasma and the wlroots desktops, each
+//! in its own way. Where no
 //! desktop Kinema knows answers, switching is not offered at all
 //! (`capabilities.rs`).
 
@@ -245,9 +246,11 @@ mod tests {
         assert!(now.modes.iter().any(|m| m.hz == 23));
     }
 
-    /// Switches the desktop's real screen to another of its modes and back.
-    /// Ignored: it needs a GNOME or Plasma session (a nested GNOME does —
-    /// see notes/TEST-SETUP.md) and blanks a real screen for a moment.
+    /// Switches the desktop's real screen to another of its modes and back,
+    /// then to another rate at the same size and back. Ignored: it needs a
+    /// GNOME, Cinnamon or Plasma session (a nested GNOME does — see
+    /// notes/TEST-SETUP.md; for Cinnamon, Muffin on a dummy-driver X server,
+    /// see CONTRIBUTING) and blanks a real screen for a moment.
     #[test]
     #[ignore]
     fn switches_a_desktops_screen_and_puts_it_back() {
@@ -268,6 +271,20 @@ mod tests {
         let (after, _) = screen_now(Some(&before.gdi_name)).unwrap();
         println!("after:  {}×{}@{}", after.width, after.height, after.hz);
         assert_eq!((during.width, during.height), (other.width, other.height));
+        assert_eq!((after.width, after.height, after.hz), (before.width, before.height, before.hz));
+        // What a film asks for: another rate at the same size (60 → 24).
+        let same_size = |m: &&crate::equipment::Mode| (m.width, m.height) == (before.width, before.height);
+        let Some(rate) = before.modes.iter().filter(same_size).find(|m| m.hz != before.hz).cloned() else {
+            println!("one rate at this size: no rate change to try");
+            return;
+        };
+        set(&before.gdi_name, Some((rate.width, rate.height, rate.hz)), None).unwrap();
+        let (during, _) = screen_now(Some(&before.gdi_name)).unwrap();
+        println!("rate:   {}×{}@{}", during.width, during.height, during.hz);
+        set(&before.gdi_name, Some((before.width, before.height, before.hz)), None).unwrap();
+        let (after, _) = screen_now(Some(&before.gdi_name)).unwrap();
+        println!("after:  {}×{}@{}", after.width, after.height, after.hz);
+        assert_eq!(during.hz, rate.hz);
         assert_eq!((after.width, after.height, after.hz), (before.width, before.height, before.hz));
     }
 }

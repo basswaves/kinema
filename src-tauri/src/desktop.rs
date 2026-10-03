@@ -7,9 +7,13 @@
 //! D-Bus (`mutter.rs`), KDE Plasma through its own `kscreen-doctor`
 //! (`kscreen.rs`). Each answers in its own shape; this is the one shape the
 //! rest of Kinema sees. Sway, Hyprland and the other wlroots desktops share
-//! one protocol for it (`wlroots.rs`).
+//! one protocol for it (`wlroots.rs`). Cinnamon's Muffin is a fork of GNOME's
+//! Mutter and is asked the same way under its own name, in its X11 session
+//! as well as on Wayland.
 
 use std::sync::OnceLock;
+
+use crate::mutter::Service;
 
 /// One screen, as the desktop has it.
 #[derive(Debug, Clone, Default)]
@@ -54,6 +58,8 @@ impl Screen {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Desktop {
     Gnome,
+    /// Cinnamon, through Muffin: GNOME's requests under another name.
+    Cinnamon,
     Kde,
     /// Sway, Hyprland and the others sharing wlr-output-management.
     Wlroots,
@@ -69,15 +75,19 @@ pub enum Colour {
 }
 
 /// The desktop that answers, found once per launch: GNOME if Mutter answers
-/// on the session bus, else KDE Plasma if this is a Plasma session and its
-/// `kscreen-doctor` answers, else a desktop offering wlr-output-management
-/// (Sway, Hyprland…). Not taken from the desktop's name alone — a
-/// desktop Kinema cannot actually talk to must not be offered a switch.
+/// on the session bus, else Cinnamon if Muffin does, else KDE Plasma if this
+/// is a Plasma session and its `kscreen-doctor` answers, else a desktop
+/// offering wlr-output-management (Sway, Hyprland…). Not taken from the
+/// desktop's name alone — a desktop Kinema cannot actually talk to must not
+/// be offered a switch.
 pub fn which() -> Option<Desktop> {
     static WHICH: OnceLock<Option<Desktop>> = OnceLock::new();
     *WHICH.get_or_init(|| {
-        if crate::mutter::state().is_ok() {
+        if crate::mutter::state(Service::Gnome).is_ok() {
             return Some(Desktop::Gnome);
+        }
+        if crate::mutter::state(Service::Cinnamon).is_ok() {
+            return Some(Desktop::Cinnamon);
         }
         if crate::kscreen::is_plasma() {
             match crate::kscreen::screens() {
@@ -97,10 +107,11 @@ pub fn which() -> Option<Desktop> {
 
 pub fn screens() -> Result<Vec<Screen>, String> {
     match which() {
-        Some(Desktop::Gnome) => crate::mutter::screens(),
+        Some(Desktop::Gnome) => crate::mutter::screens(Service::Gnome),
+        Some(Desktop::Cinnamon) => crate::mutter::screens(Service::Cinnamon),
         Some(Desktop::Kde) => crate::kscreen::screens(),
         Some(Desktop::Wlroots) => crate::wlroots::screens(),
-        None => Err("this desktop is not one Kinema can ask (GNOME, KDE Plasma, Sway, Hyprland and the other wlroots desktops so far)".into()),
+        None => Err("this desktop is not one Kinema can ask (GNOME, Cinnamon, KDE Plasma, Sway, Hyprland and the other wlroots desktops so far)".into()),
     }
 }
 
@@ -108,7 +119,8 @@ pub fn screens() -> Result<Vec<Screen>, String> {
 /// other screens and everything else about this one stay as they are.
 pub fn set(connector: &str, mode_id: Option<&str>, colour: Option<Colour>) -> Result<(), String> {
     match which() {
-        Some(Desktop::Gnome) => crate::mutter::set(connector, mode_id, colour),
+        Some(Desktop::Gnome) => crate::mutter::set(Service::Gnome, connector, mode_id, colour),
+        Some(Desktop::Cinnamon) => crate::mutter::set(Service::Cinnamon, connector, mode_id, colour),
         Some(Desktop::Kde) => crate::kscreen::set(connector, mode_id, colour),
         Some(Desktop::Wlroots) => crate::wlroots::set(connector, mode_id, colour),
         None => Err("this desktop is not one Kinema can ask".into()),

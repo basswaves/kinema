@@ -141,6 +141,7 @@ is one, and you install it when you choose.
 - **A desktop with HDR switched on**, or switched on by Kinema for the film
   (Settings → Picture & sound → Screen): GNOME 48 or later, KDE Plasma 6.4
   or later, Sway 1.12 or later; Hyprland switches it on by itself.
+  Cinnamon has no HDR, so there HDR films are converted to SDR.
 - **A graphics driver that offers HDR to windows.** NVIDIA: driver 595 or
   later, which supports GeForce RTX 20 and GTX 16 cards onwards; Ubuntu
   26.04 installs 580 unless you choose a newer one under Additional Drivers,
@@ -247,8 +248,10 @@ Kinema's page over mpv, so on Linux mpv plays in a full-screen window of its
 own and draws Kinema's controls over the video itself (docs/HISTORY.md, "The
 Linux player"). The equipment check, sound straight to a receiver and screen
 switching have been checked on a real TV and receiver with GNOME, KDE Plasma,
-Sway and Hyprland, on an NVIDIA and an AMD card. Kinema is built to work the
-same on any desktop and fall back safely, rather than tested on every one —
+Sway and Hyprland, on an NVIDIA and an AMD card; screen switching on
+Cinnamon has been checked against Cinnamon's own window manager on a test
+screen, not yet on a real TV. Kinema is built to work the same on any
+desktop and fall back safely, rather than tested on every one —
 see [When something goes wrong](#when-something-goes-wrong).
 
 An Android version is planned next. macOS is not planned by the author; a
@@ -261,7 +264,7 @@ platform") says how the code is arranged for one.
 | Library, matching, artwork, accounts | ✓ | ✓ |
 | Playback, controls, remote keys | ✓ | ✓ |
 | Equipment check, sound straight to a receiver | ✓ | ✓ |
-| Screen switching (refresh rate, resolution) | ✓ | ✓ on GNOME, KDE Plasma, Sway, Hyprland and the other wlroots desktops |
+| Screen switching (refresh rate, resolution) | ✓ | ✓ on GNOME, Cinnamon, KDE Plasma, Sway, Hyprland and the other wlroots desktops |
 | HDR switched on for an HDR film | ✓ | ✓ on GNOME and KDE Plasma, by Hyprland itself, and on Sway 1.12 or later (not yet tried on a real TV); needs a driver that offers HDR ([above](#linux)) |
 | Sleep / shut down | ✓ | ✓ where the system allows it without a password (logind) |
 

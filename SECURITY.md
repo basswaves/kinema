@@ -45,9 +45,9 @@ Worth stating up front, because it is unusually small:
   have to press: NFO export writes `.nfo` sidecars beside your videos.
 - **On Linux, Kinema also talks to the desktop it runs on** — over D-Bus and
   Wayland, on the same machine only — to read and switch the screen's mode
-  (GNOME, KDE Plasma's `kscreen-doctor`, the wlroots protocol), to borrow the
-  receiver's sound device for a film, and to ask logind for sleep or shut
-  down (`src-tauri/src/desktop.rs`, `audio_reserve.rs`, `power.rs`).
+  (GNOME, Cinnamon, KDE Plasma's `kscreen-doctor`, the wlroots protocol), to
+  borrow the receiver's sound device for a film, and to ask logind for sleep
+  or shut down (`src-tauri/src/desktop.rs`, `audio_reserve.rs`, `power.rs`).
 
 The parts most worth scrutiny are the ones that cross a trust boundary: the
 external process invocation in `src-tauri/src/detect.rs` (Skiptro and ffmpeg,

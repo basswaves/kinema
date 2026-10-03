@@ -864,7 +864,8 @@ function GridView({
             {arrangement.unwatched ? '✓ ' : ''}Unwatched only
           </FocusButton>
         </div>
-        {shown.length === 0 && (
+        {titles.length === 0 && <p className="muted">Nothing here yet.</p>}
+        {titles.length > 0 && shown.length === 0 && (
           <p className="muted">Everything here has been watched. Switch off “Unwatched only” to see it all.</p>
         )}
         <div className="search-grid">

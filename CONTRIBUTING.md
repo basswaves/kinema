@@ -399,6 +399,10 @@ reasoning is in [docs/DESIGN.md](docs/DESIGN.md) and [docs/HISTORY.md](docs/HIST
 - **No third-party binaries in the repo or the bundle.** The app may *invoke* a
   tool the user installed themselves, at a path they chose. It ships nothing,
   downloads nothing, and depends on nothing being present.
+  One exception, for building only: the Android project's
+  `gradle/wrapper/gradle-wrapper.jar` (Gradle's own 59 KB starter, which
+  every Android project keeps). It runs on the build machine and is never
+  in the app.
 - **Sidecars are read, never written** by default. The reader stays so other
   producers of the format keep working.
 - **The window is transparent so mpv can render behind the webview.** Never give

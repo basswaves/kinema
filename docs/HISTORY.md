@@ -2632,6 +2632,36 @@ answering it, as they already did for Up next. A handler that reads the
 newest state through a ref would close the gap, and would be a change in
 behaviour, so it was not made here.
 
+## Android: the plan, the bench, and the first build
+
+**Owner's choices (2026-10-03).** Media3 as the player on Android rather
+than mpv: through mpv a TV box would show Dolby Vision only as its HDR10
+base, could not reliably pass TrueHD, DTS-HD or E-AC-3 to a receiver
+(upstream mpv's Android audio output does not), and has no frame-rate
+switching; Media3 is what the boxes are built around. Testing without
+Android hardware happens in Google's Android TV emulator, run with no
+window (`scripts/android-bench.sh`) so the computer stays usable; a phone
+and an older Android TV 9 box come in later for real hardware. No TV box is
+bought for now, so Dolby Vision, 4K HDR and lossless passthrough may ship
+before they are confirmed on one.
+
+**The first build (2026-10-04).** The interface and the Rust core run on
+Android TV unchanged, apart from what the system does differently: its Back
+button left the app from any screen until it was passed to the page as the
+Back every screen handles, and the remote's OK did nothing until the page
+was given Android's focus. mpv's plugin has no Android side, so the player
+became a seam on the Rust side too (`engine.rs`), as it already was in the
+interface. Adding a folder is not possible yet: there is no folder picker
+on Android, and many TV boxes have none of their own. **Network shares
+built into Kinema** come first (the owner's choice), as Kodi does it, since
+a TV box's films are usually on a NAS; drives on the box itself later.
+
+**One exception to "no third-party binaries in the repo".** The Android
+project keeps `gradle-wrapper.jar`, Gradle's own starter, as every Android
+project does. It runs only while building and is never in the app; keeping
+it out would have meant every build fetching Gradle some other way first.
+The owner allowed it, and CONTRIBUTING says so beside the rule.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

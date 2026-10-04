@@ -22,7 +22,12 @@ import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-naviga
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
-import { chooseFolder } from '../library/folders';
+import {
+  chooseFolder,
+  forgetShareLogin,
+  shareLogins,
+  type ShareLogin,
+} from '../library/folders';
 import { openLink } from './links';
 import FocusButton from './FocusButton';
 import { count, formatBytes } from './format';
@@ -34,7 +39,7 @@ import ConfirmButton from './ConfirmButton';
 import EquipmentSection from './EquipmentSection';
 import SoundSection from './SoundSection';
 import ScreenSection from './ScreenSection';
-import { useCapabilities, type Capabilities } from '../capabilities';
+import { capabilitiesNow, useCapabilities, type Capabilities } from '../capabilities';
 import { useClaimFocus } from './focus';
 import { setTvMode, useTvMode } from './tv';
 import {
@@ -224,6 +229,8 @@ export default function Settings({
   );
 
   const [roots, setRoots] = useState<LibraryRoot[]>([]);
+  // Sign-ins kept for network shares Kinema opens itself (Android).
+  const [logins, setLogins] = useState<ShareLogin[]>([]);
   const [needsReview, setNeedsReview] = useState(0);
   const [art, setArt] = useState<ArtworkStats | null>(null);
   const [tmdbKey, setTmdbKey] = useState('');
@@ -315,6 +322,7 @@ export default function Settings({
         analysisBacklog(),
       ]);
       setRoots(r);
+      if (capabilitiesNow()?.network_shares) setLogins(await shareLogins());
       setNeedsReview(n);
       setArt(a);
       setBacklog(Object.fromEntries(pending));
@@ -708,6 +716,36 @@ export default function Settings({
                     back. New episodes are checked for intros and credits straight afterwards.
                   </p>
                 </section>
+
+                {can?.network_shares && logins.length > 0 && (
+                  <section className="settings-section">
+                    <h2>Network sign-ins</h2>
+                    <p className="settings-intro">
+                      The names and passwords Kinema uses for your network drives, kept locked
+                      on this device. Forget one and Kinema asks again the next time.
+                    </p>
+                    <ul className="settings-roots settings-logins">
+                      {logins.map((login) => (
+                        <li key={login.server}>
+                          <span className="root-path">{login.server}</span>
+                          <span className="muted">{login.user || 'as a guest'}</span>
+                          <ConfirmButton
+                            keepInView="nearest"
+                            className="settings-remove"
+                            confirmLabel="Forget it"
+                            onConfirm={() =>
+                              void forgetShareLogin(login.server)
+                                .then(refresh)
+                                .catch((e) => setError(userError(e)))
+                            }
+                          >
+                            Forget
+                          </ConfirmButton>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
 
                 {/* Under the folders, because these two are the whole of what a
                     new library needs. */}

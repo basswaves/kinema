@@ -126,15 +126,45 @@ pub fn set_login(server: &str, user: &str, password: &str) {
     s.servers.remove(server);
 }
 
-/// Signs Kinema in to a server for this session. Kept in memory only, for
-/// now; stored sign-ins come with the screen that asks for them.
-#[tauri::command]
-pub fn sign_in_share(server: String, user: String, password: String) {
-    set_login(&server, &user, &password);
+/// The name and password a server is signed in with, if any.
+pub fn login(server: &str) -> Option<(String, String)> {
+    state().logins.get(server).map(|l| (l.user.clone(), l.password.clone()))
+}
+
+/// Forgets a server's sign-in and closes its connection.
+pub fn forget_login(server: &str) {
+    let mut s = state();
+    s.logins.remove(server);
+    s.servers.remove(server);
+}
+
+/// Signs in to a server, to see whether it takes the sign-in set for it:
+/// to its `IPC$`, the share every SMB server has for exactly this.
+pub fn try_sign_in(server: &str) -> io::Result<()> {
+    connect(&parse(&format!("{SCHEME}{server}/IPC$"))?).map(|_| ())
+}
+
+/// The kept sign-ins are in memory (share_logins.rs). Until then a sign-in
+/// waits, a few seconds at most: a scan started as Kinema opens would
+/// otherwise find its shares refusing it.
+pub fn logins_loaded() {
+    let (ready, signal) = &*LOGINS_LOADED;
+    *ready.lock().unwrap_or_else(|e| e.into_inner()) = true;
+    signal.notify_all();
+}
+
+static LOGINS_LOADED: std::sync::LazyLock<(Mutex<bool>, std::sync::Condvar)> =
+    std::sync::LazyLock::new(Default::default);
+
+fn wait_for_logins() {
+    let (ready, signal) = &*LOGINS_LOADED;
+    let guard = ready.lock().unwrap_or_else(|e| e.into_inner());
+    let _ = signal.wait_timeout_while(guard, Duration::from_secs(5), |loaded| !*loaded);
 }
 
 /// A connection to the share `addr` is on, signed in, made if need be.
 fn connect(addr: &Address) -> io::Result<Arc<Server>> {
+    wait_for_logins();
     let host = addr.host();
     let (server, login) = {
         let mut s = state();
@@ -347,6 +377,7 @@ fn to_io(e: smb::Error) -> io::Error {
 /// share` makes one.
 #[cfg(test)]
 pub(crate) fn test_share() -> Option<String> {
+    logins_loaded();
     let root = std::env::var("KINEMA_TEST_SHARE").ok()?;
     let addr = Address::parse(&root).expect("KINEMA_TEST_SHARE is an smb:// address");
     set_login(

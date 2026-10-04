@@ -102,10 +102,22 @@ export function useFolderRequest(): FolderRequest | null {
   );
 }
 
+/** A network server Kinema keeps a sign-in for (share_logins.rs). */
+export interface ShareLogin {
+  server: string;
+  /** Empty for a guest. */
+  user: string;
+}
+
 /**
- * Signs Kinema in to a network server it opens itself (netshare.rs), for
- * this session: `server` as an address names it (`nas`, or `nas:4450` off
- * SMB's own port), an empty `user` is a guest.
+ * Signs in to a network server Kinema opens itself (`nas`, or `nas:4450` off
+ * SMB's own port; an empty `user` is a guest) and keeps the sign-in if the
+ * server accepts it — locked with the device's key store. Rejects with words
+ * for people when it does not. `kept` is false where the sign-in could not be
+ * locked, and lasts until Kinema closes.
  */
-export const signInShare = (server: string, user: string, password: string) =>
-  invoke<void>('sign_in_share', { server, user, password });
+export const saveShareLogin = (server: string, user: string, password: string) =>
+  invoke<{ kept: boolean }>('save_share_login', { server, user, password });
+export const forgetShareLogin = (server: string) =>
+  invoke<void>('forget_share_login', { server });
+export const shareLogins = () => invoke<ShareLogin[]>('share_logins');

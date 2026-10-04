@@ -40,7 +40,7 @@ import {
 import { fileFacts } from './ui/badges';
 import { seasonFacts } from './ui/seasonBadges';
 import { runScanPipeline } from './library/pipeline';
-import { signInShare } from './library/folders';
+import { saveShareLogin } from './library/folders';
 import { refreshTomatometer } from './metadata/scores';
 import {
   cacheArtwork,
@@ -74,7 +74,7 @@ const CALLABLE: Record<string, (...args: never[]) => Promise<unknown>> = {
   addLibraryRoot,
   listLibraryRoots,
   // A network share Kinema opens itself, signed in to before it is added.
-  signInShare,
+  saveShareLogin,
   scanLibrary,
   runScanPipeline,
   ignoreFileIds,

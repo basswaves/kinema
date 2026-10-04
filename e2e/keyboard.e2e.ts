@@ -699,3 +699,30 @@ test('Android: the log is shared, and no folder is offered to open', async ({ pa
   await press(page, 'Enter');
   await expect(page.locator('.settings-error, .settings-warn')).toHaveCount(0);
 });
+
+test('Android: a kept network sign-in is listed, and forgotten by remote', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('kinemaMockShareLogin', '1'));
+  await androidSettings(page, 'Library');
+  const section = page.locator('.settings-section', { hasText: 'Network sign-ins' });
+  await expect(section).toContainText('nas');
+  await expect(section).toContainText('films');
+  // Down from the folders' buttons, as a remote gets there.
+  await press(page, 'ArrowDown');
+  await expect.poll(() => focused(page)).toBe('Forget');
+  await press(page, 'Enter');
+  await expect.poll(() => focused(page)).toBe('Forget it');
+  await press(page, 'Enter');
+  // Nothing kept, nothing to list.
+  await expect(section).toHaveCount(0);
+  await expect(page.locator('.settings-section h2').first()).toHaveText('Folders');
+});
+
+test('a computer opens shares itself, so it lists no network sign-ins', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('kinemaMockShareLogin', '1'));
+  await open(page, 'windows');
+  await press(page, 'ArrowUp', 2);
+  for (let i = 0; i < 6 && (await focused(page)) !== 'Settings'; i++) await press(page, 'ArrowRight');
+  await press(page, 'Enter');
+  await expect(page.locator('.settings-section h2').first()).toHaveText('Folders');
+  await expect(page.locator('.settings-section', { hasText: 'Network sign-ins' })).toHaveCount(0);
+});

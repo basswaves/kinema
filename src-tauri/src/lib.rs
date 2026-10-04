@@ -41,6 +41,7 @@ mod probe;
 mod scanner;
 mod selftest;
 mod settings;
+mod share_logins;
 mod simkl;
 mod skip;
 mod skiptro;
@@ -246,7 +247,7 @@ pub fn run() {
         }));
     }
 
-    places::register(engine::register(builder))
+    share_logins::register(places::register(engine::register(builder)))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_http::init())
@@ -267,6 +268,9 @@ pub fn run() {
                 // only add an invisible second failure.
                 std::process::exit(1);
             }
+            // Network sign-ins kept from before, unlocked for the shares
+            // Kinema opens itself.
+            share_logins::load(app.handle());
 
             // What this machine is connected to: checked, saved beside what
             // was seen before, and written to app.log, so a log from any
@@ -299,7 +303,9 @@ pub fn run() {
             updates::latest_release,
             capabilities::capabilities,
             places::list_folders,
-            netshare::sign_in_share,
+            share_logins::save_share_login,
+            share_logins::forget_share_login,
+            share_logins::share_logins,
             stream::stream_address,
             overlay::overlay_frame,
             overlay::overlay_reset,

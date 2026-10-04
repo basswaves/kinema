@@ -2099,6 +2099,14 @@ html {
   font-variant-numeric: tabular-nums;
 }
 
+/* Packed to the left, under the buttons above it: a remote's Down reaches
+   only what lines up with where it is, and a button at the far right of a
+   row was skipped (the folder rows are reached from Add movies folder by
+   Up, which this list, below it, cannot be). */
+.settings-logins .root-path {
+  flex: 0 1 auto;
+}
+
 .settings-remove {
   padding: 0.3125rem 0.75rem;
   border: 1px solid rgba(255, 255, 255, 0.2);

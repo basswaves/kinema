@@ -796,6 +796,13 @@ const mockDrives: Record<string, { folders: string[]; videos: number }> = {
   '/storage/emulated/0/Download': { folders: [], videos: 0 },
   '/storage/emulated/0/Movies': { folders: [], videos: 0 },
 };
+/**
+ * Network sign-ins kept for shares Kinema opens itself (share_logins.rs).
+ * `kinemaMockShareLogin=1` starts with one; the server `nas` accepts the
+ * password `secret` (and no guests), any other server is not there.
+ */
+const shareLogins: { server: string; user: string }[] =
+  flag('kinemaMockShareLogin') === '1' ? [{ server: 'nas', user: 'films' }] : [];
 /** `kinemaMockReview` pretends that many videos wait in the review queue. */
 const REVIEW_COUNT = Number(flag('kinemaMockReview') ?? 0) || 0;
 /** `kinemaMockUpdate` pretends that version is out on GitHub. */
@@ -993,6 +1000,7 @@ const handlers: Record<string, Handler> = {
         screen_keyboard: true,
         opens_folders: false,
         shares_files: true,
+        network_shares: true,
         sleep: false,
         shut_down: false,
       };
@@ -1014,6 +1022,7 @@ const handlers: Record<string, Handler> = {
       screen_keyboard: false,
       opens_folders: true,
       shares_files: false,
+      network_shares: false,
       sleep: !NO_POWER,
       shut_down: !NO_POWER,
     };
@@ -1239,6 +1248,22 @@ const handlers: Record<string, Handler> = {
   'plugin:storage|allow_all_files': () => {
     storage.allFiles = 'granted';
     return { read: storage.read, allFiles: storage.allFiles };
+  },
+  share_logins: () => shareLogins,
+  save_share_login: (a) => {
+    const server = String(a.server);
+    if (server !== 'nas') throw new Error(`Could not reach ${server}: no answer`);
+    if (!a.user) throw new Error(`${server} does not let guests in. Sign in with a name and password.`);
+    if (a.password !== 'secret') throw new Error(`${server} did not accept that name and password.`);
+    const i = shareLogins.findIndex((l) => l.server === server);
+    if (i >= 0) shareLogins.splice(i, 1);
+    shareLogins.push({ server, user: String(a.user) });
+    return { kept: true };
+  },
+  forget_share_login: (a) => {
+    const i = shareLogins.findIndex((l) => l.server === String(a.server));
+    if (i >= 0) shareLogins.splice(i, 1);
+    return null;
   },
   list_folders: (a) => {
     const listing = mockDrives[String(a.path)];

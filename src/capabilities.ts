@@ -42,6 +42,9 @@ export interface Capabilities {
   opens_folders: boolean;
   /** The system can hand a file to another app (Android's share sheet). */
   shares_files: boolean;
+  /** Kinema opens network shares itself, as the system does not (Android):
+   * the folder browser offers the network (library/folders.ts). */
+  network_shares: boolean;
   sleep: boolean;
   shut_down: boolean;
 }

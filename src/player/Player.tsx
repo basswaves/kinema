@@ -349,18 +349,23 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     >
       {!session.frameShown && <div className="player-cover" aria-hidden="true" />}
 
-      {error && <div className="player-error">{error}</div>}
-      {notice && <div className="player-notice">{notice}</div>}
+      {/* Floating under the top bar, one above the other: in the player's
+          own column they took the top slot and pushed Back and the title
+          down to the middle of the screen. */}
+      <div className="player-messages">
+        {error && <div className="player-error">{error}</div>}
+        {notice && <div className="player-notice">{notice}</div>}
 
-      {/* Resuming is automatic, so this is where starting over is offered —
-          for as long as the notice shows, OK means "from the beginning". */}
-      {session.resumedFrom !== null && (
-        <ResumeToast
-          resumedFrom={session.resumedFrom}
-          onShown={() => dispatch({ type: 'resume-shown' })}
-          onStartOver={startOver}
-        />
-      )}
+        {/* Resuming is automatic, so this is where starting over is offered —
+            for as long as the notice shows, OK means "from the beginning". */}
+        {session.resumedFrom !== null && (
+          <ResumeToast
+            resumedFrom={session.resumedFrom}
+            onShown={() => dispatch({ type: 'resume-shown' })}
+            onStartOver={startOver}
+          />
+        )}
+      </div>
 
       <div className="player-top">
         <FocusButton className="back-button" onSelect={() => void exit()}>

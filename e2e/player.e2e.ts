@@ -451,6 +451,11 @@ test('sound that will not open falls back, and says so', async ({ page }) => {
   );
   // Every fallback refused too: no sound, and what to do about it.
   await expect(page.locator('.player-notice')).toContainText('No sound', { timeout: 10_000 });
+  // It floats under the top bar: Back and the title stay at the top (in the
+  // player's column it pushed them down to the middle of the screen).
+  expect(
+    await page.locator('.player-top').evaluate((el) => el.getBoundingClientRect().top)
+  ).toBeLessThan(2);
 
   // Next time a fallback works: it plays, through the system, and says so.
   await press(page, 'n');

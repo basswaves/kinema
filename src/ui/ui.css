@@ -2434,8 +2434,28 @@ html {
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
 }
 
+/* Error, sound notice and the resume toast, stacked under the top bar —
+   out of the player's column, which spaces its children top to bottom. */
+.player-messages {
+  position: absolute;
+  top: calc(4.75rem + var(--safe-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  width: max-content;
+  max-width: calc(100% - 3rem);
+  pointer-events: none;
+}
+
+.player-messages > * {
+  pointer-events: auto;
+}
+
 .player-error {
-  align-self: center;
   padding: 0.625rem 1rem;
   border-radius: 0.5rem;
   background: rgba(218, 54, 51, 0.92);
@@ -2444,7 +2464,6 @@ html {
 /* Something about the sound the viewer should know — not an error: the film
    is playing. Its own colour so it is not read as one. */
 .player-notice {
-  align-self: center;
   max-width: 40rem;
   padding: 0.625rem 1rem;
   border-radius: 0.5rem;
@@ -2703,10 +2722,6 @@ html {
 
 /* ---- resume toast -------------------------------------------------------- */
 .resume-toast {
-  position: absolute;
-  top: calc(4.75rem + var(--safe-top));
-  left: 50%;
-  transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 0.875rem;

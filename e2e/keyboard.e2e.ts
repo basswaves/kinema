@@ -333,7 +333,9 @@ test('Android: a folder on a USB drive, chosen in Kinema’s own browser', async
       () => (window as unknown as { __kinemaMock: { storage: { read: string; asked: number } } })
         .__kinemaMock.storage
     );
-  await expect(page.locator('.first-run')).toContainText('on a USB drive or this device’s own storage');
+  await expect(page.locator('.first-run')).toContainText(
+    'on a NAS or a computer on your network, a USB drive, or this device’s own storage'
+  );
 
   // Add movies folder: Android is asked once, then the drives.
   await expect.poll(() => focused(page)).toBe('Add movies folder');
@@ -344,7 +346,8 @@ test('Android: a folder on a USB drive, chosen in Kinema’s own browser', async
   // The subtitles' permission is offered, not required; once given, the
   // offer goes and the ring is back on the drives.
   await expect(page.locator('.folder-browser')).toContainText('All files access');
-  await press(page, 'ArrowDown', 2);
+  // Past the drives and Network drives.
+  await press(page, 'ArrowDown', 3);
   await expect.poll(() => focused(page)).toBe('Allow all files');
   await press(page, 'Enter');
   await expect(page.locator('.folder-browser')).not.toContainText('All files access');
@@ -725,4 +728,143 @@ test('a computer opens shares itself, so it lists no network sign-ins', async ({
   await press(page, 'Enter');
   await expect(page.locator('.settings-section h2').first()).toHaveText('Folders');
   await expect(page.locator('.settings-section', { hasText: 'Network sign-ins' })).toHaveCount(0);
+});
+
+test('Android: a folder on a network drive, signed in to and chosen by remote', async ({ page }) => {
+  await page.setViewportSize({ width: 960, height: 540 });
+  await page.addInitScript(() => {
+    localStorage.setItem('kinemaMockSystem', 'android');
+    localStorage.setItem('kinemaMockEmpty', '1');
+  });
+  await page.goto('/');
+  await expect.poll(() => focused(page)).toBe('Add movies folder');
+  await press(page, 'Enter');
+  const browser = page.locator('.folder-browser');
+  await expect(browser.locator('.folder-where')).toContainText('or a network drive');
+
+  // Network drives, after the drives.
+  await expect.poll(() => focused(page)).toBe('USB driveUSB drive or card');
+  for (let i = 0; i < 4 && !(await focused(page))?.startsWith('Network drives'); i++) {
+    await press(page, 'ArrowDown');
+  }
+  await press(page, 'Enter');
+  await expect(browser.locator('.folder-where')).toHaveText('Network drives');
+  // The NAS that announced itself, and a way to type one that did not.
+  await expect.poll(() => focused(page)).toBe('Living room NASnas');
+  await expect(browser).toContainText('Type an address');
+
+  // No sign-in yet: the NAS asks for one. A wrong password is said so.
+  await press(page, 'Enter');
+  await expect(browser.locator('.folder-where')).toHaveText('Network drives › Living room NAS');
+  const name = browser.locator('input').first();
+  const password = browser.locator('input[type=password]');
+  await expect(name).toBeFocused();
+  await page.keyboard.type('films');
+  await press(page, 'ArrowDown');
+  await expect(password).toBeFocused();
+  await page.keyboard.type('wrong');
+  await press(page, 'ArrowDown');
+  await expect.poll(() => focused(page)).toBe('Sign in');
+  await press(page, 'Enter');
+  await expect(browser.locator('.leave-error')).toHaveText('nas did not accept that name and password.');
+  await press(page, 'ArrowUp');
+  await expect(password).toBeFocused();
+  await password.fill('secret');
+  await press(page, 'ArrowDown');
+  await press(page, 'Enter');
+
+  // Its shares, then a share's folders, as a drive's.
+  await expect.poll(() => focused(page)).toBe('films');
+  await expect(browser).toContainText('tv');
+  await press(page, 'Enter');
+  await expect(browser.locator('.folder-where')).toHaveText('films on Living room NAS');
+  await expect.poll(() => focused(page)).toBe('A film (2001)');
+
+  // Back from the share's top: the shares; again: the servers, now signed in.
+  await press(page, 'Escape');
+  await expect.poll(() => focused(page)).toBe('films');
+  await press(page, 'Escape');
+  await expect.poll(() => focused(page)).toBe('Living room NASSigned in');
+  // Signed in, it opens straight to the shares.
+  await press(page, 'Enter');
+  await expect.poll(() => focused(page)).toBe('films');
+  await press(page, 'Enter');
+  await expect.poll(() => focused(page)).toBe('A film (2001)');
+
+  await press(page, 'ArrowUp');
+  await expect.poll(() => focused(page)).toBe('Use this folder');
+  await press(page, 'Enter');
+  await expect(browser).toHaveCount(0);
+  await expect(page.locator('.root-path')).toHaveText('smb://nas/films');
+
+  // Opened again: Back from the servers lands on Network drives.
+  await press(page, 'Enter');
+  for (let i = 0; i < 4 && !(await focused(page))?.startsWith('Network drives'); i++) {
+    await press(page, 'ArrowDown');
+  }
+  await press(page, 'Enter');
+  await expect.poll(() => focused(page)).toBe('Living room NASSigned in');
+  await press(page, 'Escape');
+  await expect.poll(() => focused(page)).toBe('Network drivesA NAS, or a folder shared by a computer');
+});
+
+test('Android: a NAS that does not announce itself, typed, and its share named', async ({ page }) => {
+  await page.setViewportSize({ width: 960, height: 540 });
+  await page.addInitScript(() => {
+    localStorage.setItem('kinemaMockSystem', 'android');
+    localStorage.setItem('kinemaMockEmpty', '1');
+    localStorage.setItem('kinemaMockShareLogin', '1');
+  });
+  await page.goto('/');
+  await expect.poll(() => focused(page)).toBe('Add movies folder');
+  await press(page, 'Enter');
+  const browser = page.locator('.folder-browser');
+  for (let i = 0; i < 4 && !(await focused(page))?.startsWith('Network drives'); i++) {
+    await press(page, 'ArrowDown');
+  }
+  await press(page, 'Enter');
+  for (let i = 0; i < 4 && (await focused(page)) !== 'Type an addressA computer or a NAS not listed'; i++) {
+    await press(page, 'ArrowDown');
+  }
+  await press(page, 'Enter');
+  // The form people copy an address in is forgiven.
+  await expect(browser.locator('input')).toBeFocused();
+  await page.keyboard.type('\\\\other\\films');
+  await press(page, 'ArrowDown');
+  await press(page, 'Enter');
+  await expect(browser.locator('.folder-where')).toHaveText('Network drives › other');
+  await expect(browser.locator('input').first()).toBeFocused();
+});
+
+test('Android: signing in to a NAS with the system keyboard takes one Enter per field', async ({ page }) => {
+  await page.setViewportSize({ width: 960, height: 540 });
+  await page.addInitScript(() => {
+    localStorage.setItem('kinemaMockSystem', 'android');
+    localStorage.setItem('kinemaMockEmpty', '1');
+  });
+  await page.goto('/');
+  await expect.poll(() => focused(page)).toBe('Add movies folder');
+  await press(page, 'Enter');
+  for (let i = 0; i < 4 && !(await focused(page))?.startsWith('Network drives'); i++) {
+    await press(page, 'ArrowDown');
+  }
+  await press(page, 'Enter');
+  await expect.poll(() => focused(page)).toBe('Living room NASnas');
+  await press(page, 'Enter');
+  const browser = page.locator('.folder-browser');
+  const name = browser.locator('input').first();
+  const password = browser.locator('input[type=password]');
+  // Arriving holds the keyboard back; OK opens it.
+  await expect(name).toHaveAttribute('inputmode', 'none');
+  await press(page, 'Enter');
+  await expect(name).toHaveAttribute('inputmode', 'text');
+  await page.keyboard.type('films');
+  // The keyboard's Enter moves on, and the keyboard goes with it...
+  await press(page, 'Enter');
+  await expect(password).toBeFocused();
+  await expect(password).toHaveAttribute('inputmode', 'text');
+  await page.keyboard.type('secret');
+  // ...so the next Enter signs in, not opens it again.
+  await press(page, 'Enter');
+  await expect.poll(() => focused(page)).toBe('films');
 });

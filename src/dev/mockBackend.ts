@@ -795,11 +795,18 @@ const mockDrives: Record<string, { folders: string[]; videos: number }> = {
   '/storage/emulated/0': { folders: ['Download', 'Movies'], videos: 0 },
   '/storage/emulated/0/Download': { folders: [], videos: 0 },
   '/storage/emulated/0/Movies': { folders: [], videos: 0 },
+  // The mock NAS's shares (netshare.rs).
+  'smb://nas/films': { folders: ['A film (2001)', 'Another film (2003)'], videos: 0 },
+  'smb://nas/films/A film (2001)': { folders: [], videos: 1 },
+  'smb://nas/films/Another film (2003)': { folders: [], videos: 1 },
+  'smb://nas/tv': { folders: ['Example Show'], videos: 0 },
+  'smb://nas/tv/Example Show': { folders: ['Season 1'], videos: 0 },
+  'smb://nas/tv/Example Show/Season 1': { folders: [], videos: 3 },
 };
 /**
  * Network sign-ins kept for shares Kinema opens itself (share_logins.rs).
  * `kinemaMockShareLogin=1` starts with one; the server `nas` accepts the
- * password `secret` (and no guests), any other server is not there.
+ * password `secret`, any other server is not there.
  */
 const shareLogins: { server: string; user: string }[] =
   flag('kinemaMockShareLogin') === '1' ? [{ server: 'nas', user: 'films' }] : [];
@@ -1250,10 +1257,19 @@ const handlers: Record<string, Handler> = {
     return { read: storage.read, allFiles: storage.allFiles };
   },
   share_logins: () => shareLogins,
+  // One NAS announces itself; a typed `nas` is the same box.
+  'plugin:network|find_servers': () => ({ servers: [{ name: 'Living room NAS', host: 'nas' }] }),
+  list_shares: (a) => {
+    const server = String(a.server);
+    if (!shareLogins.some((l) => l.server === server)) {
+      throw new Error(`${server} needs a sign-in first: not allowed`);
+    }
+    return ['films', 'tv'];
+  },
   save_share_login: (a) => {
     const server = String(a.server);
     if (server !== 'nas') throw new Error(`Could not reach ${server}: no answer`);
-    if (!a.user) throw new Error(`${server} does not let guests in. Sign in with a name and password.`);
+    if (!a.user) throw new Error('Kinema cannot sign in as a guest yet. Sign in with a name and password.');
     if (a.password !== 'secret') throw new Error(`${server} did not accept that name and password.`);
     const i = shareLogins.findIndex((l) => l.server === server);
     if (i >= 0) shareLogins.splice(i, 1);
@@ -1266,7 +1282,12 @@ const handlers: Record<string, Handler> = {
     return null;
   },
   list_folders: (a) => {
-    const listing = mockDrives[String(a.path)];
+    const path = String(a.path);
+    // A share on the mock NAS reads only once Kinema is signed in to it.
+    if (path.startsWith('smb://') && !shareLogins.some((l) => path.startsWith(`smb://${l.server}/`))) {
+      throw new Error(`not allowed to read ${path}`);
+    }
+    const listing = mockDrives[path];
     if (!listing) throw new Error(`could not read ${String(a.path)}`);
     return listing;
   },

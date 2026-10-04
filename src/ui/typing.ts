@@ -17,9 +17,24 @@
  * keyboard closes: on an Android 9 box neither the page's size nor Chrome's
  * VirtualKeyboard events changed.) The remote's OK reaches a field as Enter
  * only because MainActivity.kt sends it on as one.
+ *
+ * A form whose Enter moves on to its next field (a name, then a password)
+ * hands the open keyboard over with `carryKeyboard`: the next field takes
+ * typing with it still up, and its first Enter is its own. Otherwise that
+ * Enter went to opening a keyboard already open, and signing in took two.
  */
 import { useEffect, type KeyboardEvent, type RefObject } from 'react';
 import { useCapabilities } from '../capabilities';
+
+/** When a field last handed the open keyboard to the next one. */
+let carriedAt = 0;
+/** Long enough for the next field to be drawn and reached. */
+const CARRY_MS = 1500;
+
+/** The field that takes typing next keeps the system's keyboard open. */
+export function carryKeyboard(): void {
+  carriedAt = Date.now();
+}
 
 /**
  * Give `ref` typing focus while `focused` (the remote's focus), and take it
@@ -37,8 +52,10 @@ export function useTypingFocus(
     if (!input) return;
     if (focused) {
       // Before focus(): the system decides whether to show its keyboard as
-      // the field takes focus.
-      if (screenKeyboard) input.inputMode = 'none';
+      // the field takes focus. Handed on from the field before, it stays.
+      const carried = Date.now() - carriedAt < CARRY_MS;
+      carriedAt = 0;
+      if (screenKeyboard) input.inputMode = carried ? 'text' : 'none';
       // `preventScroll`: callers scroll the field into view themselves.
       input.focus({ preventScroll: true });
     } else {

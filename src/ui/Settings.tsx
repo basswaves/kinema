@@ -728,7 +728,7 @@ export default function Settings({
                       {logins.map((login) => (
                         <li key={login.server}>
                           <span className="root-path">{login.server}</span>
-                          <span className="muted">{login.user || 'as a guest'}</span>
+                          <span className="muted">{login.user}</span>
                           <ConfirmButton
                             keepInView="nearest"
                             className="settings-remove"

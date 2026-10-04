@@ -153,3 +153,34 @@ test('Android: Kinema’s own folder browser by mouse', async ({ page }) => {
   await expect(browser).toHaveCount(0);
   await expect(page.locator('.first-run-roots li')).toHaveCount(1);
 });
+
+test('Android: a network drive by mouse, signed in to with clicks and typing', async ({ page }) => {
+  await page.setViewportSize({ width: 960, height: 540 });
+  await page.addInitScript(() => {
+    localStorage.setItem('kinemaMockSystem', 'android');
+    localStorage.setItem('kinemaMockEmpty', '1');
+  });
+  await page.goto('/');
+  const browser = page.locator('.folder-browser');
+  const where = page.locator('.folder-where');
+
+  await page.getByRole('button', { name: 'Add movies folder' }).click();
+  await browser.getByRole('button', { name: /Network drives/ }).click();
+  await expect(where).toHaveText('Network drives');
+  // Back, for a mouse, as Up a folder is among folders.
+  await browser.getByRole('button', { name: 'Back', exact: true }).click();
+  await expect(browser.getByRole('button', { name: /Network drives/ })).toBeVisible();
+  await browser.getByRole('button', { name: /Network drives/ }).click();
+  await browser.getByRole('button', { name: /Living room NAS/ }).click();
+  await browser.locator('input').first().click();
+  await page.keyboard.type('films');
+  await browser.locator('input[type=password]').click();
+  await page.keyboard.type('secret');
+  await browser.getByRole('button', { name: 'Sign in' }).click();
+  await browser.getByRole('button', { name: 'tv', exact: true }).click();
+  await expect(where).toHaveText('tv on Living room NAS');
+  await browser.getByRole('button', { name: 'Example Show' }).click();
+  await browser.getByRole('button', { name: 'Use this folder' }).click();
+  await expect(browser).toHaveCount(0);
+  await expect(page.locator('.root-path')).toHaveText('smb://nas/tv/Example Show');
+});

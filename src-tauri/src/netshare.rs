@@ -118,8 +118,8 @@ fn state() -> std::sync::MutexGuard<'static, State> {
 }
 
 /// The name and password a server (`nas`, or `nas:4450` off SMB's own port)
-/// is signed in with. An empty name is a guest. A changed sign-in closes the
-/// server's connection, so the next use signs in afresh.
+/// is signed in with. A changed sign-in closes the server's connection, so
+/// the next use signs in afresh.
 pub fn set_login(server: &str, user: &str, password: &str) {
     let mut s = state();
     s.logins.insert(server.to_string(), Login { user: user.to_string(), password: password.to_string() });
@@ -142,6 +142,43 @@ pub fn forget_login(server: &str) {
 /// to its `IPC$`, the share every SMB server has for exactly this.
 pub fn try_sign_in(server: &str) -> io::Result<()> {
     connect(&parse(&format!("{SCHEME}{server}/IPC$"))?).map(|_| ())
+}
+
+/// The shares a server offers that a person would pick: its disk shares,
+/// not the hidden ones (srvsvc.rs, which says why Kinema asks itself).
+pub fn shares(server: &str) -> io::Result<Vec<String>> {
+    use smb::{IoctlBuffer, PipeTransceiveRequest};
+    let addr = parse(&format!("{SCHEME}{server}/IPC$"))?;
+    let connection = connect(&addr)?;
+    let pipe = connection.client.open_pipe(&addr.server, "srvsvc").map_err(to_io)?;
+    let transceive = |packet: Vec<u8>| -> io::Result<Vec<u8>> {
+        let reply = pipe
+            .fsctl_with_options(PipeTransceiveRequest::from(IoctlBuffer::from(packet)), crate::srvsvc::MAX_FRAGMENT as u32)
+            .map_err(to_io)?;
+        let bytes: &[u8] = (*reply).as_ref();
+        Ok(bytes.to_vec())
+    };
+    let answer = transceive(crate::srvsvc::bind())
+        .and_then(|ack| crate::srvsvc::check_bind(&ack))
+        .and_then(|_| transceive(crate::srvsvc::share_enum(&addr.server)))
+        .and_then(|reply| crate::srvsvc::parse_share_enum(&reply));
+    if let Err(e) = pipe.close() {
+        log::debug!("netshare: closing srvsvc: {e}");
+    }
+    answer
+}
+
+/// The shares on a server, for the folder browser. Fails in words; the
+/// browser then asks for the share's name instead.
+#[tauri::command]
+pub async fn list_shares(server: String) -> Result<Vec<String>, String> {
+    crate::jobs::off_main(move || {
+        shares(&server).map_err(|e| match e.kind() {
+            io::ErrorKind::PermissionDenied => format!("{server} needs a sign-in first: {e}"),
+            _ => format!("Kinema could not ask {server} for its shares: {e}"),
+        })
+    })
+    .await
 }
 
 /// The kept sign-ins are in memory (share_logins.rs). Until then a sign-in
@@ -392,6 +429,10 @@ pub(crate) fn test_share() -> Option<String> {
 mod tests {
     use super::*;
 
+    fn addr_of(path: &str) -> Address {
+        Address::parse(path).unwrap()
+    }
+
     #[test]
     fn addresses_are_taken_apart() {
         assert_eq!(
@@ -540,6 +581,11 @@ mod tests {
         for r in readers {
             assert!(r.join().expect("no crash") == whole, "the same bytes");
         }
+
+        // The server names its shares, the test share among them.
+        let share_list = shares(&addr_of(root).host()).unwrap();
+        assert!(share_list.contains(&addr_of(root).share), "{share_list:?}");
+        assert!(!share_list.iter().any(|s| s.ends_with('$')), "{share_list:?}");
 
         assert_eq!(stat(&format!("{root}/no such file.mkv")).unwrap_err().kind(), io::ErrorKind::NotFound);
         assert_eq!(list(&format!("{root}/no such folder")).unwrap_err().kind(), io::ErrorKind::NotFound);

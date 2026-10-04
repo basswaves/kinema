@@ -2714,6 +2714,29 @@ project does. It runs only while building and is never in the app; keeping
 it out would have meant every build fetching Gradle some other way first.
 The owner allowed it, and CONTRIBUTING says so beside the rule.
 
+**Network shares on Android, through Kinema's own SMB client (owner,
+2026-10-04).** A TV box's films are usually on a NAS, and Android does not
+open one for an app as Windows and Linux do. Of the ways to reach it — a
+Java SMB library beside the player, a Rust one in the core, or both — the
+owner chose one client, in the core, used by everything that reads files:
+the scanner walks `smb://server/share/…` folders (sizes and times come
+with the listing, so a file costs no request of its own), the readers of
+`.nfo`, trailer and skip files go through one small layer that works on
+both kinds of folder, and the player is handed a film over HTTP on the
+device itself (127.0.0.1, at a secret address made for each run) because
+Media3 cannot speak SMB. The client is smb-rs, pure Rust; two faults in it
+had to be fixed first (GOTCHAS), in a patched copy kept in the repository
+until a release has them.
+
+Shares are added in Kinema's own folder browser: Network drives lists the
+servers that announce themselves (most NAS boxes do; most Windows PCs do
+not, so an address can be typed), then the server's shares — asked for in
+the classic RPC encoding Samba accepts, which the library did not — then
+folders, as on a drive. A sign-in is tried before it is kept, and kept only
+locked with a key held by Android's key store, so a copy of the library
+carries no usable password; Settings lists the kept ones with Forget. A
+guest sign-in is not offered yet: the library cannot complete one.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

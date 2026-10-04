@@ -57,7 +57,12 @@ export default function FocusInput({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' && !enterKey(e)) onEnter?.();
+        if (e.key !== 'Enter' || enterKey(e) || !onEnter) return;
+        // The field's own: not also a press on whatever has the ring once
+        // `onEnter` has moved it (a sign-in that answers at once and puts
+        // the ring on the first share, which this Enter then opened).
+        e.stopPropagation();
+        onEnter();
       }}
     />
   );

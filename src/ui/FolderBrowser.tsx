@@ -8,6 +8,11 @@
  * level, and from the drives closes without choosing, as Cancel does. Each folder says how many videos sit directly in
  * it, which is what tells a library folder from the rest at a glance.
  *
+ * Where Kinema opens network shares itself (capability `network_shares`),
+ * Network drives, after the drives, leads to the servers and their shares
+ * (`NetworkPlaces.tsx`); a share then opens folder by folder as a drive does,
+ * and Back from its top goes back to the server's shares.
+ *
  * Reading the drives needs Android's permission. It is asked for when the
  * browser opens, in Android's own words; refused, the browser says where it
  * is granted instead. Subtitle and .nfo files beside the films need All files
@@ -22,7 +27,9 @@ import {
   useFocusable,
 } from '@noriginmedia/norigin-spatial-navigation';
 import FocusButton from './FocusButton';
+import NetworkPlaces, { type NetStep } from './NetworkPlaces';
 import { userError } from './errors';
+import { useCapabilities } from '../capabilities';
 import {
   allowAllFiles,
   listFolders,
@@ -58,6 +65,9 @@ export default function FolderBrowser({ request }: { request: FolderRequest }) {
   const [spot, setSpot] = useState<Spot | null>(null);
   const [listing, setListing] = useState<Listing | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** In the network part, and where in it; null among the drives. */
+  const [net, setNet] = useState<NetStep | null>(null);
+  const networkShares = useCapabilities()?.network_shares ?? false;
   /** Where the ring goes once the next level is shown. */
   const landOn = useRef<string | null>(null);
 
@@ -161,20 +171,47 @@ export default function FolderBrowser({ request }: { request: FolderRequest }) {
     if (refused) void setFocus(RETRY_KEY);
   }, [refused]);
 
+  // Back from the network to the drives: the ring on Network drives.
+  const backFromNet = useRef(false);
+  useEffect(() => {
+    if (!net && !spot && places && backFromNet.current) {
+      backFromNet.current = false;
+      void setFocus(itemKey(places.length));
+    }
+  }, [net, spot, places]);
+
   const up = useCallback(() => {
     if (!spot) {
-      finish(null);
+      if (net?.step === 'servers') {
+        backFromNet.current = true;
+        setNet(null);
+      } else if (net) {
+        setNet({ step: 'servers' });
+      } else {
+        finish(null);
+      }
+      return;
+    }
+    // From the top of a network share, back to that server's shares.
+    if (spot.trail.length === 0 && spot.place.server) {
+      setNet({ step: 'shares', server: spot.place.server });
+      go(null);
       return;
     }
     landOn.current = spot.trail.length > 0 ? spot.trail[spot.trail.length - 1] : spot.place.name;
     go(spot.trail.length > 0 ? { ...spot, trail: spot.trail.slice(0, -1) } : null);
-  }, [spot, finish, go]);
+  }, [spot, net, finish, go]);
 
   // Back goes up a level. Capture phase, like the Leave dialog: the page
-  // behind must never see the press.
+  // behind must never see the press. In a text box Backspace deletes.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' || e.key === 'Backspace' || e.key === 'BrowserBack') {
+        const target = e.target as HTMLElement;
+        if (target.tagName === 'INPUT') {
+          if (e.key === 'Backspace') return;
+          target.blur();
+        }
         e.preventDefault();
         e.stopPropagation();
         up();
@@ -197,7 +234,13 @@ export default function FolderBrowser({ request }: { request: FolderRequest }) {
     }
   };
 
-  const where = spot ? [spot.place.name, ...spot.trail].join(' › ') : null;
+  const where = spot
+    ? [spot.place.name, ...spot.trail].join(' › ')
+    : net
+      ? net.step === 'sign-in' || net.step === 'shares'
+        ? `Network drives › ${net.server.name}`
+        : 'Network drives'
+      : null;
 
   return (
     <FocusContext.Provider value={focusKey}>
@@ -210,7 +253,12 @@ export default function FolderBrowser({ request }: { request: FolderRequest }) {
           aria-label={`Choose your ${request.what} folder`}
         >
           <h2>Choose your {request.what} folder</h2>
-          <p className="folder-where">{where ?? 'A USB drive, or this device’s own storage'}</p>
+          <p className="folder-where">
+            {where ??
+              (networkShares
+                ? 'A USB drive, this device’s own storage, or a network drive'
+                : 'A USB drive, or this device’s own storage')}
+          </p>
 
           <div className="folder-actions">
             {spot && (
@@ -226,6 +274,12 @@ export default function FolderBrowser({ request }: { request: FolderRequest }) {
                   Up a folder
                 </FocusButton>
               </>
+            )}
+            {/* The network's steps go back as Up a folder does, for a mouse. */}
+            {!spot && net && (
+              <FocusButton className="btn-secondary" onSelect={up}>
+                Back
+              </FocusButton>
             )}
             <FocusButton className="btn-secondary" onSelect={() => finish(null)}>
               Cancel
@@ -253,7 +307,18 @@ export default function FolderBrowser({ request }: { request: FolderRequest }) {
             </div>
           )}
 
-          {!spot && places && (
+          {!spot && net && (
+            <NetworkPlaces
+              step={net}
+              onStep={setNet}
+              onOpen={(place) => {
+                setNet(null);
+                go({ place, trail: [] });
+              }}
+            />
+          )}
+
+          {!spot && !net && places && (
             <>
               <ul className="folder-list">
                 {places.map((place, i) => (
@@ -271,6 +336,19 @@ export default function FolderBrowser({ request }: { request: FolderRequest }) {
                     </FocusButton>
                   </li>
                 ))}
+                {networkShares && (
+                  <li>
+                    <FocusButton
+                      focusKey={itemKey(places.length)}
+                      keepInView="nearest"
+                      className="folder-item"
+                      onSelect={() => setNet({ step: 'servers' })}
+                    >
+                      <span className="folder-name">Network drives</span>
+                      <span className="muted">A NAS, or a folder shared by a computer</span>
+                    </FocusButton>
+                  </li>
+                )}
               </ul>
               {!places.some((p) => p.removable) && (
                 <div className="folder-note">
@@ -328,7 +406,11 @@ export default function FolderBrowser({ request }: { request: FolderRequest }) {
           )}
 
           <p className="muted folder-hint">
-            {spot ? 'Press Back to go up a folder.' : 'Press Back to close without choosing.'}
+            {spot
+              ? 'Press Back to go up a folder.'
+              : net
+                ? 'Press Back to go back.'
+                : 'Press Back to close without choosing.'}
           </p>
         </div>
       </div>

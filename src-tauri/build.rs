@@ -31,10 +31,18 @@ fn main() {
     let storage = tauri_build::InlinedPlugin::new()
         .commands(&["places", "access", "request_access", "allow_all_files", "share"])
         .default_permission(tauri_build::DefaultPermissionRule::AllowAllCommands);
+    // Network shares' Android half (share_logins.rs, NetworkPlugin.kt): the
+    // page may only look for servers. Locking and unlocking passwords is
+    // called from Rust alone, so it is not listed and the page cannot ask.
+    // capabilities/network-android.json.
+    let network = tauri_build::InlinedPlugin::new()
+        .commands(&["find_servers"])
+        .default_permission(tauri_build::DefaultPermissionRule::AllowAllCommands);
     tauri_build::try_build(
         tauri_build::Attributes::new()
             .plugin("media3", media3)
-            .plugin("storage", storage),
+            .plugin("storage", storage)
+            .plugin("network", network),
     )
         .expect("failed to run tauri-build");
 }

@@ -180,7 +180,9 @@ export default function FirstRun({ onScan }: Props) {
           </h2>
           <p className="muted">
             {can?.folder_picker === false
-              ? 'Pick the folder you keep them in, on a USB drive or this device’s own storage.'
+              ? can.network_shares
+                ? 'Pick the folder you keep them in: on a NAS or a computer on your network, a USB drive, or this device’s own storage.'
+                : 'Pick the folder you keep them in, on a USB drive or this device’s own storage.'
               : 'Pick the folder you keep them in. A local drive or a network share both work.'}{' '}
             Nothing is moved, renamed or written to; the files are only read.
           </p>

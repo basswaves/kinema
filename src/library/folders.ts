@@ -15,13 +15,15 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { useSyncExternalStore } from 'react';
 import { capabilitiesNow } from '../capabilities';
 
-/** A drive Android has mounted (StoragePlugin.kt). */
+/** A drive Android has mounted (StoragePlugin.kt), or a share on a server. */
 export interface Place {
   path: string;
   /** Android's own name for it: "SanDisk USB drive", "Internal shared storage". */
   name: string;
   /** A USB drive or a card, rather than the device's own storage. */
   removable: boolean;
+  /** For a share Kinema opens itself (`smb://…`): the server it is on. */
+  server?: Server;
 }
 
 /** What is in a folder (places.rs). */
@@ -105,15 +107,14 @@ export function useFolderRequest(): FolderRequest | null {
 /** A network server Kinema keeps a sign-in for (share_logins.rs). */
 export interface ShareLogin {
   server: string;
-  /** Empty for a guest. */
   user: string;
 }
 
 /**
  * Signs in to a network server Kinema opens itself (`nas`, or `nas:4450` off
- * SMB's own port; an empty `user` is a guest) and keeps the sign-in if the
- * server accepts it — locked with the device's key store. Rejects with words
- * for people when it does not. `kept` is false where the sign-in could not be
+ * SMB's own port) and keeps the sign-in if the server accepts it — locked
+ * with the device's key store. Rejects with words for people when it does
+ * not. `kept` is false where the sign-in could not be
  * locked, and lasts until Kinema closes.
  */
 export const saveShareLogin = (server: string, user: string, password: string) =>
@@ -121,3 +122,17 @@ export const saveShareLogin = (server: string, user: string, password: string) =
 export const forgetShareLogin = (server: string) =>
   invoke<void>('forget_share_login', { server });
 export const shareLogins = () => invoke<ShareLogin[]>('share_logins');
+
+/** A file server that announced itself on the network (NetworkPlugin.kt). */
+export interface Server {
+  name: string;
+  /** Its address, which is what Kinema connects to. */
+  host: string;
+}
+
+/** The file servers that announce themselves; takes a few seconds. */
+export const findServers = (): Promise<Server[]> =>
+  invoke<{ servers: Server[] }>('plugin:network|find_servers').then((r) => r.servers);
+
+/** A server's shares; rejects in words if it cannot say (netshare.rs). */
+export const listShares = (server: string) => invoke<string[]>('list_shares', { server });

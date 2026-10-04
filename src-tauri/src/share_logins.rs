@@ -144,7 +144,7 @@ pub struct Saved {
 }
 
 /// Signs in to a server (`nas`, or `nas:4450` off SMB's own port) and, if it
-/// accepts the name and password, keeps them. An empty name is a guest.
+/// accepts the name and password, keeps them.
 #[tauri::command]
 pub async fn save_share_login(
     app: tauri::AppHandle,
@@ -154,15 +154,17 @@ pub async fn save_share_login(
 ) -> Result<Saved, String> {
     let server = server.trim().to_string();
     let user = user.trim().to_string();
+    // The SMB library cannot finish a guest's sign-in yet (it waits for a
+    // last step a guest never gets); said plainly rather than as its error.
+    if user.is_empty() {
+        return Err("Kinema cannot sign in as a guest yet. Sign in with a name and password.".into());
+    }
     let before = netshare::login(&server);
     let tried = {
         let (server, user, password) = (server.clone(), user.clone(), password.clone());
         crate::jobs::off_main(move || {
             netshare::set_login(&server, &user, &password);
             netshare::try_sign_in(&server).map_err(|e| match e.kind() {
-                std::io::ErrorKind::PermissionDenied if user.is_empty() => {
-                    format!("{server} does not let guests in. Sign in with a name and password.")
-                }
                 std::io::ErrorKind::PermissionDenied => {
                     format!("{server} did not accept that name and password.")
                 }

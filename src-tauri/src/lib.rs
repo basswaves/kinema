@@ -45,6 +45,7 @@ mod share_logins;
 mod simkl;
 mod skip;
 mod skiptro;
+mod srvsvc;
 mod stream;
 mod tracking;
 mod trakt;
@@ -303,6 +304,7 @@ pub fn run() {
             updates::latest_release,
             capabilities::capabilities,
             places::list_folders,
+            netshare::list_shares,
             share_logins::save_share_login,
             share_logins::forget_share_login,
             share_logins::share_logins,

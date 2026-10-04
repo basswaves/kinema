@@ -307,10 +307,18 @@ case "$cmd" in
       printf '\n[kinema-test]\n   path = %s\n   read only = yes\n   valid users = kinematest\n' "$folder" \
         | sudo tee -a /etc/samba/smb.conf >/dev/null
     fi
+    # The same folder for guests, as a NAS that lets anyone in has it
+    # (Samba's `map to guest = bad user`, Ubuntu's default, makes one a guest).
+    if ! grep -q '^\[kinema-guest\]' /etc/samba/smb.conf; then
+      printf '\n[kinema-guest]\n   path = %s\n   read only = yes\n   guest ok = yes\n' "$folder" \
+        | sudo tee -a /etc/samba/smb.conf >/dev/null
+    fi
     sudo service smbd restart >/dev/null 2>&1 || sudo smbd -D
     echo "share: smb://127.0.0.1/kinema-test (the emulator: smb://10.0.2.2/kinema-test;"
     echo "       a device over adb: 'adb reverse tcp:4450 tcp:445', then smb://127.0.0.1:4450/kinema-test)"
+    echo "       smb://127.0.0.1/kinema-guest is the same folder, for a guest"
     echo "tests: KINEMA_TEST_SHARE=smb://127.0.0.1/kinema-test KINEMA_TEST_SHARE_USER=kinematest \\"
+    echo "       KINEMA_TEST_GUEST_SHARE=smb://127.0.0.1/kinema-guest \\"
     echo "       KINEMA_TEST_SHARE_PASSWORD=\"\$(cat $login)\" cargo test"
     ;;
 

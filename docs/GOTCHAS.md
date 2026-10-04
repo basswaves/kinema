@@ -1916,3 +1916,40 @@ the next app is in front, Android takes it back from the one behind
 (`ERROR_CODE_DECODING_RESOURCES_RECLAIMED`). **Do:** pause and `stop()` the
 player when Kinema leaves the screen, `prepare()` it again, paused, when it
 returns (`Media3Plugin.kt`, `suspended`).
+
+### smb-rs, the SMB library, needed two fixes to stream at all
+
+Without `TCP_NODELAY` every request waited ~40 ms for a delayed
+acknowledgement (22 MB/s reading a file on one machine instead of 368).
+And its blocking receiver polls with a 100 ms read timeout and used
+`read_exact`, which loses what it had read when the timeout falls inside a
+message: on any slow link the next read starts mid-message ("bad magic")
+and the connection never recovers. **Do:** keep the patched copy in
+`src-tauri/vendor/` (its README lists the changes) until a released
+version has them; `netshare::tests::a_slow_link_loses_nothing` fails
+without the second.
+
+### smb-rs's share list is NDR64 only, and Samba refuses NDR64
+
+`Client::list_shares` binds `srvsvc` with the 64-bit encoding alone, and
+Samba — inside most home NAS boxes — answers
+`ProposedTransferSyntaxesNotSupported`. **Do:** `srvsvc.rs` sends
+`NetrShareEnum` in classic NDR over the library's pipe. The library also
+cannot finish a guest's sign-in ("session setup succeeded before SSPI
+authentication completed"), and panicked when two sign-ins ran at once on
+one connection; netshare signs in to one server one share at a time.
+
+### Restoring files after a "without the fix" build can leave cargo on the old one
+
+Copying the originals in, building, then copying the fixed files back and
+syncing from the worktree (rsync keeps the source's older times) leaves the
+sources *older* than the last build, so cargo keeps the experimental build
+and the tests fail for no visible reason. **Do:** `touch` the restored
+files.
+
+### An Enter a text field acts on must stop there
+
+A field's `onEnter` that answers at once (a sign-in against the mock) put
+the ring on the next screen's first button before the spatial library saw
+the same keydown, which then pressed that button too. **Do:** FocusInput
+stops the event when its `onEnter` takes it.

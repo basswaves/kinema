@@ -11,6 +11,7 @@ import ConfirmButton from './ConfirmButton';
 import FocusButton from './FocusButton';
 import { formatBytes } from './format';
 import { userError } from './errors';
+import { useCapabilities } from '../capabilities';
 import { listBackups, openBackupFolder, restoreBackup, type BackupCopy } from '../metadata/api';
 
 const KIND: Record<BackupCopy['kind'], string> = {
@@ -29,6 +30,7 @@ const day = (secs: number) =>
 export default function BackupSection() {
   const [copies, setCopies] = useState<BackupCopy[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const can = useCapabilities();
 
   useEffect(() => {
     let live = true;
@@ -69,15 +71,18 @@ export default function BackupSection() {
           </ConfirmButton>
         </div>
       ))}
-      <div className="settings-row">
-        <FocusButton
-          keepInView="nearest"
-          className="btn-secondary"
-          onSelect={() => void openBackupFolder().catch((e) => setError(userError(e)))}
-        >
-          Open the folder of copies
-        </FocusButton>
-      </div>
+      {/* Nothing to show a folder in on a TV box (capability `opens_folders`). */}
+      {can?.opens_folders && (
+        <div className="settings-row">
+          <FocusButton
+            keepInView="nearest"
+            className="btn-secondary"
+            onSelect={() => void openBackupFolder().catch((e) => setError(userError(e)))}
+          >
+            Open the folder of copies
+          </FocusButton>
+        </div>
+      )}
     </section>
   );
 }

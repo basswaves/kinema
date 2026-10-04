@@ -991,6 +991,8 @@ const handlers: Record<string, Handler> = {
         system_output: true,
         runs_programs: false,
         screen_keyboard: true,
+        opens_folders: false,
+        shares_files: true,
         sleep: false,
         shut_down: false,
       };
@@ -1010,6 +1012,8 @@ const handlers: Record<string, Handler> = {
       system_output: false,
       runs_programs: true,
       screen_keyboard: false,
+      opens_folders: true,
+      shares_files: false,
       sleep: !NO_POWER,
       shut_down: !NO_POWER,
     };
@@ -1207,6 +1211,7 @@ const handlers: Record<string, Handler> = {
     return null;
   },
   link_qr: () => MOCK_QR,
+  'plugin:storage|share': () => null,
   // The folder picker answers at once, with the fixture's folder.
   'plugin:dialog|open': () => 'C:\\fixture',
   // What an Android TV box says its TV and receiver take (Media3Plugin.kt

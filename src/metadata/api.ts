@@ -55,6 +55,16 @@ export const logPaths = () => invoke<LogPaths>('log_paths');
 /** Show the log folder in Explorer, for attaching logs to a bug report. */
 export const openLogFolder = () => invoke<void>('open_log_folder');
 
+/**
+ * Hand `app.log` to another app through Android's share sheet (mail, a
+ * cloud drive), for a bug report where there is no folder to open
+ * (capability `shares_files`, StoragePlugin.kt).
+ */
+export async function shareLog(): Promise<void> {
+  const { dir } = await logPaths();
+  await invoke<void>('plugin:storage|share', { path: `${dir}/app.log`, title: 'Kinema log' });
+}
+
 /** Show the folder of automatic safety copies of the library in Explorer. */
 export const openBackupFolder = () => invoke<void>('open_backup_folder');
 

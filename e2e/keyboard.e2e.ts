@@ -682,3 +682,20 @@ test('Android: a web page nothing can open is shown as its address and a QR code
   await expect.poll(() => focused(page)).toBe('Get a free TMDB key ↗');
   await expect(page.locator('.settings-section h2').first()).toBeVisible();
 });
+
+test('Android: the log is shared, and no folder is offered to open', async ({ page }) => {
+  await androidSettings(page, 'Advanced');
+  const advanced = page.locator('.settings-content, .settings-layout').last();
+  await expect(advanced).toContainText('Share the log');
+  await expect(advanced).not.toContainText('Open log folder');
+  await expect(advanced).not.toContainText('Open the folder of copies');
+  await expect(advanced).not.toContainText('mpv.log');
+  // Beside "Show developer tools", in the same row.
+  for (let i = 0; i < 20 && (await focused(page)) !== 'Show developer tools'; i++) {
+    await press(page, 'ArrowDown');
+  }
+  await press(page, 'ArrowRight');
+  await expect.poll(() => focused(page)).toBe('Share the log');
+  await press(page, 'Enter');
+  await expect(page.locator('.settings-error, .settings-warn')).toHaveCount(0);
+});

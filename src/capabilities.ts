@@ -38,6 +38,10 @@ export interface Capabilities {
   /** The system puts its own keyboard on screen when a field takes typing
    * (Android): it opens on OK, not on arriving at a field (ui/typing.ts). */
   screen_keyboard: boolean;
+  /** The system can show a folder in a file manager (logs, safety copies). */
+  opens_folders: boolean;
+  /** The system can hand a file to another app (Android's share sheet). */
+  shares_files: boolean;
   sleep: boolean;
   shut_down: boolean;
 }

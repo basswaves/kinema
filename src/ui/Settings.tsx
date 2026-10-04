@@ -71,6 +71,7 @@ import {
   cacheArtwork,
   clearArtworkCache,
   openLogFolder,
+  shareLog,
   countNeedsReview,
   getSetting,
   setSetting,
@@ -1361,8 +1362,18 @@ export default function Settings({
                 <section className="settings-section">
                   <h2>Developer tools</h2>
                   <p className="settings-intro">
-                    For working on Kinema itself, and made for a mouse. The log folder holds what a
-                    bug report needs: <code>app.log</code> and <code>mpv.log</code>.
+                    {can?.opens_folders ? (
+                      <>
+                        For working on Kinema itself, and made for a mouse. The log folder holds
+                        what a bug report needs: <code>app.log</code> and <code>mpv.log</code>.
+                      </>
+                    ) : (
+                      <>
+                        For working on Kinema itself, and made for a mouse. Kinema&rsquo;s log is
+                        what a bug report needs: Share the log sends it to an app of your choice,
+                        such as mail or a cloud drive.
+                      </>
+                    )}
                   </p>
                   <div className="settings-row">
                     <FocusButton
@@ -1372,13 +1383,26 @@ export default function Settings({
                     >
                       {panel === 'developer' ? 'Hide developer tools' : 'Show developer tools'}
                     </FocusButton>
-                    <FocusButton
-                      keepInView="nearest"
-                      className="btn-secondary"
-                      onSelect={() => void openLogFolder().catch((e) => setError(userError(e)))}
-                    >
-                      Open log folder
-                    </FocusButton>
+                    {can?.opens_folders && (
+                      <FocusButton
+                        keepInView="nearest"
+                        className="btn-secondary"
+                        onSelect={() => void openLogFolder().catch((e) => setError(userError(e)))}
+                      >
+                        Open log folder
+                      </FocusButton>
+                    )}
+                    {/* A TV box has no folder to open; the log goes where its
+                        share sheet sends it (capability `shares_files`). */}
+                    {!can?.opens_folders && can?.shares_files && (
+                      <FocusButton
+                        keepInView="nearest"
+                        className="btn-secondary"
+                        onSelect={() => void shareLog().catch((e) => setError(userError(e)))}
+                      >
+                        Share the log
+                      </FocusButton>
+                    )}
                   </div>
                   <AccountAppFields />
                 </section>

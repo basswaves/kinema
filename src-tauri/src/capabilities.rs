@@ -49,6 +49,12 @@ pub struct Capabilities {
     /// typing (Android). Kinema then lets a field take typing without it, and
     /// opens it only when OK is pressed on the field (ui/typing.ts).
     pub screen_keyboard: bool,
+    /// The system can show a folder in a file manager (the log folder, the
+    /// safety copies). A TV box has nothing to show one in.
+    pub opens_folders: bool,
+    /// The system can hand a file to another app through its share sheet
+    /// (Android): the log goes to a bug report that way (StoragePlugin.kt).
+    pub shares_files: bool,
     pub sleep: bool,
     pub shut_down: bool,
 }
@@ -103,6 +109,8 @@ fn work_out() -> Capabilities {
         system_output: cfg!(target_os = "android"),
         runs_programs: cfg!(desktop),
         screen_keyboard: cfg!(mobile),
+        opens_folders: cfg!(desktop),
+        shares_files: cfg!(target_os = "android"),
         sleep: crate::power::can_sleep(),
         shut_down: crate::power::can_shut_down(),
     }
@@ -136,7 +144,7 @@ mod tests {
         assert_eq!(c.system, "Windows");
         assert!(c.equipment_detection && c.audio_direct && c.display_switching && c.sleep && c.shut_down);
         assert!(c.windowed && c.folder_picker && !c.system_output && c.runs_programs);
-        assert!(!c.screen_keyboard);
+        assert!(!c.screen_keyboard && c.opens_folders && !c.shares_files);
         // The rendering path the whole of docs/DESIGN.md is written about.
         assert_eq!(
             c.mpv_video,
@@ -160,6 +168,7 @@ mod tests {
         assert_eq!(c.system_output, cfg!(target_os = "android"));
         assert_eq!(c.runs_programs, cfg!(desktop));
         assert_eq!(c.screen_keyboard, cfg!(mobile));
+        assert_eq!((c.opens_folders, c.shares_files), (cfg!(desktop), cfg!(target_os = "android")));
         // Wherever logind says this session may (power.rs); never elsewhere.
         assert_eq!((c.sleep, c.shut_down), (crate::power::can_sleep(), crate::power::can_shut_down()));
         if !linux {

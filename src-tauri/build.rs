@@ -29,7 +29,7 @@ fn main() {
     // Android's drives and the permission to read them (places.rs,
     // StoragePlugin.kt), on the same footing; capabilities/storage-android.json.
     let storage = tauri_build::InlinedPlugin::new()
-        .commands(&["places", "access", "request_access", "allow_all_files"])
+        .commands(&["places", "access", "request_access", "allow_all_files", "share"])
         .default_permission(tauri_build::DefaultPermissionRule::AllowAllCommands);
     tauri_build::try_build(
         tauri_build::Attributes::new()

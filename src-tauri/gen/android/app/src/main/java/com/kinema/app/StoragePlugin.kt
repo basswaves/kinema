@@ -14,6 +14,8 @@ import android.os.storage.StorageVolume
 import android.provider.Settings
 import androidx.activity.result.ActivityResult
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
+import app.tauri.annotation.InvokeArg
 import app.tauri.annotation.ActivityCallback
 import app.tauri.annotation.Command
 import app.tauri.annotation.Permission
@@ -23,6 +25,7 @@ import app.tauri.plugin.Invoke
 import app.tauri.plugin.JSArray
 import app.tauri.plugin.JSObject
 import app.tauri.plugin.Plugin
+import java.io.File
 
 /**
  * The drives Android has mounted, and the permission to read them, for
@@ -43,6 +46,13 @@ import app.tauri.plugin.Plugin
  *    have no such screen; Kinema plays the films without it (owner,
  *    2026-10-04).
  */
+@InvokeArg
+class ShareArgs {
+  lateinit var path: String
+  /** What the receiving app may use as a subject: "Kinema's log". */
+  var title: String = ""
+}
+
 @TauriPlugin(
   permissions = [
     Permission(strings = [Manifest.permission.READ_EXTERNAL_STORAGE], alias = "files"),
@@ -164,5 +174,33 @@ class StoragePlugin(private val activity: Activity) : Plugin(activity) {
   @ActivityCallback
   private fun allFilesAnswered(invoke: Invoke, result: ActivityResult) {
     invoke.resolve(accessState())
+  }
+
+  /**
+   * A file handed to another app through Android's share sheet — the log,
+   * for a bug report, where a TV box has no folder to open. A copy in the
+   * cache goes, not the file: the cache is what the FileProvider may hand
+   * out (file_paths.xml), and the log keeps growing while the other app
+   * reads it. With no app to take it, Android's own sheet says so.
+   */
+  @Command
+  fun share(invoke: Invoke) {
+    val args = invoke.parseArgs(ShareArgs::class.java)
+    try {
+      val source = File(args.path)
+      val dir = File(activity.cacheDir, "share").apply { mkdirs() }
+      val copy = source.copyTo(File(dir, source.name), overwrite = true)
+      val uri = FileProvider.getUriForFile(activity, "${activity.packageName}.fileprovider", copy)
+      val send = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        putExtra(Intent.EXTRA_SUBJECT, args.title)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+      }
+      activity.startActivity(Intent.createChooser(send, args.title))
+      invoke.resolve()
+    } catch (e: Exception) {
+      invoke.reject(e.message ?: e.toString())
+    }
   }
 }

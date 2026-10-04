@@ -120,7 +120,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android,x86_64-linux-android
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
           components: clippy
 
       - uses: Swatinem/rust-cache@v2
@@ -131,9 +131,10 @@ jobs:
         run: npm ci
 
       # A debug build: it needs no signing key, and installs on any device
-      # with debugging on.
+      # with debugging on. 32-bit ARM too: many TV boxes run a 32-bit Android
+      # even on a 64-bit chip, and install nothing else.
       - name: Build the app
-        run: npx tauri android build --debug --target aarch64 --target x86_64 --apk
+        run: npx tauri android build --debug --target aarch64 --target armv7 --target x86_64 --apk
 
       # The code only Android compiles (engine.rs and the other `mobile`
       # branches), held to the same rule as everywhere else. After the build,

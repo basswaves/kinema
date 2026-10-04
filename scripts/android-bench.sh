@@ -7,8 +7,10 @@
 #   scripts/android-bench.sh setup            install the SDK pieces below, make the TVs
 #   scripts/android-bench.sh start [tv|tv9]   boot a TV (default tv) and wait for it
 #   scripts/android-bench.sh stop [tv|tv9]
-#   scripts/android-bench.sh build [x86_64|aarch64]   Kinema's debug APK (default x86_64,
-#                                             the emulator's; aarch64 for boxes and phones)
+#   scripts/android-bench.sh build [x86_64|aarch64|armv7]   Kinema's debug APK (default
+#                                             x86_64, the emulator's; aarch64 for phones and
+#                                             most boxes; armv7 for a box whose Android is
+#                                             32-bit — `getprop ro.product.cpu.abilist`)
 #   scripts/android-bench.sh launch [--fresh] install the last build and start Kinema;
 #                                             --fresh forgets its library and settings first
 #   scripts/android-bench.sh selftest DIR [SHOTS]   a self-test plan (src/selftest.ts) on

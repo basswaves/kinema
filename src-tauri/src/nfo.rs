@@ -332,7 +332,7 @@ pub fn parse_nfo(raw: &str, source: &str) -> Option<Nfo> {
 /// one undecodable byte in a plot summary must not cost the id in the same
 /// file.
 fn read_text(path: &Path) -> Option<String> {
-    let bytes = std::fs::read(path).ok()?;
+    let bytes = crate::files::read(path).ok()?;
     let bytes = bytes
         .strip_prefix(&[0xEF, 0xBB, 0xBF])
         .unwrap_or(&bytes)

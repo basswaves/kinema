@@ -49,6 +49,14 @@ loaded at runtime, and may be replaced with a build of your own.
 Rust implementation with no C library. It is what makes intro and credits
 detection possible inside the app rather than as another installed tool.
 
+## Network shares — smb-rs
+
+[`smb`](https://crates.io/crates/smb) and its parts (MIT), a pure Rust SMB 2
+and 3 client with no C library, which reaches a NAS where the system does not
+open it for Kinema (Android). One part, `smb-transport`, is used as a copy with
+a one-line change, in `src-tauri/vendor/` with the crate's own licence; its
+README there says what changed.
+
 ## Filename parsing — guessit-js
 
 [`guessit-js`](https://www.npmjs.com/package/guessit-js) is **LGPL-3.0**. It is

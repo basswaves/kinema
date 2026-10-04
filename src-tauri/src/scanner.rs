@@ -146,8 +146,7 @@ fn scan_root(
     root_path: &str,
     report: &mut ScanReport,
 ) -> rusqlite::Result<()> {
-    let root = Path::new(root_path);
-    if !root.exists() {
+    if crate::files::metadata(Path::new(root_path)).is_err() {
         // Offline share: leave everything under this root untouched rather
         // than marking a whole library missing because a NAS is asleep.
         report
@@ -160,6 +159,57 @@ fn scan_root(
     let mut seen_paths: HashSet<String> = HashSet::new();
     let mut pending: Vec<SeenFile> = Vec::with_capacity(WRITE_BATCH);
 
+    let mut found = |file: Result<SeenFile, String>| -> rusqlite::Result<()> {
+        let file = match file {
+            Ok(f) => f,
+            Err(e) => {
+                report.errors.push(e);
+                return Ok(());
+            }
+        };
+        report.files_seen += 1;
+        seen_paths.insert(file.path.clone());
+        pending.push(file);
+        if pending.len() >= WRITE_BATCH {
+            write_batch(conn, root_id, now, &pending, report)?;
+            pending.clear();
+        }
+        Ok(())
+    };
+    if crate::netshare::is_share_path(root_path) {
+        walk_share(root_path, &mut found)?;
+    } else {
+        walk_local(Path::new(root_path), &mut found)?;
+    }
+
+    if !pending.is_empty() {
+        write_batch(conn, root_id, now, &pending, report)?;
+    }
+
+    // A folder that is there but holds no video at all, where the library has
+    // had files, is the same offline share wearing a different face: on Linux
+    // a share or a disk is mounted *on* an existing folder, which is left
+    // behind empty when it is not mounted, and a Windows folder whose contents
+    // are out of reach can look the same. Marking every file under it missing
+    // would empty Home with no notice. A folder really emptied on purpose keeps
+    // its old titles and this notice until it is removed in Settings — the
+    // cheaper mistake of the two.
+    if seen_paths.is_empty() && has_known_files(conn, root_id)? {
+        report
+            .errors
+            .push(format!("root unavailable, skipped: {root_path}"));
+        return Ok(());
+    }
+
+    mark_missing(conn, root_id, &seen_paths, report)?;
+    Ok(())
+}
+
+/// Every video under a folder the system opened, handed to `found` one by one.
+fn walk_local(
+    root: &Path,
+    found: &mut dyn FnMut(Result<SeenFile, String>) -> rusqlite::Result<()>,
+) -> rusqlite::Result<()> {
     // Links are followed: a folder or film linked into the library from
     // another drive is part of it, as people arrange libraries on Linux (and
     // with links and junctions on Windows). A link that loops back on itself
@@ -189,7 +239,7 @@ fn scan_root(
                 continue;
             }
             Err(e) => {
-                report.errors.push(e.to_string());
+                found(Err(e.to_string()))?;
                 continue;
             }
         };
@@ -201,61 +251,77 @@ fn scan_root(
         let meta = match entry.metadata() {
             Ok(m) => m,
             Err(e) => {
-                report.errors.push(format!("{}: {e}", entry.path().display()));
+                found(Err(format!("{}: {e}", entry.path().display())))?;
                 continue;
             }
         };
 
-        let path = entry.path().to_string_lossy().to_string();
-
-        report.files_seen += 1;
-        seen_paths.insert(path.clone());
-
-        pending.push(SeenFile {
+        found(Ok(SeenFile {
             parent_dir: entry
                 .path()
                 .parent()
                 .map(|p| p.to_string_lossy().to_string())
                 .unwrap_or_default(),
             file_name: entry.file_name().to_string_lossy().to_string(),
-            extension: entry
-                .path()
-                .extension()
-                .and_then(|e| e.to_str())
-                .unwrap_or("")
-                .to_lowercase(),
-            path,
+            extension: extension_of(entry.path()),
+            path: entry.path().to_string_lossy().to_string(),
             size: meta.len() as i64,
             modified: mtime_secs(&meta),
-        });
+        }))?;
+    }
+    Ok(())
+}
 
-        if pending.len() >= WRITE_BATCH {
-            write_batch(conn, root_id, now, &pending, report)?;
-            pending.clear();
+/// Every video under a folder on a share Kinema opens itself (netshare.rs).
+/// A folder listing there carries each file's size and time, so a file costs
+/// no request of its own — the one stat per file the rules above allow is
+/// already paid for.
+fn walk_share(
+    root: &str,
+    found: &mut dyn FnMut(Result<SeenFile, String>) -> rusqlite::Result<()>,
+) -> rusqlite::Result<()> {
+    let mut folders = vec![root.trim_end_matches('/').to_string()];
+    while let Some(dir) = folders.pop() {
+        let entries = match crate::netshare::list(&dir) {
+            Ok(e) => e,
+            Err(e) => {
+                found(Err(format!("{dir}: {e}")))?;
+                continue;
+            }
+        };
+        for entry in entries {
+            let path = format!("{dir}/{}", entry.name);
+            if entry.is_dir {
+                if !is_skipped_dir(&entry.name) {
+                    folders.push(path);
+                }
+                continue;
+            }
+            if !is_video(Path::new(&entry.name)) {
+                continue;
+            }
+            found(Ok(SeenFile {
+                parent_dir: dir.clone(),
+                extension: extension_of(Path::new(&entry.name)),
+                file_name: entry.name,
+                path,
+                size: entry.size as i64,
+                modified: entry
+                    .modified
+                    .duration_since(UNIX_EPOCH)
+                    .map(|d| d.as_secs() as i64)
+                    .unwrap_or(0),
+            }))?;
         }
     }
-
-    if !pending.is_empty() {
-        write_batch(conn, root_id, now, &pending, report)?;
-    }
-
-    // A folder that is there but holds no video at all, where the library has
-    // had files, is the same offline share wearing a different face: on Linux
-    // a share or a disk is mounted *on* an existing folder, which is left
-    // behind empty when it is not mounted, and a Windows folder whose contents
-    // are out of reach can look the same. Marking every file under it missing
-    // would empty Home with no notice. A folder really emptied on purpose keeps
-    // its old titles and this notice until it is removed in Settings — the
-    // cheaper mistake of the two.
-    if seen_paths.is_empty() && has_known_files(conn, root_id)? {
-        report
-            .errors
-            .push(format!("root unavailable, skipped: {root_path}"));
-        return Ok(());
-    }
-
-    mark_missing(conn, root_id, &seen_paths, report)?;
     Ok(())
+}
+
+fn extension_of(path: &Path) -> String {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase()
 }
 
 /// Whether any file has ever been recorded under this root, missing or not —
@@ -676,5 +742,31 @@ mod tests {
         scan_root(&mut conn, 1, &root, &mut report).unwrap();
 
         assert!(report.errors.is_empty(), "{:?}", report.errors);
+    }
+
+    /// A real share, when one is named (`netshare::test_share`): every video
+    /// on it found, and found unchanged the second time.
+    #[test]
+    fn a_share_is_scanned_and_rescanned_cheaply() {
+        let Some(share) = crate::netshare::test_share() else { return };
+        let mut conn = database("share");
+        conn.execute("UPDATE library_roots SET path = ?1 WHERE id = 1", params![share]).unwrap();
+        let first = scan_all(&mut conn).unwrap();
+        assert!(first.errors.is_empty(), "{:?}", first.errors);
+        assert!(first.files_added > 0);
+        let parent: String = conn
+            .query_row("SELECT parent_dir FROM media_files ORDER BY path LIMIT 1", [], |r| r.get(0))
+            .unwrap();
+        assert!(parent.starts_with(&share), "{parent}");
+        let second = scan_all(&mut conn).unwrap();
+        assert_eq!(second.files_unchanged, first.files_added);
+        assert_eq!((second.files_added, second.files_missing), (0, 0));
+
+        // A share that cannot be reached hides nothing.
+        conn.execute("UPDATE library_roots SET path = ?1 WHERE id = 1", params![format!("{share}/no such folder")])
+            .unwrap();
+        let offline = scan_all(&mut conn).unwrap();
+        assert_eq!(offline.files_missing, 0);
+        assert!(offline.errors[0].starts_with("root unavailable"));
     }
 }

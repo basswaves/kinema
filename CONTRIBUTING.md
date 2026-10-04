@@ -221,6 +221,10 @@ A drive to choose folders from, as a USB drive would be, is made inside the
 emulator with `bash scripts/android-bench.sh adb shell sm set-virtual-disk
 true`, then `sm list-disks` and `sm partition <disk> public`; `adb push`
 puts files on it. Many boxes run a 32-bit Android: `build armv7` for those.
+`share` makes a network share on the computer itself (Samba, with a made-up
+account), for the tests of Kinema's own SMB client and for the emulator, which
+reaches it at `smb://10.0.2.2/kinema-test`; it prints the variables that turn
+those tests on (`KINEMA_TEST_SHARE`), which otherwise pass without a share.
 
 ### Running the UI without the native app
 

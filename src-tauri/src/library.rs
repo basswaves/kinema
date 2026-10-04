@@ -110,7 +110,7 @@ pub async fn add_library_root(
         return Err(format!("unknown library kind: {kind}"));
     }
     let probe = path.clone();
-    if !crate::jobs::off_main(move || Ok(std::path::Path::new(&probe).is_dir())).await? {
+    if !crate::jobs::off_main(move || Ok(crate::files::is_dir(std::path::Path::new(&probe)))).await? {
         return Err(format!("not a directory: {path}"));
     }
 

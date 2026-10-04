@@ -32,27 +32,42 @@ fn is_system_folder(name: &str) -> bool {
 }
 
 pub fn list(path: &Path) -> std::io::Result<Listing> {
-    let mut folders = Vec::new();
-    let mut videos = 0;
+    let mut entries = Vec::new();
     for entry in std::fs::read_dir(path)?.flatten() {
-        let name = entry.file_name().to_string_lossy().into_owned();
         // Followed, as the scanner follows them: a linked folder is a folder.
         let Ok(meta) = std::fs::metadata(entry.path()) else { continue };
-        if meta.is_dir() {
+        entries.push((entry.file_name().to_string_lossy().into_owned(), meta.is_dir()));
+    }
+    Ok(listing(entries))
+}
+
+/// A folder on a network share Kinema opens itself (netshare.rs).
+fn list_share(path: &str) -> std::io::Result<Listing> {
+    let entries = crate::netshare::list(path)?;
+    Ok(listing(entries.into_iter().map(|e| (e.name, e.is_dir))))
+}
+
+/// Names and whether each is a folder, as the browser shows them.
+fn listing(entries: impl IntoIterator<Item = (String, bool)>) -> Listing {
+    let mut folders = Vec::new();
+    let mut videos = 0;
+    for (name, is_dir) in entries {
+        if is_dir {
             if !is_system_folder(&name) {
                 folders.push(name);
             }
-        } else if crate::scanner::is_video(&entry.path()) {
+        } else if crate::scanner::is_video(Path::new(&name)) {
             videos += 1;
         }
     }
     folders.sort_by_key(|n| n.to_lowercase());
-    Ok(Listing { folders, videos })
+    Listing { folders, videos }
 }
 
 #[tauri::command]
 pub fn list_folders(path: String) -> Result<Listing, String> {
-    list(Path::new(&path)).map_err(|e| match e.kind() {
+    let listed = if crate::netshare::is_share_path(&path) { list_share(&path) } else { list(Path::new(&path)) };
+    listed.map_err(|e| match e.kind() {
         // Said so the browser can ask for access rather than show a fault.
         std::io::ErrorKind::PermissionDenied => format!("not allowed to read {path}"),
         _ => format!("could not read {path}: {e}"),

@@ -51,7 +51,6 @@ use crate::skiptro;
 use rusqlite::params;
 use serde::Serialize;
 use std::path::{Path, PathBuf};
-use std::time::UNIX_EPOCH;
 use tauri::Manager;
 
 /// Segment names accepted for the closing segment in a sidecar. Skiptro's own
@@ -235,23 +234,16 @@ fn find_sidecar(video: &Path) -> Option<Sidecar> {
         let Some(path) = crate::util::existing_file(&path) else {
             continue;
         };
-        let Ok(meta) = std::fs::metadata(&path) else {
+        let Ok(meta) = crate::files::metadata(&path) else {
             continue;
         };
-        if !meta.is_file() {
+        if meta.is_dir {
             continue;
         }
-        let mtime = meta
-            .modified()
-            .ok()
-            .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-            .map(|d| d.as_secs() as i64)
-            .unwrap_or(0);
-
         return Some(Sidecar {
             path,
-            size: meta.len() as i64,
-            mtime,
+            size: meta.len as i64,
+            mtime: meta.modified_secs(),
         });
     }
     None
@@ -285,16 +277,8 @@ fn local_key(
     analysed_at: Option<i64>,
     remotes: &str,
 ) -> String {
-    let file = std::fs::metadata(video)
-        .map(|m| {
-            let mtime = m
-                .modified()
-                .ok()
-                .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-                .map(|d| d.as_secs())
-                .unwrap_or(0);
-            format!("{}:{}", m.len(), mtime)
-        })
+    let file = crate::files::metadata(video)
+        .map(|m| format!("{}:{}", m.len, m.modified_secs()))
         .unwrap_or_default();
     let db = skiptro_db.map(skiptro::version_stamp).unwrap_or_default();
     let side = sidecar
@@ -614,7 +598,7 @@ fn local_markers(
     }
 
     if let Some(sidecar) = sidecar {
-        match std::fs::read_to_string(&sidecar.path) {
+        match crate::files::read_to_string(&sidecar.path) {
             Ok(raw) => {
                 let (intro, credits) = parse_sidecar(&raw, &sidecar.path);
                 if markers.intro.is_none() {

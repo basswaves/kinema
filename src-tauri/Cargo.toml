@@ -52,6 +52,11 @@ tokio = { version = "1", features = ["time", "sync"] }
 # Already compiled in through Tauri and the libmpv plugin; named so their
 # warnings and errors can be sent to app.log (applog.rs, `Forward`).
 log = "0.4"
+# Network shares (netshare.rs), where the system does not open them for Kinema
+# — Android. Pure Rust, MIT, no C library; SMB 2 and 3 with signing and
+# encryption. The blocking flavour, as the scanner and the file reading
+# around it are blocking. Its TCP part is a patched copy (vendor/README.md).
+smb = { version = "0.12.1", default-features = false, features = ["sign", "encrypt", "multi_threaded"] }
 
 # Computers only (Windows, Linux). On Android the player is Media3 and the
 # system keeps one Kinema by itself; neither plugin has a mobile side.
@@ -102,3 +107,8 @@ alsa = "0.12"
 # crates, no libwayland to link); nothing to install alongside.
 wayland-client = "0.31"
 wayland-protocols-wlr = { version = "0.3", features = ["client"] }
+
+# A crates.io dependency replaced by a patched copy; vendor/README.md says
+# what changed and when it can go.
+[patch.crates-io]
+smb-transport = { path = "vendor/smb-transport" }

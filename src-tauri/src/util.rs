@@ -57,19 +57,19 @@ pub fn is_season_folder(name: &str) -> bool {
 /// wrong case was a silent miss, so the folder is searched — an exact match
 /// first, then the first by name, so the answer is the same every time.
 pub fn existing_file(path: &Path) -> Option<PathBuf> {
-    if path.is_file() {
+    if crate::files::is_file(path) {
         return Some(path.to_path_buf());
     }
-    if cfg!(windows) {
+    // A NAS ignores case for its clients as Windows does.
+    if cfg!(windows) || path.to_str().is_some_and(crate::netshare::is_share_path) {
         return None;
     }
     let wanted = path.file_name()?.to_string_lossy().to_lowercase();
-    let mut found: Vec<PathBuf> = std::fs::read_dir(path.parent()?)
+    let mut found: Vec<PathBuf> = crate::files::read_dir(path.parent()?)
         .ok()?
-        .filter_map(Result::ok)
-        .filter(|e| e.file_name().to_string_lossy().to_lowercase() == wanted)
-        .map(|e| e.path())
-        .filter(|p| p.is_file())
+        .into_iter()
+        .filter(|(p, is_dir)| !is_dir && p.file_name().is_some_and(|n| n.to_string_lossy().to_lowercase() == wanted))
+        .map(|(p, _)| p)
         .collect();
     found.sort();
     found.into_iter().next()

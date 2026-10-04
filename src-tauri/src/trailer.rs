@@ -68,12 +68,12 @@ fn looks_like_season_dir(dir: &Path) -> bool {
 /// First video file inside `<dir>/trailers`, if that folder exists.
 fn trailer_in_subfolder(dir: &Path) -> Option<PathBuf> {
     let folder = dir.join(TRAILER_DIR);
-    let entries = std::fs::read_dir(&folder).ok()?;
+    let entries = crate::files::read_dir(&folder).ok()?;
 
     let mut found: Vec<PathBuf> = entries
-        .flatten()
-        .map(|e| e.path())
-        .filter(|p| p.is_file() && is_video(p))
+        .into_iter()
+        .filter(|(p, is_dir)| !is_dir && is_video(p))
+        .map(|(p, _)| p)
         .collect();
 
     // Sorted so a folder with several files resolves to the same one every
@@ -84,14 +84,14 @@ fn trailer_in_subfolder(dir: &Path) -> Option<PathBuf> {
 
 /// A trailer-suffixed file sitting directly in `dir`.
 fn trailer_beside(dir: &Path) -> Option<PathBuf> {
-    let entries = std::fs::read_dir(dir).ok()?;
+    let entries = crate::files::read_dir(dir).ok()?;
 
     let mut found: Vec<PathBuf> = entries
-        .flatten()
-        .map(|e| e.path())
+        .into_iter()
+        .filter(|(_, is_dir)| !is_dir)
+        .map(|(p, _)| p)
         .filter(|p| {
-            p.is_file()
-                && is_video(p)
+            is_video(p)
                 && p.file_name()
                     .and_then(|n| n.to_str())
                     .map(is_trailer_file_name)

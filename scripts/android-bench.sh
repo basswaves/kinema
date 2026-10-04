@@ -31,6 +31,9 @@
 #   scripts/android-bench.sh install FILE.apk
 #   scripts/android-bench.sh log [FILE]       the system log so far (logcat)
 #   scripts/android-bench.sh adb ARGS...      anything else, on the chosen device
+#   scripts/android-bench.sh share [VIDEO...] a network share on this computer, for
+#                                             Kinema's share tests and the emulator
+#                                             (Samba; asks for sudo), with these videos
 #
 # The two TVs: `tv` is Android TV 16 (API 36, x86_64), the current system;
 # `tv9` is Android TV 9 (API 28, x86), the oldest Kinema aims at — what many
@@ -276,6 +279,40 @@ case "$cmd" in
     ;;
 
   adb) adb_dev "$@" ;;
+
+  share)
+    # A network share on this computer (Samba), for netshare.rs's tests and
+    # for Kinema in the emulator: share `kinema-test`, folder ~/kinema-test-share,
+    # account `kinematest` with a made-up password kept in ~/.kinema-test-share.
+    # Videos named here are copied in as a film each. Asks for sudo once.
+    folder="$HOME/kinema-test-share"
+    login="$HOME/.kinema-test-share"
+    command -v smbd >/dev/null || sudo apt-get install -y samba smbclient
+    if [ ! -f "$login" ]; then
+      (umask 077; head -c 18 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' > "$login")
+    fi
+    id kinematest >/dev/null 2>&1 || sudo useradd -M -s /usr/sbin/nologin kinematest
+    printf '%s\n%s\n' "$(cat "$login")" "$(cat "$login")" | sudo smbpasswd -a -s kinematest >/dev/null
+    mkdir -p "$folder/Films"
+    # Samba reads as kinematest: it needs to pass through the home folder.
+    chmod o+x "$HOME"
+    chmod o+rx "$folder" "$folder/Films"
+    for v in "$@"; do
+      name="$(basename "${v%.*}")"
+      mkdir -p "$folder/Films/$name"
+      [ -e "$folder/Films/$name/$(basename "$v")" ] || cp "$v" "$folder/Films/$name/"
+    done
+    chmod -R o+rX "$folder"
+    if ! grep -q '^\[kinema-test\]' /etc/samba/smb.conf; then
+      printf '\n[kinema-test]\n   path = %s\n   read only = yes\n   valid users = kinematest\n' "$folder" \
+        | sudo tee -a /etc/samba/smb.conf >/dev/null
+    fi
+    sudo service smbd restart >/dev/null 2>&1 || sudo smbd -D
+    echo "share: smb://127.0.0.1/kinema-test (the emulator: smb://10.0.2.2/kinema-test;"
+    echo "       a device over adb: 'adb reverse tcp:4450 tcp:445', then smb://127.0.0.1:4450/kinema-test)"
+    echo "tests: KINEMA_TEST_SHARE=smb://127.0.0.1/kinema-test KINEMA_TEST_SHARE_USER=kinematest \\"
+    echo "       KINEMA_TEST_SHARE_PASSWORD=\"\$(cat $login)\" cargo test"
+    ;;
 
   *) sed -n '2,/^set -eu/p' "$0" | sed '$d; s/^# \{0,1\}//'; [ -z "$cmd" ] || exit 1 ;;
 esac

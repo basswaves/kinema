@@ -11,6 +11,7 @@ mod display;
 mod engine;
 mod equipment;
 mod ffmpeg;
+mod files;
 mod history;
 mod imdb;
 mod introdb;
@@ -27,6 +28,7 @@ mod kscreen;
 mod mutter;
 #[cfg(target_os = "linux")]
 mod wlroots;
+mod netshare;
 mod nfo;
 mod overlay;
 mod pointer;
@@ -296,6 +298,7 @@ pub fn run() {
             updates::latest_release,
             capabilities::capabilities,
             places::list_folders,
+            netshare::sign_in_share,
             overlay::overlay_frame,
             overlay::overlay_reset,
             pointer::pointer_script,

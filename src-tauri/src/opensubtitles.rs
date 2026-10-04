@@ -28,7 +28,6 @@ use crate::util::{now_secs, to_string_err};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
 use serde_json::{json, Value};
-use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tauri::Manager;
@@ -177,16 +176,16 @@ mod dpapi {
 /// digits. It is how subtitles timed for this very release are found.
 pub fn movie_hash(path: &Path) -> Option<String> {
     const CHUNK: u64 = 64 * 1024;
-    let mut file = std::fs::File::open(path).ok()?;
-    let size = file.metadata().ok()?.len();
+    let size = crate::files::metadata(path).ok()?.len;
     if size < CHUNK * 2 {
         return None;
     }
     let mut sum = size;
-    let mut buffer = vec![0u8; CHUNK as usize];
     for offset in [0, size - CHUNK] {
-        file.seek(SeekFrom::Start(offset)).ok()?;
-        file.read_exact(&mut buffer).ok()?;
+        let buffer = crate::files::read_at(path, offset, CHUNK as usize).ok()?;
+        if buffer.len() != CHUNK as usize {
+            return None;
+        }
         for word in buffer.as_chunks::<8>().0 {
             sum = sum.wrapping_add(u64::from_le_bytes(*word));
         }

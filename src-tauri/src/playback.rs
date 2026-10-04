@@ -6,7 +6,6 @@ use crate::library::Db;
 use rusqlite::{named_params, params};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use std::time::UNIX_EPOCH;
 
 /// Below this many seconds in, there is nothing worth resuming.
 const MIN_RESUME_SECS: f64 = 30.0;
@@ -105,11 +104,7 @@ const STILL_ARRIVING_SECS: i64 = 120;
 /// Stat-ed only when a save would mark the file watched, so a NAS sees one
 /// extra metadata call per episode, not one every five seconds.
 fn still_being_written(path: &std::path::Path, now: i64) -> bool {
-    std::fs::metadata(path)
-        .and_then(|m| m.modified())
-        .ok()
-        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-        .is_some_and(|t| now - (t.as_secs() as i64) < STILL_ARRIVING_SECS)
+    crate::files::metadata(path).is_ok_and(|m| now - m.modified_secs() < STILL_ARRIVING_SECS)
 }
 
 /// Store a resume point. Completion is decided here rather than by the caller

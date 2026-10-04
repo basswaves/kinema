@@ -13,6 +13,11 @@
  *
  * The list is kept in one place rather than beside each handler on purpose. Two
  * lists drift, and the one that drifts is always the documentation.
+ *
+ * Where Kinema is never in a window (Android: always on a TV, `windowed`),
+ * the list is the remote's — what is in the hand there — with the keyboard's
+ * keys as one line under it, since a keyboard plugged into a box works too.
+ * Same keys, same handlers; only the names differ (OK, not Enter).
  */
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import FocusButton from './FocusButton';
@@ -64,6 +69,45 @@ const GROUPS: Group[] = [
   },
 ];
 
+/** The same keys, named as a remote names them. */
+const REMOTE_GROUPS: Group[] = [
+  {
+    heading: 'Getting around',
+    keys: [
+      [['↑', '↓', '←', '→'], 'Move between things on screen'],
+      [['OK'], 'Choose the highlighted thing'],
+      [['Back'], 'Go back'],
+    ],
+    note: 'The ? at the right of the top bar opens this list.',
+  },
+  {
+    heading: 'While something is playing',
+    keys: [
+      [['OK'], 'Pause and resume'],
+      [['⏯'], 'Pause and resume'],
+      [['←', '→'], 'Back or forward 10 seconds; hold to go faster'],
+      [['↑', '↓'], 'Bring up the controls: seek bar, subtitles, audio'],
+      [['⏪', '⏩'], 'Back or forward 30 seconds'],
+      [['Back'], 'Close what is open, then stop'],
+      [['⏹'], 'Stop'],
+    ],
+    note: 'On the controls, the arrows move between them and the seek bar; they step back out of the way after a few seconds.',
+  },
+  {
+    heading: 'With a keyboard',
+    keys: [
+      [['Enter'], 'OK'],
+      [['Esc'], 'Back'],
+      [['Space'], 'Pause and resume'],
+      [['M'], 'Sound off and on'],
+      [['−', '+'], 'Volume down and up'],
+      [['N', 'P'], 'Next or previous episode'],
+      [['I'], 'Playback details'],
+      [['?'], 'Show this list'],
+    ],
+  },
+];
+
 interface Props {
   onClose: () => void;
 }
@@ -87,7 +131,7 @@ export default function Shortcuts({ onClose }: Props) {
           aria-label="Keyboard and remote controls"
         >
           <h2>Controls</h2>
-          {GROUPS.map((group) => (
+          {(windowed ? GROUPS : REMOTE_GROUPS).map((group) => (
             <section key={group.heading} className="shortcuts-group">
               <h3>{group.heading}</h3>
               <dl>
@@ -98,7 +142,7 @@ export default function Shortcuts({ onClose }: Props) {
                       <dt>
                         {keys.map((key, i) => (
                           <span key={key}>
-                            {i > 0 && <span className="shortcuts-plus">+</span>}
+                            {i > 0 && windowed && <span className="shortcuts-plus">+</span>}
                             <kbd>{key}</kbd>
                           </span>
                         ))}

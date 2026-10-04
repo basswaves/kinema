@@ -507,6 +507,14 @@ test('Android: always the TV layout, never asked', async ({ page }) => {
   await expect(page.locator('.shortcuts')).toBeVisible();
   await expect(page.locator('.shortcuts')).not.toContainText('F11');
   await expect(page.locator('.shortcuts')).not.toContainText('Fullscreen');
+  // The remote's names for the keys, the keyboard's in one group under them.
+  await expect(page.locator('.shortcuts h3')).toHaveText([
+    'Getting around',
+    'While something is playing',
+    'With a keyboard',
+  ]);
+  await expect(page.locator('.shortcuts')).toContainText('OKChoose the highlighted thing');
+  await expect(page.locator('.shortcuts')).toContainText('BackGo back');
   expect(await tv()).toBe('on');
 });
 

@@ -969,66 +969,72 @@ export default function Settings({
                   <h2>Intro and credits</h2>
                   <p className="settings-intro">
                     How Kinema finds where intros, recaps and end credits are, for the Skip button
-                    and for offering the next episode. It works by itself: new episodes are checked
-                    after every scan. When more than one source knows an episode, the most
-                    reliable one is used.
+                    and for offering the next episode.{' '}
+                    {can?.runs_programs
+                      ? 'It works by itself: new episodes are checked after every scan. When more than one source knows an episode, the most reliable one is used.'
+                      : `On ${can?.system ?? 'this system'} Kinema cannot listen to the episodes itself, so it asks the two services below the first time an episode or film plays.`}
                   </p>
 
-                  <h3>Built into Kinema</h3>
-                  <ChoiceRow
-                    label="Detect intros and credits"
-                    choices={[
-                      { value: 'on', label: 'After each scan' },
-                      { value: 'off', label: 'Only when I press Detect' },
-                    ]}
-                    value={autoAnalyse ? 'on' : 'off'}
-                    onChange={(v) => {
-                      setAutoAnalyse(v === 'on');
-                      void setSetting(AUTO_ANALYSE_KEY, v).catch((e) => setError(userError(e)));
-                    }}
-                    note="Kinema listens to a season's episodes for the music they share: the theme tune near the start, the closing music near the end. It takes a few minutes per season, once."
-                    hint="The only source that measures end credits, and the only one that works on episodes Kinema could not identify. Needs ffmpeg (below). Turning it off keeps everything already found."
-                  />
-                  <label className="settings-field">
-                    <span>
-                      Where ffmpeg is{' '}
-                      <span className="muted">(leave empty unless Kinema cannot find it)</span>
-                    </span>
-                    <FocusInput
-                      focusKey={FFMPEG_INPUT_KEY}
-                      className="settings-input"
-                      value={ffmpegPath}
-                      onChange={setFfmpegPath}
-                      placeholder="ffmpeg"
+                  {/* ffmpeg's listening: only where Kinema can run a program it did not bring (not Android). */}
+                  {can?.runs_programs && (
+                    <>
+                    <h3>Built into Kinema</h3>
+                    <ChoiceRow
+                      label="Detect intros and credits"
+                      choices={[
+                        { value: 'on', label: 'After each scan' },
+                        { value: 'off', label: 'Only when I press Detect' },
+                      ]}
+                      value={autoAnalyse ? 'on' : 'off'}
+                      onChange={(v) => {
+                        setAutoAnalyse(v === 'on');
+                        void setSetting(AUTO_ANALYSE_KEY, v).catch((e) => setError(userError(e)));
+                      }}
+                      note="Kinema listens to a season's episodes for the music they share: the theme tune near the start, the closing music near the end. It takes a few minutes per season, once."
+                      hint="The only source that measures end credits, and the only one that works on episodes Kinema could not identify. Needs ffmpeg (below). Turning it off keeps everything already found."
                     />
-                  </label>
-                  {/* Answered here rather than discovered during a detection
-                      run. A wrong path used to stay silent for minutes and then
-                      surface as somebody else's failure. */}
-                  {ffmpeg && (
-                    <p className={ffmpeg.available ? 'settings-ok' : 'settings-warn'}>
-                      {ffmpeg.available
-                        ? `Found ffmpeg at ${ffmpeg.resolved}.`
-                        : `Could not find ffmpeg (looked for "${ffmpeg.resolved}"). Install it, ` +
-                          `or type the full path to ffmpeg.exe here. Without it, this detection ` +
-                          `and the picture and sound details on a title's page are skipped. ` +
-                          `Everything else works normally.`}
+                    <label className="settings-field">
+                      <span>
+                        Where ffmpeg is{' '}
+                        <span className="muted">(leave empty unless Kinema cannot find it)</span>
+                      </span>
+                      <FocusInput
+                        focusKey={FFMPEG_INPUT_KEY}
+                        className="settings-input"
+                        value={ffmpegPath}
+                        onChange={setFfmpegPath}
+                        placeholder="ffmpeg"
+                      />
+                    </label>
+                    {/* Answered here rather than discovered during a detection
+                        run. A wrong path used to stay silent for minutes and then
+                        surface as somebody else's failure. */}
+                    {ffmpeg && (
+                      <p className={ffmpeg.available ? 'settings-ok' : 'settings-warn'}>
+                        {ffmpeg.available
+                          ? `Found ffmpeg at ${ffmpeg.resolved}.`
+                          : `Could not find ffmpeg (looked for "${ffmpeg.resolved}"). Install it, ` +
+                            `or type the full path to ffmpeg.exe here. Without it, this detection ` +
+                            `and the picture and sound details on a title's page are skipped. ` +
+                            `Everything else works normally.`}
+                      </p>
+                    )}
+                    <p className="settings-hint">
+                      ffmpeg is a free program for reading video and audio. Kinema does not include
+                      it: install it yourself and Kinema finds it. It is also used once per file to
+                      read the resolution, HDR and sound format shown on a title&rsquo;s page.
                     </p>
+                    <div className="settings-row">
+                      <FocusButton
+                        keepInView="nearest"
+                        className="btn-secondary"
+                        onSelect={() => void openUrl(FFMPEG_URL)}
+                      >
+                        Open the ffmpeg download page ↗
+                      </FocusButton>
+                    </div>
+                    </>
                   )}
-                  <p className="settings-hint">
-                    ffmpeg is a free program for reading video and audio. Kinema does not include
-                    it: install it yourself and Kinema finds it. It is also used once per file to
-                    read the resolution, HDR and sound format shown on a title&rsquo;s page.
-                  </p>
-                  <div className="settings-row">
-                    <FocusButton
-                      keepInView="nearest"
-                      className="btn-secondary"
-                      onSelect={() => void openUrl(FFMPEG_URL)}
-                    >
-                      Open the ffmpeg download page ↗
-                    </FocusButton>
-                  </div>
 
                   <h3>TheIntroDB</h3>
                   <ChoiceRow
@@ -1072,174 +1078,180 @@ export default function Settings({
                     Intro data provided by <strong>IntroDB</strong> (<code>introdb.app</code>).
                   </p>
 
-                  <h3>Skiptro</h3>
-                  <p className="choice-note">
-                    Optional: a separate free program that is very good at finding intros (not
-                    credits). Where it and the built-in detection disagree about an intro, Skiptro
-                    wins. If you have not heard of it, you can leave this alone.
-                  </p>
-                  <div className="settings-row">
-                    <FocusButton
-                      keepInView="nearest"
-                      className="btn-secondary"
-                      onSelect={() => void openUrl(SKIPTRO_URL)}
-                    >
-                      Open the Skiptro page ↗
-                    </FocusButton>
-                    <FocusButton
-                      keepInView="nearest"
-                      className="btn-secondary"
-                      onSelect={() =>
-                        void (async () => {
-                          try {
-                            const chosen = await open({
-                              multiple: false,
-                              filters: [{ name: 'Skiptro', extensions: ['exe'] }],
-                            });
-                            if (typeof chosen !== 'string') return;
-                            setSkiptroPath(chosen);
-                            await setSetting(SKIPTRO_PATH_KEY, chosen);
-                            setNote('Skiptro location saved.');
-                          } catch (e) {
-                            setError(userError(e));
-                          }
-                        })()
-                      }
-                    >
-                      {skiptroPath ? 'Change Skiptro location' : 'Choose Skiptro'}
-                    </FocusButton>
-                  </div>
-                  <p className="settings-hint">
-                    {skiptroPath ? (
-                      <>
-                        Using <code>{skiptroPath}</code>. Kinema does not include Skiptro: it runs
-                        the copy you installed after every scan that finds new episodes, and says
-                        so after the scan if it has gone missing.
-                      </>
+                  {/* Skiptro is a program, and detecting now runs ffmpeg and Skiptro: neither where programs cannot run. */}
+                  {can?.runs_programs && (
+                    <>
+                    <h3>Skiptro</h3>
+                    <p className="choice-note">
+                      Optional: a separate free program that is very good at finding intros (not
+                      credits). Where it and the built-in detection disagree about an intro, Skiptro
+                      wins. If you have not heard of it, you can leave this alone.
+                    </p>
+                    <div className="settings-row">
+                      <FocusButton
+                        keepInView="nearest"
+                        className="btn-secondary"
+                        onSelect={() => void openUrl(SKIPTRO_URL)}
+                      >
+                        Open the Skiptro page ↗
+                      </FocusButton>
+                      <FocusButton
+                        keepInView="nearest"
+                        className="btn-secondary"
+                        onSelect={() =>
+                          void (async () => {
+                            try {
+                              const chosen = await open({
+                                multiple: false,
+                                filters: [{ name: 'Skiptro', extensions: ['exe'] }],
+                              });
+                              if (typeof chosen !== 'string') return;
+                              setSkiptroPath(chosen);
+                              await setSetting(SKIPTRO_PATH_KEY, chosen);
+                              setNote('Skiptro location saved.');
+                            } catch (e) {
+                              setError(userError(e));
+                            }
+                          })()
+                        }
+                      >
+                        {skiptroPath ? 'Change Skiptro location' : 'Choose Skiptro'}
+                      </FocusButton>
+                    </div>
+                    <p className="settings-hint">
+                      {skiptroPath ? (
+                        <>
+                          Using <code>{skiptroPath}</code>. Kinema does not include Skiptro: it runs
+                          the copy you installed after every scan that finds new episodes, and says
+                          so after the scan if it has gone missing.
+                        </>
+                      ) : (
+                        <>
+                          Not set. Choose <code>skiptro.exe</code>, the command-line one, not{' '}
+                          <code>Skiptro-Desktop.exe</code>.
+                        </>
+                      )}
+                    </p>
+                    {/* Only once Skiptro is set up: until then none of these do
+                        anything, and three fields about a program someone has
+                        never heard of are the clutter this page was cut down to
+                        get rid of. Text fields rather than hard-coded, so a
+                        change to Skiptro's command line is an edit here and not a
+                        new build. They save themselves. */}
+                    {skiptroPath && (
+                      <div className="settings-subgroup">
+                        <label className="settings-field">
+                          <span>
+                            How to run it{' '}
+                            <span className="muted">
+                              (leave it as it is unless Skiptro changes; {'{dir}'} stands for the
+                              folder)
+                            </span>
+                          </span>
+                          <FocusInput
+                            className="settings-input"
+                            value={scanArgs}
+                            onChange={setScanArgs}
+                            placeholder={DEFAULT_SKIPTRO_SCAN_ARGS}
+                          />
+                        </label>
+                        <label className="settings-field">
+                          <span>
+                            How to export <span className="muted">(leave empty)</span>
+                          </span>
+                          <FocusInput
+                            className="settings-input"
+                            value={exportArgs}
+                            onChange={setExportArgs}
+                            placeholder="not run"
+                          />
+                        </label>
+                        <p className="settings-hint">
+                          Exporting writes a small extra file next to every episode with what Kinema
+                          already reads from Skiptro&rsquo;s database. Only worth it if another player
+                          should read the same results; type <code>export {'{dir}'}</code> to switch
+                          it on.
+                        </p>
+                        <label className="settings-field">
+                          <span>
+                            Skiptro&rsquo;s database{' '}
+                            <span className="muted">(only if you moved it)</span>
+                          </span>
+                          <FocusInput
+                            className="settings-input"
+                            value={skiptroDbPath}
+                            onChange={setSkiptroDbPath}
+                            placeholder="%APPDATA%\Skiptro\skiptro.db"
+                          />
+                        </label>
+                      </div>
+                    )}
+
+                    {/* One button for every TV folder, running every source that
+                        is set up. TV folders only: the method is "what do these
+                        episodes have in common", which a movies folder cannot
+                        answer. */}
+                    <h3>Detect now</h3>
+                    {tvRoots.length === 0 ? (
+                      <p className="choice-note">
+                        Add a TV folder under Library to detect intros and credits in it.
+                      </p>
                     ) : (
                       <>
-                        Not set. Choose <code>skiptro.exe</code>, the command-line one, not{' '}
-                        <code>Skiptro-Desktop.exe</code>.
+                        <p className="choice-note">
+                          Looks for intros and credits in all your TV folders now. Only needed after
+                          changing something above. Nothing is written next to your videos.
+                        </p>
+                        {/* While detection runs, this same button stops it: a Stop
+                            that appeared in its place would take the remote's
+                            focus with it when detection ended. */}
+                        <div className="settings-row">
+                          <FocusButton
+                            keepInView="nearest"
+                            className="btn-secondary"
+                            disabled={detecting === null && scan?.stage === 'detecting'}
+                            onSelect={() =>
+                              detecting !== null ? stopDetecting() : void runDetect(tvRoots)
+                            }
+                          >
+                            {detecting !== null ? 'Stop detecting' : 'Detect now'}
+                          </FocusButton>
+                        </div>
+                        <ul className="detect-folders">
+                          {tvRoots.map((root) => {
+                            const waiting = backlog[root.id] ?? 0;
+                            const outcome = detectOutcomes[root.path];
+                            return (
+                              <li key={root.id}>
+                                <code>{root.path}</code>
+                                <span className="muted">
+                                  {detecting === root.path
+                                    ? ' · detecting'
+                                    : waiting > 0
+                                      ? ` · ${count(waiting, 'episode')} not analysed yet`
+                                      : backlog[root.id] === 0
+                                        ? ' · all analysed'
+                                        : ''}
+                                </span>
+                                {detecting === root.path && detectLine && (
+                                  <span className="settings-progress">{detectLine}</span>
+                                )}
+                                {detecting !== root.path && outcome && (
+                                  <span
+                                    className={outcome.failed ? 'detect-failed' : 'settings-progress'}
+                                  >
+                                    {outcome.text}
+                                  </span>
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
                       </>
                     )}
-                  </p>
-                  {/* Only once Skiptro is set up: until then none of these do
-                      anything, and three fields about a program someone has
-                      never heard of are the clutter this page was cut down to
-                      get rid of. Text fields rather than hard-coded, so a
-                      change to Skiptro's command line is an edit here and not a
-                      new build. They save themselves. */}
-                  {skiptroPath && (
-                    <div className="settings-subgroup">
-                      <label className="settings-field">
-                        <span>
-                          How to run it{' '}
-                          <span className="muted">
-                            (leave it as it is unless Skiptro changes; {'{dir}'} stands for the
-                            folder)
-                          </span>
-                        </span>
-                        <FocusInput
-                          className="settings-input"
-                          value={scanArgs}
-                          onChange={setScanArgs}
-                          placeholder={DEFAULT_SKIPTRO_SCAN_ARGS}
-                        />
-                      </label>
-                      <label className="settings-field">
-                        <span>
-                          How to export <span className="muted">(leave empty)</span>
-                        </span>
-                        <FocusInput
-                          className="settings-input"
-                          value={exportArgs}
-                          onChange={setExportArgs}
-                          placeholder="not run"
-                        />
-                      </label>
-                      <p className="settings-hint">
-                        Exporting writes a small extra file next to every episode with what Kinema
-                        already reads from Skiptro&rsquo;s database. Only worth it if another player
-                        should read the same results; type <code>export {'{dir}'}</code> to switch
-                        it on.
-                      </p>
-                      <label className="settings-field">
-                        <span>
-                          Skiptro&rsquo;s database{' '}
-                          <span className="muted">(only if you moved it)</span>
-                        </span>
-                        <FocusInput
-                          className="settings-input"
-                          value={skiptroDbPath}
-                          onChange={setSkiptroDbPath}
-                          placeholder="%APPDATA%\Skiptro\skiptro.db"
-                        />
-                      </label>
-                    </div>
-                  )}
-
-                  {/* One button for every TV folder, running every source that
-                      is set up. TV folders only: the method is "what do these
-                      episodes have in common", which a movies folder cannot
-                      answer. */}
-                  <h3>Detect now</h3>
-                  {tvRoots.length === 0 ? (
-                    <p className="choice-note">
-                      Add a TV folder under Library to detect intros and credits in it.
-                    </p>
-                  ) : (
-                    <>
-                      <p className="choice-note">
-                        Looks for intros and credits in all your TV folders now. Only needed after
-                        changing something above. Nothing is written next to your videos.
-                      </p>
-                      {/* While detection runs, this same button stops it: a Stop
-                          that appeared in its place would take the remote's
-                          focus with it when detection ended. */}
-                      <div className="settings-row">
-                        <FocusButton
-                          keepInView="nearest"
-                          className="btn-secondary"
-                          disabled={detecting === null && scan?.stage === 'detecting'}
-                          onSelect={() =>
-                            detecting !== null ? stopDetecting() : void runDetect(tvRoots)
-                          }
-                        >
-                          {detecting !== null ? 'Stop detecting' : 'Detect now'}
-                        </FocusButton>
-                      </div>
-                      <ul className="detect-folders">
-                        {tvRoots.map((root) => {
-                          const waiting = backlog[root.id] ?? 0;
-                          const outcome = detectOutcomes[root.path];
-                          return (
-                            <li key={root.id}>
-                              <code>{root.path}</code>
-                              <span className="muted">
-                                {detecting === root.path
-                                  ? ' · detecting'
-                                  : waiting > 0
-                                    ? ` · ${count(waiting, 'episode')} not analysed yet`
-                                    : backlog[root.id] === 0
-                                      ? ' · all analysed'
-                                      : ''}
-                              </span>
-                              {detecting === root.path && detectLine && (
-                                <span className="settings-progress">{detectLine}</span>
-                              )}
-                              {detecting !== root.path && outcome && (
-                                <span
-                                  className={outcome.failed ? 'detect-failed' : 'settings-progress'}
-                                >
-                                  {outcome.text}
-                                </span>
-                              )}
-                            </li>
-                          );
-                        })}
-                      </ul>
                     </>
                   )}
+
                 </section>
               </>
             )}

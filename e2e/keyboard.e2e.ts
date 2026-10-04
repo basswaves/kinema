@@ -518,6 +518,33 @@ test('Android: always the TV layout, never asked', async ({ page }) => {
   expect(await tv()).toBe('on');
 });
 
+test('Android: nothing offers ffmpeg or Skiptro, which an Android app cannot run', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 960, height: 540 });
+  await page.addInitScript(() => localStorage.setItem('kinemaMockSystem', 'android'));
+  await page.goto('/');
+  await expect.poll(() => focused(page)).toContain('Play');
+  // The mock has no ffmpeg; on a desktop Home would say so.
+  await expect(page.locator('body')).not.toContainText('need ffmpeg');
+
+  await press(page, 'ArrowUp', 2);
+  await press(page, 'ArrowRight', 4);
+  await expect.poll(() => focused(page)).toBe('Settings');
+  await press(page, 'Enter');
+  await press(page, 'ArrowDown');
+  for (let i = 0; i < 6 && (await focused(page)) !== 'Intro & credits'; i++) {
+    await press(page, 'ArrowDown');
+  }
+  await press(page, 'Enter');
+  const section = page.locator('.settings-section');
+  await expect(section.locator('h2')).toHaveText(['Intro and credits']);
+  await expect(section).toContainText('cannot listen to the episodes itself');
+  await expect(section.locator('h3')).toHaveText(['TheIntroDB', 'IntroDB']);
+  await expect(section).not.toContainText('ffmpeg');
+  await expect(section).not.toContainText('Skiptro');
+});
+
 test('the equipment notice: Choose when never asked, Use it too for only these', async ({ page }) => {
   await open(page, 'windows');
   const api = (name: string, ...args: string[]) =>

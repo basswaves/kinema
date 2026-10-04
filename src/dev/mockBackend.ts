@@ -989,6 +989,7 @@ const handlers: Record<string, Handler> = {
         windowed: false,
         folder_picker: false,
         system_output: true,
+        runs_programs: false,
         sleep: false,
         shut_down: false,
       };
@@ -1006,6 +1007,7 @@ const handlers: Record<string, Handler> = {
       windowed: true,
       folder_picker: true,
       system_output: false,
+      runs_programs: true,
       sleep: !NO_POWER,
       shut_down: !NO_POWER,
     };

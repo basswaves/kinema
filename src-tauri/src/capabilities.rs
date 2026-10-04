@@ -40,6 +40,11 @@ pub struct Capabilities {
     /// nothing per device; `display_switching` and `audio_direct`, Kinema's
     /// own way of doing both, stay off.
     pub system_output: bool,
+    /// Kinema can run programs the user installed themselves — ffmpeg and
+    /// ffprobe for intro detection and a title's picture and sound details,
+    /// Skiptro for intros. An Android app cannot run another program, so
+    /// there nothing offers them.
+    pub runs_programs: bool,
     pub sleep: bool,
     pub shut_down: bool,
 }
@@ -92,6 +97,7 @@ fn work_out() -> Capabilities {
         windowed: cfg!(desktop),
         folder_picker: cfg!(desktop),
         system_output: cfg!(target_os = "android"),
+        runs_programs: cfg!(desktop),
         sleep: crate::power::can_sleep(),
         shut_down: crate::power::can_shut_down(),
     }
@@ -124,7 +130,7 @@ mod tests {
         let c = current();
         assert_eq!(c.system, "Windows");
         assert!(c.equipment_detection && c.audio_direct && c.display_switching && c.sleep && c.shut_down);
-        assert!(c.windowed && c.folder_picker && !c.system_output);
+        assert!(c.windowed && c.folder_picker && !c.system_output && c.runs_programs);
         // The rendering path the whole of docs/DESIGN.md is written about.
         assert_eq!(
             c.mpv_video,
@@ -146,6 +152,7 @@ mod tests {
         // A desktop has windows; Android, the other system here, does not.
         assert_eq!((c.windowed, c.folder_picker), (cfg!(desktop), cfg!(desktop)));
         assert_eq!(c.system_output, cfg!(target_os = "android"));
+        assert_eq!(c.runs_programs, cfg!(desktop));
         // Wherever logind says this session may (power.rs); never elsewhere.
         assert_eq!((c.sleep, c.shut_down), (crate::power::can_sleep(), crate::power::can_shut_down()));
         if !linux {

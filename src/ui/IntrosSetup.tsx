@@ -10,7 +10,8 @@
  *
  * Skiptro, a separate program, is brought up only when its database is on
  * this PC: to anyone else it is a name they have never heard, and Settings
- * says where it goes.
+ * says where it goes. Where Kinema cannot run programs (Android), never: it
+ * cannot listen to episodes itself there either, and says so.
  */
 import { useEffect, useState } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -22,6 +23,7 @@ import {
   skiptroFound,
 } from '../library/api';
 import { getSetting, setSetting } from '../metadata/api';
+import { useCapabilities } from '../capabilities';
 import ChoiceRow from './ChoiceRow';
 import FocusButton from './FocusButton';
 import { userError } from './errors';
@@ -33,6 +35,8 @@ type SkipMode = 'button' | 'auto';
 type Lookups = 'on' | 'off' | '';
 
 export default function IntrosSetup({ onAnswer }: { onAnswer: () => void }) {
+  const can = useCapabilities();
+  const programs = Boolean(can?.runs_programs);
   const [mode, setMode] = useState<SkipMode>('button');
   const [lookups, setLookups] = useState<Lookups>('on');
   /** Whether Skiptro's database is here; null until asked. */
@@ -93,8 +97,9 @@ export default function IntrosSetup({ onAnswer }: { onAnswer: () => void }) {
   return (
     <>
       <p className="muted">
-        Kinema finds where intros, recaps and end credits are by itself, and new episodes are
-        checked after every scan. Two choices about it; both are in Settings at any time.
+        {programs
+          ? 'Kinema finds where intros, recaps and end credits are by itself, and new episodes are checked after every scan. Two choices about it; both are in Settings at any time.'
+          : `On ${can?.system ?? 'this system'} Kinema learns where intros, recaps and end credits are from times shared by other viewers. Two choices about it; both are in Settings at any time.`}
       </p>
       {error && <div className="settings-error">{error}</div>}
 
@@ -128,10 +133,10 @@ export default function IntrosSetup({ onAnswer }: { onAnswer: () => void }) {
           ]);
         }}
         note="TheIntroDB and IntroDB are free collections of intro and credit times shared by viewers. Asked the first time an episode or film plays, they answer at once, and IntroDB knows where a film has a scene after its credits."
-        hint="Kinema tells them only which film or episode is playing, keeps each answer for a month and never looks up your whole library. No account or key. Off, Kinema relies on what it finds itself."
+        hint={`Kinema tells them only which film or episode is playing, keeps each answer for a month and never looks up your whole library. No account or key. ${programs ? 'Off, Kinema relies on what it finds itself.' : 'Off, nothing tells Kinema where they are, so there is nothing to skip.'}`}
       />
 
-      {skiptro === true && (
+      {programs && skiptro === true && (
         <div className="choice-row">
           <div className="choice-label">Skiptro</div>
           <p className="choice-note">
@@ -157,7 +162,7 @@ export default function IntrosSetup({ onAnswer }: { onAnswer: () => void }) {
           )}
         </div>
       )}
-      {skiptro === false && (
+      {programs && skiptro === false && (
         <p className="muted">
           Already use Skiptro, a separate program that finds intros? Settings → Intro &amp; credits
           is where it goes.

@@ -9,8 +9,12 @@
  *
  * Like the equipment notice it is one quiet line in the flow of Home, and "OK"
  * is for good: someone who does not want the extras is not asked again.
+ *
+ * Where Kinema cannot run programs at all (Android, `runs_programs`), ffmpeg
+ * is never missing: there is nothing anyone could install, so nothing says so.
  */
 import { useEffect, useState } from 'react';
+import { capabilitiesNow, loadCapabilities } from '../capabilities';
 import { ffmpegStatus, FFMPEG_PATH_KEY } from '../library/api';
 import { getSetting, setSetting } from '../metadata/api';
 
@@ -23,6 +27,8 @@ export function ffmpegNoticeWanted(available: boolean, dismissed: boolean): bool
 
 /** Whether the configured ffmpeg cannot be run. A failed check is not "missing". */
 export async function ffmpegMissing(): Promise<boolean> {
+  await loadCapabilities();
+  if (!capabilitiesNow()?.runs_programs) return false;
   const configured = ((await getSetting(FFMPEG_PATH_KEY)) ?? '').trim();
   const status = await ffmpegStatus(configured);
   return !status.available;

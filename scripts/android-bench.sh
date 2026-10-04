@@ -195,7 +195,10 @@ case "$cmd" in
     # Into the app's private folder through run-as: a folder adb can write
     # (/data/local/tmp) is one the app cannot list.
     adb_dev shell run-as "$pkg" rm -rf selftest
-    tar -C "$dir" --exclude=report.json --exclude='*.log' --exclude='shot-*.png' -cf - .       | adb_dev exec-in run-as "$pkg" sh -c 'mkdir -p selftest && cd selftest && tar -xf -'
+    # Through `shell`, not `exec-in`: Android 9's exec-in gives run-as no
+    # stdin. `-o`: the app cannot give the files tar's owners, and need not.
+    tar -C "$dir" --exclude=report.json --exclude='*.log' --exclude='*.txt' --exclude='shot-*.png' -cf - . \
+      | adb_dev shell "run-as $pkg sh -c 'mkdir -p selftest && cd selftest && tar -xof -'"
     adb_dev shell monkey -p "$pkg" -c android.intent.category.LEANBACK_LAUNCHER 1 >/dev/null 2>&1
     started=$(date +%s)
     for t in ${shots//,/ }; do
@@ -203,7 +206,8 @@ case "$cmd" in
       adb_dev exec-out screencap -p > "$dir/shot-${t}s.png"
     done
     # The app writes the report and quits when the plan's time is up.
-    until adb_dev shell run-as "$pkg" test -f selftest/report.json; do
+    # `ls`, not `test`: Android 9 has no test program for run-as to start.
+    until adb_dev shell run-as "$pkg" ls selftest/report.json >/dev/null 2>&1; do
       [ $(( $(date +%s) - started )) -lt $(( seconds + 90 )) ] || { echo "android-bench: no report after $(( seconds + 90 )) s" >&2; break; }
       sleep 1
     done

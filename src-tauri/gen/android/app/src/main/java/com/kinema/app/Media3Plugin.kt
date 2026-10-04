@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.graphics.Color
 import android.hardware.display.DisplayManager
+import android.media.MediaCodec
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
@@ -89,6 +90,9 @@ class SeekArgs {
  *    DTS, and refused it), so the sound is decoded on the device instead,
  *    and failing that the film plays without it — never not at all.
  */
+/** How long a taken video decoder is given before Kinema asks again. */
+private const val RETRY_MS = 1500L
+
 @TauriPlugin
 class Media3Plugin(private val activity: Activity) : Plugin(activity) {
   private var webView: WebView? = null
@@ -124,6 +128,8 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
    * other player does it.
    */
   private var suspended = false
+  /** A taken decoder was asked for once more for this file (`decoderTaken`). */
+  private var retried = false
 
   override fun onStop() {
     main.post {
@@ -271,14 +277,86 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
           fallBack(error)
           return
         }
+        // The decoder in use elsewhere: often for a moment only (the app
+        // Kinema came from letting go of it), so once more before saying so.
+        if (decoderTaken(error) && !retried) {
+          retried = true
+          Log.w("Kinema", "media3: the video decoder is in use (${error.errorCodeName}); trying again")
+          main.postDelayed({ if (player === p && path != null) p.prepare() }, RETRY_MS)
+          return
+        }
+        Log.w("Kinema", "media3: could not play: ${error.errorCodeName}: ${error.message}")
         emit("ended") {
           put("reason", "error")
-          put("detail", error.errorCodeName + (error.message?.let { ": $it" } ?: ""))
+          put("detail", inWords(error))
         }
       }
     })
     player = p
     return p
+  }
+
+  /**
+   * The video decoder is someone else's: a box may have only one, and the
+   * system says "no memory" (-12) when it is in use, or takes it back from
+   * a player behind the app in front.
+   */
+  private fun decoderTaken(error: PlaybackException): Boolean {
+    if (error.errorCode == PlaybackException.ERROR_CODE_DECODING_RESOURCES_RECLAIMED) return true
+    if (error.errorCode != PlaybackException.ERROR_CODE_DECODER_INIT_FAILED) return false
+    var cause: Throwable? = error.cause
+    while (cause != null) {
+      // The code itself on most systems; Android 9 on one box gave only
+      // its message ("…, error 0xfffffff4").
+      if (cause is MediaCodec.CodecException &&
+        (cause.errorCode == -12 || cause.message?.contains("0xfffffff4") == true)
+      ) return true
+      cause = cause.cause
+    }
+    return false
+  }
+
+  /**
+   * Why the film could not play, in words for the person holding the
+   * remote: the page shows "Could not play this file: " and this. The
+   * technical name goes to the log.
+   */
+  private fun inWords(error: PlaybackException): String {
+    val format = (error as? ExoPlaybackException)?.rendererFormat
+    return when {
+      decoderTaken(error) ->
+        "the video decoder on this device is in use by something else. Close other video apps and try again."
+      error.errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED ->
+        "Android's player cannot open this kind of file" + (path?.substringAfterLast('.', "")?.takeIf { it.isNotEmpty() && it.length <= 5 }?.let { " (.$it)" } ?: "") + "."
+      error.errorCode == PlaybackException.ERROR_CODE_DECODER_INIT_FAILED ||
+        error.errorCode == PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES ||
+        error.errorCode == PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED ||
+        error.errorCode == PlaybackException.ERROR_CODE_DECODING_FAILED ->
+        "this device could not decode its picture" + (format?.let { " (${describe(it)})" } ?: "") + "."
+      error.errorCode == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND ->
+        "the file is not there any more. It may have been moved, or its drive may be unplugged."
+      error.errorCode == PlaybackException.ERROR_CODE_IO_NO_PERMISSION ->
+        "Kinema is not allowed to read it. Check Kinema's permissions in the system's settings."
+      else -> error.errorCodeName + (error.message?.let { ": $it" } ?: "")
+    }
+  }
+
+  /** "HEVC, 3840×2160, 10-bit HDR" — what the picture asks of a decoder. */
+  private fun describe(f: Format): String {
+    val codec = when (f.sampleMimeType) {
+      MimeTypes.VIDEO_H265 -> "HEVC"
+      MimeTypes.VIDEO_H264 -> "H.264"
+      MimeTypes.VIDEO_AV1 -> "AV1"
+      MimeTypes.VIDEO_VP9 -> "VP9"
+      MimeTypes.VIDEO_DOLBY_VISION -> "Dolby Vision"
+      MimeTypes.VIDEO_MPEG2 -> "MPEG-2"
+      else -> f.sampleMimeType ?: "video"
+    }
+    val size = if (f.width > 0 && f.height > 0) ", ${f.width}×${f.height}" else ""
+    val bits = if ((f.colorInfo?.lumaBitdepth ?: 8) > 8) ", ${f.colorInfo?.lumaBitdepth}-bit" else ""
+    val transfer = f.colorInfo?.colorTransfer
+    val hdr = if (transfer == C.COLOR_TRANSFER_ST2084 || transfer == C.COLOR_TRANSFER_HLG) " HDR" else ""
+    return codec + size + bits + hdr
   }
 
   /** The sound failed: its output would not open, or its decoder would not. */
@@ -360,6 +438,7 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
         val p = ensurePlayer()
         path = args.path
         suspended = false
+        retried = false
         started = false
         seeking = false
         video = null

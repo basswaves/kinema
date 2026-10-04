@@ -43,6 +43,12 @@ import org.json.JSONObject
 @InvokeArg
 class OpenArgs {
   lateinit var path: String
+  /**
+   * Where to read it from, when that is not the path: a film on a network
+   * share Kinema opens itself comes from the core over this device's own
+   * HTTP (stream.rs). The path stays the film's name for everything else.
+   */
+  var url: String? = null
   /** Seconds to start at, or null for the beginning. */
   var start: Double? = null
 }
@@ -516,7 +522,8 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
         video = null
         failedSound = null
         keepSound(null, null)
-        val uri = if (args.path.contains("://")) Uri.parse(args.path) else Uri.fromFile(File(args.path))
+        val uri = args.url?.let { Uri.parse(it) }
+          ?: if (args.path.contains("://")) Uri.parse(args.path) else Uri.fromFile(File(args.path))
         val start = args.start
         if (start != null) p.setMediaItem(MediaItem.fromUri(uri), (start * 1000).toLong())
         else p.setMediaItem(MediaItem.fromUri(uri))

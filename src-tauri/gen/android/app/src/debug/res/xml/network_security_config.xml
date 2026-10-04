@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A test build: plain HTTP allowed, as `usesCleartextTraffic` did for it
+     before (Tauri's development server is reached that way). The released
+     app's rules are in src/main. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

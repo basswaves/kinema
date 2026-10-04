@@ -20,7 +20,14 @@ export async function listen(handle: (event: PlaybackEvent) => void): Promise<()
   return () => void listener.unregister();
 }
 
-export const open = (path: string, start: number | null) => call('open', { path, start });
+/**
+ * A film on a network share Kinema opens itself (`smb://…`) is read through
+ * the core (stream.rs), which hands back an address on this device for it.
+ */
+export async function open(path: string, start: number | null) {
+  const url = /^smb:/i.test(path) ? await invoke<string>('stream_address', { path }) : null;
+  return call('open', { path, start, url });
+}
 export const stop = () => call('stop');
 export const setPaused = (paused: boolean) => call('set_paused', { paused });
 export const seek = (seconds: number, relative: boolean) => call('seek', { seconds, relative });

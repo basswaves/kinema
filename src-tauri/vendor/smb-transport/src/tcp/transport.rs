@@ -3,7 +3,6 @@ use crate::{SmbTransport, SmbTransportRead, SmbTransportWrite};
 
 #[cfg(feature = "async")]
 use futures_core::future::BoxFuture;
-use maybe_async::*;
 use std::net::SocketAddr;
 use std::time::Duration;
 
@@ -134,7 +133,45 @@ impl TcpTransport {
         e.into()
     }
 
-    #[maybe_async]
+    /// Kinema's second change to this crate. The blocking receiver reads with
+    /// a short timeout so it can notice being stopped, and `read_exact` loses
+    /// whatever it had read when that timeout falls in the middle of a
+    /// message — the next read then starts inside the message ("bad magic"),
+    /// and every message after is misread. Seen on a slow link (an Android
+    /// emulator's network) with 1 MiB reads. Here a timeout is passed on only
+    /// while nothing of `out_buf` has arrived; once part has, the rest is
+    /// waited for, up to `MID_MESSAGE_WAIT`.
+    #[cfg(not(feature = "async"))]
+    fn receive_exact(&mut self, out_buf: &mut [u8]) -> Result<()> {
+        const MID_MESSAGE_WAIT: std::time::Duration = std::time::Duration::from_secs(30);
+        let reader = self.reader.as_mut().ok_or(TransportError::NotConnected)?;
+        let mut filled = 0;
+        let mut since = None;
+        while filled < out_buf.len() {
+            match reader.read(&mut out_buf[filled..]) {
+                Ok(0) => return Err(Self::map_tcp_error(io::ErrorKind::UnexpectedEof.into())),
+                Ok(n) => {
+                    filled += n;
+                    since = None;
+                }
+                Err(e) if e.kind() == io::ErrorKind::Interrupted => {}
+                Err(e) if matches!(e.kind(), io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut) => {
+                    if filled == 0 {
+                        return Err(Self::map_tcp_error(e));
+                    }
+                    let started = *since.get_or_insert_with(std::time::Instant::now);
+                    if started.elapsed() > MID_MESSAGE_WAIT {
+                        return Err(Self::map_tcp_error(io::ErrorKind::TimedOut.into()));
+                    }
+                }
+                Err(e) => return Err(Self::map_tcp_error(e)),
+            }
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "async")]
+    #[maybe_async::maybe_async]
     #[inline]
     async fn receive_exact(&mut self, out_buf: &mut [u8]) -> Result<()> {
         let reader = self.reader.as_mut().ok_or(TransportError::NotConnected)?;

@@ -101,3 +101,11 @@ export function useFolderRequest(): FolderRequest | null {
     () => request
   );
 }
+
+/**
+ * Signs Kinema in to a network server it opens itself (netshare.rs), for
+ * this session: `server` as an address names it (`nas`, or `nas:4450` off
+ * SMB's own port), an empty `user` is a guest.
+ */
+export const signInShare = (server: string, user: string, password: string) =>
+  invoke<void>('sign_in_share', { server, user, password });

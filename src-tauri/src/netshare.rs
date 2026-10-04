@@ -380,6 +380,67 @@ mod tests {
         assert!(!is_share_path("C:\\films"));
     }
 
+    /// A slow link, made here: a relay to the real share that passes the
+    /// server's answers on in pieces, with a pause longer than the SMB
+    /// library's 100 ms poll between them. The library lost its place in
+    /// the middle of a message like this (an emulator's network did it),
+    /// until the patched copy in vendor/.
+    #[test]
+    fn a_slow_link_loses_nothing() {
+        use std::io::{Read, Write};
+        use std::net::{TcpListener, TcpStream};
+        let Some(root) = test_share() else { return };
+        let addr = Address::parse(&root).unwrap();
+        let target = format!("{}:{}", addr.server, addr.port.unwrap_or(445));
+        let relay = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = relay.local_addr().unwrap().port();
+        std::thread::spawn(move || {
+            for client in relay.incoming().flatten() {
+                let server = TcpStream::connect(&target).unwrap();
+                let (mut c_in, mut s_out) = (client.try_clone().unwrap(), server.try_clone().unwrap());
+                std::thread::spawn(move || std::io::copy(&mut c_in, &mut s_out));
+                let (mut s_in, mut c_out) = (server, client);
+                std::thread::spawn(move || {
+                    let mut buf = vec![0; 300 * 1024];
+                    while let Ok(n) = s_in.read(&mut buf) {
+                        if n == 0 || c_out.write_all(&buf[..n]).is_err() {
+                            break;
+                        }
+                        std::thread::sleep(Duration::from_millis(150));
+                    }
+                });
+            }
+        });
+        let slow_host = format!("127.0.0.1:{port}");
+        let (user, password) = {
+            let s = state();
+            let l = s.logins.get(&addr.host()).cloned().unwrap();
+            (l.user, l.password)
+        };
+        set_login(&slow_host, &user, &password);
+        let slow_root = format!("smb://{slow_host}/{}/{}", addr.share, addr.inner);
+        let fast_root = root.clone();
+
+        // The first video, and the same 3 MiB of it read both ways.
+        let mut dir = (fast_root.clone(), slow_root.clone());
+        let (fast, slow) = loop {
+            let entries = list(&dir.0).unwrap();
+            if let Some(v) = entries.iter().find(|e| !e.is_dir && e.size > 4 << 20) {
+                break (format!("{}/{}", dir.0, v.name), format!("{}/{}", dir.1, v.name));
+            }
+            let sub = &entries.iter().find(|e| e.is_dir).expect("a video over 4 MiB below").name;
+            dir = (format!("{}/{sub}", dir.0), format!("{}/{sub}", dir.1));
+        };
+        let mut expected = vec![0; 3 << 20];
+        open(&fast).unwrap().read_at(&mut expected, 1 << 20).unwrap();
+        let mut got = vec![0; 3 << 20];
+        let n = open(&slow).unwrap().read_at(&mut got, 1 << 20).unwrap();
+        assert_eq!(n, got.len());
+        assert!(got == expected, "the same bytes over the slow link");
+        // And the connection still answers after it.
+        assert!(stat(&slow).is_ok());
+    }
+
     /// Against a real share, when one is named (`test_share`).
     #[test]
     fn a_real_share_lists_reads_and_says_what_is_missing() {
@@ -422,6 +483,32 @@ mod tests {
         // Past the end, nothing; across it, what there is.
         assert_eq!(file.read_at(&mut head, found.size).unwrap(), 0);
         assert_eq!(file.read_at(&mut head, found.size - 2).unwrap(), 2);
+
+        // Read by several at once, as a player opening a film does (the
+        // start and the end of it): every byte as it is in the file.
+        let whole = read(&video, 1 << 30).unwrap();
+        let readers: Vec<_> = (0..4)
+            .map(|i| {
+                let video = video.clone();
+                std::thread::spawn(move || {
+                    let file = open(&video).unwrap();
+                    let mut out = vec![0; file.len() as usize];
+                    let mut pos = (i * 1_000_003) as u64 % file.len();
+                    for _ in 0..2 {
+                        while pos < file.len() {
+                            let end = (pos as usize + (1 << 20)).min(out.len());
+                            let n = file.read_at(&mut out[pos as usize..end], pos).unwrap();
+                            pos += n as u64;
+                        }
+                        pos = 0;
+                    }
+                    out
+                })
+            })
+            .collect();
+        for r in readers {
+            assert!(r.join().expect("no crash") == whole, "the same bytes");
+        }
 
         assert_eq!(stat(&format!("{root}/no such file.mkv")).unwrap_err().kind(), io::ErrorKind::NotFound);
         assert_eq!(list(&format!("{root}/no such folder")).unwrap_err().kind(), io::ErrorKind::NotFound);

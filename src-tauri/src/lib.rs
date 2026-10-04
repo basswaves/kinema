@@ -44,6 +44,7 @@ mod settings;
 mod simkl;
 mod skip;
 mod skiptro;
+mod stream;
 mod tracking;
 mod trakt;
 mod trailer;
@@ -299,6 +300,7 @@ pub fn run() {
             capabilities::capabilities,
             places::list_folders,
             netshare::sign_in_share,
+            stream::stream_address,
             overlay::overlay_frame,
             overlay::overlay_reset,
             pointer::pointer_script,

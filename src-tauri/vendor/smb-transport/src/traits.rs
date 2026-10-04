@@ -122,7 +122,22 @@ pub trait SmbTransportRead: Send {
 
         // Content - final response.
         let mut data = vec![0; header.stream_protocol_length as usize];
-        self.receive_exact(&mut data)?;
+        // Kinema: the header is read, so the message has begun — a poll
+        // timeout before its first byte of content is waited through, not
+        // passed up, or the header would be lost (see TcpTransport's
+        // `receive_exact`, which passes one up only when nothing was read).
+        let started = std::time::Instant::now();
+        loop {
+            match self.receive_exact(&mut data) {
+                Err(crate::TransportError::IoError(e))
+                    if e.kind() == std::io::ErrorKind::WouldBlock
+                        && started.elapsed() < std::time::Duration::from_secs(30) =>
+                {
+                    continue
+                }
+                other => break other?,
+            }
+        }
 
         log::trace!(
             "Received SMB message of {} bytes from server: {:?}",

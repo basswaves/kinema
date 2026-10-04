@@ -18,7 +18,24 @@
  * English and its numbers mean other things — its 5 is a failed read, not
  * "access denied" — so Linux is matched by text, and before the Windows
  * numbers it would otherwise fall into.
- */import { capabilitiesNow } from '../capabilities';
+ */
+import { capabilitiesNow } from '../capabilities';
+
+/**
+ * Access refused, said in the words of the system that refused it. Android is
+ * a Linux underneath, but there it is the app's permissions that decide, not
+ * an account's, and there is no file manager to try the folder in.
+ */
+function refusedAccess(): string {
+  switch (capabilitiesNow()?.system) {
+    case 'Linux':
+      return 'Linux refused access. Check that your account can open the folder in the file manager, then try again.';
+    case 'Android':
+      return 'Android refused access. Check that Kinema is allowed to read files and media in Android’s settings for apps, then try again.';
+    default:
+      return 'Windows refused access. Check that the folder can be opened in File Explorer, then try again.';
+  }
+}
 
 const RULES: [RegExp, string | (() => string)][] = [
   [
@@ -35,10 +52,7 @@ const RULES: [RegExp, string | (() => string)][] = [
   ],
   [
     /os error 5\b|access is denied|permission denied/i,
-    () =>
-      capabilitiesNow()?.system === 'Linux'
-        ? 'Linux refused access. Check that your account can open the folder in the file manager, then try again.'
-        : 'Windows refused access. Check that the folder can be opened in File Explorer, then try again.',
+    refusedAccess,
   ],
   [/database is locked|database table is locked/i, 'Kinema was busy. Try again in a moment.'],
   [

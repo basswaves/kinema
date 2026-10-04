@@ -1,8 +1,17 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { describeError } from './errors';
 import { count, endsAtLabel } from './format';
 
+const system = vi.hoisted(() => ({ name: null as string | null }));
+vi.mock('../capabilities', () => ({
+  capabilitiesNow: () => (system.name ? { system: system.name } : null),
+}));
+
 describe('describeError', () => {
+  afterEach(() => {
+    system.name = null;
+  });
+
   it('names a missing path without the Windows error number', () => {
     expect(describeError('The system cannot find the path specified. (os error 3)')).toMatch(
       /isn’t there/
@@ -21,6 +30,18 @@ describe('describeError', () => {
     expect(describeError('No route to host (os error 113)')).toMatch(/network drive/);
     // Windows, in another language: the number is what is matched.
     expect(describeError('Ingen tilgang. (os error 5)')).toMatch(/refused access/);
+  });
+
+  it('says which system refused access, in its own words', () => {
+    // Not known yet: Windows, as everything was first written for it.
+    expect(describeError('Ingen tilgang. (os error 5)')).toMatch(/^Windows .*File Explorer/);
+    system.name = 'Linux';
+    expect(describeError('Permission denied (os error 13)')).toMatch(/^Linux .*file manager/);
+    // Android runs a Linux too, but its apps have permissions, not accounts.
+    system.name = 'Android';
+    const android = describeError('Permission denied (os error 13)');
+    expect(android).toMatch(/^Android refused access/);
+    expect(android).not.toMatch(/Windows|File Explorer|account/);
   });
 
   it('reads an HTTP status', () => {

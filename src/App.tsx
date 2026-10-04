@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import Browse from './ui/Browse';
 import ErrorBoundary from './ui/ErrorBoundary';
+import FolderBrowser from './ui/FolderBrowser';
+import { useFolderRequest } from './library/folders';
 import Shortcuts from './ui/Shortcuts';
 import { setShortcutsOpen, useShortcutsOpen } from './ui/shortcutsState';
 import { loadTvMode, setTvMode, useTvMode } from './ui/tv';
@@ -14,6 +16,8 @@ import './App.css';
 export default function App() {
   const tv = useTvMode();
   const showShortcuts = useShortcutsOpen();
+  // Kinema's own folder browser, where the system has no picker (folders.ts).
+  const folderRequest = useFolderRequest();
 
   /**
    * Show the window once there is something to show.
@@ -96,6 +100,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <Browse />
+      {folderRequest && <FolderBrowser request={folderRequest} />}
       {showShortcuts && <Shortcuts onClose={() => setShortcutsOpen(false)} />}
     </ErrorBoundary>
   );

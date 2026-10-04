@@ -120,3 +120,36 @@ test('the player by mouse: controls, pause, full screen, seek bar, volume and Ba
   await page.getByRole('button', { name: '← Back' }).click();
   await expect(page.locator('.player')).toHaveCount(0);
 });
+
+test('Android: Kinema’s own folder browser by mouse', async ({ page }) => {
+  await page.setViewportSize({ width: 960, height: 540 });
+  await page.addInitScript(() => {
+    localStorage.setItem('kinemaMockSystem', 'android');
+    localStorage.setItem('kinemaMockEmpty', '1');
+  });
+  await page.goto('/');
+  const browser = page.locator('.folder-browser');
+  const where = page.locator('.folder-where');
+
+  await page.getByRole('button', { name: 'Add TV folder' }).click();
+  await expect(browser.locator('h2')).toHaveText('Choose your TV folder');
+  await browser.getByRole('button', { name: /USB drive/ }).first().click();
+  await browser.getByRole('button', { name: 'TV', exact: true }).click();
+  await browser.getByRole('button', { name: 'Example Show' }).click();
+  await expect(where).toHaveText('USB drive › TV › Example Show');
+  // Up a folder is the mouse's Back.
+  await browser.getByRole('button', { name: 'Up a folder' }).click();
+  await expect(where).toHaveText('USB drive › TV');
+  await browser.getByRole('button', { name: 'Use this folder' }).click();
+  await expect(browser).toHaveCount(0);
+  await expect(page.locator('.root-path')).toHaveText('/storage/1A2B-3C4D/TV');
+
+  // Cancel, and a click beside the panel, both close without choosing.
+  await page.getByRole('button', { name: 'Add movies folder' }).click();
+  await browser.getByRole('button', { name: 'Cancel' }).click();
+  await expect(browser).toHaveCount(0);
+  await page.getByRole('button', { name: 'Add movies folder' }).click();
+  await page.mouse.click(5, 5);
+  await expect(browser).toHaveCount(0);
+  await expect(page.locator('.first-run-roots li')).toHaveCount(1);
+});

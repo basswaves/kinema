@@ -771,8 +771,31 @@ const SCREEN_HDR = flag('kinemaMockScreenHdr') === 'on';
 const NO_POWER = flag('kinemaMockNoPower') === '1';
 /** `kinemaMockSkiptro=1`: Skiptro's database is on this PC. */
 const SKIPTRO = flag('kinemaMockSkiptro') === '1';
-/** Under `kinemaMockEmpty`: whether a folder has been added, then scanned. */
-const emptyLibrary = { hasRoot: !EMPTY, scanned: false };
+/** Under `kinemaMockEmpty`: whether a folder has been added, then scanned,
+ * and which (the picker's, or the one chosen in Kinema's own browser). */
+const emptyLibrary = { hasRoot: !EMPTY, scanned: false, path: 'C:\\fixture' };
+
+/**
+ * Android's drives for Kinema's own folder browser (`kinemaMockSystem=android`):
+ * a USB drive with films and a show, and the device's own storage. Android's
+ * permission is not yet given, and is given when asked for, unless
+ * `kinemaMockStorageRefused=1`; All files access is off until allowed.
+ */
+const STORAGE_REFUSED = flag('kinemaMockStorageRefused') === '1';
+const storage = { read: 'prompt', allFiles: 'off', asked: 0 };
+const mockDrives: Record<string, { folders: string[]; videos: number }> = {
+  '/storage/1A2B-3C4D': { folders: ['Films', 'Photos', 'TV'], videos: 0 },
+  '/storage/1A2B-3C4D/Films': { folders: ['A film (2001)', 'Another film (2003)'], videos: 0 },
+  '/storage/1A2B-3C4D/Films/A film (2001)': { folders: [], videos: 1 },
+  '/storage/1A2B-3C4D/Films/Another film (2003)': { folders: [], videos: 1 },
+  '/storage/1A2B-3C4D/Photos': { folders: [], videos: 0 },
+  '/storage/1A2B-3C4D/TV': { folders: ['Example Show'], videos: 0 },
+  '/storage/1A2B-3C4D/TV/Example Show': { folders: ['Season 1'], videos: 0 },
+  '/storage/1A2B-3C4D/TV/Example Show/Season 1': { folders: [], videos: 3 },
+  '/storage/emulated/0': { folders: ['Download', 'Movies'], videos: 0 },
+  '/storage/emulated/0/Download': { folders: [], videos: 0 },
+  '/storage/emulated/0/Movies': { folders: [], videos: 0 },
+};
 /** `kinemaMockReview` pretends that many videos wait in the review queue. */
 const REVIEW_COUNT = Number(flag('kinemaMockReview') ?? 0) || 0;
 /** `kinemaMockUpdate` pretends that version is out on GitHub. */
@@ -854,7 +877,7 @@ const handlers: Record<string, Handler> = {
   // finds the fixture, as a real first run would.
   list_library_roots: () =>
     emptyLibrary.hasRoot
-      ? [{ id: 1, path: 'C:\\fixture', kind: 'tv', file_count: files.length }]
+      ? [{ id: 1, path: emptyLibrary.path, kind: 'tv', file_count: files.length }]
       : [],
   scan_library: () => {
     if (emptyLibrary.hasRoot) emptyLibrary.scanned = true;
@@ -866,8 +889,9 @@ const handlers: Record<string, Handler> = {
   list_unparsed: () => [],
   save_parse_results: () => 0,
   library_stats: () => ({ total: files.length, unparsed: 0, parsed: 0, missing: 0, total_bytes: 0 }),
-  add_library_root: () => {
+  add_library_root: (a) => {
     emptyLibrary.hasRoot = true;
+    emptyLibrary.path = String(a.path ?? emptyLibrary.path);
     return 1;
   },
   remove_library_root: () => null,
@@ -963,6 +987,7 @@ const handlers: Record<string, Handler> = {
         audio_direct: false,
         display_switching: false,
         windowed: false,
+        folder_picker: false,
         sleep: false,
         shut_down: false,
       };
@@ -978,6 +1003,7 @@ const handlers: Record<string, Handler> = {
       audio_direct: true,
       display_switching: full,
       windowed: true,
+      folder_picker: true,
       sleep: !NO_POWER,
       shut_down: !NO_POWER,
     };
@@ -1171,6 +1197,28 @@ const handlers: Record<string, Handler> = {
   'plugin:opener|open_url': () => null,
   // The folder picker answers at once, with the fixture's folder.
   'plugin:dialog|open': () => 'C:\\fixture',
+  // Kinema's own folder browser, on Android (places.rs, StoragePlugin.kt).
+  'plugin:storage|places': () => ({
+    places: [
+      { path: '/storage/1A2B-3C4D', name: 'USB drive', removable: true },
+      { path: '/storage/emulated/0', name: 'Internal shared storage', removable: false },
+    ],
+  }),
+  'plugin:storage|access': () => ({ read: storage.read, allFiles: storage.allFiles }),
+  'plugin:storage|request_access': () => {
+    storage.asked += 1;
+    if (!STORAGE_REFUSED) storage.read = 'granted';
+    return { read: storage.read, allFiles: storage.allFiles };
+  },
+  'plugin:storage|allow_all_files': () => {
+    storage.allFiles = 'granted';
+    return { read: storage.read, allFiles: storage.allFiles };
+  },
+  list_folders: (a) => {
+    const listing = mockDrives[String(a.path)];
+    if (!listing) throw new Error(`could not read ${String(a.path)}`);
+    return listing;
+  },
 };
 
 /**
@@ -1196,6 +1244,7 @@ export function installMockBackend(): void {
     settings,
     files,
     listenerCounts,
+    storage,
   };
   document.title = 'Kinema (mock backend)';
 }

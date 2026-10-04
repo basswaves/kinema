@@ -9,7 +9,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { formatBytes } from '../ui/format';
-import { open } from '@tauri-apps/plugin-dialog';
+import { chooseFolder } from './folders';
 import {
   addLibraryRoot,
   libraryStats,
@@ -221,8 +221,8 @@ export default function LibraryView() {
     async (kind: LibraryKind) => {
       setError(null);
       try {
-        const selected = await open({ directory: true, multiple: false });
-        if (typeof selected !== 'string') return;
+        const selected = await chooseFolder(kind === 'tv' ? 'TV' : 'movies');
+        if (!selected) return;
         await addLibraryRoot(selected, kind);
         await refresh();
       } catch (e) {

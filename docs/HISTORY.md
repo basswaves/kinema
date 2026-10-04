@@ -2662,6 +2662,24 @@ on Android, and many TV boxes have none of their own. **Network shares
 built into Kinema** come first (the owner's choice), as Kodi does it, since
 a TV box's films are usually on a NAS; drives on the box itself later.
 
+**Android as a TV box, and USB drives first (owner, 2026-10-04).** On
+Android an app is the whole screen and nobody watches at a desk, so the TV
+layout is always on there and the first run does not ask; a capability
+(`windowed`) says so rather than the system's name. The owner then moved
+drives on the box ahead of network shares: **Kinema's own folder browser**
+lists the drives Android has mounted — a USB drive, the box's own storage —
+and the folders inside, chosen with the remote, because Android's own
+picker is missing on many boxes and answers in its document system rather
+than with a path. Reading needs Android's permission, asked for the first
+time the browser opens. From Android 11 a separate "All files access" is
+needed to see the subtitle and `.nfo` files beside the films; it is
+offered, never required, since films play without it. The browser was
+tried on Android TV 16 in the emulator with a virtual card, through
+choosing, scanning and playing a film from it, and on a real 32-bit
+Android 9 box with a USB stick: Android's own question, the stick by its
+label, its folder, a scan that found every video on it, and a film opened
+from it.
+
 **One exception to "no third-party binaries in the repo".** The Android
 project keeps `gradle-wrapper.jar`, Gradle's own starter, as every Android
 project does. It runs only while building and is never in the app; keeping

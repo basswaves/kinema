@@ -217,7 +217,10 @@ The Android project is `src-tauri/gen/android` (generated once by
 `MainActivity.kt` says why). The same commands drive a phone or a box with
 network debugging on, through `KINEMA_ANDROID_SERIAL`. The emulator has no
 HDMI, so HDR, Dolby Vision and passthrough to a receiver need real hardware.
-On Android there is no player yet, and no way to add a folder.
+A drive to choose folders from, as a USB drive would be, is made inside the
+emulator with `bash scripts/android-bench.sh adb shell sm set-virtual-disk
+true`, then `sm list-disks` and `sm partition <disk> public`; `adb push`
+puts files on it. Many boxes run a 32-bit Android: `build armv7` for those.
 
 ### Running the UI without the native app
 

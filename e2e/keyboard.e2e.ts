@@ -321,6 +321,84 @@ test('first run: where to watch, a folder, then the setup pages, all by remote',
   await expect.poll(() => setting('setup_pages')).toBe('done');
 });
 
+test('Android: a folder on a USB drive, chosen in Kinema’s own browser', async ({ page }) => {
+  await page.setViewportSize({ width: 960, height: 540 });
+  await page.addInitScript(() => {
+    localStorage.setItem('kinemaMockSystem', 'android');
+    localStorage.setItem('kinemaMockEmpty', '1');
+  });
+  await page.goto('/');
+  const storage = () =>
+    page.evaluate(
+      () => (window as unknown as { __kinemaMock: { storage: { read: string; asked: number } } })
+        .__kinemaMock.storage
+    );
+  await expect(page.locator('.first-run')).toContainText('on a USB drive or this device’s own storage');
+
+  // Add movies folder: Android is asked once, then the drives.
+  await expect.poll(() => focused(page)).toBe('Add movies folder');
+  await press(page, 'Enter');
+  await expect(page.locator('.folder-browser h2')).toHaveText('Choose your movies folder');
+  await expect.poll(() => focused(page)).toBe('USB driveUSB drive or card');
+  expect(await storage()).toEqual(expect.objectContaining({ read: 'granted', asked: 1 }));
+  // The subtitles' permission is offered, not required; once given, the
+  // offer goes and the ring is back on the drives.
+  await expect(page.locator('.folder-browser')).toContainText('All files access');
+  await press(page, 'ArrowDown', 2);
+  await expect.poll(() => focused(page)).toBe('Allow all files');
+  await press(page, 'Enter');
+  await expect(page.locator('.folder-browser')).not.toContainText('All files access');
+  await expect.poll(() => focused(page)).toBe('USB driveUSB drive or card');
+
+  // Into the drive, then Films; the ring lands on the first folder each time.
+  await press(page, 'Enter');
+  await expect(page.locator('.folder-where')).toHaveText('USB drive');
+  await expect.poll(() => focused(page)).toBe('Films');
+  await press(page, 'Enter');
+  await expect(page.locator('.folder-where')).toHaveText('USB drive › Films');
+  await expect.poll(() => focused(page)).toBe('A film (2001)');
+
+  // Back goes up a level, onto the folder come out of.
+  await press(page, 'Escape');
+  await expect(page.locator('.folder-where')).toHaveText('USB drive');
+  await expect.poll(() => focused(page)).toBe('Films');
+  await press(page, 'Enter');
+  await expect.poll(() => focused(page)).toBe('A film (2001)');
+
+  // Use this folder is one press up; the browser closes and the root is added.
+  await press(page, 'ArrowUp');
+  await expect.poll(() => focused(page)).toBe('Use this folder');
+  await press(page, 'Enter');
+  await expect(page.locator('.folder-browser')).toHaveCount(0);
+  await expect(page.locator('.first-run-roots li')).toHaveCount(1);
+  await expect(page.locator('.root-path')).toHaveText('/storage/1A2B-3C4D/Films');
+  await expect.poll(() => focused(page)).toBe('Add movies folder');
+
+  // Opened again and left with Back from the drives: nothing chosen.
+  await press(page, 'Enter');
+  await expect.poll(() => focused(page)).toBe('USB driveUSB drive or card');
+  await press(page, 'Escape');
+  await expect(page.locator('.folder-browser')).toHaveCount(0);
+  await expect.poll(() => focused(page)).toBe('Add movies folder');
+  expect((await storage()).asked).toBe(1);
+});
+
+test('Android: refused, the folder browser says where to allow it', async ({ page }) => {
+  await page.setViewportSize({ width: 960, height: 540 });
+  await page.addInitScript(() => {
+    localStorage.setItem('kinemaMockSystem', 'android');
+    localStorage.setItem('kinemaMockEmpty', '1');
+    localStorage.setItem('kinemaMockStorageRefused', '1');
+  });
+  await page.goto('/');
+  await expect.poll(() => focused(page)).toBe('Add movies folder');
+  await press(page, 'Enter');
+  await expect(page.locator('.folder-browser')).toContainText('Apps → Kinema → Permissions');
+  await expect.poll(() => focused(page)).toBe('Ask again');
+  await press(page, 'Escape');
+  await expect(page.locator('.folder-browser')).toHaveCount(0);
+});
+
 test('Android: always the TV layout, never asked', async ({ page }) => {
   // A TV's screen as Android's WebView gives it to the page: a 1080p TV at
   // twice the density, as on the emulated TV and on a real box.
@@ -352,6 +430,12 @@ test('Android: always the TV layout, never asked', async ({ page }) => {
   expect(await tv()).toBe('on');
 
   // Nothing to ask about picture and sound: the pages start at intros.
+  // (A folder first: the USB drive itself, in Kinema's own browser.)
+  await press(page, 'Enter');
+  await expect.poll(() => focused(page)).toBe('USB driveUSB drive or card');
+  await press(page, 'Enter');
+  await press(page, 'ArrowUp');
+  await expect.poll(() => focused(page)).toBe('Use this folder');
   await press(page, 'Enter');
   await expect(page.locator('.first-run-roots li')).toHaveCount(1);
   for (let i = 0; i < 4 && (await focused(page)) !== 'Scan my library'; i++) await press(page, 'ArrowDown');

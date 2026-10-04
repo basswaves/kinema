@@ -32,6 +32,7 @@ mod overlay;
 mod pointer;
 mod omdb;
 mod opensubtitles;
+mod places;
 mod playback;
 mod power;
 mod probe;
@@ -242,7 +243,7 @@ pub fn run() {
         }));
     }
 
-    engine::register(builder)
+    places::register(engine::register(builder))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_http::init())
@@ -294,6 +295,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             updates::latest_release,
             capabilities::capabilities,
+            places::list_folders,
             overlay::overlay_frame,
             overlay::overlay_reset,
             pointer::pointer_script,

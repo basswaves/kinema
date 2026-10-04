@@ -33,7 +33,6 @@
 import { userError } from './errors';
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { open } from '@tauri-apps/plugin-dialog';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import FocusButton from './FocusButton';
 import FocusInput from './FocusInput';
@@ -42,6 +41,7 @@ import { setTvMode, TV_MODE_KEY } from './tv';
 import { useCapabilities } from '../capabilities';
 import { useClaimFocus } from './focus';
 import { addLibraryRoot, listLibraryRoots, type LibraryKind, type LibraryRoot } from '../library/api';
+import { chooseFolder } from '../library/folders';
 import { useScanStatus } from '../library/pipeline';
 import { getSetting, setSetting } from '../metadata/api';
 import { BUILTIN_TMDB_KEY } from '../metadata/builtinKey';
@@ -75,8 +75,9 @@ export default function FirstRun({ onScan }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [seat, setSeat] = useState<Seat>('');
   const scan = useScanStatus();
+  const can = useCapabilities();
   // Only a window can be at a desk (tv.ts); without one there is no question.
-  const askSeat = useCapabilities()?.windowed !== false;
+  const askSeat = can?.windowed !== false;
 
   useEffect(() => {
     void (async () => {
@@ -102,8 +103,8 @@ export default function FirstRun({ onScan }: Props) {
   const pickFolder = useCallback(async (kind: LibraryKind) => {
     setError(null);
     try {
-      const selected = await open({ directory: true, multiple: false });
-      if (typeof selected !== 'string') return;
+      const selected = await chooseFolder(kind === 'tv' ? 'TV' : 'movies');
+      if (!selected) return;
       await addLibraryRoot(selected, kind);
       setRoots(await listLibraryRoots());
     } catch (e) {
@@ -178,7 +179,9 @@ export default function FirstRun({ onScan }: Props) {
             <span className="first-run-num">{folderStep}</span> Where are your movies and shows?
           </h2>
           <p className="muted">
-            Pick the folder you keep them in. A local drive or a network share both work.
+            {can?.folder_picker === false
+              ? 'Pick the folder you keep them in, on a USB drive or this device’s own storage.'
+              : 'Pick the folder you keep them in. A local drive or a network share both work.'}{' '}
             Nothing is moved, renamed or written to; the files are only read.
           </p>
           <div className="settings-row">

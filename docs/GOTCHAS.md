@@ -1820,5 +1820,35 @@ does not, so on a fresh start OK on the first-run page did nothing, twice.
 
 `open({ directory: true })` from the dialog plugin rejects with "Folder
 picker is not implemented on mobile". Android TV 11 and later often has no
-system folder picker either. How Kinema reaches folders on Android is its
-own decision (the porting notes); until then Add folder says so.
+system folder picker either, and where there is one it answers with a
+document address, not a path the scanner can walk. **Do:** ask
+`chooseFolder` (`library/folders.ts`), which opens Kinema's own browser
+wherever the capabilities say `folder_picker: false`.
+
+### Android shows an app only the kind of file it asked for
+
+From Android 13, reading a USB drive by path needs READ_MEDIA_VIDEO, and
+with only that a folder lists its videos and subfolders — the `.srt`,
+`.nfo` and `.skiptro.json` files beside a film are simply not there, with
+no error. Up to Android 12 READ_EXTERNAL_STORAGE shows every file. **Do:**
+treat a missing sidecar on Android as possibly hidden; "All files access"
+(MANAGE_EXTERNAL_STORAGE) brings them back, and is granted in the system's
+settings, not in a dialog. On Android TV that screen is a list of every
+app, whichever of the two intents opens it; the person has to find Kinema
+in it (`StoragePlugin.kt`).
+
+### `run-as` does not see what the app sees on a drive
+
+`adb shell run-as com.kinema.app ls /storage/…` answers "Permission
+denied" even when Kinema has been allowed to read the drive: the
+permission belongs to the app's process, not to its user id in a shell.
+**Do:** check what Kinema can read through Kinema — the folder browser,
+a scan, a self-test plan that plays a file from the drive.
+
+### A 1080p TV gives the page 960×540
+
+Android TV's WebView draws at twice the density, so on a 1920×1080 screen
+the page is 960 by 540 CSS pixels, not 1920 by 1080: the TV layout is laid
+out for a much shorter screen than the photo suggests. A browser check at
+1920×1080 passed while the first run's buttons sat half off the real TV.
+**Do:** check layouts for Android at 960×540.

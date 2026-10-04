@@ -70,7 +70,7 @@ fn mtime_secs(meta: &std::fs::Metadata) -> i64 {
         .unwrap_or(0)
 }
 
-fn is_video(path: &Path) -> bool {
+pub(crate) fn is_video(path: &Path) -> bool {
     let is_container = path
         .extension()
         .and_then(|e| e.to_str())

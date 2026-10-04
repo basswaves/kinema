@@ -22,6 +22,15 @@ fn main() {
             "remove_listener",
         ])
         .default_permission(tauri_build::DefaultPermissionRule::AllowAllCommands);
-    tauri_build::try_build(tauri_build::Attributes::new().plugin("media3", media3))
+    // Android's drives and the permission to read them (places.rs,
+    // StoragePlugin.kt), on the same footing; capabilities/storage-android.json.
+    let storage = tauri_build::InlinedPlugin::new()
+        .commands(&["places", "access", "request_access", "allow_all_files"])
+        .default_permission(tauri_build::DefaultPermissionRule::AllowAllCommands);
+    tauri_build::try_build(
+        tauri_build::Attributes::new()
+            .plugin("media3", media3)
+            .plugin("storage", storage),
+    )
         .expect("failed to run tauri-build");
 }

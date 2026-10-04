@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "storage-android",
+  "description": "Android's drives and the permission to read them, for Kinema's own folder browser (places.rs)",
+  "windows": [
+    "main"
+  ],
+  "platforms": ["android"],
+  "permissions": [
+    "storage:default"
+  ]
+}

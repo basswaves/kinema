@@ -26,6 +26,9 @@ export interface Capabilities {
   /** Kinema runs in a window, so a desk is possible. Where it is not
    * (Android), the layout is always the TV's and nobody is asked (tv.ts). */
   windowed: boolean;
+  /** The system has a folder picker; where not, Kinema shows the folders
+   * itself (library/folders.ts). */
+  folder_picker: boolean;
   sleep: boolean;
   shut_down: boolean;
 }

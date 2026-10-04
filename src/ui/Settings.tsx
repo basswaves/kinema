@@ -22,6 +22,7 @@ import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-naviga
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
+import { chooseFolder } from '../library/folders';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import FocusButton from './FocusButton';
 import { count, formatBytes } from './format';
@@ -546,8 +547,8 @@ export default function Settings({
     async (kind: LibraryKind) => {
       setError(null);
       try {
-        const selected = await open({ directory: true, multiple: false });
-        if (typeof selected !== 'string') return;
+        const selected = await chooseFolder(kind === 'tv' ? 'TV' : 'movies');
+        if (!selected) return;
         await addLibraryRoot(selected, kind);
         await refresh();
         setNote(`Added ${selected}. Scan to pick up its files.`);

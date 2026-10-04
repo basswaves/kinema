@@ -622,3 +622,29 @@ test('Down with nothing further down reads on, and Up reads back', async ({ page
   expect(await inView()).toBe(true);
   expect(await focused(page)).toBe('▶ Play');
 });
+
+test('Android: the system keyboard opens on OK, never on arriving at a field', async ({ page }) => {
+  await page.setViewportSize({ width: 960, height: 540 });
+  await page.addInitScript(() => localStorage.setItem('kinemaMockSystem', 'android'));
+  await page.goto('/');
+  await expect.poll(() => focused(page)).toContain('Play');
+  await press(page, 'ArrowUp', 2);
+  for (let i = 0; i < 6 && (await focused(page)) !== 'Search'; i++) await press(page, 'ArrowRight');
+  await press(page, 'Enter');
+  const box = page.locator('.search-input');
+  await expect(box).toBeFocused();
+  // Typing focus, with the system's keyboard held back...
+  await expect(box).toHaveAttribute('inputmode', 'none');
+  // ...while a plugged-in keyboard types as ever.
+  await page.keyboard.type('exa');
+  await expect(box).toHaveValue('exa');
+  // OK asks for the system's keyboard, and the box keeps typing focus.
+  await press(page, 'Enter');
+  await expect(box).toHaveAttribute('inputmode', 'text');
+  await expect(box).toBeFocused();
+  // Moving on lets go, and the next arrival holds the keyboard back again.
+  await press(page, 'ArrowDown');
+  await expect(box).not.toBeFocused();
+  await press(page, 'ArrowUp');
+  await expect(box).toHaveAttribute('inputmode', 'none');
+});

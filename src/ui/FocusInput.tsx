@@ -9,6 +9,7 @@
 import { useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import { useEffect } from 'react';
 import { keepOnScreen } from './focus';
+import { useTypingFocus } from './typing';
 
 interface Props {
   value: string;
@@ -37,21 +38,14 @@ export default function FocusInput({
   focusKey,
 }: Props) {
   const { ref, focused } = useFocusable<object, HTMLInputElement>({ focusKey });
+  // Typing focus, and the system's keyboard on OK where it has one.
+  // It focuses with `preventScroll`, because a plain focus() jumps the page
+  // to the input at once and the smooth scroll below then has nothing left
+  // to do — the inputs lurched while every button around them glided.
+  const enterKey = useTypingFocus(ref, focused);
 
   useEffect(() => {
-    const input = ref.current;
-    if (!input) return;
-    if (focused) {
-      // `preventScroll`, because a plain focus() jumps the page to the input
-      // at once and the smooth scroll below then has nothing left to do — the
-      // inputs lurched while every button around them glided.
-      input.focus({ preventScroll: true });
-      keepOnScreen(input, 'nearest');
-    } else if (document.activeElement === input) {
-      // Give the caret back when the remote moves on, or this field keeps
-      // taking keystrokes — Enter included — while the ring is somewhere else.
-      input.blur();
-    }
+    if (focused) keepOnScreen(ref.current, 'nearest');
   }, [focused, ref]);
 
   return (
@@ -63,7 +57,7 @@ export default function FocusInput({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') onEnter?.();
+        if (e.key === 'Enter' && !enterKey(e)) onEnter?.();
       }}
     />
   );

@@ -990,6 +990,7 @@ const handlers: Record<string, Handler> = {
         folder_picker: false,
         system_output: true,
         runs_programs: false,
+        screen_keyboard: true,
         sleep: false,
         shut_down: false,
       };
@@ -1008,6 +1009,7 @@ const handlers: Record<string, Handler> = {
       folder_picker: true,
       system_output: false,
       runs_programs: true,
+      screen_keyboard: false,
       sleep: !NO_POWER,
       shut_down: !NO_POWER,
     };

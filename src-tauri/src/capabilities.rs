@@ -45,6 +45,10 @@ pub struct Capabilities {
     /// Skiptro for intros. An Android app cannot run another program, so
     /// there nothing offers them.
     pub runs_programs: bool,
+    /// The system puts its own keyboard on screen whenever a text field takes
+    /// typing (Android). Kinema then lets a field take typing without it, and
+    /// opens it only when OK is pressed on the field (ui/typing.ts).
+    pub screen_keyboard: bool,
     pub sleep: bool,
     pub shut_down: bool,
 }
@@ -98,6 +102,7 @@ fn work_out() -> Capabilities {
         folder_picker: cfg!(desktop),
         system_output: cfg!(target_os = "android"),
         runs_programs: cfg!(desktop),
+        screen_keyboard: cfg!(mobile),
         sleep: crate::power::can_sleep(),
         shut_down: crate::power::can_shut_down(),
     }
@@ -131,6 +136,7 @@ mod tests {
         assert_eq!(c.system, "Windows");
         assert!(c.equipment_detection && c.audio_direct && c.display_switching && c.sleep && c.shut_down);
         assert!(c.windowed && c.folder_picker && !c.system_output && c.runs_programs);
+        assert!(!c.screen_keyboard);
         // The rendering path the whole of docs/DESIGN.md is written about.
         assert_eq!(
             c.mpv_video,
@@ -153,6 +159,7 @@ mod tests {
         assert_eq!((c.windowed, c.folder_picker), (cfg!(desktop), cfg!(desktop)));
         assert_eq!(c.system_output, cfg!(target_os = "android"));
         assert_eq!(c.runs_programs, cfg!(desktop));
+        assert_eq!(c.screen_keyboard, cfg!(mobile));
         // Wherever logind says this session may (power.rs); never elsewhere.
         assert_eq!((c.sleep, c.shut_down), (crate::power::can_sleep(), crate::power::can_shut_down()));
         if !linux {

@@ -51,6 +51,7 @@ import { getTitleDetail, listTitles, type Title } from './api';
 import { searchTitles, type SearchHit } from './search';
 import { arrangeGrid, GRID_SORTS, gridSettingKey, parseGridSetting, type GridSort } from './gridSort';
 import OnScreenKeyboard from './OnScreenKeyboard';
+import { useTypingFocus } from './typing';
 import { isTvMode, useTvMode } from './tv';
 import LeaveDialog from './LeaveDialog';
 import { runSelfTest, selfTestPlan } from '../selftest';
@@ -947,10 +948,8 @@ function SearchInput({ value, onChange }: { value: string; onChange: (v: string)
 
   // And let go when the remote moves on: a box that kept the caret after the
   // ring had gone down to the keyboard showed two things selected at once.
-  useEffect(() => {
-    if (focused) ref.current?.focus();
-    else ref.current?.blur();
-  }, [focused, ref]);
+  // Where the system has a keyboard of its own, OK here opens it (typing.ts).
+  const enterKey = useTypingFocus(ref, focused);
 
   return (
     <input
@@ -959,6 +958,9 @@ function SearchInput({ value, onChange }: { value: string; onChange: (v: string)
       placeholder="Search your library…"
       value={value}
       onChange={(e) => onChange(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') enterKey(e);
+      }}
     />
   );
 }

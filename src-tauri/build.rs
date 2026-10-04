@@ -18,6 +18,10 @@ fn main() {
             "set_paused",
             "seek",
             "state",
+            "screen",
+            "set_mode",
+            "restore_mode",
+            "output",
             "register_listener",
             "remove_listener",
         ])

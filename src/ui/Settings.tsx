@@ -87,6 +87,7 @@ import { buildNfoExports, writeNfo } from '../metadata/nfo';
 import { detectLines } from '../library/detectReport';
 import FixMatch from '../library/FixMatch';
 import LibraryView from '../library/LibraryView';
+import SystemOutputSection from './SystemOutputSection';
 
 const SETTINGS_FOCUS_KEY = 'settings-root';
 
@@ -940,7 +941,12 @@ export default function Settings({
                 {can?.equipment_detection && can.audio_direct && (
                   <SoundSection onError={setError} system={can.system} />
                 )}
-                {can && !(can.display_switching && can.equipment_detection && can.audio_direct) && (
+                {/* Where the system does picture and sound itself (Android):
+                    one switch, and what the system does, said. */}
+                {can?.system_output && <SystemOutputSection onError={setError} system={can.system} />}
+                {can &&
+                  !can.system_output &&
+                  !(can.display_switching && can.equipment_detection && can.audio_direct) && (
                   <section className="settings-section">
                     <h2>Picture &amp; sound</h2>
                     <p className="settings-intro">{notYet(can)}</p>

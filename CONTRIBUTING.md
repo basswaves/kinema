@@ -362,7 +362,11 @@ reasoning is in [docs/DESIGN.md](docs/DESIGN.md) and [docs/HISTORY.md](docs/HIST
   where it can be, so the setting is an override rather than a question.
   Sound straight to the receiver, refresh matching and HDR each apply to every
   device that can, only the devices listed, or none, and are off until
-  someone chooses.
+  someone chooses. **On Android it is otherwise:** a TV box is always at its
+  TV and plays nothing else while a film plays, so the system turns HDR on
+  and passes the sound through by itself, and Kinema's one switch — matching
+  the screen to the film, by the same rule — is on unless switched off, and
+  not asked at the first run.
 - **Vendor-neutral.** Must behave identically on AMD, Intel and NVIDIA.
 - **On Linux, a stable base rather than a matrix.** Kinema is made by one
   person and Linux has more desktops, versions and drivers than one person

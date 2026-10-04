@@ -40,6 +40,7 @@ import { capabilitiesNow, loadCapabilities } from '../capabilities';
 import { keyCommand, keyFromValue, KEY_PROPERTY, MPV_KEYS } from './mpvKeys';
 import { MOUSE_PROPERTY, newEvents, parseMouse, type MouseKind } from './mpvMouse';
 import * as media3 from './media3';
+import type { Film } from './displayMode';
 
 /** Whether this system plays through Media3 rather than mpv. */
 const isMedia3 = () => capabilitiesNow()?.engine === 'media3';
@@ -222,7 +223,14 @@ export type PlaybackEvent =
    * pixels, `time` on the engine's clock in milliseconds — only where the
    * engine has one (capabilities `own_window`).
    */
-  | { type: 'mouse'; kind: MouseKind; x: number; y: number; time: number };
+  | { type: 'mouse'; kind: MouseKind; x: number; y: number; time: number }
+  /**
+   * The sound would not play the way it was opened, and the engine took the
+   * next way (Media3 only): `step` 1 decoded on the device — `chosen` is the
+   * track playing now, another one when the film's own could not be decoded
+   * — and 2 without sound.
+   */
+  | { type: 'audio-fallback'; step: number; format: string; chosen: string | null };
 
 /**
  * Hear every `PlaybackEvent`, until the returned function is called.
@@ -400,6 +408,24 @@ export async function fitWindowForPlayer(how: 'float' | 'tile' | 'close'): Promi
     console.warn('display: Kinema’s window not fitted for the player', e)
   );
 }
+
+// ---- the screen and the sound, where the system does them -------------------
+//
+// Media3 only (capabilities `system_output`): the screen's modes and the
+// film's picture as Android has them, for `displaySwitch.ts` to choose from
+// by the same rule as everywhere else, and what the TV and the receiver
+// take, for Settings. mpv's systems answer these through `display.rs`.
+
+/** The film's picture once the engine knows it, else null. */
+export async function videoFacts(): Promise<Film | null> {
+  return isMedia3() ? (await media3.state()).video : null;
+}
+
+export const systemScreen = () => media3.screen();
+export const askScreenMode = (width: number, height: number, rate: number) =>
+  media3.setMode(width, height, rate);
+export const restoreScreenMode = () => media3.restoreMode();
+export const systemOutput = () => media3.output();
 
 /** Whether the last frame has been reached; false while nothing is open. */
 export async function hasReachedEnd(): Promise<boolean> {

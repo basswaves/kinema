@@ -1845,6 +1845,31 @@ permission belongs to the app's process, not to its user id in a shell.
 **Do:** check what Kinema can read through Kinema — the folder browser,
 a scan, a self-test plan that plays a file from the drive.
 
+### Android says the HDMI output takes a format it then refuses
+
+A box with its own surround setting at "never" still reported DTS through
+HDMI, Media3 passed a film's DTS through, and Android refused the output
+(`ERROR_CODE_AUDIO_TRACK_INIT_FAILED`): the whole film failed. **Do:** treat
+any failure of the sound renderer as a reason to step down, not to stop
+(`Media3Plugin.kt` `fallBack`).
+
+### Media3 1.11 ignores `setAudioCapabilities`
+
+Building the sink with `DefaultAudioSink.Builder.setAudioCapabilities(
+DEFAULT_AUDIO_CAPABILITIES)` to stop passthrough did nothing: Media3 1.11
+works the HDMI output's capabilities out again in its own output provider,
+and passed DTS through anyway. **Do:** wrap the sink
+(`ForwardingAudioSink`) and answer unsupported for anything that is not
+decoded PCM; then Media3 decodes, or picks a track it can decode.
+
+### Media3 does not open `.m2ts`
+
+A Blu-ray stream file (`.m2ts`, 192-byte packets) fails with "None of the
+available extractors": Media3's transport-stream reader reads 188-byte
+packets, and the 192-byte ones of `.m2ts` are not recognised. Kinema's
+scanner lists `.m2ts`, so such a file shows in the library and then says
+it cannot be played on Android. Not solved yet.
+
 ### A 1080p TV gives the page 960×540
 
 Android TV's WebView draws at twice the density, so on a 1920×1080 screen

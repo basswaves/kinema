@@ -12,6 +12,11 @@
  * Refresh matching and HDR each apply to every screen, to the screens listed,
  * or to none (`devicePolicy.ts`); the screen is known by the name the system
  * gives it now, matched to the stable id the equipment check found for it.
+ *
+ * Where the system does picture and sound itself (capabilities
+ * `system_output`, Android) it is one switch instead, on unless switched off
+ * (`systemOutput.ts`), the app is always the whole screen, and the mode is
+ * asked of Android through the engine; the rule choosing it is the same.
  */
 import { invoke } from '@tauri-apps/api/core';
 import { getSetting } from '../metadata/api';
@@ -26,7 +31,19 @@ import {
 } from './displayMode';
 import { formatRate, getEquipment, type Equipment } from './equipment';
 import { covers, readPolicy, type DevicePolicy } from './devicePolicy';
-import { isPictureFullscreen, mpvGet, mpvSet } from './engine';
+import {
+  askScreenMode,
+  isPictureFullscreen,
+  mpvGet,
+  mpvSet,
+  restoreScreenMode,
+  systemScreen,
+  videoFacts,
+} from './engine';
+import { DISPLAY_MATCH_KEY, matchOn, switchSettings } from './systemOutput';
+
+/** Android's way (`systemOutput.ts`) rather than Kinema's own. */
+const bySystem = () => capabilitiesNow()?.system_output === true;
 
 export const SWITCH_REFRESH_KEY = 'display_switch_refresh';
 export const SWITCH_RESOLUTION_KEY = 'display_switch_resolution';
@@ -108,6 +125,7 @@ export async function switchSettingsHere(screen: { gdi_name: string }): Promise<
 
 /** Whether a switch could happen at all right now — before a file is opened. */
 export async function mayswitch(): Promise<boolean> {
+  if (bySystem()) return matchOn(await getSetting(DISPLAY_MATCH_KEY));
   const s = await readSwitchPolicies();
   if (s.refresh.policy === 'off' && s.resolution === 'off' && s.hdr.policy === 'off') return false;
   // The picture's fullscreen, not necessarily this window's: on Linux the
@@ -128,6 +146,7 @@ async function pictureScreen(): Promise<string | null> {
 
 /** The film as mpv decodes it. Waits for the first frame's parameters. */
 export async function filmNow(): Promise<Film | null> {
+  if (bySystem()) return poll(videoFacts, (v) => v.width > 0 && v.height > 0, PARAMS_WAIT_MS);
   const gamma = await poll(
     () => mpvGet('video-params/gamma', 'string') as Promise<string | null>,
     (v) => v.length > 0,
@@ -149,6 +168,7 @@ export async function filmNow(): Promise<Film | null> {
  * hint when it did, since HDR may now be on.
  */
 export async function switchForFilm(film: Film): Promise<boolean> {
+  if (bySystem()) return switchBySystem(film);
   if (!(await isPictureFullscreen().catch(() => false))) return false;
   const name = await pictureScreen();
   const screen = await invoke<Screen>('screen_now', { screen: name });
@@ -179,8 +199,29 @@ export async function switchForFilm(film: Film): Promise<boolean> {
   return true;
 }
 
+/** The same, on a system whose app is the whole screen (Android). */
+async function switchBySystem(film: Film): Promise<boolean> {
+  if (!matchOn(await getSetting(DISPLAY_MATCH_KEY))) return false;
+  const screen = await systemScreen();
+  const target = chooseTarget(screen, film, switchSettings(true));
+  if (!target) return false;
+  console.log(
+    `display: ${film.width}×${film.height} @ ${film.fps ? formatRate(film.fps) : '?'} fps → ${
+      target.width
+    }×${target.height}@${formatRate(target.rate)}`
+  );
+  const after = await askScreenMode(target.width, target.height, target.rate);
+  console.log(`display: now ${after.width}×${after.height}@${formatRate(after.rate)}`);
+  await sleep(SETTLE_MS);
+  return true;
+}
+
 /** Put the screen back as it was before the first switch. */
 export async function restoreScreen(): Promise<void> {
+  if (bySystem()) {
+    await restoreScreenMode().catch((e) => console.warn('display: restore failed', e));
+    return;
+  }
   const restored = await invoke<boolean>('restore_screen').catch((e) => {
     console.warn('display: restore failed', e);
     return false;

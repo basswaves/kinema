@@ -36,6 +36,7 @@ import { VIDEO_SYNC_KEY, VIDEO_SYNC_MODES } from './mpvOptions';
 import { startOverlay } from './overlay';
 import { handMouseToPage, startPointerFollowingControls } from './pageMouse';
 import { resumePoint } from './resume';
+import { audioFallbackNotice } from './systemOutput';
 import { loadFailedMessage, samePath, type Event, type Session } from './session';
 
 /**
@@ -298,6 +299,12 @@ export function usePlaybackEngine({
       // The mouse on mpv's own window (Linux): done again on this page, as
       // real mouse input where the picture of the page shows that point.
       if (event.type === 'mouse') handMouseToPage(event.kind, event.x, event.y, event.time);
+      // The engine took another way for the sound (Media3): say which.
+      if (event.type === 'audio-fallback') {
+        const system = capabilitiesNow()?.system ?? 'The system';
+        console.warn(`audio: fell back to step ${event.step} (${event.format || 'unknown format'})`);
+        setNotice(audioFallbackNotice(event.step, event.format, event.chosen, system));
+      }
     }).then((fn) => {
       // Torn down before registration finished: remove it now, or it leaks
       // and keeps receiving every event with a stale closure.

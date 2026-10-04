@@ -383,6 +383,47 @@ test('Android: a folder on a USB drive, chosen in Kinema’s own browser', async
   expect((await storage()).asked).toBe(1);
 });
 
+test('Android: Picture & sound is one switch, on, and says what the system does', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 960, height: 540 });
+  await page.addInitScript(() => localStorage.setItem('kinemaMockSystem', 'android'));
+  await page.goto('/');
+  await expect.poll(() => focused(page)).toContain('Play');
+  await press(page, 'ArrowUp', 2);
+  await press(page, 'ArrowRight', 4);
+  await expect.poll(() => focused(page)).toBe('Settings');
+  await press(page, 'Enter');
+  await press(page, 'ArrowDown');
+  for (let i = 0; i < 6 && (await focused(page)) !== 'Picture & sound'; i++) {
+    await press(page, 'ArrowDown');
+  }
+  await press(page, 'Enter');
+  const section = page.locator('.settings-section');
+  await expect(section.locator('h2')).toHaveText(['Picture & sound']);
+  // On before anyone chose: nothing stored, the tick on On.
+  await expect(section.locator('.focused, button', { hasText: '✓' })).toHaveText(['✓On']);
+  await expect(section).toContainText('HDR10 and HLG');
+  await expect(section).toContainText('never to pass surround sound through');
+  // Nothing of the desktop's per-device settings.
+  await expect(section).not.toContainText('Every screen that can');
+
+  // Off, by remote, is stored.
+  await press(page, 'ArrowRight');
+  for (let i = 0; i < 4 && (await focused(page)) !== 'Off'; i++) await press(page, 'ArrowRight');
+  await expect.poll(() => focused(page)).toBe('Off');
+  await press(page, 'Enter');
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        const path = '/src/metadata/api.ts';
+        const api = await import(/* @vite-ignore */ path);
+        return api.getSetting('display_match') as Promise<string | null>;
+      })
+    )
+    .toBe('off');
+});
+
 test('Android: refused, the folder browser says where to allow it', async ({ page }) => {
   await page.setViewportSize({ width: 960, height: 540 });
   await page.addInitScript(() => {

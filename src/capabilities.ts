@@ -29,6 +29,9 @@ export interface Capabilities {
   /** The system has a folder picker; where not, Kinema shows the folders
    * itself (library/folders.ts). */
   folder_picker: boolean;
+  /** The system turns HDR on and passes sound through by itself (Android):
+   * Kinema only matches the screen, with one switch (player/systemOutput.ts). */
+  system_output: boolean;
   sleep: boolean;
   shut_down: boolean;
 }

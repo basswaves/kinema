@@ -988,6 +988,7 @@ const handlers: Record<string, Handler> = {
         display_switching: false,
         windowed: false,
         folder_picker: false,
+        system_output: true,
         sleep: false,
         shut_down: false,
       };
@@ -1004,6 +1005,7 @@ const handlers: Record<string, Handler> = {
       display_switching: full,
       windowed: true,
       folder_picker: true,
+      system_output: false,
       sleep: !NO_POWER,
       shut_down: !NO_POWER,
     };
@@ -1197,6 +1199,15 @@ const handlers: Record<string, Handler> = {
   'plugin:opener|open_url': () => null,
   // The folder picker answers at once, with the fixture's folder.
   'plugin:dialog|open': () => 'C:\\fixture',
+  // What an Android TV box says its TV and receiver take (Media3Plugin.kt
+  // `output`): HDR10 and HLG, two surround formats, and the system's own
+  // surround setting at "never", as an operator box was found set.
+  'plugin:media3|output': () => ({
+    hdr: ['HDR10', 'HLG'],
+    sound: ['Dolby Digital', 'DTS'],
+    surround: 'never',
+    modes: 4,
+  }),
   // Kinema's own folder browser, on Android (places.rs, StoragePlugin.kt).
   'plugin:storage|places': () => ({
     places: [

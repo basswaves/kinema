@@ -17,6 +17,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { HdrState } from './equipment';
 import { mpvSet } from './engine';
+import { capabilitiesNow } from '../capabilities';
 
 interface WindowDisplay {
   gdi_name: string;
@@ -30,6 +31,8 @@ export function hintFor(hdr: HdrState): 'yes' | 'no' {
 let lastLogged = '';
 
 export async function matchHdrToDisplay(): Promise<void> {
+  // mpv's hint; where the system shows HDR by itself there is no hint to give.
+  if (capabilitiesNow()?.system_output) return;
   let display: WindowDisplay;
   try {
     display = await invoke<WindowDisplay>('window_display');

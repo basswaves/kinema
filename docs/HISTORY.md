@@ -2680,6 +2680,26 @@ Android 9 box with a USB stick: Android's own question, the stick by its
 label, its folder, a scan that found every video on it, and a film opened
 from it.
 
+**Picture and sound on Android (owner, 2026-10-04).** On Windows and Linux
+screen switching and sending sound straight to a receiver are off until
+someone chooses, per device, at the first run. On Android that is the
+wrong default: a TV box is always at its TV and plays nothing else while a
+film plays, and TV apps behave that way. There the system turns HDR on and
+passes sound through by itself, and Kinema's one addition, matching the
+screen's mode to the film by the same rule as everywhere else, is one
+switch, on unless switched off, never asked (capability `system_output`).
+Settings says what the system reports instead of asking. Made generic, for
+any box, not round the one it was tried on.
+
+What the old box taught: Android can say an HDMI output takes a sound
+format it then refuses — DTS, on a box set never to pass surround through —
+and the film then failed outright. So a sound that will not open steps
+down: decoded on the device, else another of the film's sound tracks the
+device can decode, else the film without sound, each said on screen; a
+film never fails to play for its sound. That box, like many, offers apps
+one screen mode only, so there nothing is switched; a device with several
+modes is needed to see a switch happen.
+
 **One exception to "no third-party binaries in the repo".** The Android
 project keeps `gradle-wrapper.jar`, Gradle's own starter, as every Android
 project does. It runs only while building and is never in the app; keeping

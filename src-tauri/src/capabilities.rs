@@ -34,6 +34,12 @@ pub struct Capabilities {
     /// The system has a folder picker of its own. Where it has none (Android
     /// TV boxes, often), Kinema shows the folders itself (places.rs).
     pub folder_picker: bool,
+    /// The system itself turns HDR on for an HDR film and passes sound to a
+    /// receiver untouched where it can (Android, through Media3). Kinema then
+    /// only matches the screen's mode to the film, with one switch, and asks
+    /// nothing per device; `display_switching` and `audio_direct`, Kinema's
+    /// own way of doing both, stay off.
+    pub system_output: bool,
     pub sleep: bool,
     pub shut_down: bool,
 }
@@ -85,6 +91,7 @@ fn work_out() -> Capabilities {
         display_switching: crate::display::switches(),
         windowed: cfg!(desktop),
         folder_picker: cfg!(desktop),
+        system_output: cfg!(target_os = "android"),
         sleep: crate::power::can_sleep(),
         shut_down: crate::power::can_shut_down(),
     }
@@ -117,7 +124,7 @@ mod tests {
         let c = current();
         assert_eq!(c.system, "Windows");
         assert!(c.equipment_detection && c.audio_direct && c.display_switching && c.sleep && c.shut_down);
-        assert!(c.windowed && c.folder_picker);
+        assert!(c.windowed && c.folder_picker && !c.system_output);
         // The rendering path the whole of docs/DESIGN.md is written about.
         assert_eq!(
             c.mpv_video,
@@ -138,6 +145,7 @@ mod tests {
         assert_eq!(c.display_switching, crate::display::switches());
         // A desktop has windows; Android, the other system here, does not.
         assert_eq!((c.windowed, c.folder_picker), (cfg!(desktop), cfg!(desktop)));
+        assert_eq!(c.system_output, cfg!(target_os = "android"));
         // Wherever logind says this session may (power.rs); never elsewhere.
         assert_eq!((c.sleep, c.shut_down), (crate::power::can_sleep(), crate::power::can_shut_down()));
         if !linux {

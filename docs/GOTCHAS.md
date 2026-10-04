@@ -1877,3 +1877,24 @@ the page is 960 by 540 CSS pixels, not 1920 by 1080: the TV layout is laid
 out for a much shorter screen than the photo suggests. A browser check at
 1920×1080 passed while the first run's buttons sat half off the real TV.
 **Do:** check layouts for Android at 960×540.
+
+### Tauri never tells an Android plugin that the app left the screen
+
+`Plugin.onStop` and `onResume` exist, and Tauri 2.11 generates the observer
+that calls them (`TauriLifecycleObserver` in the generated
+`TauriActivity.kt`), but never registers it. Nothing fails: the calls just
+never come. A film went on playing behind the home screen, holding the
+box's only video decoder, until the operator's own TV app took it away.
+**Do:** register it in `MainActivity.onCreate`
+(`ProcessLifecycleOwner.get().lifecycle.addObserver(TauriLifecycleObserver)`);
+registering it twice is harmless if a later Tauri does it too.
+
+### A TV box may have one video decoder, and the app in front is owed it
+
+A box's decoder list can say `concurrent-instances max="1"`. An app that
+keeps playing in the background keeps it, and the next app gets "no video
+decoders available" (`ERROR_CODE_DECODER_INIT_FAILED`, `0xfffffff4`); if
+the next app is in front, Android takes it back from the one behind
+(`ERROR_CODE_DECODING_RESOURCES_RECLAIMED`). **Do:** pause and `stop()` the
+player when Kinema leaves the screen, `prepare()` it again, paused, when it
+returns (`Media3Plugin.kt`, `suspended`).

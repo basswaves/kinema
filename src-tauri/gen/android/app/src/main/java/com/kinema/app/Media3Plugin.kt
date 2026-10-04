@@ -28,6 +28,7 @@ import androidx.media3.exoplayer.audio.AudioCapabilities
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.ForwardingAudioSink
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
+import androidx.media3.exoplayer.util.EventLogger
 import app.tauri.plugin.JSArray
 import app.tauri.annotation.Command
 import app.tauri.annotation.InvokeArg
@@ -115,6 +116,40 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
   private var failedSound: String? = null
   private val main = Handler(Looper.getMainLooper())
 
+  /**
+   * Kinema left the screen (Home, the box asleep, another app in front)
+   * with a film open: it was paused and its decoder handed back, and is
+   * opened again, paused at the same moment, when Kinema returns. A box may
+   * have one video decoder, and the app in front is owed it — as every
+   * other player does it.
+   */
+  private var suspended = false
+
+  override fun onStop() {
+    main.post {
+      val p = player ?: return@post
+      if (path == null || suspended) return@post
+      suspended = true
+      wantPlaying = false
+      // Said to the page by the listener, as any other pause.
+      p.playWhenReady = false
+      // Keeps the file and the moment; lets go of the decoder and the sound.
+      p.stop()
+      Log.i("Kinema", "media3: left the screen at ${p.currentPosition} ms; decoder handed back")
+    }
+  }
+
+  override fun onResume() {
+    main.post {
+      if (!suspended) return@post
+      suspended = false
+      val p = player ?: return@post
+      if (path == null) return@post
+      p.prepare()
+      Log.i("Kinema", "media3: back on screen; reopened paused at ${p.currentPosition} ms")
+    }
+  }
+
   override fun load(webView: WebView) {
     this.webView = webView
     // See-through wherever the page itself draws nothing.
@@ -174,6 +209,9 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
     // all; another one that it can play is, if the film has one.
     if (audioStep > 0) selector.setParameters(selector.buildUponParameters().setExceedRendererCapabilitiesIfNecessary(false))
     val p = ExoPlayer.Builder(activity, renderers(audioStep)).setTrackSelector(selector).build()
+    // Media3's own account of what it chose and did (decoder, sound path,
+    // dropped frames, stalls), in the system log of a test build only.
+    if (BuildConfig.DEBUG) p.addAnalyticsListener(EventLogger("KinemaEvents"))
     p.setVideoSurfaceView(s)
     // Kinema matches the screen itself (setMode); Media3's own matching
     // would be a second hand on the same switch.
@@ -321,6 +359,7 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
         }
         val p = ensurePlayer()
         path = args.path
+        suspended = false
         started = false
         seeking = false
         video = null
@@ -350,6 +389,7 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
       player?.release()
       player = null
       audioStep = 0
+      suspended = false
       video = null
       surface?.let { (it.parent as? ViewGroup)?.removeView(it) }
       surface = null
@@ -363,9 +403,16 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
     val args = invoke.parseArgs(PausedArgs::class.java)
     main.post {
       // Said by the listener (onPlayWhenReadyChanged), as for any other cause.
-      // Kept for the next file too, as mpv keeps its `pause`.
-      wantPlaying = !args.paused
-      player?.playWhenReady = !args.paused
+      // Kept for the next file too, as mpv keeps its `pause`. Off the screen
+      // nothing starts: the page may still be on its way to "play" (it was
+      // matching the screen when Home was pressed), and the film waits,
+      // paused, for whoever comes back to it.
+      if (suspended && !args.paused) {
+        emit("paused") { put("value", true) }
+      } else {
+        wantPlaying = !args.paused
+        player?.playWhenReady = !args.paused
+      }
       invoke.resolve()
     }
   }

@@ -17,7 +17,7 @@
  * a press, and a debounce still waiting then would lose what was typed.
  */
 import { useEffect, useState } from 'react';
-import { openUrl } from '@tauri-apps/plugin-opener';
+import { openLink } from './links';
 import { FFMPEG_PATH_KEY, ffmpegStatus, type FfmpegStatus } from '../library/api';
 import { getSetting, setSetting } from '../metadata/api';
 import { useCapabilities } from '../capabilities';
@@ -135,7 +135,7 @@ export default function ExtrasSetup({ onAnswer }: { onAnswer: () => void }) {
               <FocusButton
                 className="btn-secondary"
                 keepInView="nearest"
-                onSelect={() => void openUrl(FFMPEG_URL)}
+                onSelect={() => void openLink(FFMPEG_URL)}
               >
                 Open the ffmpeg download page ↗
               </FocusButton>
@@ -173,7 +173,7 @@ export default function ExtrasSetup({ onAnswer }: { onAnswer: () => void }) {
           <FocusButton
             className="btn-secondary"
             keepInView="nearest"
-            onSelect={() => void openUrl(OMDB_KEY_URL)}
+            onSelect={() => void openLink(OMDB_KEY_URL)}
           >
             Get a free key ↗
           </FocusButton>

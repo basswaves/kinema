@@ -8,7 +8,7 @@
 import { userError } from './errors';
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { openUrl } from '@tauri-apps/plugin-opener';
+import { openLink } from './links';
 import Art from './Art';
 import FocusButton from './FocusButton';
 import MediaBadges, { BadgeRows } from './MediaBadges';
@@ -451,9 +451,9 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
                     className="btn-secondary"
                     keepInView="page-top"
                     onSelect={() =>
-                      void openUrl(
+                      void openLink(
                         `https://www.youtube.com/watch?v=${shown.trailer_key as string}`
-                      ).catch((e) => setError(userError(e)))
+                      )
                     }
                   >
                     Trailer · opens in your browser ↗

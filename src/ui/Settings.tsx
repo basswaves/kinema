@@ -23,7 +23,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import { chooseFolder } from '../library/folders';
-import { openUrl } from '@tauri-apps/plugin-opener';
+import { openLink } from './links';
 import FocusButton from './FocusButton';
 import { count, formatBytes } from './format';
 import FocusInput from './FocusInput';
@@ -757,7 +757,7 @@ export default function Settings({
                     <FocusButton
                       keepInView="nearest"
                       className="btn-secondary"
-                      onSelect={() => void openUrl(TMDB_KEY_URL)}
+                      onSelect={() => void openLink(TMDB_KEY_URL)}
                     >
                       Get a free TMDB key ↗
                     </FocusButton>
@@ -1028,7 +1028,7 @@ export default function Settings({
                       <FocusButton
                         keepInView="nearest"
                         className="btn-secondary"
-                        onSelect={() => void openUrl(FFMPEG_URL)}
+                        onSelect={() => void openLink(FFMPEG_URL)}
                       >
                         Open the ffmpeg download page ↗
                       </FocusButton>
@@ -1091,7 +1091,7 @@ export default function Settings({
                       <FocusButton
                         keepInView="nearest"
                         className="btn-secondary"
-                        onSelect={() => void openUrl(SKIPTRO_URL)}
+                        onSelect={() => void openLink(SKIPTRO_URL)}
                       >
                         Open the Skiptro page ↗
                       </FocusButton>
@@ -1275,7 +1275,7 @@ export default function Settings({
                         keepInView="nearest"
                         className="btn-primary"
                         onSelect={() =>
-                          void openUrl(update.url).catch((e) => setError(userError(e)))
+                          void openLink(update.url)
                         }
                       >
                         Open the download page ↗

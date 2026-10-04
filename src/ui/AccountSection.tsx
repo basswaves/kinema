@@ -10,7 +10,7 @@
  * that is gone.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { openUrl } from '@tauri-apps/plugin-opener';
+import { openLink } from './links';
 import ConfirmButton from './ConfirmButton';
 import FocusButton from './FocusButton';
 import FocusInput from './FocusInput';
@@ -254,9 +254,7 @@ export default function AccountSection({ service }: { service: Service }) {
                 keepInView="nearest"
                 className="btn-secondary"
                 onSelect={() =>
-                  void openUrl(code.verification_uri_complete).catch((e: unknown) =>
-                    setError(userError(e))
-                  )
+                  void openLink(code.verification_uri_complete)
                 }
               >
                 Open in the browser ↗

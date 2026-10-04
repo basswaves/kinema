@@ -648,3 +648,37 @@ test('Android: the system keyboard opens on OK, never on arriving at a field', a
   await press(page, 'ArrowUp');
   await expect(box).toHaveAttribute('inputmode', 'none');
 });
+
+async function androidSettings(page: Page, section: string): Promise<void> {
+  await page.setViewportSize({ width: 960, height: 540 });
+  await page.addInitScript(() => localStorage.setItem('kinemaMockSystem', 'android'));
+  await page.goto('/');
+  await expect.poll(() => focused(page)).toContain('Play');
+  await press(page, 'ArrowUp', 2);
+  for (let i = 0; i < 6 && (await focused(page)) !== 'Settings'; i++) await press(page, 'ArrowRight');
+  await press(page, 'Enter');
+  await press(page, 'ArrowDown');
+  for (let i = 0; i < 8 && (await focused(page)) !== section; i++) await press(page, 'ArrowDown');
+  await press(page, 'Enter');
+  await press(page, 'ArrowRight');
+}
+
+test('Android: a web page nothing can open is shown as its address and a QR code', async ({
+  page,
+}) => {
+  await androidSettings(page, 'Library');
+  for (let i = 0; i < 12 && (await focused(page)) !== 'Get a free TMDB key ↗'; i++) {
+    await press(page, 'ArrowDown');
+  }
+  await press(page, 'Enter');
+  const card = page.locator('.link-card');
+  await expect(card).toBeVisible();
+  await expect(card).toContainText('https://www.themoviedb.org');
+  await expect(card.locator('img.simkl-qr')).toBeVisible();
+  await expect.poll(() => focused(page)).toBe('Close');
+  // Back puts it away, and the ring back on the button.
+  await press(page, 'Escape');
+  await expect(card).toHaveCount(0);
+  await expect.poll(() => focused(page)).toBe('Get a free TMDB key ↗');
+  await expect(page.locator('.settings-section h2').first()).toBeVisible();
+});

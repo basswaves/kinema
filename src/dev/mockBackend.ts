@@ -1200,7 +1200,13 @@ const handlers: Record<string, Handler> = {
     return null;
   },
   'plugin:window|show': () => null,
-  'plugin:opener|open_url': () => null,
+  // An Android box with nothing that opens web pages: the opener refuses,
+  // as Android's does (links.ts shows the address instead).
+  'plugin:opener|open_url': () => {
+    if (ON_ANDROID) throw new Error('No Activity found to handle Intent');
+    return null;
+  },
+  link_qr: () => MOCK_QR,
   // The folder picker answers at once, with the fixture's folder.
   'plugin:dialog|open': () => 'C:\\fixture',
   // What an Android TV box says its TV and receiver take (Media3Plugin.kt

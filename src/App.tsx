@@ -3,6 +3,8 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import Browse from './ui/Browse';
 import ErrorBoundary from './ui/ErrorBoundary';
 import FolderBrowser from './ui/FolderBrowser';
+import LinkCard from './ui/LinkCard';
+import { useShownLink } from './ui/links';
 import { useFolderRequest } from './library/folders';
 import Shortcuts from './ui/Shortcuts';
 import { setShortcutsOpen, useShortcutsOpen } from './ui/shortcutsState';
@@ -18,6 +20,8 @@ export default function App() {
   const showShortcuts = useShortcutsOpen();
   // Kinema's own folder browser, where the system has no picker (folders.ts).
   const folderRequest = useFolderRequest();
+  // A web address the system could not open, shown instead (links.ts).
+  const shownLink = useShownLink();
 
   /**
    * Show the window once there is something to show.
@@ -101,6 +105,7 @@ export default function App() {
     <ErrorBoundary>
       <Browse />
       {folderRequest && <FolderBrowser request={folderRequest} />}
+      {shownLink && <LinkCard link={shownLink} />}
       {showShortcuts && <Shortcuts onClose={() => setShortcutsOpen(false)} />}
     </ErrorBoundary>
   );

@@ -3143,6 +3143,20 @@ kbd {
   box-shadow: 0 1.5rem 4rem rgba(0, 0, 0, 0.6);
 }
 
+/* A web address shown instead of opened (LinkCard.tsx). */
+.link-card-body {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  margin: 1.25rem 0 1.5rem;
+}
+
+.link-card-url {
+  margin: 0;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
 .shortcuts h2 {
   margin: 0 0 1.25rem;
   font-size: 1.375rem;

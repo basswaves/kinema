@@ -33,7 +33,7 @@
 import { userError } from './errors';
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { openUrl } from '@tauri-apps/plugin-opener';
+import { openLink } from './links';
 import FocusButton from './FocusButton';
 import FocusInput from './FocusInput';
 import ChoiceRow from './ChoiceRow';
@@ -227,7 +227,7 @@ export default function FirstRun({ onScan }: Props) {
               backdrops and artwork for movies. It is free, and takes about two minutes to get.
             </p>
             <div className="settings-row">
-              <FocusButton className="btn-secondary" onSelect={() => void openUrl(TMDB_KEY_URL)}>
+              <FocusButton className="btn-secondary" onSelect={() => void openLink(TMDB_KEY_URL)}>
                 Get a free key ↗
               </FocusButton>
             </div>

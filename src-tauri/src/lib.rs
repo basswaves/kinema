@@ -314,6 +314,7 @@ pub fn run() {
             settings::append_log,
             settings::log_paths,
             settings::open_log_folder,
+            tracking::link_qr,
             settings::open_backup_folder,
             simkl::simkl_status,
             simkl::simkl_start_connect,

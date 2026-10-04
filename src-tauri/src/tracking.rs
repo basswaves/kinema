@@ -496,6 +496,13 @@ pub struct Status {
     pub last_sent_at: Option<i64>,
 }
 
+/// A web address as a QR code, for a device that cannot open web pages
+/// itself: scanned with a phone instead (`ui/links.ts`).
+#[tauri::command]
+pub fn link_qr(url: String) -> Option<String> {
+    qr_svg(&url)
+}
+
 pub fn qr_svg(text: &str) -> Option<String> {
     use qrcode::render::svg;
     let code = qrcode::QrCode::new(text.as_bytes()).ok()?;

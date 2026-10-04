@@ -53,6 +53,18 @@ behaves as if its user had not entered one: paste your own free
 [TMDB key](https://www.themoviedb.org/settings/api) in Settings, or put
 `VITE_TMDB_API_KEY=…` in a `.env.local` (ignored by git) to build one in.
 
+The app icon is drawn once, in `src-tauri/icons/icon.svg`;
+`android-foreground.svg` is the same mark with the room Android's crop needs.
+After changing either, remake every size, Android's included, with:
+
+```bash
+npx tauri icon src-tauri/icons/icons.json
+```
+
+It also writes an `ios/` folder, which Kinema has no use for: delete it. The
+Android TV banner (`res/drawable-xhdpi/banner.png`, 320×180) is not made by
+that command; redraw it by hand if the mark changes.
+
 ## Verifying
 
 Both of these, before saying something is done:

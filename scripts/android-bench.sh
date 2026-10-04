@@ -178,6 +178,11 @@ case "$cmd" in
     # a 430 MB APK, which an old box with 1 GB free could not install over
     # the copy it had. Panics still name their functions.
     export CARGO_PROFILE_DEV_STRIP="${CARGO_PROFILE_DEV_STRIP:-debuginfo}"
+    # Optimised, as a release is: unoptimised, the SMB client and its signing
+    # read a NAS at about half what a 4K film needs on a 32-bit box, and the
+    # film stopped every few seconds to wait. Checks stay on (debug
+    # assertions, overflow), so it is still a test build.
+    export CARGO_PROFILE_DEV_OPT_LEVEL="${CARGO_PROFILE_DEV_OPT_LEVEL:-2}"
     npx tauri android build --debug --target "${1:-x86_64}" --apk
     echo "$apk_dir/app-universal-debug.apk"
     ;;

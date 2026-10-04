@@ -152,7 +152,7 @@ fn answer(conn: TcpStream) -> io::Result<()> {
     let file = match netshare::open(&path) {
         Ok(f) => f,
         Err(e) => {
-            log::warn!("stream: {path}: {e}");
+            crate::log!("stream: could not open {path}: {e}");
             let status = match e.kind() {
                 io::ErrorKind::NotFound => "404 Not Found",
                 io::ErrorKind::PermissionDenied => "403 Forbidden",
@@ -194,14 +194,11 @@ fn answer(conn: TcpStream) -> io::Result<()> {
     // the reading: the reader's next hand-over finds no one there.
     let (tx, rx) = mpsc::sync_channel::<io::Result<Vec<u8>>>(AHEAD);
     std::thread::spawn(move || {
+        let mut file = file;
         let mut pos = start;
         while pos <= end {
             let want = CHUNK.min((end - pos + 1) as usize);
-            let mut buf = vec![0; want];
-            let got = file.read_at(&mut buf, pos).map(|n| {
-                buf.truncate(n);
-                buf
-            });
+            let got = read_or_reopen(&mut file, &path, pos, want);
             let stop = !matches!(&got, Ok(b) if !b.is_empty());
             if let Ok(b) = &got {
                 pos += b.len() as u64;
@@ -219,6 +216,36 @@ fn answer(conn: TcpStream) -> io::Result<()> {
         out.write_all(&chunk)?;
     }
     Ok(())
+}
+
+/// A part of the film, the file opened afresh and the read tried again if
+/// it fails: a NAS busy with a burst of skips, or a connection it dropped,
+/// should cost a moment, not the film (seen on a box: replies cut short and
+/// the player giving up).
+fn read_or_reopen(file: &mut netshare::RemoteFile, path: &str, pos: u64, want: usize) -> io::Result<Vec<u8>> {
+    let mut tries = 0;
+    loop {
+        let mut buf = vec![0; want];
+        match file.read_at(&mut buf, pos) {
+            Ok(n) => {
+                buf.truncate(n);
+                return Ok(buf);
+            }
+            Err(e) if tries < 2 => {
+                tries += 1;
+                crate::log!("stream: reading {path} at {pos}: {e}; opening it again");
+                std::thread::sleep(std::time::Duration::from_millis(300 * tries));
+                match netshare::open(path) {
+                    Ok(again) => *file = again,
+                    Err(e) => crate::log!("stream: could not open {path} again: {e}"),
+                }
+            }
+            Err(e) => {
+                crate::log!("stream: reading {path} at {pos} failed: {e}");
+                return Err(e);
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -252,6 +279,39 @@ mod tests {
         conn.read_to_end(&mut all).unwrap();
         let split = all.windows(4).position(|w| w == b"\r\n\r\n").unwrap();
         (String::from_utf8_lossy(&all[..split]).into_owned(), all[split + 4..].to_vec())
+    }
+
+    /// Skipping ahead again and again, as a remote held on → does: each skip
+    /// is a new request, and the one before is dropped part-way. The film
+    /// read after them must still come whole. (On a box, a burst of skips
+    /// was followed by replies cut short and the player giving up.)
+    #[test]
+    fn a_burst_of_skips_leaves_the_film_readable() {
+        let Some(root) = crate::netshare::test_share() else { return };
+        let mut dir = root;
+        let video = loop {
+            let entries = netshare::list(&dir).unwrap();
+            if let Some(v) = entries.iter().find(|e| !e.is_dir && e.size > 16 << 20) {
+                break format!("{dir}/{}", v.name);
+            }
+            dir = format!("{dir}/{}", entries.iter().find(|e| e.is_dir).unwrap().name);
+        };
+        let whole = netshare::read(&video, 1 << 30).unwrap();
+        let url = tauri::async_runtime::block_on(stream_address(video)).unwrap();
+        let rest = url.strip_prefix("http://").unwrap();
+        let (host, path) = rest.split_once('/').unwrap();
+        for i in 0..15u64 {
+            let mut conn = TcpStream::connect(host).unwrap();
+            let from = i * (whole.len() as u64 / 16);
+            write!(conn, "GET /{path} HTTP/1.1\r\nHost: {host}\r\nRange: bytes={from}-\r\n\r\n").unwrap();
+            let mut some = vec![0; 256 * 1024];
+            conn.read_exact(&mut some).unwrap();
+            // Dropped mid-reply, as a player does on the next skip.
+        }
+        let from = whole.len() - (8 << 20);
+        let (head, body) = get(&url, Some(&format!("bytes={from}-")));
+        assert!(head.starts_with("HTTP/1.1 206"), "{head}");
+        assert!(body == whole[from..], "the film after the skips: {} of {} bytes", body.len(), whole.len() - from);
     }
 
     /// Against a real share, when one is named (`netshare::test_share`).

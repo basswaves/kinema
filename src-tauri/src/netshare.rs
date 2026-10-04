@@ -269,12 +269,13 @@ fn drop_connection(addr: &Address) {
 
 /// Runs `op` on a connection, once more on a fresh one if the first failed
 /// for any reason but the answer itself (not there, not allowed).
-fn with_client<T>(addr: &Address, op: impl Fn(&Client, &UncPath) -> io::Result<T>) -> io::Result<T> {
+fn with_client<T>(addr: &Address, op: impl Fn(&Arc<Server>, &UncPath) -> io::Result<T>) -> io::Result<T> {
     let unc = addr.unc()?;
-    match connect(addr).and_then(|s| op(&s.client, &unc)) {
+    match connect(addr).and_then(|s| op(&s, &unc)) {
         Err(e) if !matches!(e.kind(), io::ErrorKind::NotFound | io::ErrorKind::PermissionDenied) => {
+            crate::log!("netshare: {}: {e}; connecting afresh", addr.host());
             drop_connection(addr);
-            op(&connect(addr)?.client, &unc)
+            op(&connect(addr)?, &unc)
         }
         other => other,
     }
@@ -305,8 +306,8 @@ impl Drop for Open {
 /// What is in a folder on a share: its files and folders, without `.`/`..`.
 pub fn list(path: &str) -> io::Result<Vec<Entry>> {
     let addr = parse(path)?;
-    with_client(&addr, |client, unc| {
-        let open = Open(Some(client.create_file(unc, &read_access()).map_err(to_io)?));
+    with_client(&addr, |server, unc| {
+        let open = Open(Some(server.client.create_file(unc, &read_access()).map_err(to_io)?));
         let Some(Resource::Directory(dir)) = &open.0 else {
             return Err(io::Error::new(io::ErrorKind::NotADirectory, format!("{path} is not a folder")));
         };
@@ -332,8 +333,8 @@ pub fn list(path: &str) -> io::Result<Vec<Entry>> {
 pub fn stat(path: &str) -> io::Result<Entry> {
     let addr = parse(path)?;
     let name = addr.inner.rsplit('/').next().unwrap_or(&addr.share).to_string();
-    with_client(&addr, |client, unc| {
-        let open = Open(Some(client.create_file(unc, &read_access()).map_err(to_io)?));
+    with_client(&addr, |server, unc| {
+        let open = Open(Some(server.client.create_file(unc, &read_access()).map_err(to_io)?));
         let time = |t| SystemTime::from(smb::binrw_util::file_time::FileTime::from(t));
         Ok(match open.0.as_ref().expect("just opened") {
             Resource::File(f) => {
@@ -350,6 +351,11 @@ pub fn stat(path: &str) -> io::Result<Entry> {
 pub struct RemoteFile {
     open: Open,
     len: u64,
+    /// The connection it was opened on, kept while it is open: a fresh
+    /// connection made for something else (`with_client`) must not close a
+    /// film being played on the old one. After `open`, so the file is closed
+    /// first.
+    _server: Arc<Server>,
 }
 
 impl RemoteFile {
@@ -378,8 +384,8 @@ impl RemoteFile {
 /// Opens a file on a share for reading.
 pub fn open(path: &str) -> io::Result<RemoteFile> {
     let addr = parse(path)?;
-    with_client(&addr, |client, unc| {
-        let open = Open(Some(client.create_file(unc, &read_access()).map_err(to_io)?));
+    with_client(&addr, |server, unc| {
+        let open = Open(Some(server.client.create_file(unc, &read_access()).map_err(to_io)?));
         let len = match &open.0 {
             Some(Resource::File(f)) => {
                 use smb::resource::GetLen;
@@ -387,7 +393,7 @@ pub fn open(path: &str) -> io::Result<RemoteFile> {
             }
             _ => return Err(io::Error::new(io::ErrorKind::IsADirectory, format!("{path} is a folder"))),
         };
-        Ok(RemoteFile { open, len })
+        Ok(RemoteFile { open, len, _server: server.clone() })
     })
 }
 

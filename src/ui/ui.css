@@ -77,6 +77,17 @@ html {
   font-size: max(calc(16px * var(--ui-scale)), min(1.2083vw, 2.1481vh));
 }
 
+/*
+ * Where Kinema is only ever on a TV (Android), the page is the whole TV,
+ * whatever size the system says it is: the 1080p drawing, scaled to it, up
+ * and down. Android gives a 1080p TV to the page as 960 × 540 at twice the
+ * density, so the floor above made everything twice the size it was drawn
+ * at, and little fitted (owner, 2026-10-04: the same as the TV PC).
+ */
+:root[data-tv='on'][data-tv-only] {
+  font-size: min(1.2083vw, 2.1481vh);
+}
+
 .browse {
   position: absolute;
   inset: 0;

@@ -96,6 +96,8 @@ export async function loadTvMode(): Promise<void> {
   ]);
   const fixed = alwaysTv();
   enabled = fixed || stored === 'on';
+  // The layout drawn for a 1080p TV, scaled to whatever the screen is (ui.css).
+  document.documentElement.toggleAttribute('data-tv-only', fixed);
   apply(enabled);
   emit();
   // Nothing to fill where there is no window: the app is the screen already.

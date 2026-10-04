@@ -24,6 +24,7 @@ import { SETUP_PAGES_KEY } from './SetupPages';
 import {
   hasPendingReturn,
   installFocusWatchdog,
+  installReadOn,
   recoverFocusSoon,
   returnFocusTo,
   useClaimFocus,
@@ -77,6 +78,7 @@ initSpatial({
   throttleKeypresses: true,
 });
 installFocusWatchdog();
+installReadOn();
 
 /** The nav entries, in order. Detail and player are reached, not navigated to. */
 type NavTarget = 'home' | 'movies' | 'tv' | 'search' | 'settings';

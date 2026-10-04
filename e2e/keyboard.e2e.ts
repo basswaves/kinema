@@ -585,3 +585,40 @@ test('the equipment notice: Choose when never asked, Use it too for only these',
   // The button went with the notice; the ring goes somewhere, not nowhere.
   await expect.poll(() => focused(page)).toBeTruthy();
 });
+
+test('Down with nothing further down reads on, and Up reads back', async ({ page }) => {
+  // A film's page ends in its picture and sound badges under Play, never
+  // focusable; in a short window they are more than fits beneath it.
+  await open(page, 'windows');
+  for (let i = 0; i < 6 && !(await focused(page))?.startsWith('Example Film'); i++) {
+    await press(page, 'ArrowDown');
+  }
+  await press(page, 'Enter');
+  await expect.poll(() => focused(page)).toBe('▶ Play');
+  await page.setViewportSize({ width: 1280, height: 300 });
+  await page.waitForTimeout(400);
+  const lastRow = page.locator('.media-badges .badge-row').last();
+  const rowShown = () =>
+    lastRow.evaluate((el) => el.getBoundingClientRect().bottom <= window.innerHeight);
+  expect(await rowShown()).toBe(false);
+
+  for (let i = 0; i < 6 && !(await rowShown()); i++) {
+    await press(page, 'ArrowDown');
+    await page.waitForTimeout(400);
+  }
+  expect(await rowShown()).toBe(true);
+  expect(await focused(page)).toBe('▶ Play');
+
+  // Back up: Play comes back into view before focus moves anywhere.
+  const inView = () =>
+    page.evaluate(() => {
+      const r = document.querySelector('.focused')?.getBoundingClientRect();
+      return r ? r.top >= 0 && r.bottom <= window.innerHeight : false;
+    });
+  for (let i = 0; i < 6 && !(await inView()); i++) {
+    await press(page, 'ArrowUp');
+    await page.waitForTimeout(400);
+  }
+  expect(await inView()).toBe(true);
+  expect(await focused(page)).toBe('▶ Play');
+});

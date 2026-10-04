@@ -278,3 +278,64 @@ export function keepOnScreen(node: HTMLElement | null, inline: 'center' | 'neare
     page.scrollTo({ top: page.scrollHeight, behavior: 'smooth' });
   }
 }
+
+/** How far one press reads on, as a share of the visible page. */
+const READ_STEP = 0.6;
+
+/**
+ * Down with nothing further down reads on; Up reads back.
+ *
+ * Some pages end in text below their last control — the notes under the last
+ * setting, a long description — and `keepOnScreen` can only bring that into
+ * view when it fits on one screen together with the control. Longer than
+ * that, a remote had no way to reach it (owner, 2026-10-04: "you can't see
+ * everything"). So a Down press that the spatial library could not spend on a
+ * move scrolls the page on by most of a screen, as a TV app does with text;
+ * and while the focused control is above the top of the screen, Up scrolls
+ * back before it moves anywhere.
+ *
+ * Capture phase on `window`, like the watchdog: Up has to be answered before
+ * the spatial library moves; Down is only judged once it has had its turn.
+ */
+let readOnInstalled = false;
+
+export function installReadOn(): void {
+  if (readOnInstalled) return;
+  readOnInstalled = true;
+
+  window.addEventListener(
+    'keydown',
+    (event) => {
+      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+      if ((SpatialNavigation as unknown as { paused?: boolean }).paused) return;
+      const node = document.querySelector<HTMLElement>('.focused');
+      const page = node && pageScroller(node);
+      if (!node || !page) return;
+      const step = page.clientHeight * READ_STEP;
+
+      if (event.key === 'ArrowUp') {
+        const root = document.documentElement;
+        const rem = parseFloat(getComputedStyle(root).fontSize);
+        const topBar = (TOP_BAR_REM + (root.dataset.tv === 'on' ? TV_SAFE_TOP_REM : 0)) * rem;
+        if (node.getBoundingClientRect().bottom < page.getBoundingClientRect().top + topBar) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          page.scrollBy({ top: -step, behavior: 'smooth' });
+        }
+        return;
+      }
+
+      // Held down, the spatial library skips presses (it throttles them), and
+      // a skipped press would look like the end of the page.
+      if (event.repeat) return;
+      // After the spatial library's own listener: the same control still
+      // focused means there was nothing below it to move to.
+      window.setTimeout(() => {
+        if (document.querySelector('.focused') !== node) return;
+        if (page.scrollTop + page.clientHeight >= page.scrollHeight - 1) return;
+        page.scrollBy({ top: step, behavior: 'smooth' });
+      }, 0);
+    },
+    true
+  );
+}

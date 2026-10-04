@@ -23,7 +23,8 @@
  *
  * One more step since 2026-10-02, answered in a press: where Kinema will be
  * watched (TV mode — big text and full screen, which screen switching
- * needs), asked first so the rest is already readable from a sofa.
+ * needs), asked first so the rest is already readable from a sofa. Not
+ * asked where Kinema has no window (Android): there it is always the TV.
  *
  * Scan hands over to the setup pages (`SetupPages.tsx`) at once rather than
  * waiting for the scan to end: the questions that can wait for a library are
@@ -38,6 +39,7 @@ import FocusButton from './FocusButton';
 import FocusInput from './FocusInput';
 import ChoiceRow from './ChoiceRow';
 import { setTvMode, TV_MODE_KEY } from './tv';
+import { useCapabilities } from '../capabilities';
 import { useClaimFocus } from './focus';
 import { addLibraryRoot, listLibraryRoots, type LibraryKind, type LibraryRoot } from '../library/api';
 import { useScanStatus } from '../library/pipeline';
@@ -73,6 +75,8 @@ export default function FirstRun({ onScan }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [seat, setSeat] = useState<Seat>('');
   const scan = useScanStatus();
+  // Only a window can be at a desk (tv.ts); without one there is no question.
+  const askSeat = useCapabilities()?.windowed !== false;
 
   useEffect(() => {
     void (async () => {
@@ -129,6 +133,7 @@ export default function FirstRun({ onScan }: Props) {
   }, [onScan, saveKey, tmdbKey]);
 
   const hasRoots = roots.length > 0;
+  const folderStep = askSeat ? 2 : 1;
 
   const chooseSeat = useCallback((next: Seat) => {
     setSeat(next);
@@ -150,35 +155,47 @@ export default function FirstRun({ onScan }: Props) {
           </div>
         )}
 
-        <section className="first-run-step">
-          <h2>
-            <span className="first-run-num">1</span> Where will you watch?
-          </h2>
-          <ChoiceRow<Seat>
-            label="This PC is for"
-            choices={[
-              { value: 'tv', label: 'A TV, from the sofa' },
-              { value: 'desk', label: 'A desk' },
-            ]}
-            value={seat}
-            onChange={chooseSeat}
-            note="On a TV, Kinema fills the screen with bigger text, made for a remote. At a desk it is a window like any other program."
-          />
-        </section>
+        {askSeat && (
+          <section className="first-run-step">
+            <h2>
+              <span className="first-run-num">1</span> Where will you watch?
+            </h2>
+            <ChoiceRow<Seat>
+              label="This PC is for"
+              choices={[
+                { value: 'tv', label: 'A TV, from the sofa' },
+                { value: 'desk', label: 'A desk' },
+              ]}
+              value={seat}
+              onChange={chooseSeat}
+              note="On a TV, Kinema fills the screen with bigger text, made for a remote. At a desk it is a window like any other program."
+            />
+          </section>
+        )}
 
         <section className="first-run-step">
           <h2>
-            <span className="first-run-num">2</span> Where are your movies and shows?
+            <span className="first-run-num">{folderStep}</span> Where are your movies and shows?
           </h2>
           <p className="muted">
             Pick the folder you keep them in. A local drive or a network share both work.
             Nothing is moved, renamed or written to; the files are only read.
           </p>
           <div className="settings-row">
-            <FocusButton className="btn-primary" onSelect={() => void pickFolder('movies')}>
+            {/* Kept on screen: without the seat question above them, these
+                are where the first run starts, near the foot of a TV. */}
+            <FocusButton
+              keepInView="nearest"
+              className="btn-primary"
+              onSelect={() => void pickFolder('movies')}
+            >
               Add movies folder
             </FocusButton>
-            <FocusButton className="btn-primary" onSelect={() => void pickFolder('tv')}>
+            <FocusButton
+              keepInView="nearest"
+              className="btn-primary"
+              onSelect={() => void pickFolder('tv')}
+            >
               Add TV folder
             </FocusButton>
           </div>
@@ -199,7 +216,7 @@ export default function FirstRun({ onScan }: Props) {
         {ASK_FOR_KEY && (
           <section className="first-run-step">
             <h2>
-              <span className="first-run-num">3</span> Posters and descriptions{' '}
+              <span className="first-run-num">{folderStep + 1}</span> Posters and descriptions{' '}
               <span className="first-run-optional">optional</span>
             </h2>
             <p className="muted">
@@ -237,6 +254,7 @@ export default function FirstRun({ onScan }: Props) {
         <section className="first-run-step">
           <div className="settings-row">
             <FocusButton
+              keepInView="nearest"
               className="btn-primary"
               disabled={!hasRoots || scan !== null}
               onSelect={() => void scanNow()}

@@ -23,6 +23,9 @@ export interface Capabilities {
   /** Sound can go straight to the receiver (Settings → Sound). */
   audio_direct: boolean;
   display_switching: boolean;
+  /** Kinema runs in a window, so a desk is possible. Where it is not
+   * (Android), the layout is always the TV's and nobody is asked (tv.ts). */
+  windowed: boolean;
   sleep: boolean;
   shut_down: boolean;
 }

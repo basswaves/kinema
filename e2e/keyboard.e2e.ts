@@ -321,6 +321,66 @@ test('first run: where to watch, a folder, then the setup pages, all by remote',
   await expect.poll(() => setting('setup_pages')).toBe('done');
 });
 
+test('Android: always the TV layout, never asked', async ({ page }) => {
+  // A TV's screen as Android's WebView gives it to the page: a 1080p TV at
+  // twice the density, as on the emulated TV and on a real box.
+  await page.setViewportSize({ width: 960, height: 540 });
+  await page.addInitScript(() => {
+    localStorage.setItem('kinemaMockSystem', 'android');
+    localStorage.setItem('kinemaMockEmpty', '1');
+  });
+  await page.goto('/');
+  const tv = () => page.evaluate(() => document.documentElement.dataset.tv);
+
+  // No seat question: the folder is the first step, in the TV layout.
+  await expect.poll(() => focused(page)).toBe('Add movies folder');
+  await expect(page.locator('.first-run h2').first()).toContainText('1 Where are your movies');
+  await expect(page.locator('.first-run')).not.toContainText('Where will you watch?');
+  expect(await tv()).toBe('on');
+  // Where the first run starts, so wholly on screen (it sat half off a TV).
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const box = document.querySelector('.focused')?.getBoundingClientRect();
+        return box ? box.bottom <= window.innerHeight && box.top >= 0 : false;
+      })
+    )
+    .toBe(true);
+  // F11 and Ctrl+Shift+T switch a desktop's layout; here there is no desk.
+  await press(page, 'F11');
+  await press(page, 'Control+Shift+T');
+  expect(await tv()).toBe('on');
+
+  // Nothing to ask about picture and sound: the pages start at intros.
+  await press(page, 'Enter');
+  await expect(page.locator('.first-run-roots li')).toHaveCount(1);
+  for (let i = 0; i < 4 && (await focused(page)) !== 'Scan my library'; i++) await press(page, 'ArrowDown');
+  await press(page, 'Enter');
+  await expect(page.locator('.setup-pages h1')).toHaveText('Intros and credits');
+  await expect(page.locator('.setup-progress')).toContainText('1 of 3');
+  await press(page, 'ArrowUp');
+  await press(page, 'ArrowRight');
+  await expect.poll(() => focused(page)).toBe('Finish later');
+  await press(page, 'Enter');
+  await expect.poll(() => focused(page)).toContain('Play');
+
+  // Settings → Playback has no desk-or-TV row, and the key list no F11.
+  await press(page, 'ArrowUp', 2);
+  await press(page, 'ArrowRight', 4);
+  await expect.poll(() => focused(page)).toBe('Settings');
+  await press(page, 'Enter');
+  await press(page, 'ArrowDown');
+  for (let i = 0; i < 6 && (await focused(page)) !== 'Playback'; i++) await press(page, 'ArrowDown');
+  await press(page, 'Enter');
+  await expect(page.locator('.settings-section h2').first()).toHaveText('Playback');
+  await expect(page.locator('.settings-section')).not.toContainText('Where Kinema is used');
+  await press(page, '?');
+  await expect(page.locator('.shortcuts')).toBeVisible();
+  await expect(page.locator('.shortcuts')).not.toContainText('F11');
+  await expect(page.locator('.shortcuts')).not.toContainText('Fullscreen');
+  expect(await tv()).toBe('on');
+});
+
 test('the equipment notice: Choose when never asked, Use it too for only these', async ({ page }) => {
   await open(page, 'windows');
   const api = (name: string, ...args: string[]) =>

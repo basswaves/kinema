@@ -15,9 +15,14 @@
  * Like the rendering settings, this is one switch and not a slider. The choice
  * is "where am I sitting", which has two answers; a percentage control would be
  * a preset UI by another name.
+ *
+ * Where Kinema has no window (Android: an app is the whole screen of a TV
+ * box), there is only the sofa: TV mode is always on, never asked, and cannot
+ * be switched off (owner, 2026-10-04).
  */
 import { useSyncExternalStore } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { capabilitiesNow, loadCapabilities } from '../capabilities';
 import { getSetting, setSetting } from '../metadata/api';
 
 export const TV_MODE_KEY = 'tv_mode';
@@ -56,6 +61,14 @@ async function fillScreen(on: boolean): Promise<void> {
   }
 }
 
+/**
+ * No window, so always the TV layout. Only a clear "no" counts: a system that
+ * gave no answer keeps the choice, as every desktop has always had it.
+ */
+export function alwaysTv(): boolean {
+  return capabilitiesNow()?.windowed === false;
+}
+
 function emit(): void {
   for (const listener of listeners) listener();
 }
@@ -73,23 +86,32 @@ function subscribe(listener: () => void): () => void {
  * to show no UI at all.
  */
 export async function loadTvMode(): Promise<void> {
-  try {
-    enabled = (await getSetting(TV_MODE_KEY)) === 'on';
-  } catch (e) {
-    console.warn('tv mode: could not read setting, staying on the desk layout', e);
-    enabled = false;
-  }
+  // Asked alongside the setting, so a TV box never shows the desk layout first.
+  const [stored] = await Promise.all([
+    getSetting(TV_MODE_KEY).catch((e) => {
+      console.warn('tv mode: could not read setting, staying on the desk layout', e);
+      return null;
+    }),
+    loadCapabilities(),
+  ]);
+  const fixed = alwaysTv();
+  enabled = fixed || stored === 'on';
   apply(enabled);
   emit();
-  if (enabled) await fillScreen(true);
+  // Nothing to fill where there is no window: the app is the screen already.
+  if (enabled && !fixed) await fillScreen(true);
 }
 
 /**
  * Apply immediately, persist in the background. The layout change is the
  * feedback, so making it wait on SQLite would only add latency to a switch the
  * user is watching.
+ *
+ * Without a window it stays on (`alwaysTv`): a keyboard's F11 on a TV box
+ * must not shrink everything to a desk's size with no desk to switch back at.
  */
 export function setTvMode(on: boolean): void {
+  if (alwaysTv()) return;
   const was = enabled;
   enabled = on;
   apply(on);

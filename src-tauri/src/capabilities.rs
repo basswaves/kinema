@@ -27,6 +27,10 @@ pub struct Capabilities {
     pub audio_direct: bool,
     /// The screen's refresh rate, resolution and HDR can be switched.
     pub display_switching: bool,
+    /// Kinema runs in a window on a desktop, so it may be used at a desk as
+    /// well as on a TV. Where it does not — Android, where an app is the whole
+    /// screen of a TV box — it is always the TV layout and never asks.
+    pub windowed: bool,
     pub sleep: bool,
     pub shut_down: bool,
 }
@@ -76,6 +80,7 @@ fn work_out() -> Capabilities {
         equipment_detection: crate::equipment::DETECTS,
         audio_direct: crate::equipment::DIRECT_AUDIO,
         display_switching: crate::display::switches(),
+        windowed: cfg!(desktop),
         sleep: crate::power::can_sleep(),
         shut_down: crate::power::can_shut_down(),
     }
@@ -108,6 +113,7 @@ mod tests {
         let c = current();
         assert_eq!(c.system, "Windows");
         assert!(c.equipment_detection && c.audio_direct && c.display_switching && c.sleep && c.shut_down);
+        assert!(c.windowed);
         // The rendering path the whole of docs/DESIGN.md is written about.
         assert_eq!(
             c.mpv_video,
@@ -126,6 +132,8 @@ mod tests {
         let linux = cfg!(target_os = "linux");
         assert_eq!((c.equipment_detection, c.audio_direct), (linux, linux));
         assert_eq!(c.display_switching, crate::display::switches());
+        // A desktop has windows; Android, the other system here, does not.
+        assert_eq!(c.windowed, cfg!(desktop));
         // Wherever logind says this session may (power.rs); never elsewhere.
         assert_eq!((c.sleep, c.shut_down), (crate::power::can_sleep(), crate::power::can_shut_down()));
         if !linux {

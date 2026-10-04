@@ -853,22 +853,25 @@ export default function Settings({
             {section === 'playback' && (
               <section className="settings-section">
                 <h2>Playback</h2>
-                <ChoiceRow
-                  label="Where Kinema is used"
-                  choices={[
-                    { value: 'desk', label: 'At a desk' },
-                    { value: 'tv', label: 'On a TV' },
-                  ]}
-                  value={tvMode ? 'tv' : 'desk'}
-                  onChange={(v) => setTvMode(v === 'tv')}
-                  note="On a TV, Kinema fills the whole screen, with bigger text and a margin that keeps clear of the edges some TVs cut off. At a desk it runs in a window and its text grows with the window."
-                  hint={
-                    <>
-                      Switch between them any time with <kbd>F11</kbd>, or{' '}
-                      <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>.
-                    </>
-                  }
-                />
+                {/* Without a window there is no desk to choose (tv.ts). */}
+                {can?.windowed !== false && (
+                  <ChoiceRow
+                    label="Where Kinema is used"
+                    choices={[
+                      { value: 'desk', label: 'At a desk' },
+                      { value: 'tv', label: 'On a TV' },
+                    ]}
+                    value={tvMode ? 'tv' : 'desk'}
+                    onChange={(v) => setTvMode(v === 'tv')}
+                    note="On a TV, Kinema fills the whole screen, with bigger text and a margin that keeps clear of the edges some TVs cut off. At a desk it runs in a window and its text grows with the window."
+                    hint={
+                      <>
+                        Switch between them any time with <kbd>F11</kbd>, or{' '}
+                        <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>.
+                      </>
+                    }
+                  />
+                )}
                 <LanguageSection onError={setError} />
                 <ForcedSubtitleRows onError={setError} />
                 <ChoiceRow
@@ -1278,7 +1281,7 @@ export default function Settings({
                 <section className="settings-section">
                   <h2>Storage</h2>
                   <p className="settings-intro">
-                    Posters and backgrounds are kept on this PC so browsing works offline
+                    Posters and backgrounds are kept on this device so browsing works offline
                     {art ? ` (${count(art.files, 'image')}, ${formatBytes(art.bytes)})` : ''}.
                     Clearing them is safe: they download again.
                   </p>

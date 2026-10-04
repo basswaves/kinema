@@ -747,7 +747,10 @@ export function listenerCounts(): Record<string, number> {
  * `kinemaMockSlowDetect` makes the scan's detection pass take 20 seconds,
  * `kinemaMockSystem=linux` answers `capabilities` and the equipment check as
  * the Linux build does on a typical desktop (the check, direct sound, sleep
- * and shut down, but no screen switching), `kinemaMockNoPower=1` is a system
+ * and shut down, but no screen switching), `kinemaMockSystem=android` as the
+ * Android build does (no window, none of the equipment features yet; the fake
+ * mpv still plays),
+ * `kinemaMockNoPower=1` is a system
  * that will not sleep or shut down from Kinema, `kinemaMockScreenHdr=on`
  * reports the screen in HDR (for the output check; the picture itself is the
  * fake mpv's `extra`), `kinemaMockSkiptro=1` has Skiptro's database on this PC.
@@ -763,6 +766,7 @@ const SLOW_MS = Number(flag('kinemaMockSlowMs') ?? 0) || 0;
 const EMPTY = flag('kinemaMockEmpty') === '1';
 const SLOW_DETECT = flag('kinemaMockSlowDetect') === '1';
 const ON_LINUX = flag('kinemaMockSystem') === 'linux';
+const ON_ANDROID = flag('kinemaMockSystem') === 'android';
 const SCREEN_HDR = flag('kinemaMockScreenHdr') === 'on';
 const NO_POWER = flag('kinemaMockNoPower') === '1';
 /** `kinemaMockSkiptro=1`: Skiptro's database is on this PC. */
@@ -949,6 +953,20 @@ const handlers: Record<string, Handler> = {
   // stands for a desktop Kinema cannot ask. `kinemaMockNoPower` is a system
   // whose logind will not, or is missing (capabilities.rs, power.rs).
   capabilities: () => {
+    if (ON_ANDROID) {
+      return {
+        system: 'Android',
+        // The fake mpv stands in for Media3, which the mock does not have.
+        engine: 'mpv',
+        mpv_video: { gpu_api: 'auto', hwdec: 'auto-safe', own_window: false },
+        equipment_detection: false,
+        audio_direct: false,
+        display_switching: false,
+        windowed: false,
+        sleep: false,
+        shut_down: false,
+      };
+    }
     const full = !ON_LINUX;
     return {
       system: full ? 'Windows' : 'Linux',
@@ -959,6 +977,7 @@ const handlers: Record<string, Handler> = {
       equipment_detection: true,
       audio_direct: true,
       display_switching: full,
+      windowed: true,
       sleep: !NO_POWER,
       shut_down: !NO_POWER,
     };

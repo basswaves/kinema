@@ -17,13 +17,15 @@
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import FocusButton from './FocusButton';
 import { useClaimFocus } from './focus';
+import { useCapabilities } from '../capabilities';
 
 const SHORTCUTS_FOCUS_KEY = 'shortcuts-close';
 
 interface Group {
   heading: string;
-  /** `[keys, what it does]`. Keys are split on `+` for rendering. */
-  keys: [string[], string][];
+  /** `[keys, what it does]`. Keys are split on `+` for rendering. A third
+   * `'windowed'` marks a key about the window, left out where there is none. */
+  keys: [string[], string, 'windowed'?][];
   note?: string;
 }
 
@@ -35,8 +37,8 @@ const GROUPS: Group[] = [
       [['Enter'], 'Choose the highlighted thing'],
       [['Esc'], 'Go back'],
       [['?'], 'Show this list'],
-      [['F11'], 'Switch between desk and TV layout (TV is full screen)'],
-      [['Ctrl', 'Shift', 'T'], 'The same, another way'],
+      [['F11'], 'Switch between desk and TV layout (TV is full screen)', 'windowed'],
+      [['Ctrl', 'Shift', 'T'], 'The same, another way', 'windowed'],
     ],
     note: 'A remote’s Back button works anywhere Esc does.',
   },
@@ -48,7 +50,7 @@ const GROUPS: Group[] = [
       [['←', '→'], 'Back or forward 10 seconds; hold to go faster'],
       [['↑', '↓'], 'Bring up the controls: seek bar, subtitles, audio'],
       [['Esc'], 'Close what is open, then leave fullscreen, then stop'],
-      [['F'], 'Fullscreen (the TV layout is always fullscreen)'],
+      [['F'], 'Fullscreen (the TV layout is always fullscreen)', 'windowed'],
       [['M'], 'Sound off and on'],
       [['−', '+'], 'Volume down and up'],
       [['N'], 'Next episode'],
@@ -72,6 +74,7 @@ export default function Shortcuts({ onClose }: Props) {
   // the ring stays on a control the user can no longer see, and the only way
   // out is a key they came here because they did not know.
   useClaimFocus(SHORTCUTS_FOCUS_KEY, true);
+  const windowed = useCapabilities()?.windowed !== false;
 
   return (
     <FocusContext.Provider value={focusKey}>
@@ -88,28 +91,26 @@ export default function Shortcuts({ onClose }: Props) {
             <section key={group.heading} className="shortcuts-group">
               <h3>{group.heading}</h3>
               <dl>
-                {group.keys.map(([keys, what]) => (
-                  <div key={what} className="shortcuts-row">
-                    <dt>
-                      {keys.map((key, i) => (
-                        <span key={key}>
-                          {i > 0 && <span className="shortcuts-plus">+</span>}
-                          <kbd>{key}</kbd>
-                        </span>
-                      ))}
-                    </dt>
-                    <dd>{what}</dd>
-                  </div>
-                ))}
+                {group.keys
+                  .filter(([, , needs]) => !needs || windowed)
+                  .map(([keys, what]) => (
+                    <div key={what} className="shortcuts-row">
+                      <dt>
+                        {keys.map((key, i) => (
+                          <span key={key}>
+                            {i > 0 && <span className="shortcuts-plus">+</span>}
+                            <kbd>{key}</kbd>
+                          </span>
+                        ))}
+                      </dt>
+                      <dd>{what}</dd>
+                    </div>
+                  ))}
               </dl>
               {group.note && <p className="muted">{group.note}</p>}
             </section>
           ))}
-          <FocusButton
-            focusKey={SHORTCUTS_FOCUS_KEY}
-            className="btn-primary"
-            onSelect={onClose}
-          >
+          <FocusButton focusKey={SHORTCUTS_FOCUS_KEY} className="btn-primary" onSelect={onClose}>
             Close
           </FocusButton>
         </div>

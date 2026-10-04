@@ -1,6 +1,11 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
-    <style name="Theme.kinema" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <!-- Customize your theme here. -->
+    <!-- Always dark, in Kinema's own black: the window shows while the page
+         loads (and beneath it, wherever the page is see-through), and the
+         light theme's white filled the TV for seconds at every start. -->
+    <style name="Theme.kinema" parent="Theme.MaterialComponents.NoActionBar">
+        <item name="android:windowBackground">@color/kinema_background</item>
+        <item name="android:colorBackground">@color/kinema_background</item>
+        <item name="android:statusBarColor">@color/kinema_background</item>
+        <item name="android:navigationBarColor">@color/kinema_background</item>
     </style>
 </resources>

@@ -4,9 +4,9 @@
  *
  * First the servers: those Kinema keeps a sign-in for, then those that
  * announce themselves on the network (most NAS boxes do), and Type an address
- * for the rest — most Windows PCs never announce themselves. A server with
- * no sign-in asks for one, which is kept locked on the device
- * (share_logins.rs). Then the server's shares; a share opens in the browser
+ * for the rest — most Windows PCs never announce themselves; a typed one is
+ * checked before anything more is asked. A server with no login asks for a
+ * user name and password, kept locked on the device (share_logins.rs). Then the server's shares; a share opens in the browser
  * as a drive does, folder by folder.
  *
  * The browser owns where it is (`NetStep`) and Back; this draws each step and
@@ -19,6 +19,7 @@ import FocusInput from './FocusInput';
 import { userError } from './errors';
 import { carryKeyboard } from './typing';
 import {
+  checkServer,
   findServers,
   listShares,
   saveShareLogin,
@@ -145,17 +146,28 @@ function Servers({ onStep }: { onStep: (next: NetStep) => void }) {
 
 function Address({ onStep }: { onStep: (next: NetStep) => void }) {
   const [address, setAddress] = useState('');
+  const [checking, setChecking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   useEffect(() => void setFocus('net-address'), []);
-  const next = () => {
-    // Forgiving of the forms people copy: smb://nas/films, \\nas\films.
-    const host = address
-      .trim()
-      .replace(/^smb:/i, '')
-      .replace(/^[/\\]+/, '')
-      .split(/[/\\]/)[0];
-    if (!host) return;
-    carryKeyboard();
-    onStep({ step: 'sign-in', server: { host, name: host } });
+  // Forgiving of the forms people copy: smb://nas/films, \\nas\films.
+  const host = address
+    .trim()
+    .replace(/^smb:/i, '')
+    .replace(/^[/\\]+/, '')
+    .split(/[/\\]/)[0];
+  // Whether anything answers there, before a user name and password are
+  // typed for it on a remote (owner, 2026-10-04).
+  const next = async () => {
+    if (!host || checking) return;
+    setChecking(true);
+    setError(null);
+    try {
+      await checkServer(host);
+      onStep({ step: 'sign-in', server: { host, name: host } });
+    } catch (e) {
+      setError(userError(e));
+      setChecking(false);
+    }
   };
   return (
     <div className="folder-note">
@@ -167,11 +179,12 @@ function Address({ onStep }: { onStep: (next: NetStep) => void }) {
           value={address}
           onChange={setAddress}
           placeholder="192.168.1.20"
-          onEnter={next}
+          onEnter={() => void setFocus('net-next')}
         />
       </label>
-      <FocusButton className="btn-primary" onSelect={next}>
-        Next
+      {error && <p className="leave-error">{error}</p>}
+      <FocusButton focusKey="net-next" className="btn-primary" onSelect={() => void next()}>
+        {checking ? 'Checking…' : 'Next'}
       </FocusButton>
     </div>
   );
@@ -180,11 +193,12 @@ function Address({ onStep }: { onStep: (next: NetStep) => void }) {
 function SignIn({ server, onStep }: { server: Server; onStep: (next: NetStep) => void }) {
   const [user, setUser] = useState('');
   const [password, setPassword] = useState('');
+  const [shown, setShown] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => void setFocus('net-user'), []);
 
-  const signIn = async () => {
+  const connect = async () => {
     if (busy) return;
     setBusy(true);
     setError(null);
@@ -197,14 +211,14 @@ function SignIn({ server, onStep }: { server: Server; onStep: (next: NetStep) =>
     }
   };
 
+  // The fields first, then the button, then the words: the system's
+  // keyboard covers the lower half of the screen while one is typed in.
+  // The keyboard's Enter moves on — from the password to Connect, which it
+  // leaves for the person to press once they have looked (owner, 2026-10-04).
   return (
     <div className="folder-note">
-      <p className="muted">
-        The name and password you use for {server.name}. Kinema keeps them locked on this device
-        and only reads from it.
-      </p>
       <label className="settings-field">
-        <span>Name</span>
+        <span>User name</span>
         <FocusInput
           focusKey="net-user"
           className="settings-input"
@@ -216,21 +230,30 @@ function SignIn({ server, onStep }: { server: Server; onStep: (next: NetStep) =>
           }}
         />
       </label>
-      <label className="settings-field">
+      <div className="settings-field">
         <span>Password</span>
-        <FocusInput
-          focusKey="net-password"
-          className="settings-input"
-          type="password"
-          value={password}
-          onChange={setPassword}
-          onEnter={() => void signIn()}
-        />
-      </label>
+        <div className="folder-password">
+          <FocusInput
+            focusKey="net-password"
+            className="settings-input"
+            type={shown ? 'text' : 'password'}
+            value={password}
+            onChange={setPassword}
+            onEnter={() => void setFocus('net-connect')}
+          />
+          <FocusButton className="btn-secondary" onSelect={() => setShown((s) => !s)}>
+            {shown ? 'Hide' : 'Show'}
+          </FocusButton>
+        </div>
+      </div>
       {error && <p className="leave-error">{error}</p>}
-      <FocusButton className="btn-primary" onSelect={() => void signIn()}>
-        {busy ? 'Signing in…' : 'Sign in'}
+      <FocusButton focusKey="net-connect" className="btn-primary" onSelect={() => void connect()}>
+        {busy ? 'Connecting…' : 'Connect'}
       </FocusButton>
+      <p className="muted">
+        The user name and password you use for {server.name}. Kinema keeps them locked on this
+        device, and only reads from the drive.
+      </p>
     </div>
   );
 }
@@ -255,7 +278,7 @@ function Shares({
       .catch((e: unknown) => {
         if (!live) return;
         const message = userError(e);
-        // A kept sign-in the server no longer takes asks again.
+        // A kept login the server no longer takes asks again.
         if (message.includes('needs a sign-in')) onStep({ step: 'sign-in', server });
         else {
           setError(message);
@@ -301,7 +324,6 @@ function Shares({
   const typedShare = typed.trim().replace(/^[/\\]+|[/\\]+$/g, '');
   return (
     <div className="folder-note">
-      {error && <p className="leave-error">{error}</p>}
       <label className="settings-field">
         <span>The shared folder’s name on {server.name}, such as films</span>
         <FocusInput
@@ -309,10 +331,15 @@ function Shares({
           className="settings-input"
           value={typed}
           onChange={setTyped}
-          onEnter={() => typedShare && open(typedShare)}
+          onEnter={() => void setFocus('net-open')}
         />
       </label>
-      <FocusButton className="btn-primary" onSelect={() => typedShare && open(typedShare)}>
+      {error && <p className="leave-error">{error}</p>}
+      <FocusButton
+        focusKey="net-open"
+        className="btn-primary"
+        onSelect={() => typedShare && open(typedShare)}
+      >
         Open
       </FocusButton>
     </div>

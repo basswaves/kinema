@@ -1259,6 +1259,13 @@ const handlers: Record<string, Handler> = {
   share_logins: () => shareLogins,
   // One NAS announces itself; a typed `nas` is the same box.
   'plugin:network|find_servers': () => ({ servers: [{ name: 'Living room NAS', host: 'nas' }] }),
+  check_server: (a) => {
+    const server = String(a.server);
+    if (server !== 'nas') {
+      throw new Error(`Nothing answers as a network drive at ${server}. Check the address, and that the NAS or computer is on.`);
+    }
+    return null;
+  },
   list_shares: (a) => {
     const server = String(a.server);
     if (!shareLogins.some((l) => l.server === server)) {
@@ -1269,8 +1276,8 @@ const handlers: Record<string, Handler> = {
   save_share_login: (a) => {
     const server = String(a.server);
     if (server !== 'nas') throw new Error(`Could not reach ${server}: no answer`);
-    if (!a.user) throw new Error('Kinema cannot sign in as a guest yet. Sign in with a name and password.');
-    if (a.password !== 'secret') throw new Error(`${server} did not accept that name and password.`);
+    if (!a.user) throw new Error('Kinema cannot connect as a guest yet. Enter a user name and password.');
+    if (a.password !== 'secret') throw new Error(`${server} did not accept that user name and password.`);
     const i = shareLogins.findIndex((l) => l.server === server);
     if (i >= 0) shareLogins.splice(i, 1);
     shareLogins.push({ server, user: String(a.user) });

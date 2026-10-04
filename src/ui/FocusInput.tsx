@@ -52,11 +52,30 @@ export default function FocusInput({
     <input
       ref={ref}
       type={type}
+      // User names, addresses, keys and paths: typed exactly, never
+      // capitalised or "corrected" by the system's keyboard.
+      autoCapitalize="none"
+      autoCorrect="off"
+      spellCheck={false}
       className={`${className} ${focused ? 'focused' : ''}`.trim()}
       placeholder={placeholder}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       onKeyDown={(e) => {
+        // With the system's keyboard opened, Left and Right move the cursor
+        // through the text (its own arrow keys did nothing before); at the
+        // text's end they move on as ever — to a Show button beside it.
+        const input = ref.current;
+        if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && input?.inputMode === 'text') {
+          const atEdge =
+            e.key === 'ArrowLeft'
+              ? input.selectionStart === 0 && input.selectionEnd === 0
+              : input.selectionEnd === input.value.length;
+          if (!atEdge) {
+            e.stopPropagation();
+            return;
+          }
+        }
         if (e.key !== 'Enter' || enterKey(e) || !onEnter) return;
         // The field's own: not also a press on whatever has the ring once
         // `onEnter` has moved it (a sign-in that answers at once and puts

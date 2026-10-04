@@ -144,6 +144,36 @@ pub fn try_sign_in(server: &str) -> io::Result<()> {
     connect(&parse(&format!("{SCHEME}{server}/IPC$"))?).map(|_| ())
 }
 
+/// Whether a file server answers at `server` at all — asked before anyone
+/// types a user name and password for it (owner, 2026-10-04). Connects and
+/// agrees on SMB's version, nothing more; signs in to nothing.
+pub fn reachable(server: &str) -> io::Result<()> {
+    let addr = parse(&format!("{SCHEME}{server}/IPC$"))?;
+    let mut config = ClientConfig::default();
+    config.connection.port = addr.port;
+    config.connection.timeout = Some(Duration::from_secs(5));
+    let client = Client::new(config);
+    let answered = client.connect(&addr.server).map(|_| ()).map_err(to_io);
+    if let Err(e) = client.close() {
+        log::debug!("netshare: closing a check: {e}");
+    }
+    answered
+}
+
+/// For the folder browser's typed address.
+#[tauri::command]
+pub async fn check_server(server: String) -> Result<(), String> {
+    crate::jobs::off_main(move || {
+        reachable(&server).map_err(|e| {
+            crate::log!("network: nothing answered at {server}: {e}");
+            format!(
+                "Nothing answers as a network drive at {server}. Check the address, and that the NAS or computer is on."
+            )
+        })
+    })
+    .await
+}
+
 /// The shares a server offers that a person would pick: its disk shares,
 /// not the hidden ones (srvsvc.rs, which says why Kinema asks itself).
 pub fn shares(server: &str) -> io::Result<Vec<String>> {
@@ -581,6 +611,10 @@ mod tests {
         for r in readers {
             assert!(r.join().expect("no crash") == whole, "the same bytes");
         }
+
+        // A server that is there answers the check; a port with nothing on it does not.
+        assert!(reachable(&addr_of(root).host()).is_ok());
+        assert!(reachable("127.0.0.1:9").is_err());
 
         // The server names its shares, the test share among them.
         let share_list = shares(&addr_of(root).host()).unwrap();

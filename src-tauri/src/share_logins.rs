@@ -157,21 +157,33 @@ pub async fn save_share_login(
     // The SMB library cannot finish a guest's sign-in yet (it waits for a
     // last step a guest never gets); said plainly rather than as its error.
     if user.is_empty() {
-        return Err("Kinema cannot sign in as a guest yet. Sign in with a name and password.".into());
+        return Err("Kinema cannot connect as a guest yet. Enter a user name and password.".into());
     }
     let before = netshare::login(&server);
     let tried = {
+        let named = server.clone();
         let (server, user, password) = (server.clone(), user.clone(), password.clone());
         crate::jobs::off_main(move || {
             netshare::set_login(&server, &user, &password);
             netshare::try_sign_in(&server).map_err(|e| match e.kind() {
                 std::io::ErrorKind::PermissionDenied => {
-                    format!("{server} did not accept that name and password.")
+                    format!("{server} did not accept that user name and password.")
                 }
                 _ => format!("Could not reach {server}: {e}"),
             })
         })
         .await
+        // A fault in Kinema while connecting (it is in the log): said as
+        // that, so nobody retypes a password that was never the problem.
+        .map_err(|e| {
+            if e.starts_with("Something went wrong inside Kinema") {
+                format!(
+                    "Connecting to {named} failed because of a fault in Kinema, not your user name or password. What happened is in its log (Settings → Advanced)."
+                )
+            } else {
+                e
+            }
+        })
     };
     if tried.is_err() {
         // A mistyped password leaves the sign-in that worked as it was.

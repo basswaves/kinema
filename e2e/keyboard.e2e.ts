@@ -641,8 +641,9 @@ test('Android: the system keyboard opens on OK, never on arriving at a field', a
   // ...while a plugged-in keyboard types as ever.
   await page.keyboard.type('exa');
   await expect(box).toHaveValue('exa');
-  // OK asks for the system's keyboard, and the box keeps typing focus.
-  await press(page, 'Enter');
+  // OK (Shift+Enter, as MainActivity sends it) asks for the system's
+  // keyboard, and the box keeps typing focus.
+  await press(page, 'Shift+Enter');
   await expect(box).toHaveAttribute('inputmode', 'text');
   await expect(box).toBeFocused();
   // Moving on lets go, and the next arrival holds the keyboard back again.
@@ -706,7 +707,7 @@ test('Android: the log is shared, and no folder is offered to open', async ({ pa
 test('Android: a kept network sign-in is listed, and forgotten by remote', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('kinemaMockShareLogin', '1'));
   await androidSettings(page, 'Library');
-  const section = page.locator('.settings-section', { hasText: 'Network sign-ins' });
+  const section = page.locator('.settings-section', { hasText: 'Saved network logins' });
   await expect(section).toContainText('nas');
   await expect(section).toContainText('films');
   // Down from the folders' buttons, as a remote gets there.
@@ -727,7 +728,7 @@ test('a computer opens shares itself, so it lists no network sign-ins', async ({
   for (let i = 0; i < 6 && (await focused(page)) !== 'Settings'; i++) await press(page, 'ArrowRight');
   await press(page, 'Enter');
   await expect(page.locator('.settings-section h2').first()).toHaveText('Folders');
-  await expect(page.locator('.settings-section', { hasText: 'Network sign-ins' })).toHaveCount(0);
+  await expect(page.locator('.settings-section', { hasText: 'Saved network logins' })).toHaveCount(0);
 });
 
 test('Android: a folder on a network drive, signed in to and chosen by remote', async ({ page }) => {
@@ -764,9 +765,9 @@ test('Android: a folder on a network drive, signed in to and chosen by remote', 
   await expect(password).toBeFocused();
   await page.keyboard.type('wrong');
   await press(page, 'ArrowDown');
-  await expect.poll(() => focused(page)).toBe('Sign in');
+  await expect.poll(() => focused(page)).toBe('Connect');
   await press(page, 'Enter');
-  await expect(browser.locator('.leave-error')).toHaveText('nas did not accept that name and password.');
+  await expect(browser.locator('.leave-error')).toHaveText('nas did not accept that user name and password.');
   await press(page, 'ArrowUp');
   await expect(password).toBeFocused();
   await password.fill('secret');
@@ -827,16 +828,28 @@ test('Android: a NAS that does not announce itself, typed, and its share named',
     await press(page, 'ArrowDown');
   }
   await press(page, 'Enter');
-  // The form people copy an address in is forgiven.
-  await expect(browser.locator('input')).toBeFocused();
-  await page.keyboard.type('\\\\other\\films');
-  await press(page, 'ArrowDown');
+  const field = browser.locator('input');
+  await expect(field).toBeFocused();
+  // A mistyped address is caught before any user name is asked for. The
+  // keyboard's Enter goes to Next; Next checks.
+  await page.keyboard.type('nsa');
   await press(page, 'Enter');
-  await expect(browser.locator('.folder-where')).toHaveText('Network drives › other');
+  await expect.poll(() => focused(page)).toBe('Next');
+  await expect(browser.locator('.folder-where')).toHaveText('Network drives');
+  await press(page, 'Enter');
+  await expect(browser.locator('.leave-error')).toContainText('Nothing answers as a network drive at nsa');
+  await expect(browser.locator('.folder-where')).toHaveText('Network drives');
+  // The form people copy an address in is forgiven.
+  await field.fill('\\\\nas\\films');
+  await press(page, 'ArrowUp');
+  await expect(field).toBeFocused();
+  await press(page, 'Enter');
+  await press(page, 'Enter');
+  await expect(browser.locator('.folder-where')).toHaveText('Network drives › nas');
   await expect(browser.locator('input').first()).toBeFocused();
 });
 
-test('Android: signing in to a NAS with the system keyboard takes one Enter per field', async ({ page }) => {
+test('Android: OK opens the keyboard, its Enter moves on, and Connect waits to be pressed', async ({ page }) => {
   await page.setViewportSize({ width: 960, height: 540 });
   await page.addInitScript(() => {
     localStorage.setItem('kinemaMockSystem', 'android');
@@ -853,18 +866,44 @@ test('Android: signing in to a NAS with the system keyboard takes one Enter per 
   await press(page, 'Enter');
   const browser = page.locator('.folder-browser');
   const name = browser.locator('input').first();
-  const password = browser.locator('input[type=password]');
-  // Arriving holds the keyboard back; OK opens it.
+  const password = browser.locator('.folder-password input');
+  // The form at the top, clear of the system's keyboard.
+  await expect(page.locator('.leave-backdrop')).toHaveClass(/typing/);
+  // Arriving holds the keyboard back; the remote's OK opens it, and only that.
   await expect(name).toHaveAttribute('inputmode', 'none');
-  await press(page, 'Enter');
+  await press(page, 'Shift+Enter');
   await expect(name).toHaveAttribute('inputmode', 'text');
-  await page.keyboard.type('films');
+  await expect(name).toBeFocused();
+  await page.keyboard.type('Films');
+  // Typed as typed: nothing capitalised or corrected by the system.
+  await expect(name).toHaveAttribute('autocapitalize', 'none');
   // The keyboard's Enter moves on, and the keyboard goes with it...
   await press(page, 'Enter');
   await expect(password).toBeFocused();
   await expect(password).toHaveAttribute('inputmode', 'text');
+  // ...where OK still only opens it, never connects.
+  await press(page, 'Shift+Enter');
+  await expect(password).toBeFocused();
   await page.keyboard.type('secret');
-  // ...so the next Enter signs in, not opens it again.
+  // The cursor arrows move through the text, not off the field...
+  await press(page, 'ArrowLeft', 2);
+  await expect(password).toBeFocused();
+  await expect.poll(() => password.evaluate((i: HTMLInputElement) => i.selectionStart)).toBe(4);
+  // ...and at its end Right reaches Show, which shows what was typed.
+  await press(page, 'End');
+  await press(page, 'ArrowRight');
+  await expect.poll(() => focused(page)).toBe('Show');
+  await expect(password).toHaveAttribute('type', 'password');
+  await press(page, 'Enter');
+  await expect(password).toHaveAttribute('type', 'text');
+  await expect(password).toHaveValue('secret');
+  await expect.poll(() => focused(page)).toBe('Hide');
+  await press(page, 'ArrowLeft');
+  await expect(password).toBeFocused();
+  // From the password the keyboard's Enter goes to Connect, and stops there.
+  await press(page, 'Enter');
+  await expect.poll(() => focused(page)).toBe('Connect');
+  await expect(browser).not.toContainText('films');
   await press(page, 'Enter');
   await expect.poll(() => focused(page)).toBe('films');
 });

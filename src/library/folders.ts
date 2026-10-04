@@ -134,5 +134,8 @@ export interface Server {
 export const findServers = (): Promise<Server[]> =>
   invoke<{ servers: Server[] }>('plugin:network|find_servers').then((r) => r.servers);
 
+/** Whether a file server answers at an address; rejects in words if not. */
+export const checkServer = (server: string) => invoke<void>('check_server', { server });
+
 /** A server's shares; rejects in words if it cannot say (netshare.rs). */
 export const listShares = (server: string) => invoke<string[]>('list_shares', { server });

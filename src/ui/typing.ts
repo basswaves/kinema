@@ -11,17 +11,18 @@
  * `inputmode="none"` — a plugged-in keyboard still types, nothing appears —
  * and OK on the field opens the system's keyboard, as TV apps do.
  *
- * Once opened for this visit, Enter is the field's own again (save the key,
- * search), so the system keyboard's own Enter reaches it. To open it once
- * more, move off the field and back. (The page cannot tell when the system's
- * keyboard closes: on an Android 9 box neither the page's size nor Chrome's
- * VirtualKeyboard events changed.) The remote's OK reaches a field as Enter
- * only because MainActivity.kt sends it on as one.
+ * The remote's OK reaches the page as Shift+Enter (MainActivity.kt sends it
+ * on as one; the system's keyboard never sends Shift with Enter), and on a
+ * field it always opens the keyboard — never saves, searches or signs in (owner,
+ * 2026-10-04). Any other Enter, the on-screen keyboard's own or a plugged-in
+ * keyboard's, is the field's (`onEnter`). The page cannot tell when the
+ * system's keyboard closes (on an Android 9 box neither the page's size nor
+ * Chrome's VirtualKeyboard events changed), which is why OK is not "open it
+ * if it is closed".
  *
- * A form whose Enter moves on to its next field (a name, then a password)
- * hands the open keyboard over with `carryKeyboard`: the next field takes
- * typing with it still up, and its first Enter is its own. Otherwise that
- * Enter went to opening a keyboard already open, and signing in took two.
+ * A form whose Enter moves on to its next field (a user name, then a
+ * password) hands the open keyboard over with `carryKeyboard`: the next
+ * field takes typing with it still up rather than closing it.
  */
 import { useEffect, type KeyboardEvent, type RefObject } from 'react';
 import { useCapabilities } from '../capabilities';
@@ -39,7 +40,7 @@ export function carryKeyboard(): void {
 /**
  * Give `ref` typing focus while `focused` (the remote's focus), and take it
  * back when the remote moves on. Returns the field's Enter handler: true when
- * the press was spent opening the system's keyboard.
+ * the press was the remote's OK, spent opening the system's keyboard.
  */
 export function useTypingFocus(
   ref: RefObject<HTMLInputElement | null>,
@@ -68,7 +69,7 @@ export function useTypingFocus(
 
   return (event) => {
     const input = ref.current;
-    if (!screenKeyboard || !input || input.inputMode !== 'none') return false;
+    if (!screenKeyboard || !input || !event.shiftKey) return false;
     event.preventDefault();
     input.inputMode = 'text';
     // The system shows its keyboard as a field takes focus, and a key press

@@ -112,3 +112,16 @@ wayland-protocols-wlr = { version = "0.3", features = ["client"] }
 # what changed and when it can go.
 [patch.crates-io]
 smb-transport = { path = "vendor/smb-transport" }
+
+# kbkdf (under smb: the keys of an encrypted SMB session) works out 2 to the
+# power of 32 in a usize, which overflows on 32-bit ARM — many TV boxes.
+# Release builds wrap it, harmlessly (its check then passes, as it should);
+# a debug build's overflow check stopped every NAS sign-in on such a box
+# ("attempt to exponentiate with overflow"). Built as release builds it —
+# in smb too: the calculation is generic, so it is compiled into the crate
+# that uses it, and kbkdf's own setting alone changed nothing (seen on a box).
+[profile.dev.package.kbkdf]
+overflow-checks = false
+
+[profile.dev.package.smb]
+overflow-checks = false

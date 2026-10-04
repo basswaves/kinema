@@ -719,10 +719,10 @@ export default function Settings({
 
                 {can?.network_shares && logins.length > 0 && (
                   <section className="settings-section">
-                    <h2>Network sign-ins</h2>
+                    <h2>Saved network logins</h2>
                     <p className="settings-intro">
-                      The names and passwords Kinema uses for your network drives, kept locked
-                      on this device. Forget one and Kinema asks again the next time.
+                      The user names and passwords Kinema uses for your network drives, kept
+                      locked on this device. Forget one and Kinema asks again the next time.
                     </p>
                     <ul className="settings-roots settings-logins">
                       {logins.map((login) => (

@@ -234,6 +234,9 @@ export default function FolderBrowser({ request }: { request: FolderRequest }) {
     }
   };
 
+  // The network's typing steps sit at the top, clear of the system's keyboard.
+  const typing = !spot && (net?.step === 'address' || net?.step === 'sign-in' || net?.step === 'shares');
+
   const where = spot
     ? [spot.place.name, ...spot.trail].join(' › ')
     : net
@@ -244,7 +247,10 @@ export default function FolderBrowser({ request }: { request: FolderRequest }) {
 
   return (
     <FocusContext.Provider value={focusKey}>
-      <div className="leave-backdrop" onClick={() => finish(null)}>
+      <div
+        className={`leave-backdrop ${typing ? 'typing' : ''}`.trim()}
+        onClick={() => finish(null)}
+      >
         <div
           className="folder-browser"
           ref={ref}

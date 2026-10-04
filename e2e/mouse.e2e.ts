@@ -176,7 +176,7 @@ test('Android: a network drive by mouse, signed in to with clicks and typing', a
   await page.keyboard.type('films');
   await browser.locator('input[type=password]').click();
   await page.keyboard.type('secret');
-  await browser.getByRole('button', { name: 'Sign in' }).click();
+  await browser.getByRole('button', { name: 'Connect' }).click();
   await browser.getByRole('button', { name: 'tv', exact: true }).click();
   await expect(where).toHaveText('tv on Living room NAS');
   await browser.getByRole('button', { name: 'Example Show' }).click();

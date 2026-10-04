@@ -3403,6 +3403,25 @@ kbd {
   margin: 0 0 0.75rem;
 }
 
+/* The password and its Show button, side by side. */
+.folder-password {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  max-width: 30rem;
+}
+
+.folder-password .settings-input {
+  flex: 1;
+}
+
+/* A step that types: at the top of the screen, where the system's keyboard,
+   which covers the lower half, leaves it in sight. */
+.leave-backdrop.typing {
+  align-items: flex-start;
+  padding-top: 1rem;
+}
+
 .folder-hint {
   margin: 1rem 0 0;
   font-size: 0.8125rem;

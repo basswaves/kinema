@@ -305,6 +305,7 @@ pub fn run() {
             capabilities::capabilities,
             places::list_folders,
             netshare::list_shares,
+            netshare::check_server,
             share_logins::save_share_login,
             share_logins::forget_share_login,
             share_logins::share_logins,

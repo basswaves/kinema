@@ -63,7 +63,9 @@ npx tauri icon src-tauri/icons/icons.json
 
 It also writes an `ios/` folder, which Kinema has no use for: delete it. The
 Android TV banner (`res/drawable-xhdpi/banner.png`, 320×180) is not made by
-that command; redraw it by hand if the mark changes.
+that command: its drawing is `src-tauri/icons/banner.svg`, exported to that
+PNG by hand. Its lettering is Segoe UI Semibold, named rather than included,
+so export it on Windows.
 
 ## Verifying
 

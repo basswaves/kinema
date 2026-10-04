@@ -9,7 +9,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.provider.Settings
 import android.util.Log
 import android.view.Display
 import android.view.SurfaceView
@@ -21,6 +20,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.ExoPlaybackException
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.common.Format
@@ -88,10 +88,16 @@ class SeekArgs {
  *  - a way back when the sound will not open: Android can claim a format the
  *    box then refuses (a box set never to pass surround through still said
  *    DTS, and refused it), so the sound is decoded on the device instead,
- *    and failing that the film plays without it — never not at all.
+ *    and failing that the film plays without it — never not at all;
+ *  - what the sound actually did, for Settings: sent on untouched or
+ *    decoded here, as Media3 opened it — not what any setting claims.
  */
 /** How long a taken video decoder is given before Kinema asks again. */
 private const val RETRY_MS = 1500L
+
+/** Where the last film's sound is remembered (`lastSound`), across restarts. */
+private const val PREFS = "media3"
+private const val LAST_SOUND = "last_sound"
 
 @TauriPlugin
 class Media3Plugin(private val activity: Activity) : Plugin(activity) {
@@ -218,6 +224,11 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
     // Media3's own account of what it chose and did (decoder, sound path,
     // dropped frames, stalls), in the system log of a test build only.
     if (BuildConfig.DEBUG) p.addAnalyticsListener(EventLogger("KinemaEvents"))
+    p.addAnalyticsListener(object : AnalyticsListener {
+      override fun onAudioTrackInitialized(eventTime: AnalyticsListener.EventTime, config: AudioSink.AudioTrackConfig) {
+        p.audioFormat?.let { rememberSound(it, config) }
+      }
+    })
     p.setVideoSurfaceView(s)
     // Kinema matches the screen itself (setMode); Media3's own matching
     // would be a second hand on the same switch.
@@ -359,6 +370,66 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
     return codec + size + bits + hdr
   }
 
+  /** "Dolby Digital Plus with Atmos 5.1" — the sound's format, as a person says it. */
+  private fun soundName(f: Format): String {
+    val codec = when (f.sampleMimeType) {
+      MimeTypes.AUDIO_AC3 -> "Dolby Digital"
+      MimeTypes.AUDIO_E_AC3 -> "Dolby Digital Plus"
+      MimeTypes.AUDIO_E_AC3_JOC -> "Dolby Digital Plus with Atmos"
+      MimeTypes.AUDIO_AC4 -> "Dolby AC-4"
+      MimeTypes.AUDIO_TRUEHD -> "Dolby TrueHD"
+      MimeTypes.AUDIO_DTS -> "DTS"
+      MimeTypes.AUDIO_DTS_EXPRESS -> "DTS Express"
+      MimeTypes.AUDIO_DTS_HD -> "DTS-HD"
+      MimeTypes.AUDIO_AAC -> "AAC"
+      MimeTypes.AUDIO_FLAC -> "FLAC"
+      MimeTypes.AUDIO_OPUS -> "Opus"
+      MimeTypes.AUDIO_VORBIS -> "Vorbis"
+      MimeTypes.AUDIO_MPEG -> "MP3"
+      MimeTypes.AUDIO_RAW -> "PCM"
+      else -> when {
+        // DTS:X, under the name Media3 now gives it (audio/vnd.dts.uhd).
+        f.sampleMimeType?.startsWith("audio/vnd.dts.uhd") == true -> "DTS:X"
+        else -> f.sampleMimeType?.substringAfter('/')?.uppercase() ?: "unknown"
+      }
+    }
+    val channels = when (f.channelCount) {
+      Format.NO_VALUE -> ""
+      1 -> " mono"
+      2 -> " stereo"
+      6 -> " 5.1"
+      8 -> " 7.1"
+      else -> ", ${f.channelCount} channels"
+    }
+    return codec + channels
+  }
+
+  /**
+   * The sound has opened: what it was and whether it left untouched. A
+   * compressed encoding at the output is passed through, unless it is
+   * offloaded — then the device's own sound chip decodes it.
+   */
+  private fun rememberSound(f: Format, config: AudioSink.AudioTrackConfig) {
+    val untouched = !config.offload && config.encoding != C.ENCODING_INVALID &&
+      !(config.encoding == C.ENCODING_PCM_8BIT || config.encoding == C.ENCODING_PCM_16BIT ||
+        config.encoding == C.ENCODING_PCM_24BIT || config.encoding == C.ENCODING_PCM_32BIT ||
+        config.encoding == C.ENCODING_PCM_FLOAT)
+    Log.i("Kinema", "media3: sound opened: ${soundName(f)}, encoding ${config.encoding}, offload ${config.offload} -> ${if (untouched) "untouched" else "decoded here"}")
+    keepSound(soundName(f), if (untouched) "untouched" else "decoded")
+  }
+
+  /**
+   * What became of this film's sound — "untouched", "decoded" or "none" —
+   * kept so Settings can say it, after Kinema starts again too. Null
+   * forgets it, as a new film opens.
+   */
+  private fun keepSound(format: String?, way: String?) {
+    val prefs = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+    if (format == null || way == null) prefs.remove(LAST_SOUND)
+    else prefs.putString(LAST_SOUND, JSObject().apply { put("format", format); put("way", way) }.toString())
+    prefs.apply()
+  }
+
   /** The sound failed: its output would not open, or its decoder would not. */
   private fun isAudioFailure(p: ExoPlayer, error: PlaybackException): Boolean {
     if (error.errorCode == PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED ||
@@ -381,7 +452,7 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
     val file = path ?: return
     val at = old.currentPosition
     val f = (error as? ExoPlaybackException)?.rendererFormat
-    val format = f?.label ?: f?.sampleMimeType ?: ""
+    val format = f?.let { soundName(it) } ?: ""
     audioStep += 1
     Log.w("Kinema", "media3: the sound would not play (${error.errorCodeName}, $format); step $audioStep")
     old.release()
@@ -410,12 +481,13 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
       return
     }
     val f = group.getTrackFormat(index)
-    announce(1, f.label ?: f.sampleMimeType)
+    announce(1, soundName(f))
   }
 
   private fun announce(step: Int, chosen: String?) {
     val format = failedSound ?: ""
     failedSound = null
+    if (step >= 2) keepSound(format.ifEmpty { "unknown" }, "none")
     emit("audio-fallback") {
       put("step", step)
       put("format", format)
@@ -443,6 +515,7 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
         seeking = false
         video = null
         failedSound = null
+        keepSound(null, null)
         val uri = if (args.path.contains("://")) Uri.parse(args.path) else Uri.fromFile(File(args.path))
         val start = args.start
         if (start != null) p.setMediaItem(MediaItem.fromUri(uri), (start * 1000).toLong())
@@ -631,9 +704,12 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
 
   /**
    * For Settings → Picture & sound: the HDR kinds the screen shows, the
-   * sound formats Android says the HDMI output takes untouched, and the
-   * system's own surround setting (`encoded_surround_output`: 0 automatic,
-   * 1 never, 2 always, 3 manual; missing on some boxes).
+   * sound formats Android says the HDMI output takes untouched, and what
+   * the last film's sound did (`rememberSound`).
+   *
+   * Android's own surround setting (`encoded_surround_output`) is not read:
+   * on an operator's box it said "never" one night and "always" the next
+   * while the box's own menu decided (2026-10-04), so it proved nothing.
    */
   @Command
   fun output(invoke: Invoke) {
@@ -660,16 +736,13 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
         "DTS" to C.ENCODING_DTS,
         "DTS-HD" to C.ENCODING_DTS_HD,
       )) if (caps.supportsEncoding(encoding)) sound.put(name)
-      val surround = try {
-        Settings.Global.getInt(activity.contentResolver, "encoded_surround_output")
-      } catch (e: Settings.SettingNotFoundException) {
-        -1
-      }
+      val last = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(LAST_SOUND, null)
+        ?.let { try { JSObject(it) } catch (e: Exception) { null } }
       invoke.resolve(JSObject().apply {
         put("hdr", hdr)
         put("sound", sound)
-        put("surround", when (surround) { 0 -> "auto"; 1 -> "never"; 2 -> "always"; 3 -> "manual"; else -> JSONObject.NULL })
         put("modes", display().supportedModes.size)
+        put("lastSound", last ?: JSONObject.NULL)
       })
     }
   }

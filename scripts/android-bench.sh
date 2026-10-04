@@ -171,6 +171,10 @@ case "$cmd" in
   build)
     # Run from the repository's root, so npx finds the project's Tauri CLI.
     cd "$(dirname "$0")/.."
+    # Without the debugger's line tables: they made Kinema's library 210 MB of
+    # a 430 MB APK, which an old box with 1 GB free could not install over
+    # the copy it had. Panics still name their functions.
+    export CARGO_PROFILE_DEV_STRIP="${CARGO_PROFILE_DEV_STRIP:-debuginfo}"
     npx tauri android build --debug --target "${1:-x86_64}" --apk
     echo "$apk_dir/app-universal-debug.apk"
     ;;

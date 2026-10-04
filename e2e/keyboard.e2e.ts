@@ -404,7 +404,11 @@ test('Android: Picture & sound is one switch, on, and says what the system does'
   // On before anyone chose: nothing stored, the tick on On.
   await expect(section.locator('.focused, button', { hasText: '✓' })).toHaveText(['✓On']);
   await expect(section).toContainText('HDR10 and HLG');
-  await expect(section).toContainText('never to pass surround sound through');
+  // What the system reports, and what the player did with the last film.
+  await expect(section).toContainText('Android reports that the TV or receiver takes');
+  await expect(section).toContainText(
+    'Last film: its DTS-HD 5.1 sound was turned into ordinary sound on this device.'
+  );
   // Nothing of the desktop's per-device settings.
   await expect(section).not.toContainText('Every screen that can');
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { chooseTarget, type Screen } from './displayMode';
 import {
   audioFallbackNotice,
+  lastSoundNote,
   matchNote,
   matchOn,
   pictureNote,
@@ -13,8 +14,8 @@ import {
 const out = (o: Partial<SystemOutput>): SystemOutput => ({
   hdr: [],
   sound: [],
-  surround: null,
   modes: 4,
+  lastSound: null,
   ...o,
 });
 
@@ -64,7 +65,7 @@ describe('the one switch', () => {
   it('a screen with one mode is never switched', () => {
     const one = { ...tv, modes: [tv.modes[0]] };
     expect(chooseTarget(one, film, switchSettings(true))).toBeNull();
-    expect(matchNote(out({ modes: 1 }))).toContain('only one mode');
+    expect(matchNote(out({ modes: 1 }))).toContain('only one screen mode');
     expect(matchNote(out({ modes: 4 }))).toBeNull();
   });
 });
@@ -76,17 +77,32 @@ describe('what Settings says', () => {
     expect(pictureNote(null, 'Android')).toContain('by itself');
   });
 
-  it('says where to change a system that never passes surround through', () => {
-    const never = soundNote(out({ surround: 'never', sound: ['DTS'] }), 'Android');
-    expect(never).toContain('never to pass surround sound through');
-    expect(never).toContain("Android's display and sound settings");
+  it('says what Android reports, never more', () => {
+    const two = soundNote(out({ sound: ['Dolby Digital', 'DTS'] }), 'Android');
+    expect(two).toContain('takes Dolby Digital and DTS untouched');
+    expect(two).toContain("device's own sound settings can still decide otherwise");
+    expect(soundNote(out({ sound: [] }), 'Android')).toContain('played through Android');
+    expect(soundNote(null, 'Android')).toContain('played through Android');
   });
 
-  it('lists what goes through untouched', () => {
-    expect(soundNote(out({ sound: ['Dolby Digital', 'DTS'] }), 'Android')).toContain(
-      'Dolby Digital and DTS go to the TV or receiver untouched'
+  it('says what happened to the last film’s sound, once there was one', () => {
+    expect(lastSoundNote(out({}))).toBeNull();
+    expect(lastSoundNote(null)).toBeNull();
+    expect(
+      lastSoundNote(out({ lastSound: { format: 'Dolby Digital Plus with Atmos 5.1', way: 'untouched' } }))
+    ).toBe('Last film: its Dolby Digital Plus with Atmos 5.1 sound went to the TV or receiver untouched.');
+    expect(lastSoundNote(out({ lastSound: { format: 'DTS-HD 5.1', way: 'decoded' } }))).toContain(
+      'turned into ordinary sound on this device'
     );
-    expect(soundNote(out({ sound: [] }), 'Android')).toContain('played through Android');
+    expect(lastSoundNote(out({ lastSound: { format: 'DTS-HD 5.1', way: 'none' } }))).toContain(
+      'played without sound'
+    );
+  });
+
+  it('leaves the one mode to the device’s own settings, with no number', () => {
+    const one = matchNote(out({ modes: 1 }));
+    expect(one).toContain("device's own display settings");
+    expect(one).not.toMatch(/\d/);
   });
 
   it('words the sound’s fallbacks', () => {

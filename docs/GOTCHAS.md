@@ -1853,6 +1853,24 @@ HDMI, Media3 passed a film's DTS through, and Android refused the output
 any failure of the sound renderer as a reason to step down, not to stop
 (`Media3Plugin.kt` `fallBack`).
 
+### Android's surround setting is not what a box does
+
+`Settings.Global` `encoded_surround_output` read 1 ("never") one night
+and 2 ("always") the next on an operator's box, while the box's own menu
+was what decided whether surround reached the receiver. Repeating it in
+Settings told the user something false. **Do:** report what the player
+did — Media3's `onAudioTrackInitialized` gives the encoding that reached
+the output (compressed and not offloaded = passed through) — and say
+the device's own settings can overrule what Android reports.
+
+### Media3 cannot tell Atmos in a Matroska file
+
+A film whose track is Dolby Digital Plus with Atmos (E-AC-3 JOC) comes out
+of Media3's Matroska reader as plain `audio/eac3`, and its output encoding
+as E-AC-3: the receiver still showed Atmos, because the stream went through
+untouched. **Do:** never claim Atmos from Media3's format on an `.mkv`; name
+what it reports ("Dolby Digital Plus 5.1").
+
 ### Media3 1.11 ignores `setAudioCapabilities`
 
 Building the sink with `DefaultAudioSink.Builder.setAudioCapabilities(

@@ -27,16 +27,27 @@ export function switchSettings(on: boolean): SwitchSettings {
   return { refresh: on, resolution: on ? 'auto' : 'off', hdr: false };
 }
 
-/** What the system reports about the TV and the receiver (Media3Plugin.kt `output`). */
+/**
+ * What the system reports about the TV and the receiver (Media3Plugin.kt
+ * `output`), and what the player did with the last film's sound.
+ *
+ * Only what is known goes in. Android's own surround setting is left out on
+ * purpose: on an operator's box it read "never" one night and "always" the
+ * next while the box's own menu decided, so it proved nothing (2026-10-04).
+ */
 export interface SystemOutput {
-  /** HDR kinds the screen shows: "HDR10", "HLG", "Dolby Vision", "HDR10+". */
+  /** HDR kinds the screen reports showing: "HDR10", "HLG", "Dolby Vision", "HDR10+". */
   hdr: string[];
-  /** Sound formats the HDMI output takes untouched, by name. */
+  /** Sound formats Android says the HDMI output takes untouched, by name. */
   sound: string[];
-  /** The system's own surround setting, where it has one. */
-  surround: 'auto' | 'never' | 'always' | 'manual' | null;
   /** How many modes the screen offers: one means nothing can be switched. */
   modes: number;
+  /**
+   * The last film's sound as the player opened it on this device: its
+   * format, and whether it went out untouched, was decoded here, or could
+   * not be played at all. Null until a film's sound has opened.
+   */
+  lastSound: { format: string; way: 'untouched' | 'decoded' | 'none' } | null;
 }
 
 const list = (items: string[]) =>
@@ -46,7 +57,7 @@ const list = (items: string[]) =>
 
 export function matchNote(out: SystemOutput | null): string | null {
   if (out && out.modes <= 1) {
-    return 'This device offers its screen only one mode, so there is nothing to switch to: films play in the mode it is set to.';
+    return "This device shows apps only one screen mode, so there is nothing for Kinema to switch. What the TV gets is up to the device's own display settings.";
   }
   return null;
 }
@@ -56,17 +67,27 @@ export function pictureNote(out: SystemOutput | null, system: string): string {
   if (out.hdr.length === 0) {
     return `The screen does not report HDR, so HDR films are shown in SDR by ${system}.`;
   }
-  return `The screen shows ${list(out.hdr)}. ${system} turns it on for such a film by itself, and back off after.`;
+  return `The screen reports ${list(out.hdr)}. ${system} turns HDR on for such a film by itself; Kinema leaves that to it.`;
 }
 
 export function soundNote(out: SystemOutput | null, system: string): string {
-  if (out?.surround === 'never') {
-    return `${system}'s own sound setting is set never to pass surround sound through, so films' surround sound is turned into ordinary sound here. To send it to an AV receiver untouched, change the surround sound setting in ${system}'s display and sound settings.`;
-  }
   if (!out || out.sound.length === 0) {
-    return `The sound is played through ${system}. Nothing connected says it takes surround formats untouched.`;
+    return `${system} does not report that the TV or receiver takes any surround format untouched, so films' sound is played through ${system}.`;
   }
-  return `${list(out.sound)} go to the TV or receiver untouched, as ${system} reports what it takes. Where that fails, Kinema plays the sound through ${system} instead.`;
+  return `${system} reports that the TV or receiver takes ${list(out.sound)} untouched, so Kinema sends those on as they are. The device's own sound settings can still decide otherwise; where it refuses, Kinema plays the sound through ${system} instead.`;
+}
+
+/** What happened to the last film's sound, as the player opened it; null before any film. */
+export function lastSoundNote(out: SystemOutput | null): string | null {
+  const last = out?.lastSound;
+  if (!last) return null;
+  if (last.way === 'untouched') {
+    return `Last film: its ${last.format} sound went to the TV or receiver untouched.`;
+  }
+  if (last.way === 'decoded') {
+    return `Last film: its ${last.format} sound was turned into ordinary sound on this device.`;
+  }
+  return `Last film: its ${last.format} sound could not be played on this device, so it played without sound.`;
 }
 
 /**

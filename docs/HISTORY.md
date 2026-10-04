@@ -2700,6 +2700,14 @@ film never fails to play for its sound. That box, like many, offers apps
 one screen mode only, so there nothing is switched; a device with several
 modes is needed to see a switch happen.
 
+It also taught Settings to say only what is known. Android's own surround
+setting read "never" one night and "always" the next on that box while the
+operator's own menu decided, and Settings had repeated it as fact. Now
+Settings gives what Android reports, says plainly that the device's own
+settings can overrule it, and adds what the player actually did with the
+last film's sound — sent on untouched, turned into ordinary sound on the
+device, or not playable — as Media3 opened it, kept across restarts.
+
 **One exception to "no third-party binaries in the repo".** The Android
 project keeps `gradle-wrapper.jar`, Gradle's own starter, as every Android
 project does. It runs only while building and is never in the app; keeping

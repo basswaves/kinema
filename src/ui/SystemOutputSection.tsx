@@ -1,8 +1,9 @@
 /**
  * Settings → Picture & sound where the system does most of it (capabilities
  * `system_output`, Android): one switch, matching the screen to the film,
- * on unless switched off — and what the system does by itself, said plainly,
- * with what the TV and the receiver report taking (`player/systemOutput.ts`).
+ * on unless switched off — and what the system does by itself, said plainly:
+ * what the TV and the receiver report taking, and what the player did with
+ * the last film's sound (`player/systemOutput.ts`). Only what is known.
  *
  * Nothing here is per device and nothing is asked at the first run (owner,
  * 2026-10-04): a TV box is always at its TV.
@@ -12,6 +13,7 @@ import { getSetting, setSetting } from '../metadata/api';
 import { systemOutput } from '../player/engine';
 import {
   DISPLAY_MATCH_KEY,
+  lastSoundNote,
   matchNote,
   matchOn,
   pictureNote,
@@ -51,6 +53,8 @@ export default function SystemOutputSection({
     };
   }, [onError]);
 
+  const last = lastSoundNote(output);
+
   const choose = (v: Match) => {
     if (!v) return;
     setMatch(v);
@@ -68,6 +72,7 @@ export default function SystemOutputSection({
       <p className="settings-intro">
         <strong>Sound.</strong> {soundNote(output, system)}
       </p>
+      {last && <p className="settings-intro">{last}</p>}
       <ChoiceRow<Match>
         label="Match the screen to the film"
         choices={[

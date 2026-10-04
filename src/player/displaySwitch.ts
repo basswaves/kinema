@@ -167,14 +167,15 @@ export async function filmNow(): Promise<Film | null> {
  * Returns whether anything changed; the caller re-applies the colour-space
  * hint when it did, since HDR may now be on.
  */
-export async function switchForFilm(film: Film): Promise<boolean> {
-  if (bySystem()) return switchBySystem(film);
+export async function switchForFilm(film: Film, onSwitching?: () => void): Promise<boolean> {
+  if (bySystem()) return switchBySystem(film, onSwitching);
   if (!(await isPictureFullscreen().catch(() => false))) return false;
   const name = await pictureScreen();
   const screen = await invoke<Screen>('screen_now', { screen: name });
   const settings = await switchSettingsHere(screen);
   const target = chooseTarget(screen, film, settings);
   if (!target) return false;
+  onSwitching?.();
   console.log(
     `display: ${film.width}×${film.height} @ ${film.fps ? formatRate(film.fps) : '?'} fps${
       film.hdr ? ' HDR' : ''
@@ -200,11 +201,12 @@ export async function switchForFilm(film: Film): Promise<boolean> {
 }
 
 /** The same, on a system whose app is the whole screen (Android). */
-async function switchBySystem(film: Film): Promise<boolean> {
+async function switchBySystem(film: Film, onSwitching?: () => void): Promise<boolean> {
   if (!matchOn(await getSetting(DISPLAY_MATCH_KEY))) return false;
   const screen = await systemScreen();
   const target = chooseTarget(screen, film, switchSettings(true));
   if (!target) return false;
+  onSwitching?.();
   console.log(
     `display: ${film.width}×${film.height} @ ${film.fps ? formatRate(film.fps) : '?'} fps → ${
       target.width

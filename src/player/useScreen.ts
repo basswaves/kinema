@@ -33,9 +33,14 @@ export function useScreen({
       console.warn('display: the first frame did not arrive in time; the screen is left as it is');
       return;
     }
-    setNotice('Matching the screen to the video…');
     try {
-      if (await switchForFilm(film)) await matchHdrToDisplay();
+      // Said only once there is something to change: a screen already in
+      // the film's mode, or one that offers no other (many TV boxes), is
+      // not being matched to anything.
+      const switched = await switchForFilm(film, () =>
+        setNotice('Matching the screen to the video…')
+      );
+      if (switched) await matchHdrToDisplay();
     } catch (e) {
       console.warn('display: switch failed', e);
     }

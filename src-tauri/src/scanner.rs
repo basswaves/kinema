@@ -239,8 +239,33 @@ fn scan_root(
         write_batch(conn, root_id, now, &pending, report)?;
     }
 
+    // A folder that is there but holds no video at all, where the library has
+    // had files, is the same offline share wearing a different face: on Linux
+    // a share or a disk is mounted *on* an existing folder, which is left
+    // behind empty when it is not mounted, and a Windows folder whose contents
+    // are out of reach can look the same. Marking every file under it missing
+    // would empty Home with no notice. A folder really emptied on purpose keeps
+    // its old titles and this notice until it is removed in Settings — the
+    // cheaper mistake of the two.
+    if seen_paths.is_empty() && has_known_files(conn, root_id)? {
+        report
+            .errors
+            .push(format!("root unavailable, skipped: {root_path}"));
+        return Ok(());
+    }
+
     mark_missing(conn, root_id, &seen_paths, report)?;
     Ok(())
+}
+
+/// Whether any file has ever been recorded under this root, missing or not —
+/// so a library already hidden by an earlier scan still gets named.
+fn has_known_files(conn: &Connection, root_id: i64) -> rusqlite::Result<bool> {
+    conn.query_row(
+        "SELECT EXISTS (SELECT 1 FROM media_files WHERE root_id = ?1)",
+        params![root_id],
+        |r| r.get(0),
+    )
 }
 
 /// Write one batch of gathered files. Their contents are already known, so this
@@ -556,5 +581,100 @@ mod tests {
         let path: String = conn.query_row("SELECT path FROM media_files", [], |r| r.get(0)).unwrap();
         assert!(path.ends_with("Show/Season 1/Show.S01E01.mkv"), "{path}");
         let _ = std::fs::remove_dir_all(&elsewhere);
+    }
+
+    /// The test database's root folder, and a file recorded under it as an
+    /// earlier scan would have left it.
+    fn root_with_known_file(conn: &mut Connection, name: &str) -> std::path::PathBuf {
+        let root: String = conn
+            .query_row("SELECT path FROM library_roots WHERE id = 1", [], |r| r.get(0))
+            .unwrap();
+        let root = std::path::PathBuf::from(root);
+        let file = root.join(name);
+        let file = SeenFile {
+            path: file.to_string_lossy().into(),
+            parent_dir: root.to_string_lossy().into(),
+            file_name: name.into(),
+            extension: "mkv".into(),
+            size: 1,
+            modified: 0,
+        };
+        write_batch(conn, 1, 0, &[file], &mut ScanReport::default()).unwrap();
+        root
+    }
+
+    fn missing_count(conn: &Connection) -> i64 {
+        conn.query_row("SELECT COUNT(*) FROM media_files WHERE missing = 1", [], |r| r.get(0))
+            .unwrap()
+    }
+
+    /// A share that is not there at all: the library under it stays as it
+    /// was, and Home is told which folder was skipped.
+    #[test]
+    fn an_unreachable_folder_hides_nothing() {
+        let mut conn = database("unreachable");
+        let root = root_with_known_file(&mut conn, "Show S01E01.mkv");
+        let gone = root.join("not-mounted");
+
+        let mut report = ScanReport::default();
+        scan_root(&mut conn, 1, &gone.to_string_lossy(), &mut report).unwrap();
+
+        assert_eq!(missing_count(&conn), 0);
+        assert_eq!(
+            report.errors,
+            vec![format!("root unavailable, skipped: {}", gone.to_string_lossy())]
+        );
+    }
+
+    /// The Linux way a share goes offline: the folder it is mounted on stays,
+    /// empty. Taken at its word, one scan would hide the whole library under
+    /// it with no notice. It is skipped and named exactly as an unreachable
+    /// one is — and the same holds for a library an earlier scan already hid.
+    #[test]
+    fn an_empty_folder_that_had_files_hides_nothing() {
+        let mut conn = database("unmounted");
+        let root = root_with_known_file(&mut conn, "Show S01E01.mkv");
+        let expected = vec![format!("root unavailable, skipped: {}", root.to_string_lossy())];
+
+        let mut report = ScanReport::default();
+        scan_root(&mut conn, 1, &root.to_string_lossy(), &mut report).unwrap();
+        assert_eq!(missing_count(&conn), 0);
+        assert_eq!(report.errors, expected);
+
+        conn.execute("UPDATE media_files SET missing = 1", []).unwrap();
+        let mut report = ScanReport::default();
+        scan_root(&mut conn, 1, &root.to_string_lossy(), &mut report).unwrap();
+        assert_eq!(report.errors, expected);
+    }
+
+    /// The guard is for a folder showing *nothing*. A file deleted from a
+    /// folder that still has others is ordinary, and is hidden as before.
+    #[test]
+    fn a_file_gone_from_a_folder_that_has_others_is_hidden() {
+        let mut conn = database("one-gone");
+        let root = root_with_known_file(&mut conn, "Show S01E01.mkv");
+        std::fs::write(root.join("Show S01E02.mkv"), b"x").unwrap();
+
+        let mut report = ScanReport::default();
+        scan_root(&mut conn, 1, &root.to_string_lossy(), &mut report).unwrap();
+
+        assert_eq!(report.files_added, 1);
+        assert_eq!(report.files_missing, 1);
+        assert_eq!(missing_count(&conn), 1);
+        assert!(report.errors.is_empty(), "{:?}", report.errors);
+    }
+
+    /// A folder just added, with nothing in it yet, is not a problem to report.
+    #[test]
+    fn a_new_empty_folder_is_not_an_error() {
+        let mut conn = database("new-empty");
+        let root: String = conn
+            .query_row("SELECT path FROM library_roots WHERE id = 1", [], |r| r.get(0))
+            .unwrap();
+
+        let mut report = ScanReport::default();
+        scan_root(&mut conn, 1, &root, &mut report).unwrap();
+
+        assert!(report.errors.is_empty(), "{:?}", report.errors);
     }
 }

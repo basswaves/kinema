@@ -7,6 +7,15 @@ makes no stability promises.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A share or disk that is not mounted no longer empties the library.** On
+  Linux the folder a share is mounted on stays behind, empty, when the share
+  is not there, and one scan hid every film under it with no notice. A
+  library folder that shows no video at all, where there used to be some, is
+  now left alone and named on Home, exactly like a drive that is unplugged.
+  To retire a folder you have really emptied, remove it in Settings.
+
 ## [0.9.1] — 2026-10-03
 
 For Linux: the mouse in the player, screen switching on Cinnamon, and a

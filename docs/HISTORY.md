@@ -31,6 +31,12 @@ tone-mapping to SDR, seeking, PGS subtitle selection, fullscreen, drag-and-drop.
 SQLite in app data. Scanner walks local + SMB roots with **no content reads** —
 identity is `(path, size, mtime)`. Unchanged files keep their parse results; vanished
 files are flagged `missing`, never deleted; an unreachable root is skipped entirely.
+So, later, is a root that is there but shows no video at all where the library
+has had files: on Linux a share or disk is mounted *on* an existing folder, which
+stays behind empty when it is not mounted, and one scan used to hide the whole
+library under it with no notice. Both are named on Home the same way. The price
+is that a folder really emptied on purpose keeps its old titles, and the notice,
+until it is removed in Settings — the cheaper mistake of the two.
 `guessit-js` parses filenames, with a parent-directory fallback and scoring so
 `Blade Runner 2049 (2017)/1080p.BluRay.x264.mkv` resolves correctly.
 

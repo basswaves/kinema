@@ -7,6 +7,12 @@ makes no stability promises.
 
 ## [Unreleased]
 
+## [0.9.2] — 2026-10-05
+
+For Windows and Linux: Kinema's own icon, reading on with Down, and fixes
+to the first run and the interface. The library is not upgraded (schema 22,
+as in 0.9.0).
+
 ### Added
 
 - **Kinema's own icon:** a K whose upright is a strip of film, in the

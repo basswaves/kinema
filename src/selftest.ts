@@ -23,6 +23,8 @@ import {
   primaryMonitor,
 } from '@tauri-apps/api/window';
 import {
+  addSubtitle,
+  chooseTrack,
   listenMpvEvents,
   mpvCommand,
   mpvGet,
@@ -30,6 +32,8 @@ import {
   readChapters,
   readTracks,
   seekTo,
+  setVolume,
+  showSubtitles,
   startEngine,
 } from './player/engine';
 import { setTvMode } from './ui/tv';
@@ -120,6 +124,14 @@ const CALLABLE: Record<string, (...args: never[]) => Promise<unknown>> = {
   // with whichever keys the copied library has.
   matchUnmatched: async () =>
     matchFiles(await listUnmatched(2000), await loadProviderKeys(), () => {}),
+  // The engine's tracks, subtitles and volume in Kinema's terms (engine.ts),
+  // whichever engine plays — so a plan can choose and read them back on a
+  // device the way the track panel does.
+  readTracks,
+  chooseTrack,
+  showSubtitles,
+  addSubtitle,
+  setVolume,
   // Display switching only happens fullscreen, and Browse has no key for it.
   setFullscreen: (on: boolean) => getCurrentWindow().setFullscreen(on),
   // TV mode is read at launch, before a plan's first action; this switches it

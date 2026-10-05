@@ -22,6 +22,7 @@ fn main() {
             "tracks",
             "select_track",
             "show_subtitles",
+            "add_subtitle",
             "state",
             "screen",
             "set_mode",

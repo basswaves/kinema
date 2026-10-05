@@ -47,6 +47,7 @@ mod skip;
 mod skiptro;
 mod srvsvc;
 mod stream;
+mod subtitle_files;
 mod tracking;
 mod trakt;
 mod trailer;
@@ -310,6 +311,7 @@ pub fn run() {
             share_logins::forget_share_login,
             share_logins::share_logins,
             stream::stream_address,
+            subtitle_files::subtitle_files,
             overlay::overlay_frame,
             overlay::overlay_reset,
             pointer::pointer_script,

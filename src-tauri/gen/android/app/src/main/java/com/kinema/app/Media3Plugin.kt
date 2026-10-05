@@ -3,6 +3,7 @@ package com.kinema.app
 import android.app.Activity
 import android.content.Context
 import android.graphics.Color
+import android.graphics.Typeface
 import android.hardware.display.DisplayManager
 import android.media.MediaCodec
 import android.net.Uri
@@ -12,6 +13,7 @@ import android.os.Looper
 import android.util.Log
 import android.view.Display
 import android.view.SurfaceView
+import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebView
 import androidx.media3.common.C
@@ -19,6 +21,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.common.text.CueGroup
 import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.analytics.AnalyticsListener
@@ -31,6 +34,8 @@ import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.ForwardingAudioSink
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.exoplayer.util.EventLogger
+import androidx.media3.ui.CaptionStyleCompat
+import androidx.media3.ui.SubtitleView
 import app.tauri.plugin.JSArray
 import app.tauri.annotation.Command
 import app.tauri.annotation.InvokeArg
@@ -52,6 +57,20 @@ class OpenArgs {
   var url: String? = null
   /** Seconds to start at, or null for the beginning. */
   var start: Double? = null
+  /** Subtitle files of its own beside the film, found by the core (subtitle_files.rs). */
+  var subtitles: Array<SubtitleArg> = arrayOf()
+}
+
+/** A subtitle file, beside the film or fetched, as `open` and `add_subtitle` take one. */
+@InvokeArg
+class SubtitleArg {
+  /** A path on this device, or an address (a share's, through stream.rs). */
+  lateinit var uri: String
+  var language: String? = null
+  /** The name the track panel gives it, when there is one. */
+  var label: String? = null
+  var forced: Boolean = false
+  var hearingImpaired: Boolean = false
 }
 
 @InvokeArg
@@ -130,6 +149,9 @@ class SeekArgs {
  */
 private const val CHOICE_WAIT_MS = 1500L
 
+/** How long an added subtitle file is given to be read, once the film is opened again. */
+private const val ADD_WAIT_MS = 10_000L
+
 /** The start of the id a subtitle file of its own is given, beside the film or fetched. */
 private const val EXTERNAL = "kinema-file:"
 
@@ -144,6 +166,18 @@ private const val LAST_SOUND = "last_sound"
 class Media3Plugin(private val activity: Activity) : Plugin(activity) {
   private var webView: WebView? = null
   private var surface: SurfaceView? = null
+  /**
+   * The subtitles, between the film and the page: Media3's own layer
+   * (owner, 2026-10-05), drawn the way mpv draws them on the desktop.
+   */
+  private var subtitleView: SubtitleView? = null
+  /**
+   * What is open, with its subtitle files: kept so the film can be opened
+   * again as it is — after a sound fallback, or with a subtitle added.
+   */
+  private var item: MediaItem? = null
+  /** How many subtitle files have been handed to Media3, for their ids. */
+  private var subtitleCount = 0
   private var player: ExoPlayer? = null
   private var path: String? = null
   /** The first frame of this file has been shown; until then a frame is the start. */
@@ -253,7 +287,46 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
     // Beneath the page: the first child of the page's own parent.
     parent.addView(s, 0, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
     surface = s
+    val subs = SubtitleView(activity)
+    // mpv's look on the desktop: white letters with a black outline, no box,
+    // 38 of 720 lines high and 22 above the bottom edge (mpv's defaults).
+    subs.setStyle(
+      CaptionStyleCompat(
+        Color.WHITE, Color.TRANSPARENT, Color.TRANSPARENT,
+        CaptionStyleCompat.EDGE_TYPE_OUTLINE, Color.BLACK, Typeface.SANS_SERIF,
+      )
+    )
+    subs.setFractionalTextSize(38f / 720f)
+    subs.setBottomPaddingFraction(22f / 720f)
+    // Above the film, beneath the page.
+    parent.addView(subs, 1, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+    subtitleView = subs
+    showOrHideSubtitles()
     return buildPlayer(s)
+  }
+
+  /** The subtitle layer shows or not; the chosen track stays chosen either way. */
+  private fun showOrHideSubtitles() {
+    subtitleView?.visibility = if (subtitlesShown) View.VISIBLE else View.INVISIBLE
+  }
+
+  /** A subtitle file as Media3 takes one, with an id that says it is a file of its own. */
+  private fun subtitleConfiguration(arg: SubtitleArg): MediaItem.SubtitleConfiguration {
+    subtitleCount += 1
+    val uri = if (arg.uri.contains("://")) Uri.parse(arg.uri) else Uri.fromFile(File(arg.uri))
+    val mime = when (arg.uri.substringAfterLast('.').substringBefore('?').lowercase()) {
+      "ass", "ssa" -> MimeTypes.TEXT_SSA
+      "vtt" -> MimeTypes.TEXT_VTT
+      else -> MimeTypes.APPLICATION_SUBRIP
+    }
+    return MediaItem.SubtitleConfiguration.Builder(uri)
+      .setId("$EXTERNAL$subtitleCount")
+      .setMimeType(mime)
+      .setLanguage(arg.language)
+      .setLabel(arg.label)
+      .setSelectionFlags(if (arg.forced) C.SELECTION_FLAG_FORCED else 0)
+      .setRoleFlags(if (arg.hearingImpaired) C.ROLE_FLAG_DESCRIBES_MUSIC_AND_SOUND else 0)
+      .build()
   }
 
   /**
@@ -324,6 +397,10 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
       // instant: waiting for data is not a pause.
       override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
         emit("paused") { put("value", !playWhenReady) }
+      }
+
+      override fun onCues(cueGroup: CueGroup) {
+        subtitleView?.setCues(cueGroup.cues)
       }
 
       override fun onRenderedFirstFrame() {
@@ -532,7 +609,7 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
   private fun fallBack(error: PlaybackException) {
     val old = player ?: return
     val s = surface ?: return
-    val file = path ?: return
+    val media = item ?: return
     val at = old.currentPosition
     // The subtitles chosen stay chosen; the sound is the fallback's to choose.
     val subtitles = old.trackSelectionParameters.overrides.values.filter { it.type == C.TRACK_TYPE_TEXT }
@@ -547,8 +624,9 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
     p.trackSelectionParameters = p.trackSelectionParameters.buildUpon()
       .apply { subtitles.forEach { addOverride(it) } }
       .build()
-    val uri = if (file.contains("://")) Uri.parse(file) else Uri.fromFile(File(file))
-    p.setMediaItem(MediaItem.fromUri(uri), at)
+    // As it was opened — a share's address, its subtitle files — not
+    // from its name.
+    p.setMediaItem(media, at)
     p.prepare()
     p.playWhenReady = wantPlaying
     // Said once Media3 has chosen the sound it can play (announceSound),
@@ -612,9 +690,16 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
         p.trackSelectionParameters = p.trackSelectionParameters.buildUpon().clearOverrides().build()
         val uri = args.url?.let { Uri.parse(it) }
           ?: if (args.path.contains("://")) Uri.parse(args.path) else Uri.fromFile(File(args.path))
+        subtitleCount = 0
+        val media = MediaItem.Builder()
+          .setUri(uri)
+          .setSubtitleConfigurations(args.subtitles.map { subtitleConfiguration(it) })
+          .build()
+        item = media
+        subtitleView?.setCues(emptyList())
         val start = args.start
-        if (start != null) p.setMediaItem(MediaItem.fromUri(uri), (start * 1000).toLong())
-        else p.setMediaItem(MediaItem.fromUri(uri))
+        if (start != null) p.setMediaItem(media, (start * 1000).toLong())
+        else p.setMediaItem(media)
         p.prepare()
         p.playWhenReady = wantPlaying
         main.removeCallbacks(ticker)
@@ -639,6 +724,9 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
       video = null
       surface?.let { (it.parent as? ViewGroup)?.removeView(it) }
       surface = null
+      subtitleView?.let { (it.parent as? ViewGroup)?.removeView(it) }
+      subtitleView = null
+      item = null
       if (wasOpen) emit("ended") { put("reason", "other") }
       invoke.resolve()
     }
@@ -782,7 +870,7 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
     put("codec", ffmpegName(f) ?: JSONObject.NULL)
     put("selected", t.group.isTrackSelected(t.index))
     put("forced", f.selectionFlags and C.SELECTION_FLAG_FORCED != 0)
-    put("external", f.id?.startsWith(EXTERNAL) == true)
+    put("external", f.id?.contains(EXTERNAL) == true)
     put("default", f.selectionFlags and C.SELECTION_FLAG_DEFAULT != 0)
     if (f.channelCount != Format.NO_VALUE) put("channels", f.channelCount)
     ffmpegProfile(f)?.let { put("profile", it) }
@@ -840,8 +928,68 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
     val args = invoke.parseArgs(ShowArgs::class.java)
     main.post {
       subtitlesShown = args.visible
+      showOrHideSubtitles()
       invoke.resolve()
     }
+  }
+
+  /**
+   * A subtitle file for the film that is open, chosen and shown — fetched
+   * from OpenSubtitles while it plays. Media3 takes a film's subtitle files
+   * only as it opens, so the film is opened again with it, at the same
+   * moment (owner, 2026-10-05: a short pause), keeping the sound track that
+   * was playing. Answers once the new track is chosen.
+   */
+  @Command
+  fun addSubtitle(invoke: Invoke) {
+    val args = invoke.parseArgs(SubtitleArg::class.java)
+    main.post {
+      val p = player
+      val media = item
+      if (p == null || media == null || suspended) {
+        invoke.reject("nothing is open")
+        return@post
+      }
+      val audio = found(p).firstOrNull { it.kind == "audio" && it.group.isTrackSelected(it.index) }?.id
+      val added = subtitleConfiguration(args)
+      val reopened = media.buildUpon()
+        .setSubtitleConfigurations(media.localConfiguration?.subtitleConfigurations.orEmpty() + added)
+        .build()
+      item = reopened
+      val at = p.currentPosition
+      p.setMediaItem(reopened, at)
+      p.prepare()
+      Log.i("Kinema", "media3: reopened at $at ms with a subtitle file added")
+      whenAdded(added.id, audio, System.currentTimeMillis() + ADD_WAIT_MS, invoke)
+    }
+  }
+
+  /**
+   * Whether a track is the subtitle file given this id. Media3 puts the
+   * number of the file's source in front of it ("1:kinema-file:1").
+   */
+  private fun isFile(f: Format, id: String?) = id != null && (f.id == id || f.id?.endsWith(":$id") == true)
+
+  /** Once the added file's track is there: chose it (and the sound that was playing) and show it. */
+  private fun whenAdded(id: String?, audio: Int?, until: Long, invoke: Invoke) {
+    val p = player ?: return invoke.reject("the film was closed")
+    val tracks = found(p)
+    val sub = tracks.firstOrNull { it.kind == "sub" && isFile(it.group.getTrackFormat(it.index), id) }
+    if (sub == null) {
+      if (System.currentTimeMillis() >= until) invoke.reject("the subtitle file could not be read")
+      else main.postDelayed({ whenAdded(id, audio, until, invoke) }, 100)
+      return
+    }
+    val params = p.trackSelectionParameters.buildUpon()
+      .setOverrideForType(TrackSelectionOverride(sub.group.mediaTrackGroup, sub.index))
+      .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+    tracks.firstOrNull { it.kind == "audio" && it.id == audio }?.let {
+      params.setOverrideForType(TrackSelectionOverride(it.group.mediaTrackGroup, it.index))
+    }
+    p.trackSelectionParameters = params.build()
+    subtitlesShown = true
+    showOrHideSubtitles()
+    whenChosen("sub", sub.id, System.currentTimeMillis() + CHOICE_WAIT_MS, invoke)
   }
 
   @Command

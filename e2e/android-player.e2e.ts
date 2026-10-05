@@ -72,6 +72,19 @@ function mpvComplaints(page: Page): string[] {
   return seen;
 }
 
+/** The track panel, opened by remote from the controls. */
+async function openTrackPanel(page: Page) {
+  await press(page, 'ArrowDown');
+  for (let i = 0; i < 6 && (await focused(page)) !== 'Audio & subtitles'; i++) {
+    await press(page, 'ArrowRight');
+  }
+  await expect.poll(() => focused(page)).toBe('Audio & subtitles');
+  await press(page, 'Enter');
+  const panel = page.locator('.track-panel');
+  await expect(panel).toBeVisible();
+  return panel;
+}
+
 /** Open Home as an Android box on the day whose hero is the film, and play it. */
 async function playFilm(page: Page): Promise<void> {
   await page.clock.setFixedTime(new Date('2026-10-02T12:00:00'));
@@ -169,14 +182,7 @@ test('Android: the track panel lists Media3’s tracks, chooses by remote, and t
   const complaints = mpvComplaints(page);
   await playFilm(page);
 
-  await press(page, 'ArrowDown');
-  for (let i = 0; i < 6 && (await focused(page)) !== 'Audio & subtitles'; i++) {
-    await press(page, 'ArrowRight');
-  }
-  await expect.poll(() => focused(page)).toBe('Audio & subtitles');
-  await press(page, 'Enter');
-  const panel = page.locator('.track-panel');
-  await expect(panel).toBeVisible();
+  const panel = await openTrackPanel(page);
 
   // Media3's tracks, read the same way as mpv's.
   await expect(panel.locator('.track-option', { hasText: 'English · 5.1 · Dolby Digital Plus Atmos' })).toBeVisible();
@@ -207,6 +213,53 @@ test('Android: the track panel lists Media3’s tracks, chooses by remote, and t
   await expect
     .poll(async () => (await media3(page)).commands.filter((c) => c.name === 'select_track').map((c) => c.args))
     .toContainEqual({ kind: 'sub', id: 2 });
+
+  expect(complaints).toEqual([]);
+});
+
+test('Android: subtitle files beside the film, hiding subtitles, and finding them online', async ({ page }) => {
+  const complaints = mpvComplaints(page);
+  await playFilm(page);
+  const panel = await openTrackPanel(page);
+
+  // The subtitle file beside the film was handed to Media3 as it opened,
+  // and is offered with the film's own.
+  const opened = (await media3(page)).commands.find((c) => c.name === 'open');
+  expect(opened?.args.subtitles).toEqual([
+    expect.objectContaining({ uri: expect.stringMatching(/\.nl\.srt$/), language: 'nl' }),
+  ]);
+  const dutch = panel.locator('.track-option', { hasText: 'Dutch · separate file' });
+  await expect(dutch).toBeVisible();
+  for (let i = 0; i < 12 && !(await dutch.evaluate((el) => el.classList.contains('focused'))); i++) {
+    await press(page, 'ArrowDown');
+  }
+  await press(page, 'Enter');
+  await expect(dutch).toHaveClass(/active/);
+  expect((await media3(page)).commands.filter((c) => c.name === 'select_track').at(-1)?.args).toEqual({
+    kind: 'sub',
+    id: 4,
+  });
+
+  // Subtitles off hides them and keeps the track; Find online adds one.
+  const off = panel.locator('.track-option', { hasText: 'Off' });
+  for (let i = 0; i < 10 && !(await off.evaluate((el) => el.classList.contains('focused'))); i++) {
+    await press(page, 'ArrowUp');
+  }
+  await press(page, 'Enter');
+  await expect.poll(async () => (await media3(page)).commands.at(-1)).toEqual({
+    name: 'show_subtitles',
+    args: { visible: false },
+  });
+  const find = panel.locator('.track-online');
+  for (let i = 0; i < 12 && !(await find.evaluate((el) => el.classList.contains('focused'))); i++) {
+    await press(page, 'ArrowDown');
+  }
+  await press(page, 'Enter');
+  await expect(panel.locator('.track-note', { hasText: 'Showing' })).toContainText(
+    'subtitles timed for this file'
+  );
+  await expect.poll(async () => (await sent(page)).includes('add_subtitle')).toBe(true);
+  await expect(panel.locator('.track-option.active', { hasText: 'OpenSubtitles' })).toBeVisible();
 
   expect(complaints).toEqual([]);
 });

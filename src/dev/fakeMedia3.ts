@@ -46,6 +46,8 @@ export interface FakeMedia3State {
   subtitlesShown: boolean;
   /** The chosen audio and subtitle track, by Kinema's number; 0 for none. */
   chosen: { audio: number; sub: number };
+  /** Subtitle files handed over with the film or added since, as Media3 has them. */
+  files: { uri: string; language: string | null; label: string | null; forced: boolean }[];
   /** The screen's mode now, and the modes it offers. */
   screen: { width: number; height: number; rate: number };
   modes: { width: number; height: number; rate: number }[];
@@ -72,6 +74,7 @@ const state: FakeMedia3State = {
   untouched: false,
   subtitlesShown: true,
   chosen: { audio: 1, sub: 0 },
+  files: [],
   screen: { width: 1920, height: 1080, rate: 60 },
   modes: [
     { width: 1920, height: 1080, rate: 60 },
@@ -95,8 +98,25 @@ const TRACKS = [
   { type: 'sub', id: 3, lang: 'no', codec: 'subrip', forced: true },
 ] as const;
 
+/** The film's own tracks, then its subtitle files', numbered on from its own. */
+function allTracks() {
+  const own = TRACKS.filter((t) => t.type === 'sub').length;
+  return [
+    ...TRACKS,
+    ...state.files.map((f, i) => ({
+      type: 'sub' as const,
+      id: own + i + 1,
+      lang: f.language,
+      title: f.label,
+      forced: f.forced,
+      codec: 'subrip',
+      external: true,
+    })),
+  ];
+}
+
 function trackList() {
-  return TRACKS.map((t) => ({
+  return allTracks().map((t) => ({
     title: null,
     lang: null,
     forced: false,
@@ -176,6 +196,12 @@ export function open(args: Record<string, unknown>): null {
   // The last film's choices are not this one's: Media3 picks its own until
   // Kinema puts the remembered languages on.
   state.chosen = { audio: 1, sub: 0 };
+  state.files = ((args.subtitles as Record<string, unknown>[] | undefined) ?? []).map((f) => ({
+    uri: String(f.uri),
+    language: (f.language as string | null) ?? null,
+    label: (f.label as string | null) ?? null,
+    forced: Boolean(f.forced),
+  }));
   window.clearInterval(ticker);
   ticker = window.setInterval(tick, TICK_MS);
   window.setTimeout(() => {
@@ -245,8 +271,23 @@ export function selectTrack(args: Record<string, unknown>): null {
   record('select_track', args);
   const kind = args.kind as 'audio' | 'sub';
   const id = Number(args.id);
-  if (!TRACKS.some((t) => t.type === kind && t.id === id)) throw new Error(`there is no ${kind} track ${id}`);
+  if (!allTracks().some((t) => t.type === kind && t.id === id)) throw new Error(`there is no ${kind} track ${id}`);
   state.chosen[kind] = id;
+  return null;
+}
+
+/** The film opened again with one more subtitle file, which is chosen and shown. */
+export function addSubtitle(args: Record<string, unknown>): null {
+  record('add_subtitle', args);
+  if (state.path === null) throw new Error('nothing is open');
+  state.files.push({
+    uri: String(args.uri),
+    language: (args.language as string | null) ?? null,
+    label: (args.label as string | null) ?? null,
+    forced: false,
+  });
+  state.chosen.sub = TRACKS.filter((t) => t.type === 'sub').length + state.files.length;
+  state.subtitlesShown = true;
   return null;
 }
 

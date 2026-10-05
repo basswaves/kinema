@@ -556,10 +556,11 @@ export async function subtitlesShown(): Promise<boolean> {
 
 /**
  * Add a subtitle file to the open film, choose it and show it. `title` is
- * the name the track panel gives it.
+ * the name the track panel gives it. Media3 opens the film again with it, at
+ * the same moment: a short pause.
  */
 export async function addSubtitle(path: string, language: string, title: string): Promise<void> {
-  if (isMedia3()) throw new Error('Subtitles are not here yet on this device.');
+  if (isMedia3()) return media3.addSubtitle(path, language, title);
   await command('sub-add', [path, 'select', title, language]);
   await command('set', ['sub-visibility', 'yes']);
 }

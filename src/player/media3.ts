@@ -12,22 +12,71 @@ import type { PlaybackEvent, Track } from './engine';
 import type { Film, Screen } from './displayMode';
 import type { SystemOutput } from './systemOutput';
 
+/**
+ * A refusal from the plugin, in its own words: it arrives as an object, which
+ * the page would otherwise show as "[object Object]".
+ */
+function inWords(e: unknown): Error {
+  if (e instanceof Error) return e;
+  if (typeof e === 'string') return new Error(e);
+  const message = (e as { message?: unknown } | null)?.message;
+  return new Error(typeof message === 'string' ? message : JSON.stringify(e));
+}
+
 const call = <T = void>(command: string, args?: Record<string, unknown>) =>
-  invoke<T>(`plugin:media3|${command}`, args);
+  invoke<T>(`plugin:media3|${command}`, args).catch((e: unknown) => {
+    throw inWords(e);
+  });
 
 export async function listen(handle: (event: PlaybackEvent) => void): Promise<() => void> {
   const listener = await addPluginListener<PlaybackEvent>('media3', 'playback', handle);
   return () => void listener.unregister();
 }
 
+/** A subtitle file beside the film, as the core finds them (subtitle_files.rs). */
+interface SubtitleFile {
+  path: string;
+  language: string | null;
+  forced: boolean;
+  hearing_impaired: boolean;
+}
+
 /**
- * A film on a network share Kinema opens itself (`smb://…`) is read through
+ * A file on a network share Kinema opens itself (`smb://…`) is read through
  * the core (stream.rs), which hands back an address on this device for it.
  */
+const isShare = (path: string) => /^smb:/i.test(path);
+const readable = (path: string) =>
+  isShare(path) ? invoke<string>('stream_address', { path }) : Promise.resolve(path);
+
+/**
+ * Open a film, with the subtitle files beside it: Media3 takes them only as
+ * a film opens, and does not look for them itself as mpv does. A folder that
+ * cannot be read means none, never a film that will not open.
+ */
 export async function open(path: string, start: number | null) {
-  const url = /^smb:/i.test(path) ? await invoke<string>('stream_address', { path }) : null;
-  return call('open', { path, start, url });
+  const url = isShare(path) ? await readable(path) : null;
+  const found = await invoke<SubtitleFile[]>('subtitle_files', { path }).catch((e) => {
+    console.warn('media3: subtitle files beside the film not looked for', e);
+    return [];
+  });
+  const subtitles = await Promise.all(
+    found.map(async (f) => ({
+      uri: await readable(f.path),
+      language: f.language,
+      forced: f.forced,
+      hearingImpaired: f.hearing_impaired,
+    }))
+  );
+  return call('open', { path, start, url, subtitles });
 }
+
+/**
+ * A subtitle file for the film that is open — the film is opened again with
+ * it, at the same moment. Answers once it is chosen and showing.
+ */
+export const addSubtitle = (path: string, language: string, label: string) =>
+  call('add_subtitle', { uri: path, language, label });
 export const stop = () => call('stop');
 export const setPaused = (paused: boolean) => call('set_paused', { paused });
 export const seek = (seconds: number, relative: boolean) => call('seek', { seconds, relative });

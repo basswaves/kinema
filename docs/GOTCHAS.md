@@ -1974,3 +1974,29 @@ A field's `onEnter` that answers at once (a sign-in against the mock) put
 the ring on the next screen's first button before the spatial library saw
 the same keydown, which then pressed that button too. **Do:** FocusInput
 stops the event when its `onEnter` takes it.
+
+### Media3 says nothing about a file's tracks until it has read them
+
+`prepare()` returns at once, and the tracks come later, in
+`onTracksChanged`. The plugin used to say `loaded` as it handed the file
+over, and the page put the remembered languages on a file with no tracks
+yet: nothing was chosen, and no error said so. **Do:** say `loaded` at the
+first `onTracksChanged` that has tracks (Media3Plugin.kt), which is what
+`loaded` means in engine.ts.
+
+### Media3 renames the subtitle files it is given
+
+A `SubtitleConfiguration` given the id `kinema-file:1` comes back in
+`currentTracks` as `1:kinema-file:1`: Media3 puts the number of the file's
+source in front. Comparing ids for equality found nothing, so the files
+were not marked "separate file" and an added one "timed out" although it
+had loaded (seen on the emulator, 2026-10-05). **Do:** match the end of
+the id (`isFile`, `contains(EXTERNAL)`).
+
+### Media3's subtitle layer needs Kotlin 2.2 to build
+
+`media3-ui` 1.11 is built with Kotlin 2.2 and brings its standard library;
+Tauri's Android project compiled with Kotlin 1.9, which cannot read it
+("compiled with an incompatible version of Kotlin"), and every Kotlin file
+failed. **Do:** keep the Kotlin Gradle plugin (`gen/android/build.gradle.kts`)
+at the standard library's version or above.

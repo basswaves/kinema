@@ -66,6 +66,8 @@ dependencies {
     // The player (Media3Plugin.kt). Fetched from Google's repository when
     // the app is built, like the libraries above; it is compiled into the app.
     implementation("androidx.media3:media3-exoplayer:1.11.1")
+    // Its subtitle layer only (SubtitleView), between the film and the page.
+    implementation("androidx.media3:media3-ui:1.11.1")
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.4")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.0")

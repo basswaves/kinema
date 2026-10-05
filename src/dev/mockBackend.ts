@@ -1277,6 +1277,20 @@ const handlers: Record<string, Handler> = {
   'plugin:media3|tracks': () => fakeMedia3.tracks(),
   'plugin:media3|select_track': (a) => fakeMedia3.selectTrack(a),
   'plugin:media3|show_subtitles': (a) => fakeMedia3.showSubtitles(a),
+  'plugin:media3|add_subtitle': (a) => fakeMedia3.addSubtitle(a),
+  // A Dutch subtitle file beside every film (subtitle_files.rs), asked for
+  // only where Media3 plays.
+  subtitle_files: (a) => {
+    const path = String(a.path);
+    return [
+      {
+        path: path.replace(/\.[^.\\/]+$/, '.nl.srt'),
+        language: 'nl',
+        forced: false,
+        hearing_impaired: false,
+      },
+    ];
+  },
   'plugin:media3|state': () => fakeMedia3.playerState(),
   'plugin:media3|screen': () => fakeMedia3.screen(),
   'plugin:media3|set_mode': (a) => fakeMedia3.setMode(a),

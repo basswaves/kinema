@@ -4,14 +4,8 @@
  * nothing). The level is remembered across films (volume.ts).
  */
 import { useCallback, useEffect, useState } from 'react';
-import {
-  applyMute,
-  applyVolume,
-  bitstreaming,
-  clampVolume,
-  persistVolume,
-  savedVolume,
-} from './volume';
+import { setMuted as applyMute, setVolume as applyVolume, soundGoesUntouched } from './engine';
+import { clampVolume, persistVolume, savedVolume } from './volume';
 
 export function useVolume({
   fail,
@@ -86,7 +80,7 @@ export function useVolume({
    */
   const volumeKey = useCallback(
     (act: () => void) => {
-      void bitstreaming().then((yes) => {
+      void soundGoesUntouched().then((yes) => {
         setReceiver(yes);
         if (yes) showOsd();
         else act();
@@ -104,7 +98,7 @@ export function useVolume({
   useEffect(() => {
     if (!osdVisible) return;
     let live = true;
-    void bitstreaming().then((yes) => live && setReceiver(yes));
+    void soundGoesUntouched().then((yes) => live && setReceiver(yes));
     return () => {
       live = false;
     };

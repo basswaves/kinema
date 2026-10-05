@@ -22,7 +22,8 @@
 import { getSetting } from '../metadata/api';
 import type { TitlePrefs } from './api';
 import { sameLanguage, systemLanguage } from './language';
-import { findTrackByLang, type MpvTrack } from './tracks';
+import type { Track } from './engine';
+import { findTrackByLang } from './tracks';
 
 export const AUDIO_DEFAULT_KEY = 'lang_audio';
 export const SUBS_DEFAULT_KEY = 'lang_subs';
@@ -60,7 +61,7 @@ export interface TrackChoice {
   subVisible: boolean | null;
 }
 
-export function forcedTrack(tracks: MpvTrack[], lang: string | null | undefined): MpvTrack | null {
+export function forcedTrack(tracks: Track[], lang: string | null | undefined): Track | null {
   return tracks.find((t) => t.type === 'sub' && t.forced && sameLanguage(t.lang, lang)) ?? null;
 }
 
@@ -69,9 +70,9 @@ export function forcedTrack(tracks: MpvTrack[], lang: string | null | undefined)
  * file has one and forced subtitles are on; otherwise none.
  */
 function forcedOrNone(
-  tracks: MpvTrack[],
+  tracks: Track[],
   aid: number | null,
-  spoken: MpvTrack | null,
+  spoken: Track | null,
   show: boolean
 ): TrackChoice {
   const forced = show ? forcedTrack(tracks, spoken?.lang) : null;
@@ -80,12 +81,12 @@ function forcedOrNone(
 }
 
 /** The audio track that will play: the one chosen, or the file's own. */
-export function spokenTrack(tracks: MpvTrack[], chosen: MpvTrack | null): MpvTrack | null {
+export function spokenTrack(tracks: Track[], chosen: Track | null): Track | null {
   return chosen ?? tracks.find((t) => t.type === 'audio' && t.selected) ?? null;
 }
 
 export function chooseTracks(
-  tracks: MpvTrack[],
+  tracks: Track[],
   prefs: TitlePrefs | null,
   defaults: LanguageDefaults
 ): TrackChoice {

@@ -15,11 +15,11 @@ Reading `track-list` in `node` format kills the app with
 array-of-maps across the FFI boundary; every flat scalar format is stable.
 
 **Do:** read `track-list/count`, then `track-list/N/type`, `track-list/N/id`,
-`track-list/N/lang` … as scalars. See `src/player/tracks.ts`.
+`track-list/N/lang` … as scalars. See `readTracks` in `src/player/engine.ts`.
 
 This is a property of the *format*, not of `track-list`. Every other list-shaped
 property is the same trap: `chapter-list`, `playlist`, `vo-passes`,
-`demuxer-cache-state`. `src/player/chapters.ts` reads `chapters` for the count
+`demuxer-cache-state`. `readChapters` (engine.ts) reads `chapters` for the count
 and then `chapter-list/N/time` and `chapter-list/N/title` as scalars, for exactly
 this reason. `src/player/stats.ts` is scalars throughout and reads no list
 property whole.
@@ -557,7 +557,7 @@ the only trace is a crop of "unused eslint-disable directive" warnings where
 disables that used to be needed no longer are. Found when adding "Find
 subtitles online" to the player. **Do:** keep `try` out of components and
 hooks — put the awaited work in a function outside that returns what to show
-(`onlineSearch` in useOnlineSubtitles.ts, `readSubVisibility` in tracks.ts) —
+(`onlineSearch` in useOnlineSubtitles.ts, `subtitlesShown` in engine.ts) —
 and treat a sudden batch of unused-disable warnings as the compiler bailing
 out, not as tidying to do.
 

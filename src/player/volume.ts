@@ -9,12 +9,12 @@
  * a volume that resets to full every time the app opens is its own complaint.
  * Mute is not: coming back to a silent film you have forgotten muting is worse.
  *
- * Nothing here is observed from mpv. Only this app changes the volume, so the
- * state it sets is the state there is — and an observed property would only
- * start arriving after a full restart (docs/GOTCHAS.md).
+ * Nothing here is observed from the engine. Only this app changes the volume,
+ * so the state it sets is the state there is — and an observed mpv property
+ * would only start arriving after a full restart (docs/GOTCHAS.md). Setting it
+ * is the engine's (engine.ts `setVolume`, `setMuted`).
  */
 import { getSetting, setSetting } from '../metadata/api';
-import { readProperty, mpvCommand } from './engine';
 
 export const VOLUME_KEY = 'volume';
 export const VOLUME_STEP = 5;
@@ -32,28 +32,6 @@ export async function savedVolume(): Promise<number> {
   return Number.isFinite(parsed) ? clampVolume(parsed) : DEFAULT_VOLUME;
 }
 
-/**
- * Through `set` rather than `setProperty`: the command takes a string and lets
- * mpv parse it, which sidesteps the typed-number trouble some properties have
- * with the plugin (docs/GOTCHAS.md, `sid` / `aid`).
- */
-export async function applyVolume(level: number): Promise<void> {
-  await mpvCommand('set', ['volume', String(level)]);
-}
-
 export async function persistVolume(level: number): Promise<void> {
   await setSetting(VOLUME_KEY, String(level));
-}
-
-export async function applyMute(muted: boolean): Promise<void> {
-  await mpvCommand('set', ['mute', muted ? 'yes' : 'no']);
-}
-
-/**
- * Whether the sound is going to the receiver as an untouched bitstream, where
- * this app's volume does nothing — the receiver's own control is the one.
- */
-export async function bitstreaming(): Promise<boolean> {
-  const format = await readProperty<string>('audio-out-params/format', 'string');
-  return format?.startsWith('spdif-') ?? false;
 }

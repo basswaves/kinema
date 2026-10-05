@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { canonicalLang, languageName, sameLanguage } from './language';
-import { describeTrack, findTrackByLang, type MpvTrack } from './tracks';
+import type { Track } from './engine';
+import { describeTrack, findTrackByLang } from './tracks';
 
-const track = (fields: Partial<MpvTrack>): MpvTrack => ({
+const track = (fields: Partial<Track>): Track => ({
   id: 1,
   type: 'audio',
   selected: false,

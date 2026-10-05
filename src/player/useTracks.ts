@@ -6,18 +6,18 @@
  */
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { getTitlePrefs, setTitlePrefs, type PlaybackTarget } from './api';
-import { openPath } from './engine';
+import {
+  chooseTrack as playTrack,
+  openPath,
+  readTracks,
+  showSubtitles,
+  subtitlesShown,
+  type Track,
+} from './engine';
 import { canonicalLang, systemLanguage } from './language';
 import { forcedSubtitle, loadSubtitle } from './onlineSubtitles';
 import { samePath } from './session';
 import { chooseTracks, forcedTrack, readLanguageDefaults, spokenTrack } from './trackChoice';
-import {
-  readSubVisibility,
-  readTracks,
-  selectTrack,
-  setSubtitleVisibility,
-  type MpvTrack,
-} from './tracks';
 
 export function useTracks({
   target,
@@ -26,7 +26,7 @@ export function useTracks({
   target: PlaybackTarget;
   fail: (e: unknown) => void;
 }) {
-  const [tracks, setTracks] = useState<MpvTrack[]>([]);
+  const [tracks, setTracks] = useState<Track[]>([]);
   /** The subtitle language from Settings, or Windows' when subtitles are off. */
   const [wantedSubLang, setWantedSubLang] = useState<string | null>(null);
   const [sid, setSid] = useState<number | null>(null);
@@ -58,9 +58,9 @@ export function useTracks({
       const [mode, lang] = defaults.subs.split(':');
       setWantedSubLang(mode !== 'off' && lang ? lang : systemLanguage());
       const choice = chooseTracks(list, prefs, defaults);
-      if (choice.aid !== null) await selectTrack('aid', choice.aid);
-      if (choice.sid !== null) await selectTrack('sid', choice.sid);
-      if (choice.subVisible !== null) await setSubtitleVisibility(choice.subVisible);
+      if (choice.aid !== null) await playTrack('audio', choice.aid);
+      if (choice.sid !== null) await playTrack('sub', choice.sid);
+      if (choice.subVisible !== null) await showSubtitles(choice.subVisible);
     } catch (e) {
       console.warn('could not apply track preferences', e);
     }
@@ -73,7 +73,7 @@ export function useTracks({
     setAid(updated.find((t) => t.type === 'audio' && t.selected)?.id ?? null);
     setSid(updated.find((t) => t.type === 'sub' && t.selected)?.id ?? null);
 
-    const visible = await readSubVisibility();
+    const visible = await subtitlesShown();
     setSubVisible(visible);
 
     // Forced subtitles from OpenSubtitles, for a file with none of its own —
@@ -120,15 +120,15 @@ export function useTracks({
 
   /** Changing a track also records the language for this whole title. */
   const chooseTrack = useCallback(
-    async (kind: 'sid' | 'aid', track: MpvTrack | null) => {
+    async (kind: 'audio' | 'sub', track: Track | null) => {
       try {
-        if (kind === 'sid' && track === null) {
-          await setSubtitleVisibility(false);
+        if (kind === 'sub' && track === null) {
+          await showSubtitles(false);
           setSubVisible(false);
         } else if (track) {
-          await selectTrack(kind, track.id);
-          if (kind === 'sid') {
-            await setSubtitleVisibility(true);
+          await playTrack(kind, track.id);
+          if (kind === 'sub') {
+            await showSubtitles(true);
             setSubVisible(true);
             setSid(track.id);
           } else {
@@ -139,9 +139,9 @@ export function useTracks({
         if (target.titleId !== null) {
           const current = await getTitlePrefs(target.titleId);
           await setTitlePrefs(target.titleId, {
-            audio_lang: kind === 'aid' ? (track?.lang ?? null) : current.audio_lang,
-            sub_lang: kind === 'sid' ? (track?.lang ?? null) : current.sub_lang,
-            sub_enabled: kind === 'sid' ? track !== null : current.sub_enabled,
+            audio_lang: kind === 'audio' ? (track?.lang ?? null) : current.audio_lang,
+            sub_lang: kind === 'sub' ? (track?.lang ?? null) : current.sub_lang,
+            sub_enabled: kind === 'sub' ? track !== null : current.sub_enabled,
           });
         }
       } catch (e) {

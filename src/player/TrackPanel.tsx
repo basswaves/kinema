@@ -3,7 +3,8 @@
  */
 import { FocusContext, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import FocusButton from '../ui/FocusButton';
-import { describeTrack, type MpvTrack } from './tracks';
+import type { Track } from './engine';
+import { describeTrack } from './tracks';
 import { languageName } from './language';
 import { describeOffer, type Offer } from './onlineSubtitles';
 
@@ -57,12 +58,12 @@ export default function TrackPanel({
   onClose,
   online,
 }: {
-  audioTracks: MpvTrack[];
-  subTracks: MpvTrack[];
+  audioTracks: Track[];
+  subTracks: Track[];
   aid: number | null;
   sid: number | null;
   subVisible: boolean;
-  onChoose: (kind: 'sid' | 'aid', track: MpvTrack | null) => void;
+  onChoose: (kind: 'audio' | 'sub', track: Track | null) => void;
   onClose: () => void;
   online?: OnlineSubtitles | null;
 }) {
@@ -85,7 +86,7 @@ export default function TrackPanel({
             key={track.id}
             className={`track-option ${aid === track.id ? 'active' : ''}`}
             keepInView="nearest"
-            onSelect={() => onChoose('aid', track)}
+            onSelect={() => onChoose('audio', track)}
           >
             {describeTrack(track)}
           </FocusButton>
@@ -97,7 +98,7 @@ export default function TrackPanel({
         <FocusButton
           className={`track-option ${!subVisible ? 'active' : ''}`}
           keepInView="nearest"
-          onSelect={() => onChoose('sid', null)}
+          onSelect={() => onChoose('sub', null)}
         >
           Off
         </FocusButton>
@@ -106,7 +107,7 @@ export default function TrackPanel({
             key={track.id}
             className={`track-option ${subVisible && sid === track.id ? 'active' : ''}`}
             keepInView="nearest"
-            onSelect={() => onChoose('sid', track)}
+            onSelect={() => onChoose('sub', track)}
           >
             {describeTrack(track)}
           </FocusButton>

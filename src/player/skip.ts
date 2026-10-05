@@ -25,7 +25,7 @@
  *     default it only *offers*. A guess that shows a card costs a card on
  *     screen; a guess that seeks costs content the user never saw.
  */
-import type { Chapter } from './chapters';
+import type { Chapter } from './engine';
 import type { Segment, SkipMarkers } from './api';
 
 export type SkipKind = 'intro' | 'recap' | 'credits';

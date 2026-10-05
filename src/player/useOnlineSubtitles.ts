@@ -15,7 +15,7 @@ import {
   type Offer,
 } from './onlineSubtitles';
 import { spokenTrack } from './trackChoice';
-import type { MpvTrack } from './tracks';
+import type { Track } from './engine';
 import type { OnlineSubtitles } from './TrackPanel';
 
 /**
@@ -68,7 +68,7 @@ export function useOnlineSubtitles({
   showFetched,
 }: {
   target: PlaybackTarget;
-  tracks: MpvTrack[];
+  tracks: Track[];
   /** The audio track playing, whose language is the second choice. */
   aid: number | null;
   /** The subtitle language from Settings, the first choice (useTracks). */

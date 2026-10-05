@@ -17,7 +17,6 @@ import {
   releaseAudioDevice,
   silencedAudioTrack,
 } from './audioOutput';
-import { readChapters, type Chapter } from './chapters';
 import { matchHdrToDisplay } from './displayHdr';
 import { mayswitch, restoreScreen } from './displaySwitch';
 import {
@@ -28,9 +27,11 @@ import {
   nowPlaying,
   onPlaybackEvent,
   openFile,
+  readChapters,
   setPaused,
   startEngine,
   stopPlayback,
+  type Chapter,
 } from './engine';
 import { VIDEO_SYNC_KEY, VIDEO_SYNC_MODES } from './mpvOptions';
 import { startOverlay } from './overlay';

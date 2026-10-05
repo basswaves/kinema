@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { chooseTracks } from './trackChoice';
-import type { MpvTrack } from './tracks';
+import type { Track } from './engine';
 
-const t = (id: number, type: string, lang: string | undefined, extra: Partial<MpvTrack> = {}): MpvTrack => ({
+const t = (id: number, type: string, lang: string | undefined, extra: Partial<Track> = {}): Track => ({
   id,
   type,
   lang,

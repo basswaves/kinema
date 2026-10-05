@@ -1,110 +1,9 @@
 /**
- * Reading mpv's track list.
- *
- * Deliberately avoids `mpvGet('track-list', 'node')`. The node format
- * deserialises a nested array-of-maps across the FFI boundary and reliably
- * crashed the process with STATUS_ACCESS_VIOLATION on file load. Every field is
- * available as an indexed scalar property, which is flat and safe.
+ * Saying a track in words, and finding one by language. The tracks themselves
+ * are read and chosen through the engine (engine.ts), in Kinema's terms.
  */
-import { readProperty, mpvCommand } from './engine';
+import type { Track } from './engine';
 import { languageName, sameLanguage } from './language';
-
-export interface MpvTrack {
-  id: number;
-  type: 'video' | 'audio' | 'sub' | string;
-  title?: string;
-  lang?: string;
-  codec?: string;
-  selected: boolean;
-  forced: boolean;
-  external: boolean;
-  default: boolean;
-  /** Audio only: channels as the file carries them. */
-  channels?: number;
-  /** FFmpeg's profile name — where "DTS-HD MA" and "Atmos" are said. */
-  profile?: string;
-  /** Subtitles for the deaf and hard of hearing (SDH). */
-  hearingImpaired?: boolean;
-}
-
-/**
- * Every track, read field by field as scalars — **all at once**. Each read is
- * an IPC round trip, and they used to be awaited one after another: nine per
- * track, so a release with twelve audio and subtitle tracks spent over a
- * hundred sequential round trips on it, twice per file (before and after the
- * remembered languages are applied). Order is kept by index.
- */
-export async function readTracks(): Promise<MpvTrack[]> {
-  const count = (await readProperty<number>('track-list/count', 'int64')) ?? 0;
-
-  const read = async (i: number): Promise<MpvTrack | null> => {
-    const at = (field: string) => `track-list/${i}/${field}`;
-    const [
-      type,
-      id,
-      title,
-      lang,
-      codec,
-      selected,
-      forced,
-      external,
-      isDefault,
-      channels,
-      profile,
-      hearingImpaired,
-    ] = await Promise.all([
-        readProperty<string>(at('type'), 'string'),
-        readProperty<number>(at('id'), 'int64'),
-        readProperty<string>(at('title'), 'string'),
-        readProperty<string>(at('lang'), 'string'),
-        readProperty<string>(at('codec'), 'string'),
-        readProperty<boolean>(at('selected'), 'flag'),
-        readProperty<boolean>(at('forced'), 'flag'),
-        readProperty<boolean>(at('external'), 'flag'),
-        readProperty<boolean>(at('default'), 'flag'),
-        readProperty<number>(at('demux-channel-count'), 'int64'),
-        readProperty<string>(at('codec-profile'), 'string'),
-        readProperty<boolean>(at('hearing-impaired'), 'flag'),
-      ]);
-    if (!type) return null;
-    return {
-      id: id ?? i,
-      type,
-      title: title ?? undefined,
-      lang: lang ?? undefined,
-      codec: codec ?? undefined,
-      selected: selected ?? false,
-      forced: forced ?? false,
-      external: external ?? false,
-      default: isDefault ?? false,
-      channels: channels ?? undefined,
-      profile: profile ?? undefined,
-      hearingImpaired: hearingImpaired ?? false,
-    };
-  };
-
-  const tracks = await Promise.all(Array.from({ length: count }, (_, i) => read(i)));
-  return tracks.filter((t): t is MpvTrack => t !== null);
-}
-
-/**
- * Selecting a track uses mpv's `set` input command, not mpvSet(). The
- * typed setter sends JS numbers as MPV_FORMAT_DOUBLE, and sid/aid are
- * choice-style properties ("auto" / "no" / an integer) whose handlers do not
- * implement that format — they return M_PROPERTY_NOT_IMPLEMENTED.
- */
-export async function selectTrack(kind: 'sid' | 'aid', id: number | 'no'): Promise<void> {
-  await mpvCommand('set', [kind, String(id)]);
-}
-
-export async function setSubtitleVisibility(visible: boolean): Promise<void> {
-  await mpvCommand('set', ['sub-visibility', visible ? 'yes' : 'no']);
-}
-
-/** Whether subtitles are showing, as mpv says; showing when it cannot say. */
-export async function readSubVisibility(): Promise<boolean> {
-  return (await readProperty<boolean>('sub-visibility', 'flag')) ?? true;
-}
 
 /** Codec names as they are printed on a disc box. */
 const AUDIO_CODECS: Record<string, string> = {
@@ -130,7 +29,7 @@ const DTS_PROFILES: [RegExp, string][] = [
   [/ES/, 'DTS-ES'],
 ];
 
-function audioFormat(track: MpvTrack): string | null {
+function audioFormat(track: Track): string | null {
   const codec = track.codec?.toLowerCase();
   if (!codec) return null;
   if (codec.startsWith('pcm')) return 'PCM';
@@ -166,7 +65,7 @@ const REDUNDANT = new Set(
   ).split(' ')
 );
 
-function informativeTitle(track: MpvTrack): string | null {
+function informativeTitle(track: Track): string | null {
   const title = track.title?.trim();
   if (!title) return null;
   const language = languageName(track.lang)?.toLowerCase() ?? '';
@@ -184,7 +83,7 @@ function informativeTitle(track: MpvTrack): string | null {
  * spelling — "ENG · truehd", "hdmv_pgs_subtitle" — which nobody but a
  * developer can read.
  */
-export function describeTrack(track: MpvTrack): string {
+export function describeTrack(track: Track): string {
   const parts: (string | null)[] = [languageName(track.lang)];
   if (track.type === 'audio') {
     parts.push(channelLayout(track.channels), audioFormat(track));
@@ -211,10 +110,10 @@ export function describeTrack(track: MpvTrack): string {
  * a language wants.
  */
 export function findTrackByLang(
-  tracks: MpvTrack[],
+  tracks: Track[],
   type: 'audio' | 'sub',
   lang: string | null
-): MpvTrack | null {
+): Track | null {
   if (!lang) return null;
   const candidates = tracks.filter((t) => t.type === type && sameLanguage(t.lang, lang));
   if (candidates.length === 0) return null;

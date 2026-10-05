@@ -139,14 +139,16 @@ src/
                  and screen rules ask it about the device in use (a screen
                  by the name the system gives it, matched to the equipment
                  check's stable id). engine.ts is the only
-                 file that talks to mpv: open, pause, seek, stop and the
-                 playback events in Kinema's own terms (all the player's
-                 own files use, but for frame timing), and
+                 file that talks to mpv: open, pause, seek, stop, the
+                 playback events, tracks, subtitles, volume and chapters in
+                 Kinema's own terms (all the player's own files use, but
+                 for frame timing), and
                  mpvCommand/mpvGet/mpvSet for the parts that
                  are about mpv itself — stats, output check, sound routing,
                  HDR hint, frame timing — which another engine would
                  replace rather than imitate.
-                 chapters.ts and stats.ts read mpv as flat scalars only;
+                 its track and chapter readers and stats.ts read mpv as
+                 flat scalars only;
                  skip.ts continues the credits ladder past the marker Rust
                  supplies — a named chapter, then a fenced guess at the tail
   library/       pipeline.ts — the scan→parse→match→details→ratings→artwork→

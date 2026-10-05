@@ -22,10 +22,16 @@ import {
   PhysicalPosition,
   primaryMonitor,
 } from '@tauri-apps/api/window';
-import { listenMpvEvents, mpvCommand, mpvGet, onPlaybackEvent, seekTo } from './player/engine';
-import { startEngine } from './player/engine';
-import { readTracks } from './player/tracks';
-import { readChapters } from './player/chapters';
+import {
+  listenMpvEvents,
+  mpvCommand,
+  mpvGet,
+  onPlaybackEvent,
+  readChapters,
+  readTracks,
+  seekTo,
+  startEngine,
+} from './player/engine';
 import { setTvMode } from './ui/tv';
 import { simklStatus, traktStatus } from './metadata/tracking';
 import { findSubtitles } from './player/onlineSubtitles';

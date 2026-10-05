@@ -437,6 +437,195 @@ export async function hasReachedEnd(): Promise<boolean> {
   }
 }
 
+// ---- tracks, subtitles, volume, chapters --------------------------------------
+//
+// Still Kinema's terms: what the track panel, the volume control and the
+// credits ladder need, said the same way whichever engine plays. Formats are
+// named as FFmpeg names them — `truehd`, `eac3`, "DTS-HD MA" — which is
+// Kinema's own vocabulary for them already (ffprobe's badges speak it too),
+// so an engine that says them otherwise translates into it.
+
+/** One audio, subtitle or video track of the open file. */
+export interface Track {
+  /** The engine's number for it, good until the file is opened again. */
+  id: number;
+  type: 'video' | 'audio' | 'sub' | string;
+  title?: string;
+  lang?: string;
+  /** FFmpeg's name for the format: `truehd`, `eac3`, `subrip`, `hdmv_pgs_subtitle`. */
+  codec?: string;
+  selected: boolean;
+  forced: boolean;
+  /** From a file of its own beside the film, or fetched, not inside the film. */
+  external: boolean;
+  default: boolean;
+  /** Audio only: channels as the file carries them. */
+  channels?: number;
+  /** FFmpeg's profile name — where "DTS-HD MA" and "Atmos" are said. */
+  profile?: string;
+  /** Subtitles for the deaf and hard of hearing (SDH). */
+  hearingImpaired?: boolean;
+}
+
+/**
+ * Every track, read field by field as scalars — **all at once**. Never
+ * `getProperty('track-list', 'node')`: the node format deserialises a
+ * nested array-of-maps across the FFI boundary and reliably crashed the
+ * process with STATUS_ACCESS_VIOLATION on file load. Each read is an IPC
+ * round trip, and they used to be awaited one after another: nine per track,
+ * so a release with twelve audio and subtitle tracks spent over a hundred
+ * sequential round trips on it, twice per file. Order is kept by index.
+ */
+export async function readTracks(): Promise<Track[]> {
+  if (isMedia3()) return [];
+  const count = (await readProperty<number>('track-list/count', 'int64')) ?? 0;
+
+  const read = async (i: number): Promise<Track | null> => {
+    const at = (field: string) => `track-list/${i}/${field}`;
+    const [
+      type,
+      id,
+      title,
+      lang,
+      codec,
+      selected,
+      forced,
+      external,
+      isDefault,
+      channels,
+      profile,
+      hearingImpaired,
+    ] = await Promise.all([
+      readProperty<string>(at('type'), 'string'),
+      readProperty<number>(at('id'), 'int64'),
+      readProperty<string>(at('title'), 'string'),
+      readProperty<string>(at('lang'), 'string'),
+      readProperty<string>(at('codec'), 'string'),
+      readProperty<boolean>(at('selected'), 'flag'),
+      readProperty<boolean>(at('forced'), 'flag'),
+      readProperty<boolean>(at('external'), 'flag'),
+      readProperty<boolean>(at('default'), 'flag'),
+      readProperty<number>(at('demux-channel-count'), 'int64'),
+      readProperty<string>(at('codec-profile'), 'string'),
+      readProperty<boolean>(at('hearing-impaired'), 'flag'),
+    ]);
+    if (!type) return null;
+    return {
+      id: id ?? i,
+      type,
+      title: title ?? undefined,
+      lang: lang ?? undefined,
+      codec: codec ?? undefined,
+      selected: selected ?? false,
+      forced: forced ?? false,
+      external: external ?? false,
+      default: isDefault ?? false,
+      channels: channels ?? undefined,
+      profile: profile ?? undefined,
+      hearingImpaired: hearingImpaired ?? false,
+    };
+  };
+
+  const tracks = await Promise.all(Array.from({ length: count }, (_, i) => read(i)));
+  return tracks.filter((t): t is Track => t !== null);
+}
+
+/**
+ * Play this audio track, or show this subtitle track. Through mpv's `set`
+ * input command, not `setProperty`: the typed setter sends JS numbers as
+ * MPV_FORMAT_DOUBLE, and sid/aid are choice-style properties ("auto" / "no"
+ * / an integer) whose handlers do not implement that format — they return
+ * M_PROPERTY_NOT_IMPLEMENTED.
+ */
+export async function chooseTrack(kind: 'audio' | 'sub', id: number): Promise<void> {
+  if (isMedia3()) throw new Error('Choosing a track is not here yet on this device.');
+  await command('set', [kind === 'audio' ? 'aid' : 'sid', String(id)]);
+}
+
+/** Show or hide the subtitles, keeping the track chosen. */
+export async function showSubtitles(visible: boolean): Promise<void> {
+  if (isMedia3()) throw new Error('Subtitles are not here yet on this device.');
+  await command('set', ['sub-visibility', visible ? 'yes' : 'no']);
+}
+
+/** Whether subtitles are showing, as the engine says; showing when it cannot say. */
+export async function subtitlesShown(): Promise<boolean> {
+  if (isMedia3()) return true;
+  return (await readProperty<boolean>('sub-visibility', 'flag')) ?? true;
+}
+
+/**
+ * Add a subtitle file to the open film, choose it and show it. `title` is
+ * the name the track panel gives it.
+ */
+export async function addSubtitle(path: string, language: string, title: string): Promise<void> {
+  if (isMedia3()) throw new Error('Subtitles are not here yet on this device.');
+  await command('sub-add', [path, 'select', title, language]);
+  await command('set', ['sub-visibility', 'yes']);
+}
+
+/**
+ * The volume, 0–100. Through `set` rather than `setProperty`: the command
+ * takes a string and lets mpv parse it, which sidesteps the typed-number
+ * trouble some properties have with the plugin (docs/GOTCHAS.md, `sid` /
+ * `aid`).
+ */
+export async function setVolume(level: number): Promise<void> {
+  if (isMedia3()) throw new Error('Volume is not here yet on this device.');
+  await command('set', ['volume', String(level)]);
+}
+
+export async function setMuted(muted: boolean): Promise<void> {
+  if (isMedia3()) throw new Error('Volume is not here yet on this device.');
+  await command('set', ['mute', muted ? 'yes' : 'no']);
+}
+
+/**
+ * Whether the sound is going to the receiver as an untouched bitstream, where
+ * Kinema's volume does nothing — the receiver's own control is the one.
+ */
+export async function soundGoesUntouched(): Promise<boolean> {
+  if (isMedia3()) return false;
+  const format = await readProperty<string>('audio-out-params/format', 'string');
+  return format?.startsWith('spdif-') ?? false;
+}
+
+/** One chapter of the open file. */
+export interface Chapter {
+  /** Seconds from the start of the file. */
+  time: number;
+  title: string | null;
+}
+
+/**
+ * The file's chapters in order, or an empty list when it has none. Same rule
+ * as `readTracks`: never `chapter-list` as a node, every field a flat
+ * indexed scalar.
+ *
+ * Media3 reads no chapters from a file, so on Android there are none and
+ * the credits ladder goes by its other rungs (skip.ts).
+ */
+export async function readChapters(): Promise<Chapter[]> {
+  if (isMedia3()) return [];
+  const count = (await readProperty<number>('chapters', 'int64')) ?? 0;
+
+  // All at once, in index order — see `readTracks` for why.
+  const read = async (i: number): Promise<Chapter | null> => {
+    const [time, title] = await Promise.all([
+      readProperty<number>(`chapter-list/${i}/time`, 'double'),
+      readProperty<string>(`chapter-list/${i}/title`, 'string'),
+    ]);
+    // A chapter with no start time is not usable for anything here. Its title
+    // may still be missing, which is ordinary — most remuxes number chapters
+    // rather than naming them.
+    if (time === null || Number.isNaN(time)) return null;
+    return { time, title };
+  };
+
+  const chapters = await Promise.all(Array.from({ length: count }, (_, i) => read(i)));
+  return chapters.filter((c): c is Chapter => c !== null);
+}
+
 // ---- mpv's terms -------------------------------------------------------------
 
 export type ScalarFormat = 'string' | 'int64' | 'double' | 'flag';

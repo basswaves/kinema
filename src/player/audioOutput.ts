@@ -30,8 +30,7 @@
 import { getSetting } from '../metadata/api';
 import { covers, readPolicy, type DevicePolicy } from './devicePolicy';
 import { getEquipment, type AudioDevice, type Equipment } from './equipment';
-import { readTracks } from './tracks';
-import { mpvCommand, mpvGet } from './engine';
+import { chooseTrack, mpvCommand, mpvGet, readTracks } from './engine';
 import { invoke } from '@tauri-apps/api/core';
 import { capabilitiesNow } from '../capabilities';
 
@@ -246,7 +245,7 @@ export async function applyFallback(step: number, trackId: number): Promise<bool
   lastApplied = '';
   // Selecting the track again is what reopens the output with the new
   // settings; mpv dropped it when the first open failed.
-  await mpvCommand('set', ['aid', String(trackId)]);
+  await chooseTrack('audio', trackId);
   console.warn(`audio: output failed to open; falling back to ${describePlan(plan)}`);
   return true;
 }

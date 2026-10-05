@@ -571,12 +571,12 @@ export async function addSubtitle(path: string, language: string, title: string)
  * `aid`).
  */
 export async function setVolume(level: number): Promise<void> {
-  if (isMedia3()) throw new Error('Volume is not here yet on this device.');
+  if (isMedia3()) return media3.setVolume(level);
   await command('set', ['volume', String(level)]);
 }
 
 export async function setMuted(muted: boolean): Promise<void> {
-  if (isMedia3()) throw new Error('Volume is not here yet on this device.');
+  if (isMedia3()) return media3.setMuted(muted);
   await command('set', ['mute', muted ? 'yes' : 'no']);
 }
 
@@ -585,7 +585,7 @@ export async function setMuted(muted: boolean): Promise<void> {
  * Kinema's volume does nothing — the receiver's own control is the one.
  */
 export async function soundGoesUntouched(): Promise<boolean> {
-  if (isMedia3()) return false;
+  if (isMedia3()) return (await media3.state()).untouched;
   const format = await readProperty<string>('audio-out-params/format', 'string');
   return format?.startsWith('spdif-') ?? false;
 }

@@ -3,7 +3,7 @@
  * surface beneath this page.
  *
  * Only `engine.ts` imports this, and only for Kinema's own terms — open,
- * pause, seek, stop, what is playing, and the `PlaybackEvent` stream, which
+ * pause, seek, stop, volume, what is playing, and the `PlaybackEvent` stream, which
  * the plugin already sends in those terms. mpv's terms (the stats panel, the
  * output check, the track internals) have no Media3 counterpart here yet.
  */
@@ -31,6 +31,9 @@ export async function open(path: string, start: number | null) {
 export const stop = () => call('stop');
 export const setPaused = (paused: boolean) => call('set_paused', { paused });
 export const seek = (seconds: number, relative: boolean) => call('seek', { seconds, relative });
+/** 0–100, on the same curve as mpv's; kept by the plugin across files. */
+export const setVolume = (level: number) => call('set_volume', { level });
+export const setMuted = (muted: boolean) => call('set_muted', { muted });
 
 export interface State {
   path: string | null;
@@ -40,6 +43,8 @@ export interface State {
   ended: boolean;
   /** The film's picture, once Media3 has chosen its video track. */
   video: Film | null;
+  /** The sound leaves untouched for the receiver, once it has opened. */
+  untouched: boolean;
 }
 
 export const state = () => call<State>('state');

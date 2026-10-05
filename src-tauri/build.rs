@@ -17,6 +17,8 @@ fn main() {
             "stop",
             "set_paused",
             "seek",
+            "set_volume",
+            "set_muted",
             "state",
             "screen",
             "set_mode",

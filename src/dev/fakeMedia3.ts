@@ -34,6 +34,14 @@ export interface FakeMedia3State {
   commands: Array<{ name: string; args: Record<string, unknown> }>;
   /** The film's picture, as Media3 reports it once it has chosen the video. */
   video: { width: number; height: number; fps: number | null; hdr: boolean };
+  /** 0–100, and mute, as Kinema set them. */
+  volume: number;
+  muted: boolean;
+  /**
+   * The sound goes to the receiver untouched once a file is open — set it to
+   * stand in for a box passing it through, where Kinema's volume does nothing.
+   */
+  untouched: boolean;
   /** The screen's mode now, and the modes it offers. */
   screen: { width: number; height: number; rate: number };
   modes: { width: number; height: number; rate: number }[];
@@ -55,6 +63,9 @@ const state: FakeMedia3State = {
   loadDelayMs: 300,
   commands: [],
   video: { width: 1920, height: 1080, fps: 23.976, hdr: false },
+  volume: 100,
+  muted: false,
+  untouched: false,
   screen: { width: 1920, height: 1080, rate: 60 },
   modes: [
     { width: 1920, height: 1080, rate: 60 },
@@ -176,6 +187,18 @@ export function seek(args: Record<string, unknown>): null {
   return null;
 }
 
+export function setVolume(args: Record<string, unknown>): null {
+  record('set_volume', args);
+  state.volume = Number(args.level);
+  return null;
+}
+
+export function setMuted(args: Record<string, unknown>): null {
+  record('set_muted', args);
+  state.muted = Boolean(args.muted);
+  return null;
+}
+
 export function playerState() {
   return {
     path: state.path,
@@ -184,6 +207,7 @@ export function playerState() {
     paused: !state.wantPlaying,
     ended: state.ended,
     video: state.path === null || !started ? null : state.video,
+    untouched: state.path !== null && started && state.untouched,
   };
 }
 

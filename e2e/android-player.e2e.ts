@@ -29,14 +29,28 @@ interface FakeMedia3 {
   path: string | null;
   position: number;
   wantPlaying: boolean;
+  volume: number;
+  muted: boolean;
+  untouched: boolean;
   commands: { name: string; args: Record<string, unknown> }[];
 }
 
 function media3(page: Page): Promise<FakeMedia3> {
   return page.evaluate(() => {
     const f = (window as unknown as { __fakeMedia3: FakeMedia3 }).__fakeMedia3;
-    return { path: f.path, position: f.position, wantPlaying: f.wantPlaying, commands: [...f.commands] };
+    return { ...f, commands: [...f.commands] };
   });
+}
+
+/** One of the app's own modules, called as the app would. */
+function call<T>(page: Page, module: string, name: string, ...args: unknown[]): Promise<T> {
+  return page.evaluate(
+    async ([m, n, a]) => {
+      const mod = await import(/* @vite-ignore */ m as string);
+      return mod[n as string](...(a as unknown[])) as T;
+    },
+    [module, name, args] as const
+  );
 }
 
 /** The names of the commands Media3 was sent, in order. */
@@ -104,5 +118,38 @@ test('Android: a film plays through Media3 — the screen matched, seeking, paus
   expect(await sent(page)).toContain('restore_mode');
 
   // Nothing on the way asked mpv, which Android does not have.
+  expect(complaints).toEqual([]);
+});
+
+test('Android: the volume is Media3’s, remembered, and the receiver’s when the sound goes untouched', async ({
+  page,
+}) => {
+  const complaints = mpvComplaints(page);
+  await playFilm(page);
+
+  // The remembered level is put on as the player opens.
+  await expect.poll(async () => (await sent(page)).includes('set_volume')).toBe(true);
+
+  await press(page, '-');
+  await expect.poll(async () => (await media3(page)).volume).toBe(95);
+  await press(page, '0');
+  await expect.poll(async () => (await media3(page)).volume).toBe(100);
+  await press(page, 'm');
+  await expect.poll(async () => (await media3(page)).muted).toBe(true);
+  await press(page, 'm');
+  await expect.poll(async () => (await media3(page)).muted).toBe(false);
+  await press(page, '-', 2);
+  await expect.poll(async () => (await media3(page)).volume).toBe(90);
+  await expect.poll(() => call(page, '/src/metadata/api.ts', 'getSetting', 'volume')).toBe('90');
+
+  // The box passes the sound to the receiver untouched: the keys leave the
+  // level alone and the control says the receiver has the volume.
+  await page.evaluate(() => {
+    (window as unknown as { __fakeMedia3: FakeMedia3 }).__fakeMedia3.untouched = true;
+  });
+  await press(page, '-');
+  await expect(page.locator('.volume-control.receiver')).toBeAttached();
+  expect((await media3(page)).volume).toBe(90);
+
   expect(complaints).toEqual([]);
 });

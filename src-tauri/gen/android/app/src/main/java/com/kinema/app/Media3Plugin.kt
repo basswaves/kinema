@@ -66,6 +66,17 @@ class ModeArgs {
 }
 
 @InvokeArg
+class VolumeArgs {
+  /** 0–100, as Kinema's volume control says it. */
+  var level: Double = 100.0
+}
+
+@InvokeArg
+class MutedArgs {
+  var muted: Boolean = false
+}
+
+@InvokeArg
 class SeekArgs {
   var seconds: Double = 0.0
   /** Relative to where it is, rather than from the start. */
@@ -130,6 +141,18 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
   private var video: JSObject? = null
   /** The sound that would not play, to be named once the next way is known. */
   private var failedSound: String? = null
+  /**
+   * Kinema's volume, 0–100, and mute: the player's own, kept across the
+   * player being built again (`fallBack`, `open`) as mpv keeps its own.
+   */
+  private var volume = 100.0
+  private var muted = false
+  /**
+   * This film's sound leaves untouched, for the receiver to decode: Kinema's
+   * volume does nothing to it then, and the page says the receiver's is the
+   * one (engine.ts `soundGoesUntouched`).
+   */
+  private var untouched = false
   private val main = Handler(Looper.getMainLooper())
 
   /**
@@ -236,6 +259,7 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
       }
     })
     p.setVideoSurfaceView(s)
+    applyVolume(p)
     // Kinema matches the screen itself (setMode); Media3's own matching
     // would be a second hand on the same switch.
     p.videoChangeFrameRateStrategy = C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_OFF
@@ -311,6 +335,14 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
     })
     player = p
     return p
+  }
+
+  /**
+   * Kinema's volume to Media3's gain, on the same curve as mpv's (cubed), so
+   * a step on the control sounds the same on every system. Mute is no gain.
+   */
+  private fun applyVolume(p: ExoPlayer) {
+    p.volume = if (muted) 0f else Math.pow(volume.coerceIn(0.0, 100.0) / 100.0, 3.0).toFloat()
   }
 
   /**
@@ -421,6 +453,7 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
         config.encoding == C.ENCODING_PCM_24BIT || config.encoding == C.ENCODING_PCM_32BIT ||
         config.encoding == C.ENCODING_PCM_FLOAT)
     Log.i("Kinema", "media3: sound opened: ${soundName(f)}, encoding ${config.encoding}, offload ${config.offload} -> ${if (untouched) "untouched" else "decoded here"}")
+    this.untouched = untouched
     keepSound(soundName(f), if (untouched) "untouched" else "decoded")
   }
 
@@ -460,6 +493,7 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
     val f = (error as? ExoPlaybackException)?.rendererFormat
     val format = f?.let { soundName(it) } ?: ""
     audioStep += 1
+    untouched = false
     Log.w("Kinema", "media3: the sound would not play (${error.errorCodeName}, $format); step $audioStep")
     old.release()
     player = null
@@ -521,6 +555,7 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
         seeking = false
         video = null
         failedSound = null
+        untouched = false
         keepSound(null, null)
         val uri = args.url?.let { Uri.parse(it) }
           ?: if (args.path.contains("://")) Uri.parse(args.path) else Uri.fromFile(File(args.path))
@@ -592,7 +627,7 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
     }
   }
 
-  /** What is open and where it is: path, position, duration, paused, ended. */
+  /** What is open and where it is: path, position, duration, paused, ended, and the sound untouched. */
   @Command
   fun state(invoke: Invoke) {
     main.post {
@@ -604,7 +639,28 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
         put("paused", p?.playWhenReady?.not() ?: true)
         put("ended", p?.playbackState == Player.STATE_ENDED)
         put("video", video ?: JSONObject.NULL)
+        put("untouched", untouched)
       })
+    }
+  }
+
+  @Command
+  fun setVolume(invoke: Invoke) {
+    val args = invoke.parseArgs(VolumeArgs::class.java)
+    main.post {
+      volume = args.level
+      player?.let { applyVolume(it) }
+      invoke.resolve()
+    }
+  }
+
+  @Command
+  fun setMuted(invoke: Invoke) {
+    val args = invoke.parseArgs(MutedArgs::class.java)
+    main.post {
+      muted = args.muted
+      player?.let { applyVolume(it) }
+      invoke.resolve()
     }
   }
 

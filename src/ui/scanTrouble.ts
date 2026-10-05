@@ -16,6 +16,13 @@
  */
 const UNREACHABLE = /^root unavailable, skipped: (.+)$/;
 
+/**
+ * Wikidata still busy after waiting (wikidata.ts), once per film it held up:
+ * one plain line for all of them, never Wikimedia's own sentence.
+ */
+const BUSY = /Wikimedia is busy/;
+const BUSY_LINE = 'Wikipedia was busy, so some films wait to be matched until the next scan';
+
 export interface ScanTrouble {
   /** The first problem, plus how many more there were. */
   text: string;
@@ -26,8 +33,9 @@ export interface ScanTrouble {
 export function scanTrouble(errors: string[]): ScanTrouble | null {
   if (errors.length === 0) return null;
   const folders = errors.flatMap((e) => UNREACHABLE.exec(e)?.[1] ?? []);
-  const others = errors.filter((e) => !UNREACHABLE.test(e));
-  const lines = [...folders.map((path) => `Could not reach ${path}`), ...others];
+  const busy = errors.some((e) => BUSY.test(e)) ? [BUSY_LINE] : [];
+  const others = errors.filter((e) => !UNREACHABLE.test(e) && !BUSY.test(e));
+  const lines = [...folders.map((path) => `Could not reach ${path}`), ...busy, ...others];
   const text = lines.length === 1 ? lines[0] : `${lines[0]} · and ${lines.length - 1} more`;
   // The scanner leaves a missing folder's files as they were, so they stay on
   // the shelves; what does not work is playing them (scanner.rs,

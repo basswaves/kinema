@@ -15,16 +15,20 @@ vi.mock('@tauri-apps/plugin-http', () => ({
     const url = new URL(raw);
     requests.push({ url, headers: init?.headers });
     const reply = replies.shift();
+    const body = (reply ? reply(url) : {}) as { http?: { status: number; retryAfter?: string } };
+    // `{ http: … }` stands for an answer that is only a status, as a 503 is.
+    const status = body.http?.status ?? 200;
     return {
-      ok: true,
-      status: 200,
-      headers: { get: () => null },
-      json: async () => (reply ? reply(url) : {}),
+      ok: status < 400,
+      status,
+      headers: { get: (name: string) => (name === 'retry-after' ? (body.http?.retryAfter ?? null) : null) },
+      json: async () => body,
     };
   }),
 }));
 
 const { wikidataSearch, wikidataGetMovie, tidyGenre } = await import('./wikidata');
+const { describeError } = await import('../ui/errors');
 const { providerForKind } = await import('./match');
 
 const item = (value: unknown) => ({
@@ -147,6 +151,29 @@ describe('Wikidata as the movie fallback', () => {
     expect(requests).toHaveLength(2);
     expect(requests[0].headers?.['Api-User-Agent']).toMatch(/^Kinema /);
     expect(requests[0].url.searchParams.get('maxlag')).toBe('5');
+  });
+
+  it('waits as long as a busy server asks, then carries on', async () => {
+    replies = [() => ({ http: { status: 503, retryAfter: '12' } }), () => ({ query: { search: [] } })];
+    const search = wikidataSearch('Anything');
+    await vi.advanceTimersByTimeAsync(11_000);
+    expect(requests).toHaveLength(1);
+    expect(await settle(search)).toEqual([]);
+    expect(requests).toHaveLength(2);
+  });
+
+  it('still busy after a few tries, says so in words rather than in Wikimedia’s', async () => {
+    const lagged = () => ({
+      error: { code: 'maxlag', info: 'Waiting for wdqs1014: 6.6 seconds lagged.' },
+    });
+    replies = Array.from({ length: 5 }, () => lagged);
+    const search = wikidataSearch('Anything').catch((e: unknown) => e);
+    const error = await settle(search);
+
+    expect(requests).toHaveLength(5);
+    expect(describeError(error)).toBe(
+      'Wikipedia is busy right now. Kinema tries again on the next scan, or try again in a minute.'
+    );
   });
 });
 

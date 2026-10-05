@@ -31,6 +31,15 @@ describe('scanTrouble', () => {
     });
   });
 
+  it('says Wikipedia was busy once, in words, however many films it held up', () => {
+    const busy = (title: string) =>
+      `${title}: Wikimedia is busy: Wikidata query: Waiting for wdqs1014: 6.6 seconds lagged.`;
+    expect(scanTrouble([busy('A film'), busy('Another film')])).toEqual({
+      text: 'Wikipedia was busy, so some films wait to be matched until the next scan',
+      note: null,
+    });
+  });
+
   it('speaks of folders when more than one is away', () => {
     expect(scanTrouble([away('E:\\Shows'), away('F:\\Films')])?.note).toBe(
       'Anything in those folders can’t be played until they are back.'

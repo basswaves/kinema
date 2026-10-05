@@ -59,6 +59,12 @@ const RULES: [RegExp, string | (() => string)][] = [
     /HTTP 401\b|invalid api key/i,
     'The TMDB key was not accepted. Check it in Settings.',
   ],
+  // wikidata.ts, after waiting it out: before the HTTP rules, which the
+  // message can also contain.
+  [
+    /Wikimedia is busy/,
+    'Wikipedia is busy right now. Kinema tries again on the next scan, or try again in a minute.',
+  ],
   [/HTTP 429\b/, 'The online service asked Kinema to slow down. Try again in a minute.'],
   [/HTTP 5\d\d\b/, 'The online service had a problem at its end. Try again later.'],
   [

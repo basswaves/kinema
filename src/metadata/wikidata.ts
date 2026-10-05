@@ -28,9 +28,20 @@ const HEADERS = { 'Api-User-Agent': 'Kinema (https://github.com/basswaves/kinema
 /** One at a time, as Wikimedia asks, with a short breath between. */
 const wikidataQueued = makeQueue(100);
 
-/** "Busy, try later" from `maxlag`: how long to wait, and how often to try. */
-const MAXLAG_WAIT_MS = 5000;
-const MAXLAG_RETRIES = 2;
+/**
+ * "Busy, try later": `maxlag` (Wikidata's database copies are behind), or an
+ * HTTP 429 or 503. Waited out as Wikimedia asks — the `Retry-After` it sends,
+ * at least five seconds — a few times. Still busy after that, the error says
+ * so in a form errors.ts puts into words: the service's own sentence
+ * ("Waiting for wdqs1014: 6.6 seconds lagged.") was shown as it was, and
+ * meant nothing to anyone. A file left unmatched is tried again by the next
+ * scan, never guessed at.
+ */
+const BUSY_WAIT_MS = 5000;
+const BUSY_WAIT_MAX_MS = 30000;
+const BUSY_RETRIES = 4;
+/** The start of the error for "still busy", matched in errors.ts. */
+const WIKIMEDIA_BUSY = 'Wikimedia is busy';
 
 /**
  * What counts as a film. Wikidata types a film by what it is an instance of
@@ -73,15 +84,28 @@ async function get<T>(base: string, params: Record<string, string>): Promise<T> 
   const query = new URLSearchParams({ format: 'json', maxlag: '5', ...params });
   const url = `${base}?${query.toString()}`;
   for (let attempt = 0; ; attempt++) {
-    const body = await wikidataQueued(async () => {
+    const answer = await wikidataQueued(async () => {
       const response = await fetchPolitely(url, 'Wikidata', HEADERS);
+      const header = Number(response.headers.get('retry-after'));
+      const after = Number.isFinite(header) && header > 0 ? header * 1000 : 0;
+      if (response.status === 429 || response.status === 503) {
+        return { busy: `HTTP ${response.status}`, after };
+      }
       if (!response.ok) throw new Error(`Wikidata ${params.action} failed: HTTP ${response.status}`);
-      return (await response.json()) as T & { error?: { code?: string; info?: string } };
+      const body = (await response.json()) as T & { error?: { code?: string; info?: string } };
+      if (body.error?.code === 'maxlag') return { busy: body.error.info ?? 'maxlag', after };
+      return { body };
     });
-    if (body.error?.code === 'maxlag' && attempt < MAXLAG_RETRIES) {
-      await new Promise((r) => setTimeout(r, MAXLAG_WAIT_MS));
+    if (answer.busy !== undefined) {
+      if (attempt >= BUSY_RETRIES) {
+        throw new Error(`${WIKIMEDIA_BUSY}: Wikidata ${params.action}: ${answer.busy}`);
+      }
+      const wait = Math.min(Math.max(answer.after, BUSY_WAIT_MS), BUSY_WAIT_MAX_MS);
+      console.warn(`Wikidata: busy (${answer.busy}), trying again in ${wait} ms`);
+      await new Promise((r) => setTimeout(r, wait));
       continue;
     }
+    const { body } = answer;
     if (body.error) throw new Error(`Wikidata ${params.action}: ${body.error.info ?? body.error.code}`);
     return body;
   }

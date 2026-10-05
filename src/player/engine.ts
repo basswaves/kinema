@@ -630,6 +630,9 @@ export async function readChapters(): Promise<Chapter[]> {
 
 export type ScalarFormat = 'string' | 'int64' | 'double' | 'flag';
 
+/** Whether mpv's terms are there to call at all: not where Media3 plays. */
+export const hasMpv = () => !isMedia3();
+
 /** An mpv input command, as mpv's own `input.conf` would spell it. */
 export async function mpvCommand(
   name: string,

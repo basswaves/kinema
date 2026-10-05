@@ -21,6 +21,7 @@ import { matchHdrToDisplay } from './displayHdr';
 import { mayswitch, restoreScreen } from './displaySwitch';
 import {
   fitWindowForPlayer,
+  hasMpv,
   hasReachedEnd,
   isPictureFullscreen,
   mpvCommand,
@@ -138,7 +139,10 @@ export function usePlaybackEngine({
         if (cancelled) return;
         // Likewise the sound: through Windows, or straight to the receiver
         // with whatever it takes passed through untouched. See audioOutput.ts.
-        await applyAudioPlan().catch((e) => console.warn('audio: plan not applied', e));
+        // Where the system routes the sound itself (Android), it is not ours.
+        if (!capabilitiesNow()?.system_output) {
+          await applyAudioPlan().catch((e) => console.warn('audio: plan not applied', e));
+        }
         if (cancelled) return;
 
         // On a tiling desktop Kinema's window would be squeezed beside the
@@ -260,9 +264,11 @@ export function usePlaybackEngine({
           // next launch. mpv is definitely up by the time a file has loaded.
           // mpv's own setting, so mpv's own words: another engine times
           // frames its own way.
-          await mpvCommand('set', ['video-sync', videoSync.current]).catch((e) =>
-            console.warn('could not set video-sync', e)
-          );
+          if (hasMpv()) {
+            await mpvCommand('set', ['video-sync', videoSync.current]).catch((e) =>
+              console.warn('could not set video-sync', e)
+            );
+          }
 
           // Chapters only exist once a file is open, and they are one of the
           // sources a credits marker can come from.

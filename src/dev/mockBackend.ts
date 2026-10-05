@@ -17,6 +17,7 @@
  * only as good as the check it is being used for.
  */
 import { mockIPC, mockWindows } from '@tauri-apps/api/mocks';
+import * as fakeMedia3 from './fakeMedia3';
 import * as fakeMpv from './fakeMpv';
 import type { ContinueItem, EpisodeRef, Progress, SkipMarkers, TitlePrefs } from '../player/api';
 import type { Episode, Studio, Title, TitleDetail } from '../ui/api';
@@ -748,8 +749,8 @@ export function listenerCounts(): Record<string, number> {
  * `kinemaMockSystem=linux` answers `capabilities` and the equipment check as
  * the Linux build does on a typical desktop (the check, direct sound, sleep
  * and shut down, but no screen switching), `kinemaMockSystem=android` as the
- * Android build does (no window, none of the equipment features yet; the fake
- * mpv still plays),
+ * Android build does (no window, none of the equipment features, and the
+ * fake Media3 plays instead of the fake mpv, which is not there to ask),
  * `kinemaMockNoPower=1` is a system
  * that will not sleep or shut down from Kinema, `kinemaMockScreenHdr=on`
  * reports the screen in HDR (for the output check; the picture itself is the
@@ -824,6 +825,17 @@ const mockDrives: Record<string, { folders: string[]; videos: number }> = {
  */
 const shareLogins: { server: string; user: string }[] =
   flag('kinemaMockShareLogin') === '1' ? [{ server: 'nas', user: 'films' }] : [];
+/**
+ * Android has no mpv: its plugin is not in the build, and every call to it
+ * fails as a missing plugin does — so a check sees each one that still runs
+ * there. Null elsewhere, where the fake mpv answers.
+ */
+const mpvOnly =
+  (handler: Handler): Handler =>
+  (args) => {
+    if (ON_ANDROID) throw new Error('plugin libmpv not found');
+    return handler(args);
+  };
 /** Who listened for the system's Back button (`plugin:app|register_listener`). */
 const backListeners: string[] = [];
 /** `kinemaMockReview` pretends that many videos wait in the review queue. */
@@ -1018,8 +1030,7 @@ const handlers: Record<string, Handler> = {
     if (ON_ANDROID) {
       return {
         system: 'Android',
-        // The fake mpv stands in for Media3, which the mock does not have.
-        engine: 'mpv',
+        engine: 'media3',
         mpv_video: { gpu_api: 'auto', hwdec: 'auto-safe', own_window: false },
         equipment_detection: false,
         audio_direct: false,
@@ -1246,10 +1257,27 @@ const handlers: Record<string, Handler> = {
   },
   'plugin:event|unlisten': (a) => unlisten(String(a.event), Number(a.eventId)),
   'plugin:event|emit': (a) => emitEvent(String(a.event), a.payload),
-  'plugin:libmpv|init': () => fakeMpv.init((path) => files.find((f) => f.path === path)?.duration ?? 1500),
-  'plugin:libmpv|command': (a) => fakeMpv.command(String(a.name), (a.args as unknown[]) ?? []),
-  'plugin:libmpv|get_property': (a) => fakeMpv.getProperty(String(a.name)),
-  'plugin:libmpv|set_property': (a) => fakeMpv.setProperty(String(a.name), a.value),
+  'plugin:libmpv|init': mpvOnly(() =>
+    fakeMpv.init((path) => files.find((f) => f.path === path)?.duration ?? 1500)
+  ),
+  'plugin:libmpv|command': mpvOnly((a) =>
+    fakeMpv.command(String(a.name), (a.args as unknown[]) ?? [])
+  ),
+  'plugin:libmpv|get_property': mpvOnly((a) => fakeMpv.getProperty(String(a.name))),
+  'plugin:libmpv|set_property': mpvOnly((a) => fakeMpv.setProperty(String(a.name), a.value)),
+  // Media3, Android's player (Media3Plugin.kt).
+  'plugin:media3|register_listener': (a) => fakeMedia3.registerListener(a),
+  'plugin:media3|remove_listener': (a) => fakeMedia3.removeListener(a),
+  'plugin:media3|open': (a) => fakeMedia3.open(a),
+  'plugin:media3|stop': () => fakeMedia3.stop(),
+  'plugin:media3|set_paused': (a) => fakeMedia3.setPaused(a),
+  'plugin:media3|seek': (a) => fakeMedia3.seek(a),
+  'plugin:media3|state': () => fakeMedia3.playerState(),
+  'plugin:media3|screen': () => fakeMedia3.screen(),
+  'plugin:media3|set_mode': (a) => fakeMedia3.setMode(a),
+  'plugin:media3|restore_mode': () => fakeMedia3.restoreMode(),
+  // A film on a share Kinema opens itself, read through the core (stream.rs).
+  stream_address: () => 'http://127.0.0.1:47123/stream/1',
   // Remembered, so a check can ask whether TV mode really filled the screen.
   'plugin:window|is_fullscreen': () => mockFullscreen,
   'plugin:window|set_fullscreen': (a) => {
@@ -1355,6 +1383,8 @@ export function installMockBackend(): void {
     },
   );
   fakeMpv.exposeFakeMpv();
+  fakeMedia3.init((path) => files.find((f) => f.path === path)?.duration ?? 1500);
+  fakeMedia3.exposeFakeMedia3();
   (window as unknown as { __kinemaMock: unknown }).__kinemaMock = {
     backListeners,
     playback,

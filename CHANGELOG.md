@@ -7,6 +7,20 @@ makes no stability promises.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Holding Left or Right on a remote seeks at the right speed.** Where a
+  remote's held button arrives as a run of separate presses — as it does
+  through Android, and from remotes that re-send the button while it is
+  held — every press counted as a tap and the seek ran away: two seconds
+  held went to the end of the film. A press while the button is still down,
+  or faster than anyone taps, now counts as holding it.
+- **The remote works straight after Scan on a slow device.** Reading the
+  names of a first scan's files kept the whole interface busy in one go:
+  on an old TV box, the setup pages ignored the remote for 15 to 20
+  seconds. The names are now read a few at a time, with the remote let
+  through between them.
+
 ## [0.9.2] — 2026-10-05
 
 For Windows and Linux: Kinema's own icon, reading on with Down, and fixes

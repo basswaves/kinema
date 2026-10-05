@@ -771,6 +771,12 @@ const SCREEN_HDR = flag('kinemaMockScreenHdr') === 'on';
 const NO_POWER = flag('kinemaMockNoPower') === '1';
 /** `kinemaMockSkiptro=1`: Skiptro's database is on this PC. */
 const SKIPTRO = flag('kinemaMockSkiptro') === '1';
+/**
+ * `kinemaMockNoAccountApps=1`: built without SIMKL's and Trakt's apps and
+ * without an OpenSubtitles key, as every build but a release is — so the
+ * Accounts page has nothing to press.
+ */
+const NO_ACCOUNT_APPS = flag('kinemaMockNoAccountApps') === '1';
 /** Under `kinemaMockEmpty`: whether a folder has been added, then scanned,
  * and which (the picker's, or the one chosen in Kinema's own browser). */
 const emptyLibrary = { hasRoot: !EMPTY, scanned: false, path: 'C:\\fixture' };
@@ -1106,7 +1112,7 @@ const handlers: Record<string, Handler> = {
   // OpenSubtitles (opensubtitles.rs): a stand-in that finds English and
   // Norwegian subtitles for anything, and nothing forced.
   opensubtitles_status: () => ({
-    available: true,
+    available: !NO_ACCOUNT_APPS,
     user: openSubs.user,
     remaining: openSubs.remaining,
     reset: null,
@@ -1154,7 +1160,7 @@ const handlers: Record<string, Handler> = {
         [
           `${service}_status`,
           () => ({
-            available: true,
+            available: !NO_ACCOUNT_APPS,
             connected: a.connected,
             needs_reconnect: false,
             user: a.connected ? a.user : null,

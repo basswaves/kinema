@@ -521,6 +521,79 @@ test('Android: always the TV layout, never asked', async ({ page }) => {
   expect(await tv()).toBe('on');
 });
 
+for (const system of ['android', 'windows'] as const) {
+  test(`${system}: a setup page with nothing to press keeps the ring on Next`, async ({ page }) => {
+    // A build without SIMKL's or Trakt's app and without an OpenSubtitles key
+    // — every build but a release — has nothing to press on Accounts. The
+    // ring went nowhere a moment after arriving, for good (found on a box).
+    await page.setViewportSize({ width: 960, height: 540 });
+    await page.addInitScript((s) => {
+      if (s === 'android') localStorage.setItem('kinemaMockSystem', 'android');
+      localStorage.setItem('kinemaMockEmpty', '1');
+      localStorage.setItem('kinemaMockNoAccountApps', '1');
+    }, system);
+    await page.goto('/');
+    if (system === 'windows') {
+      await expect.poll(() => focused(page)).toBe('A TV, from the sofa');
+      await press(page, 'Enter');
+      await press(page, 'ArrowDown');
+    }
+    await expect.poll(() => focused(page)).toBe('Add movies folder');
+    await press(page, 'Enter');
+    if (system === 'android') {
+      await expect.poll(() => focused(page)).toBe('USB driveUSB drive or card');
+      await press(page, 'Enter');
+      await press(page, 'ArrowUp');
+      await expect.poll(() => focused(page)).toBe('Use this folder');
+      await press(page, 'Enter');
+    }
+    await expect(page.locator('.first-run-roots li')).toHaveCount(1);
+    for (let i = 0; i < 4 && (await focused(page)) !== 'Scan my library'; i++) await press(page, 'ArrowDown');
+    await press(page, 'Enter');
+    for (let i = 0; i < 3 && (await page.locator('.setup-pages h1').textContent()) !== 'Accounts'; i++) {
+      await expect.poll(() => focused(page)).not.toBeUndefined();
+      for (let j = 0; j < 4 && !['Skip', 'Next'].includes((await focused(page)) ?? ''); j++) {
+        await press(page, 'ArrowUp');
+      }
+      await press(page, 'Enter');
+      await page.waitForTimeout(300);
+    }
+    await expect(page.locator('.setup-pages h1')).toHaveText('Accounts');
+    await expect(page.locator('.setup-page')).toContainText('built without a SIMKL app');
+
+    // Long after the page's wait for a question has run out, the ring is on
+    // the way on.
+    await page.waitForTimeout(4000);
+    expect(await focused(page)).toBe('Next');
+
+    // Down reads the page to its end, and Up comes back to Next.
+    const atBottom = () =>
+      page.evaluate(() => {
+        const el = document.querySelector('.setup-later');
+        return el ? el.getBoundingClientRect().bottom <= window.innerHeight : false;
+      });
+    for (let i = 0; i < 10 && !(await atBottom()); i++) {
+      await press(page, 'ArrowDown');
+      await page.waitForTimeout(400);
+    }
+    expect(await atBottom()).toBe(true);
+    expect(await focused(page)).toBe('Next');
+    const inView = () =>
+      page.evaluate(() => {
+        const r = document.querySelector('.focused')?.getBoundingClientRect();
+        return r ? r.top >= 0 && r.bottom <= window.innerHeight : false;
+      });
+    for (let i = 0; i < 10 && !(await inView()); i++) {
+      await press(page, 'ArrowUp');
+      await page.waitForTimeout(400);
+    }
+    expect(await inView()).toBe(true);
+    expect(await focused(page)).toBe('Next');
+    await press(page, 'Enter');
+    await expect(page.locator('.setup-pages h1')).toHaveText('Extras');
+  });
+}
+
 test('Android: nothing offers ffmpeg or Skiptro, which an Android app cannot run', async ({
   page,
 }) => {

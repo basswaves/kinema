@@ -752,6 +752,27 @@ where it will be first, call `updateAllLayouts()`, and only then `setFocus`
 (`SetupPages.tsx`, `landOn`). And run a keyboard flow that lands this way in
 a short window (`page.setViewportSize`), where the scroll makes it fail.
 
+### Focusing an empty container draws no ring anywhere
+
+`setFocus` on a container with no focusable children focuses the container
+itself. Containers render no `focused` class, so there is no ring, and every
+arrow press goes nowhere — the watchdog in `focus.ts` "recovers" onto the
+view's landing spot, which descends into the same empty container again. The
+Accounts setup page in a build without SIMKL's or Trakt's app and without an
+OpenSubtitles key (every build but a release) has nothing to press: two
+seconds after arriving the ring vanished for good, and the box's log said
+`recovered from a dead focus key onto setup-pages` fifty times a minute.
+
+The same silence comes from `setFocus` on a key nothing has registered: the
+library holds that key, on purpose — the control is focused when it
+registers (`focusOnPresetKey`), which Home's landing relies on — so a claim
+for a button that is never drawn leaves focus on nothing.
+
+**Do:** a container whose content can turn out empty is `focusable` only
+while it has a control (`SetupPages.tsx`, `PageBody`), and a claim's `ready`
+is true only when its control will be drawn (`AccountSection`'s Connect
+needs `status.available`, not just a status).
+
 ### A hidden browser pane never scrolls smoothly
 
 When testing `dev:mock` in a browser pane embedded in another program: while the pane is hidden,

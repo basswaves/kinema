@@ -42,6 +42,8 @@ const PAGE_FOCUS_KEY = 'setup-page';
 const FORWARD_FOCUS_KEY = 'setup-forward';
 /** The longest a new page's first question is waited for. */
 const LANDING_WAIT_MS = 2000;
+/** What a remote can press on a page (`FocusButton`, `FocusInput`). */
+const CONTROL = ':is(button:not(:disabled), input)';
 
 interface Page {
   id: string;
@@ -131,7 +133,8 @@ export default function SetupPages({ onClose }: Props) {
    *
    * Some pages ask the system something before their questions exist (is
    * ffmpeg there?), and focus given before then lands on whatever happened to
-   * be there first. So it waits, briefly, for the new page to have a control.
+   * be there first. So it waits, briefly, for the new page to have a control;
+   * a page that has none by then (see PageBody) starts on Next.
    *
    * Then the page goes to its top and every control is measured again before
    * focus is given. "First" is the control nearest the top-left corner by
@@ -146,14 +149,16 @@ export default function SetupPages({ onClose }: Props) {
     const land = () => {
       if (attempt !== landing.current) return;
       const root = document.querySelector<HTMLElement>(`.setup-page[data-page="${id}"]`);
-      const ready = root?.querySelector(':is(button:not(:disabled), input)');
+      const ready = root?.querySelector(CONTROL);
       if (!ready && Date.now() - started <= LANDING_WAIT_MS) {
         window.setTimeout(land, 50);
         return;
       }
       scrollPageToTop(root ?? null, 'auto');
       void Promise.resolve(updateAllLayouts()).then(() => {
-        if (attempt === landing.current) void setFocus(SETUP_FOCUS_KEY);
+        // Named outright rather than left to the containers: the page body
+        // learns it has questions a moment after they appear.
+        if (attempt === landing.current) void setFocus(ready ? PAGE_FOCUS_KEY : FORWARD_FOCUS_KEY);
       });
     };
     window.setTimeout(land, 0);
@@ -253,13 +258,38 @@ export default function SetupPages({ onClose }: Props) {
 /**
  * The page's own questions, as a container of their own, so arriving on a
  * page lands on its first question rather than on the buttons above it.
+ *
+ * Only while it has a question to land on. A page can have nothing to press:
+ * Accounts in a build without SIMKL's or Trakt's app and without an
+ * OpenSubtitles key, which is every build but a release. Focus given to an
+ * empty container stays on the container, which draws no ring, so the remote
+ * was left with nothing to act from — and every recovery chose this
+ * container again. Out of the way, the page's own landing goes to Next.
  */
 function PageBody({ id, children }: { id: string; children: ReactNode }) {
-  const { ref, focusKey } = useFocusable({
+  const [hasControls, setHasControls] = useState(false);
+  const { ref, focusKey } = useFocusable<object, HTMLElement>({
     focusKey: PAGE_FOCUS_KEY,
     trackChildren: true,
     saveLastFocusedChild: false,
+    focusable: hasControls,
   });
+
+  useEffect(() => {
+    const root = ref.current;
+    if (!root) return;
+    const look = () => setHasControls(root.querySelector(CONTROL) !== null);
+    look();
+    const watch = new MutationObserver(look);
+    watch.observe(root, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['disabled'],
+    });
+    return () => watch.disconnect();
+  }, [ref]);
+
   return (
     <FocusContext.Provider value={focusKey}>
       <section className="first-run-step setup-page" data-page={id} ref={ref}>

@@ -198,7 +198,7 @@ export default function AccountSection({ service }: { service: Service }) {
   const connected = status?.connected ?? false;
   useClaimFocus(cancelKey, code !== null);
   useClaimFocus(disconnectKey, connected && code === null);
-  useClaimFocus(connectKey, status !== null && !connected && code === null);
+  useClaimFocus(connectKey, Boolean(status?.available) && !connected && code === null);
 
   if (!status) return null;
   const qr = qrSource(code?.qr_svg ?? null);

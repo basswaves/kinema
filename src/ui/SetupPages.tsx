@@ -42,6 +42,8 @@ const PAGE_FOCUS_KEY = 'setup-page';
 const FORWARD_FOCUS_KEY = 'setup-forward';
 /** The longest a new page's first question is waited for. */
 const LANDING_WAIT_MS = 2000;
+/** …and, with the ring on Next meanwhile, the longest it is still moved to. */
+const LATE_WAIT_MS = 15000;
 /** What a remote can press on a page (`FocusButton`, `FocusInput`). */
 const CONTROL = ':is(button:not(:disabled), input)';
 
@@ -134,7 +136,10 @@ export default function SetupPages({ onClose }: Props) {
    * Some pages ask the system something before their questions exist (is
    * ffmpeg there?), and focus given before then lands on whatever happened to
    * be there first. So it waits, briefly, for the new page to have a control;
-   * a page that has none by then (see PageBody) starts on Next.
+   * a page that has none by then (see PageBody) starts on Next. A question
+   * that comes later still — a busy computer answered the ffmpeg check after
+   * the wait — gets the ring then, unless a key was pressed meanwhile: the
+   * person has started on the page, and the ring stays theirs.
    *
    * Then the page goes to its top and every control is measured again before
    * focus is given. "First" is the control nearest the top-left corner by
@@ -146,20 +151,48 @@ export default function SetupPages({ onClose }: Props) {
   const landOn = useCallback((id: string) => {
     const started = Date.now();
     const attempt = ++landing.current;
+    // A key pressed since the page opened, not one held from the page before.
+    let pressed = false;
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.repeat) pressed = true;
+    };
+    window.addEventListener('keydown', onKey, true);
+    const focusOn = (root: HTMLElement | null, key: string) => {
+      scrollPageToTop(root, 'auto');
+      void Promise.resolve(updateAllLayouts()).then(() => {
+        if (attempt === landing.current) void setFocus(key);
+      });
+    };
+    const late = () => {
+      const root = document.querySelector<HTMLElement>(`.setup-page[data-page="${id}"]`);
+      const over = attempt !== landing.current || pressed || !root;
+      if (over || Date.now() - started > LATE_WAIT_MS) {
+        window.removeEventListener('keydown', onKey, true);
+        return;
+      }
+      if (!root.querySelector(CONTROL)) {
+        window.setTimeout(late, 200);
+        return;
+      }
+      window.removeEventListener('keydown', onKey, true);
+      focusOn(root, PAGE_FOCUS_KEY);
+    };
     const land = () => {
-      if (attempt !== landing.current) return;
+      if (attempt !== landing.current) {
+        window.removeEventListener('keydown', onKey, true);
+        return;
+      }
       const root = document.querySelector<HTMLElement>(`.setup-page[data-page="${id}"]`);
       const ready = root?.querySelector(CONTROL);
       if (!ready && Date.now() - started <= LANDING_WAIT_MS) {
         window.setTimeout(land, 50);
         return;
       }
-      scrollPageToTop(root ?? null, 'auto');
-      void Promise.resolve(updateAllLayouts()).then(() => {
-        // Named outright rather than left to the containers: the page body
-        // learns it has questions a moment after they appear.
-        if (attempt === landing.current) void setFocus(ready ? PAGE_FOCUS_KEY : FORWARD_FOCUS_KEY);
-      });
+      // Named outright rather than left to the containers: the page body
+      // learns it has questions a moment after they appear.
+      focusOn(root ?? null, ready ? PAGE_FOCUS_KEY : FORWARD_FOCUS_KEY);
+      if (ready) window.removeEventListener('keydown', onKey, true);
+      else window.setTimeout(late, 200);
     };
     window.setTimeout(land, 0);
   }, []);

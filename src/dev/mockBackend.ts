@@ -777,6 +777,12 @@ const SKIPTRO = flag('kinemaMockSkiptro') === '1';
  * Accounts page has nothing to press.
  */
 const NO_ACCOUNT_APPS = flag('kinemaMockNoAccountApps') === '1';
+/**
+ * `kinemaMockSlowFfmpeg=1`: the ffmpeg check takes three seconds, as on a
+ * computer busy with something else — longer than a setup page waits for its
+ * first question.
+ */
+const SLOW_FFMPEG = flag('kinemaMockSlowFfmpeg') === '1';
 /** Under `kinemaMockEmpty`: whether a folder has been added, then scanned,
  * and which (the picker's, or the one chosen in Kinema's own browser). */
 const emptyLibrary = { hasRoot: !EMPTY, scanned: false, path: 'C:\\fixture' };
@@ -1049,7 +1055,12 @@ const handlers: Record<string, Handler> = {
     if (flag('kinemaMockPowerFail') === '1') throw new Error('Windows would not go to sleep');
     return null;
   },
-  ffmpeg_status: () => ({ resolved: 'ffmpeg', available: false }),
+  ffmpeg_status: () => {
+    const status = { resolved: 'ffmpeg', available: false };
+    return SLOW_FFMPEG
+      ? new Promise((resolve) => window.setTimeout(() => resolve(status), 3000))
+      : status;
+  },
   skiptro_found: () => SKIPTRO,
   probe_library: () => ({ read: 0, failed: 0, unavailable: true }),
   measure_pictures: () => ({ measured: 0, unavailable: true }),

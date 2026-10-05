@@ -521,6 +521,45 @@ test('Android: always the TV layout, never asked', async ({ page }) => {
   expect(await tv()).toBe('on');
 });
 
+/**
+ * Through the first run by remote, with one folder, to the setup page titled
+ * `title` — passing the pages before it with their way on. Switches for the
+ * mock go in an init script first.
+ */
+async function firstRunToSetupPage(
+  page: Page,
+  system: 'android' | 'windows',
+  title: string
+): Promise<void> {
+  await page.goto('/');
+  if (system === 'windows') {
+    await expect.poll(() => focused(page)).toBe('A TV, from the sofa');
+    await press(page, 'Enter');
+    await press(page, 'ArrowDown');
+  }
+  await expect.poll(() => focused(page)).toBe('Add movies folder');
+  await press(page, 'Enter');
+  if (system === 'android') {
+    await expect.poll(() => focused(page)).toBe('USB driveUSB drive or card');
+    await press(page, 'Enter');
+    await press(page, 'ArrowUp');
+    await expect.poll(() => focused(page)).toBe('Use this folder');
+    await press(page, 'Enter');
+  }
+  await expect(page.locator('.first-run-roots li')).toHaveCount(1);
+  for (let i = 0; i < 4 && (await focused(page)) !== 'Scan my library'; i++) await press(page, 'ArrowDown');
+  await press(page, 'Enter');
+  for (let i = 0; i < 4 && (await page.locator('.setup-pages h1').textContent()) !== title; i++) {
+    await expect.poll(() => focused(page)).not.toBeUndefined();
+    for (let j = 0; j < 4 && !['Skip', 'Next'].includes((await focused(page)) ?? ''); j++) {
+      await press(page, 'ArrowUp');
+    }
+    await press(page, 'Enter');
+    await page.waitForTimeout(300);
+  }
+  await expect(page.locator('.setup-pages h1')).toHaveText(title);
+}
+
 for (const system of ['android', 'windows'] as const) {
   test(`${system}: a setup page with nothing to press keeps the ring on Next`, async ({ page }) => {
     // A build without SIMKL's or Trakt's app and without an OpenSubtitles key
@@ -532,33 +571,7 @@ for (const system of ['android', 'windows'] as const) {
       localStorage.setItem('kinemaMockEmpty', '1');
       localStorage.setItem('kinemaMockNoAccountApps', '1');
     }, system);
-    await page.goto('/');
-    if (system === 'windows') {
-      await expect.poll(() => focused(page)).toBe('A TV, from the sofa');
-      await press(page, 'Enter');
-      await press(page, 'ArrowDown');
-    }
-    await expect.poll(() => focused(page)).toBe('Add movies folder');
-    await press(page, 'Enter');
-    if (system === 'android') {
-      await expect.poll(() => focused(page)).toBe('USB driveUSB drive or card');
-      await press(page, 'Enter');
-      await press(page, 'ArrowUp');
-      await expect.poll(() => focused(page)).toBe('Use this folder');
-      await press(page, 'Enter');
-    }
-    await expect(page.locator('.first-run-roots li')).toHaveCount(1);
-    for (let i = 0; i < 4 && (await focused(page)) !== 'Scan my library'; i++) await press(page, 'ArrowDown');
-    await press(page, 'Enter');
-    for (let i = 0; i < 3 && (await page.locator('.setup-pages h1').textContent()) !== 'Accounts'; i++) {
-      await expect.poll(() => focused(page)).not.toBeUndefined();
-      for (let j = 0; j < 4 && !['Skip', 'Next'].includes((await focused(page)) ?? ''); j++) {
-        await press(page, 'ArrowUp');
-      }
-      await press(page, 'Enter');
-      await page.waitForTimeout(300);
-    }
-    await expect(page.locator('.setup-pages h1')).toHaveText('Accounts');
+    await firstRunToSetupPage(page, system, 'Accounts');
     await expect(page.locator('.setup-page')).toContainText('built without a SIMKL app');
 
     // Long after the page's wait for a question has run out, the ring is on
@@ -593,6 +606,38 @@ for (const system of ['android', 'windows'] as const) {
     await expect(page.locator('.setup-pages h1')).toHaveText('Extras');
   });
 }
+
+test('a setup page whose question comes late still starts on it, unless the remote was used', async ({
+  page,
+}) => {
+  // Extras asks whether ffmpeg is there before it shows anything; on a busy
+  // computer that took longer than the page waits (seen once under load).
+  await page.addInitScript(() => {
+    localStorage.setItem('kinemaMockEmpty', '1');
+    localStorage.setItem('kinemaMockSlowFfmpeg', '1');
+  });
+  await firstRunToSetupPage(page, 'windows', 'Extras');
+  // Meanwhile the ring is on the way on (the last page's: Finish), never
+  // nowhere…
+  await expect.poll(() => focused(page)).toBe('Finish');
+  // …and goes to the first question when it arrives.
+  await expect(page.locator('.setup-page')).toContainText('ffmpeg is not installed');
+  await expect.poll(() => focused(page)).toBe('Open the ffmpeg download page ↗');
+
+  // Back, and on again: this time a key is pressed before the question comes,
+  // and the ring stays where the person has it.
+  await press(page, 'Escape');
+  await expect(page.locator('.setup-pages h1')).toHaveText('Accounts');
+  await press(page, 'ArrowUp');
+  for (let i = 0; i < 4 && (await focused(page)) !== 'Next'; i++) await press(page, 'ArrowUp');
+  await press(page, 'Enter');
+  await expect(page.locator('.setup-pages h1')).toHaveText('Extras');
+  await expect.poll(() => focused(page), { timeout: 2500 }).toBe('Finish');
+  await press(page, 'ArrowDown');
+  await expect(page.locator('.setup-page')).toContainText('ffmpeg is not installed');
+  await page.waitForTimeout(500);
+  expect(await focused(page)).toBe('Finish');
+});
 
 test('Android: nothing offers ffmpeg or Skiptro, which an Android app cannot run', async ({
   page,

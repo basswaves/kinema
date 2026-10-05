@@ -254,9 +254,10 @@ screen, not yet on a real TV. Kinema is built to work the same on any
 desktop and fall back safely, rather than tested on every one —
 see [When something goes wrong](#when-something-goes-wrong).
 
-An Android version is planned next. macOS is not planned by the author; a
-port is welcome, and [CONTRIBUTING.md](CONTRIBUTING.md) ("More than one
-platform") says how the code is arranged for one.
+An Android TV version is under way and not part of a release yet. macOS is
+not planned by the author; a port is welcome, and
+[CONTRIBUTING.md](CONTRIBUTING.md) ("More than one platform") says how the
+code is arranged for one.
 
 | | Windows 11 | Linux |
 |---|---|---|
@@ -330,8 +331,8 @@ distribution, desktop and graphics card is how it gets fixed.
 
 ## Known limitations
 
-- **Windows and Linux only.** Android is planned next; macOS is not planned
-  (see [Platform support](#platform-support)).
+- **Windows and Linux only.** An Android TV version is under way; macOS is
+  not planned (see [Platform support](#platform-support)).
 - **Tested on a small number of setups.** HDR passthrough, bitstreaming to a
   receiver and display switching have been confirmed on a 4K HDR TV with an AV
   receiver; TV overscan, intro detection on many different shows, and libraries

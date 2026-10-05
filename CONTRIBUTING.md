@@ -305,7 +305,7 @@ never ran, or ran and silently did nothing. Check for both by reflex:
 
 ## More than one platform
 
-Kinema runs on Windows and Linux, with Android next, from one codebase, one
+Kinema runs on Windows and Linux, with Android under way, from one codebase, one
 `master` and one version. Three rules keep that from turning into several
 programs:
 

@@ -76,8 +76,10 @@ been tried on a real TV. Since 0.9.1 the screen is switched on Cinnamon
 too (refresh rate and resolution; Cinnamon has no HDR), and the mouse works
 in the Linux player as it does on Windows.
 
-**Android** is next, with its own player engine (Media3) for Dolby Vision and
-passthrough on TV boxes. macOS is not planned by the author; a port is
+**Android** is under way, with its own player engine (Media3) for Dolby Vision
+and passthrough on TV boxes: the interface, the library, network shares and
+playing a film work, and the player's sound, subtitles and audio tracks come
+next, before a release. macOS is not planned by the author; a port is
 welcome. See [Platform support](../README.md#platform-support).
 
 ---

@@ -10,13 +10,18 @@
  * has focus, so every screen's own handling — the player, dialogs, Leave on
  * Home — works unchanged.
  *
- * Where there is no such button (Windows, Linux) the listener simply never
- * hears anything.
+ * Only where the system has such a button (capability `back_button`). A
+ * desktop has none, and asking for it there is refused — which logged a
+ * warning at every start of every Windows and Linux copy, read in bug
+ * reports as something wrong.
  */
 import { onBackButtonPress } from '@tauri-apps/api/app';
+import { capabilitiesNow, loadCapabilities } from './capabilities';
 
-export function installBackButton(): void {
-  onBackButtonPress(() => {
+export async function installBackButton(): Promise<void> {
+  await loadCapabilities();
+  if (!capabilitiesNow()?.back_button) return;
+  await onBackButtonPress(() => {
     const target = document.activeElement ?? document.body;
     target.dispatchEvent(
       new KeyboardEvent('keydown', { key: 'BrowserBack', code: 'BrowserBack', bubbles: true, cancelable: true })

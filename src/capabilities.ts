@@ -45,6 +45,9 @@ export interface Capabilities {
   /** Kinema opens network shares itself, as the system does not (Android):
    * the folder browser offers the network (library/folders.ts). */
   network_shares: boolean;
+  /** The system has its own Back button the page never sees as a key
+   * (Android's): it is listened for and passed on (backButton.ts). */
+  back_button: boolean;
   sleep: boolean;
   shut_down: boolean;
 }

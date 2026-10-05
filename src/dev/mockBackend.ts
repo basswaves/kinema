@@ -824,6 +824,8 @@ const mockDrives: Record<string, { folders: string[]; videos: number }> = {
  */
 const shareLogins: { server: string; user: string }[] =
   flag('kinemaMockShareLogin') === '1' ? [{ server: 'nas', user: 'films' }] : [];
+/** Who listened for the system's Back button (`plugin:app|register_listener`). */
+const backListeners: string[] = [];
 /** `kinemaMockReview` pretends that many videos wait in the review queue. */
 const REVIEW_COUNT = Number(flag('kinemaMockReview') ?? 0) || 0;
 /** `kinemaMockScanErrors`: the scan's problems, as the scanner words them. */
@@ -1030,6 +1032,7 @@ const handlers: Record<string, Handler> = {
         opens_folders: false,
         shares_files: true,
         network_shares: true,
+        back_button: true,
         sleep: false,
         shut_down: false,
       };
@@ -1052,6 +1055,7 @@ const handlers: Record<string, Handler> = {
       opens_folders: true,
       shares_files: false,
       network_shares: false,
+      back_button: false,
       sleep: !NO_POWER,
       shut_down: !NO_POWER,
     };
@@ -1234,6 +1238,12 @@ const handlers: Record<string, Handler> = {
 
   // plugins
   'plugin:event|listen': (a) => listen(String(a.event), Number(a.handler)),
+  // Android's Back button (backButton.ts): counted, so a check can see who
+  // asked for it.
+  'plugin:app|register_listener': (a) => {
+    backListeners.push(String(a.event));
+    return null;
+  },
   'plugin:event|unlisten': (a) => unlisten(String(a.event), Number(a.eventId)),
   'plugin:event|emit': (a) => emitEvent(String(a.event), a.payload),
   'plugin:libmpv|init': () => fakeMpv.init((path) => files.find((f) => f.path === path)?.duration ?? 1500),
@@ -1346,6 +1356,7 @@ export function installMockBackend(): void {
   );
   fakeMpv.exposeFakeMpv();
   (window as unknown as { __kinemaMock: unknown }).__kinemaMock = {
+    backListeners,
     playback,
     settings,
     files,

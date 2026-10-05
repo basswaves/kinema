@@ -17,7 +17,7 @@ function start(): void {
   installDevLog();
   // Asked now, answered long before Leave or Settings can be opened.
   void loadCapabilities();
-  installBackButton();
+  void installBackButton();
   ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(<App />);
 }
 

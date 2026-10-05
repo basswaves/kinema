@@ -59,6 +59,11 @@ pub struct Capabilities {
     /// does not open them for it (Android): the folder browser offers the
     /// network, and Settings lists the sign-ins it keeps.
     pub network_shares: bool,
+    /// The system has a Back button of its own that the page never sees as
+    /// a key (an Android remote's, a phone's gesture); Kinema listens for it
+    /// and passes it on as one (src/backButton.ts). A desktop has none, and
+    /// asking for it there was refused, with a warning in every log.
+    pub back_button: bool,
     pub sleep: bool,
     pub shut_down: bool,
 }
@@ -116,6 +121,7 @@ fn work_out() -> Capabilities {
         opens_folders: cfg!(desktop),
         shares_files: cfg!(target_os = "android"),
         network_shares: cfg!(target_os = "android"),
+        back_button: cfg!(mobile),
         sleep: crate::power::can_sleep(),
         shut_down: crate::power::can_shut_down(),
     }
@@ -150,6 +156,7 @@ mod tests {
         assert!(c.equipment_detection && c.audio_direct && c.display_switching && c.sleep && c.shut_down);
         assert!(c.windowed && c.folder_picker && !c.system_output && c.runs_programs);
         assert!(!c.screen_keyboard && c.opens_folders && !c.shares_files && !c.network_shares);
+        assert!(!c.back_button);
         // The rendering path the whole of docs/DESIGN.md is written about.
         assert_eq!(
             c.mpv_video,
@@ -175,6 +182,7 @@ mod tests {
         assert_eq!(c.screen_keyboard, cfg!(mobile));
         assert_eq!((c.opens_folders, c.shares_files), (cfg!(desktop), cfg!(target_os = "android")));
         assert_eq!(c.network_shares, cfg!(target_os = "android"));
+        assert_eq!(c.back_button, cfg!(mobile));
         // Wherever logind says this session may (power.rs); never elsewhere.
         assert_eq!((c.sleep, c.shut_down), (crate::power::can_sleep(), crate::power::can_shut_down()));
         if !linux {

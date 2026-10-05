@@ -901,6 +901,28 @@ async function androidSettings(page: Page, section: string): Promise<void> {
   await press(page, 'ArrowRight');
 }
 
+for (const system of ['windows', 'android'] as const) {
+  test(`${system}: the system's Back button is listened for only where there is one`, async ({ page }) => {
+    const warnings: string[] = [];
+    page.on('console', (m) => {
+      if (m.type() === 'warning' || m.type() === 'error') warnings.push(m.text());
+    });
+    await page.addInitScript((s) => {
+      if (s === 'android') localStorage.setItem('kinemaMockSystem', 'android');
+      else localStorage.removeItem('kinemaMockSystem');
+    }, system);
+    await page.goto('/');
+    await expect.poll(() => focused(page)).toContain('Play');
+    await page.waitForTimeout(300);
+    const asked = await page.evaluate(
+      () => (window as unknown as { __kinemaMock: { backListeners: string[] } }).__kinemaMock.backListeners
+    );
+    // A desktop has no such button: nothing asked, and nothing in the log.
+    expect(asked).toEqual(system === 'android' ? ['back-button'] : []);
+    expect(warnings.filter((w) => w.includes('back button'))).toEqual([]);
+  });
+}
+
 test('Android: a web page nothing can open is shown as its address and a QR code', async ({
   page,
 }) => {

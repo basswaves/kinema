@@ -422,6 +422,12 @@ export async function videoFacts(): Promise<Film | null> {
 }
 
 export const systemScreen = () => media3.screen();
+/**
+ * What the engine says it is doing, for the details panel — Media3's own
+ * facts (statsMedia3.ts); mpv's are read as its properties (stats.ts).
+ */
+export type PlayerFacts = media3.Facts;
+export const playerFacts = () => media3.facts();
 export const askScreenMode = (width: number, height: number, rate: number) =>
   media3.setMode(width, height, rate);
 export const restoreScreenMode = () => media3.restoreMode();

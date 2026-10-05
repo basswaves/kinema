@@ -297,6 +297,40 @@ export function showSubtitles(args: Record<string, unknown>): null {
   return null;
 }
 
+/** `plugin:media3|facts`: a 1080p film decoded in hardware, a few frames dropped. */
+export function facts() {
+  const open = state.path !== null && started;
+  return {
+    ...(open
+      ? {
+          video: {
+            codec: 'hevc',
+            described: 'HEVC, 1920×1080, 10-bit',
+            codecs: 'hvc1.2.4.L123',
+            width: state.video.width,
+            height: state.video.height,
+            fps: state.video.fps,
+            bitrate: 18_000_000,
+            transfer: state.video.hdr ? 'pq' : 'sdr',
+            dolbyVision: false,
+            decoder: 'c2.vendor.hevc.decoder',
+            hardware: true,
+          },
+          frames: { rendered: Math.round(state.position * 24), dropped: 3, skipped: 0 },
+          audio: {
+            name: 'Dolby Digital Plus 5.1',
+            channels: 6,
+            sampleRate: 48000,
+            way: state.untouched ? 'untouched' : 'decoded',
+            decoder: state.untouched ? null : 'c2.android.eac3.decoder',
+          },
+          bufferedSeconds: 42.5,
+        }
+      : {}),
+    screen: mode(state.screen),
+  };
+}
+
 export function playerState() {
   return {
     path: state.path,

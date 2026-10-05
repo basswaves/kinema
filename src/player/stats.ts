@@ -95,18 +95,18 @@ function text(value: string | null | undefined): string {
   return value && value.length > 0 ? value : DASH;
 }
 
-function num(value: number | null, digits = 0, suffix = ''): string {
+export function num(value: number | null, digits = 0, suffix = ''): string {
   if (value === null || Number.isNaN(value)) return DASH;
   return `${value.toFixed(digits)}${suffix}`;
 }
 
-function bitrate(bitsPerSecond: number | null): string {
+export function bitrate(bitsPerSecond: number | null): string {
   if (!bitsPerSecond) return DASH;
   const mbit = bitsPerSecond / 1_000_000;
   return mbit >= 1 ? `${mbit.toFixed(2)} Mb/s` : `${(bitsPerSecond / 1000).toFixed(0)} kb/s`;
 }
 
-function resolution(w: number | null, h: number | null): string {
+export function resolution(w: number | null, h: number | null): string {
   return w && h ? `${w} × ${h}` : DASH;
 }
 
@@ -126,7 +126,7 @@ function elapsed(value: number | null): string {
  * A friendly name for a resolution, since "3840 × 2160" and "is this the 4K
  * one?" are the same question asked twice.
  */
-function resolutionClass(w: number | null, h: number | null): string | undefined {
+export function resolutionClass(w: number | null, h: number | null): string | undefined {
   if (!w || !h) return undefined;
   if (h >= 2000 || w >= 3800) return '4K / UHD';
   if (h >= 1400 || w >= 2500) return '1440p';
@@ -169,7 +169,7 @@ function near(value: number, target: number): boolean {
  * makes an uneven division even, and interpolating the difference away would
  * invent frames nobody shot.
  */
-function describeCadence(sourceFps: number | null, displayHz: number | null): StatRow {
+export function describeCadence(sourceFps: number | null, displayHz: number | null): StatRow {
   if (!sourceFps || !displayHz) {
     return { label: 'Cadence', value: DASH };
   }

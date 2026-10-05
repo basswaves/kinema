@@ -6,6 +6,7 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.hardware.display.DisplayManager
 import android.media.MediaCodec
+import android.media.MediaCodecList
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
@@ -222,6 +223,9 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
    * subtitle track chosen. Kept across files, as mpv keeps it.
    */
   private var subtitlesShown = true
+  /** The decoders Media3 opened for this file, by name, for the details panel. */
+  private var videoDecoder: String? = null
+  private var audioDecoder: String? = null
   private val main = Handler(Looper.getMainLooper())
 
   /**
@@ -364,6 +368,18 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
     p.addAnalyticsListener(object : AnalyticsListener {
       override fun onAudioTrackInitialized(eventTime: AnalyticsListener.EventTime, config: AudioSink.AudioTrackConfig) {
         p.audioFormat?.let { rememberSound(it, config) }
+      }
+
+      override fun onVideoDecoderInitialized(
+        eventTime: AnalyticsListener.EventTime, decoderName: String, initializedTimestampMs: Long, initializationDurationMs: Long,
+      ) {
+        videoDecoder = decoderName
+      }
+
+      override fun onAudioDecoderInitialized(
+        eventTime: AnalyticsListener.EventTime, decoderName: String, initializedTimestampMs: Long, initializationDurationMs: Long,
+      ) {
+        audioDecoder = decoderName
       }
     })
     p.setVideoSurfaceView(s)
@@ -617,6 +633,7 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
     val format = f?.let { soundName(it) } ?: ""
     audioStep += 1
     untouched = false
+    audioDecoder = null
     Log.w("Kinema", "media3: the sound would not play (${error.errorCodeName}, $format); step $audioStep")
     old.release()
     player = null
@@ -684,6 +701,8 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
         failedSound = null
         untouched = false
         loadedSaid = false
+        videoDecoder = null
+        audioDecoder = null
         keepSound(null, null)
         // The last film's track choices are not this one's: Kinema puts the
         // remembered languages on once its tracks are known (`loaded`).
@@ -1009,6 +1028,79 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
       muted = args.muted
       player?.let { applyVolume(it) }
       invoke.resolve()
+    }
+  }
+
+  // ---- the details panel ------------------------------------------------------
+
+  /**
+   * Whether a decoder is the device's own hardware: Android says so from 10
+   * on; before, its software decoders are the ones named for Google or
+   * Android itself.
+   */
+  private fun inHardware(name: String): Boolean? {
+    if (Build.VERSION.SDK_INT >= 29) {
+      val info = MediaCodecList(MediaCodecList.ALL_CODECS).codecInfos.firstOrNull { it.name == name } ?: return null
+      return info.isHardwareAccelerated
+    }
+    val lower = name.lowercase()
+    return !(lower.startsWith("omx.google.") || lower.startsWith("c2.android."))
+  }
+
+  private fun transferName(f: Format): Any = when (f.colorInfo?.colorTransfer) {
+    C.COLOR_TRANSFER_ST2084 -> "pq"
+    C.COLOR_TRANSFER_HLG -> "hlg"
+    C.COLOR_TRANSFER_SDR -> "sdr"
+    else -> JSONObject.NULL
+  }
+
+  /**
+   * What the details panel (`i`) shows where Media3 plays, in Media3's own
+   * facts — the decoder it opened, the frames it dropped, what became of the
+   * sound — never dressed as mpv's (statsMedia3.ts).
+   */
+  @Command
+  fun facts(invoke: Invoke) {
+    main.post {
+      val out = JSObject()
+      val p = player?.takeIf { path != null }
+      if (p != null) {
+        p.videoFormat?.let { f ->
+          out.put("video", JSObject().apply {
+            put("codec", ffmpegName(f) ?: JSONObject.NULL)
+            put("described", describe(f))
+            put("codecs", f.codecs ?: JSONObject.NULL)
+            put("width", f.width)
+            put("height", f.height)
+            put("fps", if (f.frameRate > 0) f.frameRate.toDouble() else JSONObject.NULL)
+            put("bitrate", (if (f.bitrate > 0) f.bitrate else f.averageBitrate).takeIf { it > 0 } ?: JSONObject.NULL)
+            put("transfer", transferName(f))
+            put("dolbyVision", f.sampleMimeType == MimeTypes.VIDEO_DOLBY_VISION)
+            put("decoder", videoDecoder ?: JSONObject.NULL)
+            put("hardware", videoDecoder?.let { inHardware(it) } ?: JSONObject.NULL)
+          })
+        }
+        p.videoDecoderCounters?.let { c ->
+          c.ensureUpdated()
+          out.put("frames", JSObject().apply {
+            put("rendered", c.renderedOutputBufferCount)
+            put("dropped", c.droppedBufferCount)
+            put("skipped", c.skippedOutputBufferCount)
+          })
+        }
+        p.audioFormat?.let { f ->
+          out.put("audio", JSObject().apply {
+            put("name", soundName(f))
+            put("channels", f.channelCount.takeIf { it != Format.NO_VALUE } ?: JSONObject.NULL)
+            put("sampleRate", f.sampleRate.takeIf { it != Format.NO_VALUE } ?: JSONObject.NULL)
+            put("way", if (untouched) "untouched" else "decoded")
+            put("decoder", audioDecoder ?: JSONObject.NULL)
+          })
+        }
+        out.put("bufferedSeconds", p.totalBufferedDuration / 1000.0)
+      }
+      out.put("screen", modeObject(display().mode))
+      invoke.resolve(out)
     }
   }
 

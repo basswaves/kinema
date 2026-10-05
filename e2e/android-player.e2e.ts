@@ -263,3 +263,26 @@ test('Android: subtitle files beside the film, hiding subtitles, and finding the
 
   expect(complaints).toEqual([]);
 });
+
+test('Android: `i` shows what Media3 is doing, in its own rows', async ({ page }) => {
+  const complaints = mpvComplaints(page);
+  await playFilm(page);
+
+  await press(page, 'i');
+  const panel = page.locator('.stats-panel');
+  await expect(panel).toBeVisible();
+  await expect(panel).toContainText('c2.vendor.hevc.decoder');
+  await expect(panel).toContainText("the device's own video hardware");
+  await expect(panel).toContainText('dropped');
+  await expect(panel).toContainText('decoded on this device');
+  // The screen was matched to the film's 23.976 fps: an even cadence.
+  await expect(panel).toContainText('1:1, even');
+  // None of mpv's own rows.
+  await expect(panel).not.toContainText('Render passes');
+  await expect(panel).not.toContainText('Output check');
+  await expect(panel).not.toContainText('Rendering');
+  await press(page, 'Escape');
+  await expect(panel).toHaveCount(0);
+
+  expect(complaints).toEqual([]);
+});

@@ -1,0 +1,133 @@
+/**
+ * The details panel (`i`) where Media3 plays (Android): what Media3 itself
+ * says it is doing — the decoder it opened, the frames it showed and dropped,
+ * what became of the sound, the screen's mode — in its own groups.
+ *
+ * Never mpv's rows filled in from Media3 (PORTING.md, rule 5): render passes,
+ * scalers, tone mapping and the output check describe mpv's pipeline, which
+ * is not there. What the two have in common is said the same way — the
+ * resolution, the bitrate, and the cadence, the panel's headline on every
+ * system (stats.ts).
+ */
+import { playerFacts, type PlayerFacts } from './engine';
+import { bitrate, describeCadence, num, resolution, resolutionClass, type StatGroup } from './stats';
+
+const DASH = '—';
+
+function hdrName(video: NonNullable<PlayerFacts['video']>): string {
+  if (video.dolbyVision) return 'Dolby Vision';
+  switch (video.transfer) {
+    case 'pq':
+      return 'HDR10 (PQ)';
+    case 'hlg':
+      return 'HLG';
+    case 'sdr':
+      return 'SDR';
+    default:
+      // A file that says nothing of its colours is shown as SDR.
+      return 'SDR, not tagged in the file';
+  }
+}
+
+/** The panel's groups from Media3's facts; pure, for the tests. */
+export function media3Groups(facts: PlayerFacts): StatGroup[] {
+  const { video, frames, audio, screen } = facts;
+  const groups: StatGroup[] = [];
+
+  if (video) {
+    groups.push({
+      heading: 'Source',
+      rows: [
+        {
+          label: 'Resolution',
+          value: resolution(video.width, video.height),
+          note: resolutionClass(video.width, video.height),
+        },
+        { label: 'Video', value: video.described, note: video.codecs ?? undefined },
+        {
+          label: 'Frame rate',
+          value: num(video.fps, 3, ' fps'),
+          // Media3's Matroska reader often has none to give.
+          note: video.fps === null ? 'not read from this file' : undefined,
+        },
+        { label: 'Video bitrate', value: bitrate(video.bitrate) },
+        {
+          label: 'Dynamic range',
+          value: hdrName(video),
+          note:
+            video.transfer === 'pq' || video.transfer === 'hlg' || video.dolbyVision
+              ? 'Android switches the TV to it by itself'
+              : undefined,
+        },
+      ],
+    });
+  }
+
+  const shown = frames ? frames.rendered : null;
+  groups.push({
+    heading: 'Decoding',
+    rows: [
+      {
+        label: 'Video decoder',
+        value: video?.decoder ?? DASH,
+        note:
+          video?.hardware === true
+            ? "the device's own video hardware"
+            : video?.hardware === false
+              ? 'in software, on the processor'
+              : undefined,
+        warn: video?.hardware === false,
+      },
+      {
+        label: 'Frames',
+        value: frames ? `${shown} shown · ${frames.dropped} dropped` : DASH,
+        note:
+          frames && frames.skipped > 0 ? `${frames.skipped} skipped to catch up after a stall` : undefined,
+        warn: (frames?.dropped ?? 0) > 0,
+      },
+      {
+        label: 'Buffered',
+        value: facts.bufferedSeconds === undefined ? DASH : `${facts.bufferedSeconds.toFixed(1)} s ahead`,
+      },
+    ],
+  });
+
+  groups.push({
+    heading: 'Display',
+    rows: [
+      {
+        label: 'Screen mode',
+        value: `${resolution(screen.width, screen.height)} @ ${num(screen.rate, 3, ' Hz')}`,
+        note: 'as Android reports it',
+      },
+      describeCadence(video?.fps ?? null, screen.rate),
+    ],
+  });
+
+  groups.push({
+    heading: 'Sound',
+    rows: audio
+      ? [
+          { label: 'Format', value: audio.name },
+          {
+            label: 'Path',
+            value: audio.way === 'untouched' ? 'sent on untouched' : 'decoded on this device',
+            note:
+              audio.way === 'untouched'
+                ? 'for the TV or receiver to decode; its volume is the one that counts'
+                : (audio.decoder ?? undefined),
+          },
+          {
+            label: 'Sample rate',
+            value: audio.sampleRate ? `${(audio.sampleRate / 1000).toFixed(1)} kHz` : DASH,
+          },
+        ]
+      : [{ label: 'Format', value: 'none', note: 'no sound track this device can play' }],
+  });
+
+  return groups;
+}
+
+export async function readMedia3Stats(): Promise<StatGroup[]> {
+  return media3Groups(await playerFacts());
+}

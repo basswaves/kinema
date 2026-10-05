@@ -106,6 +106,43 @@ export interface State {
 
 export const state = () => call<State>('state');
 
+/** What Media3 says it is doing, for the details panel (statsMedia3.ts). */
+export interface Facts {
+  video?: {
+    /** FFmpeg's name, as everywhere in Kinema. */
+    codec: string | null;
+    /** "HEVC, 3840×2160, 10-bit HDR". */
+    described: string;
+    /** The codec string the file gives ("hvc1.2.4.L153"). */
+    codecs: string | null;
+    width: number;
+    height: number;
+    fps: number | null;
+    bitrate: number | null;
+    transfer: 'pq' | 'hlg' | 'sdr' | null;
+    dolbyVision: boolean;
+    /** The decoder Media3 opened, by its system name. */
+    decoder: string | null;
+    /** The device's own video hardware, rather than software. */
+    hardware: boolean | null;
+  };
+  /** The video decoder's count of frames since the file opened. */
+  frames?: { rendered: number; dropped: number; skipped: number };
+  audio?: {
+    /** "Dolby Digital Plus 5.1", as Media3Plugin.kt names it. */
+    name: string;
+    channels: number | null;
+    sampleRate: number | null;
+    way: 'untouched' | 'decoded';
+    decoder: string | null;
+  };
+  bufferedSeconds?: number;
+  /** The screen's mode now. */
+  screen: { width: number; height: number; hz: number; rate: number };
+}
+
+export const facts = () => call<Facts>('facts');
+
 /** The screen and the modes Android offers for it. */
 export const screen = () => call<Screen>('screen');
 /** Ask Android for a mode; answers with the mode the screen is in after. */

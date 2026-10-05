@@ -1278,6 +1278,7 @@ const handlers: Record<string, Handler> = {
   'plugin:media3|select_track': (a) => fakeMedia3.selectTrack(a),
   'plugin:media3|show_subtitles': (a) => fakeMedia3.showSubtitles(a),
   'plugin:media3|add_subtitle': (a) => fakeMedia3.addSubtitle(a),
+  'plugin:media3|facts': () => fakeMedia3.facts(),
   // A Dutch subtitle file beside every film (subtitle_files.rs), asked for
   // only where Media3 plays.
   subtitle_files: (a) => {

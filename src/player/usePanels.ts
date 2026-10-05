@@ -5,7 +5,9 @@
 import { setFocus } from '@noriginmedia/norigin-spatial-navigation';
 import { useCallback, useEffect, useState, type RefObject } from 'react';
 import { PLAYER_PLAY_KEY, PLAYER_TRACKS_KEY } from './focusKeys';
+import { hasMpv } from './engine';
 import { readPlaybackStats, type StatGroup } from './stats';
+import { readMedia3Stats } from './statsMedia3';
 import { TRACK_PANEL_KEY } from './TrackPanel';
 
 /** Stats refresh. Fast enough to watch a drop counter, slow enough to be free. */
@@ -60,8 +62,10 @@ export function usePanels({
     if (!showStats) return;
 
     let cancelled = false;
+    // Each engine's own facts: mpv's properties, or what Media3 says.
+    const readStats = hasMpv() ? readPlaybackStats : readMedia3Stats;
     const read = () => {
-      void readPlaybackStats()
+      void readStats()
         .then((groups) => {
           if (!cancelled) setStats(groups);
         })

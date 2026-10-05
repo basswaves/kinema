@@ -148,7 +148,9 @@ src/
                  HDR hint, frame timing — which another engine would
                  replace rather than imitate.
                  its track and chapter readers and stats.ts read mpv as
-                 flat scalars only;
+                 flat scalars only; on Android, media3.ts is the engine and
+                 statsMedia3.ts builds the details panel from Media3's own
+                 facts;
                  skip.ts continues the credits ladder past the marker Rust
                  supplies — a named chapter, then a fenced guess at the tail
   library/       pipeline.ts — the scan→parse→match→details→ratings→artwork→

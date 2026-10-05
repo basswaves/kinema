@@ -181,6 +181,58 @@ test('the controls by remote: the ring, the seek bar, Back, and handing the arro
   await expect(osdFocused(page)).toHaveCount(0, { timeout: 10_000 });
 });
 
+test('a run of quick skips is one seek, and a held key seeks when let go', async ({ page }) => {
+  await play(page, 'series');
+  const seeks = () =>
+    page.evaluate(
+      () =>
+        (window as unknown as { __fakeMpv: FakeMpv }).__fakeMpv.commands.filter(
+          (c) => c.name === 'seek'
+        ).length
+    );
+  await playheadTo(page, 100);
+  // The player hears of the new position on the fake mpv's next tick.
+  await page.waitForTimeout(600);
+
+  // Six taps, as a remote sends them while Right is held — a press and a
+  // release each. One seek, after they stop, to where all six lead.
+  let before = await seeks();
+  for (let i = 0; i < 6; i++) {
+    await page.keyboard.press('ArrowRight');
+    await page.waitForTimeout(100);
+  }
+  expect(await seeks()).toBe(before);
+  await expect.poll(seeks).toBe(before + 1);
+  await page.waitForTimeout(800);
+  expect(await seeks()).toBe(before + 1);
+  // 10 s a tap for four, then 30 s: two minutes on, not ten seconds.
+  expect((await mpv(page)).position).toBeGreaterThan(195);
+
+  // Held, with the key's own repeats: sent as soon as it is let go.
+  before = await seeks();
+  await page.keyboard.down('ArrowLeft');
+  for (let i = 0; i < 10; i++) {
+    await page.waitForTimeout(40);
+    await page.keyboard.down('ArrowLeft');
+  }
+  await page.keyboard.up('ArrowLeft');
+  await expect.poll(seeks, { timeout: 300 }).toBe(before + 1);
+
+  // On the seek bar, the same.
+  await press(page, 'ArrowDown');
+  await press(page, 'ArrowUp');
+  await expect.poll(() => focused(page)).toBe('Position');
+  await page.waitForTimeout(700);
+  before = await seeks();
+  for (let i = 0; i < 5; i++) {
+    await page.keyboard.press('ArrowLeft');
+    await page.waitForTimeout(100);
+  }
+  await expect.poll(seeks).toBe(before + 1);
+  await page.waitForTimeout(800);
+  expect(await seeks()).toBe(before + 1);
+});
+
 test('watching keys: seeking, pausing, volume, stats and the transport row', async ({ page }) => {
   await play(page, 'series');
 

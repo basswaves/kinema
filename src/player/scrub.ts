@@ -6,9 +6,10 @@
  * holding rather than 360 presses, while one tap is still the fine control.
  *
  * Nothing seeks while the key is moving: the target moves on the seek bar, and
- * mpv is asked once, when the key is let go or the presses stop. A seek per key
- * repeat would be thirty seeks a second into a 4K remux, each one decoding from
- * the nearest keyframe for a frame nobody sees.
+ * the player is asked once — when a held key is let go, or half a second after
+ * the last of a run of taps (useScrub.ts). A seek per key repeat would be
+ * thirty seeks a second into a 4K remux, each one decoding from the nearest
+ * keyframe for a frame nobody sees.
  *
  * Pure, so the acceleration can be tested without a player.
  */

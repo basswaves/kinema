@@ -38,7 +38,7 @@ export function usePlayerKeys({
   closeStats,
   openStats,
   scrubBy,
-  commitScrub,
+  releaseScrub,
   volumeKey,
   toggleMute,
   changeVolume,
@@ -71,7 +71,7 @@ export function usePlayerKeys({
   closeStats: () => void;
   openStats: () => void;
   scrubBy: (dir: 1 | -1, repeat: boolean) => void;
-  commitScrub: () => void;
+  releaseScrub: () => void;
   volumeKey: (act: () => void) => void;
   toggleMute: () => void;
   changeVolume: (delta: number) => void;
@@ -255,14 +255,15 @@ export function usePlayerKeys({
   ]);
 
   /**
-   * Letting go of Left/Right is what sends the seek. Only in watching mode:
-   * on the controls, the seek bar's own release handler does it.
+   * Letting go of Left/Right after holding it is what sends the seek (after
+   * taps, the pause after the last one does: useScrub). Only in watching
+   * mode: on the controls, the seek bar's own release handler does it.
    */
   useEffect(() => {
     const onKeyUp = (e: KeyboardEvent) => {
-      if (!osdFocus && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) commitScrub();
+      if (!osdFocus && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) releaseScrub();
     };
     window.addEventListener('keyup', onKeyUp);
     return () => window.removeEventListener('keyup', onKeyUp);
-  }, [osdFocus, commitScrub]);
+  }, [osdFocus, releaseScrub]);
 }

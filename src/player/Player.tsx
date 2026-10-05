@@ -231,7 +231,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   }, [dispatch, fail, showOsd]);
 
   // ---- seeking with Left/Right --------------------------------------------
-  const { scrubBy, commitScrub } = useScrub({ sessionRef, dispatch, fail, showOsd });
+  const { scrubBy, releaseScrub } = useScrub({ sessionRef, dispatch, fail, showOsd });
 
   /**
    * The clock, for "Ends at". Ticked rather than read during render, which
@@ -270,7 +270,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     closeStats,
     openStats,
     scrubBy,
-    commitScrub,
+    releaseScrub,
     volumeKey,
     toggleMute,
     changeVolume,
@@ -419,7 +419,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         receiver={receiver}
         tv={tv}
         onScrub={scrubBy}
-        onScrubRelease={commitScrub}
+        onScrubRelease={releaseScrub}
         onSeekBarEnter={() => void togglePauseByKey()}
         onDragStart={() => dispatch({ type: 'scrub-start' })}
         onDrag={(seconds) => dispatch({ type: 'scrub', timePos: seconds })}

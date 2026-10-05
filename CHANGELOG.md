@@ -7,6 +7,16 @@ makes no stability promises.
 
 ## [Unreleased]
 
+### Changed
+
+- **Quick skips are one seek.** Tapping Left or Right several times in a
+  row, or a remote that sends a press for every step while the button is
+  held, now seeks once, half a second after the last press, to where all of
+  them lead — where it used to seek at every press, each one restarting the
+  picture. A key held down and let go still seeks at once.
+- **The setup pages always say Next.** The way on said Skip until something
+  was chosen; Next now accepts what is shown, as it is.
+
 ### Fixed
 
 - **A share or disk that is not mounted no longer empties the library.** On
@@ -15,6 +25,28 @@ makes no stability promises.
   library folder that shows no video at all, where there used to be some, is
   now left alone and named on Home, exactly like a drive that is unplugged.
   To retire a folder you have really emptied, remove it in Settings.
+- **Home's notice after a scan says what is true.** It ended every problem
+  with "Anything from that folder is hidden until it is back" — wrong for a
+  folder that is away, whose films stay on the shelves and only cannot be
+  played, and for problems that have nothing to do with a folder. A folder
+  that could not be reached is now named first, with what that means.
+- **A setup page never loses the focus ring.** In a copy of Kinema built
+  from source, the Accounts page has nothing to press, and a moment after
+  arriving the ring went nowhere, leaving a remote with nothing to do. It
+  now stays on Next, and Down reads the page to its end. A page whose first
+  question arrives late, as Extras' can on a busy PC, gets the ring when it
+  does.
+- **Settings: Up and Down stay in the open section.** Going up, the ring
+  sometimes jumped to the list of sections beside it; only Left goes there
+  now, and Right comes back to where you were.
+- **The focus ring is never left half under the top bar.** Reading on past
+  a page's last control, and back, could leave it there.
+- **Wikipedia being busy is waited out.** Matching without a TMDB key
+  showed Wikidata's own "seconds lagged" message and no results when its
+  servers were busy. Kinema now waits as long as they ask, a few times, and
+  if they are still busy says so in plain words; the next scan tries again.
+- **No more "back button" warning in every log.** The listener for
+  Android's Back button is only installed where there is one.
 
 ## [0.9.1] — 2026-10-03
 

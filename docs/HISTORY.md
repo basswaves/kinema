@@ -2740,6 +2740,21 @@ locked with a key held by Android's key store, so a copy of the library
 carries no usable password; Settings lists the kept ones with Forget. A
 guest sign-in is not offered yet: the library cannot complete one.
 
+## A round of fixes from the first run on a TV box
+
+The owner went through the first run and Settings by remote on the
+Android box, for the first time, and listed what was wrong; most of it was
+wrong on every system.
+
+- **The ring is kept clear of the top bar, moving the page only when
+  needed** — not centred on every press, which was the other option
+  offered: never hidden either, but a page that moves at every press is
+  tiring on a long one, and its first and last items cannot be centred
+  anyway. Moving between items already stopped clear of the bar (the
+  `scroll-margin` on everything); what left the ring half under it was
+  reading on past a page's last control and back, which now stops with
+  the control clear or takes it off the screen entirely.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

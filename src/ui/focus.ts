@@ -250,6 +250,13 @@ function pageScroller(node: HTMLElement): HTMLElement | null {
 const TOP_BAR_REM = 4.5;
 const TV_SAFE_TOP_REM = 1.25;
 
+/** The room the top bar takes, in pixels, at the current scale and layout. */
+function topBarPx(): number {
+  const root = document.documentElement;
+  const rem = parseFloat(getComputedStyle(root).fontSize);
+  return (TOP_BAR_REM + (root.dataset.tv === 'on' ? TV_SAFE_TOP_REM : 0)) * rem;
+}
+
 /**
  * Keep a control the remote just moved to on screen.
  *
@@ -271,10 +278,7 @@ export function keepOnScreen(node: HTMLElement | null, inline: 'center' | 'neare
   // change the answer.
   const bottom = page.scrollTop + box.bottom - view.top;
   const below = page.scrollHeight - bottom;
-  const root = document.documentElement;
-  const rem = parseFloat(getComputedStyle(root).fontSize);
-  const topBar = (TOP_BAR_REM + (root.dataset.tv === 'on' ? TV_SAFE_TOP_REM : 0)) * rem;
-  if (below > 0 && below + box.height + topBar < page.clientHeight) {
+  if (below > 0 && below + box.height + topBarPx() < page.clientHeight) {
     page.scrollTo({ top: page.scrollHeight, behavior: 'smooth' });
   }
 }
@@ -294,10 +298,18 @@ const READ_STEP = 0.6;
  * and while the focused control is above the top of the screen, Up scrolls
  * back before it moves anywhere.
  *
+ * The focused control is never left half under the top bar, which is see-
+ * through, so the ring showed through it (owner, 2026-10-05: keep it clear,
+ * moving the page only when needed). Reading on stops where the control is
+ * still clear of the bar, or takes it off the screen entirely when it is
+ * already near the top; reading back ends with it clear, not part-way.
+ *
  * Capture phase on `window`, like the watchdog: Up has to be answered before
  * the spatial library moves; Down is only judged once it has had its turn.
  */
 let readOnInstalled = false;
+/** The control reading on scrolled away from, until focus moves. */
+let leftBehind: HTMLElement | null = null;
 
 export function installReadOn(): void {
   if (readOnInstalled) return;
@@ -312,15 +324,18 @@ export function installReadOn(): void {
       const page = node && pageScroller(node);
       if (!node || !page) return;
       const step = page.clientHeight * READ_STEP;
+      const pageTop = page.getBoundingClientRect().top;
+      const clear = pageTop + topBarPx();
+      if (leftBehind !== node) leftBehind = null;
 
       if (event.key === 'ArrowUp') {
-        const root = document.documentElement;
-        const rem = parseFloat(getComputedStyle(root).fontSize);
-        const topBar = (TOP_BAR_REM + (root.dataset.tv === 'on' ? TV_SAFE_TOP_REM : 0)) * rem;
-        if (node.getBoundingClientRect().bottom < page.getBoundingClientRect().top + topBar) {
+        const box = node.getBoundingClientRect();
+        // Wholly above the bar, or — left there by reading on — partly.
+        const hidden = box.bottom < clear || (node === leftBehind && box.top < clear - 1);
+        if (hidden && page.scrollTop > 0) {
           event.preventDefault();
           event.stopImmediatePropagation();
-          page.scrollBy({ top: -step, behavior: 'smooth' });
+          page.scrollBy({ top: -Math.min(step, clear - box.top), behavior: 'smooth' });
         }
         return;
       }
@@ -332,8 +347,23 @@ export function installReadOn(): void {
       // focused means there was nothing below it to move to.
       window.setTimeout(() => {
         if (document.querySelector('.focused') !== node) return;
-        if (page.scrollTop + page.clientHeight >= page.scrollHeight - 1) return;
-        page.scrollBy({ top: step, behavior: 'smooth' });
+        const remaining = page.scrollHeight - page.clientHeight - page.scrollTop;
+        const box = node.getBoundingClientRect();
+        let by = Math.min(step, remaining);
+        const top = box.top - by;
+        if (top < clear && top + box.height > pageTop) {
+          // A full step would leave it half under the bar: stop with it just
+          // clear, unless that is hardly a step — then past it altogether,
+          // where the page goes that far. (Short of that, what stays out of
+          // sight is less than the bar's height, most of it the page's own
+          // bottom padding.)
+          const keep = Math.max(0, box.top - clear);
+          const past = box.bottom - pageTop;
+          by = keep >= step / 3 || past > remaining ? keep : past;
+        }
+        if (by < 1) return;
+        leftBehind = node;
+        page.scrollBy({ top: by, behavior: 'smooth' });
       }, 0);
     },
     true

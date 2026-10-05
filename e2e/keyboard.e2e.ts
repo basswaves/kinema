@@ -793,6 +793,49 @@ test('Down with nothing further down reads on, and Up reads back', async ({ page
   expect(await focused(page)).toBe('▶ Play');
 });
 
+test('reading on and back never leaves the ring half under the top bar', async ({ page }) => {
+  // Picture & sound ends in text below its last button. Reading on, then
+  // back, left that button half under the see-through bar at the page's end.
+  await open(page, 'windows');
+  await press(page, 'ArrowUp', 2);
+  await press(page, 'ArrowRight', 4);
+  await press(page, 'Enter');
+  await press(page, 'ArrowDown');
+  for (let i = 0; i < 4 && (await focused(page)) !== 'Picture & sound'; i++) await press(page, 'ArrowDown');
+  await press(page, 'Enter');
+  await press(page, 'ArrowRight');
+  for (let i = 0; i < 20 && (await focused(page)) !== 'Check again'; i++) await press(page, 'ArrowDown');
+  await expect.poll(() => focused(page)).toBe('Check again');
+
+  const halfHidden = () =>
+    page.evaluate(() => {
+      const bar = document.querySelector('.top-nav')!.getBoundingClientRect();
+      const el = document.querySelector('.focused')!;
+      const r = el.getBoundingClientRect();
+      return !el.closest('.top-nav') && r.top < bar.bottom - 1 && r.bottom > 0;
+    });
+  const atEnd = () =>
+    page.evaluate(() => {
+      const el = document.querySelector('.browse')!;
+      return el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+    });
+  for (let i = 0; i < 6 && !(await atEnd()); i++) {
+    await press(page, 'ArrowDown');
+    await page.waitForTimeout(500);
+    expect(await halfHidden()).toBe(false);
+  }
+  await press(page, 'ArrowDown');
+  await page.waitForTimeout(500);
+  expect(await halfHidden()).toBe(false);
+  expect(await focused(page)).toBe('Check again');
+  // Back up the section to its first item: each one clear of the bar.
+  for (let i = 0; i < 5; i++) {
+    await press(page, 'ArrowUp');
+    await page.waitForTimeout(500);
+    expect(await halfHidden()).toBe(false);
+  }
+});
+
 test('Android: the system keyboard opens on OK, never on arriving at a field', async ({ page }) => {
   await page.setViewportSize({ width: 960, height: 540 });
   await page.addInitScript(() => localStorage.setItem('kinemaMockSystem', 'android'));

@@ -44,6 +44,9 @@ const FORWARD_FOCUS_KEY = 'setup-forward';
 const LANDING_WAIT_MS = 2000;
 /** …and, with the ring on Next meanwhile, the longest it is still moved to. */
 const LATE_WAIT_MS = 15000;
+/** How soon after giving focus the ring is looked for, and how many times. */
+const RING_CHECK_MS = 100;
+const RING_CHECKS = 20;
 /** What a remote can press on a page (`FocusButton`, `FocusInput`). */
 const CONTROL = ':is(button:not(:disabled), input)';
 
@@ -151,8 +154,21 @@ export default function SetupPages({ onClose }: Props) {
     window.addEventListener('keydown', onKey, true);
     const focusOn = (root: HTMLElement | null, key: string) => {
       scrollPageToTop(root, 'auto');
+      give(key, RING_CHECKS);
+    };
+    // On a busy computer a control can be on the page a moment before the
+    // focus system knows it, and focus given then lands on the page itself,
+    // which draws no ring — nothing showed until a key was pressed (the first
+    // run's Extras page, under load). So the ring is looked for, and focus
+    // given again while there is none.
+    const give = (key: string, checks: number) => {
       void Promise.resolve(updateAllLayouts()).then(() => {
-        if (attempt === landing.current) void setFocus(key);
+        if (attempt !== landing.current) return;
+        void setFocus(key);
+        window.setTimeout(() => {
+          const shown = document.querySelector('.focused');
+          if (attempt === landing.current && !shown && checks > 0) give(key, checks - 1);
+        }, RING_CHECK_MS);
       });
     };
     const late = () => {

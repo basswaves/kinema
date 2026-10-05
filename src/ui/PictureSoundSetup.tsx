@@ -19,7 +19,7 @@
  * (`qualityNotice.ts`).
  *
  * One of the setup pages shown while the first scan runs (`SetupPages.tsx`),
- * which gives it its heading and its Skip.
+ * which gives it its heading and its Next.
  */
 import { useEffect, useState } from 'react';
 import { getSetting } from '../metadata/api';
@@ -74,7 +74,7 @@ function items(system: string, sound: boolean, screen: boolean): Item[] {
 
 type Answer = Policy | '';
 
-export default function PictureSoundSetup({ onAnswer }: { onAnswer: () => void }) {
+export default function PictureSoundSetup() {
   const can = useCapabilities();
   const [equipment, setEquipment] = useState<Equipment | null>(null);
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
@@ -111,7 +111,6 @@ export default function PictureSoundSetup({ onAnswer }: { onAnswer: () => void }
     const here = item.options(equipment).filter((d) => d.connected && d.able).map((d) => d.id);
     setAnswers((a) => ({ ...a, [item.key]: policy }));
     setError(null);
-    onAnswer();
     void savePolicy(item.key, { policy, devices: policy === 'these' ? here : [] }).catch((e) =>
       setError(userError(e))
     );
@@ -121,7 +120,7 @@ export default function PictureSoundSetup({ onAnswer }: { onAnswer: () => void }
     <>
       <p className="muted">
         Kinema can get the most out of a TV and an AV receiver, now or whenever this PC is
-        connected to one. Choose for each, or skip this: everything then stays as it is, and all
+        connected to one. Choose for each, or go on with Next: what is not chosen stays off, and all
         of it is in Settings → Picture &amp; sound at any time.
       </p>
       {error && <div className="settings-error">{error}</div>}

@@ -31,7 +31,7 @@ const OMDB_KEY = 'omdb_api_key';
 /** How long the ffmpeg field rests before it is checked again. */
 const CHECK_AFTER_MS = 600;
 
-export default function ExtrasSetup({ onAnswer }: { onAnswer: () => void }) {
+export default function ExtrasSetup() {
   const programs = Boolean(useCapabilities()?.runs_programs);
   const [loaded, setLoaded] = useState(false);
   const [ffmpegPath, setFfmpegPath] = useState('');
@@ -89,7 +89,6 @@ export default function ExtrasSetup({ onAnswer }: { onAnswer: () => void }) {
 
   const save = (key: string, value: string) => {
     setError(null);
-    onAnswer();
     return setSetting(key, value.trim()).catch((e) => {
       setError(userError(e));
       throw e;

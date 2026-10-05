@@ -34,7 +34,7 @@ const SKIP_MODE_KEY = 'skip_mode';
 type SkipMode = 'button' | 'auto';
 type Lookups = 'on' | 'off' | '';
 
-export default function IntrosSetup({ onAnswer }: { onAnswer: () => void }) {
+export default function IntrosSetup() {
   const can = useCapabilities();
   const programs = Boolean(can?.runs_programs);
   const [mode, setMode] = useState<SkipMode>('button');
@@ -75,7 +75,6 @@ export default function IntrosSetup({ onAnswer }: { onAnswer: () => void }) {
 
   const save = (pairs: [string, string][]) => {
     setError(null);
-    onAnswer();
     void Promise.all(pairs.map(([k, v]) => setSetting(k, v))).catch((e) => setError(userError(e)));
   };
 
@@ -88,7 +87,6 @@ export default function IntrosSetup({ onAnswer }: { onAnswer: () => void }) {
       if (typeof chosen !== 'string') return;
       await setSetting(SKIPTRO_PATH_KEY, chosen);
       setSkiptroPath(chosen);
-      onAnswer();
     } catch (e) {
       setError(userError(e));
     }

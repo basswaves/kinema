@@ -311,9 +311,10 @@ test('first run: where to watch, a folder, then the setup pages, all by remote',
   await expect.poll(() => focused(page)).toBe('✓Every receiver');
   await expect.poll(() => setting('setup_pages')).toBe('open');
 
-  // Skip, then Finish later: straight back to the library.
+  // Next, never Skip — nothing chosen this time — then Finish later:
+  // straight back to the library.
   await press(page, 'ArrowUp');
-  await expect.poll(() => focused(page)).toBe('Skip');
+  await expect.poll(() => focused(page)).toBe('Next');
   await press(page, 'ArrowRight');
   await expect.poll(() => focused(page)).toBe('Finish later');
   await press(page, 'Enter');
@@ -491,6 +492,8 @@ test('Android: always the TV layout, never asked', async ({ page }) => {
   await expect(page.locator('.setup-pages h1')).toHaveText('Intros and credits');
   await expect(page.locator('.setup-progress')).toContainText('1 of 3');
   await press(page, 'ArrowUp');
+  // Nothing chosen, and the way on still says Next: it accepts what is shown.
+  await expect.poll(() => focused(page)).toBe('Next');
   await press(page, 'ArrowRight');
   await expect.poll(() => focused(page)).toBe('Finish later');
   await press(page, 'Enter');
@@ -551,7 +554,7 @@ async function firstRunToSetupPage(
   await press(page, 'Enter');
   for (let i = 0; i < 4 && (await page.locator('.setup-pages h1').textContent()) !== title; i++) {
     await expect.poll(() => focused(page)).not.toBeUndefined();
-    for (let j = 0; j < 4 && !['Skip', 'Next'].includes((await focused(page)) ?? ''); j++) {
+    for (let j = 0; j < 4 && (await focused(page)) !== 'Next'; j++) {
       await press(page, 'ArrowUp');
     }
     await press(page, 'Enter');

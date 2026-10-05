@@ -2570,10 +2570,13 @@ setup again brings them back whenever.
 
 **Smaller decisions on the way:**
 
-- The way on says **Skip** until something on the page is chosen, then
+- The way on said **Skip** until something on the page was chosen, then
   **Next**; two buttons that did the same thing would have been a question
-  with no difference. Accounts is Settings' own sections, unchanged, which do
-  not say when something was done there, so it says Next throughout.
+  with no difference. **Changed 2026-10-05, by the owner, after going
+  through the pages:** it always says Next. When what is shown is what one
+  wants, Next is how to accept it; Skip did the same but read as "don't do
+  this". Every answer is saved as it is given, so Next never does more than
+  go on.
 - The buttons sit at the top, as the picture-and-sound step's Skip did, and a
   new page lands on its first question rather than on the button pressed to
   get there. Extras asks whether ffmpeg is there before its questions exist,

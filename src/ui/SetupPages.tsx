@@ -50,12 +50,7 @@ const CONTROL = ':is(button:not(:disabled), input)';
 interface Page {
   id: string;
   title: string;
-  body: (onAnswer: () => void) => ReactNode;
-  /**
-   * The way on says Next from the start: a page made of Settings' own
-   * sections, which do not say when something was done on them.
-   */
-  alwaysNext?: boolean;
+  body: ReactNode;
 }
 
 interface Props {
@@ -81,19 +76,18 @@ export default function SetupPages({ onClose }: Props) {
       (can.audio_direct || can.display_switching) && {
         id: 'picture',
         title: 'Picture and sound',
-        body: (onAnswer) => <PictureSoundSetup onAnswer={onAnswer} />,
+        body: <PictureSoundSetup />,
       },
       {
         id: 'intros',
         title: 'Intros and credits',
-        body: (onAnswer) => <IntrosSetup onAnswer={onAnswer} />,
+        body: <IntrosSetup />,
       },
       // Settings → Accounts as it is: connecting is the same job here.
       {
         id: 'accounts',
         title: 'Accounts',
-        alwaysNext: true,
-        body: () => (
+        body: (
           <>
             <p className="muted">
               All optional, and each works without the others: SIMKL or Trakt keep a record of
@@ -109,15 +103,13 @@ export default function SetupPages({ onClose }: Props) {
       {
         id: 'extras',
         title: 'Extras',
-        body: (onAnswer) => <ExtrasSetup onAnswer={onAnswer} />,
+        body: <ExtrasSetup />,
       },
     ];
     return all.filter((p): p is Page => Boolean(p));
   }, [can]);
 
   const [index, setIndex] = useState(0);
-  /** Pages where something has been chosen: their way on says Next, not Skip. */
-  const [answered, setAnswered] = useState<Set<string>>(() => new Set());
   const page = pages[index] as Page | undefined;
   const last = index === pages.length - 1;
 
@@ -256,7 +248,10 @@ export default function SetupPages({ onClose }: Props) {
         </div>
         <h1>{page.title}</h1>
 
-        {/* At the top, so not caring costs one press rather than every row. */}
+        {/* At the top, so not caring costs one press rather than every row.
+            Always Next, never Skip (owner, 2026-10-05): every answer is saved
+            as it is given, so the way on only goes on, and accepting what is
+            shown is what it does — "Skip" read as "don't do this". */}
         <div className="settings-row setup-nav">
           <FocusButton
             className="btn-primary"
@@ -264,7 +259,7 @@ export default function SetupPages({ onClose }: Props) {
             keepInView="nearest"
             onSelect={forward}
           >
-            {last ? 'Finish' : page.alwaysNext || answered.has(page.id) ? 'Next' : 'Skip'}
+            {last ? 'Finish' : 'Next'}
           </FocusButton>
           {!last && (
             <FocusButton className="btn-secondary" keepInView="nearest" onSelect={onClose}>
@@ -274,7 +269,7 @@ export default function SetupPages({ onClose }: Props) {
         </div>
 
         <PageBody key={page.id} id={page.id}>
-          {page.body(() => setAnswered((a) => (a.has(page.id) ? a : new Set(a).add(page.id))))}
+          {page.body}
         </PageBody>
 
         {!last && (

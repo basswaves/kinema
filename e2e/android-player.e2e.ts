@@ -58,12 +58,16 @@ async function sent(page: Page): Promise<string[]> {
   return (await media3(page)).commands.map((c) => c.name);
 }
 
-/** Every warning and error the page logged that mentions mpv. */
+/**
+ * Every error the page logged, and every warning that mentions mpv — which
+ * Android does not have, so anything still asking it shows up here.
+ */
 function mpvComplaints(page: Page): string[] {
   const seen: string[] = [];
   page.on('console', (message) => {
-    if (message.type() !== 'warning' && message.type() !== 'error') return;
-    if (/libmpv|mpv/i.test(message.text())) seen.push(message.text());
+    if (message.type() === 'error' || (message.type() === 'warning' && /mpv/i.test(message.text()))) {
+      seen.push(message.text());
+    }
   });
   return seen;
 }
@@ -93,6 +97,11 @@ test('Android: a film plays through Media3 — the screen matched, seeking, paus
   const modes = (await media3(page)).commands.filter((c) => c.name === 'set_mode');
   expect(modes.map((c) => c.args.rate)).toEqual([23.976]);
   expect((await media3(page)).wantPlaying).toBe(true);
+
+  // Playing with sound: nothing claims otherwise once the desktop's own check
+  // for a sound output would have run (Media3 falls back by itself).
+  await page.waitForTimeout(2500);
+  expect(complaints).toEqual([]);
 
   // Right and Left seek.
   let before = (await media3(page)).position;

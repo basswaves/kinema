@@ -222,7 +222,9 @@ export function usePlaybackEngine({
     onPlaybackEvent((event) => {
       if (event.type === 'restarted') {
         dispatch({ type: 'playback-restart' });
-        checkAudioSoon();
+        // mpv's way of failing to open the sound, and its fallbacks. Media3
+        // falls back by itself and says so (`audio-fallback`).
+        if (hasMpv()) checkAudioSoon();
       }
 
       if (event.type === 'loaded') {

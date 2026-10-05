@@ -813,6 +813,11 @@ pub struct ProbeReport {
 /// a fraction of a second per file; later scans read only what changed.
 #[tauri::command]
 pub async fn probe_library(app: tauri::AppHandle) -> Result<ProbeReport, String> {
+    // Where no program can be run (Android), there is no ffprobe to look
+    // for, and nothing to say about not finding one.
+    if !crate::capabilities::current().runs_programs {
+        return Ok(ProbeReport::default());
+    }
     let Some(running) = app
         .state::<crate::jobs::Jobs>()
         .try_start(crate::jobs::Job::Probe)

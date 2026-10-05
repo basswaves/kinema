@@ -326,6 +326,10 @@ pub struct MeasureReport {
 /// Tauri command: measure what needs measuring. The scan's last step.
 #[tauri::command]
 pub async fn measure_pictures(app: tauri::AppHandle) -> Result<MeasureReport, String> {
+    // No ffmpeg can be run here (Android): nothing to measure with.
+    if !crate::capabilities::current().runs_programs {
+        return Ok(MeasureReport::default());
+    }
     // The same job as reading the files: both are "the scan looks at files",
     // and neither should run twice at once.
     let Some(running) = app

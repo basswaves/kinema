@@ -628,6 +628,11 @@ struct AutoPlan {
 /// optional detector is missing would be a worse bug than the one this fixes.
 #[tauri::command]
 pub async fn auto_detect(app: tauri::AppHandle) -> Result<AutoDetectReport, String> {
+    // Both detectors are programs (Skiptro, ffmpeg), and none can be run here
+    // (Android): no step, rather than a note per folder that they are missing.
+    if !crate::capabilities::current().runs_programs {
+        return Ok(AutoDetectReport { steps: Vec::new() });
+    }
     // Detect pressed in Settings is already doing this work — or more of it,
     // since the button ignores the settling rule. Said, not silent.
     let Some(running) = app

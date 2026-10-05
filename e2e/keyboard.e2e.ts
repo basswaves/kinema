@@ -710,6 +710,52 @@ test('the equipment notice: Choose when never asked, Use it too for only these',
   await expect.poll(() => focused(page)).toBeTruthy();
 });
 
+test('Settings: Up and Down stay in the open section, Left goes to the list', async ({ page }) => {
+  // A TV's size, where Library is longer than the screen: Up from its last
+  // item went to the section list beside it, not the item above.
+  await page.setViewportSize({ width: 960, height: 540 });
+  await open(page, 'windows');
+  await press(page, 'ArrowUp', 2);
+  await press(page, 'ArrowRight', 4);
+  await expect.poll(() => focused(page)).toBe('Settings');
+  await press(page, 'Enter');
+  await press(page, 'ArrowDown');
+  await expect.poll(() => focused(page)).toBe('Library');
+  await press(page, 'ArrowRight');
+  for (let i = 0; i < 30 && (await focused(page)) !== 'Run setup again'; i++) await press(page, 'ArrowDown');
+  await expect.poll(() => focused(page)).toBe('Run setup again');
+
+  const place = () =>
+    page.evaluate(() => {
+      const el = document.querySelector('.focused');
+      if (!el) return 'none';
+      if (el.closest('.settings-nav')) return 'list';
+      return el.closest('.settings-content') ? 'section' : 'top bar';
+    });
+  const seen: string[] = [];
+  for (let i = 0; i < 30 && (await place()) === 'section'; i++) {
+    seen.push((await focused(page)) ?? '');
+    await press(page, 'ArrowUp');
+  }
+  // Up through every item to the first, then on to the bar at the top.
+  expect(await place()).toBe('top bar');
+  expect(seen).toContain('Add movies folder');
+
+  // Left goes to the list, onto the open section (after the buttons to the
+  // left in the same row); Right comes back to where one was.
+  for (let i = 0; i < 6 && (await focused(page)) !== 'Run setup again'; i++) await press(page, 'ArrowDown');
+  await expect.poll(() => focused(page)).toBe('Run setup again');
+  let left = '';
+  for (let i = 0; i < 4 && (await place()) === 'section'; i++) {
+    left = (await focused(page)) ?? '';
+    await press(page, 'ArrowLeft');
+  }
+  await expect.poll(() => focused(page)).toBe('Library');
+  await press(page, 'ArrowRight');
+  expect(await place()).toBe('section');
+  expect(await focused(page)).toBe(left);
+});
+
 test('Down with nothing further down reads on, and Up reads back', async ({ page }) => {
   // A film's page ends in its picture and sound badges under Play, never
   // focusable; in a short window they are more than fits beneath it.

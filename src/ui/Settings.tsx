@@ -19,7 +19,7 @@ import LanguageSection from './LanguageSection';
 import ChoiceRow from './ChoiceRow';
 import { availableUpdate, UPDATE_CHECK_KEY, type Release } from './updates';
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import {
@@ -619,7 +619,7 @@ export default function Settings({
             onChoose={chooseSection}
           />
 
-          <div className="settings-content">
+          <SectionContent>
             {section === 'library' && (
               <>
                 <section className="settings-section">
@@ -1452,8 +1452,34 @@ export default function Settings({
                 )}
               </>
             )}
-          </div>
+          </SectionContent>
         </div>
+      </div>
+    </FocusContext.Provider>
+  );
+}
+
+/**
+ * The open section, as a focus container of its own, so Up and Down move
+ * within it and only Left reaches the list.
+ *
+ * With the section's controls loose beside the list, Up compared the item
+ * above with the list as a whole, and the list — sticky, so always level
+ * with the top of the screen — won whenever the item above was further away
+ * (a TV's height, Library's last item). Inside a container the item above is
+ * found first; past the first item Up goes on to the bar at the top, as it
+ * did. Right from the list comes back to where one was in the section.
+ */
+function SectionContent({ children }: { children: ReactNode }) {
+  const { ref, focusKey } = useFocusable({
+    focusKey: 'settings-content',
+    trackChildren: true,
+    saveLastFocusedChild: true,
+  });
+  return (
+    <FocusContext.Provider value={focusKey}>
+      <div className="settings-content" ref={ref}>
+        {children}
       </div>
     </FocusContext.Provider>
   );

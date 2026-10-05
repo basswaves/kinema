@@ -30,6 +30,17 @@ export interface Scrub {
 export const CHAIN_MS = 700;
 /** With no press for this long, the seek is committed even without a key release. */
 export const COMMIT_IDLE_MS = 500;
+/**
+ * A press this soon after the last one is the key held, not tapped again: no
+ * one taps a remote that fast, and a remote that sends a press and a release
+ * for every step of a hold sends them about every 110 ms.
+ */
+export const HOLD_GAP_MS = 140;
+/**
+ * After a hold is let go, the seek waits this long for another press: from
+ * such a remote, a release is only the end of one step.
+ */
+export const RELEASE_GRACE_MS = 150;
 
 const FIRST_STEP_SECS = 10;
 

@@ -194,12 +194,12 @@ test('a run of quick skips is one seek, and a held key seeks when let go', async
   // The player hears of the new position on the fake mpv's next tick.
   await page.waitForTimeout(600);
 
-  // Six taps, as a remote sends them while Right is held — a press and a
-  // release each. One seek, after they stop, to where all six lead.
+  // Six taps, as quick as a person taps — a press and a release each. One
+  // seek, after they stop, to where all six lead.
   let before = await seeks();
   for (let i = 0; i < 6; i++) {
     await page.keyboard.press('ArrowRight');
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(250);
   }
   expect(await seeks()).toBe(before);
   await expect.poll(seeks).toBe(before + 1);
@@ -208,7 +208,8 @@ test('a run of quick skips is one seek, and a held key seeks when let go', async
   // 10 s a tap for four, then 30 s: two minutes on, not ten seconds.
   expect((await mpv(page)).position).toBeGreaterThan(195);
 
-  // Held, with the key's own repeats: sent as soon as it is let go.
+  // Held, with the key's own repeats: sent a moment after it is let go
+  // (sooner than after taps), in case the release was one step of a hold.
   before = await seeks();
   await page.keyboard.down('ArrowLeft');
   for (let i = 0; i < 10; i++) {
@@ -216,7 +217,7 @@ test('a run of quick skips is one seek, and a held key seeks when let go', async
     await page.keyboard.down('ArrowLeft');
   }
   await page.keyboard.up('ArrowLeft');
-  await expect.poll(seeks, { timeout: 300 }).toBe(before + 1);
+  await expect.poll(seeks, { timeout: 400, intervals: [50] }).toBe(before + 1);
 
   // On the seek bar, the same.
   await press(page, 'ArrowDown');
@@ -226,11 +227,67 @@ test('a run of quick skips is one seek, and a held key seeks when let go', async
   before = await seeks();
   for (let i = 0; i < 5; i++) {
     await page.keyboard.press('ArrowLeft');
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(250);
   }
   await expect.poll(seeks).toBe(before + 1);
   await page.waitForTimeout(800);
   expect(await seeks()).toBe(before + 1);
+});
+
+test('a held key is a hold however the remote sends it', async ({ page }) => {
+  await play(page, 'series');
+  const seeks = () =>
+    page.evaluate(
+      () =>
+        (window as unknown as { __fakeMpv: FakeMpv }).__fakeMpv.commands.filter(
+          (c) => c.name === 'seek'
+        ).length
+    );
+  const key = (type: 'keydown' | 'keyup', key: string) =>
+    page.evaluate(
+      ([type, key]) => window.dispatchEvent(new KeyboardEvent(type, { key, bubbles: true })),
+      [type, key] as const
+    );
+  const position = async () => (await mpv(page)).position;
+
+  // Android's WebView: one press, and while it is held a press every 50 ms
+  // — none of them marked as a repeat — and a release at the end (measured
+  // on a box). A second and a half held is about forty seconds on, as
+  // anywhere else, not the end of the episode.
+  await playheadTo(page, 100);
+  await page.waitForTimeout(600);
+  let before = await seeks();
+  let from = await position();
+  await key('keydown', 'ArrowRight');
+  await page.waitForTimeout(450);
+  for (let i = 0; i < 20; i++) {
+    await key('keydown', 'ArrowRight');
+    await page.waitForTimeout(50);
+  }
+  await key('keyup', 'ArrowRight');
+  await expect.poll(seeks).toBe(before + 1);
+  await page.waitForTimeout(800);
+  expect(await seeks()).toBe(before + 1);
+  expect(await position()).toBeGreaterThan(from + 25);
+  expect(await position()).toBeLessThan(from + 80);
+
+  // A remote that sends a press and a release for every step of a hold,
+  // about every 110 ms: the same hold, one seek, as far.
+  await playheadTo(page, 100);
+  await page.waitForTimeout(600);
+  before = await seeks();
+  from = await position();
+  for (let i = 0; i < 18; i++) {
+    await key('keydown', 'ArrowRight');
+    await page.waitForTimeout(20);
+    await key('keyup', 'ArrowRight');
+    await page.waitForTimeout(60);
+  }
+  await expect.poll(seeks).toBe(before + 1);
+  await page.waitForTimeout(800);
+  expect(await seeks()).toBe(before + 1);
+  expect(await position()).toBeGreaterThan(from + 25);
+  expect(await position()).toBeLessThan(from + 80);
 });
 
 test('watching keys: seeking, pausing, volume, stats and the transport row', async ({ page }) => {

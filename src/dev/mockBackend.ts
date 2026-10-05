@@ -753,7 +753,9 @@ export function listenerCounts(): Record<string, number> {
  * `kinemaMockNoPower=1` is a system
  * that will not sleep or shut down from Kinema, `kinemaMockScreenHdr=on`
  * reports the screen in HDR (for the output check; the picture itself is the
- * fake mpv's `extra`), `kinemaMockSkiptro=1` has Skiptro's database on this PC.
+ * fake mpv's `extra`), `kinemaMockSkiptro=1` has Skiptro's database on this PC,
+ * and `kinemaMockScanErrors`, a JSON list of strings, is what the scan reports
+ * as its problems.
  */
 function flag(name: string): string | null {
   try {
@@ -824,6 +826,14 @@ const shareLogins: { server: string; user: string }[] =
   flag('kinemaMockShareLogin') === '1' ? [{ server: 'nas', user: 'films' }] : [];
 /** `kinemaMockReview` pretends that many videos wait in the review queue. */
 const REVIEW_COUNT = Number(flag('kinemaMockReview') ?? 0) || 0;
+/** `kinemaMockScanErrors`: the scan's problems, as the scanner words them. */
+const SCAN_ERRORS: string[] = (() => {
+  try {
+    return JSON.parse(flag('kinemaMockScanErrors') ?? '[]') as string[];
+  } catch {
+    return [];
+  }
+})();
 /** `kinemaMockUpdate` pretends that version is out on GitHub. */
 const UPDATE = flag('kinemaMockUpdate');
 /**
@@ -909,7 +919,7 @@ const handlers: Record<string, Handler> = {
     if (emptyLibrary.hasRoot) emptyLibrary.scanned = true;
     return {
       roots_scanned: 1, files_seen: files.length, files_added: 0, files_updated: 0,
-      files_unchanged: files.length, files_missing: 0, errors: [], duration_ms: 5,
+      files_unchanged: files.length, files_missing: 0, errors: SCAN_ERRORS, duration_ms: 5,
     };
   },
   list_unparsed: () => [],

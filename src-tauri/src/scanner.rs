@@ -675,7 +675,9 @@ mod tests {
     }
 
     /// A share that is not there at all: the library under it stays as it
-    /// was, and Home is told which folder was skipped.
+    /// was, and Home is told which folder was skipped. Home's notice says
+    /// exactly this, from the message below (`src/ui/scanTrouble.ts`);
+    /// change one and the other must follow.
     #[test]
     fn an_unreachable_folder_hides_nothing() {
         let mut conn = database("unreachable");

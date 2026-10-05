@@ -46,6 +46,7 @@ import { applyUpgrades, dismissUpgrades, readUpgrades, type Upgrade } from './qu
 import { dismissFfmpegNotice, readFfmpegNotice } from './ffmpegNotice';
 import { needsOwnTmdbKey } from '../metadata/builtinKey';
 import { availableUpdate } from './updates';
+import { scanTrouble as describeScanTrouble, type ScanTrouble } from './scanTrouble';
 import { runScanPipeline, useScanStatus } from '../library/pipeline';
 import { getTitleDetail, listTitles, type Title } from './api';
 import { searchTitles, type SearchHit } from './search';
@@ -171,8 +172,8 @@ export default function Browse() {
   const [leaving, setLeaving] = useState(false);
   const [query, setQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
-  /** A root that could not be read at startup. Not an error — see below. */
-  const [scanTrouble, setScanTrouble] = useState<string | null>(null);
+  /** What went wrong in the startup scan. Not an error — see below. */
+  const [scanTrouble, setScanTrouble] = useState<ScanTrouble | null>(null);
   /** Videos Kinema would not guess at, for the notice on Home. */
   const [reviewCount, setReviewCount] = useState(0);
   /** What the equipment could do that is switched off — see qualityNotice.ts. */
@@ -280,7 +281,10 @@ export default function Browse() {
     void runScanPipeline()
       .then((outcome) => {
         if (outcome.status === 'failed') {
-          setScanTrouble(`Could not read your library folders: ${describeError(outcome.error)}`);
+          setScanTrouble({
+            text: `Could not read your library folders: ${describeError(outcome.error)}`,
+            note: null,
+          });
         }
       })
       .catch((e) => console.warn('first scan:', e))
@@ -341,11 +345,12 @@ export default function Browse() {
    * Problems are reported quietly rather than not at all. They used to be
    * logged and nothing else, on the reasoning that an unreachable share is
    * normal and the scanner skips that root anyway — which is true, and misses
-   * what it looks like from the sofa. Every browsing query hides files marked
-   * missing, so a share that did not come back reads as a library that has
-   * silently lost half its contents, with no way to tell that from real data
-   * loss. A quiet line naming the folder is the difference between "this app
-   * ate my library" and "the NAS is asleep".
+   * what it looks like from the sofa. The skipped folder's films stay on the
+   * shelves and simply refuse to play, with no way to tell that from a broken
+   * app. A quiet line naming the folder is the difference between "this app
+   * is broken" and "the NAS is asleep". Other problems (a rejected TMDB key,
+   * failed artwork) get the same line, without the word about a folder —
+   * scanTrouble.ts.
    *
    * Deliberately not the red error banner: nothing is broken, the shelves are
    * browsing perfectly well from cache, and this must not look like a failure.
@@ -360,18 +365,17 @@ export default function Browse() {
         if (cancelled || outcome === null) return;
         if (outcome.status === 'failed') {
           console.warn('startup scan failed:', outcome.error);
-          setScanTrouble(`Could not check your library folders: ${describeError(outcome.error)}`);
+          setScanTrouble({
+            text: `Could not check your library folders: ${describeError(outcome.error)}`,
+            note: null,
+          });
           return;
         }
         if (outcome.status !== 'done') return;
         const { filesAdded, matched, artworkStored, errors } = outcome.summary;
         if (errors.length > 0) {
           console.warn('startup scan problems:', errors);
-          setScanTrouble(
-            errors.length === 1
-              ? errors[0]
-              : `${errors[0]} · and ${errors.length - 1} more`
-          );
+          setScanTrouble(describeScanTrouble(errors));
         }
         // Newly cached artwork counts too: without a reload, the shelves go on
         // showing the remote copies they loaded before the cache had them.
@@ -595,8 +599,8 @@ export default function Browse() {
 
         {scanTrouble && (
           <div className="browse-notice" onClick={() => setScanTrouble(null)}>
-            {scanTrouble}
-            <span className="muted">. Anything from that folder is hidden until it is back.</span>
+            {scanTrouble.text}
+            {scanTrouble.note && <span className="muted">. {scanTrouble.note}</span>}
           </div>
         )}
 

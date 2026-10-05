@@ -144,6 +144,30 @@ test('a file that cannot be opened says so, and Back still works', async ({ page
   await expect.poll(() => focused(page)).toContain('Play');
 });
 
+for (const [label, errors, notice] of [
+  [
+    'a folder that is away is named, with what that means',
+    ['A film: TMDB /search/movie failed: HTTP 401', 'root unavailable, skipped: \\\\nas\\Films'],
+    'Could not reach \\\\nas\\Films · and 1 more. Anything in that folder can’t be played until it is back.',
+  ],
+  // Matching went wrong, not a folder: nothing about one being away.
+  [
+    'any other problem says only what happened',
+    ['A film: TMDB /search/movie failed: HTTP 401'],
+    'A film: TMDB /search/movie failed: HTTP 401',
+  ],
+] as const) {
+  test(`the startup scan's notice: ${label}`, async ({ page }) => {
+    await page.addInitScript((e) => localStorage.setItem('kinemaMockScanErrors', e), JSON.stringify(errors));
+    await open(page, 'windows');
+    await expect(page.locator('.browse-notice')).toHaveText(notice);
+    // Only a notice: focus stays where it was, and Play still plays.
+    expect(await focused(page)).toContain('Play');
+    await press(page, 'Enter');
+    await expect.poll(async () => (await mpv(page)).path).not.toBeNull();
+  });
+}
+
 for (const [label, system, noPower, choices] of [
   ['windows', 'windows', false, ['Close Kinema', 'Put the PC to sleep', 'Shut down the PC', 'Cancel']],
   ['linux', 'linux', false, ['Close Kinema', 'Put the PC to sleep', 'Shut down the PC', 'Cancel']],

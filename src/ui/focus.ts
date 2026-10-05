@@ -295,8 +295,8 @@ const READ_STEP = 0.6;
  * that, a remote had no way to reach it (owner, 2026-10-04: "you can't see
  * everything"). So a Down press that the spatial library could not spend on a
  * move scrolls the page on by most of a screen, as a TV app does with text;
- * and while the focused control is above the top of the screen, Up scrolls
- * back before it moves anywhere.
+ * and while the control reading on left behind is above the top of the
+ * screen, Up scrolls back before it moves anywhere.
  *
  * The focused control is never left half under the top bar, which is see-
  * through, so the ring showed through it (owner, 2026-10-05: keep it clear,
@@ -330,8 +330,12 @@ export function installReadOn(): void {
 
       if (event.key === 'ArrowUp') {
         const box = node.getBoundingClientRect();
-        // Wholly above the bar, or — left there by reading on — partly.
-        const hidden = box.bottom < clear || (node === leftBehind && box.top < clear - 1);
+        // Left above the bar by reading on, wholly or partly. Only then: a
+        // control the remote has just moved to is above it too until the page
+        // has scrolled to it, and on a slow computer a quick second Up was
+        // spent scrolling instead of moving on (the first run's setup pages,
+        // on CI).
+        const hidden = node === leftBehind && box.top < clear - 1;
         if (hidden && page.scrollTop > 0) {
           event.preventDefault();
           event.stopImmediatePropagation();

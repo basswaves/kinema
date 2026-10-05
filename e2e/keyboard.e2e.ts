@@ -860,6 +860,49 @@ test('reading on and back never leaves the ring half under the top bar', async (
   }
 });
 
+test('on a slow computer every quick Up still moves the ring', async ({ page }) => {
+  // A slow computer's smooth scroll arrives late. A control just moved to was
+  // then still above the screen at the next press, and Up spent that press
+  // scrolling back as if reading on had left it there (CI's Linux WebKit).
+  await page.addInitScript(() => {
+    for (const name of ['scrollIntoView', 'scrollBy', 'scrollTo'] as const) {
+      const own = Element.prototype[name] as (this: Element, ...args: unknown[]) => void;
+      Element.prototype[name] = function (this: Element, ...args: unknown[]) {
+        const options = args[0] as { behavior?: string } | undefined;
+        if (typeof options !== 'object' || options?.behavior !== 'smooth') return own.apply(this, args);
+        window.setTimeout(() => own.call(this, { ...options, behavior: 'auto' }), 400);
+      } as never;
+    }
+  });
+  await open(page, 'windows');
+  await page.setViewportSize({ width: 1280, height: 300 });
+  await press(page, 'ArrowUp', 2);
+  await press(page, 'ArrowRight', 4);
+  await press(page, 'Enter');
+  await press(page, 'ArrowDown');
+  for (let i = 0; i < 4 && (await focused(page)) !== 'Picture & sound'; i++) await press(page, 'ArrowDown');
+  await press(page, 'Enter');
+  await press(page, 'ArrowRight');
+  for (let i = 0; i < 20 && (await focused(page)) !== 'Check again'; i++) await press(page, 'ArrowDown');
+  await expect.poll(() => focused(page)).toBe('Check again');
+  await page.waitForTimeout(600);
+
+  // Several controls here say "Off", so each is told apart by a mark of its own.
+  const ring = () =>
+    page.evaluate(() => {
+      const el = document.querySelector<HTMLElement>('.focused');
+      if (!el) return 'nothing';
+      el.dataset.seen ??= String(document.querySelectorAll('[data-seen]').length);
+      return `${el.dataset.seen} ${el.textContent?.trim()}`;
+    });
+  const seen = [await ring()];
+  for (let i = 0; i < 5; i++) {
+    await press(page, 'ArrowUp');
+    seen.push(await ring());
+  }
+  expect(new Set(seen).size, seen.join(' / ')).toBe(seen.length);
+});
+
 test('Android: the system keyboard opens on OK, never on arriving at a field', async ({ page }) => {
   await page.setViewportSize({ width: 960, height: 540 });
   await page.addInitScript(() => localStorage.setItem('kinemaMockSystem', 'android'));

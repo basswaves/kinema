@@ -7,6 +7,23 @@ makes no stability promises.
 
 ## [Unreleased]
 
+### Added
+
+- **Kinema's own icon:** a K whose upright is a strip of film, in the
+  interface's red and white on its near-black — on the window, the taskbar,
+  the desktop shortcut and Linux's app menu, where Tauri's placeholder was.
+- **Down at the end of a page reads on, and Up reads back.** Text below a
+  page's last control — the notes under the last setting, a film's picture
+  and sound badges in a short window — could only be seen with a remote
+  when it fitted on screen together with that control. Down with nowhere
+  further to go now scrolls the page on, as a TV app does with text, and Up
+  brings the control back before it moves anywhere. The focus ring is never
+  left half under the top bar on the way.
+- **A link that nothing can open is shown instead.** Kinema's links (a free
+  TMDB key, a trailer, a sign-in page) go to the system's browser; where the
+  system cannot open one, a card now shows the address in words and as a QR
+  code to open on a phone, where the button used to do nothing.
+
 ### Changed
 
 - **Quick skips are one seek.** Tapping Left or Right several times in a
@@ -16,6 +33,9 @@ makes no stability promises.
   picture. A key held down and let go still seeks at once.
 - **The setup pages always say Next.** The way on said Skip until something
   was chosen; Next now accepts what is shown, as it is.
+- **Behind the scenes: the groundwork for Android TV.** The Android version
+  is not part of this release, but the parts it shares with Windows and
+  Linux are, and the points in this list are the only ones that show there.
 
 ### Fixed
 
@@ -35,18 +55,26 @@ makes no stability promises.
   arriving the ring went nowhere, leaving a remote with nothing to do. It
   now stays on Next, and Down reads the page to its end. A page whose first
   question arrives late, as Extras' can on a busy PC, gets the ring when it
-  does.
+  does; and on a computer busy enough, the ring that could go missing on
+  arriving at a page until a key was pressed is now given again until it
+  shows.
 - **Settings: Up and Down stay in the open section.** Going up, the ring
   sometimes jumped to the list of sections beside it; only Left goes there
   now, and Right comes back to where you were.
-- **The focus ring is never left half under the top bar.** Reading on past
-  a page's last control, and back, could leave it there.
 - **Wikipedia being busy is waited out.** Matching without a TMDB key
   showed Wikidata's own "seconds lagged" message and no results when its
   servers were busy. Kinema now waits as long as they ask, a few times, and
   if they are still busy says so in plain words; the next scan tries again.
-- **No more "back button" warning in every log.** The listener for
-  Android's Back button is only installed where there is one.
+- **The player's messages no longer push the controls down.** An error, a
+  sound notice or the offer to resume took the top of the screen while it
+  showed, and Back and the title moved to the middle. They now sit
+  together under the top bar.
+- **"Matching the screen to the video…" only when it is.** With screen
+  switching on, the notice showed at the start of every film, also when
+  the screen was already in the film's mode and nothing changed.
+- **An empty Movies or TV shows page says "Nothing here yet."** It said
+  everything had been watched and to switch off "Unwatched only" — which
+  was already off.
 
 ## [0.9.1] — 2026-10-03
 

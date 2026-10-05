@@ -18,6 +18,7 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.analytics.AnalyticsListener
@@ -77,6 +78,19 @@ class MutedArgs {
 }
 
 @InvokeArg
+class TrackArgs {
+  /** "audio" or "sub", as engine.ts says it. */
+  var kind: String = ""
+  /** Kinema's number for it, from `tracks`. */
+  var id: Int = 0
+}
+
+@InvokeArg
+class ShowArgs {
+  var visible: Boolean = true
+}
+
+@InvokeArg
 class SeekArgs {
   var seconds: Double = 0.0
   /** Relative to where it is, rather than from the start. */
@@ -109,6 +123,16 @@ class SeekArgs {
  *  - what the sound actually did, for Settings: sent on untouched or
  *    decoded here, as Media3 opened it — not what any setting claims.
  */
+/**
+ * How long a track choice waits for Media3 to have made it, before answering
+ * anyway: Media3 chooses on its own thread, and the page reads the tracks
+ * again straight after choosing.
+ */
+private const val CHOICE_WAIT_MS = 1500L
+
+/** The start of the id a subtitle file of its own is given, beside the film or fetched. */
+private const val EXTERNAL = "kinema-file:"
+
 /** How long a taken video decoder is given before Kinema asks again. */
 private const val RETRY_MS = 1500L
 
@@ -153,6 +177,17 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
    * one (engine.ts `soundGoesUntouched`).
    */
   private var untouched = false
+  /**
+   * `loaded` has been said for this file. Said once its tracks are known —
+   * Kinema's meaning of it (engine.ts) — not as it is handed to Media3,
+   * when there are none yet to put the remembered languages on.
+   */
+  private var loadedSaid = false
+  /**
+   * Whether subtitles show, as mpv's `sub-visibility`: hiding them keeps the
+   * subtitle track chosen. Kept across files, as mpv keeps it.
+   */
+  private var subtitlesShown = true
   private val main = Handler(Looper.getMainLooper())
 
   /**
@@ -301,15 +336,10 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
 
       override fun onTracksChanged(tracks: Tracks) {
         announceSound(tracks)
-        val group = tracks.groups.firstOrNull { it.type == C.TRACK_TYPE_VIDEO && it.isSelected } ?: return
-        val index = (0 until group.length).firstOrNull { group.isTrackSelected(it) } ?: return
-        val f = group.getTrackFormat(index)
-        val transfer = f.colorInfo?.colorTransfer
-        video = JSObject().apply {
-          put("width", f.width)
-          put("height", f.height)
-          put("fps", if (f.frameRate > 0) f.frameRate.toDouble() else JSONObject.NULL)
-          put("hdr", transfer == C.COLOR_TRANSFER_ST2084 || transfer == C.COLOR_TRANSFER_HLG)
+        rememberVideo(tracks)
+        if (!loadedSaid && !tracks.isEmpty) {
+          loadedSaid = true
+          emit("loaded")
         }
       }
 
@@ -335,6 +365,20 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
     })
     player = p
     return p
+  }
+
+  /** The film's picture, once Media3 has chosen its video track. */
+  private fun rememberVideo(tracks: Tracks) {
+    val group = tracks.groups.firstOrNull { it.type == C.TRACK_TYPE_VIDEO && it.isSelected } ?: return
+    val index = (0 until group.length).firstOrNull { group.isTrackSelected(it) } ?: return
+    val f = group.getTrackFormat(index)
+    val transfer = f.colorInfo?.colorTransfer
+    video = JSObject().apply {
+      put("width", f.width)
+      put("height", f.height)
+      put("fps", if (f.frameRate > 0) f.frameRate.toDouble() else JSONObject.NULL)
+      put("hdr", transfer == C.COLOR_TRANSFER_ST2084 || transfer == C.COLOR_TRANSFER_HLG)
+    }
   }
 
   /**
@@ -490,6 +534,8 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
     val s = surface ?: return
     val file = path ?: return
     val at = old.currentPosition
+    // The subtitles chosen stay chosen; the sound is the fallback's to choose.
+    val subtitles = old.trackSelectionParameters.overrides.values.filter { it.type == C.TRACK_TYPE_TEXT }
     val f = (error as? ExoPlaybackException)?.rendererFormat
     val format = f?.let { soundName(it) } ?: ""
     audioStep += 1
@@ -498,6 +544,9 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
     old.release()
     player = null
     val p = buildPlayer(s)
+    p.trackSelectionParameters = p.trackSelectionParameters.buildUpon()
+      .apply { subtitles.forEach { addOverride(it) } }
+      .build()
     val uri = if (file.contains("://")) Uri.parse(file) else Uri.fromFile(File(file))
     p.setMediaItem(MediaItem.fromUri(uri), at)
     p.prepare()
@@ -556,7 +605,11 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
         video = null
         failedSound = null
         untouched = false
+        loadedSaid = false
         keepSound(null, null)
+        // The last film's track choices are not this one's: Kinema puts the
+        // remembered languages on once its tracks are known (`loaded`).
+        p.trackSelectionParameters = p.trackSelectionParameters.buildUpon().clearOverrides().build()
         val uri = args.url?.let { Uri.parse(it) }
           ?: if (args.path.contains("://")) Uri.parse(args.path) else Uri.fromFile(File(args.path))
         val start = args.start
@@ -564,7 +617,6 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
         else p.setMediaItem(MediaItem.fromUri(uri))
         p.prepare()
         p.playWhenReady = wantPlaying
-        emit("loaded")
         main.removeCallbacks(ticker)
         main.post(ticker)
         invoke.resolve()
@@ -640,7 +692,155 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
         put("ended", p?.playbackState == Player.STATE_ENDED)
         put("video", video ?: JSONObject.NULL)
         put("untouched", untouched)
+        put("subtitlesShown", subtitlesShown)
       })
+    }
+  }
+
+  // ---- tracks -----------------------------------------------------------------
+
+  /** One track in Kinema's terms, and where Media3 keeps it. */
+  private class Found(val group: Tracks.Group, val index: Int, val kind: String, val id: Int)
+
+  /**
+   * The open file's video, audio and subtitle tracks, numbered from 1 within
+   * each kind in Media3's order — the numbers `select_track` takes back.
+   */
+  private fun found(p: ExoPlayer): List<Found> {
+    val out = mutableListOf<Found>()
+    val count = mutableMapOf<String, Int>()
+    for (g in p.currentTracks.groups) {
+      val kind = when (g.type) {
+        C.TRACK_TYPE_VIDEO -> "video"
+        C.TRACK_TYPE_AUDIO -> "audio"
+        C.TRACK_TYPE_TEXT -> "sub"
+        else -> continue
+      }
+      for (i in 0 until g.length) {
+        val id = (count[kind] ?: 0) + 1
+        count[kind] = id
+        out.add(Found(g, i, kind, id))
+      }
+    }
+    return out
+  }
+
+  /**
+   * A format's name as FFmpeg says it — Kinema's vocabulary for formats
+   * (engine.ts `Track`). A film's own subtitles are turned into Media3's
+   * cues as they are read; what they were is then in `codecs`.
+   */
+  private fun ffmpegName(f: Format): String? {
+    val mime = (if (f.sampleMimeType == MimeTypes.APPLICATION_MEDIA3_CUES) f.codecs else f.sampleMimeType) ?: return null
+    if (mime.startsWith("audio/vnd.dts")) return "dts"
+    return when (mime) {
+      MimeTypes.AUDIO_TRUEHD -> "truehd"
+      MimeTypes.AUDIO_E_AC3, MimeTypes.AUDIO_E_AC3_JOC -> "eac3"
+      MimeTypes.AUDIO_AC3 -> "ac3"
+      MimeTypes.AUDIO_AC4 -> "ac4"
+      MimeTypes.AUDIO_AAC -> "aac"
+      MimeTypes.AUDIO_FLAC -> "flac"
+      MimeTypes.AUDIO_OPUS -> "opus"
+      MimeTypes.AUDIO_VORBIS -> "vorbis"
+      MimeTypes.AUDIO_MPEG -> "mp3"
+      MimeTypes.AUDIO_MPEG_L2 -> "mp2"
+      MimeTypes.AUDIO_ALAC -> "alac"
+      MimeTypes.AUDIO_RAW -> "pcm"
+      MimeTypes.APPLICATION_SUBRIP -> "subrip"
+      MimeTypes.TEXT_SSA -> "ass"
+      MimeTypes.TEXT_VTT -> "webvtt"
+      MimeTypes.APPLICATION_TTML -> "ttml"
+      MimeTypes.APPLICATION_PGS -> "hdmv_pgs_subtitle"
+      MimeTypes.APPLICATION_VOBSUB -> "dvd_subtitle"
+      MimeTypes.APPLICATION_DVBSUBS -> "dvb_subtitle"
+      MimeTypes.APPLICATION_TX3G -> "mov_text"
+      MimeTypes.VIDEO_H265, MimeTypes.VIDEO_DOLBY_VISION -> "hevc"
+      MimeTypes.VIDEO_H264 -> "h264"
+      MimeTypes.VIDEO_AV1 -> "av1"
+      MimeTypes.VIDEO_VP9 -> "vp9"
+      MimeTypes.VIDEO_MPEG2 -> "mpeg2video"
+      MimeTypes.VIDEO_VC1 -> "vc1"
+      else -> mime.substringAfter('/')
+    }
+  }
+
+  /** FFmpeg's profile name, where Media3's format says one: Atmos, the DTS kinds. */
+  private fun ffmpegProfile(f: Format): String? = when {
+    f.sampleMimeType == MimeTypes.AUDIO_E_AC3_JOC -> "Dolby Digital Plus + Dolby Atmos"
+    f.sampleMimeType == MimeTypes.AUDIO_DTS_EXPRESS -> "DTS Express"
+    f.sampleMimeType == MimeTypes.AUDIO_DTS_HD -> "DTS-HD"
+    f.sampleMimeType?.startsWith("audio/vnd.dts.uhd") == true -> "DTS:X"
+    else -> null
+  }
+
+  private fun trackObject(t: Found) = JSObject().apply {
+    val f = t.group.getTrackFormat(t.index)
+    put("id", t.id)
+    put("type", t.kind)
+    put("title", f.label ?: JSONObject.NULL)
+    put("lang", f.language ?: JSONObject.NULL)
+    put("codec", ffmpegName(f) ?: JSONObject.NULL)
+    put("selected", t.group.isTrackSelected(t.index))
+    put("forced", f.selectionFlags and C.SELECTION_FLAG_FORCED != 0)
+    put("external", f.id?.startsWith(EXTERNAL) == true)
+    put("default", f.selectionFlags and C.SELECTION_FLAG_DEFAULT != 0)
+    if (f.channelCount != Format.NO_VALUE) put("channels", f.channelCount)
+    ffmpegProfile(f)?.let { put("profile", it) }
+    put("hearingImpaired", f.roleFlags and C.ROLE_FLAG_DESCRIBES_MUSIC_AND_SOUND != 0)
+  }
+
+  /** The open file's tracks as engine.ts's `Track`s; none while nothing is open. */
+  @Command
+  fun tracks(invoke: Invoke) {
+    main.post {
+      val list = JSArray()
+      player?.takeIf { path != null }?.let { p -> found(p).forEach { list.put(trackObject(it)) } }
+      invoke.resolve(JSObject().apply { put("tracks", list) })
+    }
+  }
+
+  /**
+   * Play this audio track, or show this subtitle track. Answers once Media3
+   * has made the choice (or after `CHOICE_WAIT_MS`), so the tracks read
+   * straight after say what is playing.
+   */
+  @Command
+  fun selectTrack(invoke: Invoke) {
+    val args = invoke.parseArgs(TrackArgs::class.java)
+    main.post {
+      val p = player
+      val t = p?.let { found(it) }?.firstOrNull { it.kind == args.kind && it.id == args.id }
+      when {
+        p == null || t == null -> invoke.reject("there is no ${args.kind} track ${args.id}")
+        args.kind == "audio" && audioStep >= 2 -> invoke.reject("no sound will play on this device")
+        else -> {
+          p.trackSelectionParameters = p.trackSelectionParameters.buildUpon()
+            .setOverrideForType(TrackSelectionOverride(t.group.mediaTrackGroup, t.index))
+            .setTrackTypeDisabled(t.group.type, false)
+            .build()
+          whenChosen(args.kind, args.id, System.currentTimeMillis() + CHOICE_WAIT_MS, invoke)
+        }
+      }
+    }
+  }
+
+  private fun whenChosen(kind: String, id: Int, until: Long, invoke: Invoke) {
+    val p = player
+    val chosen = p != null && found(p).any { it.kind == kind && it.id == id && it.group.isTrackSelected(it.index) }
+    if (chosen || p == null || System.currentTimeMillis() >= until) {
+      invoke.resolve()
+      return
+    }
+    main.postDelayed({ whenChosen(kind, id, until, invoke) }, 50)
+  }
+
+  /** Show or hide the subtitles, keeping the track chosen. */
+  @Command
+  fun showSubtitles(invoke: Invoke) {
+    val args = invoke.parseArgs(ShowArgs::class.java)
+    main.post {
+      subtitlesShown = args.visible
+      invoke.resolve()
     }
   }
 

@@ -477,7 +477,7 @@ export interface Track {
  * sequential round trips on it, twice per file. Order is kept by index.
  */
 export async function readTracks(): Promise<Track[]> {
-  if (isMedia3()) return [];
+  if (isMedia3()) return media3.tracks();
   const count = (await readProperty<number>('track-list/count', 'int64')) ?? 0;
 
   const read = async (i: number): Promise<Track | null> => {
@@ -538,19 +538,19 @@ export async function readTracks(): Promise<Track[]> {
  * M_PROPERTY_NOT_IMPLEMENTED.
  */
 export async function chooseTrack(kind: 'audio' | 'sub', id: number): Promise<void> {
-  if (isMedia3()) throw new Error('Choosing a track is not here yet on this device.');
+  if (isMedia3()) return media3.selectTrack(kind, id);
   await command('set', [kind === 'audio' ? 'aid' : 'sid', String(id)]);
 }
 
 /** Show or hide the subtitles, keeping the track chosen. */
 export async function showSubtitles(visible: boolean): Promise<void> {
-  if (isMedia3()) throw new Error('Subtitles are not here yet on this device.');
+  if (isMedia3()) return media3.showSubtitles(visible);
   await command('set', ['sub-visibility', visible ? 'yes' : 'no']);
 }
 
 /** Whether subtitles are showing, as the engine says; showing when it cannot say. */
 export async function subtitlesShown(): Promise<boolean> {
-  if (isMedia3()) return true;
+  if (isMedia3()) return (await media3.state()).subtitlesShown;
   return (await readProperty<boolean>('sub-visibility', 'flag')) ?? true;
 }
 

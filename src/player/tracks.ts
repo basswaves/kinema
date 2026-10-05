@@ -25,6 +25,8 @@ const DTS_PROFILES: [RegExp, string][] = [
   [/DTS:X/i, 'DTS:X'],
   [/HD MA/i, 'DTS-HD Master Audio'],
   [/HD HRA/i, 'DTS-HD High Resolution'],
+  // Media3 says only "HD", not which (Media3Plugin.kt).
+  [/^DTS-HD$/i, 'DTS-HD'],
   [/Express/i, 'DTS Express'],
   [/ES/, 'DTS-ES'],
 ];

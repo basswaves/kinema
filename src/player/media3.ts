@@ -3,12 +3,12 @@
  * surface beneath this page.
  *
  * Only `engine.ts` imports this, and only for Kinema's own terms — open,
- * pause, seek, stop, volume, what is playing, and the `PlaybackEvent` stream, which
+ * pause, seek, stop, volume, tracks, what is playing, and the `PlaybackEvent` stream, which
  * the plugin already sends in those terms. mpv's terms (the stats panel, the
  * output check, the track internals) have no Media3 counterpart here yet.
  */
 import { addPluginListener, invoke } from '@tauri-apps/api/core';
-import type { PlaybackEvent } from './engine';
+import type { PlaybackEvent, Track } from './engine';
 import type { Film, Screen } from './displayMode';
 import type { SystemOutput } from './systemOutput';
 
@@ -35,6 +35,12 @@ export const seek = (seconds: number, relative: boolean) => call('seek', { secon
 export const setVolume = (level: number) => call('set_volume', { level });
 export const setMuted = (muted: boolean) => call('set_muted', { muted });
 
+/** The open file's tracks, already in Kinema's terms (FFmpeg's format names). */
+export const tracks = () => call<{ tracks: Track[] }>('tracks').then((r) => r.tracks);
+/** Answers once Media3 has made the choice, so tracks read after it say so. */
+export const selectTrack = (kind: 'audio' | 'sub', id: number) => call('select_track', { kind, id });
+export const showSubtitles = (visible: boolean) => call('show_subtitles', { visible });
+
 export interface State {
   path: string | null;
   position: number | null;
@@ -45,6 +51,8 @@ export interface State {
   video: Film | null;
   /** The sound leaves untouched for the receiver, once it has opened. */
   untouched: boolean;
+  /** Whether subtitles show (the chosen track stays chosen when they do not). */
+  subtitlesShown: boolean;
 }
 
 export const state = () => call<State>('state');

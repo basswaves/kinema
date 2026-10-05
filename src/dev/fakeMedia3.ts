@@ -7,8 +7,8 @@
  *
  * It answers the `plugin:media3|…` commands `Media3Plugin.kt` answers, and
  * says what happened as that plugin does — one `playback` event in Kinema's
- * own terms, through a plugin listener — in the same order: `loaded` as the
- * file is accepted, `duration` each time the player is ready, `restarted` at
+ * own terms, through a plugin listener — in the same order: `loaded` once
+ * the file's tracks are known, `duration` each time the player is ready, `restarted` at
  * the first frame and after each seek, `position` four times a second while
  * a file is open (paused too), `paused` when playing or not changes, and
  * `reached-end` then `ended` at the end. There is no picture, only a clock;
@@ -42,6 +42,10 @@ export interface FakeMedia3State {
    * stand in for a box passing it through, where Kinema's volume does nothing.
    */
   untouched: boolean;
+  /** Whether subtitles show; hiding them keeps the track chosen. */
+  subtitlesShown: boolean;
+  /** The chosen audio and subtitle track, by Kinema's number; 0 for none. */
+  chosen: { audio: number; sub: number };
   /** The screen's mode now, and the modes it offers. */
   screen: { width: number; height: number; rate: number };
   modes: { width: number; height: number; rate: number }[];
@@ -66,6 +70,8 @@ const state: FakeMedia3State = {
   volume: 100,
   muted: false,
   untouched: false,
+  subtitlesShown: true,
+  chosen: { audio: 1, sub: 0 },
   screen: { width: 1920, height: 1080, rate: 60 },
   modes: [
     { width: 1920, height: 1080, rate: 60 },
@@ -74,6 +80,33 @@ const state: FakeMedia3State = {
     { width: 3840, height: 2160, rate: 60 },
   ],
 };
+
+/**
+ * The tracks every fixture file has, as Media3Plugin.kt reports them — in
+ * Kinema's terms, with Media3's two-letter languages and what Media3 can say
+ * of a format: E-AC-3 with Atmos, but not which DTS-HD.
+ */
+const TRACKS = [
+  { type: 'video', id: 1, codec: 'hevc' },
+  { type: 'audio', id: 1, lang: 'en', codec: 'eac3', channels: 6, profile: 'Dolby Digital Plus + Dolby Atmos', default: true },
+  { type: 'audio', id: 2, lang: 'en', codec: 'ac3', channels: 2, title: 'Commentary with the director' },
+  { type: 'sub', id: 1, lang: 'en', codec: 'hdmv_pgs_subtitle', title: 'English SDH', hearingImpaired: true },
+  { type: 'sub', id: 2, lang: 'no', codec: 'subrip' },
+  { type: 'sub', id: 3, lang: 'no', codec: 'subrip', forced: true },
+] as const;
+
+function trackList() {
+  return TRACKS.map((t) => ({
+    title: null,
+    lang: null,
+    forced: false,
+    external: false,
+    default: false,
+    hearingImpaired: false,
+    ...t,
+    selected: t.type === 'video' || state.chosen[t.type] === t.id,
+  }));
+}
 
 /** The plugin's listeners: Channel ids, each with its own message count. */
 const listeners = new Map<number, { index: number }>();
@@ -140,9 +173,14 @@ export function open(args: Record<string, unknown>): null {
   state.position = typeof args.start === 'number' ? args.start : 0;
   state.ended = false;
   started = false;
-  emit('loaded');
+  // The last film's choices are not this one's: Media3 picks its own until
+  // Kinema puts the remembered languages on.
+  state.chosen = { audio: 1, sub: 0 };
   window.clearInterval(ticker);
   ticker = window.setInterval(tick, TICK_MS);
+  window.setTimeout(() => {
+    if (state.path !== null) emit('loaded');
+  }, state.loadDelayMs / 2);
   ready(() => {
     if (!started) {
       started = true;
@@ -199,6 +237,25 @@ export function setMuted(args: Record<string, unknown>): null {
   return null;
 }
 
+export function tracks() {
+  return { tracks: state.path === null ? [] : trackList() };
+}
+
+export function selectTrack(args: Record<string, unknown>): null {
+  record('select_track', args);
+  const kind = args.kind as 'audio' | 'sub';
+  const id = Number(args.id);
+  if (!TRACKS.some((t) => t.type === kind && t.id === id)) throw new Error(`there is no ${kind} track ${id}`);
+  state.chosen[kind] = id;
+  return null;
+}
+
+export function showSubtitles(args: Record<string, unknown>): null {
+  record('show_subtitles', args);
+  state.subtitlesShown = Boolean(args.visible);
+  return null;
+}
+
 export function playerState() {
   return {
     path: state.path,
@@ -208,6 +265,7 @@ export function playerState() {
     ended: state.ended,
     video: state.path === null || !started ? null : state.video,
     untouched: state.path !== null && started && state.untouched,
+    subtitlesShown: state.subtitlesShown,
   };
 }
 

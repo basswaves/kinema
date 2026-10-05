@@ -51,6 +51,15 @@ describe('describeTrack', () => {
     );
   });
 
+  it('reads the same from what Media3 says (Android): two-letter languages, its DTS and Atmos', () => {
+    expect(
+      describeTrack(track({ lang: 'en', codec: 'eac3', channels: 6, profile: 'Dolby Digital Plus + Dolby Atmos' }))
+    ).toBe('English · 5.1 · Dolby Digital Plus Atmos');
+    expect(describeTrack(track({ lang: 'nb', codec: 'dts', channels: 6, profile: 'DTS-HD' }))).toBe(
+      'Norwegian · 5.1 · DTS-HD'
+    );
+  });
+
   it('keeps a title that says something new, and drops one that repeats the line', () => {
     expect(
       describeTrack(track({ lang: 'eng', codec: 'ac3', channels: 2, title: 'Commentary with the director' }))

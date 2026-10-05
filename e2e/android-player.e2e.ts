@@ -153,3 +153,51 @@ test('Android: the volume is Media3’s, remembered, and the receiver’s when t
 
   expect(complaints).toEqual([]);
 });
+
+test('Android: the track panel lists Media3’s tracks, chooses by remote, and the choice comes back', async ({
+  page,
+}) => {
+  const complaints = mpvComplaints(page);
+  await playFilm(page);
+
+  await press(page, 'ArrowDown');
+  for (let i = 0; i < 6 && (await focused(page)) !== 'Audio & subtitles'; i++) {
+    await press(page, 'ArrowRight');
+  }
+  await expect.poll(() => focused(page)).toBe('Audio & subtitles');
+  await press(page, 'Enter');
+  const panel = page.locator('.track-panel');
+  await expect(panel).toBeVisible();
+
+  // Media3's tracks, read the same way as mpv's.
+  await expect(panel.locator('.track-option', { hasText: 'English · 5.1 · Dolby Digital Plus Atmos' })).toBeVisible();
+  await expect(panel.locator('.track-option', { hasText: 'Commentary with the director' })).toBeVisible();
+
+  const target = panel.locator('.track-option', { hasText: 'Norwegian' }).first();
+  for (let i = 0; i < 10 && !(await target.evaluate((el) => el.classList.contains('focused'))); i++) {
+    await press(page, 'ArrowDown');
+  }
+  await press(page, 'Enter');
+  await expect(target).toHaveClass(/active/);
+  const chosen = (await media3(page)).commands.filter((c) => c.name === 'select_track').map((c) => c.args);
+  expect(chosen).toContainEqual({ kind: 'sub', id: 2 });
+  expect((await media3(page)).commands.at(-1)).toEqual({ name: 'show_subtitles', args: { visible: true } });
+
+  // Out, and the film again: the remembered choice is put on by itself once
+  // Media3 knows the file's tracks.
+  await press(page, 'Escape');
+  await press(page, 'Escape');
+  await press(page, 'Escape');
+  await expect(page.locator('.player')).toHaveCount(0);
+  await page.evaluate(() => {
+    (window as unknown as { __fakeMedia3: FakeMedia3 }).__fakeMedia3.commands.length = 0;
+  });
+  await expect.poll(() => focused(page)).toContain('Play');
+  await press(page, 'Enter');
+  await expect(page.locator('.player')).toBeAttached();
+  await expect
+    .poll(async () => (await media3(page)).commands.filter((c) => c.name === 'select_track').map((c) => c.args))
+    .toContainEqual({ kind: 'sub', id: 2 });
+
+  expect(complaints).toEqual([]);
+});

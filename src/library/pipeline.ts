@@ -150,6 +150,34 @@ export function parseForLibrary(file: MediaFile, roots: LibraryRoot[]): ParseRes
   return toPayload(file, parseMediaFile(file, kind, root?.path));
 }
 
+/** The longest the parser works before the page gets a turn. */
+const PARSE_SLICE_MS = 25;
+
+/**
+ * Parse a batch the way `parseForLibrary` does, without holding the page.
+ *
+ * guessit takes a few milliseconds a name on a computer and about a tenth of
+ * a second on an old Android box, where a first scan's 158 names in one go
+ * held the page for fifteen seconds: the setup pages were up and the remote
+ * moved nothing (measured 2026-10-05). So the page gets a turn whenever the
+ * parser has worked a moment — a key waits for one name at most.
+ */
+export async function parseBatchForLibrary(
+  files: MediaFile[],
+  roots: LibraryRoot[]
+): Promise<ParseResultPayload[]> {
+  const payloads: ParseResultPayload[] = [];
+  let since = performance.now();
+  for (const file of files) {
+    payloads.push(parseForLibrary(file, roots));
+    if (performance.now() - since >= PARSE_SLICE_MS) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      since = performance.now();
+    }
+  }
+  return payloads;
+}
+
 /**
  * The examining stage: what is inside each new or changed file, for the
  * detail page's badges.
@@ -275,9 +303,7 @@ export async function runScanPipeline(): Promise<ScanOutcome> {
     for (;;) {
       const batch = await listUnparsed(PARSE_BATCH);
       if (batch.length === 0) break;
-      await saveParseResults(
-        batch.map((file) => parseForLibrary(file, roots))
-      );
+      await saveParseResults(await parseBatchForLibrary(batch, roots));
       filesParsed += batch.length;
       setStatus({ stage: 'parsing', detail: count(filesParsed, 'file') });
       if (batch.length < PARSE_BATCH) break;

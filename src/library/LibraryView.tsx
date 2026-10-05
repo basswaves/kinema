@@ -27,7 +27,7 @@ import {
   type ScanReport,
 } from './api';
 import { clearParseError, initParser, lastParseError, selfTest } from './parse';
-import { parseForLibrary } from './pipeline';
+import { parseBatchForLibrary } from './pipeline';
 import {
   artworkStats,
   cacheArtwork,
@@ -258,7 +258,7 @@ export default function LibraryView() {
         const batch = await listUnparsed(PARSE_BATCH);
         if (batch.length === 0) break;
 
-        const payloads = batch.map((file) => parseForLibrary(file, roots));
+        const payloads = await parseBatchForLibrary(batch, roots);
         await saveParseResults(payloads);
 
         total += batch.length;

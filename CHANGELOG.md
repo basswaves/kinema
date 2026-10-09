@@ -21,6 +21,16 @@ makes no stability promises.
   film's exactly; one that wrote `7. 1` where the film wrote `7.1` was
   never offered. Spaces, dots, other marks and capitals no longer count,
   on Windows, Linux and Android alike.
+- **Android: no picture after the sound fell back.** When a film's sound
+  could not go to the receiver as it was — a TV box ran out of room for a
+  DTS-HD track — Kinema opens the film again with sound the device can
+  play. It then also refused a picture the device's decoder lists as
+  beyond it, even one it had just shown, and the film played as sound
+  alone. The picture is now left as it was.
+- **Android: the remembered subtitles came on only sometimes** when the
+  sound fell back while the film was opening: the choice could arrive
+  just as the player was being built again, and was lost. It now waits
+  for the film's tracks.
 - **Android: the frame rate of `.mkv` films.** Media3 gives none for a
   Matroska file, so "Match the screen to the film" could not match the
   refresh rate and the details panel said "not read". Kinema now works it

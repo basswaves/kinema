@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.util.Pair
 import android.view.Display
 import android.view.SurfaceView
 import android.view.View
@@ -35,6 +36,8 @@ import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.ForwardingAudioSink
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
+import androidx.media3.exoplayer.trackselection.ExoTrackSelection
+import androidx.media3.exoplayer.trackselection.MappingTrackSelector.MappedTrackInfo
 import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.exoplayer.util.EventLogger
 import androidx.media3.ui.CaptionStyleCompat
@@ -151,6 +154,12 @@ class SeekArgs {
  * again straight after choosing.
  */
 private const val CHOICE_WAIT_MS = 1500L
+
+/**
+ * How long a choice waits for the film's tracks when the player was just
+ * built again (`fallBack`) and has not read them yet.
+ */
+private const val TRACKS_WAIT_MS = 10_000L
 
 /** How long an added subtitle file is given to be read, once the film is opened again. */
 private const val ADD_WAIT_MS = 10_000L
@@ -373,11 +382,29 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
     }
   }
 
+  /**
+   * Past step 0 (`strict`), a sound track Media3 cannot play here is not
+   * chosen at all; another one that it can play is, if the film has one.
+   * The sound only: a box's decoder may say a film's picture is beyond it
+   * and play it all the same (a 4K HEVC of a higher level than the box
+   * lists, 2026-10-09), so the picture keeps Media3's own leeway — set for
+   * every track, the film opened again as sound alone.
+   */
+  private fun soundOnlySelector(strict: Boolean) = object : DefaultTrackSelector(activity) {
+    override fun selectAudioTrack(
+      info: MappedTrackInfo,
+      support: Array<Array<IntArray>>,
+      mixed: IntArray,
+      params: Parameters,
+    ): Pair<ExoTrackSelection.Definition, Int>? =
+      super.selectAudioTrack(
+        info, support, mixed,
+        if (strict) params.buildUpon().setExceedRendererCapabilitiesIfNecessary(false).build() else params,
+      )
+  }
+
   private fun buildPlayer(s: SurfaceView): ExoPlayer {
-    val selector = DefaultTrackSelector(activity)
-    // Past step 0, a sound track Media3 cannot play here is not chosen at
-    // all; another one that it can play is, if the film has one.
-    if (audioStep > 0) selector.setParameters(selector.buildUponParameters().setExceedRendererCapabilitiesIfNecessary(false))
+    val selector = soundOnlySelector(audioStep > 0)
     val sources = DefaultMediaSourceFactory(activity, FrameTimingExtractors(DefaultExtractorsFactory()) { rateSink() })
     val p = ExoPlayer.Builder(activity, renderers(audioStep))
       .setTrackSelector(selector)
@@ -438,6 +465,11 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
 
       override fun onCues(cueGroup: CueGroup) {
         subtitleView?.setCues(cueGroup.cues)
+        // What reached the subtitle layer, words or pictures (PGS), in a test build's log.
+        if (BuildConfig.DEBUG && cueGroup.cues.isNotEmpty()) {
+          val pictures = cueGroup.cues.count { it.bitmap != null }
+          Log.d("Kinema", "media3: cues at ${player?.currentPosition} ms: ${cueGroup.cues.size} (pictures $pictures)")
+        }
       }
 
       override fun onRenderedFirstFrame() {
@@ -983,19 +1015,31 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
   @Command
   fun selectTrack(invoke: Invoke) {
     val args = invoke.parseArgs(TrackArgs::class.java)
-    main.post {
-      val p = player
-      val t = p?.let { found(it) }?.firstOrNull { it.kind == args.kind && it.id == args.id }
-      when {
-        p == null || t == null -> invoke.reject("there is no ${args.kind} track ${args.id}")
-        args.kind == "audio" && audioStep >= 2 -> invoke.reject("no sound will play on this device")
-        else -> {
-          p.trackSelectionParameters = p.trackSelectionParameters.buildUpon()
-            .setOverrideForType(TrackSelectionOverride(t.group.mediaTrackGroup, t.index))
-            .setTrackTypeDisabled(t.group.type, false)
-            .build()
-          whenChosen(args.kind, args.id, System.currentTimeMillis() + CHOICE_WAIT_MS, invoke)
-        }
+    main.post { choose(args, System.currentTimeMillis() + TRACKS_WAIT_MS, invoke) }
+  }
+
+  /**
+   * The choice, once the player knows the film's tracks. A sound that would
+   * not play builds the player again (`fallBack`), and a choice made from
+   * the tracks the old one read can arrive before the new one has read them
+   * — the same film, so the same tracks: it waits for them rather than
+   * being lost (seen on a box, 2026-10-09: the remembered subtitles did not
+   * come on).
+   */
+  private fun choose(args: TrackArgs, until: Long, invoke: Invoke) {
+    val p = player
+    val t = p?.let { found(it) }?.firstOrNull { it.kind == args.kind && it.id == args.id }
+    when {
+      p != null && t == null && p.currentTracks.isEmpty && System.currentTimeMillis() < until ->
+        main.postDelayed({ choose(args, until, invoke) }, 50)
+      p == null || t == null -> invoke.reject("there is no ${args.kind} track ${args.id}")
+      args.kind == "audio" && audioStep >= 2 -> invoke.reject("no sound will play on this device")
+      else -> {
+        p.trackSelectionParameters = p.trackSelectionParameters.buildUpon()
+          .setOverrideForType(TrackSelectionOverride(t.group.mediaTrackGroup, t.index))
+          .setTrackTypeDisabled(t.group.type, false)
+          .build()
+        whenChosen(args.kind, args.id, System.currentTimeMillis() + CHOICE_WAIT_MS, invoke)
       }
     }
   }

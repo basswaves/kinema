@@ -1905,6 +1905,29 @@ times are rounded to a millisecond, so it takes about 4.5 s of film to tell
 23.976 from 24; the rate is snapped to the standard one it is, and a file
 whose frames are not evenly timed gets none rather than a guess.
 
+### "Never past the device's capabilities" turns off the picture too
+
+After a sound fallback the player was built with
+`setExceedRendererCapabilitiesIfNecessary(false)`, so that a sound track
+the device cannot play is not chosen again. The setting is for every kind
+of track: a box's decoder listed a 4K HEVC film's level as beyond it
+(`NO_EXCEEDS_CAPABILITIES`), though it had just shown that film's first
+frame, and the reopened film played as sound alone over a blank screen.
+**Do:** apply it to the sound only — `DefaultTrackSelector.selectAudioTrack`
+overridden (`Media3Plugin.kt` `soundOnlySelector`) — and leave the
+picture Media3's own leeway.
+
+### A choice can land on the player a fallback is replacing
+
+A sound fallback builds a new player, which reads the film's tracks
+afresh. The page reads the tracks and chooses the remembered subtitles a
+moment after the film opens; when the fallback falls in between, the
+choice reached a player with no tracks yet, was refused, and the
+subtitles never came on. Whether it happens is a matter of milliseconds
+(a subtitle file beside the film was enough to shift it). **Do:** a choice
+that finds no tracks yet waits for them (`selectTrack` → `choose`); the
+film is the same, so its tracks are numbered the same.
+
 ### Subtitle file names are not always the film's, exactly
 
 mpv's `sub-auto=fuzzy` takes a subtitle file whose name contains the

@@ -1002,10 +1002,14 @@ const handlers: Record<string, Handler> = {
   },
   next_episode: (a) => adjacent(num(a, 'fileId'), true),
   previous_episode: (a) => adjacent(num(a, 'fileId'), false),
+  // `kinemaMockSlowNextUp` (ms) answers after the episode list, as a slow
+  // box's database can.
   first_unwatched_episode: (a) => {
     const list = episodesOf(num(a, 'titleId'));
     const first = list.find((f) => !playback.get(f.id)?.completed) ?? list[0];
-    return first ? episodeRef(first) : null;
+    const answer = first ? episodeRef(first) : null;
+    const slow = Number(flag('kinemaMockSlowNextUp') ?? 0) || 0;
+    return slow ? new Promise((resolve) => window.setTimeout(() => resolve(answer), slow)) : answer;
   },
   get_title_prefs: (a) =>
     prefs.get(num(a, 'titleId')) ?? { audio_lang: null, sub_lang: null, sub_enabled: true, chosen: false },

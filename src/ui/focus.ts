@@ -12,7 +12,7 @@
  * top-level view therefore claims focus when it arrives, if nothing live holds
  * it.
  */
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   doesFocusableExist,
   getCurrentFocusKey,
@@ -110,6 +110,34 @@ export function returnFocusTo(focusKey: string | null): void {
 }
 
 /**
+ * Presses, clicks and pointer moves so far — so a view can tell whether the
+ * person has done anything since it arrived.
+ */
+let inputs = 0;
+let inputCounting = false;
+
+function countInputs(): void {
+  if (inputCounting) return;
+  inputCounting = true;
+  const count = () => {
+    inputs++;
+  };
+  for (const type of ['keydown', 'pointerdown', 'pointermove', 'wheel']) {
+    window.addEventListener(type, count, { capture: true, passive: true });
+  }
+}
+
+/** Whether the ring is on `focusKey` or something inside it. */
+function focusWithin(focusKey: string): boolean {
+  const components = (
+    SpatialNavigation as unknown as { focusableComponents?: Record<string, { node?: HTMLElement }> }
+  ).focusableComponents;
+  const node = components?.[focusKey]?.node;
+  const ring = document.querySelector('.focused');
+  return Boolean(node && ring && node.contains(ring));
+}
+
+/**
  * Claim focus for `focusKey` once `ready`, unless something live already holds
  * it — and look again after the library's own delayed restore has had its
  * turn, since that can land on a dead key after this claim succeeded.
@@ -119,17 +147,34 @@ export function returnFocusTo(focusKey: string | null): void {
  * Pointing this at a *container* is usually right — the spatial system then
  * descends to its last focused child, or its `preferredChildFocusKey`, which
  * keeps the choice of landing spot next to the markup that knows about it.
+ *
+ * `page`: this view replaces the whole screen, and takes focus when it is
+ * ready even from a live control, as long as the person has not pressed,
+ * clicked or moved anything since it arrived. A page that waits for its data
+ * otherwise lost its landing: the button that opened it is gone, the spatial
+ * library restores focus by itself 300 ms later to whatever it can find —
+ * the top bar — and "something live holds it" then kept the page off its own
+ * Play (a series on a slow box, 2026-10-09). Not for parts of a page: one
+ * whose data arrives while the person is browsing the list beside it would
+ * pull the ring out of their hands.
  */
-export function useClaimFocus(focusKey: string, ready: boolean): void {
+export function useClaimFocus(focusKey: string, ready: boolean, page = false): void {
+  // The count when the view arrived, before it was ready.
+  const [arrivedAt] = useState(() => {
+    countInputs();
+    return inputs;
+  });
+
   useEffect(() => {
     if (!ready) return;
     landingSpots.push(focusKey);
-    if (focusIsDead() && !pendingReturn) void setFocus(focusKey);
+    const shouldClaim = () =>
+      !pendingReturn &&
+      (focusIsDead() || (page && inputs === arrivedAt && !focusWithin(focusKey)));
+    if (shouldClaim()) void setFocus(focusKey);
 
     const second = window.setTimeout(() => {
-      if (focusIsDead() && !pendingReturn && doesFocusableExist(focusKey)) {
-        void setFocus(focusKey);
-      }
+      if (shouldClaim() && doesFocusableExist(focusKey)) void setFocus(focusKey);
     }, SECOND_LOOK_MS);
 
     return () => {
@@ -137,7 +182,7 @@ export function useClaimFocus(focusKey: string, ready: boolean): void {
       const index = landingSpots.lastIndexOf(focusKey);
       if (index >= 0) landingSpots.splice(index, 1);
     };
-  }, [focusKey, ready]);
+  }, [focusKey, ready, page, arrivedAt]);
 }
 
 /**

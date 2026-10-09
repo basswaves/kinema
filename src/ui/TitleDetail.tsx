@@ -99,6 +99,8 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
   const [trailerPath, setTrailerPath] = useState<string | null>(null);
   /** For a series: the episode the Play button will actually start. */
   const [nextUp, setNextUp] = useState<EpisodeRef | null>(null);
+  /** For a series: whether that has been asked yet — see the landing below. */
+  const [nextUpAsked, setNextUpAsked] = useState(false);
 
   // Land on the primary action. That is Play for a film, and Play for a series
   // too now that it names the episode it will start; only a series with nothing
@@ -116,8 +118,15 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
   });
 
   // Waits for the load: claiming earlier would land on Back, the only control
-  // that exists before the episodes arrive, and then stay there.
-  useClaimFocus(DETAIL_FOCUS_KEY, Boolean(detail));
+  // that exists before the episodes arrive, and then stay there. For a series
+  // it waits for the next episode too: Play only exists once that is known,
+  // and on a slow box it came after the episode list, so the page had already
+  // landed on the first episode (owner, 2026-10-09). A page: see useClaimFocus.
+  useClaimFocus(
+    DETAIL_FOCUS_KEY,
+    Boolean(detail) && (title.kind !== 'series' || nextUpAsked),
+    true
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -149,7 +158,9 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
     let cancelled = false;
     firstUnwatchedEpisode(title.id)
       .then((found) => !cancelled && setNextUp(found))
-      .catch((e) => console.warn('next episode lookup failed', e));
+      .catch((e) => console.warn('next episode lookup failed', e))
+      // Failed or not, the page lands: on the episode list if there is no Play.
+      .finally(() => !cancelled && setNextUpAsked(true));
     return () => {
       cancelled = true;
     };

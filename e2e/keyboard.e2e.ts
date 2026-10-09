@@ -823,6 +823,23 @@ test('Settings: Up and Down stay in the open section, Left goes to the list', as
   expect(await focused(page)).toBe(left);
 });
 
+// Play only appears once the next episode is known, which on a slow box came
+// after the episode list — and the page had already landed on an episode.
+test("a series' page lands on Play even when the next episode is slow to find", async ({
+  page,
+}) => {
+  await page.addInitScript(() => localStorage.setItem('kinemaMockSlowNextUp', '600'));
+  await open(page, 'windows');
+  // The hero is the fixture series; More info opens its page.
+  await press(page, 'ArrowRight');
+  await expect.poll(() => focused(page)).toBe('More info');
+  await press(page, 'Enter');
+  await expect(page.locator('.detail')).toBeVisible();
+  await expect.poll(() => focused(page)).toMatch(/^▶ (Play|Resume) S\d\dE\d\d/);
+  await page.waitForTimeout(800);
+  await expect.poll(() => focused(page)).toMatch(/^▶ (Play|Resume) S\d\dE\d\d/);
+});
+
 // White lettering on a solid plate went one white block; it is cut out now.
 test('a studio logo with lettering on a plate keeps its lettering', async ({ page }) => {
   await open(page, 'windows');

@@ -561,6 +561,28 @@ export async function subtitlesShown(): Promise<boolean> {
 }
 
 /**
+ * Hand mpv the subtitle files beside the open film that its own search
+ * (`sub-auto=fuzzy`) misses — named a little off the film, `7. 1` for `7.1`
+ * (subtitle_files.rs) — not chosen, with the language their names give, so
+ * the remembered languages can choose among them as among the rest. Media3
+ * was handed them all as the film opened. A folder that cannot be read
+ * adds none.
+ */
+export async function addSubtitlesBeside(path: string): Promise<void> {
+  if (isMedia3()) return;
+  const found = await invoke<media3.SubtitleFile[]>('subtitle_files', { path }).catch((e) => {
+    console.warn('subtitle files beside the film not looked for', e);
+    return [];
+  });
+  for (const f of found.filter((f) => !f.exact_name)) {
+    const name = f.path.split(/[\\/]/).pop() ?? f.path;
+    await command('sub-add', [f.path, 'auto', name, f.language ?? '']).catch((e) =>
+      console.warn(`could not add ${name}`, e)
+    );
+  }
+}
+
+/**
  * Add a subtitle file to the open film, choose it and show it. `title` is
  * the name the track panel gives it. Media3 opens the film again with it, at
  * the same moment: a short pause.

@@ -1279,8 +1279,8 @@ const handlers: Record<string, Handler> = {
   'plugin:media3|show_subtitles': (a) => fakeMedia3.showSubtitles(a),
   'plugin:media3|add_subtitle': (a) => fakeMedia3.addSubtitle(a),
   'plugin:media3|facts': () => fakeMedia3.facts(),
-  // A Dutch subtitle file beside every film (subtitle_files.rs), asked for
-  // only where Media3 plays.
+  // A Dutch subtitle file beside every film (subtitle_files.rs), named as
+  // the film is: Media3 is handed it, mpv finds it itself.
   subtitle_files: (a) => {
     const path = String(a.path);
     return [
@@ -1289,6 +1289,7 @@ const handlers: Record<string, Handler> = {
         language: 'nl',
         forced: false,
         hearing_impaired: false,
+        exact_name: true,
       },
     ];
   },

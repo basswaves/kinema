@@ -16,6 +16,11 @@ makes no stability promises.
 
 ### Fixed
 
+- **Subtitle files named a little differently from the film.** A
+  subtitle file beside a film was only offered when its name held the
+  film's exactly; one that wrote `7. 1` where the film wrote `7.1` was
+  never offered. Spaces, dots, other marks and capitals no longer count,
+  on Windows, Linux and Android alike.
 - **Android: the frame rate of `.mkv` films.** Media3 gives none for a
   Matroska file, so "Match the screen to the film" could not match the
   refresh rate and the details panel said "not read". Kinema now works it

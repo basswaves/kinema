@@ -1905,6 +1905,16 @@ times are rounded to a millisecond, so it takes about 4.5 s of film to tell
 23.976 from 24; the rate is snapped to the standard one it is, and a file
 whose frames are not evenly timed gets none rather than a guess.
 
+### Subtitle file names are not always the film's, exactly
+
+mpv's `sub-auto=fuzzy` takes a subtitle file whose name contains the
+film's. A release's own subtitle file said `7. 1` where the film said
+`7.1`, and was never offered — on Android, which took the same rule
+(`subtitle_files.rs`), or on the desktop. **Do:** compare the names with
+spaces, marks and capitals left out, and hand mpv the files its own search
+misses (`addSubtitlesBeside` in engine.ts) — not the others: a file handed
+over that mpv also finds itself is listed twice, and loses its language.
+
 ### Media3 1.11 ignores `setAudioCapabilities`
 
 Building the sink with `DefaultAudioSink.Builder.setAudioCapabilities(

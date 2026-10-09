@@ -34,11 +34,13 @@ export async function listen(handle: (event: PlaybackEvent) => void): Promise<()
 }
 
 /** A subtitle file beside the film, as the core finds them (subtitle_files.rs). */
-interface SubtitleFile {
+export interface SubtitleFile {
   path: string;
   language: string | null;
   forced: boolean;
   hearing_impaired: boolean;
+  /** mpv finds it itself (subtitle_files.rs); Media3 is handed every one. */
+  exact_name: boolean;
 }
 
 /**

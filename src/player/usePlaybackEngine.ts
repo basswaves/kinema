@@ -20,6 +20,7 @@ import {
 import { matchHdrToDisplay } from './displayHdr';
 import { mayswitch, restoreScreen } from './displaySwitch';
 import {
+  addSubtitlesBeside,
   fitWindowForPlayer,
   hasMpv,
   hasReachedEnd,
@@ -259,6 +260,8 @@ export function usePlaybackEngine({
           // them throwing must not leave the file unable to offer a Skip button.
           dispatch({ type: 'opened', path: open, timePos: pos, duration: len, resumedFrom: resumed });
 
+          // Before the remembered languages choose: they choose among these too.
+          if (open) await addSubtitlesBeside(open);
           await latestHandlers.current.applyPrefs();
 
           // Applied per file rather than once at init, so changing it in

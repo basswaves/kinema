@@ -29,6 +29,7 @@ import {
   mpvCommand,
   mpvGet,
   onPlaybackEvent,
+  playerFacts,
   readChapters,
   readTracks,
   seekTo,
@@ -36,6 +37,8 @@ import {
   showSubtitles,
   startEngine,
 } from './player/engine';
+import { capabilitiesNow } from './capabilities';
+import { countCallbacks, expandActions } from './selftestPlan';
 import { setTvMode } from './ui/tv';
 import { simklStatus, traktStatus } from './metadata/tracking';
 import { findSubtitles } from './player/onlineSubtitles';
@@ -76,6 +79,47 @@ import {
  * so a test proves the real argument names reach the real commands, which no
  * mock can. Read the copied library afterwards to check what they did.
  */
+/**
+ * What this webview and process hold right now, for a leak run: sampled
+ * again and again, a number that only climbs is something not let go.
+ * Whatever a platform cannot answer is null, never zero.
+ */
+function tauriCallbacks(): number {
+  const map = (window as { __TAURI_INTERNALS__?: { callbacks?: Map<unknown, unknown> } })
+    .__TAURI_INTERNALS__?.callbacks;
+  return map instanceof Map ? map.size : countCallbacks(Object.getOwnPropertyNames(window));
+}
+
+async function leakSample() {
+  const heap = (performance as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize;
+  return {
+    jsHeapMb: heap === undefined ? null : Math.round(heap / 1048.576) / 1000,
+    domNodes: document.getElementsByTagName('*').length,
+    // Tauri's registered callbacks: one for each listener and channel, kept
+    // until it is unregistered. Tauri 2 keeps them in a map of its own
+    // (`__TAURI_INTERNALS__.callbacks`); older ones put `_123` on window.
+    callbacks: tauriCallbacks(),
+    process: await invoke('process_stats').catch((e) => ({ error: String(e) })),
+    // Media3's own counts (the plugin's `perf`), where it is the engine.
+    media3:
+      capabilitiesNow()?.engine === 'media3'
+        ? await playerFacts().then(
+            (facts) => facts.perf ?? null,
+            () => null
+          )
+        : null,
+  };
+}
+
+/**
+ * Browse's way of opening the plan's file — the same call `openAfter` makes —
+ * for the `play` action. Set while Browse is up; the page owns the screens.
+ */
+let openPlanFile: (() => void) | null = null;
+export function registerSelfTestPlay(open: (() => void) | null) {
+  openPlanFile = open;
+}
+
 const CALLABLE: Record<string, (...args: never[]) => Promise<unknown>> = {
   // A library built from nothing: a folder added as Settings adds it, and a
   // whole scan — so a plan on an empty copy checks the library side end to end:
@@ -132,6 +176,8 @@ const CALLABLE: Record<string, (...args: never[]) => Promise<unknown>> = {
   showSubtitles,
   addSubtitle,
   setVolume,
+  // What the process and the page hold (see above); one sample, on demand.
+  leakSample,
   // Display switching only happens fullscreen, and Browse has no key for it.
   setFullscreen: (on: boolean) => getCurrentWindow().setFullscreen(on),
   // TV mode is read at launch, before a plan's first action; this switches it
@@ -164,7 +210,7 @@ export interface SelfTestAction {
    * mid-run ends what it started. Point the copied library's Skiptro setting
    * at something harmless first: this runs whatever is configured there.
    */
-  do: 'key' | 'seek' | 'mark' | 'detect' | 'call' | 'mpv' | 'probe';
+  do: 'key' | 'seek' | 'mark' | 'detect' | 'call' | 'mpv' | 'probe' | 'repeat' | 'play' | 'leak';
   key?: string;
   to?: number;
   root?: string;
@@ -180,6 +226,24 @@ export interface SelfTestAction {
    */
   args?: unknown[];
   note?: string;
+  /**
+   * `play` opens the plan's file on the real player screen, as `openAfter`
+   * does — use it after Back (`key` Escape) has left the player. `leak`
+   * records one sample of what the process holds (`leakSample`), as a
+   * `leak` entry in the timeline, labelled with `note`.
+   *
+   * `repeat` runs `actions` `times` times, a round starting every `every`
+   * seconds; inside, `at` counts from the round's start. For example, open,
+   * watch, leave and sample, ten times:
+   * `{"at":20,"do":"repeat","times":10,"every":30,"actions":[
+   *    {"at":0,"do":"play"},{"at":15,"do":"key","key":"Escape"},
+   *    {"at":20,"do":"leak"}]}`
+   */
+  times?: number;
+  every?: number;
+  actions?: SelfTestAction[];
+  /** Set by the runner on an action that came from a `repeat`: its round, from 0. */
+  round?: number;
 }
 
 export interface SelfTestPlan {
@@ -204,6 +268,8 @@ export interface SelfTestPlan {
    * that is already up.
    */
   openAfter?: number;
+  /** Take a leak sample every this many seconds, from the start to the end. */
+  leakEvery?: number;
   actions?: SelfTestAction[];
   /**
    * mpv options set once mpv is up, before the file's first frame is likely
@@ -356,49 +422,73 @@ export async function runSelfTest(plan: SelfTestPlan): Promise<void> {
     }
   }, 100);
 
-  const timers = (plan.actions ?? []).map((action) =>
-    window.setTimeout(() => {
-      note(`action:${action.do}`, action);
-      if (action.do === 'key' && action.key) {
-        window.dispatchEvent(new KeyboardEvent('keydown', { key: action.key, bubbles: true }));
-      } else if (action.do === 'seek' && action.to !== undefined) {
-        void seekTo(action.to).catch((e) => note('seek-failed', String(e)));
-      } else if (action.do === 'call' && action.fn) {
-        const target = CALLABLE[action.fn];
-        if (!target) note('call:unknown', action.fn);
-        else
-          (target as (...args: unknown[]) => Promise<unknown>)(...(action.args ?? [])).then(
-            (result) => note('call:done', { fn: action.fn, result }),
-            (e) => note('call:failed', { fn: action.fn, error: String(e) })
+  const timers: number[] = [];
+  const sampleLeak = (label?: string, round?: number) =>
+    leakSample().then(
+      (sample) => note('leak', { ...sample, label, round }),
+      (e) => note('leak-failed', String(e))
+    );
+  if (plan.leakEvery) {
+    void sampleLeak('start');
+    timers.push(window.setInterval(() => void sampleLeak(), plan.leakEvery * 1000));
+  }
+
+  const actions = expandActions(plan.actions ?? []);
+  for (const action of actions) {
+    timers.push(
+      window.setTimeout(() => {
+        note(`action:${action.do}`, action);
+        if (action.do === 'play') {
+          if (openPlanFile) openPlanFile();
+          else note('play:unavailable');
+        } else if (action.do === 'leak') {
+          void sampleLeak(action.note, action.round);
+        } else if (action.do === 'key' && action.key) {
+          window.dispatchEvent(new KeyboardEvent('keydown', { key: action.key, bubbles: true }));
+        } else if (action.do === 'seek' && action.to !== undefined) {
+          void seekTo(action.to).catch((e) => note('seek-failed', String(e)));
+        } else if (action.do === 'call' && action.fn) {
+          const target = CALLABLE[action.fn];
+          if (!target) note('call:unknown', action.fn);
+          else
+            (target as (...args: unknown[]) => Promise<unknown>)(...(action.args ?? [])).then(
+              (result) => note('call:done', { fn: action.fn, result }),
+              (e) => note('call:failed', { fn: action.fn, error: String(e) })
+            );
+        } else if (action.do === 'mpv' && action.args?.length) {
+          const [name, ...rest] = action.args.map(String);
+          void mpvCommand(name, rest).then(
+            () => note('mpv:done', action.args),
+            (e) => note('mpv:failed', { args: action.args, error: String(e) })
           );
-      } else if (action.do === 'mpv' && action.args?.length) {
-        const [name, ...rest] = action.args.map(String);
-        void mpvCommand(name, rest).then(
-          () => note('mpv:done', action.args),
-          (e) => note('mpv:failed', { args: action.args, error: String(e) })
-        );
-      } else if (action.do === 'probe' && action.args?.length) {
-        void Promise.all(
-          action.args.map(String).map((name) =>
-            mpvGet(name, 'string').then(
-              (value) => [name, value] as const,
-              () => [name, null] as const
+        } else if (action.do === 'probe' && action.args?.length) {
+          void Promise.all(
+            action.args.map(String).map((name) =>
+              mpvGet(name, 'string').then(
+                (value) => [name, value] as const,
+                () => [name, null] as const
+              )
             )
-          )
-        ).then((pairs) => note('probed', Object.fromEntries(pairs)));
-      } else if (action.do === 'detect' && action.root) {
-        invoke('detect_intros', { rootPath: action.root }).then(
-          (report) => note('detect:done', report),
-          (e) => note('detect:refused', String(e))
-        );
-      }
-    }, action.at * 1000)
-  );
+          ).then((pairs) => note('probed', Object.fromEntries(pairs)));
+        } else if (action.do === 'detect' && action.root) {
+          invoke('detect_intros', { rootPath: action.root }).then(
+            (report) => note('detect:done', report),
+            (e) => note('detect:refused', String(e))
+          );
+        }
+      }, action.at * 1000)
+    );
+  }
 
   await new Promise((resolve) => window.setTimeout(resolve, plan.seconds * 1000));
 
   window.clearInterval(sampler);
-  timers.forEach((id) => window.clearTimeout(id));
+  // Timeouts and the leak interval share one id space; clearing both ways is harmless.
+  timers.forEach((id) => {
+    window.clearTimeout(id);
+    window.clearInterval(id);
+  });
+  if (plan.leakEvery) await sampleLeak('end');
   unlisten();
   offEngine();
 

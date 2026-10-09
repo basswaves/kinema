@@ -117,6 +117,11 @@ fn state() -> std::sync::MutexGuard<'static, State> {
     m.lock().unwrap_or_else(|e| e.into_inner())
 }
 
+/// How many servers are held signed in, for the self-test's leak counts.
+pub fn server_count() -> usize {
+    state().servers.len()
+}
+
 /// The name and password a server (`nas`, or `nas:4450` off SMB's own port)
 /// is signed in with. A changed sign-in closes the server's connection, so
 /// the next use signs in afresh.

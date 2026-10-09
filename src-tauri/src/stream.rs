@@ -17,6 +17,7 @@ use std::collections::HashMap;
 use std::hash::{BuildHasher, Hasher};
 use std::io::{self, BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc;
 use std::sync::{Mutex, OnceLock};
 
@@ -38,8 +39,42 @@ fn random() -> u64 {
     std::collections::hash_map::RandomState::new().build_hasher().finish()
 }
 
+static SERVER: OnceLock<Server> = OnceLock::new();
+
+/// Requests being answered, and the reader threads behind them. Each counts
+/// itself in and, by `Gauge`'s drop, out again however it ends — so a count
+/// that stays up after the player has closed is a leak (procstats.rs).
+static CONNECTIONS: AtomicUsize = AtomicUsize::new(0);
+static READERS: AtomicUsize = AtomicUsize::new(0);
+
+struct Gauge(&'static AtomicUsize);
+
+impl Gauge {
+    fn up(counter: &'static AtomicUsize) -> Gauge {
+        counter.fetch_add(1, Ordering::Relaxed);
+        Gauge(counter)
+    }
+}
+
+impl Drop for Gauge {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::Relaxed);
+    }
+}
+
+/// What the link holds right now, without starting it if it is not running.
+pub fn counts() -> crate::procstats::Counts {
+    crate::procstats::Counts {
+        stream_connections: CONNECTIONS.load(Ordering::Relaxed),
+        stream_readers: READERS.load(Ordering::Relaxed),
+        stream_films: SERVER
+            .get()
+            .map_or(0, |s| s.films.lock().unwrap_or_else(|e| e.into_inner()).len()),
+        netshare_servers: 0,
+    }
+}
+
 fn server() -> io::Result<&'static Server> {
-    static SERVER: OnceLock<Server> = OnceLock::new();
     if let Some(s) = SERVER.get() {
         return Ok(s);
     }
@@ -118,6 +153,7 @@ fn content_type(path: &str) -> &'static str {
 }
 
 fn answer(conn: TcpStream) -> io::Result<()> {
+    let _counted = Gauge::up(&CONNECTIONS);
     let mut reader = BufReader::new(conn.try_clone()?);
     let mut out = conn;
     let mut request = String::new();
@@ -193,7 +229,9 @@ fn answer(conn: TcpStream) -> io::Result<()> {
     // listening (a seek, the film closed) ends the sending, and with it
     // the reading: the reader's next hand-over finds no one there.
     let (tx, rx) = mpsc::sync_channel::<io::Result<Vec<u8>>>(AHEAD);
+    let counted = Gauge::up(&READERS);
     std::thread::spawn(move || {
+        let _counted = counted;
         let mut file = file;
         let mut pos = start;
         while pos <= end {

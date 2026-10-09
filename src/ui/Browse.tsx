@@ -55,7 +55,7 @@ import OnScreenKeyboard from './OnScreenKeyboard';
 import { useTypingFocus } from './typing';
 import { isTvMode, useTvMode } from './tv';
 import LeaveDialog from './LeaveDialog';
-import { runSelfTest, selfTestPlan } from '../selftest';
+import { registerSelfTestPlay, runSelfTest, selfTestPlan } from '../selftest';
 import { startEngine } from '../player/engine';
 import './ui.css';
 
@@ -429,10 +429,13 @@ export default function Browse() {
         );
       if (plan.openAfter) window.setTimeout(play, plan.openAfter * 1000);
       else play();
+      // The same opening again for a plan's `play` action (leak runs).
+      registerSelfTestPlay(play);
       void runSelfTest(plan).catch((e) => console.error('selftest failed', e));
     });
     return () => {
       cancelled = true;
+      registerSelfTestPlay(null);
     };
   }, [openView]);
 

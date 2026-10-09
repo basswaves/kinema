@@ -20,6 +20,14 @@
 #                                             paths a plan names); report.json, app.log and
 #                                             photos at SHOTS seconds (default 6,14) come back
 #                                             into DIR
+#   scripts/android-bench.sh leak DIR [EVERY]   `selftest DIR`, and every EVERY seconds
+#                                             (default 20) while it runs, a row in
+#                                             DIR/meminfo.csv: the app's memory from `dumpsys
+#                                             meminfo` (Java and native heap, graphics, total
+#                                             PSS, views, WebViews) and, for the app and for
+#                                             the WebView's renderer, resident memory, threads
+#                                             and open files. A plan's `leak` samples (src/
+#                                             selftest.ts) and this file graph the same run
 #   scripts/android-bench.sh info             Android version, screen, WebView
 #   scripts/android-bench.sh key UP DOWN OK BACK HOME ...   the remote's buttons
 #   scripts/android-bench.sh text 'words'     typing, as a keyboard would
@@ -119,6 +127,41 @@ hw.camera.back=none
 hw.camera.front=none
 CONFIG
   echo "made $name ($image)"
+}
+
+# `dumpsys meminfo` for one app as a row of numbers: Java heap, native heap,
+# graphics, total PSS (all KB), Views, WebViews. Android 9 and 16 word the
+# total differently ("TOTAL:", "TOTAL PSS:"); a number that is not there is
+# left empty.
+meminfo_row() {
+  adb_dev shell dumpsys meminfo "$1" | tr -d '\r' | awk '
+    /^ *Java Heap:/ { j = $3 }
+    /^ *Native Heap:/ { n = $3 }
+    /^ *Graphics:/ { g = $2 }
+    /^ *TOTAL:/ { t = $2 }
+    /^ *TOTAL PSS:/ { t = $3 }
+    /^ *Views:/ { v = $2 }
+    /^ *WebViews:/ { w = $2 }
+    END { printf "%s,%s,%s,%s,%s,%s", j, n, g, t, v, w }'
+}
+
+# The process ids of the app and of its WebView's renderer (sandboxed_process…),
+# or empty when there is none.
+pid_of_app() { adb_dev shell ps -A | tr -d '\r' | awk -v p="$1" '$NF == p { print $2; exit }'; }
+pid_of_renderer() { adb_dev shell ps -A | tr -d '\r' | awk '$NF ~ /sandboxed_process/ { print $2; exit }'; }
+
+# Resident memory (KB), threads and open files of one process, as a row. The
+# app's own files need run-as, and the renderer's cannot be read at all: those
+# are left empty.
+proc_row() {
+  local pkg="$1" pid="$2" status files
+  [ -n "$pid" ] || { echo ",,"; return; }
+  status="$(adb_dev shell "cat /proc/$pid/status 2>/dev/null" | tr -d '\r')"
+  files="$( { adb_dev shell "ls /proc/$pid/fd 2>/dev/null"; adb_dev shell "run-as $pkg ls /proc/$pid/fd 2>/dev/null"; } | tr -d '\r' | grep -c . || true)"
+  printf '%s' "$status" | awk -v f="$files" '
+    /^VmRSS:/ { r = $2 }
+    /^Threads:/ { t = $2 }
+    END { printf "%s,%s,%s", r, t, (f > 0 ? f : "") }'
 }
 
 cmd="${1:-}"; shift || true
@@ -228,6 +271,29 @@ case "$cmd" in
     # So the next start is an ordinary one; the copied library stays for reading.
     adb_dev shell run-as "$pkg" rm -f selftest/plan.json
     echo "$dir/report.json"
+    ;;
+
+  leak)
+    dir="$(realpath "${1:?leak DIR [EVERY]}")"; every="${2:-20}"
+    pkg=com.kinema.app
+    csv="$dir/meminfo.csv"
+    echo "time_s,java_heap_kb,native_heap_kb,graphics_kb,total_pss_kb,views,webviews,app_pid,app_rss_kb,app_threads,app_fds,renderer_pid,renderer_rss_kb,renderer_threads,renderer_fds" > "$csv"
+    started=$(date +%s)
+    # The self-test runs in the background; this watches it from the side.
+    "$0" selftest "$dir" &
+    bench=$!
+    next=0
+    while kill -0 "$bench" 2>/dev/null; do
+      elapsed=$(( $(date +%s) - started ))
+      if [ "$elapsed" -ge "$next" ]; then
+        app="$(pid_of_app "$pkg")"; renderer="$(pid_of_renderer)"
+        echo "$elapsed,$(meminfo_row "$pkg"),$app,$(proc_row "$pkg" "$app"),$renderer,$(proc_row "$pkg" "$renderer")" >> "$csv"
+        next=$(( elapsed + every ))
+      fi
+      sleep 1
+    done
+    wait "$bench" || echo "android-bench: the self-test ended with an error" >&2
+    echo "$csv"
     ;;
 
   info)

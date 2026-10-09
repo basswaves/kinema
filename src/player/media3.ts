@@ -145,6 +145,11 @@ export interface Facts {
   };
   bufferedSeconds?: number;
   /**
+   * What the plugin itself holds (threads, listeners, players, memory), for
+   * the self-test's leak runs; its names are the plugin's own.
+   */
+  perf?: Record<string, number | string | boolean | null>;
+  /**
    * The screen's mode now, and the HDR kinds Android says it takes
    * ("HDR10", "HLG", "Dolby Vision", "HDR10+") — Android's word, not the TV's.
    */

@@ -38,6 +38,7 @@ mod places;
 mod playback;
 mod power;
 mod probe;
+mod procstats;
 mod scanner;
 mod selftest;
 mod settings;
@@ -311,6 +312,7 @@ pub fn run() {
             share_logins::forget_share_login,
             share_logins::share_logins,
             stream::stream_address,
+            procstats::process_stats,
             subtitle_files::subtitle_files,
             overlay::overlay_frame,
             overlay::overlay_reset,

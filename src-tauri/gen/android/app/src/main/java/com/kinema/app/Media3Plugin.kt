@@ -253,6 +253,8 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
   private var videoDecoder: String? = null
   private var audioDecoder: String? = null
   private val main = Handler(Looper.getMainLooper())
+  /** What playing this film costs, measured and logged (PerfMeter.kt); it changes nothing. */
+  private val perf = PerfMeter()
 
   /**
    * Kinema left the screen (Home, the box asleep, another app in front)
@@ -305,6 +307,7 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
     override fun run() {
       val p = player ?: return
       emit("position") { put("value", p.currentPosition / 1000.0) }
+      perf.tick()
       main.postDelayed(this, 250)
     }
   }
@@ -430,6 +433,7 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
         audioDecoder = decoderName
       }
     })
+    perf.attach(p)
     p.setVideoSurfaceView(s)
     applyVolume(p)
     // Kinema matches the screen itself (setMode); Media3's own matching
@@ -817,6 +821,7 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
         val start = args.start
         if (start != null) p.setMediaItem(media, (start * 1000).toLong())
         else p.setMediaItem(media)
+        perf.open()
         p.prepare()
         p.playWhenReady = wantPlaying
         main.removeCallbacks(ticker)
@@ -836,6 +841,7 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
       path = null
       player?.release()
       player = null
+      perf.detach()
       audioStep = 0
       suspended = false
       video = null
@@ -1213,6 +1219,8 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
           })
         }
         out.put("bufferedSeconds", p.totalBufferedDuration / 1000.0)
+        // What playing has cost so far (PerfMeter.kt), for a self-test to read.
+        out.put("perf", perf.facts(p))
       }
       // With the HDR kinds Android says it takes: a box that says none turns
       // an HDR film into ordinary colour, whatever the TV could show.

@@ -69,6 +69,11 @@ describe('media3Groups', () => {
     const untagged: PlayerFacts = { ...film, video: { ...film.video!, transfer: null, fps: null } };
     expect(row(untagged, 'Source', 'Dynamic range')?.value).toBe('SDR, not tagged in the file');
     expect(row(untagged, 'Source', 'Frame rate')).toMatchObject({ value: '—', note: 'not read from this file' });
+    const timed: PlayerFacts = { ...film, video: { ...film.video!, fpsMeasured: true } };
+    expect(row(timed, 'Source', 'Frame rate')).toMatchObject({
+      value: '23.976 fps',
+      note: "worked out from the frames' times",
+    });
     expect(row({ ...film, audio: { ...film.audio!, way: 'decoded', decoder: 'c2.android.aac.decoder' } }, 'Sound', 'Path'))
       .toMatchObject({ value: 'decoded on this device', note: 'c2.android.aac.decoder' });
   });

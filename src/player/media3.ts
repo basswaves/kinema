@@ -118,6 +118,11 @@ export interface Facts {
     width: number;
     height: number;
     fps: number | null;
+    /**
+     * The frame rate was worked out from the frames' times (FrameTiming.kt),
+     * the file stating none Media3 reports — Matroska's, as a rule.
+     */
+    fpsMeasured?: boolean;
     bitrate: number | null;
     transfer: 'pq' | 'hlg' | 'sdr' | null;
     dolbyVision: boolean;

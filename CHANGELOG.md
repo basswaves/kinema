@@ -16,6 +16,12 @@ makes no stability promises.
 
 ### Fixed
 
+- **Android: the frame rate of `.mkv` films.** Media3 gives none for a
+  Matroska file, so "Match the screen to the film" could not match the
+  refresh rate and the details panel said "not read". Kinema now works it
+  out from the frames' times while the film opens (23.976, 25 and 59.94
+  checked), says so in the panel, and gives none for a film whose frames
+  are not evenly timed rather than guess.
 - **Android: the details panel says what Android says of HDR.** It said
   the TV was switched to HDR whenever the film was HDR. A TV box can tell
   Android its screen takes no HDR — one that restarted while the TV was off

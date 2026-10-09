@@ -33,7 +33,9 @@ import androidx.media3.common.MimeTypes
 import androidx.media3.exoplayer.audio.AudioCapabilities
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.ForwardingAudioSink
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
+import androidx.media3.extractor.DefaultExtractorsFactory
 import androidx.media3.exoplayer.util.EventLogger
 import androidx.media3.ui.CaptionStyleCompat
 import androidx.media3.ui.SubtitleView
@@ -159,6 +161,13 @@ private const val EXTERNAL = "kinema-file:"
 /** How long a taken video decoder is given before Kinema asks again. */
 private const val RETRY_MS = 1500L
 
+/**
+ * How long the frames' times are waited for (FrameTiming.kt) where the file
+ * states no frame rate, before the film is said to have none: the screen
+ * switch waits for it, and a slow share must not hold the film for long.
+ */
+private const val TIMING_WAIT_MS = 8000L
+
 /** Where the last film's sound is remembered (`lastSound`), across restarts. */
 private const val PREFS = "media3"
 private const val LAST_SOUND = "last_sound"
@@ -196,8 +205,16 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
    * at all. Each refusal moves one step on.
    */
   private var audioStep = 0
-  /** The film's picture, once Media3 has chosen its video track. */
+  /** The film's picture, once Media3 has chosen its video track and its frame rate is known or given up on. */
   private var video: JSObject? = null
+  /** The chosen video track's format, for `video`. */
+  private var videoFormat: Format? = null
+  /** Which file a frame rate worked out from the frames' times belongs to (`rateSink`). */
+  @Volatile private var timingFile = 0
+  /** The frame rate worked out from the frames' times, where the file states none Media3 reports. */
+  private var timedFps: Double? = null
+  /** The frames' times have answered for this file, or were waited for long enough. */
+  private var timingDone = false
   /** The sound that would not play, to be named once the next way is known. */
   private var failedSound: String? = null
   /**
@@ -361,7 +378,11 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
     // Past step 0, a sound track Media3 cannot play here is not chosen at
     // all; another one that it can play is, if the film has one.
     if (audioStep > 0) selector.setParameters(selector.buildUponParameters().setExceedRendererCapabilitiesIfNecessary(false))
-    val p = ExoPlayer.Builder(activity, renderers(audioStep)).setTrackSelector(selector).build()
+    val sources = DefaultMediaSourceFactory(activity, FrameTimingExtractors(DefaultExtractorsFactory()) { rateSink() })
+    val p = ExoPlayer.Builder(activity, renderers(audioStep))
+      .setTrackSelector(selector)
+      .setMediaSourceFactory(sources)
+      .build()
     // Media3's own account of what it chose and did (decoder, sound path,
     // dropped frames, stalls), in the system log of a test build only.
     if (BuildConfig.DEBUG) p.addAnalyticsListener(EventLogger("KinemaEvents"))
@@ -465,12 +486,52 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
     val group = tracks.groups.firstOrNull { it.type == C.TRACK_TYPE_VIDEO && it.isSelected } ?: return
     val index = (0 until group.length).firstOrNull { group.isTrackSelected(it) } ?: return
     val f = group.getTrackFormat(index)
+    val first = videoFormat == null
+    videoFormat = f
+    if (first && f.frameRate <= 0 && !timingDone) main.postDelayed(timingTimeout, TIMING_WAIT_MS)
+    publishVideo()
+  }
+
+  /**
+   * `video` for the page, which matches the screen to it: held back while
+   * the frame rate is still being worked out, so the match has it.
+   */
+  private fun publishVideo() {
+    val f = videoFormat ?: return
+    val fps = frameRate(f)
+    if (fps == null && !timingDone) return
     val transfer = f.colorInfo?.colorTransfer
     video = JSObject().apply {
       put("width", f.width)
       put("height", f.height)
-      put("fps", if (f.frameRate > 0) f.frameRate.toDouble() else JSONObject.NULL)
+      put("fps", fps ?: JSONObject.NULL)
       put("hdr", transfer == C.COLOR_TRANSFER_ST2084 || transfer == C.COLOR_TRANSFER_HLG)
+    }
+  }
+
+  /** The file's own frame rate as Media3 reports it, else the one its frames' times keep. */
+  private fun frameRate(f: Format): Double? = if (f.frameRate > 0) f.frameRate.toDouble() else timedFps
+
+  /** Where this file's frame rate goes when its frames' times have given one (FrameTiming.kt). */
+  private fun rateSink(): (Double?) -> Unit {
+    val file = timingFile
+    return { fps -> main.post { if (file == timingFile) rateKnown(fps) } }
+  }
+
+  private fun rateKnown(fps: Double?) {
+    // A file opened again (a subtitle added) is timed again; a second answer
+    // of nothing does not undo the first.
+    if (fps != null) timedFps = fps
+    timingDone = true
+    main.removeCallbacks(timingTimeout)
+    publishVideo()
+  }
+
+  private val timingTimeout = Runnable {
+    if (!timingDone) {
+      Log.i("Kinema", "media3: no frame rate from the frames' times within $TIMING_WAIT_MS ms")
+      timingDone = true
+      publishVideo()
     }
   }
 
@@ -698,6 +759,11 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
         started = false
         seeking = false
         video = null
+        videoFormat = null
+        timingFile++
+        timedFps = null
+        timingDone = false
+        main.removeCallbacks(timingTimeout)
         failedSound = null
         untouched = false
         loadedSaid = false
@@ -741,6 +807,9 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
       audioStep = 0
       suspended = false
       video = null
+      videoFormat = null
+      timingFile++
+      main.removeCallbacks(timingTimeout)
       surface?.let { (it.parent as? ViewGroup)?.removeView(it) }
       surface = null
       subtitleView?.let { (it.parent as? ViewGroup)?.removeView(it) }
@@ -1072,7 +1141,9 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
             put("codecs", f.codecs ?: JSONObject.NULL)
             put("width", f.width)
             put("height", f.height)
-            put("fps", if (f.frameRate > 0) f.frameRate.toDouble() else JSONObject.NULL)
+            put("fps", frameRate(f) ?: JSONObject.NULL)
+            // Worked out from the frames' times rather than stated by the file.
+            put("fpsMeasured", f.frameRate <= 0 && timedFps != null)
             put("bitrate", (if (f.bitrate > 0) f.bitrate else f.averageBitrate).takeIf { it > 0 } ?: JSONObject.NULL)
             put("transfer", transferName(f))
             put("dolbyVision", f.sampleMimeType == MimeTypes.VIDEO_DOLBY_VISION)

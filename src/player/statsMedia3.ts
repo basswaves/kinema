@@ -90,8 +90,14 @@ export function media3Groups(facts: PlayerFacts): StatGroup[] {
         {
           label: 'Frame rate',
           value: num(video.fps, 3, ' fps'),
-          // Media3's Matroska reader often has none to give.
-          note: video.fps === null ? 'not read from this file' : undefined,
+          // Media3's Matroska reader has none to give; Kinema then works it
+          // out from the frames' times, and says so.
+          note:
+            video.fps === null
+              ? 'not read from this file'
+              : video.fpsMeasured
+                ? "worked out from the frames' times"
+                : undefined,
         },
         { label: 'Video bitrate', value: bitrate(video.bitrate) },
         { label: 'Dynamic range', value: hdrName(video), ...hdrOnScreen(video, screen.hdr) },

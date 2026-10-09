@@ -1892,6 +1892,19 @@ as E-AC-3: the receiver still showed Atmos, because the stream went through
 untouched. **Do:** never claim Atmos from Media3's format on an `.mkv`; name
 what it reports ("Dolby Digital Plus 5.1").
 
+### Media3 gives no frame rate for a Matroska file
+
+`Format.frameRate` is unset for every `.mkv` tried, though Media3's
+Matroska reader reads the file's frame duration (`DefaultDuration`) — it
+never turns it into a rate. Matching the screen's refresh rate to the film
+then had nothing to match. Waiting for frames to be shown does not help
+either: the film is held paused while the screen switches. **Do:** work it
+out from the video samples' times as Media3 reads the file ahead, which it
+does while paused (`FrameTiming.kt`, wrapping the extractors). Matroska's
+times are rounded to a millisecond, so it takes about 4.5 s of film to tell
+23.976 from 24; the rate is snapped to the standard one it is, and a file
+whose frames are not evenly timed gets none rather than a guess.
+
 ### Media3 1.11 ignores `setAudioCapabilities`
 
 Building the sink with `DefaultAudioSink.Builder.setAudioCapabilities(

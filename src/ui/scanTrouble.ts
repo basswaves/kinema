@@ -30,12 +30,18 @@ export interface ScanTrouble {
   note: string | null;
 }
 
-export function scanTrouble(errors: string[]): ScanTrouble | null {
-  if (errors.length === 0) return null;
+/**
+ * `waiting` is whether anything is still left to match. The line about
+ * Wikipedia is only true while something is: matched later — by hand, or
+ * with a TMDB key added since — it went on saying films were waiting, on
+ * Home, until the next start (owner, 2026-10-09).
+ */
+export function scanTrouble(errors: string[], waiting = true): ScanTrouble | null {
   const folders = errors.flatMap((e) => UNREACHABLE.exec(e)?.[1] ?? []);
-  const busy = errors.some((e) => BUSY.test(e)) ? [BUSY_LINE] : [];
+  const busy = waiting && errors.some((e) => BUSY.test(e)) ? [BUSY_LINE] : [];
   const others = errors.filter((e) => !UNREACHABLE.test(e) && !BUSY.test(e));
   const lines = [...folders.map((path) => `Could not reach ${path}`), ...busy, ...others];
+  if (lines.length === 0) return null;
   const text = lines.length === 1 ? lines[0] : `${lines[0]} · and ${lines.length - 1} more`;
   // The scanner leaves a missing folder's files as they were, so they stay on
   // the shelves; what does not work is playing them (scanner.rs,

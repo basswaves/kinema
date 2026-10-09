@@ -838,8 +838,11 @@ const mpvOnly =
   };
 /** Who listened for the system's Back button (`plugin:app|register_listener`). */
 const backListeners: string[] = [];
-/** `kinemaMockReview` pretends that many videos wait in the review queue. */
-const REVIEW_COUNT = Number(flag('kinemaMockReview') ?? 0) || 0;
+/**
+ * `kinemaMockReview` pretends that many videos wait in the review queue.
+ * Read at each count, so a test can match them "by hand" part-way through.
+ */
+const reviewCount = (): number => Number(flag('kinemaMockReview') ?? 0) || 0;
 /** `kinemaMockScanErrors`: the scan's problems, as the scanner words them. */
 const SCAN_ERRORS: string[] = (() => {
   try {
@@ -957,7 +960,7 @@ const handlers: Record<string, Handler> = {
       .map((f) => ({ file_id: f.id, ...mockFileFacts(f.id) })),
   list_unmatched: () => [],
   list_needs_review: () => [],
-  count_needs_review: () => REVIEW_COUNT,
+  count_needs_review: () => reviewCount(),
   latest_release: () =>
     UPDATE ? { version: UPDATE, url: 'https://github.com/Basswaves/kinema/releases' } : null,
   list_titles_needing_detail: () => [],

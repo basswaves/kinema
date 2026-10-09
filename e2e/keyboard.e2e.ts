@@ -178,6 +178,39 @@ for (const [label, errors, notice] of [
   });
 }
 
+// Matched by hand afterwards (or with a TMDB key added since), nothing waits
+// any more, and Home stops saying that films do (owner, 2026-10-09).
+test("the startup scan's notice: Wikipedia's line goes once nothing waits", async ({ page }) => {
+  const busy = 'A film: Wikimedia is busy: Wikidata query: HTTP 503';
+  await page.addInitScript((e) => {
+    localStorage.setItem('kinemaMockScanErrors', e);
+    if (!sessionStorage.getItem('reviewSet')) {
+      localStorage.setItem('kinemaMockReview', '2');
+      sessionStorage.setItem('reviewSet', '1');
+    }
+  }, JSON.stringify([busy]));
+  await open(page, 'windows');
+  const notice = page.locator('.browse-notice');
+  await expect(notice).toHaveText(
+    'Wikipedia was busy, so some films wait to be matched until the next scan'
+  );
+
+  // Both matched in Settings; back on Home, the line is gone.
+  await page.evaluate(() => localStorage.setItem('kinemaMockReview', '0'));
+  // One Up: an empty Continue Watching once caught it, with this line
+  // pushing Home down, and the ring vanished.
+  await press(page, 'ArrowUp');
+  await expect.poll(() => focused(page)).toBe('Home');
+  await press(page, 'ArrowRight', 4);
+  // With its badge: still 2 to review when Home was read.
+  await expect.poll(() => focused(page)).toBe('Settings2');
+  await press(page, 'Enter');
+  await expect(page.locator('.settings-section').first()).toBeVisible();
+  await press(page, 'Escape');
+  await expect.poll(() => focused(page)).toContain('Play');
+  await expect(notice).toHaveCount(0);
+});
+
 for (const [label, system, noPower, choices] of [
   ['windows', 'windows', false, ['Close Kinema', 'Put the PC to sleep', 'Shut down the PC', 'Cancel']],
   ['linux', 'linux', false, ['Close Kinema', 'Put the PC to sleep', 'Shut down the PC', 'Cancel']],

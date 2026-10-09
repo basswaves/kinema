@@ -172,10 +172,13 @@ export default function Browse() {
   const [leaving, setLeaving] = useState(false);
   const [query, setQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
-  /** What went wrong in the startup scan. Not an error — see below. */
-  const [scanTrouble, setScanTrouble] = useState<ScanTrouble | null>(null);
+  /** The startup scan could not run at all. Not an error — see below. */
+  const [scanFailed, setScanFailed] = useState<ScanTrouble | null>(null);
+  /** The startup scan's problems, put into words as they stand (scanTrouble.ts). */
+  const [scanErrors, setScanErrors] = useState<string[]>([]);
   /** Videos Kinema would not guess at, for the notice on Home. */
   const [reviewCount, setReviewCount] = useState(0);
+  const scanTrouble = scanFailed ?? describeScanTrouble(scanErrors, reviewCount > 0);
   /** What the equipment could do that is switched off — see qualityNotice.ts. */
   const [upgrades, setUpgrades] = useState<Upgrade[]>([]);
   const [keyRejected, setKeyRejected] = useState(false);
@@ -281,7 +284,7 @@ export default function Browse() {
     void runScanPipeline()
       .then((outcome) => {
         if (outcome.status === 'failed') {
-          setScanTrouble({
+          setScanFailed({
             text: `Could not read your library folders: ${describeError(outcome.error)}`,
             note: null,
           });
@@ -365,7 +368,7 @@ export default function Browse() {
         if (cancelled || outcome === null) return;
         if (outcome.status === 'failed') {
           console.warn('startup scan failed:', outcome.error);
-          setScanTrouble({
+          setScanFailed({
             text: `Could not check your library folders: ${describeError(outcome.error)}`,
             note: null,
           });
@@ -375,7 +378,7 @@ export default function Browse() {
         const { filesAdded, matched, artworkStored, errors } = outcome.summary;
         if (errors.length > 0) {
           console.warn('startup scan problems:', errors);
-          setScanTrouble(describeScanTrouble(errors));
+          setScanErrors(errors);
         }
         // Newly cached artwork counts too: without a reload, the shelves go on
         // showing the remote copies they loaded before the cache had them.
@@ -598,7 +601,13 @@ export default function Browse() {
         )}
 
         {scanTrouble && (
-          <div className="browse-notice" onClick={() => setScanTrouble(null)}>
+          <div
+            className="browse-notice"
+            onClick={() => {
+              setScanFailed(null);
+              setScanErrors([]);
+            }}
+          >
             {scanTrouble.text}
             {scanTrouble.note && <span className="muted">. {scanTrouble.note}</span>}
           </div>

@@ -40,6 +40,12 @@ describe('scanTrouble', () => {
     });
   });
 
+  it('drops the line about Wikipedia once nothing is left to match', () => {
+    const busy = 'A film: Wikimedia is busy: Wikidata query: HTTP 503';
+    expect(scanTrouble([busy], false)).toBeNull();
+    expect(scanTrouble([busy, tmdb], false)).toEqual({ text: tmdb, note: null });
+  });
+
   it('speaks of folders when more than one is away', () => {
     expect(scanTrouble([away('E:\\Shows'), away('F:\\Films')])?.note).toBe(
       'Anything in those folders can’t be played until they are back.'

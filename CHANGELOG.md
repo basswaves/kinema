@@ -7,8 +7,21 @@ makes no stability promises.
 
 ## [Unreleased]
 
+### Added
+
+- **Playback details without a keyboard.** The details panel ("Stats for
+  nerds") opens from the end of Audio & subtitles, and on a remote's Info
+  key where it has one, as well as on `i`. A remote moves through it group
+  by group, so the parts below the edge of a TV can be read.
+
 ### Fixed
 
+- **Android: the details panel says what Android says of HDR.** It said
+  the TV was switched to HDR whenever the film was HDR. A TV box can tell
+  Android its screen takes no HDR — one that restarted while the TV was off
+  did, and turned HDR films into washed-out ordinary colour until it was
+  restarted again. The panel now shows which HDR kinds Android says the
+  screen takes, and warns when the film's kind is not among them.
 - **Holding Left or Right on a remote seeks at the right speed.** Where a
   remote's held button arrives as a run of separate presses — as it does
   through Android, and from remotes that re-send the button while it is

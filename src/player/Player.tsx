@@ -104,8 +104,16 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   const { osdVisible, osdFocus, osdFocusRef, showOsd, enterOsdFocus, leaveOsdFocus, revealOsd } =
     useOsd({ sessionRef, paused });
 
-  const { showTracks, openTracks, closeTracks, showStats, openStats, closeStats, stats } =
-    usePanels({ osdFocus, osdFocusRef });
+  const {
+    showTracks,
+    openTracks,
+    closeTracks,
+    showStats,
+    openStats,
+    openStatsFromTracks,
+    closeStats,
+    stats,
+  } = usePanels({ osdFocus, osdFocusRef });
 
   const onlinePanel = useOnlineSubtitles({
     target,
@@ -405,6 +413,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           onChoose={(kind, track) => void chooseTrack(kind, track)}
           online={onlinePanel}
           onClose={closeTracks}
+          onDetails={openStatsFromTracks}
         />
       )}
 

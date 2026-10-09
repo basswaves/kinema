@@ -75,7 +75,8 @@ audio and subtitles, volume. Back steps back to wherever you came from.
 
 ![The playback statistics panel, listing resolution, codec, cadence, scaling and colour information](docs/images/stats.png)
 
-Press `i` while watching for what is actually happening: the display's real
+Press `i` while watching — or choose Playback details at the end of Audio &
+subtitles, or a remote's Info key — for what is actually happening: the display's real
 refresh rate, the frame cadence, which scaler ran and why, and the colour
 pipeline end to end. It reports rather than flatters — the cadence line above is
 telling the truth about 24p on a 60 Hz panel.

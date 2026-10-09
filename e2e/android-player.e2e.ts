@@ -17,6 +17,17 @@ async function press(page: Page, key: string, times = 1): Promise<void> {
   }
 }
 
+/**
+ * A remote's Info key, as Android's WebView hands it to the page (checked on
+ * the old box): key "Info", no code. Playwright has no such key to press.
+ */
+async function infoKey(page: Page): Promise<void> {
+  await page.evaluate(() =>
+    document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Info', bubbles: true }))
+  );
+  await page.waitForTimeout(150);
+}
+
 /** The control the focus ring is on: its spoken name, else its text. */
 function focused(page: Page): Promise<string | undefined> {
   return page.evaluate(() => {
@@ -282,6 +293,75 @@ test('Android: `i` shows what Media3 is doing, in its own rows', async ({ page }
   await expect(panel).not.toContainText('Output check');
   await expect(panel).not.toContainText('Rendering');
   await press(page, 'Escape');
+  await expect(panel).toHaveCount(0);
+
+  expect(complaints).toEqual([]);
+});
+
+test('Android: a remote opens the details from Audio & subtitles, and they say what Android says of HDR', async ({
+  page,
+}) => {
+  const complaints = mpvComplaints(page);
+  await playFilm(page);
+  // An HDR film on a box that says its screen takes no HDR — the old box
+  // after it read the TV while the TV was off (2026-10-05).
+  await page.evaluate(() => {
+    const f = (window as unknown as { __fakeMedia3: { video: { hdr: boolean }; screenHdr: string[] } })
+      .__fakeMedia3;
+    f.video.hdr = true;
+    f.screenHdr = [];
+  });
+
+  const tracks = await openTrackPanel(page);
+  for (let i = 0; i < 20 && (await focused(page)) !== 'Playback details ›'; i++) {
+    await press(page, 'ArrowDown');
+  }
+  expect(await focused(page)).toBe('Playback details ›');
+  await press(page, 'Enter');
+
+  const panel = page.locator('.stats-panel');
+  await expect(panel).toBeVisible();
+  await expect(tracks).toHaveCount(0);
+  // The ring is in the panel, so OK or Back closes it.
+  await expect.poll(() => focused(page)).toBe('close');
+  await expect(panel.locator('.stats-row.warn', { hasText: 'Dynamic range' })).toContainText(
+    'Android says the screen takes no HDR, so the picture is turned into ordinary colour (SDR)'
+  );
+  await expect(panel.locator('.stats-row', { hasText: 'Screen HDR' })).toContainText('none');
+  await expect(panel).not.toContainText('switches the TV');
+
+  // Down walks the panel group by group, each scrolled into view: a TV's
+  // screen leaves it too short for all of it (the old box cut it off after
+  // Frames), and the close button was the only stop.
+  for (let i = 0; i < 6 && !(await focused(page))?.startsWith('Sound'); i++) {
+    await press(page, 'ArrowDown');
+  }
+  expect(await focused(page)).toMatch(/^Sound/);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const box = document.querySelector('.stats-panel')!.getBoundingClientRect();
+        const group = document.querySelector('.stats-group.focused')!.getBoundingClientRect();
+        return group.top >= box.top - 1 && group.bottom <= box.bottom + 1;
+      })
+    )
+    .toBe(true);
+  for (let i = 0; i < 6 && (await focused(page)) !== 'close'; i++) await press(page, 'ArrowUp');
+  expect(await focused(page)).toBe('close');
+
+  // Back closes it, and the ring is back where it came from.
+  await press(page, 'Escape');
+  await expect(panel).toHaveCount(0);
+  await expect.poll(() => focused(page)).toBe('Audio & subtitles');
+
+  // With HDR10 on the screen, the same film says the screen takes it.
+  await page.evaluate(() => {
+    (window as unknown as { __fakeMedia3: { screenHdr: string[] } }).__fakeMedia3.screenHdr = ['HDR10'];
+  });
+  await infoKey(page);
+  await expect(panel).toContainText('the screen takes HDR10, Android says');
+  await expect(panel.locator('.stats-row.warn', { hasText: 'Dynamic range' })).toHaveCount(0);
+  await infoKey(page);
   await expect(panel).toHaveCount(0);
 
   expect(complaints).toEqual([]);

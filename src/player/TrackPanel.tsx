@@ -56,6 +56,7 @@ export default function TrackPanel({
   subVisible,
   onChoose,
   onClose,
+  onDetails,
   online,
 }: {
   audioTracks: Track[];
@@ -65,6 +66,11 @@ export default function TrackPanel({
   subVisible: boolean;
   onChoose: (kind: 'audio' | 'sub', track: Track | null) => void;
   onClose: () => void;
+  /**
+   * The details panel ("Stats for nerds"): here, off the bar (owner, UX
+   * pass), so a remote, a mouse or a finger reaches it without a keyboard's `i`.
+   */
+  onDetails: () => void;
   online?: OnlineSubtitles | null;
 }) {
   const { ref, focusKey } = useFocusable({
@@ -155,6 +161,9 @@ export default function TrackPanel({
           </>
         )}
         <p className="track-note">Remembered for this show.</p>
+        <FocusButton className="track-option" keepInView="nearest" onSelect={onDetails}>
+          Playback details ›
+        </FocusButton>
       </aside>
     </FocusContext.Provider>
   );

@@ -192,8 +192,10 @@ export function usePlayerKeys({
         case '0':
           volumeKey(() => changeVolume(VOLUME_STEP));
           break;
-        // mpv's own key for its stats overlay, so the reflex transfers.
+        // mpv's own key for its stats overlay, so the reflex transfers; and a
+        // remote's Info key, where it has one (Android's WebView names it so).
         case 'i':
+        case 'Info':
           e.preventDefault();
           if (showStats) closeStats();
           else openStats();

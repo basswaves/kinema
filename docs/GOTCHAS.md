@@ -773,6 +773,33 @@ while it has a control (`SetupPages.tsx`, `PageBody`), and a claim's `ready`
 is true only when its control will be drawn (`AccountSection`'s Connect
 needs `status.available`, not just a status).
 
+### A container that renders nothing is still a place to move to
+
+`useFocusable` registers the component whether or not its `ref` is ever
+attached. A rail that returns `null` when empty — Continue Watching with
+nothing to continue — stays in the tree with no element, and the library
+then measures it at the screen's top left. Usually something else is closer;
+with the scan's notice pushing Home down a few rows, Up from Play chose the
+empty rail over the top bar, and the ring vanished.
+
+**Do:** pass `focusable: false` while the component renders nothing
+(`ContinueRail`, `Rail`, `HomeNotices`). An early `return null` after
+`useFocusable` is the pattern to look for.
+
+### The library's own restore counts as "something live holds focus"
+
+A page that waits for its data before claiming focus — a series' page waits
+for the next episode, so Play exists — gives the library's
+`AUTO_RESTORE_FOCUS_DELAY` time to act first: the button that opened the
+page is gone, and 300 ms later focus is restored to whatever the library can
+find, the top bar. That is a live control with a ring, so the page's claim
+stood aside and the page opened on Home's tab.
+
+**Do:** a whole page passes `page` to `useClaimFocus`: it then claims when
+ready unless the person has pressed, clicked or moved anything since it
+arrived. Never for part of a page — data arriving while the person browses
+the list beside it would pull the ring out of their hands.
+
 ### A hidden browser pane never scrolls smoothly
 
 When testing `dev:mock` in a browser pane embedded in another program: while the pane is hidden,

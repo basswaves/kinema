@@ -51,8 +51,14 @@ export default function HomeNotices({
   onFfmpeg,
   onDismissFfmpeg,
 }: Props) {
-  const { ref, focusKey } = useFocusable({ trackChildren: true, saveLastFocusedChild: true });
-  if (reviewCount === 0 && upgrades.length === 0 && !keyRejected && !ffmpegMissing) return null;
+  const empty = reviewCount === 0 && upgrades.length === 0 && !keyRejected && !ffmpegMissing;
+  // Not a place to move to while empty — see ContinueRail.tsx.
+  const { ref, focusKey } = useFocusable({
+    trackChildren: true,
+    saveLastFocusedChild: true,
+    focusable: !empty,
+  });
+  if (empty) return null;
   // Only additions to an "only these" list can be done here in a press; a
   // question never answered is answered where all three answers are.
   const onlyAdds = upgrades.every((u) => u.action === 'add');

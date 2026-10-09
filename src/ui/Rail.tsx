@@ -26,7 +26,12 @@ interface Props {
 }
 
 export default function Rail({ heading, titles, onSelect, onSeeAll }: Props) {
-  const { ref, focusKey } = useFocusable({ trackChildren: true, saveLastFocusedChild: true });
+  // Not a place to move to while empty — see ContinueRail.tsx.
+  const { ref, focusKey } = useFocusable({
+    trackChildren: true,
+    saveLastFocusedChild: true,
+    focusable: titles.length > 0,
+  });
 
   if (titles.length === 0) return null;
 

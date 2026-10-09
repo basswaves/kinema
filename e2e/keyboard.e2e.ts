@@ -166,6 +166,16 @@ for (const [label, errors, notice] of [
     await press(page, 'Enter');
     await expect.poll(async () => (await mpv(page)).path).not.toBeNull();
   });
+
+  // The line pushes Home down; an empty Continue Watching, still registered
+  // with nothing on screen, then caught Up from Play and the ring vanished.
+  test(`the startup scan's notice leaves the top bar one Up away: ${label}`, async ({ page }) => {
+    await page.addInitScript((e) => localStorage.setItem('kinemaMockScanErrors', e), JSON.stringify(errors));
+    await open(page, 'windows');
+    await expect(page.locator('.browse-notice')).toBeVisible();
+    await press(page, 'ArrowUp');
+    await expect.poll(() => focused(page)).toBe('Home');
+  });
 }
 
 for (const [label, system, noPower, choices] of [

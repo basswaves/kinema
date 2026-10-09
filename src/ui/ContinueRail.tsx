@@ -30,7 +30,16 @@ function remainingLabel(item: ContinueItem): string {
 }
 
 export default function ContinueRail({ items, onResume, onRemove }: Props) {
-  const { ref, focusKey } = useFocusable({ trackChildren: true, saveLastFocusedChild: true });
+  // Empty, this renders nothing but would still be registered: a target
+  // with no element, which the spatial library places at the screen's top
+  // left. With the scan's notice pushing Home down, Up from Play chose it over
+  // the top bar, and the ring vanished until the focus watchdog put it back
+  // (2026-10-09).
+  const { ref, focusKey } = useFocusable({
+    trackChildren: true,
+    saveLastFocusedChild: true,
+    focusable: items.length > 0,
+  });
 
   if (items.length === 0) return null;
 

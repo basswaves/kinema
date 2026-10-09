@@ -14,8 +14,15 @@
  * Both are MediaWiki's action API, which has been stable for well over a
  * decade — this adds nothing that needs looking after. Wikimedia asks API
  * clients to say who they are (`Api-User-Agent`, the header a web client may
- * set), to send requests one at a time, and to back off when `maxlag` says
- * their servers are busy. All three are done here.
+ * set), to send requests one at a time, and to back off when their servers
+ * answer "too many" (HTTP 429 or 503). All three are done here.
+ *
+ * `maxlag` is not sent. Wikimedia asks it of bots that *edit*, so they pause
+ * while the database copies catch up; Kinema only reads. Wikidata also counts
+ * the lag of its separate query service in it, which Kinema never uses — and
+ * that lag sat above the threshold for long stretches, so every read was
+ * answered "busy" while the same read without the flag was answered at once
+ * (checked 2026-10-09: 7.65 s lagged, three refusals, three answers).
  */
 import type { Candidate } from './score';
 import { CAST_LIMIT, fetchPolitely, makeQueue, type TitleMetadata } from './providers';
@@ -29,13 +36,11 @@ const HEADERS = { 'Api-User-Agent': 'Kinema (https://github.com/basswaves/kinema
 const wikidataQueued = makeQueue(100);
 
 /**
- * "Busy, try later": `maxlag` (Wikidata's database copies are behind), or an
- * HTTP 429 or 503. Waited out as Wikimedia asks — the `Retry-After` it sends,
- * at least five seconds — a few times. Still busy after that, the error says
- * so in a form errors.ts puts into words: the service's own sentence
- * ("Waiting for wdqs1014: 6.6 seconds lagged.") was shown as it was, and
- * meant nothing to anyone. A file left unmatched is tried again by the next
- * scan, never guessed at.
+ * "Busy, try later": an HTTP 429 or 503. Waited out as Wikimedia asks — the
+ * `Retry-After` it sends, at least five seconds — a few times. Still busy
+ * after that, the error says so in a form errors.ts puts into words, never
+ * the service's own wording. A file left unmatched is tried again by the
+ * next scan, never guessed at.
  */
 const BUSY_WAIT_MS = 5000;
 const BUSY_WAIT_MAX_MS = 30000;
@@ -81,7 +86,7 @@ export interface Entity {
 }
 
 async function get<T>(base: string, params: Record<string, string>): Promise<T> {
-  const query = new URLSearchParams({ format: 'json', maxlag: '5', ...params });
+  const query = new URLSearchParams({ format: 'json', ...params });
   const url = `${base}?${query.toString()}`;
   for (let attempt = 0; ; attempt++) {
     const answer = await wikidataQueued(async () => {
@@ -93,7 +98,6 @@ async function get<T>(base: string, params: Record<string, string>): Promise<T> 
       }
       if (!response.ok) throw new Error(`Wikidata ${params.action} failed: HTTP ${response.status}`);
       const body = (await response.json()) as T & { error?: { code?: string; info?: string } };
-      if (body.error?.code === 'maxlag') return { busy: body.error.info ?? 'maxlag', after };
       return { body };
     });
     if (answer.busy !== undefined) {

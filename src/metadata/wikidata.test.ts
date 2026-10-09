@@ -141,16 +141,20 @@ describe('Wikidata as the movie fallback', () => {
   });
 
   it('says who it is, and waits when Wikimedia says its servers are busy', async () => {
-    replies = [
-      () => ({ error: { code: 'maxlag', info: 'Waiting for a database server' } }),
-      () => ({ query: { search: [] } }),
-    ];
+    replies = [() => ({ http: { status: 429 } }), () => ({ query: { search: [] } })];
     const candidates = await settle(wikidataSearch('Anything'));
 
     expect(candidates).toEqual([]);
     expect(requests).toHaveLength(2);
     expect(requests[0].headers?.['Api-User-Agent']).toMatch(/^Kinema /);
-    expect(requests[0].url.searchParams.get('maxlag')).toBe('5');
+  });
+
+  // `maxlag` is for bots that edit. Sent on reads, Wikidata refused every one
+  // as "busy" for as long as its query service lagged — which Kinema never uses.
+  it('does not ask Wikimedia to refuse reads while its copies lag', async () => {
+    replies = [() => ({ query: { search: [] } })];
+    await settle(wikidataSearch('Anything'));
+    expect(requests[0].url.searchParams.has('maxlag')).toBe(false);
   });
 
   it('waits as long as a busy server asks, then carries on', async () => {
@@ -163,10 +167,8 @@ describe('Wikidata as the movie fallback', () => {
   });
 
   it('still busy after a few tries, says so in words rather than in Wikimedia’s', async () => {
-    const lagged = () => ({
-      error: { code: 'maxlag', info: 'Waiting for wdqs1014: 6.6 seconds lagged.' },
-    });
-    replies = Array.from({ length: 5 }, () => lagged);
+    const busy = () => ({ http: { status: 503 } });
+    replies = Array.from({ length: 5 }, () => busy);
     const search = wikidataSearch('Anything').catch((e: unknown) => e);
     const error = await settle(search);
 

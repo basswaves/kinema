@@ -140,8 +140,9 @@ Descriptions are the opening of the film's article on
 [English Wikipedia](https://en.wikipedia.org), under
 [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), and are
 credited where they are shown and in Settings. Requests follow Wikimedia's API
-etiquette: one at a time, with an identifying `Api-User-Agent`, backing off on
-`maxlag`. No key required, and no pictures are taken from either.
+etiquette: one at a time, with an identifying `Api-User-Agent`, backing off
+when the servers answer that they are busy. No key required, and no pictures
+are taken from either.
 
 ### TheIntroDB
 

@@ -1604,6 +1604,15 @@ to double-check TMDB was considered. A second source could only turn matches
 into refusals under "a wrong match is worse than no match", and letting it
 accept what TMDB alone would not is a change to that rule, which was not made.
 
+**No `maxlag` on reads** (owner, 2026-10-09). Wikidata was sent `maxlag=5`
+as part of being polite, and answered nearly every request "busy": it counts
+the lag of its separate query service in that figure, which sat above five
+seconds for long stretches, while the same request without the flag was
+answered at once. The flag is Wikimedia's request to bots that *edit*, so
+they pause while database copies catch up; Kinema only reads. Still one
+request at a time, still named, still waiting when the servers answer 429 or
+503.
+
 **Films found through Wikidata move to TMDB by id.** When a key works again,
 each is fetched from TMDB by the id Wikidata holds, with no search and no
 scoring, and its row is re-keyed in place, so files and watch history stay

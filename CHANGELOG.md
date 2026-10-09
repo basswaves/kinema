@@ -21,7 +21,11 @@ makes no stability promises.
   Android its screen takes no HDR — one that restarted while the TV was off
   did, and turned HDR films into washed-out ordinary colour until it was
   restarted again. The panel now shows which HDR kinds Android says the
-  screen takes, and warns when the film's kind is not among them.
+  screen takes, and warns when the film's kind is not among them; Settings
+  → Picture & sound says the same, as Android's word, and how to make the
+  device check the TV again. Where a device gives Android only one screen
+  mode, the panel says the device itself decides what the TV gets — the
+  box tested sent 4K while Android was told 1080p.
 - **Holding Left or Right on a remote seeks at the right speed.** Where a
   remote's held button arrives as a run of separate presses — as it does
   through Android, and from remotes that re-send the button while it is

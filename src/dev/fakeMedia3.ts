@@ -333,7 +333,7 @@ export function facts() {
           bufferedSeconds: 42.5,
         }
       : {}),
-    screen: { ...mode(state.screen), hdr: state.screenHdr },
+    screen: { ...mode(state.screen), hdr: state.screenHdr, modes: state.modes.length },
   };
 }
 

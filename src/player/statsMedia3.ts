@@ -61,6 +61,17 @@ function hdrOnScreen(
   };
 }
 
+/**
+ * The cadence, from the rate Android is given — which, where it is given only
+ * one mode, may not be the rate the TV gets, and is said to be that.
+ */
+function cadenceFrom(fps: number | null, screen: PlayerFacts['screen']) {
+  const row = describeCadence(fps, screen.rate);
+  if (screen.modes !== 1 || row.value === DASH) return row;
+  const from = 'worked out from the rate Android is given';
+  return { ...row, note: row.note ? `${row.note}; ${from}` : from };
+}
+
 /** The panel's groups from Media3's facts; pure, for the tests. */
 export function media3Groups(facts: PlayerFacts): StatGroup[] {
   const { video, frames, audio, screen } = facts;
@@ -123,7 +134,12 @@ export function media3Groups(facts: PlayerFacts): StatGroup[] {
       {
         label: 'Screen mode',
         value: `${resolution(screen.width, screen.height)} @ ${num(screen.rate, 3, ' Hz')}`,
-        note: 'as Android reports it',
+        // With one mode the device may send the TV more than it tells
+        // Android: the old box sent 3840×2160 while Android had 1920×1080.
+        note:
+          screen.modes === 1
+            ? "the only mode Android is given; the device itself decides what the TV gets, which can be more"
+            : 'as Android reports it',
       },
       ...(screen.hdr
         ? [
@@ -134,7 +150,7 @@ export function media3Groups(facts: PlayerFacts): StatGroup[] {
             },
           ]
         : []),
-      describeCadence(video?.fps ?? null, screen.rate),
+      cadenceFrom(video?.fps ?? null, screen),
     ],
   });
 

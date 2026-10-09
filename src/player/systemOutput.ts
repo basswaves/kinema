@@ -62,12 +62,18 @@ export function matchNote(out: SystemOutput | null): string | null {
   return null;
 }
 
+/**
+ * The HDR kinds are what the system was told about the screen, which is not
+ * always what the TV can do: an operator's box that restarted while the TV
+ * was off told Android none, and showed HDR films in ordinary colour until it
+ * was restarted with the TV on (2026-10-05, and again the next night).
+ */
 export function pictureNote(out: SystemOutput | null, system: string): string {
   if (!out) return `${system} turns HDR on for an HDR film by itself.`;
   if (out.hdr.length === 0) {
-    return `The screen does not report HDR, so HDR films are shown in SDR by ${system}.`;
+    return `${system} says this screen takes no HDR, so ${system} shows HDR films in ordinary colour (SDR). If the TV can show HDR, restart this device with the TV on, so it checks the TV again.`;
   }
-  return `The screen reports ${list(out.hdr)}. ${system} turns HDR on for such a film by itself; Kinema leaves that to it.`;
+  return `${system} says this screen takes ${list(out.hdr)}. ${system} sends such a film to it as it is; Kinema leaves that to it.`;
 }
 
 export function soundNote(out: SystemOutput | null, system: string): string {

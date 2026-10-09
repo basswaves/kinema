@@ -73,6 +73,20 @@ describe('media3Groups', () => {
       .toMatchObject({ value: 'decoded on this device', note: 'c2.android.aac.decoder' });
   });
 
+  it('with one mode, says the device decides what the TV gets, and where the cadence comes from', () => {
+    const one: PlayerFacts = { ...film, screen: { ...film.screen, modes: 1 } };
+    expect(row(one, 'Display', 'Screen mode')?.note).toBe(
+      'the only mode Android is given; the device itself decides what the TV gets, which can be more'
+    );
+    expect(row(one, 'Display', 'Cadence')?.note).toContain('worked out from the rate Android is given');
+    expect(row({ ...film, screen: { ...film.screen, modes: 4 } }, 'Display', 'Screen mode')?.note).toBe(
+      'as Android reports it'
+    );
+    expect(row({ ...film, screen: { ...film.screen, modes: 4 } }, 'Display', 'Cadence')?.note).not.toContain(
+      'Android is given'
+    );
+  });
+
   it('says what Android says of HDR on this screen, never more', () => {
     const range = (screenHdr: string[] | undefined, video = film.video!) =>
       row({ ...film, video, screen: { ...film.screen, hdr: screenHdr } }, 'Source', 'Dynamic range');

@@ -1101,7 +1101,13 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
       }
       // With the HDR kinds Android says it takes: a box that says none turns
       // an HDR film into ordinary colour, whatever the TV could show.
-      out.put("screen", modeObject(display().mode).apply { put("hdr", hdrKinds()) })
+      // And how many modes Android is given: with one, the device decides
+      // what the TV gets, which can be more than this mode (the old box
+      // sent 3840x2160 while Android was told 1920x1080).
+      out.put("screen", modeObject(display().mode).apply {
+        put("hdr", hdrKinds())
+        put("modes", display().supportedModes.size)
+      })
       invoke.resolve(out)
     }
   }

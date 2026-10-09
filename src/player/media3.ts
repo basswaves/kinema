@@ -141,7 +141,15 @@ export interface Facts {
    * The screen's mode now, and the HDR kinds Android says it takes
    * ("HDR10", "HLG", "Dolby Vision", "HDR10+") — Android's word, not the TV's.
    */
-  screen: { width: number; height: number; hz: number; rate: number; hdr?: string[] };
+  screen: {
+    width: number;
+    height: number;
+    hz: number;
+    rate: number;
+    hdr?: string[];
+    /** How many modes Android is given; with one, the device decides what the TV gets. */
+    modes?: number;
+  };
 }
 
 export const facts = () => call<Facts>('facts');

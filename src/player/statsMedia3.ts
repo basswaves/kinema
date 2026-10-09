@@ -29,6 +29,38 @@ function hdrName(video: NonNullable<PlayerFacts['video']>): string {
   }
 }
 
+/** The HDR kind the film asks of the screen, by Android's names; null for SDR. */
+function hdrNeeded(video: NonNullable<PlayerFacts['video']>): string | null {
+  if (video.dolbyVision) return 'Dolby Vision';
+  if (video.transfer === 'pq') return 'HDR10';
+  if (video.transfer === 'hlg') return 'HLG';
+  return null;
+}
+
+/**
+ * What becomes of an HDR film on this screen, in Android's own words: the
+ * screen's HDR kinds are what Android says, not what the TV could do. A box
+ * that read its TV while the TV was off said none, and drew HDR films in
+ * ordinary colour all evening while this row said the TV was switched
+ * (2026-10-05).
+ */
+function hdrOnScreen(
+  video: NonNullable<PlayerFacts['video']>,
+  screenHdr: string[] | undefined
+): { note?: string; warn?: boolean } {
+  const needed = hdrNeeded(video);
+  if (!needed || !screenHdr) return {};
+  if (screenHdr.includes(needed)) return { note: `the screen takes ${needed}, Android says` };
+  if (needed === 'Dolby Vision' && screenHdr.includes('HDR10')) {
+    return { note: 'the screen takes HDR10 but not Dolby Vision, Android says' };
+  }
+  const takes = screenHdr.length === 0 ? 'no HDR' : `${screenHdr.join(' and ')}, not ${needed}`;
+  return {
+    note: `Android says the screen takes ${takes}, so the picture is turned into ordinary colour (SDR)`,
+    warn: true,
+  };
+}
+
 /** The panel's groups from Media3's facts; pure, for the tests. */
 export function media3Groups(facts: PlayerFacts): StatGroup[] {
   const { video, frames, audio, screen } = facts;
@@ -51,14 +83,7 @@ export function media3Groups(facts: PlayerFacts): StatGroup[] {
           note: video.fps === null ? 'not read from this file' : undefined,
         },
         { label: 'Video bitrate', value: bitrate(video.bitrate) },
-        {
-          label: 'Dynamic range',
-          value: hdrName(video),
-          note:
-            video.transfer === 'pq' || video.transfer === 'hlg' || video.dolbyVision
-              ? 'Android switches the TV to it by itself'
-              : undefined,
-        },
+        { label: 'Dynamic range', value: hdrName(video), ...hdrOnScreen(video, screen.hdr) },
       ],
     });
   }
@@ -100,6 +125,15 @@ export function media3Groups(facts: PlayerFacts): StatGroup[] {
         value: `${resolution(screen.width, screen.height)} @ ${num(screen.rate, 3, ' Hz')}`,
         note: 'as Android reports it',
       },
+      ...(screen.hdr
+        ? [
+            {
+              label: 'Screen HDR',
+              value: screen.hdr.length > 0 ? screen.hdr.join(' · ') : 'none',
+              note: 'as Android reports it',
+            },
+          ]
+        : []),
       describeCadence(video?.fps ?? null, screen.rate),
     ],
   });

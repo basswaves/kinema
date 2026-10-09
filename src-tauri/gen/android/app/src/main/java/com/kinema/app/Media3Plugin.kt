@@ -1099,7 +1099,9 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
         }
         out.put("bufferedSeconds", p.totalBufferedDuration / 1000.0)
       }
-      out.put("screen", modeObject(display().mode))
+      // With the HDR kinds Android says it takes: a box that says none turns
+      // an HDR film into ordinary colour, whatever the TV could show.
+      out.put("screen", modeObject(display().mode).apply { put("hdr", hdrKinds()) })
       invoke.resolve(out)
     }
   }
@@ -1206,6 +1208,28 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
   // ---- what the TV and the receiver take -------------------------------------
 
   /**
+   * The HDR kinds Android says the screen takes, by Kinema's names. Android's
+   * word, not the TV's: an operator's box that read the TV while it was off
+   * said none, and drew HDR films in ordinary colour until it was restarted
+   * (2026-10-05).
+   */
+  private fun hdrKinds(): JSArray {
+    val hdr = JSArray()
+    for (t in display().hdrCapabilities?.supportedHdrTypes ?: IntArray(0)) {
+      hdr.put(
+        when (t) {
+          Display.HdrCapabilities.HDR_TYPE_DOLBY_VISION -> "Dolby Vision"
+          Display.HdrCapabilities.HDR_TYPE_HDR10 -> "HDR10"
+          Display.HdrCapabilities.HDR_TYPE_HLG -> "HLG"
+          4 -> "HDR10+"
+          else -> "HDR ($t)"
+        }
+      )
+    }
+    return hdr
+  }
+
+  /**
    * For Settings → Picture & sound: the HDR kinds the screen shows, the
    * sound formats Android says the HDMI output takes untouched, and what
    * the last film's sound did (`rememberSound`).
@@ -1217,18 +1241,7 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
   @Command
   fun output(invoke: Invoke) {
     main.post {
-      val hdr = JSArray()
-      for (t in display().hdrCapabilities?.supportedHdrTypes ?: IntArray(0)) {
-        hdr.put(
-          when (t) {
-            Display.HdrCapabilities.HDR_TYPE_DOLBY_VISION -> "Dolby Vision"
-            Display.HdrCapabilities.HDR_TYPE_HDR10 -> "HDR10"
-            Display.HdrCapabilities.HDR_TYPE_HLG -> "HLG"
-            4 -> "HDR10+"
-            else -> "HDR ($t)"
-          }
-        )
-      }
+      val hdr = hdrKinds()
       val caps = AudioCapabilities.getCapabilities(activity)
       val sound = JSArray()
       for ((name, encoding) in listOf(

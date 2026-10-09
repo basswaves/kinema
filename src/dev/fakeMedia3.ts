@@ -51,6 +51,11 @@ export interface FakeMedia3State {
   /** The screen's mode now, and the modes it offers. */
   screen: { width: number; height: number; rate: number };
   modes: { width: number; height: number; rate: number }[];
+  /**
+   * The HDR kinds Android says the screen takes. Empty stands in for a box
+   * that read its TV while it was off.
+   */
+  screenHdr: string[];
 }
 
 /** How long each fixture file runs. */
@@ -82,6 +87,7 @@ const state: FakeMedia3State = {
     { width: 1920, height: 1080, rate: 23.976 },
     { width: 3840, height: 2160, rate: 60 },
   ],
+  screenHdr: ['HDR10', 'HLG'],
 };
 
 /**
@@ -327,7 +333,7 @@ export function facts() {
           bufferedSeconds: 42.5,
         }
       : {}),
-    screen: mode(state.screen),
+    screen: { ...mode(state.screen), hdr: state.screenHdr },
   };
 }
 

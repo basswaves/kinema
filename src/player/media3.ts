@@ -137,8 +137,11 @@ export interface Facts {
     decoder: string | null;
   };
   bufferedSeconds?: number;
-  /** The screen's mode now. */
-  screen: { width: number; height: number; hz: number; rate: number };
+  /**
+   * The screen's mode now, and the HDR kinds Android says it takes
+   * ("HDR10", "HLG", "Dolby Vision", "HDR10+") — Android's word, not the TV's.
+   */
+  screen: { width: number; height: number; hz: number; rate: number; hdr?: string[] };
 }
 
 export const facts = () => call<Facts>('facts');

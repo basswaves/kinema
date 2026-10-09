@@ -19,7 +19,7 @@ const film: PlayerFacts = {
   frames: { rendered: 2400, dropped: 0, skipped: 0 },
   audio: { name: 'Dolby TrueHD 7.1', channels: 8, sampleRate: 48000, way: 'untouched', decoder: null },
   bufferedSeconds: 30,
-  screen: { width: 3840, height: 2160, hz: 23, rate: 23.976 },
+  screen: { width: 3840, height: 2160, hz: 23, rate: 23.976, hdr: ['HDR10', 'HLG'] },
 };
 
 /** Every row as "Heading / Label: value". */
@@ -43,6 +43,7 @@ describe('media3Groups', () => {
       'Decoding / Frames: 2400 shown · 0 dropped',
       'Decoding / Buffered: 30.0 s ahead',
       'Display / Screen mode: 3840 × 2160 @ 23.976 Hz',
+      'Display / Screen HDR: HDR10 · HLG',
       'Display / Cadence: 1:1, even',
       'Sound / Format: Dolby TrueHD 7.1',
       'Sound / Path: sent on untouched',
@@ -70,5 +71,30 @@ describe('media3Groups', () => {
     expect(row(untagged, 'Source', 'Frame rate')).toMatchObject({ value: '—', note: 'not read from this file' });
     expect(row({ ...film, audio: { ...film.audio!, way: 'decoded', decoder: 'c2.android.aac.decoder' } }, 'Sound', 'Path'))
       .toMatchObject({ value: 'decoded on this device', note: 'c2.android.aac.decoder' });
+  });
+
+  it('says what Android says of HDR on this screen, never more', () => {
+    const range = (screenHdr: string[] | undefined, video = film.video!) =>
+      row({ ...film, video, screen: { ...film.screen, hdr: screenHdr } }, 'Source', 'Dynamic range');
+    expect(range(['HDR10', 'HLG'])).toMatchObject({ value: 'HDR10 (PQ)', note: 'the screen takes HDR10, Android says' });
+    // The box that read its TV while the TV was off (2026-10-05).
+    expect(range([])).toMatchObject({
+      note: 'Android says the screen takes no HDR, so the picture is turned into ordinary colour (SDR)',
+      warn: true,
+    });
+    expect(range(['HDR10'], { ...film.video!, transfer: 'hlg' })).toMatchObject({
+      value: 'HLG',
+      note: 'Android says the screen takes HDR10, not HLG, so the picture is turned into ordinary colour (SDR)',
+      warn: true,
+    });
+    expect(range(['HDR10'], { ...film.video!, dolbyVision: true })).toMatchObject({
+      value: 'Dolby Vision',
+      note: 'the screen takes HDR10 but not Dolby Vision, Android says',
+    });
+    expect(range(['HDR10'], { ...film.video!, dolbyVision: true })?.warn).toBeFalsy();
+    // An SDR film asks nothing of the screen; a plugin that does not say leaves it unsaid.
+    expect(range([], { ...film.video!, transfer: 'sdr' })?.note).toBeUndefined();
+    expect(range(undefined)?.note).toBeUndefined();
+    expect(row({ ...film, screen: { ...film.screen, hdr: [] } }, 'Display', 'Screen HDR')?.value).toBe('none');
   });
 });

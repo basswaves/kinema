@@ -11,6 +11,7 @@ import Art from './Art';
 import type { Studio } from './api';
 import { initParser } from '../library/parse';
 import { useFfmpegMissing } from './ffmpegNotice';
+import { useLetteringCutOut } from './logoCutOut';
 import { readRelease, type Release } from '../library/release';
 import {
   buildBadges,
@@ -93,14 +94,7 @@ export function BadgeRows({ rows, heading }: { rows: BadgeRow[]; heading?: strin
                   // will not load.
                   <span className="media-badge-logos" aria-label={badge.value}>
                     {badge.logos.map((studio) => (
-                      <Art
-                        key={studio.name}
-                        className="media-badge-logo"
-                        local={studio.logo_path}
-                        remote={studio.logo_url}
-                        alt={studio.name}
-                        fallback={<span className="media-badge-value">{studio.name}</span>}
-                      />
+                      <StudioLogo key={studio.name} studio={studio} />
                     ))}
                   </span>
                 ) : (
@@ -120,5 +114,24 @@ export function BadgeRows({ rows, heading }: { rows: BadgeRow[]; heading?: strin
         </p>
       )}
     </div>
+  );
+}
+
+/**
+ * A studio's logo in white — or, for light lettering on a solid plate, the
+ * plate in white with the lettering cut out, which plain white turned into a
+ * blank block (logoCutOut.ts).
+ */
+function StudioLogo({ studio }: { studio: Studio }) {
+  const cut = useLetteringCutOut(studio.logo_path, studio.logo_url);
+  if (cut) return <img className="media-badge-logo cut-out" src={cut} alt={studio.name} draggable={false} />;
+  return (
+    <Art
+      className="media-badge-logo"
+      local={studio.logo_path}
+      remote={studio.logo_url}
+      alt={studio.name}
+      fallback={<span className="media-badge-value">{studio.name}</span>}
+    />
   );
 }

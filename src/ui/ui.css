@@ -1030,6 +1030,11 @@ html {
   filter: brightness(0) invert(1);
 }
 
+/* Already white, with its lettering cut out (logoCutOut.ts). */
+.media-badge-logo.cut-out {
+  filter: none;
+}
+
 .media-badge-value {
   font-size: 0.8125rem;
   font-weight: 600;

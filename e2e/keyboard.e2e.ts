@@ -823,6 +823,18 @@ test('Settings: Up and Down stay in the open section, Left goes to the list', as
   expect(await focused(page)).toBe(left);
 });
 
+// White lettering on a solid plate went one white block; it is cut out now.
+test('a studio logo with lettering on a plate keeps its lettering', async ({ page }) => {
+  await open(page, 'windows');
+  for (let i = 0; i < 6 && !(await focused(page))?.startsWith('Example Film'); i++) {
+    await press(page, 'ArrowDown');
+  }
+  await press(page, 'Enter');
+  await expect(page.locator('.media-badge-logo.cut-out')).toHaveAttribute('alt', 'Mock Bros.');
+  // A coloured word on nothing stays plain white.
+  await expect(page.getByAltText('Example Pictures')).not.toHaveClass(/cut-out/);
+});
+
 test('Down with nothing further down reads on, and Up reads back', async ({ page }) => {
   // A film's page ends in its picture and sound badges under Play, never
   // focusable; in a short window they are more than fits beneath it.

@@ -206,6 +206,12 @@ const logo = (text: string, colour: string) =>
     `<svg xmlns="http://www.w3.org/2000/svg" width="${text.length * 34}" height="60"><text x="2" y="46" textLength="${text.length * 34 - 4}" lengthAdjust="spacingAndGlyphs" font-family="Georgia" font-size="46" font-weight="700" fill="${colour}">${text}</text></svg>`
   )}`;
 
+/** White lettering on a solid plate, as some studios' logos are (logoCutOut.ts). */
+const plateLogo = (text: string, colour: string) =>
+  `data:image/svg+xml,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${text.length * 34 + 16}" height="60"><rect width="100%" height="60" fill="${colour}"/><text x="10" y="46" textLength="${text.length * 34 - 4}" lengthAdjust="spacingAndGlyphs" font-family="Georgia" font-size="46" font-weight="700" fill="#fff">${text}</text></svg>`
+  )}`;
+
 /**
  * Studios per fixture title: the film has two with logos and one without, as
  * TMDB's lists usually go; the saga has a network; the show has none.
@@ -214,7 +220,7 @@ const STUDIOS: Record<number, Studio[]> = {
   2: [
     { name: 'Example Pictures', logo_url: logo('EXAMPLE', '#1a4fb5'), logo_path: null },
     { name: 'Fixture Film Partnership', logo_url: null, logo_path: null },
-    { name: 'Mock Bros.', logo_url: logo('MOCK', '#b51a1a'), logo_path: null },
+    { name: 'Mock Bros.', logo_url: plateLogo('MOCK', '#b51a1a'), logo_path: null },
   ],
   3: [{ name: 'Example Network', logo_url: logo('XNET', '#2a8f3a'), logo_path: null }],
 };

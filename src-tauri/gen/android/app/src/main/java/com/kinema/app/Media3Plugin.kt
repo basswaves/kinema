@@ -277,6 +277,8 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
       p.playWhenReady = false
       // Keeps the file and the moment; lets go of the decoder and the sound.
       p.stop()
+      // Nobody is watching the position now; onResume starts it again.
+      main.removeCallbacks(ticker)
       Log.i("Kinema", "media3: left the screen at ${p.currentPosition} ms; decoder handed back")
     }
   }
@@ -288,6 +290,9 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
       val p = player ?: return@post
       if (path == null) return@post
       p.prepare()
+      lastPosition = -1
+      main.removeCallbacks(ticker)
+      main.post(ticker)
       Log.i("Kinema", "media3: back on screen; reopened paused at ${p.currentPosition} ms")
     }
   }
@@ -302,11 +307,19 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
     trigger("playback", JSObject().apply { put("type", type); fill() })
   }
 
+  /** The position last said to the page (ms), so a film that has not moved says nothing. */
+  private var lastPosition = -1L
+
   /** The position, a few times a second while something is open: Media3 has no event for it. */
   private val ticker = object : Runnable {
     override fun run() {
       val p = player ?: return
-      emit("position") { put("value", p.currentPosition / 1000.0) }
+      // Only when it moved: a paused film says nothing.
+      val at = p.currentPosition
+      if (at != lastPosition) {
+        lastPosition = at
+        emit("position") { put("value", at / 1000.0) }
+      }
       perf.tick()
       main.postDelayed(this, 250)
     }
@@ -335,7 +348,16 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
     parent.addView(subs, 1, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
     subtitleView = subs
     showOrHideSubtitles()
-    return buildPlayer(s)
+    return try {
+      buildPlayer(s)
+    } catch (e: Exception) {
+      // The next open would add a second pair beneath the page.
+      parent.removeView(s)
+      parent.removeView(subs)
+      surface = null
+      subtitleView = null
+      throw e
+    }
   }
 
   /** The subtitle layer shows or not; the chosen track stays chosen either way. */
@@ -824,6 +846,7 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
         perf.open()
         p.prepare()
         p.playWhenReady = wantPlaying
+        lastPosition = -1
         main.removeCallbacks(ticker)
         main.post(ticker)
         invoke.resolve()
@@ -1152,6 +1175,9 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
 
   // ---- the details panel ------------------------------------------------------
 
+  /** What `inHardware` has already answered, by decoder name. */
+  private val hardwareDecoders = HashMap<String, Boolean>()
+
   /**
    * Whether a decoder is the device's own hardware: Android says so from 10
    * on; before, its software decoders are the ones named for Google or
@@ -1159,7 +1185,11 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
    */
   private fun inHardware(name: String): Boolean? {
     if (Build.VERSION.SDK_INT >= 29) {
+      // The panel asks every second, and listing every codec is not cheap;
+      // a device's decoders do not change while it runs.
+      hardwareDecoders[name]?.let { return it }
       val info = MediaCodecList(MediaCodecList.ALL_CODECS).codecInfos.firstOrNull { it.name == name } ?: return null
+      hardwareDecoders[name] = info.isHardwareAccelerated
       return info.isHardwareAccelerated
     }
     val lower = name.lowercase()

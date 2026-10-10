@@ -20,12 +20,15 @@ use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc;
 use std::sync::{Mutex, OnceLock};
+use std::time::Duration;
 
 /// What one read from the share asks for, and what is sent on at a time.
 const CHUNK: usize = 1 << 20;
 /// Reads made ahead of what the player has taken, so the network and the
 /// player each work while the other waits.
 const AHEAD: usize = 4;
+/// How long a connection may take to send its request.
+const REQUEST_WAIT: Duration = Duration::from_secs(10);
 
 struct Server {
     port: u16,
@@ -154,6 +157,10 @@ fn content_type(path: &str) -> &'static str {
 
 fn answer(conn: TcpStream) -> io::Result<()> {
     let _counted = Gauge::up(&CONNECTIONS);
+    // A client that connects and says nothing would otherwise hold this
+    // thread for good.
+    conn.set_read_timeout(Some(REQUEST_WAIT))?;
+    conn.set_nodelay(true)?;
     let mut reader = BufReader::new(conn.try_clone()?);
     let mut out = conn;
     let mut request = String::new();
@@ -212,15 +219,16 @@ fn answer(conn: TcpStream) -> io::Result<()> {
         None => (0, len - 1, "200 OK"),
     };
     let count = if len == 0 { 0 } else { end - start + 1 };
-    write!(
-        out,
+    // The head in one piece: several small writes would each be a packet.
+    let mut head = format!(
         "HTTP/1.1 {status}\r\nContent-Type: {}\r\nContent-Length: {count}\r\nAccept-Ranges: bytes\r\n",
         content_type(&path)
-    )?;
+    );
     if status.starts_with("206") {
-        write!(out, "Content-Range: bytes {start}-{end}/{len}\r\n")?;
+        head.push_str(&format!("Content-Range: bytes {start}-{end}/{len}\r\n"));
     }
-    out.write_all(b"Connection: close\r\n\r\n")?;
+    head.push_str("Connection: close\r\n\r\n");
+    out.write_all(head.as_bytes())?;
     if head_only || count == 0 {
         return Ok(());
     }

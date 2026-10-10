@@ -28,9 +28,30 @@ const call = <T = void>(command: string, args?: Record<string, unknown>) =>
     throw inWords(e);
   });
 
+/** Everyone listening now; the one plugin listener below hands each event to all of them. */
+const handlers = new Set<(event: PlaybackEvent) => void>();
+let attached: Promise<unknown> | null = null;
+
+/**
+ * The plugin listener is made once and kept for the life of the app. Tauri
+ * never lets go of one: `unregister()` only tells the plugin to stop, while
+ * the page's callback and the core's Channel stay registered for good, so a
+ * listener per film would leave one more behind for every film played.
+ */
+function attach(): Promise<unknown> {
+  attached ??= addPluginListener<PlaybackEvent>('media3', 'playback', (event) => {
+    for (const handle of [...handlers]) handle(event);
+  }).catch((e: unknown) => {
+    attached = null; // not made; the next listen tries again
+    throw e;
+  });
+  return attached;
+}
+
 export async function listen(handle: (event: PlaybackEvent) => void): Promise<() => void> {
-  const listener = await addPluginListener<PlaybackEvent>('media3', 'playback', handle);
-  return () => void listener.unregister();
+  await attach();
+  handlers.add(handle);
+  return () => void handlers.delete(handle);
 }
 
 /** A subtitle file beside the film, as the core finds them (subtitle_files.rs). */

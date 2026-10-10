@@ -98,11 +98,26 @@ struct Login {
 
 /// A kept connection to one server.
 struct Server {
-    client: Client,
+    client: Arc<Client>,
     /// The shares it is signed in to, lower-cased. Locked while one is being
     /// signed in to: two sign-ins at once on one connection crashed inside the
     /// SMB library (a scan and a film starting together would do it).
     shares: Mutex<HashSet<String>>,
+}
+
+impl Drop for Server {
+    /// Forgetting a server is not enough: the library keeps a dropped client's
+    /// connection, and its threads, alive. This runs when the last holder lets
+    /// go, so a film still playing on the old connection keeps it; the closing
+    /// is done on a thread of its own so no one waits on a server that is gone.
+    fn drop(&mut self) {
+        let client = self.client.clone();
+        std::thread::spawn(move || {
+            if let Err(e) = client.close() {
+                log::debug!("netshare: closing a forgotten connection: {e}");
+            }
+        });
+    }
 }
 
 #[derive(Default)]
@@ -250,7 +265,7 @@ fn connect(addr: &Address) -> io::Result<Arc<Server>> {
                 config.connection.timeout = Some(TIMEOUT);
                 // DFS referrals lead to other servers Kinema has no sign-in for.
                 config.dfs = false;
-                Arc::new(Server { client: Client::new(config), shares: Mutex::default() })
+                Arc::new(Server { client: Arc::new(Client::new(config)), shares: Mutex::default() })
             })
             .clone();
         (server, login)

@@ -102,7 +102,9 @@ enum Kind {
     Poster,
     Backdrop,
     Still,
-    /// Logos and faces, already fetched small, or one-off: never resized here.
+    /// A title's own lettering (TMDB keeps them at full size: a few MB each).
+    Logo,
+    /// Faces and studio logos, already fetched small, or one-off: never resized here.
     Other,
 }
 
@@ -119,7 +121,7 @@ fn all_urls(conn: &rusqlite::Connection) -> rusqlite::Result<Vec<(String, Kind)>
          UNION ALL
          SELECT backdrop_url, 2 FROM titles   WHERE backdrop_url IS NOT NULL AND backdrop_url <> ''
          UNION ALL
-         SELECT logo_url,     0 FROM titles   WHERE logo_url     IS NOT NULL AND logo_url     <> ''
+         SELECT logo_url,     4 FROM titles   WHERE logo_url     IS NOT NULL AND logo_url     <> ''
          UNION ALL
          SELECT still_url,    3 FROM episodes WHERE still_url    IS NOT NULL AND still_url    <> ''
          UNION ALL
@@ -137,6 +139,7 @@ fn all_urls(conn: &rusqlite::Connection) -> rusqlite::Result<Vec<(String, Kind)>
             1 => Kind::Poster,
             2 => Kind::Backdrop,
             3 => Kind::Still,
+            4 => Kind::Logo,
             _ => Kind::Other,
         };
         match at.get(&url) {
@@ -160,7 +163,9 @@ const SMALL_COPIES: bool = cfg!(target_os = "android");
 /// address (it is the cache's key, and what a desktop fetches); on a TV a
 /// smaller copy of a TMDB picture is enough, so the size in its path is
 /// swapped. Sizes are what a 1080p to 4K screen shows a card at, not the
-/// picture's own: posters 500 wide, backdrops 1280, episode stills 780.
+/// picture's own: posters 500 wide, backdrops 1280, episode stills 780,
+/// title logos 500 (TMDB keeps those at full size, 0.8 MB on average for
+/// 400 films — more than every other picture together).
 /// TVmaze's are kept as they are: its smaller copies are 210–250 wide, soft
 /// on a TV, and its originals are small already. A picture that is not one
 /// of those kinds (a logo, a face) is returned as it is.
@@ -173,6 +178,7 @@ fn rendition(url: &str, kind: Kind, small: bool) -> String {
             Kind::Poster => "w500",
             Kind::Backdrop => "w1280",
             Kind::Still => "w780",
+            Kind::Logo => "w500",
             Kind::Other => return url.to_string(),
         };
         return format!("https://image.tmdb.org/t/p/{size}/{file}");
@@ -625,6 +631,7 @@ mod tests {
         assert_eq!(rendition(tmdb, Kind::Poster, true), sized("w500"));
         assert_eq!(rendition(tmdb, Kind::Backdrop, true), sized("w1280"));
         assert_eq!(rendition(tmdb, Kind::Still, true), sized("w780"));
+        assert_eq!(rendition(tmdb, Kind::Logo, true), sized("w500"));
         assert_eq!(rendition(tmdb, Kind::Other, true), tmdb, "a logo keeps its size");
         // Already sized, or from elsewhere: left alone.
         let w300 = "https://image.tmdb.org/t/p/w300/s.png";
@@ -640,7 +647,7 @@ mod tests {
 
     #[test]
     fn a_desktop_keeps_the_original() {
-        for kind in [Kind::Poster, Kind::Backdrop, Kind::Still, Kind::Other] {
+        for kind in [Kind::Poster, Kind::Backdrop, Kind::Still, Kind::Logo, Kind::Other] {
             for url in [
                 "https://image.tmdb.org/t/p/original/abc.jpg",
                 "https://static.tvmaze.com/uploads/images/original_untouched/1/2.jpg",
@@ -673,7 +680,7 @@ mod tests {
                 ("b".to_string(), Kind::Backdrop),
                 ("both".to_string(), Kind::Other),
                 ("f".to_string(), Kind::Other),
-                ("l".to_string(), Kind::Other),
+                ("l".to_string(), Kind::Logo),
                 ("p".to_string(), Kind::Poster),
                 ("s".to_string(), Kind::Still),
                 ("st".to_string(), Kind::Other),

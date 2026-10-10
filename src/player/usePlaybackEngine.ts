@@ -335,15 +335,19 @@ export function usePlaybackEngine({
   }, [lastAid, setChapters, dispatch, sessionRef, setNotice, revealOsd]);
 
   /**
-   * End-of-file detection by polling as well.
+   * End-of-file detection by polling as well, for mpv.
    *
    * `eof-reached` is also observed, but observed properties are registered when
    * mpv initialises — which happens once per window. Adding one later has no
    * effect until the app restarts, and that silent dependency already cost a
    * debugging round. Polling works regardless of when this code loads; the
    * session ignores the repeats.
+   *
+   * Not for Media3: it says so itself, with both `reached-end` and `ended`,
+   * and each poll there is a call into the app for nothing.
    */
   useEffect(() => {
+    if (!hasMpv()) return;
     const id = window.setInterval(async () => {
       if (sessionRef.current.ended) return;
       if (await hasReachedEnd()) dispatch({ type: 'eof' });

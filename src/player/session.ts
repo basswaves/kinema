@@ -80,6 +80,16 @@ export type Event =
   | { type: 'scrub-end' }
   | { type: 'resume-shown' };
 
+/**
+ * How far the position must move before the session notices. The engines push
+ * it far more often than anything shows it (mpv per frame, Media3 four times a
+ * second), and each change re-renders the whole player. The clock reads whole
+ * seconds, a skip prompt appears at a marker rather than within half a second
+ * of it, and a seek is always many seconds, so a smaller step changes nothing
+ * anyone sees.
+ */
+export const POSITION_STEP_SECS = 0.5;
+
 export function initialSession(path: string): Session {
   return {
     path,
@@ -149,7 +159,14 @@ export function reduce(state: Session, event: Event): Session {
 
     case 'time-pos':
       if (!state.open || state.scrubbing) return state;
-      return { ...state, timePos: event.value };
+      if (
+        event.value !== null &&
+        state.timePos !== null &&
+        Math.abs(event.value - state.timePos) < POSITION_STEP_SECS
+      ) {
+        return state;
+      }
+      return event.value === state.timePos ? state : { ...state, timePos: event.value };
 
     case 'duration':
       if (!state.open) return state;

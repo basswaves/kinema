@@ -241,6 +241,33 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   // ---- seeking with Left/Right --------------------------------------------
   const { scrubBy, releaseScrub } = useScrub({ sessionRef, dispatch, fail, showOsd });
 
+  // The handlers the controls are given, built once, so the bar can sit out
+  // the position ticking over while it is hidden (PlayerControls.tsx).
+  const onSeekBarEnter = useCallback(() => void togglePauseByKey(), [togglePauseByKey]);
+  const onDragStart = useCallback(() => dispatch({ type: 'scrub-start' }), [dispatch]);
+  const onDrag = useCallback(
+    (seconds: number) => dispatch({ type: 'scrub', timePos: seconds }),
+    [dispatch]
+  );
+  const onDragEnd = useCallback(
+    (seconds: number | null) => {
+      dispatch({ type: 'scrub-end' });
+      if (seconds !== null) void seekTo(seconds);
+    },
+    [dispatch]
+  );
+  const onSeekBy = useCallback((seconds: number) => void seekRelative(seconds), [seekRelative]);
+  const onTogglePause = useCallback(() => void togglePause(), [togglePause]);
+  const onTracks = useCallback(() => {
+    if (showTracks) {
+      closeTracks();
+      return;
+    }
+    openTracks();
+    void refreshTracks();
+  }, [showTracks, closeTracks, openTracks, refreshTracks]);
+  const onFullscreen = useCallback(() => void toggleFullscreen(), [toggleFullscreen]);
+
   /**
    * The clock, for "Ends at". Ticked rather than read during render, which
    * would make the render impure; every 15 s is plenty for a minute display,
@@ -325,6 +352,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   ]);
 
   const endsAt = endsAtLabel(timePos, duration, now);
+  const controlsShown = osdVisible || showTracks || osdFocus;
   const subTracks = tracks.filter((t) => t.type === 'sub');
   const audioTracks = tracks.filter((t) => t.type === 'audio');
 
@@ -333,7 +361,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     <div
       ref={shellRef}
       className={`player ${osdFocus ? 'osd-focused' : ''} ${
-        osdVisible || showTracks || osdFocus ? '' : 'osd-hidden'
+        controlsShown ? '' : 'osd-hidden'
       }`}
       onMouseMove={showOsd}
       onClick={(e) => {
@@ -418,6 +446,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       )}
 
       <PlayerControls
+        visible={controlsShown}
         timePos={timePos}
         duration={duration}
         paused={paused}
@@ -429,28 +458,18 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         tv={tv}
         onScrub={scrubBy}
         onScrubRelease={releaseScrub}
-        onSeekBarEnter={() => void togglePauseByKey()}
-        onDragStart={() => dispatch({ type: 'scrub-start' })}
-        onDrag={(seconds) => dispatch({ type: 'scrub', timePos: seconds })}
-        onDragEnd={(seconds) => {
-          dispatch({ type: 'scrub-end' });
-          if (seconds !== null) void seekTo(seconds);
-        }}
-        onSeekBy={(seconds) => void seekRelative(seconds)}
-        onTogglePause={() => void togglePause()}
+        onSeekBarEnter={onSeekBarEnter}
+        onDragStart={onDragStart}
+        onDrag={onDrag}
+        onDragEnd={onDragEnd}
+        onSeekBy={onSeekBy}
+        onTogglePause={onTogglePause}
         onPlayNeighbour={playNeighbour}
-        onTracks={() => {
-          if (showTracks) {
-            closeTracks();
-            return;
-          }
-          openTracks();
-          void refreshTracks();
-        }}
+        onTracks={onTracks}
         onVolumeChange={changeVolume}
         onVolumeSet={setVolumeLevel}
         onToggleMute={toggleMute}
-        onFullscreen={() => void toggleFullscreen()}
+        onFullscreen={onFullscreen}
       />
     </div>
     </FocusContext.Provider>

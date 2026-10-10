@@ -148,6 +148,25 @@ describe('a new target', () => {
   });
 });
 
+describe('the position', () => {
+  it('stays the same session while it moves less than a step', () => {
+    const s = openOn();
+    expect(run(s, { type: 'time-pos', value: 100.04 })).toBe(s);
+    expect(run(s, { type: 'time-pos', value: 99.8 })).toBe(s);
+    expect(run(s, { type: 'time-pos', value: 100 })).toBe(s);
+  });
+
+  it('follows a step, forward or back, and a seek', () => {
+    expect(run(openOn(), { type: 'time-pos', value: 100.5 }).timePos).toBe(100.5);
+    expect(run(openOn(), { type: 'time-pos', value: 99.4 }).timePos).toBe(99.4);
+    expect(run(openOn(), { type: 'time-pos', value: 700 }).timePos).toBe(700);
+  });
+
+  it('takes the position going away', () => {
+    expect(run(openOn(), { type: 'time-pos', value: null }).timePos).toBeNull();
+  });
+});
+
 describe('the seek bar', () => {
   it('holds the dragged position against pushes until released', () => {
     const s = run(openOn(), { type: 'scrub-start' }, { type: 'scrub', timePos: 700 });

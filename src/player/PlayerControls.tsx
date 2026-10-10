@@ -3,6 +3,7 @@
  * under them the buttons. It draws and reports; what each control does is the
  * player's (Player.tsx), passed in.
  */
+import { memo } from 'react';
 import FocusButton from '../ui/FocusButton';
 import { formatTime } from '../ui/format';
 import { setShortcutsOpen } from '../ui/shortcutsState';
@@ -22,6 +23,12 @@ import SeekBar from './SeekBar';
 import VolumeControl from './VolumeControl';
 
 interface Props {
+  /**
+   * Whether the bar is showing. While it is not, a change of position is not
+   * drawn: the bar has faded out, and the film ticking over would re-render
+   * every button under it for nothing.
+   */
+  visible: boolean;
   timePos: number | null;
   duration: number | null;
   paused: boolean;
@@ -54,7 +61,7 @@ interface Props {
   onFullscreen: () => void;
 }
 
-export default function PlayerControls({
+function PlayerControls({
   timePos,
   duration,
   paused,
@@ -78,6 +85,8 @@ export default function PlayerControls({
   onVolumeSet,
   onToggleMute,
   onFullscreen,
+  // Read only by the comparison below.
+  visible: _visible,
 }: Props) {
   const progress = duration && timePos !== null ? (timePos / duration) * 100 : 0;
 
@@ -215,3 +224,14 @@ export default function PlayerControls({
     </div>
   );
 }
+
+/**
+ * Re-drawn when anything but the position changes, and when the position
+ * changes while the bar can be seen. Coming back into view changes `visible`,
+ * so it is always drawn at the current position before it can be seen.
+ */
+export default memo(PlayerControls, (prev, next) =>
+  (Object.keys(next) as (keyof Props)[]).every(
+    (key) => (key === 'timePos' && !next.visible) || Object.is(prev[key], next[key])
+  )
+);

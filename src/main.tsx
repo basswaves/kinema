@@ -28,6 +28,7 @@ function start(): void {
 if (import.meta.env.DEV && import.meta.env.VITE_KINEMA_MOCK === '1') {
   void import('./dev/mockBackend').then(({ installMockBackend }) => {
     installMockBackend();
+    void import('./dev/navProbe').then((m) => m.installNavProbe()); // test:nav
     start();
   });
 } else {

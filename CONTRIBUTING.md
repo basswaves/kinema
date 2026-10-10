@@ -186,7 +186,20 @@ a person would, since two presses 25 ms apart are one (GOTCHAS), and a prompt
 is read before it is answered. `e2e/player.e2e.ts` covers everything a sofa
 does in the player; a change there should leave all of it passing.
 
-CI runs all of this on every push — Windows, and Linux for x86 and ARM, with
+The navigation checker presses every arrow from every control on every
+screen, at TV size, as Windows, Linux and Android, and writes where each one
+went as a plain-words map in `navmap-results/` (about 25 minutes; its own
+port, so it can run beside the tests above):
+
+```bash
+npm run test:nav
+```
+
+It reports what the app does, and flags focus leaving a menu, ending under
+the top bar or off screen, and controls no arrow reaches or leaves. Read its
+map after changing how a screen is laid out. CI does not run it.
+
+CI runs all of the rest on every push — Windows, and Linux for x86 and ARM, with
 the WebKit tests on x86 Linux — so checking here is about finding out before
 pushing, not instead of it.
 

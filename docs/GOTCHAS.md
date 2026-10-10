@@ -992,6 +992,23 @@ a fresh library as if it were the result. **Do:** set state with
 use the `localStorage` switches (`kinemaMockReview`, `kinemaMockUpdate`,
 `kinemaMockEmpty`) for anything that has to survive a reload.
 
+### Playwright empties `test-results/` at the start of every run
+
+Any `npx playwright test`, with either config, deletes the whole
+`test-results/` folder before it starts — not just its own files. The
+navigation checker first wrote its map there, and the next keyboard-flow run
+deleted 24 minutes of results without a word. **Do:** anything meant to
+outlast a run goes elsewhere; the checker writes to `navmap-results/`.
+
+### Most tools do not read `.gitignore`
+
+Claude Code keeps its worktrees — whole copies of the project — under
+`.claude/worktrees/`. Git ignores them; ESLint, Vitest and Vite's file watcher
+do not, so `npm run check` linted and tested every copy (2,687 errors and over
+a thousand test files, 2026-10-10) and the dev server watched them. All three
+now skip `.claude/` (`eslint.config.js`, `vite.config.ts`); a new tool that
+walks the project needs the same line.
+
 ### A self-test presses keys and never lets go
 
 `selftest.ts` dispatches `keydown` only. Anything that acts on the key's

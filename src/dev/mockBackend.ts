@@ -874,7 +874,41 @@ const backListeners: string[] = [];
  * `kinemaMockReview` pretends that many videos wait in the review queue.
  * Read at each count, so a test can match them "by hand" part-way through.
  */
-const reviewCount = (): number => Number(flag('kinemaMockReview') ?? 0) || 0;
+const reviewCount = (): number =>
+  flag('kinemaMockReview') === 'items'
+    ? REVIEW_ITEMS.length
+    : Number(flag('kinemaMockReview') ?? 0) || 0;
+/**
+ * `kinemaMockReview=items`: three plausible files wait in the queue, and
+ * `list_needs_review` lists them (the navigation checker opens one). Only that
+ * call: `list_unmatched` stays empty, since the scan's matching pass reads it.
+ */
+const REVIEW_ITEMS = (
+  [
+    ['Fixture.Movie.1999.1080p.mkv', 'Fixture Movie', 1999, null, null, 'movie'],
+    ['Sample Series S02E03 720p.mkv', 'Sample Series', null, 2, 3, 'episode'],
+    ['Sample Series S02E04 720p.mkv', 'Sample Series', null, 2, 4, 'episode'],
+  ] as const
+).map(([name, title, year, season, episode, kind], i) => ({
+  id: 9001 + i,
+  path: `C:\\fixture\\unsorted\\${name}`,
+  parent_dir: 'C:\\fixture\\unsorted',
+  file_name: name,
+  size_bytes: 1_500_000_000,
+  missing: false,
+  match_status: 'unmatched',
+  parsed_title: title,
+  parsed_year: year,
+  parsed_season: season,
+  parsed_episode: episode,
+  parsed_kind: kind,
+  parsed_from: 'filename',
+  title_id: null,
+  match_confidence: null,
+  match_reason: 'Several close matches, none clearly best',
+  matched_title: null,
+  episode_name: null,
+}));
 /** `kinemaMockScanErrors`: the scan's problems, as the scanner words them. */
 const SCAN_ERRORS: string[] = (() => {
   try {
@@ -992,7 +1026,7 @@ const handlers: Record<string, Handler> = {
       .filter((f) => f.season === num(a, 'season'))
       .map((f) => ({ file_id: f.id, ...mockFileFacts(f.id) })),
   list_unmatched: () => [],
-  list_needs_review: () => [],
+  list_needs_review: () => (flag('kinemaMockReview') === 'items' ? REVIEW_ITEMS : []),
   count_needs_review: () => reviewCount(),
   latest_release: () =>
     UPDATE ? { version: UPDATE, url: 'https://github.com/Basswaves/kinema/releases' } : null,

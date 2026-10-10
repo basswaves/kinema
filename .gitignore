@@ -59,5 +59,6 @@ src-tauri/app.log
 /notes/
 /CLAUDE.md
 test-results/
+navmap-results/
 playwright-report/
 __pycache__/

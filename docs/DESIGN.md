@@ -335,6 +335,29 @@ the focus key it was left on; Back pops one and puts focus back on that control
 (`returnFocusTo`). Top-bar destinations start again from Home. This only works
 for controls with stable focus keys — see GOTCHAS.
 
+**Screens are built from a few kinds of focus group** (`focusGroups.ts`,
+2026-10-10). Inside a screen, "where does this arrow go" used to be answered by
+distance between buttons, which is right between big areas and wrong inside
+them: Down from Back reached the nearest season instead of Play, focus walked
+out of the Audio & subtitles panel. So an area says what it is — a **menu**
+(focus cannot leave by arrows, Up/Down go round), a **row** (Left/Right
+inside; arriving always lands on its current item: Play, the active season),
+or a **list / grid / rail** (arriving lands where you last were) — and
+distance only decides which area is next. The geometry inside a group is
+`navGeometry.ts`, measured at the moment of the press. A navigation checker
+(`npm run test:nav`) presses every arrow from every control in the mock and
+writes the result as a plain-words map, so a move nobody intended shows up as
+a changed line rather than as a surprise on a TV.
+
+**One rule for what is on screen, one for typing** (`focus.ts`). The focused
+control *and the heading of its group* — the rail's title, the section's
+heading, found from the markup — stop clear of the top bar when both fit;
+under a held key the page jumps with the ring instead of animating behind it.
+A text box being typed into is put in the upper part of the visible area
+when OK opens the keyboard and whenever the visible area shrinks, so an
+on-screen keyboard cannot cover it; on a system that never says its keyboard
+is open (an Android 9 box), the OK press is the only moment it can be done.
+
 **Rails are capped, and the cap lives in one place.** Every card is a registered
 focusable and spatial navigation measures elements live at navigation time, so
 an uncapped genre rail on a large library is a real cost for something nobody

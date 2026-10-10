@@ -24,6 +24,7 @@
     "test:watch": "vitest",
     "check": "tsc --noEmit && tsc --noEmit -p tsconfig.e2e.json && eslint . && vitest run",
     "test:ui": "playwright test",
+    "test:nav": "playwright test -c playwright.nav.config.ts",
     "tauri": "tauri",
     "app:build": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-app.ps1"
   },

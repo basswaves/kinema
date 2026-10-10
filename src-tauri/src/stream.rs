@@ -17,7 +17,7 @@ use std::collections::{HashMap, VecDeque};
 use std::hash::{BuildHasher, Hasher};
 use std::io::{self, BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
@@ -253,8 +253,12 @@ fn answer(conn: TcpStream) -> io::Result<()> {
     let (jobs, work) = mpsc::channel::<(u64, usize, mpsc::SyncSender<io::Result<Vec<u8>>>)>();
     let work = Arc::new(Mutex::new(work));
     let file = Arc::new(file);
+    // Set once the player has stopped listening: pieces still waiting to be
+    // read are then left, rather than read for no one while the next
+    // request (the skip that ended this one) waits behind them.
+    let gone = Arc::new(AtomicBool::new(false));
     for _ in 0..readers() {
-        let (work, file, path) = (work.clone(), file.clone(), path.clone());
+        let (work, file, path, gone) = (work.clone(), file.clone(), path.clone(), gone.clone());
         let counted = Gauge::up(&READERS);
         std::thread::spawn(move || {
             let _counted = counted;
@@ -263,6 +267,9 @@ fn answer(conn: TcpStream) -> io::Result<()> {
             loop {
                 let job = work.lock().unwrap_or_else(|e| e.into_inner()).recv();
                 let Ok((pos, want, answer)) = job else { break };
+                if gone.load(Ordering::Relaxed) {
+                    continue;
+                }
                 let _ = answer.send(read_or_reopen(&file, &mut again, &path, pos, want));
             }
         });
@@ -306,6 +313,7 @@ fn answer(conn: TcpStream) -> io::Result<()> {
         }
         Ok(())
     })();
+    gone.store(true, Ordering::Relaxed);
     if sent > 0 {
         crate::log!(
             "stream: {} MB from {start} in {:.1} s; waited {:.1} s for the share, {:.1} s for the player",

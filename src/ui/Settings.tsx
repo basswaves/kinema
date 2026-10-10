@@ -19,7 +19,7 @@ import LanguageSection from './LanguageSection';
 import ChoiceRow from './ChoiceRow';
 import { availableUpdate, UPDATE_CHECK_KEY, type Release } from './updates';
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import {
@@ -92,8 +92,11 @@ import { VIDEO_SYNC_KEY } from '../player/mpvOptions';
 import { buildNfoExports, writeNfo } from '../metadata/nfo';
 import { detectLines } from '../library/detectReport';
 import FixMatch from '../library/FixMatch';
-import LibraryView from '../library/LibraryView';
 import SystemOutputSection from './SystemOutputSection';
+
+// The developer tools are mouse-only and opened by choice; their code is
+// fetched when they are.
+const LibraryView = lazy(() => import('../library/LibraryView'));
 
 const SETTINGS_FOCUS_KEY = 'settings-root';
 
@@ -1447,7 +1450,9 @@ export default function Settings({
 
                 {panel === 'developer' && (
                   <div className="settings-developer">
-                    <LibraryView />
+                    <Suspense fallback={null}>
+                      <LibraryView />
+                    </Suspense>
                   </div>
                 )}
               </>

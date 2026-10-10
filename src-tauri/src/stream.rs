@@ -254,14 +254,36 @@ fn answer(conn: TcpStream) -> io::Result<()> {
             }
         }
     });
-    for chunk in rx {
-        let chunk = chunk?;
-        if chunk.is_empty() {
-            break;
+    // Where the time goes, said once the request ends: waiting on the share
+    // means it fed too slowly; waiting on the player means the share was
+    // ahead and the player (or the device) was the slower side.
+    let began = std::time::Instant::now();
+    let (mut sent, mut for_share, mut for_player) = (0u64, Duration::ZERO, Duration::ZERO);
+    let result = (|| {
+        loop {
+            let t = std::time::Instant::now();
+            let Ok(chunk) = rx.recv() else { return Ok(()) };
+            for_share += t.elapsed();
+            let chunk = chunk?;
+            if chunk.is_empty() {
+                return Ok(());
+            }
+            let t = std::time::Instant::now();
+            out.write_all(&chunk)?;
+            for_player += t.elapsed();
+            sent += chunk.len() as u64;
         }
-        out.write_all(&chunk)?;
+    })();
+    if sent > 0 {
+        crate::log!(
+            "stream: {} MB from {start} in {:.1} s; waited {:.1} s for the share, {:.1} s for the player",
+            sent >> 20,
+            began.elapsed().as_secs_f64(),
+            for_share.as_secs_f64(),
+            for_player.as_secs_f64()
+        );
     }
-    Ok(())
+    result
 }
 
 /// A part of the film, the file opened afresh and the read tried again if

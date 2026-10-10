@@ -64,14 +64,24 @@ fn listing(entries: impl IntoIterator<Item = (String, bool)>) -> Listing {
     Listing { folders, videos }
 }
 
-#[tauri::command]
-pub fn list_folders(path: String) -> Result<Listing, String> {
-    let listed = if crate::netshare::is_share_path(&path) { list_share(&path) } else { list(Path::new(&path)) };
+/// Read one folder, wherever it is. Plain blocking work; see [`list_folders`].
+fn list_any(path: &str) -> Result<Listing, String> {
+    let listed = if crate::netshare::is_share_path(path) { list_share(path) } else { list(Path::new(path)) };
     listed.map_err(|e| match e.kind() {
         // Said so the browser can ask for access rather than show a fault.
         std::io::ErrorKind::PermissionDenied => format!("not allowed to read {path}"),
         _ => format!("could not read {path}: {e}"),
     })
+}
+
+/// **Async, with the reading on a blocking thread.** A folder on a network
+/// share is listed over the network, and a server that is asleep or gone is
+/// waited for up to twenty seconds. As a plain command this ran on the main
+/// thread (see `jobs.rs`) and froze the whole window for that long, in the
+/// very dialog a person opens to fix a share they cannot reach.
+#[tauri::command]
+pub async fn list_folders(path: String) -> Result<Listing, String> {
+    crate::jobs::off_main(move || list_any(&path)).await
 }
 
 /// The Kotlin side (drives, and permission to read them), registered under
@@ -119,6 +129,6 @@ mod tests {
 
     #[test]
     fn a_missing_folder_is_an_error_not_an_empty_listing() {
-        assert!(list_folders("/no/such/folder/for/kinema".into()).is_err());
+        assert!(list_any("/no/such/folder/for/kinema").is_err());
     }
 }

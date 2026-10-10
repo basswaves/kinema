@@ -13,9 +13,72 @@ makes no stability promises.
   nerds") opens from the end of Audio & subtitles, and on a remote's Info
   key where it has one, as well as on `i`. A remote moves through it group
   by group, so the parts below the edge of a TV can be read.
+- **A light look for weak devices, and a Look setting.** On a device with
+  two processor cores or fewer, 2 GB of memory or less, or whose screen
+  draws slower than its own pace, Kinema now drops the blur, the large
+  shadows and the zoom on a focused card, so menus keep up. It decides by
+  itself; Settings → Playback → Look says what it chose and why, and can be
+  set to Full or Light instead. The focus ring, the layout and the text do
+  not change, and nothing about the film's picture does.
+- **Desktop: a graphics card that cannot keep up loses the least visible
+  processing first.** If frames are being dropped early in a film, the
+  player gives up HDR peak measuring, then the chroma scaler, then correct
+  downscaling, then perceptual gamut mapping — one step at a time, only
+  while it is needed — and remembers it for that card. The details panel
+  names each step and why. A card that keeps up never sees any of it.
+
+### Changed
+
+- **Android: a bigger read-ahead and quicker skips on big films.** Kinema
+  now reads ahead from the device's memory (a 4K remux from a USB drive was
+  kept ready only about two seconds ahead, and is now about ten), and a skip
+  lands on the nearest keyframe, so the picture comes back in about half a
+  second instead of up to three. Resuming, the seek bar, chapters and intro
+  markers stay exact.
+- **A network share reads faster.** Kinema now asks the share for several
+  pieces at once, where it waited for each in turn: on a 100 Mbit link it
+  reads at the speed of the wire, and the buffer fills much further ahead.
+  The first picture after a skip is quicker as well.
+- **Desktop: the player keeps more of the film ready.** Every file,
+  including one on a USB drive or a mounted share, gets a read-ahead from
+  the computer's memory and a skip back is served from it; compiled shaders
+  are kept between films; Windows falls back to hardware decoding with a
+  copy rather than to software decoding.
+- **The library works in the background without getting in the way.**
+  Pictures, reading files, the IMDb import, scanning a share and matching
+  titles wait while a film plays and run below it when nothing is playing;
+  file names are read off the interface's own thread, and titles are
+  matched a few at a time.
+- **Menus are lighter.** A press in a grid or the search results costs the
+  same with 50 titles as with 1,000, a held key no longer queues up
+  scrolling, and Home does not redraw everything when you come back to it
+  unchanged. The player page does less while a film plays.
+- **Android: TMDB pictures are downloaded at TV size** (posters 500 pixels
+  wide, backdrops 1280, episode stills 780) rather than the original, for
+  pictures downloaded from now on; a 4K backdrop took about 33 MB of
+  memory. What is already downloaded is not touched, and Windows and Linux
+  still fetch the originals.
 
 ### Fixed
 
+- **Android: a Blu-ray remux with many subtitle tracks stalled.** A film
+  with 18 or more picture-subtitle tracks from a network share stopped five
+  to seven times in under two minutes, because reading the film waited on
+  turning every subtitle track into text. Only the chosen track is decoded,
+  and when it is shown; the same films play without a stall.
+- **Android: Dolby Vision profile 7 films had sound and no picture** on a
+  device with no decoder for that profile, which is most of the Dolby Vision
+  Blu-ray remuxes. They now play as their HDR10 picture, and the details
+  panel says "Dolby Vision layer not applied".
+- **Android: a DTS-HD track that fell back to ordinary sound** because its
+  buffer was refused is now tried once at the plain size and, if the device
+  takes it, reaches the receiver untouched.
+- **Android: every film left a little of itself behind.** Each film played
+  kept the closed player's state in memory until Kinema was restarted. Now
+  it is let go, and the position stops being reported while Kinema is in the
+  background.
+- **Browsing a network share's folders no longer freezes the window** for up
+  to twenty seconds when the server is slow to answer.
 - **Subtitle files named a little differently from the film.** A
   subtitle file beside a film was only offered when its name held the
   film's exactly; one that wrote `7. 1` where the film wrote `7.1` was

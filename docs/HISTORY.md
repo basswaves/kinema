@@ -2764,6 +2764,141 @@ wrong on every system.
   reading on past a page's last control and back, which now stops with
   the control clear or takes it off the screen entirely.
 
+## The optimisation pass (2026-10-09 and 10)
+
+**The request.** Make every part of Kinema faster, above all on Android, and
+above all for a large 4K Blu-ray remux on a weak, old TV box — without losing
+anything it does. The first step was to measure, not to guess: a kit that
+logs what playing costs (first picture, stalls with the buffer at each,
+seek-to-picture, dropped frames, load rate, heap, threads) in debug builds,
+a command that reports the process's memory, threads and handles, and
+scripted sessions that play a fixed passage, skip ten times and read the
+lines back. Each change below was measured before and after through the real
+player, on an old 32-bit Android 9 box with a USB stick and with a NAS, and
+on Windows and Linux where it applies to them.
+
+**The rule it was done under.** Every optimisation adapts to what the device
+reports at run time and never to the numbers of the box it was tried on
+(CONTRIBUTING). The first audit leaned on that box's figures — 1.4 GB, two
+cores, a 35 Mbit/s decoder claim — and the owner called it out; counts and
+sizes now come from the cores and memory a device reports, and a decoder
+trick only where the system says it is supported.
+
+**What was found.**
+
+- **Subtitle parsing was starving the player.** Media3 turns every subtitle
+  track into cues on the one thread that reads the film. A Blu-ray remux has
+  18 to 42 picture-subtitle tracks, and films of about 30 Mbit/s stalled five
+  to seven times in 100 seconds (7 to 14 seconds in all) while the film link
+  waited, by its own log, on the player — not the share. The clips that
+  played cleanly had no such tracks, which is why it hid so long. Tracks are
+  now decoded by the renderer, for the chosen one only; the same films play
+  without a stall and the buffer grows to 8–12 seconds, with the pictures
+  still drawn.
+- **A local file was read ahead by about two seconds.** Media3 gives a local
+  file a fixed 18.75 MB, which is two seconds of a 4K remux from a USB drive
+  (a network source gets 144 MB, most of a weak device's heap). Kinema set
+  nothing. The read-ahead is now a quarter of the app's heap, at most a tenth
+  of the device's memory, 32–192 MB and up to a minute, with `largeHeap` on.
+  A USB film's buffer went from about 1.6 seconds to about 10.
+- **The share link read one piece at a time.** One 1 MiB read in flight left
+  the NAS idle while each reply was checked and copied. Two to four readers
+  (from the cores) now take pieces in turn, six asked ahead, the first piece
+  after a request only 256 KB. The share's raw rate went from about 65 to
+  about 93 Mbit/s — the wire, on what is probably a 100 Mbit link — and the
+  buffer grew to 27–32 seconds. Right after, the first bytes after a skip got
+  slower, because the abandoned request's queued pieces were still being
+  read; a skip now drops them, and first bytes after a jump fell from
+  165–408 ms to 55–377 ms. SMB signing (a soft implementation on this CPU,
+  about 40% of a core at that rate) was suspected and turned out not to be the
+  ceiling, so it was left alone.
+- **Every film leaked its player listener.** Tauri never lets go of a plugin
+  listener (the unregister call removes it on one side and not the other), so
+  each film left a channel, and the closed player's state with it. The leak
+  test, which counts the page's callbacks over ten plays, showed one more per
+  film; one listener now lives for the app and hands events on, and the count
+  stays flat. Threads, handles and memory returned to the same floor after
+  every film.
+- **Skips were exact.** Each skip decoded and discarded frames from the
+  keyframe before the target. Skips now land on the nearest keyframe (Media3
+  `CLOSEST_SYNC`, mpv `absolute+keyframes`) while resume, the seek bar,
+  chapters and markers stay exact: skip to picture went from 0.3–3.4 seconds
+  to 0.2–0.7.
+
+**What else changed.** The Rust core and every dependency are built
+optimised even in a debug build, and releases get thin LTO. On the old box
+this changed nothing measurable, because its test builds were already
+optimised; it matters for the builds people install, and for CI, which built
+Android unoptimised. A DTS-HD
+sound that the device refuses a buffer for is tried once with Media3's plain
+size before it is decoded. The player page re-renders twice a second instead
+of per frame, panels over the film lose their blur, and the controls are
+taken out of drawing when hidden. The desktop player keeps a read-ahead from
+memory for every file (a USB drive or a mounted share is an ordinary file to
+mpv), a shader cache in app data, and `d3d11va-copy` as a fallback instead
+of software decoding on Windows. SQLite keeps temporary tables in memory and
+sizes its cache from the device's memory. Browsing a share's folders no
+longer freezes the window (the listing ran on the main thread and could wait
+20 seconds). The library's background work — artwork, reading files,
+the IMDb import, a share's walk, the scan's stages and title matching — waits
+while a film plays and runs below it; file names are parsed in a worker, off
+the page's thread; titles are matched two to four at a time. Menus move by
+index, so a press in a grid costs the same with 50 titles or 1,000, and a
+held key no longer piles up smooth scrolls. TMDB pictures on Android are
+fetched TV-sized.
+
+**Three decisions that bend a rule, made by the owner.**
+
+- **The Look setting, an exception to "no quality presets".** Auto, Full or
+  Light, in Settings → Playback. A light look (no blur, large shadows or card
+  zoom) is chosen by itself on a device with two cores or fewer, 2 GB of
+  memory or less, or frames slower than 1.4 times its own screen's pace while
+  Home opens. The first version of that last test used a fixed 22 ms and
+  would have called any 24 or 30 Hz screen weak; it now compares with the
+  screen's quickest frames. The setting exists because the owner chose, knowingly, that
+  a weak device the automatic choice misjudges must not be stuck with it. It
+  describes the interface, not the film, and no other preset follows from it.
+- **The desktop player steps down when a card falls behind.** Peak detection
+  first, then the chroma scaler (spline36 to bilinear), then correct
+  downscaling, then perceptual gamut mapping, one step per 10-second window
+  in a film's first 45 seconds, only while drops plus late frames are over 2%
+  and at least three; remembered per card, never back up by itself, named in
+  the details panel. It sits beside "creator's intent" rather than against it:
+  it acts only where the alternative is a stuttering picture, and says what it
+  gave up. On a healthy card (a 100 Mbit/s 4K HDR clip, checked in the real
+  app) it stayed off, with no drops. It has not been seen on a weak card.
+- **Dolby Vision profile 7 plays as HDR10 where no decoder takes it.** Media3
+  falls back to the plain picture for profiles 4 and 8 only, and most DV
+  remuxes are profile 7, so on the old box such a film had sound and no
+  picture. The track is handed over as the HEVC it is underneath and the
+  panel says the Dolby Vision layer was not applied. Tested with a clip whose
+  Dolby Vision label was added by hand — it proves the fallback path (no
+  picture before, a picture after in three seconds), not a real enhancement
+  layer, which none of the test library has.
+
+**Tried and dropped.**
+
+- **Tunneled playback.** Media3 would not pick the tunnel decoder for HEVC
+  Main10 (it rates it unable), so the switch changed nothing; forcing it would
+  have been shaped round one box.
+- **Asynchronous codec queueing forced on older Android.** A small gain and
+  known problems on some devices — not worth a switch that cannot be checked
+  on those.
+- **Narrowing mpv's `msg-level`.** The log file is written verbose whatever the
+  level, so it saved nothing and made GOTCHAS wrong.
+- **TVmaze pictures made smaller.** TVmaze offers the original or a roughly
+  250-pixel one, too small for a TV; they stay as they are. On a library of
+  mostly series that is most of the pictures, so the saving from TV-sized
+  TMDB pictures is small there (the thirteen it applied to went from 13.5 MB
+  to 1.9 MB). Shrinking them after download, or preferring TMDB's own
+  episode stills, is an open question.
+
+**Left alone, and said so.** A link slower than the film (a remux averaging
+above about 90 Mbit/s cannot stream over a 100 Mbit link, and buffering only
+rides out peaks), and a sound format the device cannot decode with no
+receiver to pass it to. Software decoding of those would bundle a native
+library, which "no third-party binaries" forbids; not now.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

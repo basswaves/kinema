@@ -371,6 +371,43 @@ reasoning is in [docs/DESIGN.md](docs/DESIGN.md) and [docs/HISTORY.md](docs/HIST
   and passes the sound through by itself, and Kinema's one switch — matching
   the screen to the film, by the same rule — is on unless switched off, and
   not asked at the first run.
+  **One written exception, chosen on purpose: the Look.** Settings →
+  Playback → Look is Auto, Full or Light, and it is a matter of how the
+  interface is drawn, not of the film's picture. Light drops blur, large
+  shadows and the zoom on focus, for a weak device (two processor cores or
+  fewer, 2 GB of memory or less, or frames that come slower than its own
+  screen's pace). Auto, the default, decides from what the device reports
+  and from measured frame times, and Settings says what it chose and why;
+  the setting is there because a device that is weak in a way it cannot
+  report should not be stuck with the choice. Nothing else becomes a preset
+  because of it.
+- **When a graphics card cannot keep up, the desktop player steps down — and
+  only then.** The picture Kinema aims for is the full one. But a card that
+  drops frames shows a stuttering film, which is further from the creator's
+  intent than a slightly cheaper way of drawing it. So only once frames are
+  being dropped (judged over short windows early in a film; seeks, pauses and
+  stalls do not count), the player gives up the least visible processing
+  first — HDR peak measuring, then the chroma scaler, then correct
+  downscaling, then perceptual gamut mapping — one step at a time. It is
+  remembered for that graphics card, never goes back up by itself, and the
+  details panel names every step and why. A healthy card never sees it. It
+  is not for Android, where the system's decoder and display do the work.
+- **Dolby Vision profile 7 on a device with no profile 7 decoder plays its
+  HDR10 base layer, and says so.** Most Dolby Vision Blu-ray remuxes are
+  profile 7, and Media3 falls back to the plain picture only for profiles 4
+  and 8, so such a film played with sound and no picture at all. Where the
+  device lists no decoder for it, the film is handed over as the HEVC it is
+  underneath and the details panel reads "HDR10 (PQ) — Dolby Vision layer not
+  applied". Kinema never claims a Dolby Vision picture the device did not show.
+- **Optimisations adapt to what each device reports, never to one test
+  device.** Buffer sizes come from the app's memory, worker and download
+  counts from the number of cores (clamped), the light look from measured
+  frame times, and a decoder or output trick is used only where the system
+  says it supports it. A number measured on one box is evidence that a
+  change works, not a value to put in the code; a change that matters on
+  weak hardware is checked on at least two kinds of device. Background work
+  (artwork, reading files, the IMDb import, a share's folder walk) yields to
+  a playing film and runs below it.
 - **Vendor-neutral.** Must behave identically on AMD, Intel and NVIDIA.
 - **On Linux, a stable base rather than a matrix.** Kinema is made by one
   person and Linux has more desktops, versions and drivers than one person
@@ -382,6 +419,15 @@ reasoning is in [docs/DESIGN.md](docs/DESIGN.md) and [docs/HISTORY.md](docs/HIST
   or a state it did not read back. There are no test rounds per desktop or
   per version: something that fails safe ships, and a setup that still
   misbehaves is a bug report (with the logs), not a release blocker.
+- **On Android, a stable base too.** There are far more Android devices than
+  anyone can buy and test, so Kinema uses standard Android and Media3 APIs
+  only, and nothing is shaped round one box or brand: a feature gates on
+  what the system reports (never on a model name) and fails safe — leave it
+  as it is, play the film — saying what the system reported. There are no
+  test rounds per device; trouble on one particular box comes in as a bug
+  report (with the logs). The automated checks stay: scripted sessions through
+  the real player on a TV box, and the Android TV emulator that runs with no
+  window.
 - **A wrong metadata match is worse than no match.** The 0.75 threshold and the
   0.05 runner-up margin stay. Refusing and surfacing for review beats guessing —
   which is only defensible because the **Needs attention** queue makes refusals

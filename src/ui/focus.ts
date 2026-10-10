@@ -13,6 +13,7 @@
  * it.
  */
 import { useEffect, useState } from 'react';
+import { isLightLook } from './lightLook';
 import {
   doesFocusableExist,
   getCurrentFocusKey,
@@ -244,6 +245,57 @@ export function installFocusWatchdog(): void {
   );
 }
 
+const ARROW_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+
+/** Presses closer than this are a key being held, or tapped as fast as one. */
+const QUICK_PRESS_MS = 150;
+/** How long a press still explains the scroll that follows it. */
+const PRESS_FRESH_MS = 300;
+
+let lastArrowAt = -Infinity;
+let arrowQuick = false;
+let scrollPaceInstalled = false;
+
+/**
+ * Note how fast the arrow keys are coming, so the scrolling they cause can keep
+ * up (`scrollBehavior`).
+ *
+ * Capture phase on `window` like the watchdog, and only looking: it changes
+ * nothing about the press.
+ */
+export function installScrollPace(): void {
+  if (scrollPaceInstalled) return;
+  scrollPaceInstalled = true;
+  window.addEventListener(
+    'keydown',
+    (event) => {
+      if (!ARROW_KEYS.has(event.key)) return;
+      const now = performance.now();
+      arrowQuick = event.repeat || now - lastArrowAt < QUICK_PRESS_MS;
+      lastArrowAt = now;
+    },
+    { capture: true, passive: true }
+  );
+}
+
+/**
+ * How to scroll for the press that has just moved focus: smooth for a single
+ * press, at once for one that follows another within a moment or is a held
+ * key repeating.
+ *
+ * A smooth scroll takes a few hundred milliseconds, and every press under a
+ * held key started a new one, so the page was always behind the ring and
+ * landed only when the key was let go. An instant scroll also ends one still
+ * running. Moves not made by a key — a mouse, a view claiming focus — are
+ * smooth, as ever. The light look (lightLook.ts) never animates: on the
+ * devices that get it a scroll that has to be drawn frame by frame is the
+ * cost.
+ */
+function scrollBehavior(): ScrollBehavior {
+  if (isLightLook()) return 'auto';
+  return arrowQuick && performance.now() - lastArrowAt < PRESS_FRESH_MS ? 'auto' : 'smooth';
+}
+
 /**
  * The scrolling ancestor a node actually lives in — `.browse` in practice,
  * found by looking rather than by hard-coding the selector, so this keeps
@@ -268,10 +320,13 @@ function scrollParent(node: HTMLElement | null): HTMLElement | null {
  */
 export function scrollPageToTop(
   node: HTMLElement | null,
-  behavior: ScrollBehavior = 'smooth'
+  behavior: ScrollBehavior = scrollBehavior()
 ): void {
   scrollParent(node)?.scrollTo({ top: 0, behavior });
 }
+
+/** The page scroller found for a node's parent, so the walk is done once. */
+const scrollers = new WeakMap<HTMLElement, HTMLElement>();
 
 /**
  * The ancestor that scrolls the page up and down. A rail's track counts as
@@ -279,10 +334,20 @@ export function scrollPageToTop(
  * but it never has anything to scroll vertically, so it is passed over here.
  */
 function pageScroller(node: HTMLElement): HTMLElement | null {
-  for (let el = node.parentElement; el; el = el.parentElement) {
+  // Every press asked every ancestor for its computed style. The answer is
+  // the same for all the cards in a row or a grid, so it is kept by parent
+  // and trusted while the scroller is still there, still holds the node and
+  // still has something to scroll.
+  const parent = node.parentElement;
+  const known = parent ? scrollers.get(parent) : undefined;
+  if (known?.isConnected && known.contains(node) && known.scrollHeight > known.clientHeight + 1)
+    return known;
+  for (let el = parent; el; el = el.parentElement) {
     const { overflowY } = getComputedStyle(el);
-    if ((overflowY === 'auto' || overflowY === 'scroll') && el.scrollHeight > el.clientHeight + 1)
+    if ((overflowY === 'auto' || overflowY === 'scroll') && el.scrollHeight > el.clientHeight + 1) {
+      if (parent) scrollers.set(parent, el);
       return el;
+    }
   }
   return null;
 }
@@ -295,11 +360,30 @@ function pageScroller(node: HTMLElement): HTMLElement | null {
 const TOP_BAR_REM = 4.5;
 const TV_SAFE_TOP_REM = 1.25;
 
-/** The room the top bar takes, in pixels, at the current scale and layout. */
+/**
+ * The room the top bar takes, in pixels, at the current scale and layout.
+ *
+ * Kept until the window is resized or TV mode is switched, the only things
+ * that change the size of a rem: reading the root's font size on every press
+ * made the browser settle its styles first.
+ */
+let topBar: { tv: string | undefined; px: number } | null = null;
+let topBarWatched = false;
+
 function topBarPx(): number {
   const root = document.documentElement;
+  const tv = root.dataset.tv;
+  if (topBar && topBar.tv === tv) return topBar.px;
+  if (!topBarWatched) {
+    topBarWatched = true;
+    window.addEventListener('resize', () => {
+      topBar = null;
+    });
+  }
   const rem = parseFloat(getComputedStyle(root).fontSize);
-  return (TOP_BAR_REM + (root.dataset.tv === 'on' ? TV_SAFE_TOP_REM : 0)) * rem;
+  const px = (TOP_BAR_REM + (tv === 'on' ? TV_SAFE_TOP_REM : 0)) * rem;
+  topBar = { tv, px };
+  return px;
 }
 
 /**
@@ -314,7 +398,8 @@ function topBarPx(): number {
  */
 export function keepOnScreen(node: HTMLElement | null, inline: 'center' | 'nearest' = 'center'): void {
   if (!node) return;
-  node.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline });
+  const behavior = scrollBehavior();
+  node.scrollIntoView({ behavior, block: 'nearest', inline });
   const page = pageScroller(node);
   if (!page) return;
   const box = node.getBoundingClientRect();
@@ -324,7 +409,7 @@ export function keepOnScreen(node: HTMLElement | null, inline: 'center' | 'neare
   const bottom = page.scrollTop + box.bottom - view.top;
   const below = page.scrollHeight - bottom;
   if (below > 0 && below + box.height + topBarPx() < page.clientHeight) {
-    page.scrollTo({ top: page.scrollHeight, behavior: 'smooth' });
+    page.scrollTo({ top: page.scrollHeight, behavior });
   }
 }
 
@@ -384,7 +469,7 @@ export function installReadOn(): void {
         if (hidden && page.scrollTop > 0) {
           event.preventDefault();
           event.stopImmediatePropagation();
-          page.scrollBy({ top: -Math.min(step, clear - box.top), behavior: 'smooth' });
+          page.scrollBy({ top: -Math.min(step, clear - box.top), behavior: scrollBehavior() });
         }
         return;
       }
@@ -412,7 +497,7 @@ export function installReadOn(): void {
         }
         if (by < 1) return;
         leftBehind = node;
-        page.scrollBy({ top: by, behavior: 'smooth' });
+        page.scrollBy({ top: by, behavior: scrollBehavior() });
       }, 0);
     },
     true

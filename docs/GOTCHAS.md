@@ -943,6 +943,25 @@ same every time it renders, and unique on the page: cards are keyed by where
 they sit as well as what they show (`rail:<heading>:<id>`, `grid:<id>`,
 `search:<id>`), because one title appears in several rails at once.
 
+### Every press measures every sibling of the focused control
+
+Left to itself the library answers an arrow press by calling
+`getBoundingClientRect` on **each sibling** of the focused control and sorting
+them by distance. A rail is capped at thirty cards; a grid or search is not, so
+on a library of a thousand every press measured a thousand cards — nothing wrong
+on a PC, a stall on a TV box, and no error.
+
+**Do:** give a long, regular list its own focus group with
+`measureChildrenLayout: false` and a `nextFocusResolver` that works out the
+neighbour from the index (`CardGrid.tsx`, `gridMove.ts`; the column count is
+read when the grid is resized, not per press). The resolver replaces the
+geometric search for that group only, so keep the group to the cards: Back, the
+order buttons and the search box sit beside it in a group that still measures.
+A press the resolver answers `null` to (Up from the first row) goes on to the
+parent's own search, which sees the whole grid as one block. A group with no
+cards is `focusable: false`, and names a `preferredChildFocusKey`, or focusing
+the group measures all its children after all.
+
 ---
 
 ## Frontend

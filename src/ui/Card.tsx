@@ -4,7 +4,7 @@
  * two card components would guarantee they drift apart.
  */
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
-import { useEffect, useRef } from 'react';
+import { memo, useEffect, useRef } from 'react';
 import Art from './Art';
 import type { Title } from './api';
 import { posterState } from './poster';
@@ -22,7 +22,13 @@ interface Props {
   note?: string | null;
 }
 
-export default function Card({ title, onSelect, focusKey: key, note }: Props) {
+/**
+ * Memoised: a rail redraws itself every time focus enters or leaves it, and
+ * its thirty cards have no reason to follow. Their props are stable — the
+ * title rows are the ones already on screen when a reload brought back the
+ * same data (keepSame.ts) and `onSelect` is one function for the whole shell.
+ */
+export default memo(function Card({ title, onSelect, focusKey: key, note }: Props) {
   const { ref, focused, focusKey } = useFocusable({
     focusKey: key,
     onEnterPress: () => onSelect(title),
@@ -79,4 +85,4 @@ export default function Card({ title, onSelect, focusKey: key, note }: Props) {
       </div>
     </FocusContext.Provider>
   );
-}
+});

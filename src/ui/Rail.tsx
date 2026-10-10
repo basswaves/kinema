@@ -9,6 +9,7 @@
  * Nobody scrolls a rail of five hundred anyway; that is what the grid is for.
  */
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
+import { memo } from 'react';
 import Card from './Card';
 import FocusButton from './FocusButton';
 import type { Title } from './api';
@@ -25,7 +26,7 @@ interface Props {
   onSeeAll?: (heading: string, titles: Title[]) => void;
 }
 
-export default function Rail({ heading, titles, onSelect, onSeeAll }: Props) {
+export default memo(function Rail({ heading, titles, onSelect, onSeeAll }: Props) {
   // Not a place to move to while empty — see ContinueRail.tsx.
   const { ref, focusKey } = useFocusable({
     trackChildren: true,
@@ -73,4 +74,4 @@ export default function Rail({ heading, titles, onSelect, onSeeAll }: Props) {
       </section>
     </FocusContext.Provider>
   );
-}
+});

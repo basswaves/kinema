@@ -27,6 +27,12 @@ interface Props {
    * has something to show instead should get to show it in either case.
    */
   fallback?: ReactNode;
+  /**
+   * A picture further down a page or along a row — a poster, a still. It loads
+   * when it nears the screen and is decoded off the page's thread, so a row of
+   * them arriving does not stall a press. Left off for the picture that is the
+   * first thing on a page (the hero), which should be there at first paint.
+   */
   lazy?: boolean;
   /** Describes the image where it carries meaning, as a logo does. */
   alt?: string;
@@ -59,6 +65,7 @@ export default function Art({
       alt={alt}
       draggable={false}
       loading={lazy ? 'lazy' : undefined}
+      decoding={lazy ? 'async' : undefined}
       onError={() => {
         // Falling back silently would make a broken asset protocol look exactly
         // like a working one — the images still appear, just fetched over the

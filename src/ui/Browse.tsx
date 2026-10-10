@@ -17,7 +17,7 @@ import {
 } from '@noriginmedia/norigin-spatial-navigation';
 import Home, { HERO_PLAY_FOCUS_KEY } from './Home';
 import TitleDetailView from './TitleDetail';
-import Card from './Card';
+import CardGrid from './CardGrid';
 import FocusButton from './FocusButton';
 import Settings, { type SettingsTarget } from './Settings';
 import { SETUP_PAGES_KEY } from './SetupPages';
@@ -25,6 +25,7 @@ import {
   hasPendingReturn,
   installFocusWatchdog,
   installReadOn,
+  installScrollPace,
   recoverFocusSoon,
   returnFocusTo,
   useClaimFocus,
@@ -50,6 +51,7 @@ import { scanTrouble as describeScanTrouble, type ScanTrouble } from './scanTrou
 import { runScanPipeline, useScanStatus } from '../library/pipeline';
 import { setPlaybackActive } from '../library/playback';
 import { getTitleDetail, listTitles, type Title } from './api';
+import { keepSame } from './keepSame';
 import { searchTitles, type SearchHit } from './search';
 import { arrangeGrid, GRID_SORTS, gridSettingKey, parseGridSetting, type GridSort } from './gridSort';
 import OnScreenKeyboard from './OnScreenKeyboard';
@@ -81,6 +83,8 @@ initSpatial({
   throttleKeypresses: true,
 });
 installFocusWatchdog();
+// Before read-on, which scrolls on the strength of what this has noted.
+installScrollPace();
 installReadOn();
 
 /** The nav entries, in order. Detail and player are reached, not navigated to. */
@@ -160,6 +164,17 @@ export default function Browse() {
   const openView = useCallback((next: View, from: string | null = getCurrentFocusKey()) => {
     setStack((s) => open(s, next, from));
   }, []);
+
+  /**
+   * Stable, so the memoised rails and cards (Rail.tsx, Card.tsx) are not drawn
+   * again by every render of the shell for a callback that only looks new.
+   */
+  const openDetail = useCallback((title: Title) => openView({ name: 'detail', title }), [openView]);
+  const openGrid = useCallback(
+    (heading: string, list: Title[]) =>
+      openView({ name: 'grid', heading, titleIds: list.map((t) => t.id) }),
+    [openView]
+  );
 
   const goBack = useCallback(() => {
     const next = back(stack);
@@ -242,15 +257,19 @@ export default function Browse() {
       // A title with no files left is not watchable — unlinking a wrong match
       // leaves the cached title row behind, and it should not show up as a
       // card that plays nothing.
-      setTitles(list.filter((t) => t.file_count > 0));
-      setResumable(resume);
+      // Each keeps the list already shown when the library has not changed
+      // (keepSame.ts): Home is read every time it is shown, and drawing a
+      // thousand identical cards again is the slowest thing a weak box does.
+      const watchable = list.filter((t) => t.file_count > 0);
+      setTitles((shown) => keepSame(shown, watchable, (t) => t.id));
+      setResumable((shown) => keepSame(shown, resume, (item) => item.title_id));
       // Neither is worth an error on screen if it cannot be read: the notices
       // are extras, and Home is complete without them.
       void countNeedsReview()
         .then(setReviewCount)
         .catch((e) => console.warn('review count:', e));
       void readUpgrades()
-        .then(setUpgrades)
+        .then((found) => setUpgrades((shown) => keepSame(shown, found)))
         .catch((e) => console.warn('equipment notice:', e));
       void needsOwnTmdbKey()
         .then(setKeyRejected)
@@ -629,7 +648,7 @@ export default function Browse() {
             titles={titles}
             loaded={loaded}
             resumable={resumable}
-            onSelect={(title) => openView({ name: 'detail', title })}
+            onSelect={openDetail}
             onPlay={(title) => void playTitle(title)}
             onRemoveResumable={(item) => void removeResumable(item)}
             onFirstScan={firstScan}
@@ -658,9 +677,7 @@ export default function Browse() {
                 .then(() => setFfmpegMissing(false))
                 .catch((e) => setError(userError(e)))
             }
-            onSeeAll={(heading, list) =>
-              openView({ name: 'grid', heading, titleIds: list.map((t) => t.id) })
-            }
+            onSeeAll={openGrid}
             onResume={(item) =>
               void startPlayback({
                 path: item.path,
@@ -678,7 +695,7 @@ export default function Browse() {
             query={query}
             onQueryChange={setQuery}
             results={results}
-            onSelect={(title) => openView({ name: 'detail', title })}
+            onSelect={openDetail}
           />
         )}
 
@@ -689,7 +706,7 @@ export default function Browse() {
             // A whole shelf from the top bar has the bar for getting away;
             // a See-all grid was reached from a rail and goes back to it.
             showBack={!view.kind}
-            onSelect={(title) => openView({ name: 'detail', title })}
+            onSelect={openDetail}
             onBack={goBack}
           />
         )}
@@ -852,6 +869,7 @@ function GridView({
     () => arrangeGrid(titles, arrangement.sort, arrangement.unwatched),
     [titles, arrangement]
   );
+  const entries = useMemo(() => shown.map((title) => ({ title })), [shown]);
 
   // Land on the first title, not on Back or the sort buttons above it.
   const first = shown[0] ? `grid:${shown[0].id}` : GRID_FOCUS_KEY;
@@ -895,11 +913,7 @@ function GridView({
         {titles.length > 0 && shown.length === 0 && (
           <p className="muted">Everything here has been watched. Switch off “Unwatched only” to see it all.</p>
         )}
-        <div className="search-grid">
-          {shown.map((title) => (
-            <Card key={title.id} title={title} onSelect={onSelect} focusKey={`grid:${title.id}`} />
-          ))}
-        </div>
+        <CardGrid name="grid" entries={entries} onSelect={onSelect} />
       </div>
     </FocusContext.Provider>
   );
@@ -936,17 +950,7 @@ function SearchView({
         {/* The TV layout gets letters a remote can reach; a desk has a keyboard. */}
         {tv && <OnScreenKeyboard value={query} onChange={onQueryChange} />}
         <p className="muted search-hint">Titles, actors, genres or a year.</p>
-        <div className="search-grid">
-          {results.map(({ title, why }) => (
-            <Card
-              key={title.id}
-              title={title}
-              note={why}
-              onSelect={onSelect}
-              focusKey={`search:${title.id}`}
-            />
-          ))}
-        </div>
+        <CardGrid name="search" entries={results} onSelect={onSelect} />
         {results.length === 0 && <p className="muted center">No matches.</p>}
       </div>
     </FocusContext.Provider>

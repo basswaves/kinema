@@ -762,7 +762,8 @@ export function listenerCounts(): Record<string, number> {
  * reports the screen in HDR (for the output check; the picture itself is the
  * fake mpv's `extra`), `kinemaMockSkiptro=1` has Skiptro's database on this PC,
  * and `kinemaMockScanErrors`, a JSON list of strings, is what the scan reports
- * as its problems.
+ * as its problems. `kinemaMockTitles=N` adds N more films to the library, for
+ * checking how the shelves and search behave on a big one.
  */
 function flag(name: string): string | null {
   try {
@@ -773,6 +774,20 @@ function flag(name: string): string | null {
 }
 const SLOW_MS = Number(flag('kinemaMockSlowMs') ?? 0) || 0;
 const EMPTY = flag('kinemaMockEmpty') === '1';
+const EXTRA_TITLES = Math.min(5000, Number(flag('kinemaMockTitles') ?? 0) || 0);
+
+/** `kinemaMockTitles`: films with nothing but a name, listed and nothing more. */
+const extraTitles: StoredTitle[] = Array.from({ length: EXTRA_TITLES }, (_, i) => ({
+  ...titles[1],
+  id: 10_000 + i,
+  title: `Extra Film ${i + 1}`,
+  year: 1950 + (i % 70),
+  added_at: 100 + i,
+  genres: null,
+  poster_url: null,
+  poster_path: null,
+}));
+
 const SLOW_DETECT = flag('kinemaMockSlowDetect') === '1';
 const ON_LINUX = flag('kinemaMockSystem') === 'linux';
 const ON_ANDROID = flag('kinemaMockSystem') === 'android';
@@ -957,7 +972,8 @@ const handlers: Record<string, Handler> = {
   list_media_files: () => [],
 
   // metadata
-  list_titles: () => later(EMPTY && !emptyLibrary.scanned ? [] : titles.map(withWatchState)),
+  list_titles: () =>
+    later(EMPTY && !emptyLibrary.scanned ? [] : [...titles, ...extraTitles].map(withWatchState)),
   get_title_detail: (a) => titleDetail(num(a, 'titleId')),
   file_facts: (a) => mockFileFacts(num(a, 'fileId')),
   season_facts: (a) =>

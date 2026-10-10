@@ -23,9 +23,18 @@
  * A form whose Enter moves on to its next field (a user name, then a
  * password) hands the open keyboard over with `carryKeyboard`: the next
  * field takes typing with it still up rather than closing it.
+ *
+ * Where the field sits while it is typed into is one rule for every field
+ * (focus.ts, `placeForTyping`): in the upper part of the visible area, so a
+ * keyboard on screen cannot cover it (TV-FEEL.md, N10). It is applied when
+ * OK opens the system's keyboard — on the Android 9 box the page is never
+ * told the keyboard is there, so this is the only moment it can be — and
+ * again whenever the visible area shrinks while the field has the caret,
+ * which is how a system that does report its keyboard says so.
  */
 import { useEffect, type KeyboardEvent, type RefObject } from 'react';
 import { useCapabilities } from '../capabilities';
+import { placeForTyping, releaseTypingRoom } from './focus';
 
 /** When a field last handed the open keyboard to the next one. */
 let carriedAt = 0;
@@ -59,13 +68,38 @@ export function useTypingFocus(
       if (screenKeyboard) input.inputMode = carried ? 'text' : 'none';
       // `preventScroll`: callers scroll the field into view themselves.
       input.focus({ preventScroll: true });
+      // A keyboard handed on is already up.
+      if (screenKeyboard && carried) placeForTyping(input);
     } else {
       // Give the caret back when the remote moves on, or this field keeps
       // taking keystrokes — Enter included — while the ring is somewhere else.
       if (document.activeElement === input) input.blur();
       input.inputMode = '';
+      releaseTypingRoom(input);
     }
   }, [focused, ref, screenKeyboard]);
+
+  // The visible area shrinking while this field has the caret: a keyboard
+  // came up over the page.
+  useEffect(() => {
+    const input = ref.current;
+    if (!focused || !input) return;
+    const visual = window.visualViewport;
+    const height = () => visual?.height ?? window.innerHeight;
+    let last = height();
+    const check = () => {
+      const now = height();
+      if (now < last - 1 && document.activeElement === input) placeForTyping(input);
+      last = now;
+    };
+    visual?.addEventListener('resize', check);
+    window.addEventListener('resize', check);
+    return () => {
+      visual?.removeEventListener('resize', check);
+      window.removeEventListener('resize', check);
+      releaseTypingRoom(input);
+    };
+  }, [focused, ref]);
 
   return (event) => {
     const input = ref.current;
@@ -76,6 +110,7 @@ export function useTypingFocus(
     // counts as the person's own act, which it needs to allow that.
     input.blur();
     input.focus({ preventScroll: true });
+    placeForTyping(input);
     return true;
   };
 }

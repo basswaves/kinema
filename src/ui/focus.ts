@@ -386,8 +386,44 @@ function topBarPx(): number {
   return px;
 }
 
+const HEADING = /^H[1-3]$/;
+
 /**
- * Keep a control the remote just moved to on screen.
+ * A heading standing before a group: the element itself, or one held
+ * directly by a header row beside it (the grid's Back button and title share
+ * a `.grid-head`). Never one inside a `section` — that is another group, with
+ * a heading of its own.
+ */
+function headingIn(el: Element): HTMLElement | null {
+  if (HEADING.test(el.tagName)) return el as HTMLElement;
+  if (el.tagName === 'SECTION') return null;
+  let found: HTMLElement | null = null;
+  for (const child of el.children) if (HEADING.test(child.tagName)) found = child as HTMLElement;
+  return found;
+}
+
+/**
+ * The heading of the group a control is in: the last `h1`–`h3` before the
+ * branch holding the control, at the nearest level of the page that has one —
+ * a rail's title before its track, a Settings section's heading at its top,
+ * a grid's title in the header row above it. Read from the markup each time,
+ * so a screen gets this by using headings, not by registering them.
+ */
+function headingOf(node: HTMLElement, page: HTMLElement): HTMLElement | null {
+  for (let el = node.parentElement; el && el !== page; el = el.parentElement) {
+    let heading: HTMLElement | null = null;
+    for (const child of el.children) {
+      if (child.contains(node)) break;
+      heading = headingIn(child) ?? heading;
+    }
+    if (heading) return heading;
+  }
+  return null;
+}
+
+/**
+ * Keep a control the remote just moved to on screen — and the heading of its
+ * group with it.
  *
  * `scrollIntoView({ block: 'nearest' })` stops as soon as the control itself
  * is visible, so whatever sits under the last control on a page — a card's
@@ -395,6 +431,13 @@ function topBarPx(): number {
  * and nothing a remote could press would ever scroll to it. So when
  * everything below the control fits on screen together with it, the page goes
  * all the way to the bottom instead.
+ *
+ * It also stopped with the control just clear of the top bar and the rail
+ * title or section heading above it hidden underneath (owner, 2026-10-09:
+ * "things you should see stay hidden under the top bar"). So when the
+ * heading and the control fit on screen together, the page stops with the
+ * heading clear instead; when they do not (a long section), the control
+ * alone, as before.
  */
 export function keepOnScreen(node: HTMLElement | null, inline: 'center' | 'nearest' = 'center'): void {
   if (!node) return;
@@ -404,13 +447,86 @@ export function keepOnScreen(node: HTMLElement | null, inline: 'center' | 'neare
   if (!page) return;
   const box = node.getBoundingClientRect();
   const view = page.getBoundingClientRect();
+  const bar = topBarPx();
   // Measured from the content's top, so a scroll already under way does not
   // change the answer.
-  const bottom = page.scrollTop + box.bottom - view.top;
+  const scroll = page.scrollTop;
+  const top = scroll + box.top - view.top;
+  const bottom = scroll + box.bottom - view.top;
+
+  const heading = headingOf(node, page);
+  const headTop = heading ? scroll + heading.getBoundingClientRect().top - view.top : top;
+  const fits = bottom - headTop + bar <= page.clientHeight;
+  const from = fits ? Math.min(headTop, top) : top;
+
   const below = page.scrollHeight - bottom;
-  if (below > 0 && below + box.height + topBarPx() < page.clientHeight) {
+  if (below > 0 && below + (bottom - from) + bar < page.clientHeight) {
     page.scrollTo({ top: page.scrollHeight, behavior });
+    return;
   }
+  if (from >= top) return;
+  // Where `nearest` leaves the page: up to the control when it was above the
+  // view, down to it when below, unmoved when it was on screen.
+  let landing = scroll;
+  if (top < scroll + bar) landing = top - bar;
+  else if (bottom > scroll + page.clientHeight) landing = bottom - page.clientHeight;
+  if (from < landing + bar) page.scrollTo({ top: Math.max(0, from - bar), behavior });
+}
+
+/**
+ * A text box being typed into sits in the upper part of what is visible:
+ * below the top bar, its bottom no lower than this share of the visible
+ * height. An on-screen keyboard takes the lower part — Android's half the
+ * screen or more, Windows' touch keyboard about as much.
+ */
+const TYPING_ZONE = 0.45;
+/** Where a box that had to move is put, as a share below the top bar. */
+const TYPING_SPOT = 0.08;
+
+/** Pages given extra room at the bottom so a box near the end can rise. */
+const typingRoom = new WeakMap<HTMLElement, string>();
+
+/**
+ * Put a text box being typed into where a keyboard on screen cannot cover it
+ * (TV-FEEL.md, N10): in the upper part of the visible area, measured from
+ * `visualViewport`, which shrinks when a system keyboard opens on systems
+ * that report it. A box too near the end of the page to rise that far gets
+ * room added under the page until `releaseTypingRoom`.
+ *
+ * Called by typing.ts when the keyboard is opened on purpose and whenever the
+ * visible area shrinks; never on mere arrival, so arrowing past a field moves
+ * the page no more than any other control.
+ */
+export function placeForTyping(node: HTMLElement | null): void {
+  if (!node?.isConnected) return;
+  const page = pageScroller(node) ?? scrollParent(node);
+  if (!page) return;
+  const visual = window.visualViewport;
+  const visibleTop = visual?.offsetTop ?? 0;
+  const visibleHeight = visual?.height ?? window.innerHeight;
+  const view = page.getBoundingClientRect();
+  const clear = Math.max(view.top, visibleTop) + topBarPx();
+  const box = node.getBoundingClientRect();
+  if (box.top >= clear && box.bottom <= visibleTop + visibleHeight * TYPING_ZONE) return;
+
+  const by = box.top - (clear + visibleHeight * TYPING_SPOT);
+  const room = page.scrollHeight - page.clientHeight - page.scrollTop;
+  if (by > room) {
+    if (!typingRoom.has(page)) typingRoom.set(page, page.style.paddingBottom);
+    const current = parseFloat(getComputedStyle(page).paddingBottom) || 0;
+    page.style.paddingBottom = `${current + by - room}px`;
+  }
+  // At once: the keyboard is already coming up, and a smooth scroll behind
+  // it leaves the box covered for its whole length.
+  page.scrollBy({ top: by, behavior: 'auto' });
+}
+
+/** Take back the room `placeForTyping` added under the page, if any. */
+export function releaseTypingRoom(node: HTMLElement | null): void {
+  const page = node && (pageScroller(node) ?? scrollParent(node));
+  if (!page || !typingRoom.has(page)) return;
+  page.style.paddingBottom = typingRoom.get(page) ?? '';
+  typingRoom.delete(page);
 }
 
 /** How far one press reads on, as a share of the visible page. */

@@ -229,7 +229,11 @@ export default function FirstRun({ onScan }: Props) {
               backdrops and artwork for movies. It is free, and takes about two minutes to get.
             </p>
             <div className="settings-row">
-              <FocusButton className="btn-secondary" onSelect={() => void openLink(TMDB_KEY_URL)}>
+              <FocusButton
+                keepInView="nearest"
+                className="btn-secondary"
+                onSelect={() => void openLink(TMDB_KEY_URL)}
+              >
                 Get a free key ↗
               </FocusButton>
             </div>
@@ -248,7 +252,11 @@ export default function FirstRun({ onScan }: Props) {
               />
             </label>
             <div className="settings-row">
-              <FocusButton className="btn-secondary" onSelect={() => void saveKey()}>
+              <FocusButton
+                keepInView="nearest"
+                className="btn-secondary"
+                onSelect={() => void saveKey()}
+              >
                 Save key
               </FocusButton>
               {savedKey && <span className="muted">Saved.</span>}

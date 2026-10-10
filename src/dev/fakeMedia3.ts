@@ -303,6 +303,14 @@ export function showSubtitles(args: Record<string, unknown>): null {
   return null;
 }
 
+/**
+ * `plugin:media3|decoder_limits`: what an Android box reports for its hardware
+ * decoders' highest bitrate — HEVC at 35 Mbit/s, as the old test box does.
+ */
+export function decoderLimits() {
+  return { hevc: 35_000_000, avc: 40_000_000 };
+}
+
 /** `plugin:media3|facts`: a 1080p film decoded in hardware, a few frames dropped. */
 export function facts() {
   const open = state.path !== null && started;

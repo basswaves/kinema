@@ -682,6 +682,9 @@ pub struct FileFacts {
     /// The file's folder also holds files matched to another title, so its
     /// name belongs to that title as much as this one and is not read.
     pub folder_shared: bool,
+    /// The file's size on disk, in bytes: with its length, how heavy it is
+    /// (the notice under Play on Android, `heavyFile.ts`).
+    pub size_bytes: i64,
 }
 
 /// Whether a file's folder holds files of another title as well.
@@ -757,7 +760,7 @@ fn season_files(conn: &Connection, title_id: i64, season: i64) -> rusqlite::Resu
 /// library does not have.
 fn facts_for(conn: &Connection, file_id: i64) -> rusqlite::Result<Option<FileFacts>> {
     let names = conn.query_row(
-        "SELECT m.file_name, m.parent_dir, m.extension, r.path
+        "SELECT m.file_name, m.parent_dir, m.extension, r.path, m.size_bytes
            FROM media_files m JOIN library_roots r ON r.id = m.root_id
           WHERE m.id = ?1",
         params![file_id],
@@ -767,10 +770,11 @@ fn facts_for(conn: &Connection, file_id: i64) -> rusqlite::Result<Option<FileFac
                 r.get::<_, String>(1)?,
                 r.get::<_, String>(2)?,
                 r.get::<_, String>(3)?,
+                r.get::<_, i64>(4)?,
             ))
         },
     );
-    let (file_name, parent_dir, extension, root_path) = match names {
+    let (file_name, parent_dir, extension, root_path, size_bytes) = match names {
         Ok(names) => names,
         Err(rusqlite::Error::QueryReturnedNoRows) => return Ok(None),
         Err(e) => return Err(e),
@@ -786,6 +790,7 @@ fn facts_for(conn: &Connection, file_id: i64) -> rusqlite::Result<Option<FileFac
         extension,
         root_path,
         folder_shared,
+        size_bytes,
     }))
 }
 

@@ -1334,3 +1334,49 @@ test('Android: OK opens the keyboard, its Enter moves on, and Connect waits to b
   await press(page, 'Enter');
   await expect.poll(() => focused(page)).toBe('films');
 });
+
+// A file far heavier than the video chip Android reports is made for gets a
+// line under Play (heavyFile.ts): the fixture film averages 88 Mbit/s where
+// the fake box reports 35 for HEVC. Read, never pressed; Play still works.
+for (const system of ['android', 'windows'] as const) {
+  test(`${system}: a film far above the video chip's limit is ${
+    system === 'android' ? 'told so under Play' : 'not mentioned'
+  }`, async ({ page }) => {
+    await page.addInitScript((s) => {
+      if (s === 'android') localStorage.setItem('kinemaMockSystem', 'android');
+      else localStorage.removeItem('kinemaMockSystem');
+    }, system);
+    await page.goto('/');
+    await expect.poll(() => focused(page)).toContain('Play');
+    for (let i = 0; i < 6 && !(await focused(page))?.startsWith('Example Film'); i++) {
+      await press(page, 'ArrowDown');
+    }
+    await press(page, 'Enter');
+    await expect.poll(() => focused(page)).toBe('▶ Play');
+    // The badges have been read by now; the line is made from the same facts.
+    await expect(page.locator('.media-badges')).toBeVisible();
+
+    const note = page.locator('.heavy-file-note');
+    if (system === 'windows') {
+      await page.waitForTimeout(500);
+      await expect(note).toHaveCount(0);
+      return;
+    }
+    await expect(note).toHaveText(
+      "Android says this device's video chip is made for up to 35 Mbit/s; this film averages about 88 Mbit/s. It may stutter or show no picture."
+    );
+    // Under the buttons, and the remote walks past it as it does the badges.
+    expect(
+      await page.evaluate(() => {
+        const note = document.querySelector('.heavy-file-note')!.getBoundingClientRect();
+        const play = document.querySelector('.btn-primary')!.getBoundingClientRect();
+        return note.top >= play.bottom;
+      })
+    ).toBe(true);
+    expect(await note.evaluate((el) => el.closest('[tabindex]') === null)).toBe(true);
+    for (let i = 0; i < 4; i++) {
+      await press(page, 'ArrowDown');
+      expect(await focused(page)).not.toContain('Android says');
+    }
+  });
+}

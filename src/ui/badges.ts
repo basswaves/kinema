@@ -84,6 +84,8 @@ export interface FileFacts {
   root_path: string;
   /** The file's folder also holds another title's files; its name is not this file's. */
   folder_shared?: boolean;
+  /** The file's size on disk, in bytes (the heavy-file notice, heavyFile.ts). */
+  size_bytes?: number;
 }
 
 /** The badges' facts for one file, or null for a file the library lacks. */

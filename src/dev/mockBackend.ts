@@ -416,6 +416,13 @@ const files: FixtureFile[] = [
   })),
 ];
 
+/** A fixture file's average bit rate, in bits a second. */
+function fileBitrate(file: FixtureFile): number {
+  if (file.titleId === FILM_ID) return 88_000_000;
+  if (file.titleId === SAGA_ID) return file.season === 2 ? 9_400_000 : 6_200_000;
+  return 4_000_000;
+}
+
 /**
  * What the scan would have read from a fixture file (`probe.rs`, `aspect.rs`),
  * for the detail page's badges: the film as a 4K Dolby Vision profile 7 FEL
@@ -432,6 +439,10 @@ function mockFileFacts(fileId: number) {
     extension: file.path.split('.').pop() ?? '',
     root_path: 'C:\\fixture',
     folder_shared: false,
+    // The film is the heavy one (88 Mbit/s, past twice the 35 the fake box
+    // reports for HEVC), for the notice under Play on Android; the saga's
+    // episodes are not.
+    size_bytes: Math.round((fileBitrate(file) * file.duration) / 8),
   };
   const audio = (codec: string, profile: string | null, layout: string, commentary = false) => ({
     codec,
@@ -469,7 +480,7 @@ function mockFileFacts(fileId: number) {
       details: {
         container: 'matroska,webm',
         duration_secs: file.duration,
-        bit_rate: 58_400_000,
+        bit_rate: 88_000_000,
         video: {
           ...video,
           width: 3840,
@@ -1314,6 +1325,7 @@ const handlers: Record<string, Handler> = {
   'plugin:media3|show_subtitles': (a) => fakeMedia3.showSubtitles(a),
   'plugin:media3|add_subtitle': (a) => fakeMedia3.addSubtitle(a),
   'plugin:media3|facts': () => fakeMedia3.facts(),
+  'plugin:media3|decoder_limits': () => fakeMedia3.decoderLimits(),
   // A Dutch subtitle file beside every film (subtitle_files.rs), named as
   // the film is: Media3 is handed it, mpv finds it itself.
   subtitle_files: (a) => {

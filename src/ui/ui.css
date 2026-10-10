@@ -962,6 +962,15 @@ html {
   opacity: 0.6;
 }
 
+/* A quiet line under Play (HeavyFileNotice.tsx): the same voice as the
+ * badges' note, and read, not pressed. */
+.heavy-file-note {
+  margin: 0.875rem 0 0;
+  max-width: 38rem;
+  font-size: 0.75rem;
+  opacity: 0.6;
+}
+
 .media-badges-heading {
   font-size: 0.625rem;
   font-weight: 700;

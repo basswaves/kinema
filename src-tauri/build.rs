@@ -29,6 +29,7 @@ fn main() {
             "set_mode",
             "restore_mode",
             "output",
+            "decoder_limits",
             "register_listener",
             "remove_listener",
         ])

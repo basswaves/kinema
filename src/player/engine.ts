@@ -456,6 +456,13 @@ export const askScreenMode = (width: number, height: number, rate: number) =>
   media3.setMode(width, height, rate);
 export const restoreScreenMode = () => media3.restoreMode();
 export const systemOutput = () => media3.output();
+/**
+ * The highest bitrate Android says the device's video decoders are made for
+ * (the notice under Play, `ui/heavyFile.ts`). Null off Android: mpv's
+ * decoders are not limited this way, so nothing is said there.
+ */
+export const decoderLimits = () =>
+  isMedia3() ? media3.decoderLimits() : Promise.resolve(null);
 
 /** Whether the last frame has been reached; false while nothing is open. */
 export async function hasReachedEnd(): Promise<boolean> {

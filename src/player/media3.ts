@@ -206,3 +206,15 @@ export const restoreMode = () =>
   call<{ restored: boolean }>('restore_mode').then((r) => r.restored);
 /** What the TV and the receiver take, as Android reports it. */
 export const output = () => call<SystemOutput>('output');
+
+/**
+ * The highest bitrate Android says the device's own video decoders are made
+ * for, in bits a second, per kind of video. Null for a kind with no hardware
+ * decoder or no answer. Android's word, not a measure of what plays.
+ */
+export interface DecoderLimits {
+  hevc: number | null;
+  avc: number | null;
+}
+
+export const decoderLimits = () => call<DecoderLimits>('decoder_limits');

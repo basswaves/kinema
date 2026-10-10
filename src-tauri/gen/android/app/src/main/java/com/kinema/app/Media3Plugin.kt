@@ -1281,6 +1281,41 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
     return !(lower.startsWith("omx.google.") || lower.startsWith("c2.android."))
   }
 
+  /** What `decoderLimits` has answered; a device's decoders do not change while it runs. */
+  private var decoderLimitsAnswer: JSObject? = null
+
+  /**
+   * The highest bitrate Android says the device's own (hardware) video
+   * decoders are made for, in bits a second, for HEVC and for H.264 — or
+   * null for a kind with no hardware decoder or no answer. The detail page
+   * says so beside a film far above it (heavyFile.ts). It is the range
+   * Android reports, not a promise: a decoder may manage more, or less.
+   */
+  @Command
+  fun decoderLimits(invoke: Invoke) {
+    main.post {
+      val answer = decoderLimitsAnswer ?: JSObject().also { out ->
+        val all = MediaCodecList(MediaCodecList.ALL_CODECS).codecInfos
+        for ((key, mime) in listOf("hevc" to "video/hevc", "avc" to "video/avc")) {
+          var best: Int? = null
+          for (info in all) {
+            if (info.isEncoder || info.name.endsWith(".secure") || !info.supportedTypes.contains(mime)) continue
+            if (inHardware(info.name) != true) continue
+            val upper = try {
+              info.getCapabilitiesForType(mime).videoCapabilities?.bitrateRange?.upper
+            } catch (e: IllegalArgumentException) {
+              null
+            }
+            if (upper != null && upper > 0 && (best == null || upper > best)) best = upper
+          }
+          out.put(key, best ?: JSONObject.NULL)
+        }
+        decoderLimitsAnswer = out
+      }
+      invoke.resolve(answer)
+    }
+  }
+
   private fun transferName(f: Format): Any = when (f.colorInfo?.colorTransfer) {
     C.COLOR_TRANSFER_ST2084 -> "pq"
     C.COLOR_TRANSFER_HLG -> "hlg"

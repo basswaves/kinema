@@ -12,6 +12,7 @@ import { openLink } from './links';
 import Art from './Art';
 import FocusButton from './FocusButton';
 import MediaBadges, { BadgeRows } from './MediaBadges';
+import HeavyFileNotice from './HeavyFileNotice';
 import { useSeasonBadges } from './seasonBadges';
 import { keepOnScreen, useClaimFocus } from './focus';
 import {
@@ -471,6 +472,18 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
                   </FocusButton>
                 )}
               </div>
+              {/* Under Play, about the file it would play; only on Android, and
+                  only when that file is far above what Android says the
+                  device's video chip is made for (heavyFile.ts). */}
+              <HeavyFileNotice
+                fileId={primary?.fileId ?? null}
+                runtimeMins={
+                  (title.kind === 'series'
+                    ? detail?.episodes.find((e) => e.file_id === primary?.fileId)?.runtime_mins
+                    : null) ?? title.runtime_mins
+                }
+                what={title.kind === 'series' ? 'episode' : 'film'}
+              />
               {/* Below the buttons, not above them: three rows of tiles above
                   Play pushed it off a TV screen under a long description, and
                   Play is where a remote lands. */}

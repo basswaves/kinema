@@ -1997,9 +1997,40 @@ decoded PCM; then Media3 decodes, or picks a track it can decode.
 
 A Blu-ray stream file (`.m2ts`, 192-byte packets) fails with "None of the
 available extractors": Media3's transport-stream reader reads 188-byte
-packets, and the 192-byte ones of `.m2ts` are not recognised. Kinema's
-scanner lists `.m2ts`, so such a file shows in the library and then says
-it cannot be played on Android. Not solved yet.
+packets, and the 192-byte ones of `.m2ts` are not recognised. Kinema reads
+them with its own extractor (`M2tsExtractor.kt`), which hides the 4 extra
+bytes of each packet from Media3's reader and turns the places it gives out
+back into the file's own. It is added ahead of Media3's list in
+`FrameTimingExtractors`. A disc's streams differ from a broadcast's too, in
+ways that give no error:
+
+- Media3's factory reads stream type 0x80 (a disc's uncompressed sound) as
+  video and 0x86 (DTS-HD) as an ad marker. `BdTsPayloadReaderFactory.kt`
+  decides these first.
+- Dolby TrueHD (0x83) is one stream holding the TrueHD access units and, now
+  and then, a Dolby Digital frame. Media3 has no reader for it. It is given
+  as two tracks, TrueHD and the Dolby Digital "core".
+- **A track Media3 is told of must get a format**, or preparing the film
+  waits for it until the end of the file. A TrueHD stream without a core
+  would hang if its core track were made regardless, so the start of the
+  file is scanned for one first (`BdCoreScan`). A track made after
+  Media3 has the tracks is dropped without a word.
+- A disc's Dolby Digital Plus (0x84, 0xA1) is an AC-3 frame followed by
+  E-AC-3 dependent frames. Media3's reader makes a sample of each frame and
+  flips the track between `ac3` and `eac3`: the sound output reopened five
+  times a second and stalled. `BdEac3Reader` joins them into one sample with
+  one format (channels of all the frames together, each place counted once,
+  at most 8: a first count read the dependent frame's channel map in the
+  wrong order and gave 11, which the decoder refuses).
+- Bytes the extractor looks at ahead (`peek`) are moved down in the input's
+  buffer on every read after, so a long look ahead costs more than its
+  length; and a loop over every byte of it is seconds on a weak box. The
+  look for a Dolby Digital core is 1 MB and reads headers, not bytes.
+- Picture subtitles (0x90) come one segment to a packet; Media3's reader
+  wants a whole display set in a sample.
+
+Tried on streams put together to this layout and played through Media3's
+own reader on a computer; not yet on a file from a disc.
 
 ### A 1080p TV gives the page 960×540
 

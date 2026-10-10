@@ -12,6 +12,7 @@ import androidx.media3.extractor.ExtractorOutput
 import androidx.media3.extractor.ExtractorsFactory
 import androidx.media3.extractor.PositionHolder
 import androidx.media3.extractor.TrackOutput
+import androidx.media3.extractor.text.DefaultSubtitleParserFactory
 import androidx.media3.extractor.text.SubtitleParser
 import kotlin.math.abs
 
@@ -29,16 +30,26 @@ import kotlin.math.abs
  *
  * `rateFor` is asked once per file opened, on the loading thread, for where
  * that file's answer goes.
+ *
+ * It is also where the Blu-ray stream file reader ([M2tsExtractor]) is added,
+ * ahead of Media3's own, which cannot open `.m2ts`: it is measured the same.
  */
 internal class FrameTimingExtractors(
   private val inner: ExtractorsFactory,
   private val rateFor: () -> (Double?) -> Unit,
 ) : ExtractorsFactory {
+  // What Media3 has told the wrapped factory about subtitles, kept for the
+  // Blu-ray reader, which is made here and so is not told by it.
+  private var transcodeText = true
+  private var subtitleParserFactory: SubtitleParser.Factory = DefaultSubtitleParserFactory()
+
   override fun createExtractors(): Array<Extractor> =
-    inner.createExtractors().map { Timed(it) }.toTypedArray()
+    (listOf<Extractor>(M2tsExtractor(transcodeText, subtitleParserFactory)) + inner.createExtractors())
+      .map { Timed(it) }.toTypedArray()
 
   override fun createExtractors(uri: Uri, responseHeaders: Map<String, List<String>>): Array<Extractor> =
-    inner.createExtractors(uri, responseHeaders).map { Timed(it) }.toTypedArray()
+    (listOf<Extractor>(M2tsExtractor(transcodeText, subtitleParserFactory)) + inner.createExtractors(uri, responseHeaders))
+      .map { Timed(it) }.toTypedArray()
 
   // Media3 sets these on the factory it is given; they are the wrapped one's
   // (subtitles inside the file are parsed by it).
@@ -46,11 +57,13 @@ internal class FrameTimingExtractors(
   @Suppress("DEPRECATION")
   override fun experimentalSetTextTrackTranscodingEnabled(enabled: Boolean): ExtractorsFactory {
     inner.experimentalSetTextTrackTranscodingEnabled(enabled)
+    transcodeText = enabled
     return this
   }
 
   override fun setSubtitleParserFactory(factory: SubtitleParser.Factory): ExtractorsFactory {
     inner.setSubtitleParserFactory(factory)
+    subtitleParserFactory = factory
     return this
   }
 

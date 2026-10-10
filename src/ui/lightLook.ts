@@ -139,6 +139,9 @@ const listeners = new Set<() => void>();
 
 function readFacts(): DeviceFacts {
   const facts: DeviceFacts = {};
+  // Read when this module loads; outside a browser (the unit tests, on a
+  // Node without `navigator`) there is nothing to read.
+  if (typeof navigator === 'undefined') return facts;
   const nav = navigator as Navigator & { deviceMemory?: number };
   if (typeof nav.hardwareConcurrency === 'number' && nav.hardwareConcurrency > 0) {
     facts.cores = nav.hardwareConcurrency;

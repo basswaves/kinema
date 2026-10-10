@@ -224,7 +224,13 @@ pub async fn scan_library(app: tauri::AppHandle) -> Result<ScanReport, String> {
         let _running = running;
         let db = app.state::<ScanDb>();
         let mut conn = db.0.lock().map_err(to_string_err)?;
-        scanner::scan_all(&mut conn).map_err(to_string_err)
+        let report = scanner::scan_all(&mut conn).map_err(to_string_err)?;
+        // Lets SQLite refresh the statistics its query planner chooses
+        // indexes by, for the tables this scan has just changed. Cheap (it
+        // looks only at what is stale) and best effort: the library works
+        // the same without it.
+        let _ = conn.execute_batch("PRAGMA optimize");
+        Ok(report)
     })
     .await
     .map_err(to_string_err)?

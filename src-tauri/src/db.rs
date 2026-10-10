@@ -696,11 +696,35 @@ CREATE INDEX idx_subtitle_files ON subtitle_files(media_file_id, language, force
 /// would tolerate as a hang.
 const BUSY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
+/// SQLite's page cache per connection, in the unit its `cache_size` pragma
+/// takes when negative (KiB). The default is about 2 MB, which a library of
+/// thousands of films and episodes outgrows on every Home screen; but a box
+/// with 2 GB or less also runs the film and the web view, so it gets a small
+/// one. Decided by the memory the system reports, never by what device it is;
+/// where that cannot be read, the small one.
+fn cache_kib() -> i64 {
+    static KIB: std::sync::OnceLock<i64> = std::sync::OnceLock::new();
+    *KIB.get_or_init(|| {
+        const TWO_GIB: u64 = 2 * 1024 * 1024 * 1024;
+        let bytes = crate::capabilities::current().memory_bytes;
+        if bytes == 0 || bytes <= TWO_GIB { -2000 } else { -8000 }
+    })
+}
+
 fn configure(conn: &Connection) -> rusqlite::Result<()> {
     // WAL is what lets the UI keep reading while the scanner writes. PRAGMA
     // journal_mode returns a row, so it must be queried rather than executed.
     let _: String = conn.query_row("PRAGMA journal_mode=WAL", [], |r| r.get(0))?;
-    conn.execute_batch("PRAGMA foreign_keys=ON; PRAGMA synchronous=NORMAL;")?;
+    // `temp_store`: sorting and grouping for a query (Home's rails) use
+    // temporary space, by default a file on disk; memory is faster and, on an
+    // SD card or a TV box's flash, spares it writes. `journal_size_limit`: the
+    // write-ahead log is cut back to 4 MiB after it has been merged, instead
+    // of staying as large as the biggest scan ever made it.
+    conn.execute_batch(&format!(
+        "PRAGMA foreign_keys=ON; PRAGMA synchronous=NORMAL;
+         PRAGMA temp_store=MEMORY; PRAGMA cache_size={}; PRAGMA journal_size_limit=4194304;",
+        cache_kib()
+    ))?;
     conn.busy_timeout(BUSY_TIMEOUT)?;
     Ok(())
 }

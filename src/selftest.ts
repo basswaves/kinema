@@ -45,6 +45,7 @@ import { findSubtitles } from './player/onlineSubtitles';
 import {
   addLibraryRoot,
   listLibraryRoots,
+  removeLibraryRoot,
   measurePictures,
   probeLibrary,
   refreshImdbRatings,
@@ -156,6 +157,9 @@ const CALLABLE: Record<string, (...args: never[]) => Promise<unknown>> = {
   // ratings → artwork → read files → intro detection.
   addLibraryRoot,
   listLibraryRoots,
+  // A folder taken out, as Settings takes it out — e.g. single-film folders
+  // inside one that is about to be added whole (which Kinema refuses).
+  removeLibraryRoot,
   // A network share Kinema opens itself, signed in to before it is added.
   saveShareLogin,
   scanLibrary,

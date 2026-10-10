@@ -13,20 +13,31 @@
 //! player is given the path, as always.
 
 use crate::netshare;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::hash::{BuildHasher, Hasher};
 use std::io::{self, BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc;
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
 /// What one read from the share asks for, and what is sent on at a time.
 const CHUNK: usize = 1 << 20;
-/// Reads made ahead of what the player has taken, so the network and the
-/// player each work while the other waits.
-const AHEAD: usize = 4;
+/// The first read after a request is smaller, so the player's first bytes
+/// after a skip come after one short round trip rather than a whole chunk.
+const FIRST: usize = 256 << 10;
+/// Reads asked for ahead of what the player has taken, so the network and
+/// the player each work while the other waits.
+const AHEAD: usize = 6;
+
+/// Reads in flight at once. One at a time left the server idle while each
+/// reply was checked and copied on the device; several overlap that work.
+/// From the device's cores, so a two-core box is not swamped and a bigger
+/// one is not held to one read.
+fn readers() -> usize {
+    std::thread::available_parallelism().map_or(2, |n| n.get()).clamp(2, 4)
+}
 /// How long a connection may take to send its request.
 const REQUEST_WAIT: Duration = Duration::from_secs(10);
 
@@ -233,46 +244,67 @@ fn answer(conn: TcpStream) -> io::Result<()> {
         return Ok(());
     }
 
-    // Read ahead on one thread, send on this one. A player that stops
-    // listening (a seek, the film closed) ends the sending, and with it
-    // the reading: the reader's next hand-over finds no one there.
-    let (tx, rx) = mpsc::sync_channel::<io::Result<Vec<u8>>>(AHEAD);
-    let counted = Gauge::up(&READERS);
-    std::thread::spawn(move || {
-        let _counted = counted;
-        let mut file = file;
-        let mut pos = start;
-        while pos <= end {
-            let want = CHUNK.min((end - pos + 1) as usize);
-            let got = read_or_reopen(&mut file, &path, pos, want);
-            let stop = !matches!(&got, Ok(b) if !b.is_empty());
-            if let Ok(b) = &got {
-                pos += b.len() as u64;
+    // A few readers take pieces to read, each answered on a channel of its
+    // own; this thread asks for them in order, keeps AHEAD asked, and sends
+    // each on as it comes. A player that stops listening (a seek, the film
+    // closed) ends the sending and with it the asking: the readers finish
+    // the piece in hand and find no more.
+    type Answer = mpsc::Receiver<io::Result<Vec<u8>>>;
+    let (jobs, work) = mpsc::channel::<(u64, usize, mpsc::SyncSender<io::Result<Vec<u8>>>)>();
+    let work = Arc::new(Mutex::new(work));
+    let file = Arc::new(file);
+    for _ in 0..readers() {
+        let (work, file, path) = (work.clone(), file.clone(), path.clone());
+        let counted = Gauge::up(&READERS);
+        std::thread::spawn(move || {
+            let _counted = counted;
+            // This reader's own copy, once a read on the shared one failed.
+            let mut again = None;
+            loop {
+                let job = work.lock().unwrap_or_else(|e| e.into_inner()).recv();
+                let Ok((pos, want, answer)) = job else { break };
+                let _ = answer.send(read_or_reopen(&file, &mut again, &path, pos, want));
             }
-            if tx.send(got).is_err() || stop {
-                break;
-            }
+        });
+    }
+    let mut next = start;
+    let mut asked: VecDeque<Answer> = VecDeque::new();
+    let ask = |next: &mut u64, asked: &mut VecDeque<Answer>| {
+        if *next > end {
+            return;
         }
-    });
+        let size = if *next == start { FIRST } else { CHUNK };
+        let want = size.min((end - *next + 1) as usize);
+        let (tx, rx) = mpsc::sync_channel(1);
+        if jobs.send((*next, want, tx)).is_ok() {
+            asked.push_back(rx);
+            *next += want as u64;
+        }
+    };
+    for _ in 0..AHEAD {
+        ask(&mut next, &mut asked);
+    }
     // Where the time goes, said once the request ends: waiting on the share
     // means it fed too slowly; waiting on the player means the share was
     // ahead and the player (or the device) was the slower side.
     let began = std::time::Instant::now();
     let (mut sent, mut for_share, mut for_player) = (0u64, Duration::ZERO, Duration::ZERO);
     let result = (|| {
-        loop {
+        while let Some(answer) = asked.pop_front() {
             let t = std::time::Instant::now();
-            let Ok(chunk) = rx.recv() else { return Ok(()) };
+            let Ok(chunk) = answer.recv() else { return Ok(()) };
             for_share += t.elapsed();
             let chunk = chunk?;
             if chunk.is_empty() {
                 return Ok(());
             }
+            ask(&mut next, &mut asked);
             let t = std::time::Instant::now();
             out.write_all(&chunk)?;
             for_player += t.elapsed();
             sent += chunk.len() as u64;
         }
+        Ok(())
     })();
     if sent > 0 {
         crate::log!(
@@ -290,10 +322,19 @@ fn answer(conn: TcpStream) -> io::Result<()> {
 /// it fails: a NAS busy with a burst of skips, or a connection it dropped,
 /// should cost a moment, not the film (seen on a box: replies cut short and
 /// the player giving up).
-fn read_or_reopen(file: &mut netshare::RemoteFile, path: &str, pos: u64, want: usize) -> io::Result<Vec<u8>> {
+/// `again` is the reader's own copy, opened after a read on the shared one
+/// failed, and used from then on.
+fn read_or_reopen(
+    shared: &netshare::RemoteFile,
+    again: &mut Option<netshare::RemoteFile>,
+    path: &str,
+    pos: u64,
+    want: usize,
+) -> io::Result<Vec<u8>> {
     let mut tries = 0;
     loop {
         let mut buf = vec![0; want];
+        let file = again.as_ref().unwrap_or(shared);
         match file.read_at(&mut buf, pos) {
             Ok(n) => {
                 buf.truncate(n);
@@ -304,7 +345,7 @@ fn read_or_reopen(file: &mut netshare::RemoteFile, path: &str, pos: u64, want: u
                 crate::log!("stream: reading {path} at {pos}: {e}; opening it again");
                 std::thread::sleep(std::time::Duration::from_millis(300 * tries));
                 match netshare::open(path) {
-                    Ok(again) => *file = again,
+                    Ok(file) => *again = Some(file),
                     Err(e) => crate::log!("stream: could not open {path} again: {e}"),
                 }
             }

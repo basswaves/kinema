@@ -150,6 +150,11 @@ export interface Facts {
     bitrate: number | null;
     transfer: 'pq' | 'hlg' | 'sdr' | null;
     dolbyVision: boolean;
+    /**
+     * A Dolby Vision profile 7 film this device has no decoder for, played as
+     * the HDR10 picture beneath it (DolbyVision.kt).
+     */
+    dolbyVisionBaseLayer?: boolean;
     /** The decoder Media3 opened, by its system name. */
     decoder: string | null;
     /** The device's own video hardware, rather than software. */

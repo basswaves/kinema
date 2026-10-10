@@ -111,6 +111,11 @@ describe('media3Groups', () => {
       note: 'the screen takes HDR10 but not Dolby Vision, Android says',
     });
     expect(range(['HDR10'], { ...film.video!, dolbyVision: true })?.warn).toBeFalsy();
+    // Profile 7 with no decoder for it: the HDR10 picture beneath, and said so.
+    expect(range(['HDR10'], { ...film.video!, dolbyVisionBaseLayer: true })).toMatchObject({
+      value: 'HDR10 (PQ) — Dolby Vision layer not applied',
+      note: 'the screen takes HDR10, Android says',
+    });
     // An SDR film asks nothing of the screen; a plugin that does not say leaves it unsaid.
     expect(range([], { ...film.video!, transfer: 'sdr' })?.note).toBeUndefined();
     expect(range(undefined)?.note).toBeUndefined();

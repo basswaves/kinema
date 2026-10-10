@@ -97,7 +97,7 @@ internal class FrameTimingExtractors(
   }
 
   private class TimedTrack(private val track: TrackOutput, private val meter: FrameRateMeter) : TrackOutput {
-    override fun format(format: Format) = track.format(format)
+    override fun format(format: Format) = track.format(DolbyVision.playable(format))
     override fun durationUs(durationUs: Long) = track.durationUs(durationUs)
     override fun sampleData(input: DataReader, length: Int, allowEndOfInput: Boolean) =
       track.sampleData(input, length, allowEndOfInput)

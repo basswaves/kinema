@@ -927,6 +927,7 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
         if (start != null) p.setMediaItem(media, (start * 1000).toLong())
         else p.setMediaItem(media)
         perf.open()
+        DolbyVision.baseLayerOnly = false
         p.prepare()
         p.playWhenReady = wantPlaying
         lastPosition = -1
@@ -1311,6 +1312,8 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
             put("bitrate", (if (f.bitrate > 0) f.bitrate else f.averageBitrate).takeIf { it > 0 } ?: JSONObject.NULL)
             put("transfer", transferName(f))
             put("dolbyVision", f.sampleMimeType == MimeTypes.VIDEO_DOLBY_VISION)
+            // Profile 7 played as its HDR10 base layer here (DolbyVision.kt).
+            put("dolbyVisionBaseLayer", DolbyVision.baseLayerOnly)
             put("decoder", videoDecoder ?: JSONObject.NULL)
             put("hardware", videoDecoder?.let { inHardware(it) } ?: JSONObject.NULL)
           })

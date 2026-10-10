@@ -16,6 +16,8 @@ const DASH = '—';
 
 function hdrName(video: NonNullable<PlayerFacts['video']>): string {
   if (video.dolbyVision) return 'Dolby Vision';
+  // Profile 7 with no decoder for it here: its HDR10 picture, said as such.
+  if (video.dolbyVisionBaseLayer) return 'HDR10 (PQ) — Dolby Vision layer not applied';
   switch (video.transfer) {
     case 'pq':
       return 'HDR10 (PQ)';

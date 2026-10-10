@@ -60,7 +60,7 @@ export function useScrub({
     scrubRef.current = null;
     lastScrub.current = s;
     dispatch({ type: 'scrub-end' });
-    void seekTo(s.target).catch(fail);
+    void seekTo(s.target, true).catch(fail);
     showOsd();
   }, [dispatch, fail, showOsd]);
 

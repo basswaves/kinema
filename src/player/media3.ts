@@ -102,7 +102,8 @@ export const addSubtitle = (path: string, language: string, label: string) =>
   call('add_subtitle', { uri: path, language, label });
 export const stop = () => call('stop');
 export const setPaused = (paused: boolean) => call('set_paused', { paused });
-export const seek = (seconds: number, relative: boolean) => call('seek', { seconds, relative });
+export const seek = (seconds: number, relative: boolean, quick = false) =>
+  call('seek', { seconds, relative, quick });
 /** 0–100, on the same curve as mpv's; kept by the plugin across files. */
 export const setVolume = (level: number) => call('set_volume', { level });
 export const setMuted = (muted: boolean) => call('set_muted', { muted });

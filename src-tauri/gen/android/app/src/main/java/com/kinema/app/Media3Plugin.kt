@@ -1,6 +1,7 @@
 package com.kinema.app
 
 import android.app.Activity
+import android.app.ActivityManager
 import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
@@ -25,8 +26,10 @@ import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.text.CueGroup
 import androidx.media3.common.Tracks
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.Renderer
+import androidx.media3.exoplayer.SeekParameters
 import androidx.media3.exoplayer.text.TextOutput
 import androidx.media3.exoplayer.text.TextRenderer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
@@ -36,6 +39,8 @@ import androidx.media3.common.Format
 import androidx.media3.common.MimeTypes
 import androidx.media3.exoplayer.audio.AudioCapabilities
 import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioTrackBufferSizeProvider
 import androidx.media3.exoplayer.audio.ForwardingAudioSink
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
@@ -123,6 +128,8 @@ class SeekArgs {
   var seconds: Double = 0.0
   /** Relative to where it is, rather than from the start. */
   var relative: Boolean = false
+  /** The nearest keyframe, not the exact moment: a skip, which should show at once (engine.ts seekTo). */
+  var quick: Boolean = false
 }
 
 /**
@@ -217,6 +224,12 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
    * at all. Each refusal moves one step on.
    */
   private var audioStep = 0
+  /**
+   * This device refused the untouched sound's usual buffer, so it gets a
+   * smaller one from then on (`renderers`): kept while Kinema runs, so the
+   * next film is not refused the same way first.
+   */
+  private var smallSoundBuffer = false
   /** The film's picture, once Media3 has chosen its video track and its frame rate is known or given up on. */
   private var video: JSObject? = null
   /** The chosen video track's format, for `video`. */
@@ -397,7 +410,19 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
    */
   private fun renderers(step: Int) = object : DefaultRenderersFactory(activity) {
     override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): AudioSink? {
-      val sink = super.buildAudioSink(context, enableFloatOutput, enableAudioTrackPlaybackParams) ?: return null
+      val sink = if (smallSoundBuffer) {
+        // Media3's own build of the sink, with the untouched sound's buffer
+        // at its plain size: Media3 makes DTS-HD's four times larger (for
+        // underruns on some boxes), about 4 MB, and a device may refuse that
+        // much ("not enough memory for AudioTrack", seen on a box).
+        DefaultAudioSink.Builder(context)
+          .setEnableFloatOutput(enableFloatOutput)
+          .setEnableAudioOutputPlaybackParameters(enableAudioTrackPlaybackParams)
+          .setAudioTrackBufferSizeProvider(DefaultAudioTrackBufferSizeProvider.Builder().setDtshdBufferMultiplicationFactor(1).build())
+          .build()
+      } else {
+        super.buildAudioSink(context, enableFloatOutput, enableAudioTrackPlaybackParams) ?: return null
+      }
       if (step == 0) return sink
       return object : ForwardingAudioSink(sink) {
         override fun supportsFormat(format: Format) =
@@ -440,6 +465,31 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
       )
   }
 
+  /**
+   * How much of the film is read ahead, from this device's memory rather
+   * than a fixed figure. Media3's own: a film from a USB drive gets 18.75 MB
+   * — about two seconds of a 4K remux, so any hiccup in reading is a stall —
+   * and one from a share up to 144 MB, most of a small box's Java heap. Here
+   * both get a quarter of the heap the app may use, at most a tenth of the
+   * device's memory, between 32 and 192 MB; up to a minute, playing after a
+   * second, and after a stall only once three seconds are back (fewer,
+   * shorter stops than starting again on a sliver).
+   */
+  private fun loadControl(): DefaultLoadControl {
+    val memory = ActivityManager.MemoryInfo()
+    (activity.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager).getMemoryInfo(memory)
+    val bytes = minOf(Runtime.getRuntime().maxMemory() / 4, memory.totalMem / 10, 192L shl 20)
+      .coerceAtLeast(32L shl 20)
+    Log.i("Kinema", "media3: reads ahead up to ${bytes shr 20} MB")
+    return DefaultLoadControl.Builder()
+      .setTargetBufferBytes(bytes.toInt())
+      .setBufferDurationsMsForStreaming(30_000, 60_000, 1_000, 3_000)
+      .setBufferDurationsMsForLocalPlayback(30_000, 60_000, 1_000, 3_000)
+      .setPrioritizeTimeOverSizeThresholdsForStreaming(false)
+      .setPrioritizeTimeOverSizeThresholdsForLocalPlayback(false)
+      .build()
+  }
+
   private fun buildPlayer(s: SurfaceView): ExoPlayer {
     val selector = soundOnlySelector(audioStep > 0)
     // Not every subtitle track turned into pictures while the file is read:
@@ -452,6 +502,7 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
     val p = ExoPlayer.Builder(activity, renderers(audioStep))
       .setTrackSelector(selector)
       .setMediaSourceFactory(sources)
+      .setLoadControl(loadControl())
       .build()
     // Media3's own account of what it chose and did (decoder, sound path,
     // dropped frames, stalls), in the system log of a test build only.
@@ -534,6 +585,14 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
       }
 
       override fun onPlayerError(error: PlaybackException) {
+        // The untouched sound's buffer refused: once more with a smaller
+        // one, before giving up on sending it untouched.
+        if (audioStep == 0 && !smallSoundBuffer && error.errorCode == PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED) {
+          smallSoundBuffer = true
+          Log.w("Kinema", "media3: the sound's buffer was refused; trying a smaller one")
+          reopen()
+          return
+        }
         if (audioStep < 2 && isAudioFailure(p, error)) {
           fallBack(error)
           return
@@ -760,18 +819,28 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
    * playing or paused as it was. The page is told, in Kinema's terms.
    */
   private fun fallBack(error: PlaybackException) {
-    val old = player ?: return
-    val s = surface ?: return
-    val media = item ?: return
-    val at = old.currentPosition
-    // The subtitles chosen stay chosen; the sound is the fallback's to choose.
-    val subtitles = old.trackSelectionParameters.overrides.values.filter { it.type == C.TRACK_TYPE_TEXT }
+    if (player == null || surface == null || item == null) return
     val f = (error as? ExoPlaybackException)?.rendererFormat
     val format = f?.let { soundName(it) } ?: ""
     audioStep += 1
     untouched = false
     audioDecoder = null
     Log.w("Kinema", "media3: the sound would not play (${error.errorCodeName}, $format); step $audioStep")
+    reopen()
+    // Said once Media3 has chosen the sound it can play (announceSound),
+    // or now, when there is none to choose.
+    failedSound = format
+    if (audioStep >= 2) announce(2, null)
+  }
+
+  /** A new player for the film, at the moment it was, playing or paused as it was. */
+  private fun reopen() {
+    val old = player ?: return
+    val s = surface ?: return
+    val media = item ?: return
+    val at = old.currentPosition
+    // The subtitles chosen stay chosen; the sound is the fallback's to choose.
+    val subtitles = old.trackSelectionParameters.overrides.values.filter { it.type == C.TRACK_TYPE_TEXT }
     old.release()
     player = null
     val p = buildPlayer(s)
@@ -783,10 +852,6 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
     p.setMediaItem(media, at)
     p.prepare()
     p.playWhenReady = wantPlaying
-    // Said once Media3 has chosen the sound it can play (announceSound),
-    // or now, when there is none to choose.
-    failedSound = format
-    if (audioStep >= 2) announce(2, null)
   }
 
   /** Once the tracks are chosen after a fallback: which sound plays now, if any. */
@@ -928,6 +993,7 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
       } else {
         val target = if (args.relative) p.currentPosition + (args.seconds * 1000).toLong() else (args.seconds * 1000).toLong()
         seeking = true
+        p.setSeekParameters(if (args.quick) SeekParameters.CLOSEST_SYNC else SeekParameters.EXACT)
         p.seekTo(target.coerceAtLeast(0))
         invoke.resolve()
       }

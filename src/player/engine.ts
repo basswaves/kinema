@@ -327,9 +327,16 @@ export async function isPaused(): Promise<boolean> {
   return (await getProperty('pause', 'flag')) as boolean;
 }
 
-export async function seekTo(seconds: number): Promise<void> {
-  if (isMedia3()) return media3.seek(seconds, false);
-  await command('seek', [seconds, 'absolute']);
+/**
+ * `quick` lands on the nearest keyframe instead of the exact second: the
+ * picture shows sooner, a fraction of a second off, because the frames
+ * between the keyframe and the second are not decoded and thrown away —
+ * on a 4K remux and a weak decoder, up to a second or two per skip. For
+ * skips only; resume, the seek bar, chapters and marker jumps stay exact.
+ */
+export async function seekTo(seconds: number, quick = false): Promise<void> {
+  if (isMedia3()) return media3.seek(seconds, false, quick);
+  await command('seek', [seconds, quick ? 'absolute+keyframes' : 'absolute']);
 }
 
 export async function seekBy(seconds: number): Promise<void> {

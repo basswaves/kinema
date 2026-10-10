@@ -48,6 +48,7 @@ import { needsOwnTmdbKey } from '../metadata/builtinKey';
 import { availableUpdate } from './updates';
 import { scanTrouble as describeScanTrouble, type ScanTrouble } from './scanTrouble';
 import { runScanPipeline, useScanStatus } from '../library/pipeline';
+import { setPlaybackActive } from '../library/playback';
 import { getTitleDetail, listTitles, type Title } from './api';
 import { searchTitles, type SearchHit } from './search';
 import { arrangeGrid, GRID_SORTS, gridSettingKey, parseGridSetting, type GridSort } from './gridSort';
@@ -564,6 +565,13 @@ export default function Browse() {
     // puts you on that result instead, which returnFocusTo is already doing.
     if (view.name === 'search' && !hasPendingReturn()) setFocus('search-input');
   }, [view.name]);
+
+  // The library's background work gives way while a film is open (playback.ts).
+  const inPlayer = view.name === 'player';
+  useEffect(() => {
+    setPlaybackActive(inPlayer);
+    return () => setPlaybackActive(false);
+  }, [inPlayer]);
 
   if (view.name === 'player') {
     return (

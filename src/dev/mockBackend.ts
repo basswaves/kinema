@@ -1388,6 +1388,8 @@ const handlers: Record<string, Handler> = {
     shareLogins.push({ server, user: String(a.user) });
     return { kept: true };
   },
+  // The scan waits while a film plays and tells the native side so (playback.ts).
+  set_playing: () => null,
   forget_share_login: (a) => {
     const i = shareLogins.findIndex((l) => l.server === String(a.server));
     if (i >= 0) shareLogins.splice(i, 1);

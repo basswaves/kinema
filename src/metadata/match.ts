@@ -45,6 +45,7 @@ import {
 import { pickBest, type Candidate, type ScoreContext } from './score';
 import { wikidataGetMovie, wikidataSearch } from './wikidata';
 import { nfoForGroup, resolveNfoIds, sourceName } from './nfo';
+import { yieldToPlayback } from '../library/playback';
 
 export interface MatchProgress {
   groupsTotal: number;
@@ -285,6 +286,7 @@ export async function backfillTitleDetails(): Promise<DetailBackfill> {
   if (!keys.tmdb) return result;
 
   for (const target of await listTitlesNeedingDetail()) {
+    await yieldToPlayback();
     const kind = target.kind === 'series' ? 'series' : 'movie';
     try {
       const metadata = await tmdbGetTitle(keys.tmdb, target.tmdb_id, kind);
@@ -321,6 +323,7 @@ export async function refreshStaleTitles(): Promise<DetailBackfill> {
   if (!keys.tmdb) return result;
 
   for (const target of await listStaleTitles(REFRESH_PER_SCAN)) {
+    await yieldToPlayback();
     const kind = target.kind === 'series' ? 'series' : 'movie';
     try {
       const titleId = await saveTitle(await tmdbGetTitle(keys.tmdb, target.tmdb_id, kind));
@@ -355,6 +358,7 @@ export async function upgradeWikidataFilms(): Promise<DetailBackfill> {
   if (!keys.tmdb) return result;
 
   for (const target of await listWikidataFilms(REFRESH_PER_SCAN)) {
+    await yieldToPlayback();
     try {
       // Fetched before re-keying, so a failure leaves the row as it was.
       const metadata = await tmdbGetTitle(keys.tmdb, target.tmdb_id, 'movie');
@@ -483,6 +487,18 @@ async function resolveGroup(
   };
 }
 
+/**
+ * How many titles are matched at once: the device's cores, between two and
+ * four. The providers' own queues (`makeQueue`) still send their requests one
+ * at a time with a gap between them, so this overlaps what a title does
+ * *around* the network — reading its NFO, the database writes, scoring — with
+ * the next title's request, and never asks a service faster than before.
+ */
+export function matchConcurrency(): number {
+  const cores = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency : 0;
+  return Math.min(4, Math.max(2, Number.isFinite(cores) && cores > 0 ? Math.floor(cores) : 2));
+}
+
 export async function matchFiles(
   files: MediaFile[],
   startingKeys: ProviderKeys,
@@ -491,9 +507,17 @@ export async function matchFiles(
   let keys = startingKeys;
   const groups = groupFiles(files);
   const outcome: MatchOutcome = { matched: 0, unmatched: 0, errors: [] };
+  // Kept per group and joined in group order, so the list reads the same
+  // whichever title finished first.
+  const errorsByGroup: Array<string | undefined> = new Array<string | undefined>(groups.length);
 
   let done = 0;
-  for (const group of groups) {
+  // Two groups of one title (a film and a series called the same, or two years
+  // of a remake) are never in flight together: each waits for the one before.
+  const titleChains = new Map<string, Promise<void>>();
+
+  const matchGroup = async (group: FileGroup, index: number): Promise<void> => {
+    await yieldToPlayback();
     onProgress({
       groupsTotal: groups.length,
       groupsDone: done,
@@ -526,7 +550,7 @@ export async function matchFiles(
       }
     } catch (e) {
       const message = `${group.title}: ${e instanceof Error ? e.message : String(e)}`;
-      outcome.errors.push(message);
+      errorsByGroup[index] = message;
 
       // TMDB refused the built-in key: it has been set aside (builtinKey.ts),
       // and the rest of this run uses what works without it rather than
@@ -546,7 +570,38 @@ export async function matchFiles(
     }
 
     done++;
+  };
+
+  const inTitleOrder = (group: FileGroup, index: number): Promise<void> => {
+    const titleKey = group.title.toLowerCase();
+    const run = (titleChains.get(titleKey) ?? Promise.resolve()).then(() =>
+      matchGroup(group, index)
+    );
+    titleChains.set(
+      titleKey,
+      run.catch(() => undefined)
+    );
+    return run;
+  };
+
+  let next = 0;
+  const lane = async (): Promise<void> => {
+    for (;;) {
+      const index = next++;
+      if (index >= groups.length) return;
+      await inTitleOrder(groups[index], index);
+    }
+  };
+
+  // With the app's own key the first title goes alone: if TMDB refuses that
+  // key, the answer must be known before the others are sent with it.
+  if (keys.tmdbSource === 'builtin' && groups.length > 0) {
+    next = 1;
+    await inTitleOrder(groups[0], 0);
   }
+  await Promise.all(Array.from({ length: Math.min(matchConcurrency(), groups.length) }, lane));
+
+  for (const message of errorsByGroup) if (message) outcome.errors.push(message);
 
   onProgress({
     groupsTotal: groups.length,

@@ -57,7 +57,8 @@ function start(): Worker | null {
     made.onmessageerror = () => drop('the parse worker sent something unreadable', true);
     worker = made;
     return made;
-  } catch {
+  } catch (e) {
+    console.warn(`parse: a worker could not be made here (${String(e)}); parsing on the page`);
     unusable = true;
     return null;
   }
@@ -95,9 +96,14 @@ export async function parseInWorker(
         reject(e instanceof Error ? e : new Error(String(e)));
       }
     });
-    if ('failure' in reply) return null;
+    if ('failure' in reply) {
+      console.warn(`parse: the worker could not (${reply.failure}); parsing on the page`);
+      return null;
+    }
+    console.log(`parse: ${files.length} names parsed in a worker`);
     return { payloads: reply.payloads, parseError: reply.parseError };
-  } catch {
+  } catch (e) {
+    console.warn(`parse: no worker here (${String(e)}); parsing on the page`);
     return null;
   } finally {
     releaseWhenQuiet();

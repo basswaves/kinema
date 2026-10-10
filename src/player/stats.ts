@@ -43,6 +43,7 @@ import { readSwitchPolicies, screenIdOf, switchSettingsFor } from './displaySwit
 import { goesDirect, readAudioSettings, targetDevice } from './audioOutput';
 import { getEquipment, type DisplayMode } from './equipment';
 import { capabilitiesNow, screenOwner } from '../capabilities';
+import { currentStepDown, stepsInForce, type StepState } from './stepDown';
 
 export interface StatRow {
   label: string;
@@ -160,7 +161,7 @@ export function hwdecNote(hwdec: string | null): string | undefined {
 /** Transfer functions that carry more range than an SDR display can show. */
 const HDR_TRANSFERS = new Set(['pq', 'hlg', 'st2084', 'arib-std-b67']);
 
-function isHdr(gamma: string | null): boolean {
+export function isHdr(gamma: string | null): boolean {
   return gamma !== null && HDR_TRANSFERS.has(gamma.toLowerCase());
 }
 
@@ -314,6 +315,29 @@ export function describeDolbyVision(profile: number | null): StatRow | null {
         note: 'Kinema cannot send Dolby Vision itself',
       };
   }
+}
+
+/**
+ * Which processing steps Kinema gave up to keep up, and why — only when one is
+ * in force for this film (stepDown.ts). The rows around it show the values mpv
+ * is using; this says they are not the ones Kinema chose, and who changed them.
+ * A step that cannot show in an SDR film's picture is not listed for it.
+ */
+export function describeStepDown(state: StepState, hdrSource: boolean): StatRow | null {
+  const steps = stepsInForce(state.level, hdrSource);
+  if (steps.length === 0) return null;
+  const why =
+    state.percent === null
+      ? 'dropped to keep up on an earlier film: the graphics card fell behind'
+      : `dropped to keep up: the graphics card fell behind (${state.percent.toFixed(
+          state.percent < 10 ? 1 : 0
+        )}% frames dropped)`;
+  return {
+    label: 'Dropped to keep up',
+    value: steps.map((s) => s.label).join(' · '),
+    note: `${why}. Remembered for this graphics card; the picture is otherwise as set.`,
+    warn: true,
+  };
 }
 
 /** `system` names the ordinary path: "the Windows mixer", "the Linux sound server". */
@@ -841,6 +865,7 @@ export async function readPlaybackStats(): Promise<StatGroup[]> {
         },
         describeScaling(sourceW, sourceH, videoW, videoH, scale, dscale, resizesOnly),
         chromaRow,
+        ...[describeStepDown(currentStepDown(), hdrSource)].filter((r): r is StatRow => r !== null),
         // An absent value is itself the finding here, so it says so rather than
         // leaving a hole. gpu-next does not implement `vo-passes` on every
         // build, and "no section" and "no passes ran" look identical.

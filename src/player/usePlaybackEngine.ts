@@ -37,6 +37,8 @@ import {
 } from './engine';
 import { VIDEO_SYNC_KEY, VIDEO_SYNC_MODES } from './mpvOptions';
 import { startOverlay } from './overlay';
+import { applyRememberedStepDown } from './stepDown';
+import { useStepDown } from './useStepDown';
 import { handMouseToPage, startPointerFollowingControls } from './pageMouse';
 import { resumePoint } from './resume';
 import { audioFallbackNotice } from './systemOutput';
@@ -273,6 +275,9 @@ export function usePlaybackEngine({
             await mpvCommand('set', ['video-sync', videoSync.current]).catch((e) =>
               console.warn('could not set video-sync', e)
             );
+            // The steps this graphics card needed on an earlier film, if any
+            // (stepDown.ts); never throws.
+            await applyRememberedStepDown();
           }
 
           // Chapters only exist once a file is open, and they are one of the
@@ -373,6 +378,13 @@ export function usePlaybackEngine({
       })
       .catch((e) => console.warn('could not read video sync mode', e));
   }, []);
+
+  // Dropped frames: step down, only if they come (stepDown.ts). Mpv only.
+  useStepDown({
+    sessionRef,
+    seq: session.seq,
+    watching: session.open && session.frameShown,
+  });
 
   // The cover never outstays its purpose: if no first frame is reported in
   // time — a file with no video, an event that never comes — it goes anyway.

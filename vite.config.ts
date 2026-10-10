@@ -1,4 +1,5 @@
 import { defineConfig } from "vite";
+import { configDefaults } from "vitest/config";
 import react from "@vitejs/plugin-react";
 
 // @ts-expect-error process is a nodejs global
@@ -29,6 +30,13 @@ export default defineConfig(async () => ({
     format: 'es',
   },
 
+  // Claude Code's worktrees live under .claude/ — whole copies of the
+  // project, each with its own tests. Left in, `vitest run` ran every copy's
+  // tests as well as these (over a thousand files instead of a few hundred).
+  test: {
+    exclude: [...configDefaults.exclude, '.claude/**'],
+  },
+
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent Vite from obscuring rust errors
@@ -46,8 +54,9 @@ export default defineConfig(async () => ({
         }
       : undefined,
     watch: {
-      // 3. tell Vite to ignore watching `src-tauri`
-      ignored: ["**/src-tauri/**"],
+      // 3. tell Vite to ignore watching `src-tauri`, and Claude Code's
+      //    worktrees (whole copies of the project under .claude/)
+      ignored: ["**/src-tauri/**", "**/.claude/**"],
     },
   },
 }));

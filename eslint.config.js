@@ -5,7 +5,8 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 
 export default tseslint.config(
-  { ignores: ['dist', 'src-tauri/target', 'node_modules'] },
+  // `.claude`: Claude Code's worktrees, whole copies of the project.
+  { ignores: ['dist', 'src-tauri/target', 'node_modules', '.claude'] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ['**/*.{ts,tsx}'],

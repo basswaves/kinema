@@ -257,6 +257,62 @@ for (const [system, sections] of [
   });
 }
 
+test('Settings → Playback: Look is Auto, Full or Light, by remote, and Light drops the blur', async ({
+  page,
+}) => {
+  await open(page, 'windows');
+  await press(page, 'ArrowUp', 2);
+  await press(page, 'ArrowRight', 4);
+  await expect.poll(() => focused(page)).toBe('Settings');
+  await press(page, 'Enter');
+  await press(page, 'ArrowDown');
+  for (let i = 0; i < 6 && (await focused(page)) !== 'Playback'; i++) await press(page, 'ArrowDown');
+  await press(page, 'Enter');
+  await expect(page.locator('.settings-section h2').first()).toHaveText('Playback');
+
+  const row = page.locator('.choice-row', { has: page.locator('.choice-label', { hasText: /^Look$/ }) });
+  await expect(row.locator('.choice')).toHaveText(['✓Auto', 'Full', 'Light']);
+  // Reach the row with Down, as a remote would.
+  const onLook = () =>
+    page.evaluate(() => !!document.querySelector('.focused')?.closest('[aria-label="Look"]'));
+  await press(page, 'ArrowRight');
+  for (let i = 0; i < 12 && !(await onLook()); i++) await press(page, 'ArrowDown');
+  expect(await onLook()).toBe(true);
+
+  // Auto says what it chose; either way the page carries one of the two looks.
+  await expect(row.locator('.choice-hint')).toContainText(/^Auto (chose (Full|Light): |is still looking)/);
+  const look = () => page.evaluate(() => document.documentElement.dataset.look);
+  await expect.poll(look).toMatch(/^(full|light)$/);
+  const blur = () =>
+    page.evaluate(() => getComputedStyle(document.querySelector('.top-nav')!).backdropFilter);
+
+  // Move to Light: the chosen one is marked, the page is light, the blur is gone.
+  const toward = async (label: string, key: string) => {
+    for (let i = 0; i < 3 && (await focused(page)) !== label && (await focused(page)) !== `✓${label}`; i++) {
+      await press(page, key);
+    }
+  };
+  await toward('Light', 'ArrowRight');
+  await press(page, 'Enter');
+  await expect(row.locator('.choice.chosen')).toHaveText('✓Light');
+  await expect.poll(look).toBe('light');
+  await expect.poll(blur).toBe('none');
+  await expect(row.locator('.choice-hint')).toHaveCount(0);
+  // The ring is still on the control: focus stays clearly visible.
+  await expect.poll(() => focused(page)).toBe('✓Light');
+
+  await toward('Full', 'ArrowLeft');
+  await press(page, 'Enter');
+  await expect(row.locator('.choice.chosen')).toHaveText('✓Full');
+  await expect.poll(look).toBe('full');
+  await expect.poll(blur).not.toBe('none');
+
+  await toward('Auto', 'ArrowLeft');
+  await press(page, 'Enter');
+  await expect(row.locator('.choice.chosen')).toHaveText('✓Auto');
+  await expect(row.locator('.choice-hint')).toContainText('Auto');
+});
+
 test('first run: where to watch, a folder, then the setup pages, all by remote', async ({ page }) => {
   // A short window, so the welcome page is scrolled when Scan opens the
   // pages: the first page's focus landed a row down from stale positions

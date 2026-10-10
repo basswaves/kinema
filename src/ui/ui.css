@@ -3451,3 +3451,66 @@ kbd {
   margin: 1rem 0 0;
   font-size: 0.8125rem;
 }
+
+/* ---- the light look ---------------------------------------------------------
+ *
+ * lightLook.ts sets data-look='light' on weak devices (Auto) or when Settings
+ * says so. Every rule here only takes an effect away: sizes, spacing and
+ * focus order are untouched, so navigation behaves the same. The focus outline
+ * stays; it is what shows where you are. text-shadow stays too, it is what
+ * keeps a title readable over artwork. Never an opaque background on
+ * html/body/#root (the window is transparent so mpv can draw behind it).
+ */
+:root[data-look='light'],
+:root[data-look='light'] * {
+  scroll-behavior: auto;
+}
+
+:root[data-look='light'] .top-nav,
+:root[data-look='light'] .btn-secondary {
+  backdrop-filter: none;
+}
+
+:root[data-look='light'] .hero-logo {
+  filter: none;
+}
+
+/* The zoom on the highlighted picture and button, hovered or focused. */
+:root[data-look='light'] .btn-primary:hover,
+:root[data-look='light'] .btn-secondary:hover,
+:root[data-look='light'] .btn-primary.focused,
+:root[data-look='light'] .btn-secondary.focused,
+:root[data-look='light'] .see-all-card:hover,
+:root[data-look='light'] .see-all-card.focused,
+:root[data-look='light'] .card:hover,
+:root[data-look='light'] .card.focused,
+:root[data-look='light'] .continue-body:hover,
+:root[data-look='light'] .continue-body.focused,
+:root[data-look='light'] .leave-choice.focused,
+:root[data-look='light'] .folder-item.focused {
+  transform: none;
+}
+
+/* Shadows under pictures and panels: a blurred shadow is repainted with the
+   thing above it. Panels keep a thin edge so they still stand off the page. */
+:root[data-look='light'] .card-art,
+:root[data-look='light'] .continue-art,
+:root[data-look='light'] .detail-poster,
+:root[data-look='light'] .skip-button,
+:root[data-look='light'] .card-watched {
+  box-shadow: none;
+}
+
+:root[data-look='light'] .up-next,
+:root[data-look='light'] .stats-panel,
+:root[data-look='light'] .shortcuts,
+:root[data-look='light'] .leave,
+:root[data-look='light'] .folder-browser {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+
+/* TV mode's dark halo round the focus ring keeps its ring, loses its blur. */
+:root[data-look='light'][data-tv='on'] .card.focused .card-art,
+:root[data-look='light'][data-tv='on'] .continue-body.focused .continue-art {
+  box-shadow: 0 0 0 0.5rem rgba(0, 0, 0, 0.55);
+}

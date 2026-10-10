@@ -8,6 +8,7 @@ import { useShownLink } from './ui/links';
 import { useFolderRequest } from './library/folders';
 import Shortcuts from './ui/Shortcuts';
 import { setShortcutsOpen, useShortcutsOpen } from './ui/shortcutsState';
+import { loadLook } from './ui/lightLook';
 import { loadTvMode, setTvMode, useTvMode } from './ui/tv';
 import './App.css';
 
@@ -47,6 +48,11 @@ export default function App() {
   // sofa, and they live outside Browse.
   useEffect(() => {
     void loadTvMode();
+  }, []);
+
+  // The light look (lightLook.ts): decided once, a moment after Home appears.
+  useEffect(() => {
+    void loadLook();
   }, []);
 
   // Ctrl+Shift+T toggles the layout without a trip to the settings screen.

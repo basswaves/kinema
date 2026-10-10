@@ -42,6 +42,7 @@ import ScreenSection from './ScreenSection';
 import { capabilitiesNow, useCapabilities, type Capabilities } from '../capabilities';
 import { useClaimFocus } from './focus';
 import { setTvMode, useTvMode } from './tv';
+import { setLook, useLook, type LookSetting } from './lightLook';
 import {
   addLibraryRoot,
   analysisBacklog,
@@ -298,6 +299,7 @@ export default function Settings({
   const [autoAnalyse, setAutoAnalyse] = useState(true);
 
   const tvMode = useTvMode();
+  const look = useLook();
   const can = useCapabilities();
   const scan = useScanStatus();
 
@@ -916,6 +918,27 @@ export default function Settings({
                     }
                   />
                 )}
+                {/* A written exception to "no quality presets" (owner,
+                    2026-10-10; lightLook.ts): whether this device keeps up
+                    with the effects is hardware, and Auto says what it saw. */}
+                <ChoiceRow<LookSetting>
+                  label="Look"
+                  choices={[
+                    { value: 'auto', label: 'Auto' },
+                    { value: 'full', label: 'Full' },
+                    { value: 'light', label: 'Light' },
+                  ]}
+                  value={look.setting}
+                  onChange={setLook}
+                  note="Light turns off blurs, shadows and the zoom on the highlighted picture, and scrolls without gliding, so a slow device keeps up. Everything stays where it is, and the outline round the highlighted picture stays. Auto picks Light on a device with two processor cores or fewer, 2 GB of memory or less, or a screen that drew slowly when Kinema opened."
+                  hint={
+                    look.setting !== 'auto'
+                      ? undefined
+                      : look.measuring
+                        ? 'Auto is still looking at how this device draws.'
+                        : `Auto chose ${look.reason}.`
+                  }
+                />
                 <LanguageSection onError={setError} />
                 <ForcedSubtitleRows onError={setError} />
                 <ChoiceRow

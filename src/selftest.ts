@@ -90,6 +90,35 @@ function tauriCallbacks(): number {
   return map instanceof Map ? map.size : countCallbacks(Object.getOwnPropertyNames(window));
 }
 
+const nextFrame = () => new Promise<number>((done) => requestAnimationFrame(done));
+
+/**
+ * How long a key press takes to show, as a person holding the remote feels
+ * it: the press, then two frames (the one that handles it and the one that
+ * draws it). Pressed `times` times, each after the last has shown.
+ */
+async function navTiming(key: string, times = 10) {
+  const ms: number[] = [];
+  for (let i = 0; i < times; i++) {
+    const start = performance.now();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+    window.dispatchEvent(new KeyboardEvent('keyup', { key, bubbles: true }));
+    await nextFrame();
+    await nextFrame();
+    ms.push(Math.round(performance.now() - start));
+  }
+  const sorted = [...ms].sort((a, b) => a - b);
+  return { key, ms, median: sorted[sorted.length >> 1], max: sorted[sorted.length - 1] };
+}
+
+/** How long the library's whole title list takes to come, and how big it is. */
+async function homeTiming() {
+  const start = performance.now();
+  const titles = await invoke<unknown[]>('list_titles');
+  const ms = Math.round(performance.now() - start);
+  return { titles: titles.length, ms, kb: Math.round(JSON.stringify(titles).length / 1024) };
+}
+
 async function leakSample() {
   const heap = (performance as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize;
   return {
@@ -178,6 +207,9 @@ const CALLABLE: Record<string, (...args: never[]) => Promise<unknown>> = {
   setVolume,
   // What the process and the page hold (see above); one sample, on demand.
   leakSample,
+  // How a key press and the title list feel on this device (above).
+  navTiming,
+  homeTiming,
   // The share's own reading speed, apart from the player (procstats.rs).
   readRate: (path: string, mb: number, seeks: number) =>
     invoke('read_rate', { path, mb, seeks }),

@@ -178,6 +178,9 @@ const CALLABLE: Record<string, (...args: never[]) => Promise<unknown>> = {
   setVolume,
   // What the process and the page hold (see above); one sample, on demand.
   leakSample,
+  // The share's own reading speed, apart from the player (procstats.rs).
+  readRate: (path: string, mb: number, seeks: number) =>
+    invoke('read_rate', { path, mb, seeks }),
   // Display switching only happens fullscreen, and Browse has no key for it.
   setFullscreen: (on: boolean) => getCurrentWindow().setFullscreen(on),
   // TV mode is read at launch, before a plan's first action; this switches it

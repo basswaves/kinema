@@ -137,6 +137,77 @@ pub async fn process_stats() -> Result<Stats, String> {
     crate::jobs::off_main(|| Ok(read())).await
 }
 
+/// How fast the core hands a film on a share to the player, apart from the
+/// player: `mb` megabytes straight through the same local address Media3
+/// reads (stream.rs), then the wait for the first byte at `seeks` places
+/// further in — the share's side of a stall or a slow skip.
+#[derive(Serialize, Debug)]
+pub struct ReadRate {
+    pub mbit_per_s: f64,
+    pub first_byte_ms: u64,
+    pub bytes: u64,
+    pub seek_first_byte_ms: Vec<u64>,
+}
+
+#[tauri::command]
+pub async fn read_rate(path: String, mb: u64, seeks: u64) -> Result<ReadRate, String> {
+    let url = crate::stream::stream_address(path).await?;
+    crate::jobs::off_main(move || measure(&url, mb, seeks).map_err(|e| e.to_string())).await
+}
+
+fn measure(url: &str, mb: u64, seeks: u64) -> std::io::Result<ReadRate> {
+    use std::io::{BufRead, BufReader, Read, Write};
+    use std::time::Instant;
+    let rest = url.strip_prefix("http://").unwrap_or(url);
+    let (host, target) = rest.split_at(rest.find('/').unwrap_or(rest.len()));
+    // One request for `range`, its head read; the body is left to the caller.
+    let ask = |range: &str| -> std::io::Result<(BufReader<std::net::TcpStream>, Option<u64>)> {
+        let mut conn = std::net::TcpStream::connect(host)?;
+        write!(conn, "GET {target} HTTP/1.1\r\nHost: {host}\r\nRange: bytes={range}\r\n\r\n")?;
+        let mut reader = BufReader::new(conn);
+        let mut total = None;
+        loop {
+            let mut line = String::new();
+            if reader.read_line(&mut line)? == 0 || line == "\r\n" {
+                break;
+            }
+            if let Some(v) = line.to_ascii_lowercase().strip_prefix("content-range:") {
+                total = v.trim().rsplit('/').next().and_then(|n| n.parse().ok());
+            }
+        }
+        Ok((reader, total))
+    };
+    let start = Instant::now();
+    let (mut body, total) = ask(&format!("0-{}", mb * 1_048_576 - 1))?;
+    let mut buf = vec![0u8; 1 << 20];
+    let (mut bytes, mut first) = (0u64, None);
+    loop {
+        let n = body.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        first.get_or_insert_with(|| start.elapsed().as_millis() as u64);
+        bytes += n as u64;
+    }
+    let secs = start.elapsed().as_secs_f64().max(0.001);
+    let mut seek_first_byte_ms = Vec::new();
+    if let Some(size) = total {
+        for i in 1..=seeks {
+            let at = size * i / (seeks + 1);
+            let t = Instant::now();
+            let (mut body, _) = ask(&format!("{at}-"))?;
+            body.read_exact(&mut [0u8; 1])?;
+            seek_first_byte_ms.push(t.elapsed().as_millis() as u64);
+        }
+    }
+    Ok(ReadRate {
+        mbit_per_s: (bytes as f64 * 8.0 / secs / 1e5).round() / 10.0,
+        first_byte_ms: first.unwrap_or(0),
+        bytes,
+        seek_first_byte_ms,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

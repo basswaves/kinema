@@ -26,7 +26,7 @@ import {
   type MediaFile,
   type ScanReport,
 } from './api';
-import { clearParseError, initParser, lastParseError, selfTest } from './parse';
+import { clearParseError, lastParseError, selfTest } from './parse';
 import { parseBatchForLibrary } from './pipeline';
 import {
   artworkStats,
@@ -250,7 +250,6 @@ export default function LibraryView() {
     setError(null);
     clearParseError();
     try {
-      await initParser();
       let total = 0;
       // Batched so a large library reports progress and never builds one
       // enormous IPC payload.

@@ -1,6 +1,8 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { LibraryRoot, MediaFile } from './api';
 import { initParser } from './parse';
+import { lastParseError } from './parse';
+import { resetParseWorker } from './parseClient';
 import { parseBatchForLibrary } from './pipeline';
 
 function episode(n: number): MediaFile {
@@ -36,6 +38,8 @@ beforeAll(async () => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+  resetParseWorker();
 });
 
 describe('parseBatchForLibrary', () => {
@@ -57,5 +61,60 @@ describe('parseBatchForLibrary', () => {
     const batch = Array.from({ length: 20 }, (_, i) => episode(i + 1));
     await parseBatchForLibrary(batch, roots).then(() => order.push('batch parsed'));
     expect(order).toEqual(['key handled', 'batch parsed']);
+  });
+});
+
+describe('the parse worker', () => {
+  /** A stand-in worker that answers every batch the way `parse.worker.ts` would. */
+  class AnsweringWorker {
+    onmessage: ((e: MessageEvent) => void) | null = null;
+    onerror: (() => void) | null = null;
+    onmessageerror: (() => void) | null = null;
+    postMessage(request: { id: number; files: MediaFile[] }) {
+      const payloads = request.files.map((f) => ({ id: f.id, title: 'from the worker' }));
+      queueMicrotask(() =>
+        this.onmessage?.({
+          data: { id: request.id, payloads, parseError: 'worker saw a bad name' },
+        } as MessageEvent)
+      );
+    }
+    terminate() {}
+  }
+
+  it('does the parsing when there is one, and passes on what the parser reported', async () => {
+    vi.stubGlobal('Worker', AnsweringWorker);
+    const parsed = await parseBatchForLibrary([episode(1), episode(2)], roots);
+    expect(parsed.map((p) => p.title)).toEqual(['from the worker', 'from the worker']);
+    expect(lastParseError).toBe('worker saw a bad name');
+  });
+
+  it('leaves the parsing to the page when the worker cannot be made', async () => {
+    vi.stubGlobal(
+      'Worker',
+      class {
+        constructor() {
+          throw new Error('no module workers here');
+        }
+      }
+    );
+    const parsed = await parseBatchForLibrary([episode(1)], roots);
+    expect(parsed.map((p) => [p.kind, p.episode])).toEqual([['episode', 1]]);
+  });
+
+  it('leaves the parsing to the page when the worker dies mid-batch', async () => {
+    vi.stubGlobal(
+      'Worker',
+      class {
+        onerror: (() => void) | null = null;
+        onmessage = null;
+        onmessageerror = null;
+        postMessage() {
+          queueMicrotask(() => this.onerror?.());
+        }
+        terminate() {}
+      }
+    );
+    const parsed = await parseBatchForLibrary([episode(1)], roots);
+    expect(parsed.map((p) => [p.kind, p.episode])).toEqual([['episode', 1]]);
   });
 });

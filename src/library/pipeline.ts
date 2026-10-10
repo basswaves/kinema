@@ -30,13 +30,20 @@ import {
   scanLibrary,
   type AutoStep,
   type DetectProgress,
-  type LibraryKind,
   type LibraryRoot,
   type MediaFile,
   type ParseResultPayload,
   type ProbeProgress,
 } from './api';
-import { clearParseError, initParser, lastParseError, parseMediaFile, toPayload } from './parse';
+import {
+  clearParseError,
+  initParser,
+  lastParseError,
+  parseForLibrary,
+  recordParseError,
+} from './parse';
+import { parseInWorker } from './parseClient';
+import { yieldToPlayback } from './playback';
 import { cacheArtwork, listUnmatched } from '../metadata/api';
 import {
   backfillTitleDetails,
@@ -128,27 +135,7 @@ export function useScanStatus(): ScanStatus | null {
   return useSyncExternalStore(subscribeScan, getScanStatus);
 }
 
-/** The library folder a file was found under; the longest match wins. */
-function rootForPath(roots: LibraryRoot[], path: string): LibraryRoot | null {
-  let best: LibraryRoot | null = null;
-  for (const root of roots) {
-    if (path.startsWith(root.path) && (!best || root.path.length > best.path.length)) {
-      best = root;
-    }
-  }
-  return best;
-}
-
-/**
- * Parse one file as the library it lives in: that library's kind decides
- * movie-or-episode, and its folder bounds how far up a title may be looked
- * for. Shared by the scan and the developer tools so the two cannot differ.
- */
-export function parseForLibrary(file: MediaFile, roots: LibraryRoot[]): ParseResultPayload {
-  const root = rootForPath(roots, file.path);
-  const kind: LibraryKind = root?.kind ?? 'movies';
-  return toPayload(file, parseMediaFile(file, kind, root?.path));
-}
+export { parseForLibrary };
 
 /** The longest the parser works before the page gets a turn. */
 const PARSE_SLICE_MS = 25;
@@ -159,13 +146,22 @@ const PARSE_SLICE_MS = 25;
  * guessit takes a few milliseconds a name on a computer and about a tenth of
  * a second on an old Android box, where a first scan's 158 names in one go
  * held the page for fifteen seconds: the setup pages were up and the remote
- * moved nothing (measured 2026-10-05). So the page gets a turn whenever the
- * parser has worked a moment — a key waits for one name at most.
+ * moved nothing (measured 2026-10-05). So the work goes to a worker
+ * (`parse.worker.ts`), where it cannot hold the page at all. Where there is
+ * no worker, or it fails, the page does it as before, giving itself a turn
+ * whenever the parser has worked a moment — a key waits for one name at most.
  */
 export async function parseBatchForLibrary(
   files: MediaFile[],
   roots: LibraryRoot[]
 ): Promise<ParseResultPayload[]> {
+  const fromWorker = await parseInWorker(files, roots);
+  if (fromWorker) {
+    if (fromWorker.parseError) recordParseError(fromWorker.parseError);
+    return fromWorker.payloads;
+  }
+
+  await initParser();
   const payloads: ParseResultPayload[] = [];
   let since = performance.now();
   for (const file of files) {
@@ -297,10 +293,13 @@ export async function runScanPipeline(): Promise<ScanOutcome> {
 
     setStatus({ stage: 'parsing', detail: '' });
     clearParseError();
-    // guessit-js is fetched here rather than at startup — it is only needed for
-    // this stage, and it is the largest thing in the bundle.
-    await initParser();
+    // guessit-js is fetched by the parse worker (or, without one, by the page)
+    // on the first batch rather than at startup — it is only needed for this
+    // stage, and it is the largest thing in the bundle.
     for (;;) {
+      // Between batches, like between stages below: a film that is playing
+      // has the processor, and the scan resumes where it stopped.
+      await yieldToPlayback();
       const batch = await listUnparsed(PARSE_BATCH);
       if (batch.length === 0) break;
       await saveParseResults(await parseBatchForLibrary(batch, roots));
@@ -311,6 +310,7 @@ export async function runScanPipeline(): Promise<ScanOutcome> {
 
     // Before listing: a built-in key that arrived or went since the last scan
     // re-opens the refusals it could change, and they belong in this list.
+    await yieldToPlayback();
     await syncBuiltinKey();
     const pending = await listUnmatched(2000);
     if (pending.length > 0) {
@@ -332,18 +332,22 @@ export async function runScanPipeline(): Promise<ScanOutcome> {
     // photos for titles matched before those were stored, and it used to run
     // *after* the artwork download — so everything it found waited for the
     // next launch to be cached, and the UI fetched it from TMDB meanwhile.
+    await yieldToPlayback();
     setStatus({ stage: 'details', detail: '' });
     const details = await backfillTitleDetails();
     errors.push(...details.errors);
     // TMDB's data may be kept six months; anything older is fetched again,
     // a few titles per scan. Before artwork, so new image URLs are cached.
+    await yieldToPlayback();
     const refreshed = await refreshStaleTitles();
     errors.push(...refreshed.errors);
     // Films found through Wikidata get TMDB's pictures once a key works.
+    await yieldToPlayback();
     const upgraded = await upgradeWikidataFilms();
     errors.push(...upgraded.errors);
     // After matching and details, so every IMDb id the library has is known.
     // Usually nothing: the file is fetched weekly at most.
+    await yieldToPlayback();
     try {
       await refreshImdbRatings();
     } catch (e) {
@@ -352,17 +356,20 @@ export async function runScanPipeline(): Promise<ScanOutcome> {
     // Rotten Tomatoes, only with an OMDb key of the user's own, and within a
     // daily budget of that key's lookups. A wrong key is worth saying; the
     // day's allowance running out is not a problem, only a pause.
+    await yieldToPlayback();
     const scores = await refreshTomatometer();
     if (scores.stopped && !/limit/i.test(scores.stopped)) errors.push(scores.stopped);
 
     // After matching and details: every artwork URL is known now, and
     // browsing should not need the network afterwards.
+    await yieldToPlayback();
     setStatus({ stage: 'artwork', detail: '' });
     const art = await cacheArtwork();
     if (art.failed > 0) errors.push(`${count(art.failed, 'artwork download')} failed`);
 
     // Before detection, which can take minutes: a fraction of a second per new
     // file, and the badges on a new film should not wait for a season's intros.
+    await yieldToPlayback();
     await runProbe(errors);
 
     // Last, and deliberately part of the same sequence rather than something the
@@ -370,7 +377,9 @@ export async function runScanPipeline(): Promise<ScanOutcome> {
     // is in the library; this decides whether the Skip button will be there when
     // one of the new episodes is played. It works out for itself whether there
     // is anything to do, so calling it unconditionally costs two queries.
+    await yieldToPlayback();
     const detectNotes = await runAutoDetect(errors);
+    await yieldToPlayback();
     await runMeasure(errors);
 
     lastSummary = {

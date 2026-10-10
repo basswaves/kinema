@@ -16,7 +16,7 @@
  * (Phase 2), and keeping them separate means matching can be re-run and
  * improved without touching the filesystem again.
  */
-import type { LibraryKind, MediaFile, ParseResultPayload } from './api';
+import type { LibraryKind, LibraryRoot, MediaFile, ParseResultPayload } from './api';
 
 /**
  * guessit-js, loaded on demand.
@@ -128,6 +128,14 @@ export let lastParseError: string | null = null;
 
 export function clearParseError() {
   lastParseError = null;
+}
+
+/**
+ * Note a failure that happened somewhere else — the parse worker's own copy of
+ * this module is the one that saw it, and the page reports what it is told.
+ */
+export function recordParseError(message: string) {
+  lastParseError = message;
 }
 
 function runGuessit(input: string, kind: LibraryKind): Guess {
@@ -330,4 +338,27 @@ export function toPayload(file: MediaFile, parsed: ParsedFile): ParseResultPaylo
     from: parsed.from,
     raw_json: JSON.stringify(parsed.raw),
   };
+}
+
+/** The library folder a file was found under; the longest match wins. */
+function rootForPath(roots: LibraryRoot[], path: string): LibraryRoot | null {
+  let best: LibraryRoot | null = null;
+  for (const root of roots) {
+    if (path.startsWith(root.path) && (!best || root.path.length > best.path.length)) {
+      best = root;
+    }
+  }
+  return best;
+}
+
+/**
+ * Parse one file as the library it lives in: that library's kind decides
+ * movie-or-episode, and its folder bounds how far up a title may be looked
+ * for. Shared by the scan, the parse worker and the developer tools so the
+ * three cannot differ. Needs {@link initParser}.
+ */
+export function parseForLibrary(file: MediaFile, roots: LibraryRoot[]): ParseResultPayload {
+  const root = rootForPath(roots, file.path);
+  const kind: LibraryKind = root?.kind ?? 'movies';
+  return toPayload(file, parseMediaFile(file, kind, root?.path));
 }

@@ -22,6 +22,13 @@ export default defineConfig(async () => ({
     'process.env': '{}',
   },
 
+  // The parse worker (src/library/parse.worker.ts) is a module worker so it
+  // can load guessit with a dynamic import. Vite's default worker format,
+  // iife, cannot split code and fails the build on exactly that.
+  worker: {
+    format: 'es',
+  },
+
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent Vite from obscuring rust errors

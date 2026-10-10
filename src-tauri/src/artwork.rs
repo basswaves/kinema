@@ -96,26 +96,88 @@ fn extension(url: &str) -> String {
     }
 }
 
-/// Every artwork URL the library knows about, in one list.
+/// What a picture is for, which decides how large a copy a small screen needs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Kind {
+    Poster,
+    Backdrop,
+    Still,
+    /// Logos and faces, already fetched small, or one-off: never resized here.
+    Other,
+}
+
+/// Every artwork URL the library knows about, with what each one is.
 ///
 /// Keying the cache by URL is what makes adding a kind a one-line change here
-/// rather than a new table and a new download path each time.
-fn all_urls(conn: &rusqlite::Connection) -> rusqlite::Result<Vec<String>> {
+/// rather than a new table and a new download path each time. The kind comes
+/// from the column a URL is read from; a URL found in two columns is `Other`,
+/// which is left as it is — a copy too large costs space, one too small costs
+/// the picture.
+fn all_urls(conn: &rusqlite::Connection) -> rusqlite::Result<Vec<(String, Kind)>> {
     let mut stmt = conn.prepare(
-        "SELECT poster_url   FROM titles   WHERE poster_url   IS NOT NULL AND poster_url   <> ''
-         UNION
-         SELECT backdrop_url FROM titles   WHERE backdrop_url IS NOT NULL AND backdrop_url <> ''
-         UNION
-         SELECT logo_url     FROM titles   WHERE logo_url     IS NOT NULL AND logo_url     <> ''
-         UNION
-         SELECT still_url    FROM episodes WHERE still_url    IS NOT NULL AND still_url    <> ''
-         UNION
-         SELECT profile_url  FROM people   WHERE profile_url  IS NOT NULL AND profile_url  <> ''
-         UNION
-         SELECT logo_url     FROM studios  WHERE logo_url     IS NOT NULL AND logo_url     <> ''",
+        "SELECT poster_url,   1 FROM titles   WHERE poster_url   IS NOT NULL AND poster_url   <> ''
+         UNION ALL
+         SELECT backdrop_url, 2 FROM titles   WHERE backdrop_url IS NOT NULL AND backdrop_url <> ''
+         UNION ALL
+         SELECT logo_url,     0 FROM titles   WHERE logo_url     IS NOT NULL AND logo_url     <> ''
+         UNION ALL
+         SELECT still_url,    3 FROM episodes WHERE still_url    IS NOT NULL AND still_url    <> ''
+         UNION ALL
+         SELECT profile_url,  0 FROM people   WHERE profile_url  IS NOT NULL AND profile_url  <> ''
+         UNION ALL
+         SELECT logo_url,     0 FROM studios  WHERE logo_url     IS NOT NULL AND logo_url     <> ''",
     )?;
-    let rows = stmt.query_map([], |r| r.get::<_, String>(0))?;
-    rows.collect()
+    let rows = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?)))?;
+    let mut kinds: Vec<(String, Kind)> = Vec::new();
+    let mut at: HashMap<String, usize> = HashMap::new();
+    for row in rows {
+        let (url, code) = row?;
+        let url = url.trim().to_string();
+        let kind = match code {
+            1 => Kind::Poster,
+            2 => Kind::Backdrop,
+            3 => Kind::Still,
+            _ => Kind::Other,
+        };
+        match at.get(&url) {
+            Some(&i) if kinds[i].1 != kind => kinds[i].1 = Kind::Other,
+            Some(_) => {}
+            None => {
+                at.insert(url.clone(), kinds.len());
+                kinds.push((url, kind));
+            }
+        }
+    }
+    Ok(kinds)
+}
+
+const TMDB_ORIGINAL: &str = "https://image.tmdb.org/t/p/original/";
+
+/// Whether this device takes smaller copies: a TV, not a monitor.
+const SMALL_COPIES: bool = cfg!(target_os = "android");
+
+/// The address to download a picture from. The library keeps the original's
+/// address (it is the cache's key, and what a desktop fetches); on a TV a
+/// smaller copy of a TMDB picture is enough, so the size in its path is
+/// swapped. Sizes are what a 1080p to 4K screen shows a card at, not the
+/// picture's own: posters 500 wide, backdrops 1280, episode stills 780.
+/// TVmaze's are kept as they are: its smaller copies are 210–250 wide, soft
+/// on a TV, and its originals are small already. A picture that is not one
+/// of those kinds (a logo, a face) is returned as it is.
+fn rendition(url: &str, kind: Kind, small: bool) -> String {
+    if !small {
+        return url.to_string();
+    }
+    if let Some(file) = url.strip_prefix(TMDB_ORIGINAL) {
+        let size = match kind {
+            Kind::Poster => "w500",
+            Kind::Backdrop => "w1280",
+            Kind::Still => "w780",
+            Kind::Other => return url.to_string(),
+        };
+        return format!("https://image.tmdb.org/t/p/{size}/{file}");
+    }
+    url.to_string()
 }
 
 /// Claim a row — and therefore a unique id — for every URL that still needs
@@ -304,8 +366,16 @@ async fn fetch_one(
     dir: PathBuf,
     id: i64,
     url: String,
+    kind: Kind,
 ) -> Option<Stored> {
-    let body = download(&client, &url).await?;
+    // The smaller copy first; if it is not there, the picture as the library
+    // has it. Stored under the library's address either way.
+    let wanted = rendition(&url, kind, SMALL_COPIES);
+    let body = match download(&client, &wanted).await {
+        Some(body) => body,
+        None if wanted != url => download(&client, &url).await?,
+        None => return None,
+    };
     let name = format!("{id}.{}", extension(&url));
     let path = dir.join(&name);
     let bytes = body.len() as i64;
@@ -356,15 +426,18 @@ pub async fn cache_artwork(app: tauri::AppHandle) -> Result<CacheResult, String>
     let pending = {
         let app = app.clone();
         crate::jobs::off_main(move || {
-            let urls = {
+            let known = {
                 let db = app.state::<Db>();
                 let conn = db.0.lock().map_err(to_string_err)?;
                 all_urls(&conn).map_err(to_string_err)?
             };
-            reserve(&app, &urls)
+            let urls: Vec<String> = known.iter().map(|(u, _)| u.clone()).collect();
+            let pending = reserve(&app, &urls)?;
+            Ok((pending, known.into_iter().collect::<HashMap<String, Kind>>()))
         })
         .await?
     };
+    let (pending, kinds) = pending;
     let mut result = CacheResult {
         stored: 0,
         failed: 0,
@@ -390,8 +463,9 @@ pub async fn cache_artwork(app: tauri::AppHandle) -> Result<CacheResult, String>
                     break; // closed: the run was given up
                 };
                 let (client, dir, finished) = (client.clone(), dir.clone(), finished.clone());
+                let kind = kinds.get(&url).copied().unwrap_or(Kind::Other);
                 tauri::async_runtime::spawn(async move {
-                    let outcome = fetch_one(client, dir, id, url).await;
+                    let outcome = fetch_one(client, dir, id, url, kind).await;
                     drop(slot);
                     let _ = finished.send(outcome);
                 });
@@ -509,7 +583,7 @@ pub fn use_this_systems_separator(conn: &rusqlite::Connection) -> rusqlite::Resu
 
 #[cfg(test)]
 mod tests {
-    use super::{extension, past_tmdb_age, use_this_systems_separator};
+    use super::{extension, past_tmdb_age, rendition, use_this_systems_separator, Kind};
     use crate::metadata::TMDB_MAX_AGE_SECS;
 
     #[test]
@@ -541,6 +615,70 @@ mod tests {
         assert!(past_tmdb_age("https://image.tmdb.org/t/p/original/a.jpg", old, now));
         assert!(!past_tmdb_age("https://image.tmdb.org/t/p/original/a.jpg", now - 60, now));
         assert!(!past_tmdb_age("https://static.tvmaze.com/a.jpg", old, now));
+    }
+
+    /// A TV gets a smaller copy by what the picture is; a desktop, the original.
+    #[test]
+    fn a_tv_asks_for_a_smaller_copy_by_kind() {
+        let tmdb = "https://image.tmdb.org/t/p/original/abc.jpg";
+        let sized = |size: &str| format!("https://image.tmdb.org/t/p/{size}/abc.jpg");
+        assert_eq!(rendition(tmdb, Kind::Poster, true), sized("w500"));
+        assert_eq!(rendition(tmdb, Kind::Backdrop, true), sized("w1280"));
+        assert_eq!(rendition(tmdb, Kind::Still, true), sized("w780"));
+        assert_eq!(rendition(tmdb, Kind::Other, true), tmdb, "a logo keeps its size");
+        // Already sized, or from elsewhere: left alone.
+        let w300 = "https://image.tmdb.org/t/p/w300/s.png";
+        assert_eq!(rendition(w300, Kind::Poster, true), w300);
+        assert_eq!(rendition("https://a/b.jpg", Kind::Poster, true), "https://a/b.jpg");
+
+        // TVmaze's smaller copies are too small for a TV: its originals stay.
+        let maze = "https://static.tvmaze.com/uploads/images/original_untouched/1/4388.jpg";
+        for kind in [Kind::Poster, Kind::Backdrop, Kind::Still] {
+            assert_eq!(rendition(maze, kind, true), maze);
+        }
+    }
+
+    #[test]
+    fn a_desktop_keeps_the_original() {
+        for kind in [Kind::Poster, Kind::Backdrop, Kind::Still, Kind::Other] {
+            for url in [
+                "https://image.tmdb.org/t/p/original/abc.jpg",
+                "https://static.tvmaze.com/uploads/images/original_untouched/1/2.jpg",
+            ] {
+                assert_eq!(rendition(url, kind, false), url);
+            }
+        }
+        assert_eq!(super::SMALL_COPIES, cfg!(target_os = "android"));
+    }
+
+    #[test]
+    fn each_url_is_known_by_the_column_it_came_from() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE titles (poster_url TEXT, backdrop_url TEXT, logo_url TEXT);
+             CREATE TABLE episodes (still_url TEXT);
+             CREATE TABLE people (profile_url TEXT);
+             CREATE TABLE studios (logo_url TEXT);
+             INSERT INTO titles VALUES ('p', 'b', 'l'), ('p', 'b', NULL), ('both', 'both', '');
+             INSERT INTO episodes VALUES ('s'), ('s');
+             INSERT INTO people VALUES ('f');
+             INSERT INTO studios VALUES ('st');",
+        )
+        .unwrap();
+        let mut found = super::all_urls(&conn).unwrap();
+        found.sort_by(|a, b| a.0.cmp(&b.0));
+        assert_eq!(
+            found,
+            vec![
+                ("b".to_string(), Kind::Backdrop),
+                ("both".to_string(), Kind::Other),
+                ("f".to_string(), Kind::Other),
+                ("l".to_string(), Kind::Other),
+                ("p".to_string(), Kind::Poster),
+                ("s".to_string(), Kind::Still),
+                ("st".to_string(), Kind::Other),
+            ]
+        );
     }
 
     #[test]

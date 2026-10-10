@@ -163,7 +163,7 @@ function apply(setting: LookSetting): void {
   state = { setting, light: decision.light, reason: decision.reason, measuring };
   document.documentElement.dataset.look = decision.light ? 'light' : 'full';
   // Rare (start-up, the measurement, a change in Settings), so every time.
-  console.info(`look: ${decision.reason}`, { setting, ...facts });
+  console.log(`look: ${decision.reason}`, { setting, ...facts });
   for (const listener of listeners) listener();
 }
 
@@ -209,7 +209,7 @@ async function probe(): Promise<void> {
     const times = await sampleFrames(1500);
     const median = medianFrameInterval(times);
     if (median === undefined) {
-      console.info('look: too few frames to judge the screen', { frames: times.length });
+      console.log('look: too few frames to judge the screen', { frames: times.length });
     } else {
       facts.medianFrameMs = median;
       facts.screenFrameMs = screenFrameInterval(times);

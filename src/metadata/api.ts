@@ -48,6 +48,8 @@ export const setSetting = (key: string, value: string) =>
 export interface LogPaths {
   dir: string;
   mpv_log: string;
+  /** Absolute folder for mpv's compiled-shader cache (`gpu-shader-cache-dir`). */
+  shader_cache: string;
 }
 
 export const logPaths = () => invoke<LogPaths>('log_paths');

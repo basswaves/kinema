@@ -144,6 +144,19 @@ function bitDepth(pixelFormat: string | null): string | undefined {
   return undefined;
 }
 
+/**
+ * What to say about `hwdec-current`. `no` and an absent value are software
+ * decoding. A `-copy` decoder (`d3d11va-copy`, `nvdec-copy`, `vaapi-copy`)
+ * decodes on the graphics card but copies every frame back to system memory
+ * before drawing it: still hardware decoding, but not the direct path, and the
+ * panel says so rather than showing a name that reads as the same thing.
+ */
+export function hwdecNote(hwdec: string | null): string | undefined {
+  if (hwdec === null || hwdec === 'no') return 'software decoding';
+  if (hwdec.endsWith('-copy')) return 'decoded on the graphics card, frames copied back to memory';
+  return undefined;
+}
+
 /** Transfer functions that carry more range than an SDR display can show. */
 const HDR_TRANSFERS = new Set(['pq', 'hlg', 'st2084', 'arib-std-b67']);
 
@@ -823,7 +836,7 @@ export async function readPlaybackStats(): Promise<StatGroup[]> {
         {
           label: 'Hardware decode',
           value: text(hwdec),
-          note: hwdec === null || hwdec === 'no' ? 'software decoding' : undefined,
+          note: hwdecNote(hwdec),
           warn: hwdec === 'no',
         },
         describeScaling(sourceW, sourceH, videoW, videoH, scale, dscale, resizesOnly),

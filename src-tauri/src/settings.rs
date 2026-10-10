@@ -85,14 +85,24 @@ pub struct LogPaths {
     pub dir: String,
     /// Absolute path for mpv's `log-file` option.
     pub mpv_log: String,
+    /// Absolute path for mpv's `gpu-shader-cache-dir`: the compiled shaders
+    /// kept between films and launches. Here beside the logs because the
+    /// player asks for both at the same moment.
+    pub shader_cache: String,
 }
 
-/// Where the logs are. The player needs the absolute mpv log path before it
-/// initialises mpv; a relative one lands in whatever the current directory is.
+/// Where the logs are (and mpv's shader cache). The player needs the absolute
+/// mpv log path before it initialises mpv; a relative one lands in whatever
+/// the current directory is.
 #[tauri::command]
 pub fn log_paths(app: tauri::AppHandle) -> Result<LogPaths, String> {
     let dir = log_dir(&app)?;
+    let shader_cache = crate::data_dir(&app)?.join("shadercache");
+    // Made here so mpv never depends on creating it; failing is harmless, as
+    // mpv then goes without a cache for the run.
+    let _ = std::fs::create_dir_all(&shader_cache);
     Ok(LogPaths {
+        shader_cache: shader_cache.to_string_lossy().into_owned(),
         mpv_log: dir.join(crate::applog::MPV_LOG).to_string_lossy().into_owned(),
         dir: dir.to_string_lossy().into_owned(),
     })

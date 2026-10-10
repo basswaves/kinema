@@ -32,7 +32,13 @@ import {
   setProperty,
   type MpvConfig,
 } from 'tauri-plugin-libmpv-api';
-import { BASE_MPV_OPTIONS, IDLE_SURFACE_OPTIONS, TONE_MAPPING_OPTIONS } from './mpvOptions';
+import {
+  BASE_MPV_OPTIONS,
+  IDLE_SURFACE_OPTIONS,
+  TONE_MAPPING_OPTIONS,
+  cacheOptions,
+  shaderCacheOptions,
+} from './mpvOptions';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { logPaths } from '../metadata/api';
@@ -81,12 +87,23 @@ async function initialOptions(): Promise<MpvConfig['initialOptions']> {
   if (video?.own_window) {
     Object.assign(graphics, { 'force-window': 'no', fs: 'yes', 'input-vo-keyboard': 'yes' });
   }
+  // Read-ahead sized to this computer's memory, for every file whatever it
+  // is stored on (mpvOptions.ts `cacheOptions`).
+  const cache = cacheOptions(capabilitiesNow()?.memory_bytes ?? 0);
   try {
-    const { mpv_log } = await logPaths();
-    return { ...BASE_MPV_OPTIONS, 'log-file': mpv_log, ...graphics };
+    // The shader cache folder is absolute for the same reason as the log:
+    // a relative one would follow the current directory.
+    const { mpv_log, shader_cache } = await logPaths();
+    return {
+      ...BASE_MPV_OPTIONS,
+      'log-file': mpv_log,
+      ...cache,
+      ...shaderCacheOptions(shader_cache),
+      ...graphics,
+    };
   } catch (e) {
     console.warn('mpv: could not resolve the log folder, logging beside the exe', e);
-    return { ...BASE_MPV_OPTIONS, ...graphics };
+    return { ...BASE_MPV_OPTIONS, ...cache, ...graphics };
   }
 }
 

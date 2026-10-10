@@ -20,6 +20,68 @@
  * both, so it decides per file, at runtime.
  */
 
+/** How much of mpv's log is written: all of it, verbose — `mpv.log` is the authority on rendering (docs/GOTCHAS.md). */
+export const MSG_LEVEL = 'all=v';
+
+/**
+ * The read-ahead policy, sized from the computer's memory (capabilities.rs
+ * `memory_bytes`; 0 when unknown).
+ *
+ * mpv's own default (`cache=auto`) keeps a cache for network streams and not
+ * for local files, and it tells them apart by how the file is opened, not by
+ * where it lives: a USB drive, a mounted SMB or NFS share or a UNC path is, to
+ * mpv, an ordinary file. Whether such a file got one was never checked, so the
+ * cache is asked for on every file, and a slow disk or a network stall is
+ * absorbed before it reaches the screen.
+ *
+ *  - `demuxer-max-bytes`: how far ahead it reads, a sixteenth of the memory
+ *    between 256 MiB and 1 GiB. A high-bitrate remux is several megabytes a
+ *    second, so this is tens of seconds of film to ride out a stall.
+ *  - `demuxer-max-back-bytes`: how much already-played film is kept, so a
+ *    short skip back is served from memory instead of the disk or the network.
+ *    Half the read-ahead, never under 256 MiB.
+ *  - `stream-buffer-size`: the size of each read from the file. Larger reads
+ *    mean fewer round trips on a network path and cost nothing on a disk.
+ *
+ * `cache-pause` is left at mpv's default: it stops to refill when the cache
+ * runs dry rather than stuttering through it.
+ *
+ * All four are read as a file opens, so they belong in the init set — set
+ * before any file exists — and they have been in mpv for years, so an
+ * unknown name is not a risk worth a second code path. Sizes are plain byte
+ * counts in strings, which every mpv version parses the same way.
+ */
+export function cacheOptions(memoryBytes: number): Record<string, string> {
+  const MiB = 1024 * 1024;
+  const known = Number.isFinite(memoryBytes) && memoryBytes > 0;
+  const ahead = known
+    ? Math.min(1024 * MiB, Math.max(256 * MiB, Math.floor(memoryBytes / 16)))
+    : 256 * MiB;
+  const back = Math.max(256 * MiB, Math.floor(ahead / 2));
+  return {
+    cache: 'yes',
+    'demuxer-max-bytes': String(ahead),
+    'demuxer-max-back-bytes': String(back),
+    'stream-buffer-size': String(4 * MiB),
+  };
+}
+
+/**
+ * Where mpv keeps the shaders it has compiled, so a film does not wait for
+ * the graphics driver to build the same shaders again: on Linux mpv's window
+ * (and with it the renderer) is made afresh for each film, and on Windows the
+ * first film after a launch pays for them. `gpu-shader-cache` is on by
+ * default; it is named so this does not depend on a default.
+ *
+ * Init options, since the renderer reads them as it starts — after it, they
+ * would apply from the next launch. Both have been in mpv since well before
+ * 0.40, the oldest the README supports. Nothing here depends on a GPU brand:
+ * the cache holds whatever the driver produced.
+ */
+export function shaderCacheOptions(dir: string | undefined): Record<string, string> {
+  return dir ? { 'gpu-shader-cache': 'yes', 'gpu-shader-cache-dir': dir } : {};
+}
+
 /** Options applied once at mpv init and never changed at runtime. */
 export const BASE_MPV_OPTIONS: Record<string, string | boolean | number> = {
   // ---- Diagnostics FIRST ------------------------------------------------
@@ -29,7 +91,7 @@ export const BASE_MPV_OPTIONS: Record<string, string | boolean | number> = {
   // Replaced with an absolute path in app data by `engine.ts` before init; this
   // relative fallback is used only if that path cannot be resolved.
   'log-file': 'mpv.log',
-  'msg-level': 'all=v',
+  'msg-level': MSG_LEVEL,
 
   // ---- Rendering path ---------------------------------------------------
   // gpu-next is the modern renderer (libplacebo). `gpu-api` and `hwdec` name

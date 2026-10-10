@@ -64,6 +64,11 @@ pub struct Capabilities {
     /// and passes it on as one (src/backButton.ts). A desktop has none, and
     /// asking for it there was refused, with a warning in every log.
     pub back_button: bool,
+    /// How much memory the computer has, in bytes; 0 where it could not be
+    /// read. The player sizes its read-ahead from it (src/player/mpvOptions.ts,
+    /// `cacheOptions`), so a machine with little is not asked for more than it
+    /// can spare.
+    pub memory_bytes: u64,
     pub sleep: bool,
     pub shut_down: bool,
 }
@@ -84,14 +89,17 @@ pub struct MpvVideo {
 }
 
 /// On Windows, d3d11 and d3d11va: the vendor-neutral path, the same on
-/// NVIDIA, AMD and Intel (docs/DESIGN.md). Elsewhere mpv chooses for itself —
+/// NVIDIA, AMD and Intel (docs/DESIGN.md). `d3d11va-copy` follows it so that a
+/// card or driver whose zero-copy hand-over to the renderer fails decodes on
+/// the card all the same and copies each frame back, instead of falling to the
+/// processor; the stats panel shows which of the two is running. Elsewhere mpv chooses for itself —
 /// Vulkan or OpenGL, and only the hardware decoders it knows to be safe —
 /// until a port has a reason to name one. Android has no mpv; its player draws
 /// beneath the page as mpv does on Windows, so there is no window of its own
 /// and nothing to photograph the page for (overlay.rs).
 fn mpv_video() -> MpvVideo {
     if cfg!(windows) {
-        MpvVideo { gpu_api: "d3d11", hwdec: "d3d11va", own_window: false }
+        MpvVideo { gpu_api: "d3d11", hwdec: "d3d11va,d3d11va-copy", own_window: false }
     } else {
         MpvVideo { gpu_api: "auto", hwdec: "auto-safe", own_window: cfg!(desktop) }
     }
@@ -122,9 +130,44 @@ fn work_out() -> Capabilities {
         shares_files: cfg!(target_os = "android"),
         network_shares: cfg!(target_os = "android"),
         back_button: cfg!(mobile),
+        memory_bytes: memory_bytes(),
         sleep: crate::power::can_sleep(),
         shut_down: crate::power::can_shut_down(),
     }
+}
+
+/// The computer's memory in bytes, or 0 where it cannot be read (the player
+/// then assumes the least it is built for). Windows asks the system; the
+/// others read the kernel's own `MemTotal` line (kB), which Linux and Android
+/// both have.
+fn memory_bytes() -> u64 {
+    #[cfg(windows)]
+    {
+        use windows::Win32::System::SystemInformation::{GlobalMemoryStatusEx, MEMORYSTATUSEX};
+        let mut status = MEMORYSTATUSEX {
+            dwLength: std::mem::size_of::<MEMORYSTATUSEX>() as u32,
+            ..Default::default()
+        };
+        // SAFETY: `status` is a valid, correctly sized MEMORYSTATUSEX.
+        match unsafe { GlobalMemoryStatusEx(&mut status) } {
+            Ok(()) => status.ullTotalPhys,
+            Err(_) => 0,
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        std::fs::read_to_string("/proc/meminfo").map(|text| meminfo_total(&text)).unwrap_or(0)
+    }
+}
+
+/// `MemTotal` from the text of /proc/meminfo, in bytes; 0 if it is not there.
+#[cfg(not(windows))]
+fn meminfo_total(text: &str) -> u64 {
+    text.lines()
+        .find_map(|line| line.strip_prefix("MemTotal:"))
+        .and_then(|rest| rest.split_whitespace().next())
+        .and_then(|kb| kb.parse::<u64>().ok())
+        .map_or(0, |kb| kb.saturating_mul(1024))
 }
 
 fn system_name() -> &'static str {
@@ -160,8 +203,28 @@ mod tests {
         // The rendering path the whole of docs/DESIGN.md is written about.
         assert_eq!(
             c.mpv_video,
-            MpvVideo { gpu_api: "d3d11", hwdec: "d3d11va", own_window: false }
+            MpvVideo { gpu_api: "d3d11", hwdec: "d3d11va,d3d11va-copy", own_window: false }
         );
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn meminfo_is_read_in_bytes() {
+        assert_eq!(meminfo_total("MemFree: 1 kB
+MemTotal:       16384 kB
+"), 16384 * 1024);
+        assert_eq!(meminfo_total("MemFree: 1 kB
+"), 0);
+        assert_eq!(meminfo_total("MemTotal: lots
+"), 0);
+    }
+
+    /// The memory is a real number wherever it can be read, so the player's
+    /// read-ahead is sized from fact rather than from the fallback.
+    #[cfg(any(windows, target_os = "linux"))]
+    #[test]
+    fn memory_is_known() {
+        assert!(current().memory_bytes > 64 * 1024 * 1024);
     }
 
     /// Elsewhere, nothing is claimed that has no implementation behind it.

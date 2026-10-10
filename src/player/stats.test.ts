@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { describeAudioPath, describeDolbyVision, describeHdr, type HdrFacts } from './stats';
+import {
+  describeAudioPath,
+  describeDolbyVision,
+  describeHdr,
+  hwdecNote,
+  type HdrFacts,
+} from './stats';
 
 const hdr10: HdrFacts = {
   sourceGamma: 'pq',
@@ -77,5 +83,22 @@ describe('describeDolbyVision', () => {
   it('stays out of the way for everything else', () => {
     expect(describeDolbyVision(null)).toBeNull();
     expect(describeDolbyVision(0)).toBeNull();
+  });
+});
+
+describe('hwdecNote', () => {
+  it('calls no decoder, and no answer, software decoding', () => {
+    expect(hwdecNote('no')).toBe('software decoding');
+    expect(hwdecNote(null)).toBe('software decoding');
+  });
+
+  it('says a copy-back decoder copies frames back, and is still hardware', () => {
+    expect(hwdecNote('d3d11va-copy')).toMatch(/graphics card.*copied back/);
+    expect(hwdecNote('d3d11va-copy')).not.toMatch(/software/);
+  });
+
+  it('has nothing to add for a direct decoder', () => {
+    expect(hwdecNote('d3d11va')).toBeUndefined();
+    expect(hwdecNote('vaapi')).toBeUndefined();
   });
 });

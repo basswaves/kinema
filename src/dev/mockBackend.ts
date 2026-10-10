@@ -1057,6 +1057,7 @@ const handlers: Record<string, Handler> = {
         shares_files: true,
         network_shares: true,
         back_button: true,
+        memory_bytes: 4 * 1024 ** 3,
         sleep: false,
         shut_down: false,
       };
@@ -1066,7 +1067,7 @@ const handlers: Record<string, Handler> = {
       system: full ? 'Windows' : 'Linux',
       engine: 'mpv',
       mpv_video: full
-        ? { gpu_api: 'd3d11', hwdec: 'd3d11va', own_window: false }
+        ? { gpu_api: 'd3d11', hwdec: 'd3d11va,d3d11va-copy', own_window: false }
         : { gpu_api: 'auto', hwdec: 'auto-safe', own_window: true },
       equipment_detection: true,
       audio_direct: true,
@@ -1080,6 +1081,7 @@ const handlers: Record<string, Handler> = {
       shares_files: false,
       network_shares: false,
       back_button: false,
+      memory_bytes: 16 * 1024 ** 3,
       sleep: !NO_POWER,
       shut_down: !NO_POWER,
     };
@@ -1148,7 +1150,11 @@ const handlers: Record<string, Handler> = {
   // Deliberately silent: devlog forwards console.* here, so logging from this
   // handler would recurse.
   append_log: () => null,
-  log_paths: () => ({ dir: 'C:\\fixture\\logs', mpv_log: 'C:\\fixture\\logs\\mpv.log' }),
+  log_paths: () => ({
+    dir: 'C:\\fixture\\logs',
+    mpv_log: 'C:\\fixture\\logs\\mpv.log',
+    shader_cache: 'C:\\fixture\\shadercache',
+  }),
   open_log_folder: () => null,
   open_backup_folder: () => null,
   list_backups: () => [

@@ -48,6 +48,9 @@ export interface Capabilities {
   /** The system has its own Back button the page never sees as a key
    * (Android's): it is listened for and passed on (backButton.ts). */
   back_button: boolean;
+  /** The computer's memory in bytes; 0 when it could not be read. The mpv
+   * read-ahead is sized from it (player/mpvOptions.ts `cacheOptions`). */
+  memory_bytes: number;
   sleep: boolean;
   shut_down: boolean;
 }

@@ -12,18 +12,27 @@
 
 use crate::util::{now_secs, to_string_err};
 use crate::library::Db;
-use rusqlite::params;
+use rusqlite::{params, Connection};
 use serde::Serialize;
-use std::collections::HashSet;
-use std::path::PathBuf;
+use std::collections::{HashMap, HashSet};
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 use tauri::Manager;
+use tokio::sync::{mpsc, Semaphore};
 
 /// Sub-directory of app data holding the cached images.
 const DIR: &str = "artwork";
 
-/// How many downloads run at once. Six keeps a season of stills quick without
-/// hammering the CDN.
-const CONCURRENCY: usize = 6;
+/// How many downloads run at once on a machine with `cores` threads: two per
+/// thread, since they mostly wait on the network, but never fewer than four
+/// (a 2-core box would crawl through a season of stills) nor more than twelve
+/// (more only hammers the CDN and the disk).
+fn window_for(cores: usize) -> usize {
+    cores.saturating_mul(2).clamp(4, 12)
+}
+
+/// How many finished downloads are marked in the database in one transaction.
+const COMMIT_EVERY: usize = 16;
 
 /// Ceiling on a single image. Artwork is well under a megabyte; anything far
 /// larger is not the picture we asked for.
@@ -118,75 +127,162 @@ fn all_urls(conn: &rusqlite::Connection) -> rusqlite::Result<Vec<String>> {
 /// TMDB image, only while it is younger than TMDB allows. An old one is
 /// downloaded again under its own row id, so the new file replaces the old
 /// under the same name, and the old one is shown until it does.
+///
+/// This runs at every launch over every image the library has, so it is kept
+/// to three short steps rather than one long one: the cache is read in one
+/// query, the folder is listed once (instead of asking the disk about each
+/// file in turn, which on a slow SD card or a spun-down drive is thousands of
+/// round trips), and the rows to claim are written in one transaction. The
+/// database lock is held only for the first and the last; the page's own
+/// commands, which share it, no longer wait behind a stat per image.
 fn reserve(app: &tauri::AppHandle, urls: &[String]) -> Result<Vec<(i64, String)>, String> {
     let base = app_data(app)?;
     let db = app.state::<Db>();
-    let conn = db.0.lock().map_err(to_string_err)?;
+    reserve_in(&db.0, &base, urls, now_secs())
+}
 
-    let mut pending = Vec::new();
+/// What a cached row says: its id, where the file should be, when it was got.
+type Cached = (i64, String, i64);
+
+/// A decision about one URL, kept in order so the answer comes back in the
+/// order the URLs were given.
+enum Plan {
+    /// Cached but too old: fetch again under the row it has.
+    Refresh(i64, String),
+    /// Not cached, or the file is gone: claim a row, then fetch.
+    Claim(String),
+}
+
+fn reserve_in(
+    db: &Mutex<Connection>,
+    base: &Path,
+    urls: &[String],
+    now: i64,
+) -> Result<Vec<(i64, String)>, String> {
+    // 1. Everything the cache holds, in one query.
+    let cached: HashMap<String, Cached> = {
+        let conn = db.lock().map_err(to_string_err)?;
+        let mut stmt = conn
+            .prepare("SELECT url, rowid, local_path, fetched_at FROM artwork_cache WHERE local_path <> ''")
+            .map_err(to_string_err)?;
+        let rows = stmt
+            .query_map([], |r| Ok((r.get::<_, String>(0)?, (r.get(1)?, r.get(2)?, r.get(3)?))))
+            .map_err(to_string_err)?;
+        rows.collect::<rusqlite::Result<_>>().map_err(to_string_err)?
+    };
+
+    // 2. The folder, listed once. No lock is held.
+    let on_disk = file_names(&base.join(DIR));
+
+    // 3. Decide, still without the lock.
+    let mut plans = Vec::new();
     let mut seen = HashSet::new();
-    let now = now_secs();
     let mut refresh_budget = REFRESH_PER_PASS;
-
     for url in urls {
         let url = url.trim();
         if url.is_empty() || !seen.insert(url.to_string()) {
             continue;
         }
-
-        let cached: Option<(i64, String, i64)> = conn
-            .query_row(
-                "SELECT rowid, local_path, fetched_at FROM artwork_cache
-                  WHERE url = ?1 AND local_path <> ''",
-                params![url],
-                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
-            )
-            .ok();
-
-        if let Some((id, relative, fetched_at)) = cached {
-            if base.join(&relative).exists() {
-                if refresh_budget > 0 && past_tmdb_age(url, fetched_at, now) {
+        if let Some((id, relative, fetched_at)) = cached.get(url) {
+            if file_exists(base, &on_disk, relative) {
+                if refresh_budget > 0 && past_tmdb_age(url, *fetched_at, now) {
                     refresh_budget -= 1;
-                    pending.push((id, url.to_string()));
+                    plans.push(Plan::Refresh(*id, url.to_string()));
                 }
                 continue;
             }
         }
-
-        conn.execute(
-            "INSERT INTO artwork_cache (url, local_path, bytes, fetched_at)
-             VALUES (?1, '', 0, ?2)
-             ON CONFLICT(url) DO UPDATE SET local_path = '', bytes = 0,
-                                            fetched_at = excluded.fetched_at",
-            params![url, now_secs()],
-        )
-        .map_err(to_string_err)?;
-
-        let id: i64 = conn
-            .query_row(
-                "SELECT rowid FROM artwork_cache WHERE url = ?1",
-                params![url],
-                |r| r.get(0),
-            )
-            .map_err(to_string_err)?;
-
-        pending.push((id, url.to_string()));
+        plans.push(Plan::Claim(url.to_string()));
     }
 
+    // 4. Claim the rows that need claiming, all in one transaction.
+    if !plans.iter().any(|p| matches!(p, Plan::Claim(_))) {
+        return Ok(plans
+            .into_iter()
+            .filter_map(|p| match p {
+                Plan::Refresh(id, url) => Some((id, url)),
+                Plan::Claim(_) => None,
+            })
+            .collect());
+    }
+    let mut conn = db.lock().map_err(to_string_err)?;
+    let tx = conn.transaction().map_err(to_string_err)?;
+    let mut pending = Vec::with_capacity(plans.len());
+    {
+        let mut claim = tx
+            .prepare(
+                "INSERT INTO artwork_cache (url, local_path, bytes, fetched_at)
+                 VALUES (?1, '', 0, ?2)
+                 ON CONFLICT(url) DO UPDATE SET local_path = '', bytes = 0,
+                                                fetched_at = excluded.fetched_at
+                 RETURNING rowid",
+            )
+            .map_err(to_string_err)?;
+        for plan in plans {
+            match plan {
+                Plan::Refresh(id, url) => pending.push((id, url)),
+                Plan::Claim(url) => {
+                    let id: i64 = claim
+                        .query_row(params![url, now], |r| r.get(0))
+                        .map_err(to_string_err)?;
+                    pending.push((id, url));
+                }
+            }
+        }
+    }
+    tx.commit().map_err(to_string_err)?;
     Ok(pending)
 }
 
-/// Mark a URL as cached. Written only after the file is on disk, so a row with
-/// a non-empty `local_path` always has a file behind it.
-fn commit(app: &tauri::AppHandle, url: &str, relative: &str, bytes: i64) -> Result<(), String> {
+/// The names of the files in a folder; empty if it cannot be listed (then
+/// nothing counts as cached, and everything is fetched, as it should be).
+fn file_names(dir: &Path) -> HashSet<String> {
+    std::fs::read_dir(dir)
+        .map(|entries| {
+            entries
+                .flatten()
+                .filter_map(|e| e.file_name().into_string().ok())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Whether the file a row names is there. `local_path` is `artwork`, a
+/// separator and the file's name, so the listing of that folder answers it; a
+/// path of any other shape (never written by this module) is asked of the disk.
+fn file_exists(base: &Path, listed: &HashSet<String>, relative: &str) -> bool {
+    match relative.rsplit_once(['/', '\\']) {
+        Some((DIR, name)) => listed.contains(name),
+        _ => base.join(relative).exists(),
+    }
+}
+
+/// Mark downloaded URLs as cached, all in one transaction. Written only after
+/// the files are on disk, so a row with a non-empty `local_path` always has a
+/// file behind it. (A crash between the two costs one download again.)
+fn commit_batch(app: &tauri::AppHandle, stored: &[Stored]) -> Result<(), String> {
     let db = app.state::<Db>();
-    let conn = db.0.lock().map_err(to_string_err)?;
-    conn.execute(
-        "UPDATE artwork_cache SET local_path = ?2, bytes = ?3, fetched_at = ?4 WHERE url = ?1",
-        params![url, relative, bytes, now_secs()],
-    )
-    .map_err(to_string_err)?;
-    Ok(())
+    let mut conn = db.0.lock().map_err(to_string_err)?;
+    let tx = conn.transaction().map_err(to_string_err)?;
+    {
+        let mut update = tx
+            .prepare("UPDATE artwork_cache SET local_path = ?2, bytes = ?3, fetched_at = ?4 WHERE url = ?1")
+            .map_err(to_string_err)?;
+        let now = now_secs();
+        for s in stored {
+            update
+                .execute(params![s.url, s.relative, s.bytes, now])
+                .map_err(to_string_err)?;
+        }
+    }
+    tx.commit().map_err(to_string_err)
+}
+
+/// An image that is on disk and waits for its row to be marked.
+struct Stored {
+    url: String,
+    relative: String,
+    bytes: i64,
 }
 
 async fn download(client: &tauri_plugin_http::reqwest::Client, url: &str) -> Option<Vec<u8>> {
@@ -201,11 +297,49 @@ async fn download(client: &tauri_plugin_http::reqwest::Client, url: &str) -> Opt
     Some(body.to_vec())
 }
 
+/// Download one image and write it, on a blocking thread so a slow disk does
+/// not hold up the network tasks beside it. `None` if either part failed.
+async fn fetch_one(
+    client: tauri_plugin_http::reqwest::Client,
+    dir: PathBuf,
+    id: i64,
+    url: String,
+) -> Option<Stored> {
+    let body = download(&client, &url).await?;
+    let name = format!("{id}.{}", extension(&url));
+    let path = dir.join(&name);
+    let bytes = body.len() as i64;
+    match tauri::async_runtime::spawn_blocking(move || std::fs::write(path, body)).await {
+        Ok(Ok(())) => Some(Stored {
+            url,
+            relative: format!("{DIR}{}{name}", std::path::MAIN_SEPARATOR),
+            bytes,
+        }),
+        Ok(Err(e)) => {
+            crate::log!("artwork: writing {name} failed: {e}");
+            None
+        }
+        Err(_) => None,
+    }
+}
+
 /// Download every artwork URL that is not already cached.
 ///
 /// Takes no arguments on purpose: the set of images the library needs is a
 /// property of the database, not of whichever screen happens to call this. One
 /// call after matching and one on startup keep the cache complete.
+///
+/// **A sliding window, not batches.** Downloads used to go six at a time, each
+/// batch waiting for its slowest image before the next began; one slow
+/// response idled five connections. Now a new download starts the moment any
+/// one finishes, up to [`window_for`] at once. Each download writes its own
+/// file, and the rows are marked [`COMMIT_EVERY`] at a time in one
+/// transaction, so the database is touched a few times, not once per image.
+///
+/// While a film plays, no new download is started (`jobs::playing`); the ones
+/// in flight finish. This runs on the shared async threads, so it cannot lower
+/// its own priority the way the file-reading loops do — waiting is its way of
+/// giving way.
 #[tauri::command]
 pub async fn cache_artwork(app: tauri::AppHandle) -> Result<CacheResult, String> {
     // One run at a time, the second after the first rather than refused — see
@@ -217,13 +351,20 @@ pub async fn cache_artwork(app: tauri::AppHandle) -> Result<CacheResult, String>
     let dir = base.join(DIR);
     std::fs::create_dir_all(&dir).map_err(to_string_err)?;
 
-    let urls = {
-        let db = app.state::<Db>();
-        let conn = db.0.lock().map_err(to_string_err)?;
-        all_urls(&conn).map_err(to_string_err)?
+    // Both steps take the database lock and read the disk: not for the async
+    // threads, which the downloads below need.
+    let pending = {
+        let app = app.clone();
+        crate::jobs::off_main(move || {
+            let urls = {
+                let db = app.state::<Db>();
+                let conn = db.0.lock().map_err(to_string_err)?;
+                all_urls(&conn).map_err(to_string_err)?
+            };
+            reserve(&app, &urls)
+        })
+        .await?
     };
-
-    let pending = reserve(&app, &urls)?;
     let mut result = CacheResult {
         stored: 0,
         failed: 0,
@@ -233,45 +374,67 @@ pub async fn cache_artwork(app: tauri::AppHandle) -> Result<CacheResult, String>
     }
 
     let client = tauri_plugin_http::reqwest::Client::new();
+    let window = std::thread::available_parallelism().map_or(2, |n| n.get());
+    let slots = Arc::new(Semaphore::new(window_for(window)));
+    let (finished, mut outcomes) = mpsc::unbounded_channel::<Option<Stored>>();
 
-    for chunk in pending.chunks(CONCURRENCY) {
-        let mut tasks = Vec::with_capacity(chunk.len());
-        for (id, url) in chunk {
-            let client = client.clone();
-            let url = url.clone();
-            let id = *id;
-            // Downloads run concurrently but touch no database state; the rows
-            // are written back here, on one thread, after each batch lands.
-            tasks.push(tauri::async_runtime::spawn(async move {
-                let body = download(&client, &url).await;
-                (id, url, body)
-            }));
-        }
-
-        for task in tasks {
-            let Ok((id, url, body)) = task.await else {
-                result.failed += 1;
-                continue;
-            };
-            let Some(body) = body else {
-                result.failed += 1;
-                continue;
-            };
-
-            let name = format!("{id}.{}", extension(&url));
-            if let Err(e) = std::fs::write(dir.join(&name), &body) {
-                crate::log!("artwork: writing {name} failed: {e}");
-                result.failed += 1;
-                continue;
+    // Starts the downloads, a slot at a time. Its own task, so that marking
+    // rows below goes on while it waits for a slot.
+    let starter = {
+        let slots = slots.clone();
+        tauri::async_runtime::spawn(async move {
+            for (id, url) in pending {
+                // Between two downloads, never inside one.
+                crate::jobs::wait_while_playing_async().await;
+                let Ok(slot) = slots.clone().acquire_owned().await else {
+                    break; // closed: the run was given up
+                };
+                let (client, dir, finished) = (client.clone(), dir.clone(), finished.clone());
+                tauri::async_runtime::spawn(async move {
+                    let outcome = fetch_one(client, dir, id, url).await;
+                    drop(slot);
+                    let _ = finished.send(outcome);
+                });
             }
+        })
+    };
 
-            let relative = format!("{DIR}{}{name}", std::path::MAIN_SEPARATOR);
-            commit(&app, &url, &relative, body.len() as i64)?;
-            result.stored += 1;
+    let mut waiting: Vec<Stored> = Vec::with_capacity(COMMIT_EVERY);
+    while let Some(outcome) = outcomes.recv().await {
+        match outcome {
+            None => result.failed += 1,
+            Some(stored) => {
+                waiting.push(stored);
+                if waiting.len() >= COMMIT_EVERY {
+                    if let Err(e) = mark_cached(&app, &mut waiting, &mut result).await {
+                        slots.close(); // stop starting downloads nobody will mark
+                        return Err(e);
+                    }
+                }
+            }
         }
     }
+    mark_cached(&app, &mut waiting, &mut result).await?;
+    let _ = starter.await;
 
     Ok(result)
+}
+
+/// Mark the images waiting as cached, in one transaction on a blocking thread.
+async fn mark_cached(
+    app: &tauri::AppHandle,
+    waiting: &mut Vec<Stored>,
+    result: &mut CacheResult,
+) -> Result<(), String> {
+    if waiting.is_empty() {
+        return Ok(());
+    }
+    let batch = std::mem::take(waiting);
+    let count = batch.len();
+    let app = app.clone();
+    crate::jobs::off_main(move || commit_batch(&app, &batch)).await?;
+    result.stored += count;
+    Ok(())
 }
 
 #[tauri::command]
@@ -391,5 +554,120 @@ mod tests {
     fn unknown_extensions_fall_back_to_jpg() {
         assert_eq!(extension("https://example.com/image"), "jpg");
         assert_eq!(extension("https://example.com/a/b.svgz"), "jpg");
+    }
+
+    /// A cache with a table and a folder on disk, as `reserve_in` sees them.
+    fn cache(name: &str) -> (std::sync::Mutex<rusqlite::Connection>, std::path::PathBuf) {
+        let base = std::env::temp_dir().join(format!("kinema-artwork-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(base.join(super::DIR)).unwrap();
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE artwork_cache (
+                 url TEXT PRIMARY KEY, local_path TEXT NOT NULL,
+                 bytes INTEGER NOT NULL, fetched_at INTEGER NOT NULL);",
+        )
+        .unwrap();
+        (std::sync::Mutex::new(conn), base)
+    }
+
+    fn row(db: &std::sync::Mutex<rusqlite::Connection>, url: &str) -> (i64, String) {
+        db.lock()
+            .unwrap()
+            .query_row(
+                "SELECT rowid, local_path FROM artwork_cache WHERE url = ?1",
+                [url],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap()
+    }
+
+    /// Every way a URL can stand, answered from one listing of the folder.
+    #[test]
+    fn reserve_keeps_what_is_on_disk_and_claims_the_rest() {
+        let (db, base) = cache("reserve");
+        let sep = std::path::MAIN_SEPARATOR;
+        let tmdb = |n: &str| format!("https://image.tmdb.org/t/p/original/{n}.jpg");
+        let now = TMDB_MAX_AGE_SECS * 3;
+        let old = now - TMDB_MAX_AGE_SECS - 1;
+        {
+            let conn = db.lock().unwrap();
+            for (url, path, at) in [
+                ("https://a/ok.jpg", format!("artwork{sep}1.jpg"), now),       // cached, file there
+                ("https://a/gone.jpg", format!("artwork{sep}2.jpg"), now),     // cached, file deleted
+                (tmdb("old").as_str(), format!("artwork{sep}3.jpg"), old),     // old TMDB, file there
+                ("https://a/failed.jpg", String::new(), now),                  // tried, never stored
+            ] {
+                conn.execute(
+                    "INSERT INTO artwork_cache VALUES (?1, ?2, 10, ?3)",
+                    rusqlite::params![url, path, at],
+                )
+                .unwrap();
+            }
+        }
+        for file in ["1.jpg", "3.jpg"] {
+            std::fs::write(base.join("artwork").join(file), b"x").unwrap();
+        }
+        let (gone_id, _) = row(&db, "https://a/gone.jpg");
+        let (failed_id, _) = row(&db, "https://a/failed.jpg");
+        let (old_id, _) = row(&db, &tmdb("old"));
+
+        let urls: Vec<String> = [
+            "https://a/ok.jpg",
+            "https://a/gone.jpg",
+            " https://a/new.jpg ",
+            "",
+            "https://a/new.jpg", // a duplicate once trimmed
+            "https://a/failed.jpg",
+            &tmdb("old"),
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+        let pending = super::reserve_in(&db, &base, &urls, now).unwrap();
+        let (new_id, _) = row(&db, "https://a/new.jpg");
+
+        assert_eq!(
+            pending,
+            vec![
+                (gone_id, "https://a/gone.jpg".to_string()),
+                (new_id, "https://a/new.jpg".to_string()),
+                (failed_id, "https://a/failed.jpg".to_string()),
+                (old_id, tmdb("old")),
+            ]
+        );
+        // The kept one is untouched; the claimed ones wait with no file.
+        assert_eq!(row(&db, "https://a/ok.jpg").1, format!("artwork{sep}1.jpg"));
+        assert_eq!(row(&db, "https://a/gone.jpg").1, "");
+        assert_eq!(row(&db, "https://a/new.jpg").1, "");
+        // The old TMDB image keeps showing until its new file replaces it.
+        assert_eq!(row(&db, &tmdb("old")).1, format!("artwork{sep}3.jpg"));
+
+        // A second pass finds the same work and claims nothing new.
+        let again = super::reserve_in(&db, &base, &urls, now).unwrap();
+        assert_eq!(again.len(), 4);
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// No folder at all (wiped, or never made): everything is fetched.
+    #[test]
+    fn reserve_without_a_folder_fetches_everything() {
+        let (db, base) = cache("nofolder");
+        std::fs::remove_dir_all(base.join("artwork")).unwrap();
+        db.lock()
+            .unwrap()
+            .execute("INSERT INTO artwork_cache VALUES ('https://a/x.jpg', 'artwork/9.jpg', 1, 1)", [])
+            .unwrap();
+        let pending = super::reserve_in(&db, &base, &["https://a/x.jpg".to_string()], 5).unwrap();
+        assert_eq!(pending.len(), 1);
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn the_download_window_follows_the_cores_within_limits() {
+        assert_eq!(super::window_for(1), 4);
+        assert_eq!(super::window_for(2), 4);
+        assert_eq!(super::window_for(4), 8);
+        assert_eq!(super::window_for(32), 12);
     }
 }

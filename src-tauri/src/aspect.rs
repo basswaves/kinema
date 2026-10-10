@@ -352,7 +352,7 @@ pub async fn measure_pictures(app: tauri::AppHandle) -> Result<MeasureReport, St
         return Ok(MeasureReport::default());
     }
 
-    crate::jobs::off_main(move || {
+    crate::jobs::off_main_background(move || {
         let _running = running;
         if !crate::ffmpeg::is_available(&ffmpeg) {
             return Ok(MeasureReport {
@@ -374,6 +374,8 @@ pub async fn measure_pictures(app: tauri::AppHandle) -> Result<MeasureReport, St
             if file.season.is_some_and(|s| seasons_done.contains(&s)) {
                 continue;
             }
+            // Between two files: wait while a film plays. No lock is held.
+            crate::jobs::wait_while_playing();
             if file.season.is_none_or(|s| seasons_started.insert(s)) {
                 let _ = app.emit(PROGRESS_EVENT, MeasureProgress { done, total });
                 done += 1;

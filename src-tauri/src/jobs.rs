@@ -28,6 +28,183 @@ pub async fn off_main<T: Send + 'static>(
     })?
 }
 
+// ---- a film is playing -------------------------------------------------------
+
+use std::time::Duration;
+
+/// Whether a film is playing right now. One flag for the whole process: the
+/// background loops (artwork, reading and measuring files, IMDb, the walk of a
+/// share) look at it between two units of work and wait while it is set.
+static PLAYING: AtomicBool = AtomicBool::new(false);
+
+/// How often a waiting loop looks again. Short enough that work resumes
+/// promptly when the film is closed, long enough to cost nothing.
+const PLAYING_POLL: Duration = Duration::from_millis(500);
+
+/// When the flag was last set, in seconds since the epoch.
+static PLAYING_SINCE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// No film is this long: a flag older than this was left set by a page that
+/// went away mid-film (a reload, a crash), and background work goes on.
+const PLAYING_AT_MOST: u64 = 6 * 60 * 60;
+
+fn now_secs() -> u64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs())
+}
+
+/// Whether a film is playing (see [`set_playing`]).
+pub fn playing() -> bool {
+    PLAYING.load(Ordering::Relaxed)
+        && now_secs().saturating_sub(PLAYING_SINCE.load(Ordering::Relaxed)) < PLAYING_AT_MOST
+}
+
+/// Tell the background work whether a film is playing: `true` when the player
+/// opens, `false` when it closes. Also the Tauri command `set_playing`, with
+/// one argument, `on`; the page calls it, and nothing here depends on it
+/// being called (never called, nothing ever waits).
+///
+/// Why: a 2-core TV box cannot decode a film and download posters, read files
+/// and walk a share at the same time, and the film is the one thing nobody
+/// forgives. Work that waits is only late; a film that stutters is wrong.
+///
+/// A unit of work already started is finished: the loops look at the flag
+/// between files and downloads, never in the middle of one.
+#[tauri::command]
+pub fn set_playing(on: bool) {
+    PLAYING_SINCE.store(now_secs(), Ordering::Relaxed);
+    PLAYING.store(on, Ordering::Relaxed);
+}
+
+/// Block this thread while a film plays. Call between two units of work, and
+/// **never while holding the database lock** — the page's own commands need it.
+pub fn wait_while_playing() {
+    while playing() {
+        std::thread::sleep(PLAYING_POLL);
+    }
+}
+
+/// [`wait_while_playing`] for async code: waits without holding a thread.
+pub async fn wait_while_playing_async() {
+    while playing() {
+        tokio::time::sleep(PLAYING_POLL).await;
+    }
+}
+
+// ---- below the film in priority ---------------------------------------------
+
+/// Proof that this thread is running at background priority; dropping it puts
+/// the priority back where it was.
+///
+/// **Linux and Android: new threads inherit the creator's priority.** A thread
+/// lowered here that then creates another (a connection to a share starts its
+/// own worker threads, the first time one is opened) hands that thread the low
+/// priority for good — and if a film later reads through that connection, the
+/// film is the one that runs slowly. So hold this only around work that does
+/// not open a connection to a share, and never in the walk of one.
+///
+/// **Linux and Android: priority can be lowered but, for an ordinary program,
+/// not raised again** (the kernel refuses without a privilege Kinema does not
+/// have), so dropping this cannot undo it there. Use it on a thread that ends
+/// soon after — [`off_main_background`] makes one — never on one of the shared
+/// pool's, which would stay low for whatever runs on it next. Windows gives it
+/// back exactly.
+#[must_use]
+pub struct Background {
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    before: Option<(libc::id_t, libc::c_int)>,
+    #[cfg(windows)]
+    lowered: bool,
+}
+
+/// Nice value for background work on Linux and Android: clearly behind the
+/// film's threads, still given time when nothing else wants the CPU.
+#[cfg(any(target_os = "linux", target_os = "android"))]
+const BACKGROUND_NICE: libc::c_int = 10;
+
+/// Lower the priority of the calling thread until the result is dropped. Best
+/// effort: where the system refuses, or the system is another one, work simply
+/// runs at normal priority, as it did before.
+pub fn background() -> Background {
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    {
+        // SAFETY: gettid, getpriority and setpriority take and return plain
+        // integers and touch only this thread's own scheduling.
+        unsafe {
+            let tid = libc::syscall(libc::SYS_gettid) as libc::id_t;
+            let was = libc::getpriority(libc::PRIO_PROCESS, tid);
+            let lowered = libc::setpriority(libc::PRIO_PROCESS, tid, BACKGROUND_NICE) == 0;
+            Background { before: lowered.then_some((tid, was)) }
+        }
+    }
+    #[cfg(windows)]
+    {
+        use windows::Win32::System::Threading::{
+            GetCurrentThread, SetThreadPriority, THREAD_MODE_BACKGROUND_BEGIN,
+        };
+        // Background mode lowers the thread's CPU, disk and memory priority
+        // together, which is what a library scan wants beside a film.
+        // SAFETY: the pseudo handle of the calling thread is always valid.
+        let lowered =
+            unsafe { SetThreadPriority(GetCurrentThread(), THREAD_MODE_BACKGROUND_BEGIN) }.is_ok();
+        Background { lowered }
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "android", windows)))]
+    Background {}
+}
+
+impl Drop for Background {
+    fn drop(&mut self) {
+        #[cfg(any(target_os = "linux", target_os = "android"))]
+        if let Some((tid, was)) = self.before {
+            // Refused for an ordinary program (see the type's note); the
+            // thread this runs on is then one that is about to end.
+            // SAFETY: as in `background`.
+            unsafe {
+                libc::setpriority(libc::PRIO_PROCESS, tid, was);
+            }
+        }
+        #[cfg(windows)]
+        if self.lowered {
+            use windows::Win32::System::Threading::{
+                GetCurrentThread, SetThreadPriority, THREAD_MODE_BACKGROUND_END,
+            };
+            // SAFETY: as in `background`; END must come from the same thread.
+            unsafe {
+                let _ = SetThreadPriority(GetCurrentThread(), THREAD_MODE_BACKGROUND_END);
+            }
+        }
+    }
+}
+
+/// [`off_main`] for work that should stay out of a film's way: it runs on a
+/// thread of its own, at background priority, that ends with the work.
+///
+/// A thread of its own rather than the blocking pool's, because a lowered
+/// priority cannot be put back on Linux and Android (see [`Background`]): a
+/// pool thread left low would slow whatever was handed to it next, perhaps a
+/// film's file reading. Only for long loops, where the cost of starting a
+/// thread is nothing; and not for anything that opens a connection to a
+/// share, whose threads would inherit the low priority.
+pub async fn off_main_background<T: Send + 'static>(
+    work: impl FnOnce() -> Result<T, String> + Send + 'static,
+) -> Result<T, String> {
+    let (done, result) = tokio::sync::oneshot::channel();
+    let started = std::thread::Builder::new().name("kinema-background".into()).spawn(move || {
+        let _low = background();
+        let _ = done.send(work());
+    });
+    let failed = |what: String| {
+        crate::log!("background work failed: {what}");
+        "Something went wrong inside Kinema. What happened is in its log (Settings → Advanced)."
+            .to_string()
+    };
+    if let Err(e) = started {
+        return Err(failed(e.to_string()));
+    }
+    // A closed channel means the thread panicked before it answered.
+    result.await.map_err(|e| failed(e.to_string()))?
+}
+
 // ---- one of each at a time ---------------------------------------------------
 
 use std::process::Child;
@@ -239,5 +416,36 @@ mod tests {
         })
         .join();
         assert!(jobs.try_start(Job::Scan).is_some());
+    }
+
+    /// The film's flag, and a waiting loop that is let go when it clears.
+    #[test]
+    fn work_waits_while_a_film_plays_and_goes_on_after() {
+        super::set_playing(true);
+        assert!(super::playing());
+        let waiter = std::thread::spawn(super::wait_while_playing);
+        std::thread::sleep(std::time::Duration::from_millis(700));
+        assert!(!waiter.is_finished(), "should still be waiting");
+        super::set_playing(false);
+        waiter.join().unwrap();
+        assert!(!super::playing());
+    }
+
+    /// Background work runs, hands back what it made, and a panic in it
+    /// becomes an error rather than a hang.
+    #[test]
+    fn background_work_returns_its_result_or_an_error() {
+        let ok = tauri::async_runtime::block_on(super::off_main_background(|| Ok(7)));
+        assert_eq!(ok, Ok(7));
+        let failed: Result<(), String> =
+            tauri::async_runtime::block_on(super::off_main_background(|| panic!("the work failed")));
+        assert!(failed.is_err());
+    }
+
+    /// Lowering and restoring is harmless to the thread that does it.
+    #[test]
+    fn the_background_guard_comes_and_goes() {
+        drop(super::background());
+        let _held = super::background();
     }
 }

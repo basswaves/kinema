@@ -6,8 +6,8 @@
 //!    scan — identity is (path, size, mtime), which costs one stat call. A
 //!    content hash over a 60GB remux on a gigabit link is not an option.
 //!  * A rescan must be cheap. Files whose size and mtime are unchanged keep
-//!    their existing parse/match results and are only touched to update
-//!    `last_seen_at`.
+//!    their existing parse/match results and are not written to at all —
+//!    except one that was flagged `missing` and has come back.
 //!  * Deletions are soft. A share that is offline should not wipe the library,
 //!    so vanished files are flagged `missing` rather than deleted.
 
@@ -282,6 +282,16 @@ fn walk_share(
 ) -> rusqlite::Result<()> {
     let mut folders = vec![root.trim_end_matches('/').to_string()];
     while let Some(dir) = folders.pop() {
+        // Between two folders: wait while a film plays, so the walk's
+        // requests do not share the line with the film's reads. Waiting
+        // holds only the scan's own connection, which nothing else uses.
+        //
+        // The walk is deliberately *not* run at background priority
+        // (`jobs::background`): it is often the first to open the connection
+        // to a share, and on Linux and Android the threads that connection
+        // starts would inherit the low priority — and a film read through it
+        // later would run slowly.
+        crate::jobs::wait_while_playing();
         let entries = match crate::netshare::list(&dir) {
             Ok(e) => e,
             Err(e) => {
@@ -350,14 +360,20 @@ fn write_batch(
 ) -> rusqlite::Result<()> {
     let tx = conn.transaction()?;
     {
-        let mut select =
-            tx.prepare("SELECT id, size_bytes, modified_at FROM media_files WHERE path = ?1")?;
+        let mut select = tx.prepare(
+            "SELECT id, size_bytes, modified_at, missing FROM media_files WHERE path = ?1",
+        )?;
         let mut insert = tx.prepare(
             "INSERT INTO media_files
                 (root_id, path, parent_dir, file_name, extension, size_bytes,
                  modified_at, first_seen_at, last_seen_at, missing, match_status)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8, 0, 'unparsed')",
         )?;
+        // Only for a file that comes back after being flagged missing. An
+        // unchanged file that was never missing is not written at all: this
+        // used to rewrite every row of the library at every launch (a write
+        // transaction and WAL traffic per 500 files) for a `last_seen_at`
+        // nothing reads.
         let mut touch =
             tx.prepare("UPDATE media_files SET last_seen_at = ?2, missing = 0 WHERE id = ?1")?;
         // Content changed. Only the facts about the bytes are updated.
@@ -383,20 +399,22 @@ fn write_batch(
         )?;
 
         for file in batch {
-            let existing: Option<(i64, i64, i64)> = select
+            let existing: Option<(i64, i64, i64, bool)> = select
                 .query_row(params![&file.path], |r| {
-                    Ok((r.get(0)?, r.get(1)?, r.get(2)?))
+                    Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?))
                 })
                 .ok();
 
             match existing {
-                Some((id, old_size, old_mtime))
+                Some((id, old_size, old_mtime, was_missing))
                     if old_size == file.size && old_mtime == file.modified =>
                 {
-                    touch.execute(params![id, now])?;
+                    if was_missing {
+                        touch.execute(params![id, now])?;
+                    }
                     report.files_unchanged += 1;
                 }
-                Some((id, old_size, _)) => {
+                Some((id, old_size, _, _)) => {
                     update.execute(params![id, file.size, file.modified, now])?;
                     // A file that changed *size* is different content, and
                     // "watched" is a claim about content. The commonest way this
@@ -569,6 +587,30 @@ mod tests {
         assert_eq!(report.files_unchanged, 1);
         assert_eq!(report.files_updated, 0);
         assert_eq!(completion(&conn, id), (1, Some(1450.0)));
+        // Not written to: the row still says when it was first recorded.
+        assert_eq!(seen_state(&conn), (0, false));
+    }
+
+    fn seen_state(conn: &Connection) -> (i64, bool) {
+        conn.query_row("SELECT last_seen_at, missing FROM media_files", [], |r| {
+            Ok((r.get(0)?, r.get(1)?))
+        })
+        .unwrap()
+    }
+
+    /// A drive that was unplugged and is back: the file is unchanged, but it
+    /// is no longer missing, and that has to be written.
+    #[test]
+    fn an_unchanged_file_that_comes_back_is_no_longer_missing() {
+        let mut conn = database("back");
+        watched_file(&mut conn, 500_000_000, 100);
+        conn.execute("UPDATE media_files SET missing = 1", []).unwrap();
+
+        let mut report = ScanReport::default();
+        write_batch(&mut conn, 1, 5, &[seen(500_000_000, 100)], &mut report).unwrap();
+
+        assert_eq!(report.files_unchanged, 1);
+        assert_eq!(seen_state(&conn), (5, false));
     }
 
     /// A match picked by hand survives the file being touched — size or date.

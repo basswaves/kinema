@@ -838,7 +838,7 @@ pub async fn probe_library(app: tauri::AppHandle) -> Result<ProbeReport, String>
         return Ok(ProbeReport::default());
     }
 
-    crate::jobs::off_main(move || {
+    crate::jobs::off_main_background(move || {
         let _running = running;
         if !available(&ffmpeg) {
             crate::log!(
@@ -856,6 +856,8 @@ pub async fn probe_library(app: tauri::AppHandle) -> Result<ProbeReport, String>
         let total = files.len();
         let mut report = ProbeReport::default();
         for (done, file) in files.iter().enumerate() {
+            // Between two files: wait while a film plays. No lock is held.
+            crate::jobs::wait_while_playing();
             let _ = app.emit(PROGRESS_EVENT, ProbeProgress { done, total });
 
             // A folder that is offline right now — a NAS asleep, a drive

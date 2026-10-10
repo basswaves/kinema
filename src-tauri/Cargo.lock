@@ -2559,6 +2559,7 @@ dependencies = [
  "alsa",
  "flate2",
  "gtk",
+ "libc",
  "log",
  "qrcode",
  "quick-xml 0.38.4",

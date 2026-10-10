@@ -133,7 +133,14 @@ jobs:
       # A debug build: it needs no signing key, and installs on any device
       # with debugging on. 32-bit ARM too: many TV boxes run a 32-bit Android
       # even on a 64-bit chip, and install nothing else.
+      # Kinema's own code optimised too and without the debugger's line
+      # tables, as scripts/android-bench.sh builds it: unoptimised, a 4K film
+      # from a NAS stopped every few seconds, and the line tables made an APK
+      # too big for an old box's free space.
       - name: Build the app
+        env:
+          CARGO_PROFILE_DEV_OPT_LEVEL: 2
+          CARGO_PROFILE_DEV_STRIP: debuginfo
         run: npx tauri android build --debug --target aarch64 --target armv7 --target x86_64 --apk
 
       # The code only Android compiles (engine.rs and the other `mobile`

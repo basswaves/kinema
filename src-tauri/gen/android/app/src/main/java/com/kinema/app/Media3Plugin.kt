@@ -26,6 +26,9 @@ import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.text.CueGroup
 import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.exoplayer.Renderer
+import androidx.media3.exoplayer.text.TextOutput
+import androidx.media3.exoplayer.text.TextRenderer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.ExoPlaybackException
 import androidx.media3.exoplayer.ExoPlayer
@@ -405,6 +408,15 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
           else AudioSink.SINK_FORMAT_UNSUPPORTED
       }
     }
+
+    // Subtitles are turned into pictures and text as they are shown, by the
+    // renderer, only for the track that is on (see buildPlayer).
+    override fun buildTextRenderers(
+      context: Context, output: TextOutput, outputLooper: Looper, extensionRendererMode: Int, out: ArrayList<Renderer>,
+    ) {
+      super.buildTextRenderers(context, output, outputLooper, extensionRendererMode, out)
+      out.filterIsInstance<TextRenderer>().forEach { it.experimentalSetLegacyDecodingEnabled(true) }
+    }
   }
 
   /**
@@ -430,7 +442,13 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
 
   private fun buildPlayer(s: SurfaceView): ExoPlayer {
     val selector = soundOnlySelector(audioStep > 0)
+    // Not every subtitle track turned into pictures while the file is read:
+    // Media3 does that by default on the one thread that reads the film, and
+    // a Blu-ray remux with 18–42 picture-subtitle tracks starved it — the
+    // film stalled with the share waiting on the player (seen on a box,
+    // 2026-10-10). The renderer decodes the chosen track instead.
     val sources = DefaultMediaSourceFactory(activity, FrameTimingExtractors(DefaultExtractorsFactory()) { rateSink() })
+      .experimentalParseSubtitlesDuringExtraction(false)
     val p = ExoPlayer.Builder(activity, renderers(audioStep))
       .setTrackSelector(selector)
       .setMediaSourceFactory(sources)

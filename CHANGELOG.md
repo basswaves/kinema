@@ -7,8 +7,23 @@ makes no stability promises.
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-10-11
+
 ### Added
 
+- **Android, as an early version (beta).** Kinema now runs on Android TV
+  boxes, installed by hand from the release's `.apk` (sideloaded); the same
+  file installs on a phone, which has not been tried yet.
+  It has its own player engine (Media3) for Dolby Vision and sound passed
+  straight through, the same library, matching, accounts and subtitles as
+  the desktop, network shares, and the same interface with a remote or
+  a keyboard. It has been tried on one TV box and on the Android TV
+  emulator only, and a few things are not there yet: the badges on a film's
+  page, intro detection from the audio, and Blu-ray folders, disc images and
+  4K UHD `.m2ts` files (1080p `.m2ts` works, and a file that cannot be
+  opened here is said so before Play). Held keys and the on-screen keyboard
+  have not yet been checked on a real box. Reports from other devices are
+  welcome; the README says what is known.
 - **Playback details without a keyboard.** The details panel ("Stats for
   nerds") opens from the end of Audio & subtitles, and on a remote's Info
   key where it has one, as well as on `i`. A remote moves through it group
@@ -29,6 +44,12 @@ makes no stability promises.
 
 ### Changed
 
+- **The arrow keys go where you expect on every screen.** Each screen was
+  checked arrow by arrow, for a remote, a keyboard and the mouse, on Windows,
+  Linux and Android: a group's heading stays clear of the top bar, a text box
+  rises above an on-screen or hardware keyboard so what you type stays in
+  sight, Search remembers the card you left from, and a checker now holds
+  every move in place so a later change cannot quietly move one.
 - **Android: a bigger read-ahead and quicker skips on big films.** Kinema
   now reads ahead from the device's memory (a 4K remux from a USB drive was
   kept ready only about two seconds ahead, and is now about ten), and a skip

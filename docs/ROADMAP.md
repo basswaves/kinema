@@ -11,7 +11,11 @@ Ideas and reports are welcome as [issues](https://github.com/Basswaves/kinema/is
 
 ## Next
 
-**Android**, below under [Other platforms](#other-platforms).
+**Android**, now an early version (beta) since 0.10.0: the badges on a film's
+page, intro detection from the audio, Blu-ray folders, disc images and 4K UHD
+`.m2ts` files, and a phone and more boxes to test on. Trakt resume points and
+Kinema as the default player for local media (Windows first) come after that.
+See [Other platforms](#other-platforms).
 
 ---
 
@@ -76,10 +80,11 @@ been tried on a real TV. Since 0.9.1 the screen is switched on Cinnamon
 too (refresh rate and resolution; Cinnamon has no HDR), and the mouse works
 in the Linux player as it does on Windows.
 
-**Android** is under way, with its own player engine (Media3) for Dolby Vision
-and passthrough on TV boxes: the interface, the library, network shares and
-playing a film work, and the player's sound, subtitles and audio tracks come
-next, before a release. macOS is not planned by the author; a port is
+**Android** is an early version (beta) since 0.10.0, with its own player
+engine (Media3) for Dolby Vision and passthrough on TV boxes: the interface,
+the library, network shares, subtitles and playing a film work, tried on one TV
+box and the emulator. What is missing and untested is listed in the
+[README](../README.md#android-early-version). macOS is not planned by the author; a port is
 welcome. See [Platform support](../README.md#platform-support).
 
 ---

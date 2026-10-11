@@ -9,7 +9,8 @@ interface into skin XML, and every good-looking option (Jellyfin Media Player)
 is a thin client that does nothing without a Jellyfin server running somewhere.
 Kinema is one program: close it and nothing is left running.
 
-**Windows 11 and Linux**; see [Platform support](#platform-support).
+**Windows 11 and Linux**, and **Android TV as an early version (beta)**; see
+[Platform support](#platform-support).
 
 ![Kinema's home screen: a full-width backdrop for a title from the library, with rails of posters beneath it](docs/images/home.jpg)
 
@@ -87,7 +88,8 @@ tinyMediaManager or Kodi, and treats them as authoritative.
 ## Install
 
 Everything is on the [Releases](https://github.com/Basswaves/kinema/releases)
-page: a ZIP for Windows, and packages for Linux ([below](#linux)).
+page: a ZIP for Windows, packages for Linux ([below](#linux)), and an `.apk`
+for Android TV ([below](#android-early-version)).
 
 On Windows, download the ZIP, extract it anywhere, and run `kinema.exe`.
 There is no installer — it is a folder, and deleting the folder uninstalls it.
@@ -255,20 +257,43 @@ screen, not yet on a real TV. Kinema is built to work the same on any
 desktop and fall back safely, rather than tested on every one —
 see [When something goes wrong](#when-something-goes-wrong).
 
-An Android TV version is under way and not part of a release yet. macOS is
-not planned by the author; a port is welcome, and
+**Android TV**, since 0.10.0, as an early version (beta): see
+[Android (early version)](#android-early-version) for what is tested and what
+is missing. macOS is not planned by the author; a port is welcome, and
 [CONTRIBUTING.md](CONTRIBUTING.md) ("More than one platform") says how the
 code is arranged for one.
 
-| | Windows 11 | Linux |
-|---|---|---|
-| Builds and passes its tests | ✓ | ✓ |
-| Library, matching, artwork, accounts | ✓ | ✓ |
-| Playback, controls, remote keys | ✓ | ✓ |
-| Equipment check, sound straight to a receiver | ✓ | ✓ |
-| Screen switching (refresh rate, resolution) | ✓ | ✓ on GNOME, Cinnamon, KDE Plasma, Sway, Hyprland and the other wlroots desktops |
-| HDR switched on for an HDR film | ✓ | ✓ on GNOME and KDE Plasma, by Hyprland itself, and on Sway 1.12 or later (not yet tried on a real TV); needs a driver that offers HDR ([above](#linux)) |
-| Sleep / shut down | ✓ | ✓ where the system allows it without a password (logind) |
+| | Windows 11 | Linux | Android (early version) |
+|---|---|---|---|
+| Builds and passes its tests | ✓ | ✓ | ✓ |
+| Library, matching, artwork, accounts | ✓ | ✓ | ✓ |
+| Playback, controls, remote keys | ✓ | ✓ | ✓ on one TV box and the emulator |
+| Equipment check, sound straight to a receiver | ✓ | ✓ | by Android itself; Kinema shows what Android reports |
+| Screen switching (refresh rate, resolution) | ✓ | ✓ on GNOME, Cinnamon, KDE Plasma, Sway, Hyprland and the other wlroots desktops | one switch, "Match the screen to the film" |
+| HDR switched on for an HDR film | ✓ | ✓ on GNOME and KDE Plasma, by Hyprland itself, and on Sway 1.12 or later (not yet tried on a real TV); needs a driver that offers HDR ([above](#linux)) | by Android itself |
+| Sleep / shut down | ✓ | ✓ where the system allows it without a password (logind) | — |
+| Badges on a film's page, intro detection from the audio | ✓ | ✓ | not yet |
+| Blu-ray folders, disc images, 4K UHD `.m2ts` | ✓ | ✓ | not yet (1080p `.m2ts` works) |
+
+### Android (early version)
+
+Since 0.10.0, as a file to install by hand: download `kinema-X.Y.Z-android.apk`
+from the Releases page, copy it to the device and open it (Android asks once
+to allow installs from that source). It plays through Android's own media
+player (Media3) rather than mpv, so Dolby Vision and sound passed straight to
+a receiver are Android's to do; Kinema shows what Android reports and, where
+sound will not open, falls back rather than not playing. The interface is
+always the TV layout, and folders are chosen in Kinema's own browser.
+
+**Tested:** one TV box and the Android TV emulator, with a remote — library,
+matching, network shares, playback of HDR, Dolby Vision and 1080p `.m2ts`
+files, subtitles. **Not yet tested:** a phone, other boxes, held keys on the
+box and the on-screen keyboard. **Missing:** the badges on a film's page,
+intro detection from the audio, and Blu-ray folders, disc images and 4K UHD
+`.m2ts` files (Kinema says before Play when a file cannot be opened on the
+device). Kinema is built on standard Android and Media3 APIs and falls back
+safely rather than being tested on every box; a setup that misbehaves is what
+the bug report form is for.
 
 ## Building from source
 
@@ -332,8 +357,9 @@ distribution, desktop and graphics card is how it gets fixed.
 
 ## Known limitations
 
-- **Windows and Linux only.** An Android TV version is under way; macOS is
-  not planned (see [Platform support](#platform-support)).
+- **Android is an early version.** See [above](#android-early-version) for
+  what is untested and missing. macOS is not planned (see
+  [Platform support](#platform-support)).
 - **Tested on a small number of setups.** HDR passthrough, bitstreaming to a
   receiver and display switching have been confirmed on a 4K HDR TV with an AV
   receiver; TV overscan, intro detection on many different shows, and libraries

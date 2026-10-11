@@ -12,6 +12,12 @@
  * the two clearly apart. A shaded mark has a range of greys rather than two
  * colours, and cutting its lighter half out broke it into pieces; anything not
  * plainly a plate keeps the plain white it had, so no logo looks worse.
+ *
+ * One more case, separate and safe: a logo with nothing see-through at all (a
+ * dark rectangle with the name on it). Whitened it is a featureless white
+ * block whatever its lettering, so nothing is lost by taking the plate away
+ * instead: what differs from the plate shows in white, the plate itself
+ * disappears (`plateBrightness`, `removePlate`).
  */
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { useEffect, useState } from 'react';
@@ -83,6 +89,46 @@ export function letteringSplit(pixels: Uint8ClampedArray): number | null {
   return plate ? (dark + light) / 2 : null;
 }
 
+/** A logo this much of which is solid has nothing see-through to speak of. */
+const OPAQUE_SHARE = 0.98;
+/** The plate is the biggest area of one brightness: at least this much. */
+const PLATE_SHARE = 0.3;
+/** A difference from the plate's brightness below this is still the plate… */
+const PLATE_NOISE = 0.12;
+/** …and from this much above it, the mark is shown in full. */
+const PLATE_FULL = 0.37;
+
+/**
+ * The plate's brightness (0–1) for a logo that is solid all over and has one
+ * plain colour behind its marks, or null for every other logo. `pixels` is RGBA.
+ */
+export function plateBrightness(pixels: Uint8ClampedArray): number | null {
+  const hist = new Array<number>(BINS).fill(0);
+  let n = 0;
+  let solid = 0;
+  for (let i = 0; i < pixels.length; i += 4) {
+    n++;
+    if (pixels[i + 3] < 250) continue;
+    solid++;
+    const l = luminance(pixels[i], pixels[i + 1], pixels[i + 2]);
+    hist[Math.min(BINS - 1, Math.floor(l * BINS))]++;
+  }
+  if (n < 50 || solid / n < OPAQUE_SHARE) return null;
+  let mode = 0;
+  for (let i = 1; i < BINS; i++) if (hist[i] > hist[mode]) mode = i;
+  return hist[mode] / solid >= PLATE_SHARE ? (mode + 0.5) / BINS : null;
+}
+
+/** The logo in white with its plate see-through, in place. */
+export function removePlate(pixels: Uint8ClampedArray, plate: number): void {
+  for (let i = 0; i < pixels.length; i += 4) {
+    const l = luminance(pixels[i], pixels[i + 1], pixels[i + 2]);
+    const shown = Math.min(1, Math.max(0, (Math.abs(l - plate) - PLATE_NOISE) / (PLATE_FULL - PLATE_NOISE)));
+    pixels[i] = pixels[i + 1] = pixels[i + 2] = 255;
+    pixels[i + 3] = Math.round(pixels[i + 3] * shown);
+  }
+}
+
 /** The logo in white with its lettering see-through, in place. */
 export function cutOut(pixels: Uint8ClampedArray, split: number): void {
   for (let i = 0; i < pixels.length; i += 4) {
@@ -120,8 +166,13 @@ async function lookAt(sources: string[]): Promise<string | null> {
       context.drawImage(img, 0, 0);
       const data = context.getImageData(0, 0, canvas.width, canvas.height);
       const split = letteringSplit(data.data);
-      if (split === null) return null;
-      cutOut(data.data, split);
+      if (split !== null) {
+        cutOut(data.data, split);
+      } else {
+        const plate = plateBrightness(data.data);
+        if (plate === null) return null;
+        removePlate(data.data, plate);
+      }
       context.putImageData(data, 0, 0);
       return canvas.toDataURL('image/png');
     } catch (e) {

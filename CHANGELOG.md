@@ -89,6 +89,13 @@ makes no stability promises.
 
 ### Fixed
 
+- **Studio logos that are a dark plate with the name on it** (one film's
+  studio badge was a plain white rectangle) now show their name and artwork:
+  the plate is taken away and what stands out from it stays. Logos with a
+  see-through background are untouched. Two kinds of studio logo are known to
+  still look wrong: light lettering on a plate that is not a clean two-colour
+  design is left as it was (earlier, Marvel's was fixed), and the gold Warner
+  Bros. shield still shows as a plain white shape.
 - **The "Skip to the scene after the credits" card came up long before the
   credits.** On one big recent film it appeared thirteen minutes early, over
   the ending: two community databases disagreed about where the credits start,

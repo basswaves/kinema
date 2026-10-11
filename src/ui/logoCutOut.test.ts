@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cutOut, letteringSplit } from './logoCutOut';
+import { cutOut, letteringSplit, plateBrightness, removePlate } from './logoCutOut';
 
 type Rgba = [number, number, number, number];
 
@@ -50,5 +50,37 @@ describe('cutOut', () => {
     const pixels = logo([RED, 1], [WHITE, 1], [CLEAR, 1]);
     cutOut(pixels, letteringSplit(logo([RED, 600], [WHITE, 300])) as number);
     expect([...pixels]).toEqual([255, 255, 255, 255, 255, 255, 255, 0, 255, 255, 255, 0]);
+  });
+});
+
+describe('a logo that is solid all over', () => {
+  const PLATE: Rgba = [35, 35, 35, 255];
+  const GREY: Rgba = [130, 130, 130, 255];
+
+  it('has the plate taken away, the name and the mark kept', () => {
+    // Dark plate, a grey mark and white lettering: not two-tone enough for
+    // letteringSplit, so it would have been a white block.
+    const make = () => logo([PLATE, 700], [GREY, 150], [WHITE, 150]);
+    expect(letteringSplit(make())).toBeNull();
+    const plate = plateBrightness(make());
+    expect(plate).not.toBeNull();
+    const pixels = logo([PLATE, 1], [GREY, 1], [WHITE, 1]);
+    removePlate(pixels, plate as number);
+    expect(pixels[3]).toBe(0);
+    expect(pixels[7]).toBeGreaterThan(200);
+    expect(pixels[11]).toBe(255);
+    expect([...pixels.slice(0, 3), ...pixels.slice(4, 7), ...pixels.slice(8, 11)]).toEqual(Array(9).fill(255));
+  });
+
+  it('is only for a logo with nothing see-through', () => {
+    expect(plateBrightness(logo([PLATE, 700], [WHITE, 150], [CLEAR, 150]))).toBeNull();
+  });
+
+  it('leaves a logo with no plain plate alone', () => {
+    const greys = Array.from({ length: 40 }, (_, i): [Rgba, number] => {
+      const v = Math.round(20 + i * 5.5);
+      return [[v, v, v, 255], 20];
+    });
+    expect(plateBrightness(logo(...greys))).toBeNull();
   });
 });

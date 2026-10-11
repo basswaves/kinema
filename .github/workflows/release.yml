@@ -230,9 +230,9 @@ jobs:
           KINEMA_KEY_ALIAS: kinema
         run: npx tauri android build --target aarch64 --target armv7 --apk
 
-      # Looks inside the finished APK: signed with our key, and each built-in
-      # key really compiled in (the TMDB key lives in the page bundle, the
-      # others in the native library). Only names are printed, never values.
+      # Looks at the finished APK: signed with our key, and each built-in key
+      # really compiled in (the TMDB key in the page bundle, the others in the
+      # native library). Only names are printed, never values.
       - name: Check the APK
         env:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
@@ -247,7 +247,9 @@ jobs:
           "$apksigner" verify --print-certs "$apk" | grep -E "certificate (DN|SHA-256)" | head -2
           "$apksigner" verify "$apk"
           fail=0
-          unzip -p "$apk" 'assets/*' | grep -aqF -- "$TMDB_API_KEY" && echo "TMDB_API_KEY: in the page bundle" || { echo "TMDB_API_KEY: NOT in the APK"; fail=1; }
+          # Tauri compresses the page into the native library, so the TMDB key
+          # is read from the page bundle as it was handed to the build.
+          grep -rlaF -- "$TMDB_API_KEY" dist/assets > /dev/null && echo "TMDB_API_KEY: in the page bundle that was embedded" || { echo "TMDB_API_KEY: NOT in the page bundle"; fail=1; }
           for name in SIMKL_CLIENT_ID TRAKT_CLIENT_ID TRAKT_CLIENT_SECRET OPENSUBTITLES_API_KEY; do
             for abi in arm64-v8a armeabi-v7a; do
               unzip -p "$apk" "lib/$abi/*.so" | grep -aqF -- "${!name}" && echo "$name: in lib/$abi" || { echo "$name: NOT in lib/$abi"; fail=1; }

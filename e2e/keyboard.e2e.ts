@@ -1536,3 +1536,38 @@ for (const system of ['android', 'windows'] as const) {
     }
   });
 }
+
+/** The first run, up to the point of picking a TV folder that holds two already added. */
+async function pickFolderHoldingFolders(page: import('@playwright/test').Page) {
+  await page.addInitScript(() => {
+    localStorage.setItem('kinemaMockEmpty', '1');
+    localStorage.setItem('kinemaMockMerge', '1');
+  });
+  await page.goto('/');
+  await expect.poll(() => focused(page)).toBe('A TV, from the sofa');
+  await press(page, 'Enter');
+  await press(page, 'ArrowDown');
+  await expect.poll(() => focused(page)).toBe('Add movies folder');
+  await press(page, 'ArrowRight');
+  await expect.poll(() => focused(page)).toBe('Add TV folder');
+  await press(page, 'Enter');
+  // The offer names what would be merged, and the ring is on the button that does it.
+  await expect(page.locator('.merge-offer')).toContainText('2 library folders');
+  await expect.poll(() => focused(page)).toBe('Merge them');
+}
+
+test('a folder that holds folders already added: merged by remote', async ({ page }) => {
+  await pickFolderHoldingFolders(page);
+  await press(page, 'Enter');
+  await expect(page.locator('.merge-offer')).toHaveCount(0);
+  await expect(page.locator('.first-run-roots li')).toHaveCount(1);
+});
+
+test('a folder that holds folders already added: Not now leaves everything as it was', async ({ page }) => {
+  await pickFolderHoldingFolders(page);
+  await press(page, 'ArrowRight');
+  await expect.poll(() => focused(page)).toBe('Not now');
+  await press(page, 'Enter');
+  await expect(page.locator('.merge-offer')).toHaveCount(0);
+  await expect(page.locator('.first-run-roots li')).toHaveCount(0);
+});

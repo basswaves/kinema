@@ -66,6 +66,22 @@ export interface ParseResultPayload {
 export const addLibraryRoot = (path: string, kind: LibraryKind) =>
   invoke<number>('add_library_root', { path, kind });
 
+export const libraryRootsInside = (path: string) =>
+  invoke<LibraryRoot[]>('library_roots_inside', { path });
+
+export const mergeLibraryRoots = (path: string, kind: LibraryKind) =>
+  invoke<number>('merge_library_roots', { path, kind });
+
+/**
+ * The library folders a newly picked folder would swallow, when merging them is
+ * on offer: there are some, and all are of the kind being added. Otherwise empty,
+ * and adding the folder says why it cannot be.
+ */
+export async function rootsToMerge(path: string, kind: LibraryKind): Promise<LibraryRoot[]> {
+  const inside = await libraryRootsInside(path);
+  return inside.length > 0 && inside.every((root) => root.kind === kind) ? inside : [];
+}
+
 export const removeLibraryRoot = (id: number) => invoke<void>('remove_library_root', { id });
 
 export const listLibraryRoots = () => invoke<LibraryRoot[]>('list_library_roots');

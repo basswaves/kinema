@@ -168,6 +168,95 @@ pub async fn add_library_root(
     .map_err(to_string_err)
 }
 
+/// Library folders already added that sit inside `path`. When there are some,
+/// adding `path` is refused ([`add_library_root`]); the app then offers to
+/// merge them into it ([`merge_library_roots`]) rather than leaving the person
+/// to remove them one by one.
+#[tauri::command]
+pub fn library_roots_inside(db: tauri::State<Db>, path: String) -> Result<Vec<LibraryRoot>, String> {
+    let conn = db.0.lock().map_err(to_string_err)?;
+    roots_inside(&conn, &path)
+}
+
+fn roots_inside(conn: &rusqlite::Connection, path: &str) -> Result<Vec<LibraryRoot>, String> {
+    let candidate = comparable(path);
+    Ok(list_roots(conn)?
+        .into_iter()
+        .filter(|root| {
+            let known = comparable(&root.path);
+            known != candidate && is_within(&known, &candidate)
+        })
+        .collect())
+}
+
+/// Add `path` as a library folder and take over the folders already inside it.
+///
+/// Their files move to the new folder **as they are** - same rows, so matches,
+/// watch history and resume points stay. Removing the folders and adding the
+/// new one would not do that: a removed folder takes its files, and everything
+/// recorded about them, with it. Only folders of the same kind merge (a movies
+/// folder holding a TV folder is a different question), and the next scan picks
+/// up whatever else the new folder holds.
+#[tauri::command]
+pub async fn merge_library_roots(
+    db: tauri::State<'_, Db>,
+    path: String,
+    kind: String,
+) -> Result<i64, String> {
+    if kind != "movies" && kind != "tv" {
+        return Err(format!("unknown library kind: {kind}"));
+    }
+    let probe = path.clone();
+    if !crate::jobs::off_main(move || Ok(crate::files::is_dir(std::path::Path::new(&probe)))).await? {
+        return Err(format!("not a directory: {path}"));
+    }
+    let mut conn = db.0.lock().map_err(to_string_err)?;
+    merge_roots(&mut conn, &path, &kind)
+}
+
+fn merge_roots(conn: &mut rusqlite::Connection, path: &str, kind: &str) -> Result<i64, String> {
+    let candidate = comparable(path);
+    let roots = list_roots(conn)?;
+    for root in &roots {
+        let known = comparable(&root.path);
+        if known == candidate || is_within(&candidate, &known) {
+            return Err(format!(
+                "That folder is already in a library folder:\n{}",
+                root.path
+            ));
+        }
+    }
+    let inside = roots_inside(conn, path)?;
+    if inside.is_empty() {
+        return Err("There is no library folder inside that folder to merge.".into());
+    }
+    if let Some(other) = inside.iter().find(|root| root.kind != kind) {
+        return Err(format!(
+            "That folder holds a {} library folder, so it cannot be merged into a {} one:\n{}",
+            other.kind, kind, other.path
+        ));
+    }
+
+    let tx = conn.transaction().map_err(to_string_err)?;
+    tx.execute(
+        "INSERT INTO library_roots (path, kind, added_at) VALUES (?1, ?2, ?3)",
+        params![path, kind, now_secs()],
+    )
+    .map_err(to_string_err)?;
+    let new_id = tx.last_insert_rowid();
+    for root in &inside {
+        tx.execute(
+            "UPDATE media_files SET root_id = ?1 WHERE root_id = ?2",
+            params![new_id, root.id],
+        )
+        .map_err(to_string_err)?;
+        tx.execute("DELETE FROM library_roots WHERE id = ?1", params![root.id])
+            .map_err(to_string_err)?;
+    }
+    tx.commit().map_err(to_string_err)?;
+    Ok(new_id)
+}
+
 #[tauri::command]
 pub fn remove_library_root(db: tauri::State<Db>, id: i64) -> Result<(), String> {
     let conn = db.0.lock().map_err(to_string_err)?;
@@ -179,6 +268,10 @@ pub fn remove_library_root(db: tauri::State<Db>, id: i64) -> Result<(), String> 
 #[tauri::command]
 pub fn list_library_roots(db: tauri::State<Db>) -> Result<Vec<LibraryRoot>, String> {
     let conn = db.0.lock().map_err(to_string_err)?;
+    list_roots(&conn)
+}
+
+fn list_roots(conn: &rusqlite::Connection) -> Result<Vec<LibraryRoot>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT r.id, r.path, r.kind,
@@ -399,7 +492,74 @@ pub fn library_stats(db: tauri::State<Db>) -> Result<LibraryStats, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{comparable, is_within};
+    use super::{comparable, is_within, merge_roots, roots_inside};
+
+    /// An in-memory library with two TV folders and a film folder, one file
+    /// each, and a watch position on the first file.
+    fn library() -> rusqlite::Connection {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        crate::db::migrate(&conn).unwrap();
+        conn.execute_batch(
+            "PRAGMA foreign_keys=ON;
+             INSERT INTO library_roots (id, path, kind, added_at) VALUES
+                 (1, 'D:\\Media\\Shows A', 'tv', 0),
+                 (2, 'd:\\media\\Shows B\\', 'tv', 0),
+                 (3, 'D:\\Media\\Films', 'movies', 0);
+             INSERT INTO media_files (id, root_id, path, parent_dir, file_name, extension,
+                 size_bytes, modified_at, first_seen_at, last_seen_at) VALUES
+                 (1, 1, 'D:\\Media\\Shows A\\a.mkv', 'D:\\Media\\Shows A', 'a.mkv', 'mkv', 1, 1, 1, 1),
+                 (2, 2, 'D:\\Media\\Shows B\\b.mkv', 'D:\\Media\\Shows B', 'b.mkv', 'mkv', 1, 1, 1, 1),
+                 (3, 3, 'D:\\Media\\Films\\c.mkv', 'D:\\Media\\Films', 'c.mkv', 'mkv', 1, 1, 1, 1);
+             INSERT INTO playback_state (file_id, position_secs, completed, updated_at)
+                 VALUES (1, 812.5, 0, 1);",
+        )
+        .unwrap();
+        conn
+    }
+
+    fn root_ids_of_files(conn: &rusqlite::Connection) -> Vec<(i64, i64)> {
+        let mut stmt = conn.prepare("SELECT id, root_id FROM media_files ORDER BY id").unwrap();
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?))).unwrap();
+        rows.map(|r| r.unwrap()).collect()
+    }
+
+    /// The point of merging rather than remove-and-add: the files keep their
+    /// ids, so what is recorded about them (a resume point here) survives.
+    #[test]
+    fn merging_keeps_the_files_and_their_history() {
+        let mut conn = library();
+        let inside = roots_inside(&conn, r"D:\Media").unwrap();
+        assert_eq!(inside.len(), 3);
+
+        // The film folder is a different kind, so the whole merge is refused
+        // and nothing changes.
+        let refused = merge_roots(&mut conn, r"D:\Media", "tv").unwrap_err();
+        assert!(refused.contains("movies library folder"), "got {refused}");
+        assert_eq!(root_ids_of_files(&conn), vec![(1, 1), (2, 2), (3, 3)]);
+
+        conn.execute("DELETE FROM library_roots WHERE id = 3", []).unwrap();
+        let id = merge_roots(&mut conn, r"D:\Media", "tv").unwrap();
+        assert_eq!(root_ids_of_files(&conn), vec![(1, id), (2, id)]);
+        let roots: i64 = conn.query_row("SELECT COUNT(*) FROM library_roots", [], |r| r.get(0)).unwrap();
+        assert_eq!(roots, 1);
+        let position: f64 = conn
+            .query_row("SELECT position_secs FROM playback_state WHERE file_id = 1", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(position, 812.5);
+    }
+
+    /// Merging is for a folder that holds library folders, nothing else.
+    #[test]
+    fn merging_refuses_what_is_not_a_parent() {
+        let mut conn = library();
+        // Inside an existing folder, and the same folder: not parents.
+        assert!(merge_roots(&mut conn, r"D:\Media\Shows A\Season 1", "tv").is_err());
+        assert!(merge_roots(&mut conn, r"D:\Media\Shows A", "tv").is_err());
+        // A sibling with a shared prefix holds nothing.
+        assert!(merge_roots(&mut conn, r"D:\Media2", "tv").is_err());
+        assert!(roots_inside(&conn, r"D:\Media2").unwrap().is_empty());
+        assert_eq!(root_ids_of_files(&conn), vec![(1, 1), (2, 2), (3, 3)]);
+    }
 
     #[test]
     fn windows_paths_compare_case_insensitively() {

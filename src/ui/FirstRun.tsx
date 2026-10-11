@@ -41,7 +41,15 @@ import { setTvMode, TV_MODE_KEY } from './tv';
 import { useCapabilities } from '../capabilities';
 import { useClaimFocus } from './focus';
 import { ALL_ARROWS, useFocusGroup } from './focusGroups';
-import { addLibraryRoot, listLibraryRoots, type LibraryKind, type LibraryRoot } from '../library/api';
+import {
+  addLibraryRoot,
+  listLibraryRoots,
+  mergeLibraryRoots,
+  rootsToMerge,
+  type LibraryKind,
+  type LibraryRoot,
+} from '../library/api';
+import MergeOffer, { type MergeOfferState } from './MergeOffer';
 import { chooseFolder } from '../library/folders';
 import { useScanStatus } from '../library/pipeline';
 import { getSetting, setSetting } from '../metadata/api';
@@ -103,12 +111,30 @@ export default function FirstRun({ onScan }: Props) {
     })();
   }, []);
 
+  /** A picked folder that holds folders already added: merge them, or not. */
+  const [mergeOffer, setMergeOffer] = useState<MergeOfferState | null>(null);
   const pickFolder = useCallback(async (kind: LibraryKind) => {
     setError(null);
     try {
       const selected = await chooseFolder(kind === 'tv' ? 'TV' : 'movies');
       if (!selected) return;
+      const inside = await rootsToMerge(selected, kind);
+      if (inside.length > 0) {
+        setMergeOffer({ path: selected, kind, inside });
+        return;
+      }
       await addLibraryRoot(selected, kind);
+      setRoots(await listLibraryRoots());
+    } catch (e) {
+      setError(userError(e));
+    }
+  }, []);
+
+  const merge = useCallback(async (offer: MergeOfferState) => {
+    setMergeOffer(null);
+    setError(null);
+    try {
+      await mergeLibraryRoots(offer.path, offer.kind);
       setRoots(await listLibraryRoots());
     } catch (e) {
       setError(userError(e));
@@ -207,6 +233,13 @@ export default function FirstRun({ onScan }: Props) {
               Add TV folder
             </FocusButton>
           </div>
+          {mergeOffer && (
+            <MergeOffer
+              offer={mergeOffer}
+              onMerge={() => void merge(mergeOffer)}
+              onCancel={() => setMergeOffer(null)}
+            />
+          )}
           {hasRoots && (
             <ul className="first-run-roots">
               {roots.map((root) => (

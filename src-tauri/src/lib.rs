@@ -320,6 +320,8 @@ pub fn run() {
             pointer::pointer_script,
             pointer::pointer_event,
             library::add_library_root,
+            library::library_roots_inside,
+            library::merge_library_roots,
             library::remove_library_root,
             library::list_library_roots,
             library::scan_library,

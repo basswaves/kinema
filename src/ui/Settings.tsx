@@ -17,6 +17,7 @@
 import { userError } from './errors';
 import LanguageSection from './LanguageSection';
 import ChoiceRow from './ChoiceRow';
+import { getVersion } from '@tauri-apps/api/app';
 import { availableUpdate, UPDATE_CHECK_KEY, type Release } from './updates';
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
@@ -36,6 +37,7 @@ import BackupSection from './BackupSection';
 import AccountSection, { AccountAppFields } from './AccountSection';
 import { ForcedSubtitleRows, OpenSubtitlesSection } from './SubtitlesSettings';
 import ConfirmButton from './ConfirmButton';
+import MergeOffer, { type MergeOfferState } from './MergeOffer';
 import EquipmentSection from './EquipmentSection';
 import SoundSection from './SoundSection';
 import ScreenSection from './ScreenSection';
@@ -46,6 +48,8 @@ import { setTvMode, useTvMode } from './tv';
 import { setLook, useLook, type LookSetting } from './lightLook';
 import {
   addLibraryRoot,
+  mergeLibraryRoots,
+  rootsToMerge,
   analysisBacklog,
   AUTO_ANALYSE_KEY,
   detectIntros,
@@ -306,10 +310,12 @@ export default function Settings({
 
   /** A newer release, if one is out; and whether looking for one is on. */
   const [update, setUpdate] = useState<Release | null>(null);
+  const [version, setVersion] = useState<string | null>(null);
   const [checkUpdates, setCheckUpdates] = useState(true);
   useEffect(() => {
     let live = true;
     void availableUpdate().then((r) => live && setUpdate(r));
+    void getVersion().then((v) => live && setVersion(v)).catch(() => {});
     void getSetting(UPDATE_CHECK_KEY).then((v) => live && setCheckUpdates(v !== 'off'));
     return () => {
       live = false;
@@ -559,15 +565,37 @@ export default function Settings({
     await refresh();
   }, [refresh]);
 
+  /** A picked folder that holds folders already added: merge them, or not. */
+  const [mergeOffer, setMergeOffer] = useState<MergeOfferState | null>(null);
   const pickFolder = useCallback(
     async (kind: LibraryKind) => {
       setError(null);
       try {
         const selected = await chooseFolder(kind === 'tv' ? 'TV' : 'movies');
         if (!selected) return;
+        const inside = await rootsToMerge(selected, kind);
+        if (inside.length > 0) {
+          setMergeOffer({ path: selected, kind, inside });
+          return;
+        }
         await addLibraryRoot(selected, kind);
         await refresh();
         setNote(`Added ${selected}. Scan to pick up its files.`);
+      } catch (e) {
+        setError(userError(e));
+      }
+    },
+    [refresh]
+  );
+
+  const merge = useCallback(
+    async (offer: MergeOfferState) => {
+      setMergeOffer(null);
+      setError(null);
+      try {
+        await mergeLibraryRoots(offer.path, offer.kind);
+        await refresh();
+        setNote(`Merged into ${offer.path}. Scan to pick up what else it holds.`);
       } catch (e) {
         setError(userError(e));
       }
@@ -660,6 +688,14 @@ export default function Settings({
                         </li>
                       ))}
                     </ul>
+                  )}
+
+                  {mergeOffer && (
+                    <MergeOffer
+                      offer={mergeOffer}
+                      onMerge={() => void merge(mergeOffer)}
+                      onCancel={() => setMergeOffer(null)}
+                    />
                   )}
 
                   <div className="settings-row">
@@ -1334,6 +1370,7 @@ export default function Settings({
               <>
                 <section className="settings-section">
                   <h2>Updates</h2>
+                  {version && <p className="settings-intro">This is Kinema {version}.</p>}
                   {update && (
                     <div className="settings-update">
                       <strong>Kinema {update.version} is available.</strong>

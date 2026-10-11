@@ -11,6 +11,13 @@ makes no stability promises.
 
 ### Added
 
+- **Kinema says which version it is.** Settings → Advanced → Updates now
+  begins with "This is Kinema 0.10.0".
+- **A folder that holds folders you already added can be merged.** Adding a
+  parent folder used to be refused with a note to remove the others first, which
+  would have forgotten what was watched in them. Kinema now offers to merge them
+  into it, on the first run and in Settings: their films and shows, matches
+  and watch history stay exactly as they are.
 - **Android, as an early version (beta).** Kinema now runs on Android TV
   boxes, installed by hand from the release's `.apk` (sideloaded); the same
   file installs on a phone, which has not been tried yet.
@@ -82,6 +89,12 @@ makes no stability promises.
 
 ### Fixed
 
+- **The "Skip to the scene after the credits" card came up long before the
+  credits.** On one big recent film it appeared thirteen minutes early, over
+  the ending: two community databases disagreed about where the credits start,
+  and Kinema took the earlier time from one and the scene from the other. A
+  scene now brings the credits start of the service that timed it, so the card
+  shows when those credits begin. Credits measured on your own file still win.
 - **Android: a Blu-ray remux with many subtitle tracks stalled.** A film
   with 18 or more picture-subtitle tracks from a network share stopped five
   to seven times in under two minutes, because reading the film waited on

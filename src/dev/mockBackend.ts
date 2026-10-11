@@ -1013,6 +1013,19 @@ const handlers: Record<string, Handler> = {
     emptyLibrary.path = String(a.path ?? emptyLibrary.path);
     return 1;
   },
+  // `kinemaMockMerge=1`: the picked folder holds two TV folders already added.
+  library_roots_inside: (a) =>
+    flag('kinemaMockMerge') === '1' && String(a.path ?? '')
+      ? [
+          { id: 11, path: String(a.path) + '/Shows A', kind: 'tv', file_count: 12 },
+          { id: 12, path: String(a.path) + '/Shows B', kind: 'tv', file_count: 8 },
+        ]
+      : [],
+  merge_library_roots: (a) => {
+    emptyLibrary.hasRoot = true;
+    emptyLibrary.path = String(a.path ?? emptyLibrary.path);
+    return 13;
+  },
   remove_library_root: () => null,
   list_media_files: () => [],
 
@@ -1331,6 +1344,7 @@ const handlers: Record<string, Handler> = {
   'plugin:event|listen': (a) => listen(String(a.event), Number(a.handler)),
   // Android's Back button (backButton.ts): counted, so a check can see who
   // asked for it.
+  'plugin:app|version': () => '0.0.0-mock',
   'plugin:app|register_listener': (a) => {
     backListeners.push(String(a.event));
     return null;

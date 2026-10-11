@@ -149,10 +149,128 @@ jobs:
           name: linux-${{ matrix.os }}
           path: dist-linux/*
 
+  android:
+    # The signed release APK, for sideloading on a TV box or a phone. Built
+    # for 64-bit and 32-bit ARM (the boxes and phones; many TV boxes run a
+    # 32-bit Android even on a 64-bit chip). The x86-64 build in ci.yml is for
+    # the emulator and is not shipped. Signed with Kinema's own key, kept as
+    # repository secrets (ANDROID_KEYSTORE_BASE64 is the .p12 file in base64);
+    # the same key must sign every release or phones refuse to update.
+    runs-on: ubuntu-24.04
+
+    env:
+      # Pinned with ci.yml and scripts/android-bench.sh.
+      NDK_VERSION: 28.2.13676358
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install the Android NDK
+        run: |
+          echo y | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;$NDK_VERSION" > /dev/null
+          echo "NDK_HOME=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Every key the desktop jobs get, and the signing key. The desktop jobs
+      # let all but TMDB's be missing; the Android release does not, so a
+      # forgotten secret stops it instead of shipping an app without Trakt.
+      - name: Check every key is set
+        env:
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          SIMKL_CLIENT_ID: ${{ secrets.SIMKL_CLIENT_ID }}
+          TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
+          TRAKT_CLIENT_SECRET: ${{ secrets.TRAKT_CLIENT_SECRET }}
+          OPENSUBTITLES_API_KEY: ${{ secrets.OPENSUBTITLES_API_KEY }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          missing=0
+          for name in TMDB_API_KEY SIMKL_CLIENT_ID TRAKT_CLIENT_ID TRAKT_CLIENT_SECRET OPENSUBTITLES_API_KEY ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD; do
+            if [ -z "${!name}" ]; then echo "The $name repository secret is not set."; missing=1; fi
+          done
+          exit $missing
+
+      - name: Restore the signing key
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/kinema-release.p12"
+          echo "KINEMA_KEYSTORE_FILE=$RUNNER_TEMP/kinema-release.p12" >> "$GITHUB_ENV"
+
+      # The version code comes from the version (0.10.0 -> 10000), so it
+      # rises with every release.
+      - name: Build the signed app
+        env:
+          VITE_TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          KINEMA_SIMKL_CLIENT_ID: ${{ secrets.SIMKL_CLIENT_ID }}
+          KINEMA_TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
+          KINEMA_TRAKT_CLIENT_SECRET: ${{ secrets.TRAKT_CLIENT_SECRET }}
+          KINEMA_OPENSUBTITLES_API_KEY: ${{ secrets.OPENSUBTITLES_API_KEY }}
+          KINEMA_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KINEMA_KEY_ALIAS: kinema
+        run: npx tauri android build --target aarch64 --target armv7 --apk
+
+      # Looks inside the finished APK: signed with our key, and each built-in
+      # key really compiled in (the TMDB key lives in the page bundle, the
+      # others in the native library). Only names are printed, never values.
+      - name: Check the APK
+        env:
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          SIMKL_CLIENT_ID: ${{ secrets.SIMKL_CLIENT_ID }}
+          TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
+          TRAKT_CLIENT_SECRET: ${{ secrets.TRAKT_CLIENT_SECRET }}
+          OPENSUBTITLES_API_KEY: ${{ secrets.OPENSUBTITLES_API_KEY }}
+        run: |
+          apk=$(ls src-tauri/gen/android/app/build/outputs/apk/universal/release/*.apk)
+          echo "APK: $apk"
+          apksigner=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$apksigner" verify --print-certs "$apk" | grep -E "certificate (DN|SHA-256)" | head -2
+          "$apksigner" verify "$apk"
+          fail=0
+          unzip -p "$apk" 'assets/*' | grep -aqF -- "$TMDB_API_KEY" && echo "TMDB_API_KEY: in the page bundle" || { echo "TMDB_API_KEY: NOT in the APK"; fail=1; }
+          for name in SIMKL_CLIENT_ID TRAKT_CLIENT_ID TRAKT_CLIENT_SECRET OPENSUBTITLES_API_KEY; do
+            for abi in arm64-v8a armeabi-v7a; do
+              unzip -p "$apk" "lib/$abi/*.so" | grep -aqF -- "${!name}" && echo "$name: in lib/$abi" || { echo "$name: NOT in lib/$abi"; fail=1; }
+            done
+          done
+          exit $fail
+
+      - name: Package
+        run: |
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          mkdir -p out
+          cp src-tauri/gen/android/app/build/outputs/apk/universal/release/*.apk "out/kinema-$version-android.apk"
+          cd out && sha256sum "kinema-$version-android.apk" > "kinema-$version-android.apk.sha256"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: android
+          path: out/*
+
   publish:
     # Only for a pushed tag; a run started by hand stops at the artifacts.
     if: github.event_name == 'push'
-    needs: [windows, linux]
+    needs: [windows, linux, android]
     runs-on: ubuntu-24.04
 
     steps:
@@ -221,6 +339,15 @@ jobs:
             install. HDR on Wayland needs mpv 0.40 or later — Ubuntu 26.04,
             Debian 13, Fedora 43 and Arch have it. Each file has a `.sha256`
             beside it to check the download with `sha256sum -c`.
+
+            ## Android (early version)
+
+            For TV boxes and phones, installed by hand (sideloaded): download
+            `kinema-${{ env.VERSION }}-android.apk`, copy it to the device and
+            open it (Android asks once to allow installs from that source).
+            It is an early version: see the README for what has been tested
+            and what is still missing. Check the download with
+            `sha256sum -c kinema-${{ env.VERSION }}-android.apk.sha256`.
 
             ## First run
 

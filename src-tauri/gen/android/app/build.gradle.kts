@@ -24,6 +24,20 @@ android {
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
         versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")
     }
+    // Kinema's release key, handed in by release.yml through the environment
+    // (the keystore file itself is never in the repository). Without it the
+    // release build is simply unsigned, as a build from source is.
+    val releaseKeystore = System.getenv("KINEMA_KEYSTORE_FILE")
+    signingConfigs {
+        if (!releaseKeystore.isNullOrEmpty()) {
+            create("release") {
+                storeFile = file(releaseKeystore)
+                storePassword = System.getenv("KINEMA_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KINEMA_KEY_ALIAS")
+                keyPassword = System.getenv("KINEMA_KEYSTORE_PASSWORD")
+            }
+        }
+    }
     buildTypes {
         getByName("debug") {
             manifestPlaceholders["usesCleartextTraffic"] = "true"
@@ -37,6 +51,7 @@ android {
             }
         }
         getByName("release") {
+            signingConfigs.findByName("release")?.let { signingConfig = it }
             isMinifyEnabled = true
             proguardFiles(
                 *fileTree(".") { include("**/*.pro") }

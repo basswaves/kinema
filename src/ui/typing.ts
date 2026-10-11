@@ -80,24 +80,19 @@ export function useTypingFocus(
   }, [focused, ref, screenKeyboard]);
 
   // The visible area shrinking while this field has the caret: a keyboard
-  // came up over the page. On a desktop only when the window itself kept its
-  // size (Windows' touch keyboard over the page), so making the window
-  // smaller by hand while typing does not move the page.
+  // came up over the page. A window made smaller by hand looks the same from
+  // here, and Windows' touch keyboard does shrink the window, so both count;
+  // the box only moves to where it can be seen.
   useEffect(() => {
     const input = ref.current;
     if (!focused || !input) return;
     const visual = window.visualViewport;
     const height = () => visual?.height ?? window.innerHeight;
     let last = height();
-    let lastWindow = window.innerHeight;
     const check = () => {
       const now = height();
-      const windowKept = window.innerHeight === lastWindow;
-      if (now < last - 1 && (screenKeyboard || windowKept) && document.activeElement === input) {
-        placeForTyping(input);
-      }
+      if (now < last - 1 && document.activeElement === input) placeForTyping(input);
       last = now;
-      lastWindow = window.innerHeight;
     };
     visual?.addEventListener('resize', check);
     window.addEventListener('resize', check);
@@ -106,7 +101,7 @@ export function useTypingFocus(
       window.removeEventListener('resize', check);
       releaseTypingRoom(input);
     };
-  }, [focused, ref, screenKeyboard]);
+  }, [focused, ref]);
 
   return (event) => {
     const input = ref.current;

@@ -15,7 +15,8 @@ remote. Close it and nothing is left running.
 x86-64 and ARM) or **Android TV** (an early version, installed by hand) ·
 [Install](#install) · [What it does](#what-it-does) ·
 [Platform support](#platform-support) ·
-[Give feedback](#testing-it-and-giving-feedback)
+[Give feedback](#testing-it-and-giving-feedback) ·
+[Website](https://basswaves.github.io/kinema/)
 
 ![Kinema's home screen: a full-width backdrop for a title from the library, with rails of posters beneath it](docs/images/home.jpg)
 
@@ -521,7 +522,9 @@ distribution, desktop and graphics card is how it gets fixed.
 
 Kinema is tested on a small number of setups, and it is built to fall back
 safely where it cannot test, so reports from other equipment are what shapes
-what comes next. Three kinds are welcome, all through
+what comes next. A question, or a story about how it went, is welcome in
+[Discussions](https://github.com/Basswaves/kinema/discussions). Three kinds of
+report are welcome through
 [Issues](https://github.com/Basswaves/kinema/issues/new/choose):
 
 - **A bug**, with the logs — [bug report](https://github.com/Basswaves/kinema/issues/new?template=bug_report.yml).

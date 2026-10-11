@@ -1,0 +1,722 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kinema – free media library &amp; player, no server needed</title>
+<meta name="description" content="Free Netflix-style library and player for the movies and shows on your disk or NAS. 4K HDR, Dolby Vision and Atmos set up for you. No server, no account.">
+<link rel="canonical" href="https://basswaves.github.io/kinema/">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta name="theme-color" content="#0a0a0c">
+<meta name="color-scheme" content="dark">
+
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-48.png" type="image/png" sizes="48x48">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Kinema">
+<meta property="og:title" content="Kinema – free media library &amp; player, no server needed">
+<meta property="og:description" content="Netflix-style browsing for the movies and shows already on your disk or NAS, with the picture and sound set up right for your own screen. No server, no account, no settings maze.">
+<meta property="og:url" content="https://basswaves.github.io/kinema/">
+<meta property="og:image" content="https://basswaves.github.io/kinema/img/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Kinema's home screen: a full-width backdrop with rails of film posters beneath it">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Kinema – free media library &amp; player, no server needed">
+<meta name="twitter:description" content="Netflix-style browsing for the films on your disk or NAS, with picture and sound set up right. Free, open source, no server.">
+<meta name="twitter:image" content="https://basswaves.github.io/kinema/img/og.jpg">
+
+<link rel="preload" as="image" href="img/home.webp" type="image/webp" fetchpriority="high">
+
+<script>document.documentElement.className+=" js"</script>
+<style>
+:root{
+  --bg:#0a0a0c; --bg-2:#101014; --card:#15151a; --card-2:#1b1b21;
+  --line:rgba(255,255,255,.09); --line-2:rgba(255,255,255,.17);
+  --text:#f4f4f6; --muted:#a8a8b3; --dim:#7d7d89;
+  --red:#e50914; --red-text:#ff5c61; --amber:#f2b84b; --green:#52c996;
+  --maxw:1180px; --r:18px;
+  --sans:"Segoe UI Variable Display","Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"Cascadia Mono",SFMono-Regular,Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:84px;-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:400 1.0625rem/1.65 var(--sans);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+img{display:block;max-width:100%;height:auto}
+a{color:inherit}
+h1,h2,h3{margin:0;font-weight:800;letter-spacing:-.03em;line-height:1.08}
+p{margin:0}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 clamp(18px,4vw,32px)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.skip{position:absolute;left:12px;top:-60px;z-index:100;background:#fff;color:#000;padding:10px 16px;border-radius:10px;font-weight:700;text-decoration:none}
+.skip:focus{top:12px}
+:focus-visible{outline:3px solid #fff;outline-offset:3px;border-radius:6px}
+
+/* ───────── header: the page is the seek bar ───────── */
+.top{position:sticky;top:0;z-index:50;background:rgba(10,10,12,.78);-webkit-backdrop-filter:blur(14px) saturate(1.4);backdrop-filter:blur(14px) saturate(1.4);border-bottom:1px solid var(--line)}
+.bar{display:flex;align-items:center;gap:clamp(12px,2.4vw,28px);height:64px}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;font-weight:800;font-size:1.25rem;letter-spacing:-.02em;color:var(--red)}
+.brand svg{width:30px;height:30px}
+.top nav{display:flex;gap:clamp(14px,2vw,26px);margin-left:auto}
+.top nav a{font-size:.94rem;color:var(--muted);text-decoration:none;padding:6px 2px}
+.top nav a:hover{color:var(--text)}
+.tc{font:500 .78rem var(--mono);color:var(--dim);letter-spacing:.04em;min-width:15ch;text-align:right}
+.seek{position:absolute;left:0;right:0;bottom:-1px;height:3px;background:rgba(255,255,255,.07)}
+.seek i{display:block;height:100%;width:0;background:var(--red);position:relative}
+.seek i::after{content:"";position:absolute;right:-6px;top:50%;width:12px;height:12px;margin-top:-6px;border-radius:50%;background:var(--red);box-shadow:0 0 0 4px rgba(229,9,20,.25)}
+@media (max-width:900px){.tc{display:none}.top nav{display:none}.bar{justify-content:space-between}}
+
+/* ───────── buttons ───────── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;font:700 1rem var(--sans);padding:15px 26px;border-radius:12px;text-decoration:none;border:1px solid transparent;transition:transform .15s,background .15s,border-color .15s,box-shadow .15s;cursor:pointer}
+.btn.primary{background:var(--red);color:#fff;box-shadow:0 10px 34px -8px rgba(229,9,20,.65)}
+.btn.primary:hover{background:#ff1f2b;transform:translateY(-2px)}
+.btn.ghost{background:rgba(255,255,255,.05);border-color:var(--line-2);color:var(--text)}
+.btn.ghost:hover{background:rgba(255,255,255,.1);transform:translateY(-2px)}
+.btn.small{padding:9px 16px;font-size:.9rem;border-radius:10px}
+.btn svg{width:18px;height:18px}
+
+/* ───────── hero ───────── */
+.hero{position:relative;overflow:hidden;padding:clamp(48px,8vw,96px) 0 0;text-align:center;isolation:isolate}
+.hero::before{content:"";position:absolute;inset:0;z-index:-2;background:radial-gradient(70% 55% at 50% -5%,rgba(229,9,20,.26),transparent 70%),radial-gradient(40% 40% at 85% 40%,rgba(229,9,20,.08),transparent 70%)}
+.hero::after{content:"";position:absolute;inset:0;z-index:-1;opacity:.1;pointer-events:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .55 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")}
+.eyebrow{display:inline-flex;gap:10px;align-items:center;font:600 .78rem var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding:7px 14px;border:1px solid var(--line-2);border-radius:99px;background:rgba(255,255,255,.04)}
+.eyebrow b{width:7px;height:7px;border-radius:50%;background:var(--red);box-shadow:0 0 12px var(--red)}
+.hero h1{font-size:clamp(2.9rem,9.2vw,6.6rem);letter-spacing:-.045em;line-height:.98;margin:26px auto 0;max-width:13ch}
+.hero h1 .r{background:linear-gradient(100deg,#ff4a52,#e50914 55%,#b5070f);-webkit-background-clip:text;background-clip:text;color:transparent}
+.lede{max-width:46rem;margin:28px auto 0;font-size:clamp(1.08rem,2.1vw,1.3rem);color:#d2d2da;line-height:1.55}
+.cta{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin-top:36px}
+.meta{margin-top:20px;font-size:.9rem;color:var(--dim)}
+.screen{position:relative;margin:clamp(40px,6vw,72px) auto 0;max-width:1060px;perspective:1800px}
+.frame{position:relative;border-radius:18px;overflow:hidden;border:1px solid var(--line-2);background:#000;
+  box-shadow:0 60px 140px -30px rgba(229,9,20,.45),0 30px 80px rgba(0,0,0,.7);
+  transform:rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg));transition:transform .18s ease-out}
+.frame img{width:100%}
+.frame::after{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 1px 0 rgba(255,255,255,.18);pointer-events:none}
+.pills{position:relative;display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:-22px;padding-bottom:clamp(36px,5vw,56px)}
+.pills span{font:600 .9rem var(--sans);padding:10px 18px;border-radius:99px;background:rgba(21,21,26,.92);border:1px solid var(--line-2);box-shadow:0 12px 30px rgba(0,0,0,.5);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.pills span i{font-style:normal;color:var(--red-text);margin-right:6px}
+
+/* ───────── film strip ───────── */
+.strip{position:relative;background:#0d0d10;border-block:1px solid var(--line);padding:38px 0}
+.strip::before,.strip::after{content:"";position:absolute;left:0;right:0;height:9px;background:repeating-linear-gradient(90deg,transparent 0 12px,#25252c 12px 26px,transparent 26px 38px)}
+.strip::before{top:10px}.strip::after{bottom:10px}
+.strip ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;justify-content:center;gap:10px 0;font:600 .82rem var(--mono);letter-spacing:.14em;text-transform:uppercase;color:#c9c9d2}
+.strip li{padding:0 22px;position:relative}
+.strip li+li::before{content:"";position:absolute;left:-2px;top:50%;width:4px;height:4px;margin-top:-2px;background:var(--red);border-radius:50%}
+
+/* ───────── sections ───────── */
+section{padding:clamp(64px,10vw,120px) 0}
+.chap{display:flex;align-items:center;gap:14px;font:600 .78rem var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--red-text);margin-bottom:18px}
+.chap::after{content:"";flex:0 0 56px;height:1px;background:var(--red)}
+h2{font-size:clamp(2rem,5vw,3.4rem);max-width:20ch}
+.intro{max-width:44rem;margin-top:22px;color:#cfcfd8;font-size:1.15rem}
+.intro+.intro{margin-top:14px}
+
+/* why */
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:48px}
+.card{position:relative;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:26px 24px 28px}
+.card .tag{font:600 .72rem var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.card h3{font-size:1.4rem;margin:10px 0 12px}
+.card p{color:var(--muted);font-size:.98rem;line-height:1.6}
+.card.us{background:linear-gradient(180deg,rgba(229,9,20,.2),rgba(229,9,20,.05) 60%),var(--card);border-color:rgba(229,9,20,.55);box-shadow:0 24px 70px -24px rgba(229,9,20,.55)}
+.card.us .tag{color:var(--red-text)}
+.card.us p{color:#e4e4ea}
+@media (max-width:1020px){.cards{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:620px){.cards{grid-template-columns:1fr}}
+
+.scroll{overflow-x:auto;margin-top:56px;border:1px solid var(--line);border-radius:var(--r);background:var(--card)}
+.cmp{width:100%;min-width:760px;border-collapse:collapse;font-size:.96rem}
+.cmp caption{text-align:left;padding:20px 22px 6px;font:600 .78rem var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.cmp th,.cmp td{padding:15px 18px;text-align:left;border-top:1px solid var(--line);vertical-align:top}
+.cmp thead th{border-top:0;font-size:.95rem;color:var(--muted);font-weight:700}
+.cmp tbody th{font-weight:600;color:var(--text);width:26%}
+.cmp td{color:var(--muted)}
+.cmp td::before{display:inline-block;width:1.4em;font-weight:800}
+.cmp .yes{color:#dff6ea}.cmp .yes::before{content:"✓";color:var(--green)}
+.cmp .part{color:#f6e6c4}.cmp .part::before{content:"◐";color:var(--amber)}
+.cmp .no{color:#cbbfc0}.cmp .no::before{content:"✕";color:#e0656b}
+.cmp .us{background:rgba(229,9,20,.09);border-left:1px solid rgba(229,9,20,.35);border-right:1px solid rgba(229,9,20,.35)}
+.cmp thead th.us{color:#fff;font-size:1.05rem;border-top:3px solid var(--red)}
+.fine{margin-top:16px;font-size:.88rem;color:var(--dim);max-width:52rem}
+
+/* setup */
+.split{display:grid;grid-template-columns:1.12fr .88fr;gap:clamp(32px,6vw,80px);align-items:start;margin-top:12px}
+.ticks{list-style:none;padding:0;margin:34px 0 0;display:grid;gap:20px}
+.ticks li{display:grid;grid-template-columns:36px 1fr;gap:16px}
+.ticks .n{width:36px;height:36px;border-radius:10px;background:rgba(229,9,20,.14);border:1px solid rgba(229,9,20,.5);display:grid;place-items:center;font:700 .85rem var(--mono);color:var(--red-text)}
+.ticks b{display:block;font-size:1.08rem;margin-bottom:2px}
+.ticks span{color:var(--muted);font-size:1rem}
+.quote{margin:44px 0 0;padding:22px 0 0 24px;border-left:3px solid var(--red);font-size:1.28rem;line-height:1.45;font-weight:600;letter-spacing:-.01em}
+.quote small{display:block;margin-top:10px;font:400 .95rem var(--sans);color:var(--muted);letter-spacing:0}
+.stats{position:relative;border-radius:var(--r);border:1px solid var(--line-2);overflow:hidden;background:#06060a;box-shadow:0 40px 90px -30px rgba(0,0,0,.9)}
+.stats .head{display:flex;justify-content:space-between;gap:12px;padding:12px 16px;font:600 .72rem var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--line);background:#0b0b0f}
+.stats .head kbd{font:inherit;color:var(--text);background:rgba(255,255,255,.1);padding:1px 7px;border-radius:5px}
+.stats .shot{max-height:640px;overflow:hidden;-webkit-mask-image:linear-gradient(#000 78%,transparent);mask-image:linear-gradient(#000 78%,transparent)}
+.stats img{width:100%}
+@media (max-width:900px){.split{grid-template-columns:1fr}.stats{max-width:520px}}
+
+/* look */
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:clamp(18px,3vw,32px);margin-top:48px}
+.duo figure{margin:0}
+.duo .frame{transform:none}
+.duo figcaption{margin-top:16px;color:var(--muted);font-size:.98rem}
+.duo figcaption b{color:var(--text)}
+@media (max-width:820px){.duo{grid-template-columns:1fr}}
+
+/* features */
+.feat{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;margin-top:48px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.feat div{background:var(--bg-2);padding:28px 26px 30px;transition:background .2s}
+.feat div:hover{background:var(--card-2)}
+.feat .k{font:600 .75rem var(--mono);color:var(--red-text);letter-spacing:.12em}
+.feat h3{font-size:1.2rem;margin:10px 0 8px;letter-spacing:-.02em}
+.feat p{color:var(--muted);font-size:.97rem;line-height:1.6}
+@media (max-width:980px){.feat{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:620px){.feat{grid-template-columns:1fr}}
+
+/* for you */
+.fit{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:48px}
+.fit>div{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:30px 28px}
+.fit .yes{border-top:3px solid var(--green)}
+.fit .nope{border-top:3px solid #6b6b78}
+.fit h3{font-size:1.5rem;margin-bottom:6px}
+.fit .sub{color:var(--muted);margin-bottom:18px}
+.fit ul{list-style:none;margin:0;padding:0;display:grid;gap:16px}
+.fit li{padding-left:28px;position:relative;color:var(--muted);font-size:1rem}
+.fit li b{color:var(--text)}
+.fit li::before{position:absolute;left:0;top:0;font-weight:800}
+.fit .yes li::before{content:"✓";color:var(--green)}
+.fit .nope li::before{content:"–";color:#9a9aa6}
+@media (max-width:820px){.fit{grid-template-columns:1fr}}
+
+/* made */
+.made{background:linear-gradient(180deg,var(--bg-2),var(--bg));border-block:1px solid var(--line)}
+.checks{list-style:none;padding:0;margin:30px 0 0;display:grid;grid-template-columns:repeat(2,1fr);gap:14px 28px;max-width:62rem}
+.checks li{padding-left:30px;position:relative;color:#d6d6de}
+.checks li::before{content:"";position:absolute;left:0;top:.5em;width:14px;height:8px;border-left:3px solid var(--red);border-bottom:3px solid var(--red);transform:rotate(-45deg) translateY(-3px)}
+.checks a{color:#fff}
+@media (max-width:760px){.checks{grid-template-columns:1fr}}
+
+/* download */
+.dl{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:48px}
+.dl article{position:relative;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:30px 26px 28px;display:flex;flex-direction:column}
+.dl h3{font-size:1.55rem}
+.dl .sub{font:600 .75rem var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin:6px 0 16px}
+.dl p{color:var(--muted);font-size:.97rem;margin-bottom:12px}
+.dl .btn{margin-top:auto;align-self:stretch}
+.dl article:has(.btn){padding-bottom:26px}
+.dl .rec{display:none;position:absolute;top:-12px;left:22px;background:var(--red);color:#fff;font:700 .7rem var(--mono);letter-spacing:.1em;text-transform:uppercase;padding:4px 10px;border-radius:99px}
+html[data-os="windows"] .dl [data-for="windows"],html[data-os="linux"] .dl [data-for="linux"],html[data-os="android"] .dl [data-for="android"]{border-color:rgba(229,9,20,.6);box-shadow:0 24px 70px -26px rgba(229,9,20,.6)}
+html[data-os="windows"] [data-for="windows"] .rec,html[data-os="linux"] [data-for="linux"] .rec,html[data-os="android"] [data-for="android"] .rec{display:block}
+@media (max-width:980px){.dl{grid-template-columns:1fr}.dl .btn{margin-top:12px}}
+
+/* faq */
+.faq{margin-top:44px;max-width:52rem;border-top:1px solid var(--line)}
+.faq details{border-bottom:1px solid var(--line)}
+.faq summary{list-style:none;cursor:pointer;padding:22px 44px 22px 0;font-weight:700;font-size:1.12rem;letter-spacing:-.01em;position:relative}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"+";position:absolute;right:6px;top:18px;font:300 1.9rem/1 var(--sans);color:var(--red-text);transition:transform .2s}
+.faq details[open] summary::after{transform:rotate(45deg)}
+.faq .a{padding:0 44px 24px 0;color:var(--muted)}
+.faq .a a{color:#fff}
+
+/* footer */
+footer{border-top:1px solid var(--line);padding:56px 0 64px;color:var(--dim);font-size:.9rem}
+.foot{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:36px}
+footer h4{margin:0 0 12px;font:600 .74rem var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+footer ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+footer a{text-decoration:none;color:#c2c2cc}
+footer a:hover{color:#fff;text-decoration:underline}
+footer .brand{margin-bottom:12px}
+footer .legal{grid-column:1/-1;border-top:1px solid var(--line);padding-top:24px;line-height:1.6;max-width:62rem}
+@media (max-width:760px){.foot{grid-template-columns:1fr}}
+
+/* reveal */
+.js .rv{opacity:0;transform:translateY(22px);transition:opacity .7s ease,transform .7s ease}
+.js .rv.in{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .js .rv{opacity:1;transform:none;transition:none}
+  .frame{transition:none}
+  .btn{transition:none}
+}
+</style>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Kinema",
+  "url": "https://basswaves.github.io/kinema/",
+  "description": "A free, open-source, Netflix-style media library and video player for the movies and TV shows already on your disk or NAS. It sets up picture and sound for your screen and receiver, and needs no server and no account.",
+  "applicationCategory": "MultimediaApplication",
+  "applicationSubCategory": "Media library and video player",
+  "operatingSystem": "Windows 11, Linux, Android TV",
+  "isAccessibleForFree": true,
+  "license": "https://opensource.org/license/mit",
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
+  "downloadUrl": "https://github.com/basswaves/kinema/releases/latest",
+  "installUrl": "https://github.com/basswaves/kinema/releases/latest",
+  "codeRepository": "https://github.com/basswaves/kinema",
+  "screenshot": [
+    "https://basswaves.github.io/kinema/img/home.webp",
+    "https://basswaves.github.io/kinema/img/detail.webp",
+    "https://basswaves.github.io/kinema/img/player.webp"
+  ],
+  "featureList": [
+    "Netflix-style browsing of local movies and TV shows",
+    "No media server and no account",
+    "4K HDR, Dolby Vision, Atmos, DTS-HD and TrueHD playback",
+    "Screen refresh rate and HDR matched to the film",
+    "Intro, recap and credits skipping",
+    "Subtitles in your language, with online search",
+    "Mouse, keyboard and TV remote control"
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What is Kinema?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Kinema is a free, open-source media library and video player for Windows 11, Linux and Android TV. It scans the folders where you keep your movies and TV shows, on a local drive, a USB drive or a NAS, finds posters and descriptions, remembers where you stopped, and plays everything through mpv (through Android's own media player on Android TV)."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is Kinema really free?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. It is MIT-licensed open source, with no premium tier, no subscription and no ads, and it will stay free and open source."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Do I need a media server like Plex or Jellyfin?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. Kinema is one program: there is nothing to host or keep updated, and when you close it nothing is left running. The other side of that is that a film plays on the device Kinema runs on; it does not stream to your other devices."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is Kinema a good Kodi alternative?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "If you like what Kodi does for your own files but not the effort of skinning, tuning and learning its settings, yes: Kinema gives you a library that looks good and plays right out of the box. If you rely on Kodi add-ons for streaming services, no. Kinema plays only the files you own."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does it play 4K HDR, Dolby Vision, Atmos, DTS-HD and TrueHD?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. On a screen that supports HDR it shows HDR, and on one that does not it converts the picture to look as close to SDR as it can. Atmos, DTS:X and TrueHD can be sent untouched to a receiver that takes them. If a Dolby Vision file needs a decoder your setup does not have, Kinema plays the HDR10 base layer and says so, rather than claiming a picture it did not show. A playback details panel (press i) shows what is really happening."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Which systems does it run on?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Windows 11, Linux (Ubuntu 24.04 or later, Debian 13 and Fedora through packages, other distributions through a folder, on x86-64 and ARM) and Android TV, which is an early version installed by hand. macOS is not available yet."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Do I need an account or an internet connection?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No account. Posters and descriptions come from TMDB through a key Kinema carries, and once fetched they are kept on your device, so browsing works offline. SIMKL, Trakt and OpenSubtitles are optional and stay off until you connect them."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does Kinema collect data about me?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No accounts, no telemetry, no analytics. Kinema asks metadata services about the titles in your library, and asks GitHub once per launch for the latest version number (you can turn that off in Settings). The full list of what it connects to is in SECURITY.md."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Will it change or move my files?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. Your files are only read, never renamed, moved or written to. The one exception is an optional export of .nfo files that you have to press yourself."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Windows says “Windows protected your PC”. Is that a problem?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "It appears once because Kinema is not code-signed, which needs a paid certificate. It is the same box any small program from an independent developer shows, and it does not mean something was found. Click More info, then Run anyway. Every release publishes a checksum beside the ZIP so you can check the file is the one that was published."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Was Kinema made with AI?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. It is built by one person together with Claude, Anthropic's AI coding assistant, which writes the code under the author's direction. The checking is out in the open: automated tests on every change, scripted sessions through the real app and player, and every design decision written down with its reasons."
+      }
+    }
+  ]
+}
+</script>
+</head>
+
+<body id="top">
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="top">
+  <div class="wrap bar">
+    <a class="brand" href="#top" aria-label="Kinema, back to the top">
+      <svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="112" fill="#0a0a0c" stroke="#26262c" stroke-width="10"/><rect x="102" y="104" width="104" height="304" rx="12" fill="#fff"/><g fill="#0a0a0c"><rect x="116" y="124" width="20" height="26" rx="4"/><rect x="116" y="192" width="20" height="26" rx="4"/><rect x="116" y="260" width="20" height="26" rx="4"/><rect x="116" y="328" width="20" height="26" rx="4"/><rect x="172" y="124" width="20" height="26" rx="4"/><rect x="172" y="192" width="20" height="26" rx="4"/><rect x="172" y="260" width="20" height="26" rx="4"/><rect x="172" y="328" width="20" height="26" rx="4"/></g><path d="M222 256 L342 104 L410 104 L290 256 L410 408 L342 408 Z" fill="#e50914"/></svg>
+      <span>Kinema</span>
+    </a>
+    <nav aria-label="Main">
+      <a href="#why">Why Kinema</a>
+      <a href="#setup">Sets itself up</a>
+      <a href="#for-you">Is it for you?</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <span class="tc" id="tc" aria-hidden="true">0:00:00 / 1:58:59</span>
+    <a class="btn small primary" data-dl href="https://github.com/basswaves/kinema/releases/latest">Download</a>
+  </div>
+  <div class="seek" aria-hidden="true"><i id="seekfill"></i></div>
+</header>
+
+<main id="main">
+
+<!-- ───────────── hero ───────────── -->
+<section class="hero" style="padding-bottom:0">
+  <div class="wrap">
+    <p class="eyebrow"><b></b>Free local media library &amp; video player</p>
+    <h1>Your films. <span class="r">Set up right,</span> by itself.</h1>
+    <p class="lede">Kinema is a free, open-source, Netflix-style library and player for the movies and shows already on your disk or NAS. It finds the posters, remembers where you stopped, and gets the picture and sound right for your screen and speakers, with <strong>no server, no account and no settings maze</strong>.</p>
+    <div class="cta">
+      <a class="btn primary" data-dl href="https://github.com/basswaves/kinema/releases/latest">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 20h16"/></svg>
+        <span data-dl-text>Download</span>
+      </a>
+      <a class="btn ghost" href="#why">Why Kinema?</a>
+    </div>
+    <p class="meta">Free and open source (MIT) · Windows 11 · Linux · Android TV (early version)</p>
+
+    <div class="screen" id="screen">
+      <div class="frame">
+        <img src="img/home.webp" width="1600" height="1000" fetchpriority="high" decoding="async"
+             alt="Kinema's home screen: a full-width backdrop for a film in the library, with a Play button, and a rail of recently added film posters beneath it">
+      </div>
+    </div>
+    <div class="pills" aria-label="Highlights">
+      <span><i>●</i>No server</span>
+      <span><i>●</i>No account</span>
+      <span><i>●</i>Mouse, keyboard or remote</span>
+      <span><i>●</i>24p, HDR and Atmos set up for you</span>
+    </div>
+  </div>
+</section>
+
+<div class="strip" aria-label="What it plays">
+  <ul>
+    <li>4K HDR</li><li>Dolby Vision</li><li>Atmos</li><li>DTS-HD</li><li>TrueHD</li><li>24p</li><li>NAS &amp; USB</li><li>Remuxes</li>
+  </ul>
+</div>
+
+<!-- ───────────── why ───────────── -->
+<section id="why">
+  <div class="wrap">
+    <p class="chap rv">01 · Why Kinema</p>
+    <h2 class="rv">The missing middle between VLC, Kodi and Plex.</h2>
+    <p class="intro rv">Most people who keep their own video files end up choosing between three kinds of program, each good at one thing. Kinema is a Kodi and Plex alternative for people who would rather just press play.</p>
+
+    <div class="cards">
+      <div class="card rv">
+        <span class="tag">Plays anything</span>
+        <h3>VLC &amp; MPC-HC</h3>
+        <p>They just work, which is why so many people never leave them. But you get a file browser with a player in it: no posters, no “continue watching”, no next episode, no Skip intro.</p>
+      </div>
+      <div class="card rv">
+        <span class="tag">Tuned to perfection</span>
+        <h3>Kodi</h3>
+        <p>No server, plays almost anything and can be tuned to do exactly what you want. It can also be clunky to find your way around, its many settings are a lot for a newcomer, and the best-looking skins are heavy, so they can make it sluggish, most of all on a modest PC or a TV box.</p>
+      </div>
+      <div class="card rv">
+        <span class="tag">Looks the part</span>
+        <h3>Plex &amp; Jellyfin</h3>
+        <p>They close the gap, but only once a server is running somewhere and somebody keeps it maintained.</p>
+      </div>
+      <div class="card us rv">
+        <span class="tag">The one in between</span>
+        <h3>Kinema</h3>
+        <p>The library and polish of a streaming app, the “press play and it works” of VLC, and no server. One program that looks good out of the box, with nothing to host, skin or maintain, and stays quick on a TV box as well as a big PC.</p>
+      </div>
+    </div>
+
+    <div class="scroll rv" role="region" aria-label="Comparison table" tabindex="0">
+      <table class="cmp">
+        <caption>At a glance</caption>
+        <thead>
+          <tr><th scope="col"><span class="sr">Feature</span></th><th scope="col">VLC &amp; MPC-HC</th><th scope="col">Kodi</th><th scope="col">Plex &amp; Jellyfin</th><th scope="col" class="us">Kinema</th></tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">Needs no server</th><td class="yes">Yes</td><td class="yes">Yes</td><td class="no">No, a server has to run</td><td class="yes us">Yes</td></tr>
+          <tr><th scope="row">Library with posters, resume and next episode</th><td class="part">Basic</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes us">Yes</td></tr>
+          <tr><th scope="row">Looks like a streaming app out of the box</th><td class="no">No</td><td class="part">With a skin</td><td class="yes">Yes</td><td class="yes us">Yes</td></tr>
+          <tr><th scope="row">Plays your files as they are, with no transcoding</th><td class="yes">Yes</td><td class="yes">Yes</td><td class="part">Usually, otherwise transcoded</td><td class="yes us">Yes</td></tr>
+          <tr><th scope="row">Refresh rate, HDR and receiver sound set up for you</th><td class="no">By hand</td><td class="no">By hand</td><td class="part">Depends on the client app</td><td class="yes us">Yes, from what your equipment reports</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="fine rv">A simplified view from the author's own experience. Each of these is a good program that does its job well; Kinema is built to fill the gap between them, not to replace what any of them does best.</p>
+  </div>
+</section>
+
+<!-- ───────────── sets itself up ───────────── -->
+<section id="setup" style="background:linear-gradient(180deg,var(--bg),var(--bg-2));border-block:1px solid var(--line)">
+  <div class="wrap">
+    <p class="chap rv">02 · It sets itself up</p>
+    <h2 class="rv">You don't need to know what 24p is.</h2>
+    <div class="split">
+      <div>
+        <p class="intro rv">Getting a film to look and sound right at home depends on things most people have never heard of: whether the screen switches to the film's 24 frames a second or shows it with judder, whether HDR is on, which sound formats the receiver can take untouched, which subtitles should show. Enthusiasts spend hours on this in MPC-HC or Kodi. Everyone else never does, and gets a picture or sound that is a little wrong without ever knowing.</p>
+        <p class="intro rv"><strong>Kinema asks your equipment what it can do, and sets things up from the answer.</strong></p>
+        <ul class="ticks rv">
+          <li><span class="n">01</span><div><b>The screen matches the film</b><span>Its refresh rate for smooth 24p, and HDR switched on for an HDR film.</span></div></li>
+          <li><span class="n">02</span><div><b>Atmos, DTS:X and TrueHD go to a receiver untouched</b><span>When the receiver takes them.</span></div></li>
+          <li><span class="n">03</span><div><b>Subtitles in your language</b><span>When the sound is in another, and none when it is not.</span></div></li>
+          <li><span class="n">04</span><div><b>A film is never matched to the wrong title</b><span>When Kinema is not sure, it puts the file aside for you to check instead of guessing.</span></div></li>
+        </ul>
+        <p class="intro rv">You answer a few plain questions once, on the first run, each with what it gives and what it costs, and each skippable. If you know what all this means, the setup is the part you get to skip, and the details are one key away.</p>
+        <blockquote class="quote rv">There is no quality preset to fiddle with, on purpose: the right choice depends on the film and the screen, and Kinema already knows both.<small>Nothing is invented either: no machine-learning upscaling that makes up detail the master never had, and no frame interpolation that makes up frames.</small></blockquote>
+      </div>
+      <figure class="stats rv" style="margin:0">
+        <div class="head"><span>Playback details</span><span>press <kbd>i</kbd> while watching</span></div>
+        <div class="shot"><img src="img/stats.webp" width="623" height="1310" loading="lazy" decoding="async"
+          alt="Kinema's playback details panel: output check, source, display and rendering sections listing the real refresh rate, frame cadence, scaler and colour pipeline"></div>
+        <figcaption class="sr">The playback details panel reports what is really happening: the display's measured refresh rate, the frame cadence, which scaler ran and why, and the colour pipeline end to end. It reports rather than flatters.</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────── look ───────────── -->
+<section id="look">
+  <div class="wrap">
+    <p class="chap rv">03 · What it looks like</p>
+    <h2 class="rv">Browse like a streaming app. Know what you're playing.</h2>
+    <div class="duo">
+      <figure class="rv">
+        <div class="frame"><img src="img/detail.webp" width="1400" height="875" loading="lazy" decoding="async"
+          alt="A film's detail page: poster, description, IMDb, Rotten Tomatoes and TMDB scores, badges for resolution, Dolby Vision profile, HDR format, sound format, frame rate and aspect ratio, and a row of cast portraits"></div>
+        <figcaption><b>Badges that say what the file really holds</b>: resolution, Dolby Vision profile, HDR, the exact sound format, frame rate and an aspect ratio measured from the picture itself, beside scores and cast.</figcaption>
+      </figure>
+      <figure class="rv">
+        <div class="frame"><img src="img/player.webp" width="1400" height="875" loading="lazy" decoding="async"
+          alt="The player: a seek bar, transport buttons, volume and an Audio and subtitles button, with the list of audio tracks open on the right"></div>
+        <figcaption><b>A player that stays out of the way</b>: seek bar, audio and subtitles, volume, and when the film will end. It works the same with a remote, a keyboard or a mouse.</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────── features ───────────── -->
+<section id="features" style="padding-top:0">
+  <div class="wrap">
+    <p class="chap rv">04 · What it does</p>
+    <h2 class="rv">Everything a media library should, and nothing to maintain.</h2>
+    <div class="feat">
+      <div class="rv"><span class="k">01</span><h3>Finds your movies and shows</h3><p>Walks the folders you point it at: a local drive, a USB drive or a NAS share. It reads file names, never file contents, so scanning a NAS stays cheap.</p></div>
+      <div class="rv"><span class="k">02</span><h3>Refuses to guess</h3><p>A match it is not confident about goes to a review queue with the reason, rather than silently attaching the wrong movie to your file.</p></div>
+      <div class="rv"><span class="k">03</span><h3>Remembers where you were</h3><p>Per file, and offers the next episode. Posters show what you have watched.</p></div>
+      <div class="rv"><span class="k">04</span><h3>Skips intros, recaps and credits</h3><p>From community databases, chapter markers, or by comparing a season's audio. Where a film has a scene after its credits, Skip takes you straight to it.</p></div>
+      <div class="rv"><span class="k">05</span><h3>Subtitles that fit</h3><p>In your language when the audio is in another, forced subtitles for foreign lines, and online search when a file has none in yours.</p></div>
+      <div class="rv"><span class="k">06</span><h3>Plays through mpv</h3><p>Hardware decoding, HDR tone mapping, PGS subtitles and 4K remuxes. On Android it uses Android's own media player, which takes Dolby Vision and receiver sound from the system.</p></div>
+      <div class="rv"><span class="k">07</span><h3>Works from the sofa</h3><p>Browsing, search with an on-screen keyboard, playing, subtitles and resume all work with a D-pad. The TV layout fills the screen with bigger text.</p></div>
+      <div class="rv"><span class="k">08</span><h3>Yours, and offline</h3><p>Posters and descriptions are cached locally. No account, no telemetry, and a weekly safety copy of your watch history and resume points.</p></div>
+      <div class="rv"><span class="k">09</span><h3>Tracks what you watch, if you want</h3><p>Connect SIMKL or Trakt and what you finish is added to your account. Nothing else is sent, and it stays off until you connect it.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────── for you ───────────── -->
+<section id="for-you" style="padding-top:0">
+  <div class="wrap">
+    <p class="chap rv">05 · Is it for you?</p>
+    <h2 class="rv">An honest answer, in both directions.</h2>
+    <div class="fit">
+      <div class="yes rv">
+        <h3>Yes, if you…</h3>
+        <p class="sub">…keep your own movies and shows as files on a PC, a laptop plugged into the TV, a Linux box or an Android TV box, and want them to look and sound right without it becoming a project.</p>
+        <ul>
+          <li><b>Never wondered what a refresh rate or a sound format has to do with a film</b>, and should not have to. Kinema sets it up, so the picture and sound are what the film's makers meant, on the equipment you have.</li>
+          <li><b>Know exactly what they are</b>, have spent evenings in a config file for them, and would rather have them just work. Kinema does what you would have configured, shows its working, and gives the evenings back.</li>
+        </ul>
+      </div>
+      <div class="nope rv">
+        <h3>Probably not, if you want…</h3>
+        <p class="sub">Better to know before you download.</p>
+        <ul>
+          <li><b>Your library on every screen in the house, or on the road.</b> With no server, a film plays on the device Kinema runs on. Several devices can read the same NAS, but each keeps its own library and its own place in a film.</li>
+          <li><b>Streaming-service apps or an add-on store.</b> Kinema plays the files you own. Keeping that kind of thing working is a job of its own, and Kinema is built to run for years without one.</li>
+          <li><b>A tuning bench.</b> If you enjoy comparing upscalers and writing shader chains, Kinema takes those decisions away on purpose: no quality presets, no machine-learning upscaling, no frame interpolation.</li>
+          <li><b>Apple TV, iPhone or iPad.</b> Not planned. A Mac version is possible one day, with no promise attached.</li>
+          <li><b>Something to pay for.</b> Kinema is free and open source, and will stay that way: no premium tier, no subscription, no “unlock 4K” button. If paying is how you know software is good, we are sorry; there is nobody to hand the money to.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────── made ───────────── -->
+<section id="made" class="made">
+  <div class="wrap">
+    <p class="chap rv">06 · Who makes it</p>
+    <h2 class="rv">Built with an AI assistant. Checked in the open.</h2>
+    <p class="intro rv">Kinema is built by one person together with Claude, Anthropic's AI coding assistant, which writes the code under the author's direction; the author decides what Kinema is, and what it deliberately is not. A project made that way has to earn trust differently, so the checking is out in the open.</p>
+    <ul class="checks rv">
+      <li>Automated tests run on every change, on Windows and Linux (x86-64 and ARM).</li>
+      <li>Scripts run the real app and the real player through scripted sessions, not just the parts in isolation.</li>
+      <li>Every design decision is written down with its reasons in <a href="https://github.com/basswaves/kinema/blob/master/docs/HISTORY.md">HISTORY</a>, and every trap found along the way in <a href="https://github.com/basswaves/kinema/blob/master/docs/GOTCHAS.md">GOTCHAS</a>.</li>
+      <li>It is MIT-licensed and <a href="https://github.com/basswaves/kinema">all of it is on GitHub</a> to read.</li>
+    </ul>
+    <p class="intro rv">It is an early project, tested on a small number of setups. <a href="https://github.com/basswaves/kinema/discussions" style="color:#fff">Reports from yours</a>, working or not, are what shapes it.</p>
+  </div>
+</section>
+
+<!-- ───────────── download ───────────── -->
+<section id="download">
+  <div class="wrap">
+    <p class="chap rv">07 · Download</p>
+    <h2 class="rv">Free. Pick your system.</h2>
+    <p class="intro rv">Every release is on GitHub, with a checksum beside each file so you can check it is the one that was published.</p>
+    <div class="dl">
+      <article data-for="windows" class="rv">
+        <span class="rec">Your system</span>
+        <h3>Windows 11</h3>
+        <div class="sub">ZIP · no installer</div>
+        <p>Extract it anywhere and run <code>kinema.exe</code>. Deleting the folder uninstalls it.</p>
+        <p>Windows asks once (“Windows protected your PC”) because Kinema is not code-signed, which is the same box any small independent program gets. Click <b>More info</b>, then <b>Run anyway</b>.</p>
+        <a class="btn primary" href="https://github.com/basswaves/kinema/releases/latest">Get the Windows ZIP</a>
+      </article>
+      <article data-for="linux" class="rv">
+        <span class="rec">Your system</span>
+        <h3>Linux</h3>
+        <div class="sub">.deb · .rpm · folder · x86-64 &amp; ARM</div>
+        <p>Ubuntu 24.04 or later, Debian 13 and Fedora through the packages; other distributions through the folder. Kinema uses your system's mpv and WebKitGTK, and the package manager installs them.</p>
+        <p>HDR needs mpv 0.40 or later and a desktop and graphics driver that offer it; the playback details panel says which one is missing.</p>
+        <a class="btn primary" href="https://github.com/basswaves/kinema/releases/latest">Get the Linux packages</a>
+      </article>
+      <article data-for="android" class="rv">
+        <span class="rec">Your system</span>
+        <h3>Android TV</h3>
+        <div class="sub">APK · early version</div>
+        <p>An early version, installed by hand: copy the <code>.apk</code> to the box (a USB stick works) and open it. Android asks once to allow installs from that source.</p>
+        <p>Tried so far on one TV box and an emulator, so reports from other boxes are especially welcome.</p>
+        <a class="btn primary" href="https://github.com/basswaves/kinema/releases/latest">Get the Android APK</a>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────── faq ───────────── -->
+<section id="faq" style="padding-top:0">
+  <div class="wrap">
+    <p class="chap rv">08 · Questions</p>
+    <h2 class="rv">Frequently asked questions.</h2>
+    <div class="faq rv">
+      <details><summary>What is Kinema?</summary><div class="a">Kinema is a free, open-source media library and video player for Windows 11, Linux and Android TV. It scans the folders where you keep your movies and TV shows, on a local drive, a USB drive or a NAS, finds posters and descriptions, remembers where you stopped, and plays everything through mpv (through Android's own media player on Android TV).</div></details>
+      <details><summary>Is Kinema really free?</summary><div class="a">Yes. It is MIT-licensed open source, with no premium tier, no subscription and no ads, and it will stay free and open source.</div></details>
+      <details><summary>Do I need a media server like Plex or Jellyfin?</summary><div class="a">No. Kinema is one program: there is nothing to host or keep updated, and when you close it nothing is left running. The other side of that is that a film plays on the device Kinema runs on; it does not stream to your other devices.</div></details>
+      <details><summary>Is Kinema a good Kodi alternative?</summary><div class="a">If you like what Kodi does for your own files but not the effort of skinning, tuning and learning its settings, yes: Kinema gives you a library that looks good and plays right out of the box. If you rely on Kodi add-ons for streaming services, no. Kinema plays only the files you own.</div></details>
+      <details><summary>Does it play 4K HDR, Dolby Vision, Atmos, DTS-HD and TrueHD?</summary><div class="a">Yes. On a screen that supports HDR it shows HDR, and on one that does not it converts the picture to look as close to SDR as it can. Atmos, DTS:X and TrueHD can be sent untouched to a receiver that takes them. If a Dolby Vision file needs a decoder your setup does not have, Kinema plays the HDR10 base layer and says so, rather than claiming a picture it did not show. A playback details panel (press <kbd>i</kbd>) shows what is really happening.</div></details>
+      <details><summary>Which systems does it run on?</summary><div class="a">Windows 11, Linux (Ubuntu 24.04 or later, Debian 13 and Fedora through packages, other distributions through a folder, on x86-64 and ARM) and Android TV, which is an early version installed by hand. macOS is not available yet.</div></details>
+      <details><summary>Do I need an account or an internet connection?</summary><div class="a">No account. Posters and descriptions come from TMDB through a key Kinema carries, and once fetched they are kept on your device, so browsing works offline. SIMKL, Trakt and OpenSubtitles are optional and stay off until you connect them.</div></details>
+      <details><summary>Does Kinema collect data about me?</summary><div class="a">No accounts, no telemetry, no analytics. Kinema asks metadata services about the titles in your library, and asks GitHub once per launch for the latest version number (you can turn that off in Settings). The full list of what it connects to is in <a href="https://github.com/basswaves/kinema/blob/master/SECURITY.md">SECURITY.md</a>.</div></details>
+      <details><summary>Will it change or move my files?</summary><div class="a">No. Your files are only read, never renamed, moved or written to. The one exception is an optional export of .nfo files that you have to press yourself.</div></details>
+      <details><summary>Windows says “Windows protected your PC”. Is that a problem?</summary><div class="a">It appears once because Kinema is not code-signed, which needs a paid certificate. It is the same box any small program from an independent developer shows, and it does not mean something was found. Click More info, then Run anyway. Every release publishes a checksum beside the ZIP so you can check the file is the one that was published.</div></details>
+      <details><summary>Was Kinema made with AI?</summary><div class="a">Yes. It is built by one person together with Claude, Anthropic's AI coding assistant, which writes the code under the author's direction. The checking is out in the open: automated tests on every change, scripted sessions through the real app and player, and every design decision written down with its reasons.</div></details>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <div>
+      <a class="brand" href="#top"><svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="112" fill="#0a0a0c" stroke="#26262c" stroke-width="10"/><rect x="102" y="104" width="104" height="304" rx="12" fill="#fff"/><path d="M222 256 L342 104 L410 104 L290 256 L410 408 L342 408 Z" fill="#e50914"/></svg><span>Kinema</span></a>
+      <p>A free local media library and video player. MIT licence. This page loads nothing from other sites and has no analytics.</p>
+    </div>
+    <div>
+      <h4>Project</h4>
+      <ul>
+        <li><a href="https://github.com/basswaves/kinema">Source on GitHub</a></li>
+        <li><a href="https://github.com/basswaves/kinema/releases/latest">Latest release</a></li>
+        <li><a href="https://github.com/basswaves/kinema/blob/master/CHANGELOG.md">Changelog</a></li>
+        <li><a href="https://github.com/basswaves/kinema/blob/master/docs/ROADMAP.md">Roadmap</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Help &amp; feedback</h4>
+      <ul>
+        <li><a href="https://github.com/basswaves/kinema/discussions">Discussions</a></li>
+        <li><a href="https://github.com/basswaves/kinema/issues/new/choose">Report a bug or a device</a></li>
+        <li><a href="https://github.com/basswaves/kinema/blob/master/SECURITY.md">Security &amp; privacy</a></li>
+        <li><a href="https://github.com/basswaves/kinema/blob/master/CONTRIBUTING.md">Contributing</a></li>
+      </ul>
+    </div>
+    <p class="legal">This product uses the TMDB API but is not endorsed or certified by TMDB. Kodi, Plex, Jellyfin, VLC, MPC-HC, Dolby, Dolby Vision, Dolby Atmos, DTS and other names are trademarks of their respective owners; Kinema is not affiliated with or endorsed by any of them, and names them only to say what it works with or is compared to. Film posters and artwork in the screenshots belong to their owners.</p>
+  </div>
+</footer>
+
+<script>
+(function(){
+  var html=document.documentElement, ua=navigator.userAgent||"";
+  /* highlight the download that fits this device */
+  var os=/Android/i.test(ua)?"android":/Windows/i.test(ua)?"windows":/Linux|X11/i.test(ua)?"linux":"";
+  if(os){
+    html.setAttribute("data-os",os);
+    var label={windows:"Windows",linux:"Linux",android:"Android"}[os];
+    var t=document.querySelector("[data-dl-text]"); if(t)t.textContent="Download for "+label;
+    var s=document.querySelector(".top [data-dl]"); if(s)s.textContent="Download for "+label;
+  }
+  /* the page is the seek bar */
+  var fill=document.getElementById("seekfill"), tc=document.getElementById("tc"), total=7139, tick=false;
+  function f(n){var h=Math.floor(n/3600),m=Math.floor(n%3600/60),s=Math.floor(n%60);return h+":"+(m<10?"0":"")+m+":"+(s<10?"0":"")+s}
+  function upd(){
+    tick=false;
+    var max=html.scrollHeight-window.innerHeight, p=max>0?Math.min(1,Math.max(0,window.scrollY/max)):0;
+    fill.style.width=(p*100)+"%";
+    tc.textContent=f(p*total)+" / "+f(total);
+  }
+  window.addEventListener("scroll",function(){if(!tick){tick=true;requestAnimationFrame(upd)}},{passive:true});
+  window.addEventListener("resize",upd); upd();
+  /* a little tilt on the hero screen */
+  var box=document.getElementById("screen"), fr=box&&box.querySelector(".frame");
+  if(fr&&window.matchMedia("(hover:hover) and (prefers-reduced-motion:no-preference)").matches){
+    box.addEventListener("pointermove",function(e){
+      var r=box.getBoundingClientRect(), x=(e.clientX-r.left)/r.width-.5, y=(e.clientY-r.top)/r.height-.5;
+      fr.style.setProperty("--ry",(x*5)+"deg"); fr.style.setProperty("--rx",(-y*4)+"deg");
+    });
+    box.addEventListener("pointerleave",function(){fr.style.setProperty("--ry","0deg");fr.style.setProperty("--rx","0deg")});
+  }
+  /* reveal on scroll */
+  var els=document.querySelectorAll(".rv");
+  if("IntersectionObserver" in window){
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add("in");io.unobserve(e.target)}})},{rootMargin:"0px 0px -8% 0px",threshold:.08});
+    els.forEach(function(el){io.observe(el)});
+  } else { els.forEach(function(el){el.classList.add("in")}); }
+})();
+</script>
+</body>
+</html>

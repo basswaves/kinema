@@ -36,10 +36,11 @@ export function writeReports(
     JSON.stringify({ generatedBy: 'e2e/navmap.nav.ts', viewport: '1920x1080, TV mode on', engines: byEngine }, null, 1)
   );
   const primary = byEngine.edge ? 'edge' : byEngine.webkit ? 'webkit' : engine;
-  // Against the expected answer: every engine that has results, but only this engine's differences fail the run.
-  const expectedMoves = readExpected();
-  const differences: Record<string, string[]> = {};
-  for (const [e, list] of Object.entries(byEngine)) differences[e] = compare(expectedMoves, list, filter, e);
+  // Against the expected answer: this engine's run only. The other engine's
+  // file on disk may be from an older or differently filtered run.
+  const differences: Record<string, string[]> = {
+    [engine]: compare(readExpected(), byEngine[engine] ?? [], filter, engine),
+  };
   for (const d of differences[engine] ?? []) console.log(`DIFFERENT  ${d}`);
   writeFileSync(join(dir, 'NAV-MAP.generated.md'), markdown(primary, byEngine, differences));
   return differences[engine] ?? [];

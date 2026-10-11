@@ -33,9 +33,12 @@ interface Props {
   /** `why`: the line under the title saying why it is here (search). */
   entries: { title: Title; why?: string | null }[];
   onSelect: (title: Title) => void;
+  /** Arriving from above lands on the first card, not the one last on: the
+   *  shelf, under its order buttons (NAV-MAP, agreed 2026-10-11). */
+  fromAboveFirst?: boolean;
 }
 
-export default function CardGrid({ name, entries, onSelect }: Props) {
+export default function CardGrid({ name, entries, onSelect, fromAboveFirst = false }: Props) {
   const keys = useMemo(() => entries.map(({ title }) => `${name}:${title.id}`), [entries, name]);
   const positions = useMemo(() => new Map(keys.map((key, index) => [key, index])), [keys]);
 
@@ -54,10 +57,9 @@ export default function CardGrid({ name, entries, onSelect }: Props) {
 
   const { ref, focusKey } = useFocusable<object, HTMLDivElement>({
     focusKey: `${name}-cards`,
-    // Arriving from above lands on the first card, whichever order button or
-    // key it came from (NAV-MAP, agreed 2026-10-11). Back from a film's page
-    // finds its card by key (`grid:7`), not by remembering.
-    saveLastFocusedChild: false,
+    // Back from a film's page finds its card by key (`grid:7`), not by
+    // remembering, so the shelf can afford to forget.
+    saveLastFocusedChild: !fromAboveFirst,
     // A group with no cards is nowhere to move to — see Rail.tsx.
     focusable: entries.length > 0,
     // When the card last on is gone (a filter), the first one, not a search

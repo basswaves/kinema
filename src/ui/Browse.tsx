@@ -17,6 +17,7 @@ import {
   type FocusableComponent,
 } from '@noriginmedia/norigin-spatial-navigation';
 import Home, { HERO_PLAY_FOCUS_KEY } from './Home';
+import { SCAN_OK_KEY } from './HomeNotices';
 import TitleDetailView from './TitleDetail';
 import CardGrid from './CardGrid';
 import FocusButton from './FocusButton';
@@ -199,9 +200,12 @@ export default function Browse() {
   const [reviewCount, setReviewCount] = useState(0);
   const scanTrouble = scanFailed ?? describeScanTrouble(scanErrors, reviewCount > 0);
   const dismissScanTrouble = useCallback(() => {
-    // OK takes its own notice away: the ring goes to Play first, so the
-    // library's own restore does not pick a neighbour by itself.
-    if (doesFocusableExist(HERO_PLAY_FOCUS_KEY)) void setFocus(HERO_PLAY_FOCUS_KEY);
+    // OK by remote takes its own notice away: the ring goes to Play first, so
+    // the library's own restore does not pick a neighbour by itself. A click
+    // with the ring elsewhere leaves it there.
+    if (getCurrentFocusKey() === SCAN_OK_KEY && doesFocusableExist(HERO_PLAY_FOCUS_KEY)) {
+      void setFocus(HERO_PLAY_FOCUS_KEY);
+    }
     setScanFailed(null);
     setScanErrors([]);
   }, []);
@@ -940,7 +944,7 @@ function GridView({
         {titles.length > 0 && shown.length === 0 && (
           <p className="muted">Everything here has been watched. Switch off “Unwatched only” to see it all.</p>
         )}
-        <CardGrid name="grid" entries={entries} onSelect={onSelect} />
+        <CardGrid name="grid" entries={entries} onSelect={onSelect} fromAboveFirst />
       </div>
     </FocusContext.Provider>
   );

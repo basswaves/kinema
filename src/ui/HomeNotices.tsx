@@ -24,6 +24,9 @@ import { count } from './format';
 import type { Upgrade } from './qualityNotice';
 import type { ScanTrouble } from './scanTrouble';
 
+/** The startup scan notice's OK, so OK by remote can tell it was pressed there. */
+export const SCAN_OK_KEY = 'notice-scan-ok';
+
 interface Props {
   /** The startup scan's problems, in words (scanTrouble.ts); null when none. */
   scanTrouble: ScanTrouble | null;
@@ -64,7 +67,7 @@ export default function HomeNotices({
   // the first time lands on the top notice's button, not on whichever is
   // nearest the left edge.
   const first = scanTrouble
-    ? 'notice-scan-ok'
+    ? SCAN_OK_KEY
     : keyRejected
       ? 'notice-tmdb-key'
       : reviewCount > 0
@@ -97,7 +100,7 @@ export default function HomeNotices({
               {scanTrouble.note && <span className="muted">. {scanTrouble.note}</span>}
             </div>
             <FocusButton
-              focusKey="notice-scan-ok"
+              focusKey={SCAN_OK_KEY}
               className="btn-secondary"
               keepInView="nearest"
               onSelect={onDismissScanTrouble}

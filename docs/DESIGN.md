@@ -196,8 +196,8 @@ a NAS.
 
 ### Platforms
 
-Windows and Linux ship from the same code; each system is an addition beside
-the rest, not a branch through it, and Android is meant to be the next. Three
+Windows, Linux and Android (an early version since 0.10.0) ship from the same
+code; each system is an addition beside the rest, not a branch through it. Three
 seams:
 
 ```

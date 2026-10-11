@@ -1,7 +1,9 @@
 # Contributing
 
 Patches, bug reports and "I could not work out what this does" are all welcome.
-This file is what you need before writing code.
+This file is what you need before writing code. If you are not writing code,
+[Reporting, testing and feedback](#reporting-testing-and-feedback) is the part
+for you.
 
 ## Read this first
 
@@ -16,6 +18,30 @@ single most useful file in this repository.
 | [docs/DESIGN.md](docs/DESIGN.md) | Architecture, data flow, and the design decisions worth preserving |
 | [docs/HISTORY.md](docs/HISTORY.md) | How it was built, and *why each decision went the way it did* |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | What is next, what is not planned, and where help is wanted — a good place to start |
+
+## Reporting, testing and feedback
+
+Kinema is tested on a small number of setups and built to fall back safely
+where it cannot be tested, so reports from other equipment are as useful as
+patches. Through [Issues](https://github.com/Basswaves/kinema/issues/new/choose):
+
+- **A bug** — the [bug report](https://github.com/Basswaves/kinema/issues/new?template=bug_report.yml)
+  form asks for the two logs (`app.log`, and `mpv.log` for playback; on Android
+  Settings → Advanced → Developer tools → **Share the log**), the system, the
+  graphics card or device, and where the media is. Most problems here make no
+  visible error, only a log line.
+- **"I tried it on this device"** — the [device report](https://github.com/Basswaves/kinema/issues/new?template=device_report.yml)
+  form, for a box, phone, TV, receiver, desktop or library that has not been
+  tried. "It works" is as useful as "it does not".
+- **An idea** — the [feature request](https://github.com/Basswaves/kinema/issues/new?template=feature_request.yml)
+  form, after reading [the settled decisions](#settled-decisions--please-do-not-re-open).
+- **Something exploitable** — not an issue: [SECURITY.md](SECURITY.md).
+
+Android is an early version (since 0.10.0), tried on one TV box and the
+emulator, so reports from other boxes and phones are the most wanted. Bugs on
+one box or one desktop are fixed by making the code not need that box, not by
+adding code for it: see "On Linux, a stable base rather than a matrix" and "On Android, a
+stable base too" under [Settled decisions](#settled-decisions--please-do-not-re-open).
 
 ## Building
 
@@ -209,7 +235,7 @@ pushing, not instead of it.
 
 ### The Android test bench
 
-Android is under way. `scripts/android-bench.sh` runs Google's Android TV
+Android is an early version (since 0.10.0). `scripts/android-bench.sh` runs Google's Android TV
 emulator with no window — in WSL too, where `/dev/kvm` is available — and
 drives it from inside Android: the remote's buttons, typing, mouse clicks and
 the wheel, touches, photos of the screen and the system log. Nothing reaches
@@ -322,8 +348,8 @@ never ran, or ran and silently did nothing. Check for both by reflex:
 
 ## More than one platform
 
-Kinema runs on Windows and Linux, with Android under way, from one codebase, one
-`master` and one version. Three rules keep that from turning into several
+Kinema runs on Windows, Linux and Android (an early version since 0.10.0) from
+one codebase, one `master` and one version. Three rules keep that from turning into several
 programs:
 
 - **Ask what the device can do, never which system it is.** The interface

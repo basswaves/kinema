@@ -20,6 +20,7 @@ this project has been in for months, which is why they are separate.
 - [ ] `npm run build`
 - [ ] `cargo test --manifest-path src-tauri/Cargo.toml` and `cargo clippy` (if the change touches Rust)
 - [ ] `npm run test:ui` (if the change touches the interface)
+- [ ] Android: if it touches the player, storage, capabilities or anything under `src-tauri/gen/android`, CI's `android` job builds it; say whether it was tried on a box or the emulator (CONTRIBUTING, "The Android test bench")
 - [ ] Checked on Linux too (WSL is fine — CONTRIBUTING, "Checking Linux from Windows") if it touches the player, paths, file names or platform code
 - [ ] Tested in the real app, not only over HMR
 

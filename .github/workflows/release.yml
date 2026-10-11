@@ -344,12 +344,14 @@ jobs:
 
             ## Android (early version)
 
-            For TV boxes and phones, installed by hand (sideloaded): download
+            For Android TV boxes, installed by hand (sideloaded): download
             `kinema-${{ env.VERSION }}-android.apk`, copy it to the device and
             open it (Android asks once to allow installs from that source).
-            It is an early version: see the README for what has been tested
+            It is an early version, tried on one TV box and the emulator; a
+            phone has not been tried. See the README for what has been tested
             and what is still missing. Check the download with
-            `sha256sum -c kinema-${{ env.VERSION }}-android.apk.sha256`.
+            `sha256sum -c kinema-${{ env.VERSION }}-android.apk.sha256`; the
+            certificate it is signed with is named in the README.
 
             ## First run
 
@@ -362,5 +364,9 @@ jobs:
             ---
 
             The Windows ZIP bundles an unmodified LGPL build of libmpv, which
-            you may replace; on Linux the system's libmpv is used — see
-            [NOTICE.md](NOTICE.md).
+            you may replace; on Linux the system's libmpv is used; Android uses
+            Google's Media3 (Apache-2.0) — see [NOTICE.md](NOTICE.md).
+
+            Something not working, or it works on a device the README does not
+            list? Say so: [bug report](https://github.com/Basswaves/kinema/issues/new?template=bug_report.yml)
+            or [device report](https://github.com/Basswaves/kinema/issues/new?template=device_report.yml).

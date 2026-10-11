@@ -1,16 +1,40 @@
-# Kinema
+# Kinema — a free local media library and video player for Windows, Linux and Android TV
 
-A media library for the movies and TV shows already on your disk. It scans your
-folders, finds the artwork and descriptions, remembers where you stopped, and
-plays them — with no server, no account, and nothing running in the background.
+[![Latest release](https://img.shields.io/github/v/release/Basswaves/kinema)](https://github.com/Basswaves/kinema/releases/latest)
+[![Build](https://github.com/Basswaves/kinema/actions/workflows/ci.yml/badge.svg)](https://github.com/Basswaves/kinema/actions/workflows/ci.yml)
+[![Licence: MIT](https://img.shields.io/github/license/Basswaves/kinema)](LICENSE)
+
+Kinema is a free, open-source media library and video player for the movies and
+TV shows already on your disk or NAS. It scans your folders, finds posters and
+descriptions, remembers where you stopped, and plays everything — 4K HDR and
+Dolby Vision remuxes, Atmos, DTS-HD and TrueHD included — with **no server, no
+account, and nothing running in the background**. Netflix-style browsing with a
+mouse, a keyboard or a TV remote, for Windows 11, Linux, and Android TV boxes.
 
 Built because nothing existing fits. Every serverless option (Kodi) locks the
-interface into skin XML, and every good-looking option (Jellyfin Media Player)
-is a thin client that does nothing without a Jellyfin server running somewhere.
-Kinema is one program: close it and nothing is left running.
+interface into skin XML, and every good-looking option (Jellyfin Media Player,
+Plex) is a thin client that does nothing without a media server running
+somewhere. Kinema is one program: close it and nothing is left running.
 
-**Windows 11 and Linux**, and **Android TV as an early version (beta)**; see
-[Platform support](#platform-support).
+**[Download](https://github.com/Basswaves/kinema/releases/latest)** for
+**Windows 11** (a ZIP, no installer), **Linux** (`.deb`, `.rpm` or a folder,
+x86-64 and ARM) or **Android TV** (an early version, installed by hand). See
+[Install](#install) and [Platform support](#platform-support).
+
+## Try it
+
+1. Download the file for your system from the
+   [Releases](https://github.com/Basswaves/kinema/releases/latest) page and open
+   it ([Windows](#install), [Linux](#linux), [Android](#android)).
+2. Answer two questions — where you will watch, and which folder your films are
+   in. A local drive, a USB drive and a NAS share all work.
+3. Press **Scan my library**. Posters and descriptions arrive by themselves;
+   anything Kinema is not sure about is put aside for you to check, never
+   guessed.
+
+Nothing to sign up for, nothing left running, nothing written to your media.
+It is an early project made by one person: if something misbehaves on your
+equipment, [tell us](#when-something-goes-wrong) — that is how it gets better.
 
 ![Kinema's home screen: a full-width backdrop for a title from the library, with rails of posters beneath it](docs/images/home.jpg)
 
@@ -39,7 +63,12 @@ audio and subtitles, volume. Back steps back to wherever you came from.
   with the reason, rather than silently attaching the wrong movie to your file —
   and Home tells you when something is waiting there.
 - **Plays through mpv** — the same engine as the standalone player — with
-  hardware decoding, HDR tone mapping, PGS subtitles and 4K remuxes.
+  hardware decoding, HDR tone mapping, PGS subtitles and 4K remuxes. On
+  Android it plays through Android's own media player (Media3) instead, which
+  takes Dolby Vision and sound for a receiver straight from the system.
+- **Reads from a NAS or a USB drive** as easily as from a local disk: SMB
+  shares are browsed and signed in to from inside Kinema, and a share that is
+  switched off is left alone rather than treated as an empty library.
 - **Says what each file really holds.** A title's page shows the resolution,
   the Dolby Vision profile — with FEL or MEL — and HDR format, the exact sound
   format (TrueHD Atmos, DTS:X, DD+ Atmos), frame rate, bit depth and the aspect
@@ -158,6 +187,27 @@ SDR before it reaches it. On Hyprland, which switches HDR on by itself for a
 full-screen HDR film, add `bitdepth, 10` to the TV's monitor rule: without
 it HDR goes out at 8 bits per colour, and smooth gradients show bands.
 
+### Android
+
+Since 0.10.0, as an early version (beta), for Android TV boxes: download
+`kinema-<version>-android.apk` from the Releases page, copy it to the device (a
+USB stick works) and open it from a file manager. Android asks once to allow
+installs from that source, because Kinema is not from an app store. What has
+been tried and what is missing is under
+[Android (early version)](#android-early-version).
+
+The file is signed with Kinema's own key. To check it is the one that was
+published, compare the checksum beside it (`sha256sum -c`), and the certificate
+that signed it, which for every Kinema release is:
+
+```text
+SHA-256  92f709adbc5b3f64a41e4b31c9c94b28514cd1e389786acd2b2d2274db4dbf67
+```
+
+A different certificate means it is not from this project. Android refuses to
+update an app with one signed by another key, so a copy built elsewhere has to
+be removed first.
+
 ## First run
 
 The app opens on a welcome panel that asks two things, each answered in a
@@ -169,6 +219,11 @@ press:
   another at your TV shows if they live somewhere else. Local drives and
   network shares both work. Nothing is moved, renamed or written to — the
   files are only read.
+
+On Android there is no system folder picker on a TV, so Kinema shows its own:
+the device's storage, a USB drive, or a network drive (a NAS or a computer's
+shared folder, which it signs in to itself). The first time, Android asks to
+let Kinema read the files.
 
 Then press **Scan my library**. The first scan takes a few minutes on a large
 library, and while it runs Kinema asks the rest on a few short pages, each
@@ -209,6 +264,9 @@ without it that feature is skipped and everything else carries on.
 | **[ffmpeg](https://ffmpeg.org/download.html)** | Kinema's own intro and credits detection, by fingerprinting a season's audio; and the picture and sound badges on a title's page — resolution, Dolby Vision, HDR, Atmos, the measured aspect ratio | Intros and credits come from TheIntroDB and chapter markers only; a title's page keeps its source, studio, age rating and scores, without the picture and sound badges |
 | **[Skiptro](https://github.com/MikeSiLVO/skiptro-releases)** | A second, well-tuned intro detector that Kinema can run and read | The built-in detector handles it |
 | **An [OMDb key](https://www.omdbapi.com/apikey.aspx)** (free) | Rotten Tomatoes scores on a title's page, in Settings → Library. Kinema spends at most half of a free key's daily lookups | IMDb's and TMDB's scores only |
+
+These two are for Windows and Linux; Android has no way to run them, and its
+intro skips come from the two community databases below.
 
 Put ffmpeg on your `PATH`, or point Settings at it. Skiptro is configured the
 same way, at whatever path you installed it to — point Kinema at `skiptro.exe`,
@@ -277,9 +335,7 @@ code is arranged for one.
 
 ### Android (early version)
 
-Since 0.10.0, as a file to install by hand: download `kinema-X.Y.Z-android.apk`
-from the Releases page, copy it to the device and open it (Android asks once
-to allow installs from that source). It plays through Android's own media
+Installed by hand ([above](#android)). It plays through Android's own media
 player (Media3) rather than mpv, so Dolby Vision and sound passed straight to
 a receiver are Android's to do; Kinema shows what Android reports and, where
 sound will not open, falls back rather than not playing. The interface is
@@ -336,7 +392,9 @@ player or D-pad navigation.
 
 Kinema writes two logs to `%APPDATA%\com.kinema.app\logs\` on Windows and
 `~/.local/share/com.kinema.app/logs/` on Linux. The quickest way there is
-**Settings → Advanced → Developer tools → Open log folder**:
+**Settings → Advanced → Developer tools → Open log folder**. On Android there
+is no folder to open: the same place has **Share the log**, which sends the log
+to an app of your choice, such as mail or a cloud drive.
 
 - **`app.log`** — the app's own messages. The window's own console is
   invisible from outside the app, so this is where its errors go.
@@ -344,9 +402,10 @@ Kinema writes two logs to `%APPDATA%\com.kinema.app\logs\` on Windows and
   it records what actually happened in the render pipeline, not what was asked
   for.
 
-Attach both to a [bug report](https://github.com/Basswaves/kinema/issues/new/choose).
+Attach both to a [bug report](https://github.com/Basswaves/kinema/issues/new?template=bug_report.yml).
 They are the most useful thing you can send, and most problems here produce no
-visible error at all — only a log line.
+visible error at all — only a log line. Say which system, which device or
+graphics card, and where the media is (a local disk, a USB drive or a NAS).
 
 On Linux, Kinema is built to work the same everywhere rather than tested on
 every desktop, version and driver — there are too many for one person. It
@@ -354,6 +413,27 @@ uses the shared standards first and falls back safely: where it cannot ask a
 desktop to switch the screen, or a driver offers no HDR, the film still
 plays. If your setup still misbehaves, a bug report with the logs, your
 distribution, desktop and graphics card is how it gets fixed.
+
+## Testing it and giving feedback
+
+Kinema is tested on a small number of setups, and it is built to fall back
+safely where it cannot test, so reports from other equipment are what shapes
+what comes next. Three kinds are welcome, all through
+[Issues](https://github.com/Basswaves/kinema/issues/new/choose):
+
+- **A bug**, with the logs — [bug report](https://github.com/Basswaves/kinema/issues/new?template=bug_report.yml).
+- **"I tried it on this device"**, whether it worked or not — especially an
+  Android TV box or phone, a different TV or receiver, another Linux desktop,
+  or a very large library —
+  [device report](https://github.com/Basswaves/kinema/issues/new?template=device_report.yml).
+  A report that says "works" is as useful as one that says "broken".
+- **An idea**, as a [feature request](https://github.com/Basswaves/kinema/issues/new?template=feature_request.yml).
+  Read the settled decisions in [CONTRIBUTING.md](CONTRIBUTING.md) first: some
+  things are deliberately not done, and the reasons are written down.
+
+Code and documentation changes are welcome too; [CONTRIBUTING.md](CONTRIBUTING.md)
+says how to build, check and submit one. Anything exploitable goes to
+[SECURITY.md](SECURITY.md), not a public issue.
 
 ## Known limitations
 
@@ -383,8 +463,9 @@ distribution, desktop and graphics card is how it gets fixed.
 
 [MIT](LICENSE).
 
-Kinema links against libmpv, which is LGPL, and the release bundles an
-unmodified LGPL build of it that you are free to replace. It uses data from TMDB,
+Kinema links against libmpv, which is LGPL, and the Windows release bundles an
+unmodified LGPL build of it that you are free to replace. The Android version
+uses Google's Media3 player (Apache-2.0) instead. It uses data from TMDB,
 TVmaze, Wikidata, Wikipedia, TheIntroDB and IntroDB, each under their own terms. [NOTICE.md](NOTICE.md) has the
 detail.
 

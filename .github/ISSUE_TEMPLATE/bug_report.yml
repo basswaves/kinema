@@ -12,16 +12,35 @@ body:
 
         Open them from **Settings → Advanced → Developer tools → Open log folder**, or go
         to `%APPDATA%\com.kinema.app\logs\` (Windows) or
-        `~/.local/share/com.kinema.app/logs/` (Linux):
+        `~/.local/share/com.kinema.app/logs/` (Linux). On Android there is no
+        folder to open: use **Share the log** in the same place, and send it to
+        yourself by mail or a cloud drive:
 
         - `app.log` — the app's own messages, including what it found about
           your screen, receiver and graphics card at start
         - `mpv.log` — the player's, and the authority on anything about video
+          (Windows and Linux; on Android the player is Android's own, and
+          `app.log` says what it did)
+
+        Android is an early version, tried on very few devices, and reports from
+        other boxes and phones are what it needs: a bug here is welcome even if
+        you are not sure it is one.
 
         On Linux there are more desktops, versions and drivers than one person
         can test, so Kinema aims for a base that works everywhere and falls
         back safely where something is missing. A setup where it still
         misbehaves is exactly what this form is for.
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Which Kinema
+      options:
+        - Windows 11
+        - Linux
+        - Android
+    validations:
+      required: true
 
   - type: textarea
     id: what
@@ -55,6 +74,8 @@ body:
       description: >
         Windows: run `winver`, e.g. "Windows 11 Pro 24H2 (26100.2314)". Linux:
         the distribution and version, e.g. "Fedora 43", "Ubuntu 26.04", "Arch".
+        Android: the Android version and the device, from Settings → About,
+        e.g. "Android 9, a TV box".
     validations:
       required: true
 
@@ -77,9 +98,11 @@ body:
   - type: input
     id: gpu
     attributes:
-      label: GPU and driver version
+      label: GPU and driver version (Android: the device and its chip)
       description: >
-        Windows: Task Manager → Performance → GPU, or `dxdiag`. Linux: the
+        Android: the model and, if you know it, the chip (the box's maker usually
+        lists it), and the TV or receiver it is connected to. Windows: Task
+        Manager → Performance → GPU, or `dxdiag`. Linux: the
         "Driver info" line in `mpv.log` gives it (NVIDIA's version, or Mesa's).
         Playback behaviour differs between AMD, Intel and NVIDIA, and driver
         version matters more than you would think — on Linux, HDR needs NVIDIA
@@ -123,5 +146,6 @@ body:
         - Mouse and keyboard
         - Keyboard only
         - Remote / D-pad / gamepad
+        - Touch screen
     validations:
       required: true

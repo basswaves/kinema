@@ -9,6 +9,11 @@ makes no stability promises.
 
 ## [0.10.0] — 2026-10-11
 
+The first release with an Android TV version (an early version, below), and
+for Windows and Linux a lot of work on how the interface moves, how much the
+player keeps ready and how the library behaves while a film plays. The library
+is not upgraded (schema 22, as in 0.9.0).
+
 ### Added
 
 - **Kinema says which version it is.** Settings → Advanced → Updates now
@@ -23,14 +28,25 @@ makes no stability promises.
   file installs on a phone, which has not been tried yet.
   It has its own player engine (Media3) for Dolby Vision and sound passed
   straight through, the same library, matching, accounts and subtitles as
-  the desktop, network shares, and the same interface with a remote or
-  a keyboard. It has been tried on one TV box and on the Android TV
+  the desktop, network shares and USB drives, and the same interface with a
+  remote or a keyboard. In the player: volume and mute, the film's audio and
+  subtitle tracks to choose from (the choice is remembered for the title),
+  subtitles drawn the way mpv draws them on the desktop, subtitle files beside
+  the film found before it opens, and a details panel that says what Android
+  is doing. Blu-ray `.m2ts` files (1080p) play, with DTS-HD, TrueHD, E-AC-3 and
+  picture subtitles. It has been tried on one TV box and on the Android TV
   emulator only, and a few things are not there yet: the badges on a film's
   page, intro detection from the audio, and Blu-ray folders, disc images and
-  4K UHD `.m2ts` files (1080p `.m2ts` works, and a file that cannot be
-  opened here is said so before Play). Held keys and the on-screen keyboard
-  have not yet been checked on a real box. Reports from other devices are
-  welcome; the README says what is known.
+  4K UHD `.m2ts` files (a file that cannot be opened here is said so before
+  Play). Held keys and the on-screen keyboard have not yet been checked on a
+  real box. Reports from other devices are welcome; the README says what is
+  known.
+- **Android: a line under Play when a film is far heavier than the device's
+  video chip is made for.** When a file's average bitrate is more than twice
+  the highest Android reports for the device's hardware decoder, the page says
+  so ("Android says this device's video chip is made for up to 35 Mbit/s; this
+  film averages about 88 Mbit/s. It may stutter or show no picture."). It is
+  text only: nothing is blocked, and nothing like it shows on the desktop.
 - **Playback details without a keyboard.** The details panel ("Stats for
   nerds") opens from the end of Audio & subtitles, and on a remote's Info
   key where it has one, as well as on `i`. A remote moves through it group
@@ -53,10 +69,21 @@ makes no stability promises.
 
 - **The arrow keys go where you expect on every screen.** Each screen was
   checked arrow by arrow, for a remote, a keyboard and the mouse, on Windows,
-  Linux and Android: a group's heading stays clear of the top bar, a text box
-  rises above an on-screen or hardware keyboard so what you type stays in
-  sight, Search remembers the card you left from, and a checker now holds
-  every move in place so a later change cannot quietly move one.
+  Linux and Android, and every move was agreed. A checker now holds every move
+  in place, so a later change cannot quietly move one. In particular:
+  - A group's heading stays clear of the top bar when you move into it, and a
+    text box rises above an on-screen or hardware keyboard so what you type
+    stays in sight.
+  - Audio & subtitles keeps the focus inside it and goes round: Up from the top
+    option goes to the bottom one.
+  - A series' page opens on Play; Down from Back goes to Play; Up from an
+    episode and Down from Play land on the season that is being watched, and
+    "Mark season watched" is reached by Right from the last season.
+  - Opening a "needs attention" item scrolls down to what it opened, and the
+    Review button on Settings is in sight when Home sends you there.
+  - Home's notice after a scan can be dismissed with the remote's OK.
+  - Holding an arrow no longer queues up scrolling: the screen keeps up while
+    the key is held.
 - **Android: a bigger read-ahead and quicker skips on big films.** Kinema
   now reads ahead from the device's memory (a 4K remux from a USB drive was
   kept ready only about two seconds ahead, and is now about ten), and a skip
@@ -82,20 +109,28 @@ makes no stability promises.
   scrolling, and Home does not redraw everything when you come back to it
   unchanged. The player page does less while a film plays.
 - **Android: TMDB pictures are downloaded at TV size** (posters 500 pixels
-  wide, backdrops 1280, episode stills 780) rather than the original, for
-  pictures downloaded from now on; a 4K backdrop took about 33 MB of
+  wide, backdrops 1280, episode stills 780, and title logos) rather than the
+  original, for pictures downloaded from now on; a 4K backdrop took about 33 MB of
   memory. What is already downloaded is not touched, and Windows and Linux
   still fetch the originals.
 
+- **Behind the scenes.** The library database keeps its temporary tables in
+  memory and sizes its cache to the device's memory (about 2 MB on a device
+  with 2 GB or less, 8 MB above). The developer tools' library view loads only
+  when the panel is opened, and Kinema's own measuring tools gained playback
+  costs on Android, memory and leak samples. Nothing here shows on screen.
+
 ### Fixed
 
-- **Studio logos that are a dark plate with the name on it** (one film's
-  studio badge was a plain white rectangle) now show their name and artwork:
-  the plate is taken away and what stands out from it stays. Logos with a
-  see-through background are untouched. Two kinds of studio logo are known to
-  still look wrong: light lettering on a plate that is not a clean two-colour
-  design is left as it was (earlier, Marvel's was fixed), and the gold Warner
-  Bros. shield still shows as a plain white shape.
+- **Studio logos that lost their name.** Every studio logo is drawn in white,
+  which turned a logo that is a coloured plate with light lettering into one
+  white block. Light lettering on a clean two-colour plate (Marvel Studios') is
+  now cut out of the white, and a logo that is a solid dark plate with its name
+  on it (one film's studio badge was a plain white rectangle) has the plate
+  taken away so the name and artwork show. Logos with a see-through background
+  are untouched. Known to still look wrong: the gold Warner Bros. shield, which
+  shows as a plain white shape, and any plate logo that is not a clean
+  two-colour design.
 - **The "Skip to the scene after the credits" card came up long before the
   credits.** On one big recent film it appeared thirteen minutes early, over
   the ending: two community databases disagreed about where the credits start,
@@ -157,6 +192,23 @@ makes no stability promises.
   held — every press counted as a tap and the seek ran away: two seconds
   held went to the end of the film. A press while the button is still down,
   or faster than anyone taps, now counts as holding it.
+- **Wikipedia was often "busy".** Kinema asked Wikidata not to answer when its
+  separate query service lagged, which it did for long stretches, so nearly
+  every lookup was refused while the same request without the request was
+  answered at once. Kinema only reads, one request at a time and with its name
+  sent, and still waits when Wikimedia's servers say too many.
+- **Home kept saying films waited for Wikipedia** after they were matched by
+  hand, or after a TMDB key was added. The line now follows what still needs
+  review and is gone when nothing does.
+- **The focus ring could vanish on Home.** With the scan's notice showing, Up
+  from Play went to a hidden, empty shelf and the ring disappeared. Empty
+  shelves and notices can no longer be moved to.
+- **A series' page could land on the first episode instead of Play** on a slow
+  device, because Play appears only once the next episode is known. The page
+  now waits for it.
+- **Android: "No sound" flashed at every start** while the sound was playing
+  fine. The check that asks mpv whether the sound opened ran where mpv does not
+  exist, and counted the missing answer as a failure.
 - **The remote works straight after Scan on a slow device.** Reading the
   names of a first scan's files kept the whole interface busy in one go:
   on an old TV box, the setup pages ignored the remote for 15 to 20

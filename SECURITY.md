@@ -79,11 +79,28 @@ seriously, and you will be credited in the fix unless you would rather not be.
 
 The latest release, and `master`. There are no backports.
 
+## Android
+
+The Android version (since 0.10.0, an early version) is a file you install by
+hand, not from an app store, so Android asks once to allow installs from where
+you got it. It is signed with Kinema's own key; the certificate's SHA-256 is in
+the README, and a different one is not from this project. It asks for the
+network, and for read access to video files; on Android 11 and later it also
+asks for "All files access", which only lets it read subtitle files that sit
+beside a film (films play without it). It never writes to your media, does not
+run in the background and accepts no connections. Keys, sign-ins and the
+database live in the app's private storage, readable by Kinema alone unless the
+device is rooted. The same limits as on the desktop apply to what it sends and
+where (see above). Report a problem in it the same way.
+
 ## Things that are not vulnerabilities
 
 - **SmartScreen warns on the downloaded executable** (Windows). It is not code-signed.
   This is expected and documented in the README; verify the SHA-256 published
   with the release instead.
+- **Android asks to allow installs from an unknown source.** The `.apk` is not
+  from an app store. Verify the checksum and the signing certificate in the
+  README instead.
 - **API keys are readable in the local database.** They are stored in plain text
   in your own app data folder, deliberately — anything reversible on the same
   machine would be obfuscation, not encryption. Treat the database as being as

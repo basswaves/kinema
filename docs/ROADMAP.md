@@ -96,6 +96,12 @@ tried on a small number of setups. Reports — from `app.log` and `mpv.log`
 (Settings → Advanced → Developer tools → Open log folder) — are the most
 useful contribution there is.
 
+- **Android on more devices.** An early version since 0.10.0, tried on one TV
+  box and the emulator: other boxes and phones, held keys and the on-screen
+  keyboard on a real device, a very large library, and a TV that reports HDR
+  differently are all untested. A short "I tried it on my device" report, even
+  if everything worked, is the most useful thing there is.
+
 - **Linux on more desktops, distributions and graphics cards.** Kinema is
   built to work the same everywhere and fall back safely rather than tested
   on each; a setup where it still misbehaves is exactly what the bug report

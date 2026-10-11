@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security problem
+    url: https://github.com/Basswaves/kinema/security/advisories/new
+    about: Anything exploitable goes here, privately, not in a public issue. See SECURITY.md.
+  - name: Something not working? Read this first
+    url: https://github.com/Basswaves/kinema#when-something-goes-wrong
+    about: Where the logs are (including Android), and what to put in a report.

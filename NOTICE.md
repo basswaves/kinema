@@ -43,6 +43,17 @@ from [nini22P/libmpv-wrapper](https://github.com/nini22P/libmpv-wrapper). It
 is a separate file (`/usr/lib/kinema/` in the packages, `lib/` in the folder)
 loaded at runtime, and may be replaced with a build of your own.
 
+## Android — Media3 and the Android libraries
+
+On Android no libmpv is used. The player is Google's
+[Media3](https://developer.android.com/media/media3) (ExoPlayer and its UI
+layer for subtitles), and the app is built with the AndroidX libraries
+(AppCompat, Activity, Lifecycle, WebKit), Google's Material Components and the
+Kotlin standard library — all **Apache-2.0**, fetched from Google's and Maven
+Central's repositories when the app is built and compiled into the `.apk`, never
+committed here. Kinema adds code beside Media3's own readers (for Blu-ray
+`.m2ts` streams) rather than changing them.
+
 ## Audio fingerprinting — rusty-chromaprint
 
 [`rusty-chromaprint`](https://crates.io/crates/rusty-chromaprint) (MIT), a pure

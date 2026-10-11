@@ -1,0 +1,80 @@
+name: I tried Kinema on my device
+description: Tell us what worked and what did not, even if nothing is broken
+labels: [device-report]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Kinema is tested on a small number of setups, and is built to fall back
+        safely where it cannot be tested. **A report that says "it works" is as
+        useful as one that says "it does not"** — it is how the list of what has
+        been tried grows. Android TV boxes and phones, other TVs and receivers,
+        other Linux desktops and very large libraries are the most wanted.
+
+        If something is broken, the [bug report](https://github.com/Basswaves/kinema/issues/new?template=bug_report.yml)
+        form asks for the logs and is the better place.
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Which Kinema
+      options:
+        - Windows 11
+        - Linux
+        - Android
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Kinema version
+      description: From the release you downloaded.
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: Your device
+      description: >
+        The make and model of the box, phone or PC, the system and its version
+        (Android 11, Ubuntu 26.04, Windows 11 24H2), and the graphics card or
+        chip if you know it. Plus the TV and receiver, if there is one.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: worked
+    attributes:
+      label: What you tried, and it worked
+      description: Tick what you tried and found fine. Leave the rest.
+      options:
+        - label: Installed it and it started
+        - label: Added a folder and scanned (local disk, USB drive or network share)
+        - label: Posters and descriptions arrived, titles were matched correctly
+        - label: Played a film or episode
+        - label: HDR or Dolby Vision looked right on the TV
+        - label: Sound reached the receiver as it should (Atmos, DTS, TrueHD)
+        - label: Subtitles and audio tracks
+        - label: Everything worked with the remote or keyboard alone
+        - label: Skipping an intro or credits
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: What did not work, or looked odd
+      description: >
+        Anything, however small — a button the remote could not reach, a
+        picture that looked wrong, something slow. If it is clearly a bug, the
+        bug report form is better, with the logs.
+
+  - type: dropdown
+    id: media
+    attributes:
+      label: Where is the media
+      options:
+        - Local disk
+        - Network share (SMB / NAS)
+        - External / USB drive
+        - More than one of these

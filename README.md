@@ -4,22 +4,126 @@
 [![Build](https://github.com/Basswaves/kinema/actions/workflows/ci.yml/badge.svg)](https://github.com/Basswaves/kinema/actions/workflows/ci.yml)
 [![Licence: MIT](https://img.shields.io/github/license/Basswaves/kinema)](LICENSE)
 
-Kinema is a free, open-source media library and video player for the movies and
-TV shows already on your disk or NAS. It scans your folders, finds posters and
-descriptions, remembers where you stopped, and plays everything — 4K HDR and
-Dolby Vision remuxes, Atmos, DTS-HD and TrueHD included — with **no server, no
-account, and nothing running in the background**. Netflix-style browsing with a
-mouse, a keyboard or a TV remote, for Windows 11, Linux, and Android TV boxes.
-
-Built because nothing existing fits. Every serverless option (Kodi) locks the
-interface into skin XML, and every good-looking option (Jellyfin Media Player,
-Plex) is a thin client that does nothing without a media server running
-somewhere. Kinema is one program: close it and nothing is left running.
+**Netflix-style browsing for the movies and shows already on your disk or NAS,
+with the picture and sound set up right for your own screen and speakers — and
+no server, no account and no settings maze.** One free, open-source program for
+Windows 11, Linux and Android TV boxes, used with a mouse, a keyboard or a TV
+remote. Close it and nothing is left running.
 
 **[Download](https://github.com/Basswaves/kinema/releases/latest)** for
 **Windows 11** (a ZIP, no installer), **Linux** (`.deb`, `.rpm` or a folder,
-x86-64 and ARM) or **Android TV** (an early version, installed by hand). See
-[Install](#install) and [Platform support](#platform-support).
+x86-64 and ARM) or **Android TV** (an early version, installed by hand) ·
+[Install](#install) · [What it does](#what-it-does) ·
+[Platform support](#platform-support) ·
+[Give feedback](#testing-it-and-giving-feedback)
+
+![Kinema's home screen: a full-width backdrop for a title from the library, with rails of posters beneath it](docs/images/home.jpg)
+
+## Why Kinema
+
+Most people who keep their own video files end up choosing between three kinds
+of program, each good at one thing:
+
+- **VLC and MPC-HC play anything and just work**, which is why so many people
+  never leave them. But what you get is a file browser with a player in it: no
+  posters, no "continue watching", no next episode, no Skip intro — none of the
+  niceties of a modern streaming app.
+- **Kodi** needs no server, plays almost anything and can be tuned to do exactly
+  what you want, which is why enthusiasts love it. The flip side: it can be
+  clunky to find your way around, its many settings are a lot for a newcomer,
+  and the best-looking skins are heavy, so they can make it sluggish, most of
+  all on a modest PC or a TV box.
+- **Plex and Jellyfin** look the part and close the gap, but only once a server
+  is running somewhere and somebody keeps it maintained.
+
+Kinema is the one in between: the library and polish of a streaming app, the
+"press play and it works" of VLC, and no server. It is a single program that
+looks good out of the box, with nothing to host, skin or maintain. Its
+interface is part of the program rather than a skin on top of one, and it eases
+off its own effects on weaker hardware, so it stays quick on a TV box as well
+as a big PC.
+
+## It sets itself up
+
+Getting a film to look and sound right at home depends on things most people
+have never heard of: whether the screen switches to the film's 24 frames a
+second or shows it with judder, whether HDR is on, which sound formats the
+receiver can take untouched, which subtitles should show. Enthusiasts spend
+hours on this in MPC-HC or Kodi. Everyone else never does, and gets a picture
+or sound that is a little wrong without ever knowing.
+
+Kinema asks your equipment what it can do, and sets things up from the answer:
+
+- **The screen matches the film**: its refresh rate for smooth 24p, and HDR
+  switched on for an HDR film.
+- **Atmos, DTS:X and TrueHD go to a receiver untouched**, when the receiver
+  takes them.
+- **Subtitles in your language** when the sound is in another, and none when it
+  is not.
+- **A film is never matched to the wrong title.** When Kinema is not sure, it
+  puts the file aside for you to check instead of guessing.
+
+You answer a few plain questions once, on the first run, each with what it
+gives and what it costs, and each skippable. If you know what all this means,
+the setup is the part you get to skip, and the details are one key away: press
+`i` while watching to see the display's real refresh rate, the frame cadence,
+which scaler ran and why, and the colour pipeline end to end. It reports
+rather than flatters.
+
+There is no quality preset to fiddle with, on purpose: the right choice depends
+on the film and the screen, and Kinema already knows both. Nothing is invented
+either. No machine-learning upscaling that makes up detail the master never
+had, and no frame interpolation that makes up frames.
+
+## Is it for you?
+
+**Yes, if** you keep your own movies and shows as files — on a PC, a laptop
+plugged into the TV, a Linux box or an Android TV box — and want them to look
+and sound right without it becoming a project:
+
+- **You never wondered what a refresh rate or a sound format has to do with a
+  film**, and you should not have to. Kinema sets it up, so the picture and the
+  sound are what the film's makers meant, on the equipment you have.
+- **You know exactly what they are**, have spent evenings in a config file for
+  them, and would rather have them just work. Kinema does what you would have
+  configured, shows its working when you press `i`, and gives the evenings back.
+
+**Probably not, if you want:**
+
+- **Your library on every screen in the house, or on the road.** With no server,
+  a film plays on the device Kinema runs on. Several devices can read the same
+  NAS, but each keeps its own library and its own place in a film.
+- **Streaming-service apps or an add-on store.** Kinema plays the files you own.
+  Keeping that kind of thing working is a job of its own, and Kinema is built to
+  run for years without one.
+- **A tuning bench.** If you enjoy comparing upscalers and writing shader
+  chains, Kinema takes those decisions away on purpose: no quality presets, no
+  machine-learning upscaling, no frame interpolation. What is in the film is
+  what is shown.
+- **Apple TV, iPhone or iPad.** Not planned. A Mac version is possible one day,
+  with no promise attached.
+- **Something to pay for.** Kinema is free and open source, and will stay that
+  way: no premium tier, no subscription, no "unlock 4K" button. If paying is how
+  you know software is good, we are sorry; there is nobody to hand the money to.
+
+## Who makes it
+
+Kinema is built by one person together with Claude, Anthropic's AI coding
+assistant, which writes the code under the author's direction; the author
+decides what Kinema is, and what it deliberately is not. A project made that
+way has to earn trust differently, so the checking is out in the open:
+
+- Automated tests run on every change, on Windows and Linux (x86-64 and ARM).
+- Scripts run the real app and the real player through scripted sessions, not
+  just the parts in isolation.
+- Every design decision is written down with its reasons
+  ([docs/HISTORY.md](docs/HISTORY.md)), and so is every trap found along the
+  way ([docs/GOTCHAS.md](docs/GOTCHAS.md)).
+- It is MIT-licensed and all of it is here to read.
+
+It is an early project, and tested on a small number of setups.
+[Reports from yours](#testing-it-and-giving-feedback) — working or not — are
+what shapes it.
 
 ## Try it
 
@@ -36,9 +140,7 @@ Nothing to sign up for, nothing left running, nothing written to your media.
 It is an early project made by one person: if something misbehaves on your
 equipment, [tell us](#when-something-goes-wrong) — that is how it gets better.
 
-![Kinema's home screen: a full-width backdrop for a title from the library, with rails of posters beneath it](docs/images/home.jpg)
-
-![A movie's detail page, showing the poster, description and a row of cast portraits](docs/images/detail.jpg)
+![A 4K Dolby Vision movie's detail page: poster, description, scores, badges for the picture, sound and file, and a row of cast portraits](docs/images/detail.jpg)
 
 Detail pages carry the cast, the description and — for a series — every season
 and episode, opening on the season you are in, with progress on the ones you
@@ -47,7 +149,7 @@ series, what the season on screen holds, and which episodes differ — and
 beside the year are its age rating and its IMDb, Rotten Tomatoes and TMDB
 scores. Posters everywhere show what you have watched.
 
-![The player's controls: seek bar, the transport in the middle, audio and subtitles and volume at the right, and when it will end](docs/images/player.jpg)
+![The player's controls: seek bar, the transport in the middle, audio and subtitles and volume at the right, with the list of audio tracks open](docs/images/player.jpg)
 
 A remote works the way it does on any streaming app: **OK** pauses, **←/→**
 seek (hold to go faster), and **↑/↓** bring up the controls — the seek bar,

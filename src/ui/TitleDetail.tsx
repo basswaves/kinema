@@ -6,11 +6,16 @@
  * with gaps, not like a shorter season.
  */
 import { userError } from './errors';
-import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
+import {
+  useFocusable,
+  FocusContext,
+  type FocusableComponent,
+} from '@noriginmedia/norigin-spatial-navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { openLink } from './links';
 import Art from './Art';
 import FocusButton from './FocusButton';
+import FocusGroup from './FocusGroup';
 import MediaBadges, { BadgeRows } from './MediaBadges';
 import HeavyFileNotice from './HeavyFileNotice';
 import { useSeasonBadges } from './seasonBadges';
@@ -68,6 +73,50 @@ const DETAIL_FOCUS_KEY = 'detail-root';
 const DETAIL_PLAY_KEY = 'detail-play';
 const DETAIL_FIRST_EPISODE_KEY = 'detail-first-episode';
 
+/**
+ * The page's four areas, top to bottom, each a focus group of its own
+ * (focusGroups.ts): Back, the buttons under the title (a row landing on Play),
+ * the season row (a row landing on the season shown, with "Mark season
+ * watched" at its end), and the episode list.
+ */
+const DETAIL_BACK_KEY = 'detail-back';
+const DETAIL_ACTIONS_KEY = 'detail-actions';
+const DETAIL_SEASONS_KEY = 'detail-seasons';
+const DETAIL_EPISODES_KEY = 'detail-episodes';
+const DETAIL_AREAS = [DETAIL_BACK_KEY, DETAIL_ACTIONS_KEY, DETAIL_SEASONS_KEY, DETAIL_EPISODES_KEY];
+
+const seasonKey = (s: number) => `detail-season:${s}`;
+
+/**
+ * Up and Down between the page's areas, in that fixed order rather than by
+ * distance (NAV-MAP, agreed 2026-10-11): Down from Back is Play, never the
+ * season nearest below it; Up from the first episode is the season shown,
+ * never "Mark season watched" because it happens to sit closer. With one
+ * season the row holds only "Mark season watched", and Down from Play goes
+ * past it straight to the episodes — it is reached by Up from the first one.
+ * Left and Right between areas are nothing (the page holds them).
+ */
+function resolveDetailArea(
+  oneSeason: boolean,
+  direction: string,
+  from: string,
+  siblings: FocusableComponent[]
+): FocusableComponent | null {
+  if (direction !== 'up' && direction !== 'down') return null;
+  const present = DETAIL_AREAS.filter((k) => siblings.some((s) => s.focusKey === k));
+  const at = present.indexOf(from);
+  if (at < 0) return null;
+  let next = direction === 'down' ? at + 1 : at - 1;
+  if (direction === 'down' && oneSeason && from === DETAIL_ACTIONS_KEY && present[next] === DETAIL_SEASONS_KEY) {
+    next++;
+  }
+  // Up from Back leaves the page for the top bar, through the page's parent.
+  if (next < 0 || next >= present.length) return null;
+  return siblings.find((s) => s.focusKey === present[next]) ?? null;
+}
+
+const PAGE_STOPS: ('left' | 'right' | 'down')[] = ['left', 'right', 'down'];
+
 /** Stable while the detail loads, so the badges do not rebuild for nothing. */
 const NO_STUDIOS: Studio[] = [];
 
@@ -110,12 +159,22 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
   //
   // The old test was `detail?.movie_path`, which is set for a *series* as well
   // (it is the largest file), so the series branch was unreachable.
+  const oneSeason = new Set(detail?.episodes.map((e) => e.season)).size <= 1;
+  const resolveArea = useCallback(
+    (direction: string, from: string, siblings: FocusableComponent[]) =>
+      resolveDetailArea(oneSeason, direction, from, siblings),
+    [oneSeason]
+  );
   const { ref, focusKey } = useFocusable({
     focusKey: DETAIL_FOCUS_KEY,
     trackChildren: true,
     saveLastFocusedChild: true,
     preferredChildFocusKey:
-      title.kind === 'series' && !nextUp ? DETAIL_FIRST_EPISODE_KEY : DETAIL_PLAY_KEY,
+      title.kind === 'series' && !nextUp ? DETAIL_EPISODES_KEY : DETAIL_ACTIONS_KEY,
+    nextFocusResolver: resolveArea,
+    // Only Up leaves the page (from Back, to the top bar).
+    isFocusBoundary: true,
+    focusBoundaryDirections: PAGE_STOPS,
   });
 
   // Waits for the load: claiming earlier would land on Back, the only control
@@ -319,6 +378,14 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
   // filling in.
   const shown = detail?.title ?? title;
 
+  // Whether the row under the title has anything to land on: a series with
+  // nothing to continue and no trailer has no buttons there at all.
+  const hasActions =
+    primary !== null ||
+    (title.kind !== 'series' && detail?.movie_file_id != null) ||
+    trailerPath !== null ||
+    Boolean(shown.trailer_key);
+
   return (
     <FocusContext.Provider value={focusKey}>
       <div className="detail" ref={ref}>
@@ -329,7 +396,12 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
         />
         <div className="detail-scrim" />
 
-        <FocusButton className="back-button" keepInView="page-top" onSelect={onBack}>
+        <FocusButton
+          focusKey={DETAIL_BACK_KEY}
+          className="back-button"
+          keepInView="page-top"
+          onSelect={onBack}
+        >
           ← Back
         </FocusButton>
 
@@ -389,7 +461,13 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
                 <p className="detail-credit muted">From Wikipedia · CC BY-SA 4.0</p>
               )}
 
-              <div className="detail-actions">
+              <FocusGroup
+                kind="row"
+                focusKey={DETAIL_ACTIONS_KEY}
+                current={primary ? DETAIL_PLAY_KEY : undefined}
+                focusable={hasActions}
+                className="detail-actions"
+              >
                 {/* A series and a film need different questions asked.
                     `detail.movie_path` is the largest file by size, which for a
                     series is whichever episode happens to be biggest — often a
@@ -471,7 +549,7 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
                     Trailer · opens in your browser ↗
                   </FocusButton>
                 )}
-              </div>
+              </FocusGroup>
               {/* Under Play, about the file it would play; only on Android, and
                   only when that file is far above what Android says the
                   device's video chip is made for (heavyFile.ts). */}
@@ -533,12 +611,19 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
 
           {seasons.length > 0 && (
             <>
-              <div className="season-bar">
+              <FocusGroup
+                kind="row"
+                focusKey={DETAIL_SEASONS_KEY}
+                current={seasons.length > 1 && season !== null ? seasonKey(season) : undefined}
+                focusable={seasons.length > 1 || ownedInSeason.length > 1}
+                className="season-bar"
+              >
               {seasons.length > 1 && (
                 <div className="season-tabs">
                   {seasons.map((s) => (
                     <FocusButton
                       key={s}
+                      focusKey={seasonKey(s)}
                       className={season === s ? 'active' : ''}
                       keepInView="nearest"
                       onSelect={() => {
@@ -560,9 +645,15 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
                   {seasonWatched ? 'Mark season as not watched' : '✓ Mark season watched'}
                 </FocusButton>
               )}
-              </div>
+              </FocusGroup>
 
-              <div className="episode-list">
+              <FocusGroup
+                kind="list"
+                focusKey={DETAIL_EPISODES_KEY}
+                current={firstOwnedId !== null ? DETAIL_FIRST_EPISODE_KEY : undefined}
+                focusable={firstOwnedId !== null}
+                className="episode-list"
+              >
                 {visibleEpisodes.map((episode) => (
                   <EpisodeRow
                     key={episode.id}
@@ -587,7 +678,7 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
                     }
                   />
                 ))}
-              </div>
+              </FocusGroup>
             </>
           )}
         </div>

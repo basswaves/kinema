@@ -4,8 +4,9 @@
  * For every screen the mock can show, at a TV's size with TV mode on, it
  * puts focus on each control in turn, presses each arrow once, and writes down
  * where focus went and whether the result looked wrong (under the top bar, off
- * the screen, out of a dialog). It REPORTS today's behaviour; it asserts on
- * nothing about the moves. It fails only when it cannot get to Home.
+ * the screen, out of a dialog), then compares every move with the agreed
+ * answer in e2e/navmap.expected.json and fails on any difference
+ * (NAV_APPROVE=1 rewrites that file from the run; see navmapExpected.ts).
  *
  * Never the mouse: a hover repairs focus and hides exactly the failures this
  * looks for. Keys only (Playwright's keyboard); `__nav.setFocus` is used to
@@ -16,9 +17,10 @@
  * under test-results/: Playwright empties that at the start of every run, so
  * one `npm run test:ui` afterwards deleted the map.
  */
-import { test, type Browser, type BrowserContext, type Page } from '@playwright/test';
+import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { approve } from './navmapExpected';
 import { writeReports } from './navmapReport';
 import {
   DIRS,
@@ -913,5 +915,13 @@ test('write the map', async ({ browserName: _browserName }, info) => {
   const engine = info.project.name;
   const systems = SYSTEMS.map((s) => readSystem(engine, s)).filter((s): s is SystemResult => s !== null);
   mkdirSync(OUT, { recursive: true });
-  writeReports(OUT, engine, systems, (e, s) => readSystem(e, s));
+  const filter = { only: ONLY, systems: ONLY_SYSTEMS };
+  // NAV_APPROVE=1 takes this run as the answer (Edge's, where it ran), keeping whatever did not run.
+  if (process.env.NAV_APPROVE && (engine === 'edge' || !readSystem('edge', 'windows'))) {
+    console.log(`approved ${approve(systems, filter)} screens into e2e/navmap.expected.json`);
+  }
+  const differences = writeReports(OUT, engine, systems, (e, s) => readSystem(e, s), filter);
+  if (!process.env.NAV_APPROVE) {
+    expect(differences, `${differences.length} moves differ from e2e/navmap.expected.json (see NAV-MAP.generated.md)`).toEqual([]);
+  }
 });

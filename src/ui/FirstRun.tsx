@@ -31,7 +31,7 @@
  * asked while it is being read.
  */
 import { userError } from './errors';
-import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
+import { FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { openLink } from './links';
 import FocusButton from './FocusButton';
@@ -40,6 +40,7 @@ import ChoiceRow from './ChoiceRow';
 import { setTvMode, TV_MODE_KEY } from './tv';
 import { useCapabilities } from '../capabilities';
 import { useClaimFocus } from './focus';
+import { ALL_ARROWS, useFocusGroup } from './focusGroups';
 import { addLibraryRoot, listLibraryRoots, type LibraryKind, type LibraryRoot } from '../library/api';
 import { chooseFolder } from '../library/folders';
 import { useScanStatus } from '../library/pipeline';
@@ -62,10 +63,12 @@ interface Props {
 }
 
 export default function FirstRun({ onScan }: Props) {
-  const { ref, focusKey } = useFocusable({
+  // A page of its own (NAV-MAP, agreed 2026-10-11): Up from the first
+  // question is nothing, not the top bar, and Right with nothing beside it is
+  // nothing, not "Add TV folder" a section higher.
+  const { ref, focusKey } = useFocusGroup('panel', {
     focusKey: FIRST_RUN_FOCUS_KEY,
-    trackChildren: true,
-    saveLastFocusedChild: true,
+    stopAt: ALL_ARROWS,
   });
   useClaimFocus(FIRST_RUN_FOCUS_KEY, true);
 

@@ -54,7 +54,10 @@ export default function CardGrid({ name, entries, onSelect }: Props) {
 
   const { ref, focusKey } = useFocusable<object, HTMLDivElement>({
     focusKey: `${name}-cards`,
-    saveLastFocusedChild: true,
+    // Arriving from above lands on the first card, whichever order button or
+    // key it came from (NAV-MAP, agreed 2026-10-11). Back from a film's page
+    // finds its card by key (`grid:7`), not by remembering.
+    saveLastFocusedChild: false,
     // A group with no cards is nowhere to move to — see Rail.tsx.
     focusable: entries.length > 0,
     // When the card last on is gone (a filter), the first one, not a search

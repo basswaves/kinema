@@ -800,6 +800,36 @@ ready unless the person has pressed, clicked or moved anything since it
 arrived. Never for part of a page — data arriving while the person browses
 the list beside it would pull the ring out of their hands.
 
+### A press nothing answers goes to the parent — and from there anywhere
+
+When a group's resolver (or the library's own search) finds nothing that way,
+the press is handed to the group's parent, and on up. In the player that
+reached the page behind it: Up or Left from Back put focus on a control that
+was not drawn, and the ring vanished until the next press. Returning `null`
+does **not** mean "stay". **Do:** say which arrows a group holds with
+`isFocusBoundary` plus `focusBoundaryDirections` (`stopAt` in
+`useFocusGroup`); a held arrow with nothing that way leaves focus where it is.
+A row holds Left and Right, the player and a page of its own all four.
+
+### The navigation checker's walk is part of what it measures
+
+The checker stands on every control in turn and presses each arrow, so a
+group that remembers its last control (a rail, the letter pad) answers with
+wherever the walk last stood. Its first map said Up from a rail went to "the
+last card" of the rail above and Up from a search result to the key "8" — both
+were the memory working, the walk having just visited them. **Do:** before
+calling a move wrong, ask what the walk had just focused in the group it
+lands in.
+
+### An edit during a Playwright run reloads the page under it
+
+The tests run against the Vite dev server, which reloads a module the moment
+its file is saved. Saving a component while `test:nav` or `test:ui` is running
+reloads the page mid-screen: a screen comes back "not walked", or a flow fails
+at a step that has nothing to do with the change. **Do:** leave `src/` alone
+while a run is going (docs and notes are safe), and re-run the screen rather
+than reading anything into the failure.
+
 ### A hidden browser pane never scrolls smoothly
 
 When testing `dev:mock` in a browser pane embedded in another program: while the pane is hidden,

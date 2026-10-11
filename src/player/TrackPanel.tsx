@@ -1,7 +1,8 @@
 /**
  * The audio and subtitle panel in the player.
  */
-import { FocusContext, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
+import { FocusContext } from '@noriginmedia/norigin-spatial-navigation';
+import { useFocusGroup } from '../ui/focusGroups';
 import FocusButton from '../ui/FocusButton';
 import type { Track } from './engine';
 import { describeTrack } from './tracks';
@@ -73,11 +74,10 @@ export default function TrackPanel({
   onDetails: () => void;
   online?: OnlineSubtitles | null;
 }) {
-  const { ref, focusKey } = useFocusable({
-    focusKey: TRACK_PANEL_KEY,
-    trackChildren: true,
-    saveLastFocusedChild: true,
-  });
+  // A closed menu (NAV-MAP N1, agreed 2026-10-11): focus never walks out to
+  // the controls behind it; Up on the top goes round to the bottom and back;
+  // Back closes it (Player.tsx).
+  const { ref, focusKey } = useFocusGroup<HTMLElement>('menu', { focusKey: TRACK_PANEL_KEY });
 
   return (
     <FocusContext.Provider value={focusKey}>

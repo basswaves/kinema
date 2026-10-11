@@ -183,7 +183,12 @@ function Address({ onStep }: { onStep: (next: NetStep) => void }) {
         />
       </label>
       {error && <p className="leave-error">{error}</p>}
-      <FocusButton focusKey="net-next" className="btn-primary" onSelect={() => void next()}>
+      <FocusButton
+        focusKey="net-next"
+        className="btn-primary"
+        keepInView="nearest"
+        onSelect={() => void next()}
+      >
         {checking ? 'Checking…' : 'Next'}
       </FocusButton>
     </div>
@@ -241,13 +246,22 @@ function SignIn({ server, onStep }: { server: Server; onStep: (next: NetStep) =>
             onChange={setPassword}
             onEnter={() => void setFocus('net-connect')}
           />
-          <FocusButton className="btn-secondary" onSelect={() => setShown((s) => !s)}>
+          <FocusButton
+            className="btn-secondary"
+            keepInView="nearest"
+            onSelect={() => setShown((s) => !s)}
+          >
             {shown ? 'Hide' : 'Show'}
           </FocusButton>
         </div>
       </div>
       {error && <p className="leave-error">{error}</p>}
-      <FocusButton focusKey="net-connect" className="btn-primary" onSelect={() => void connect()}>
+      <FocusButton
+        focusKey="net-connect"
+        className="btn-primary"
+        keepInView="nearest"
+        onSelect={() => void connect()}
+      >
         {busy ? 'Connecting…' : 'Connect'}
       </FocusButton>
       <p className="muted">

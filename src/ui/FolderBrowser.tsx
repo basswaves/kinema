@@ -362,6 +362,7 @@ export default function FolderBrowser({ request }: { request: FolderRequest }) {
                   <FocusButton
                     focusKey={RETRY_KEY}
                     className="btn-secondary"
+                    keepInView="nearest"
                     onSelect={() => void loadPlaces()}
                   >
                     Look again
@@ -379,7 +380,11 @@ export default function FolderBrowser({ request }: { request: FolderRequest }) {
                     there, then press Back. Android calls it managing all files; Kinema only reads
                     them.
                   </p>
-                  <FocusButton className="btn-secondary" onSelect={() => void grantAllFiles()}>
+                  <FocusButton
+                    className="btn-secondary"
+                    keepInView="nearest"
+                    onSelect={() => void grantAllFiles()}
+                  >
                     Allow all files
                   </FocusButton>
                 </div>

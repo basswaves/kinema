@@ -18,6 +18,7 @@ interface Registered {
   node?: HTMLElement;
   focusable: boolean;
   isFocusBoundary: boolean;
+  focusBoundaryDirections?: string[];
 }
 
 export interface NavLeaf {
@@ -26,7 +27,8 @@ export interface NavLeaf {
   rect: { left: number; top: number; right: number; bottom: number };
   /** Parent focus keys, nearest first. */
   parents: string[];
-  /** The nearest ancestor that is an `isFocusBoundary` container, or null. */
+  /** The nearest ancestor that holds every arrow (a dialog, a menu, the
+   *  player), or null. A row holding only Left and Right is not one. */
   boundary: string | null;
 }
 
@@ -73,7 +75,8 @@ function leaves(): NavLeaf[] {
     let p = all[c.parentFocusKey];
     for (let guard = 0; p && guard < 50; guard++) {
       parents.push(p.focusKey);
-      if (boundary === null && p.isFocusBoundary) boundary = p.focusKey;
+      const holdsAll = !p.focusBoundaryDirections || p.focusBoundaryDirections.length === 4;
+      if (boundary === null && p.isFocusBoundary && holdsAll) boundary = p.focusKey;
       p = all[p.parentFocusKey];
     }
     out.push({

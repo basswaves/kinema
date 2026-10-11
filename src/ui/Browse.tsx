@@ -9,6 +9,7 @@ import { describeError, userError } from './errors';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   init as initSpatial,
+  doesFocusableExist,
   getCurrentFocusKey,
   setFocus,
   useFocusable,
@@ -31,6 +32,8 @@ import {
   useClaimFocus,
 } from './focus';
 import { back, current, navigate, open, replace, type Entry } from './history';
+import { useFocusGroup } from './focusGroups';
+import FocusGroup from './FocusGroup';
 import { setShortcutsOpen } from './shortcutsState';
 import Player from '../player/Player';
 import {
@@ -195,6 +198,13 @@ export default function Browse() {
   /** Videos Kinema would not guess at, for the notice on Home. */
   const [reviewCount, setReviewCount] = useState(0);
   const scanTrouble = scanFailed ?? describeScanTrouble(scanErrors, reviewCount > 0);
+  const dismissScanTrouble = useCallback(() => {
+    // OK takes its own notice away: the ring goes to Play first, so the
+    // library's own restore does not pick a neighbour by itself.
+    if (doesFocusableExist(HERO_PLAY_FOCUS_KEY)) void setFocus(HERO_PLAY_FOCUS_KEY);
+    setScanFailed(null);
+    setScanErrors([]);
+  }, []);
   /** What the equipment could do that is switched off — see qualityNotice.ts. */
   const [upgrades, setUpgrades] = useState<Upgrade[]>([]);
   const [keyRejected, setKeyRejected] = useState(false);
@@ -604,6 +614,9 @@ export default function Browse() {
     );
   }
 
+  // Where Home shows its notices: titles there, and no setup pages over them.
+  const scanTroubleOnHome = view.name === 'home' && titles.length > 0 && !setupOpen;
+
   return (
     <div className="browse" ref={shellRef}>
       <FocusContext.Provider value={shellFocusKey}>
@@ -630,13 +643,12 @@ export default function Browse() {
           </div>
         )}
 
-        {scanTrouble && (
+        {/* On Home with titles it is one of Home's notices, with an OK a
+            remote can reach; elsewhere a line a click puts away. */}
+        {scanTrouble && !scanTroubleOnHome && (
           <div
             className="browse-notice"
-            onClick={() => {
-              setScanFailed(null);
-              setScanErrors([]);
-            }}
+            onClick={dismissScanTrouble}
           >
             {scanTrouble.text}
             {scanTrouble.note && <span className="muted">. {scanTrouble.note}</span>}
@@ -671,6 +683,8 @@ export default function Browse() {
                 .catch((e) => setError(userError(e)))
             }
             ffmpegMissing={ffmpegMissing}
+            scanTrouble={scanTrouble}
+            onDismissScanTrouble={dismissScanTrouble}
             onFfmpeg={() => openView({ name: 'settings', section: 'ffmpeg' })}
             onDismissFfmpeg={() =>
               void dismissFfmpegNotice()
@@ -745,6 +759,8 @@ export default function Browse() {
   );
 }
 
+const navKey = (name: string) => `nav:${name}`;
+
 /**
  * The nav bar, as its own component so that its container is created *inside*
  * the shell's focus context and is therefore parented to the shell. Declaring
@@ -763,10 +779,12 @@ function TopNav({
   hasUpdate: boolean;
   onNavigate: (target: NavTarget) => void;
 }) {
-  const { ref, focusKey } = useFocusable({
+  // A row landing on the open section (NAV-MAP, agreed 2026-10-11): Up from
+  // Home's Play, from Settings' list or a section's first row is the section
+  // you are in, not the button last used or the one nearest.
+  const { ref, focusKey } = useFocusGroup<HTMLElement>('row', {
     focusKey: NAV_FOCUS_KEY,
-    trackChildren: true,
-    saveLastFocusedChild: true,
+    current: navKey(active),
   });
 
   // A scan is the only long-running thing the app does on its own, so it says
@@ -781,6 +799,7 @@ function TopNav({
         {NAV_ITEMS.map(([name, label]) => (
           <FocusButton
             key={name}
+            focusKey={navKey(name)}
             className={active === name ? 'active' : ''}
             keepInView="page-top"
             onSelect={() => onNavigate(name)}
@@ -873,7 +892,7 @@ function GridView({
 
   // Land on the first title, not on Back or the sort buttons above it.
   const first = shown[0] ? `grid:${shown[0].id}` : GRID_FOCUS_KEY;
-  useClaimFocus(first, titles.length > 0 || shown.length === 0);
+  useClaimFocus(first, titles.length > 0 || shown.length === 0, true);
 
   return (
     <FocusContext.Provider value={focusKey}>
@@ -888,7 +907,15 @@ function GridView({
             {heading} <span className="muted">{shown.length}</span>
           </h2>
         </div>
-        <div className="grid-controls choice-options" role="group" aria-label="Order">
+        {/* A row landing on the order in use (NAV-MAP, agreed 2026-10-11):
+            Up from the first row of films is the order you chose. */}
+        <FocusGroup
+          kind="row"
+          current={`grid-sort:${arrangement.sort}`}
+          className="grid-controls choice-options"
+          role="group"
+          aria-label="Order"
+        >
           {GRID_SORTS.map((s) => (
             <FocusButton
               key={s.value}
@@ -908,7 +935,7 @@ function GridView({
           >
             {arrangement.unwatched ? '✓ ' : ''}Unwatched only
           </FocusButton>
-        </div>
+        </FocusGroup>
         {titles.length === 0 && <p className="muted">Nothing here yet.</p>}
         {titles.length > 0 && shown.length === 0 && (
           <p className="muted">Everything here has been watched. Switch off “Unwatched only” to see it all.</p>

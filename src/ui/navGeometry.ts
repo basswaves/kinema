@@ -58,25 +58,58 @@ function gap(aFrom: number, aTo: number, bFrom: number, bTo: number): number {
 }
 
 /**
- * How far a move from `from` to `other` is: the gap along the arrow, with any
- * sideways step counting double, so the control straight ahead wins over a
- * nearer one off to the side. Ties go to the closer middle.
+ * How a move from `from` to `other` ranks, best first:
+ *
+ * 1. The nearest row that way (the gap along the arrow): Up and Down go to
+ *    the next row or group, never past one to a control more in line further
+ *    on (the owner's "neighbours only", NAV-MAP 2026-10-11). Controls a few
+ *    pixels apart along the arrow count as one row.
+ * 2. In that row, the one under the start of this one (near its left edge,
+ *    going up or down): rows of choices start at the same edge whatever the
+ *    text, so this is the same in every browser engine, where the width of a
+ *    word is not. A quarter in from the edge, not the edge itself, which can
+ *    sit a pixel inside the neighbour in one engine and outside in another;
+ *    and a neighbour whose edge is within a few pixels of that point does
+ *    not count as under it, for the same reason.
+ * 3. The one more squarely ahead (the larger overlap), a near tie counting
+ *    as a tie; then the nearer sideways; then the first in reading order.
  */
-function cost(from: Box, other: Box, dir: Direction): [number, number] {
+type Cost = [number, number, number, number, number];
+
+function cost(from: Box, other: Box, dir: Direction): Cost {
   const f = spans(from, dir);
   const o = spans(other, dir);
   const along = gap(f.from, f.to, o.from, o.to);
   const across = gap(f.crossFrom, f.crossTo, o.crossFrom, o.crossTo);
-  const mid = Math.abs((f.crossFrom + f.crossTo) / 2 - (o.crossFrom + o.crossTo) / 2);
-  return [along + 2 * across, mid];
+  const overlap = Math.max(0, Math.min(f.crossTo, o.crossTo) - Math.max(f.crossFrom, o.crossFrom));
+  const start = f.crossFrom + (f.crossTo - f.crossFrom) / 4;
+  const underStart = o.crossFrom <= start - EDGE_PX && o.crossTo >= start + EDGE_PX ? 0 : 1;
+  return [along, underStart, -overlap, across, o.crossFrom];
+}
+
+/** An edge this close to the point measured from counts as not under it. */
+const EDGE_PX = 4;
+/** Within this many pixels along the arrow, two controls are in one row. */
+const ROW_PX = 8;
+/** Within a pixel, or this share of the larger overlap, is a tie. */
+const NEAR_PX = 1;
+const NEAR_OVERLAP = 0.15;
+
+function better(a: Cost, b: Cost): boolean {
+  if (Math.abs(a[0] - b[0]) > ROW_PX) return a[0] < b[0];
+  if (a[1] !== b[1]) return a[1] < b[1];
+  const most = Math.max(-a[2], -b[2]);
+  if (Math.abs(a[2] - b[2]) > Math.max(NEAR_PX, most * NEAR_OVERLAP)) return a[2] < b[2];
+  if (Math.abs(a[3] - b[3]) > NEAR_PX) return a[3] < b[3];
+  return a[4] < b[4];
 }
 
 function cheapest(from: Box, candidates: Box[], dir: Direction): Box | null {
   let best: Box | null = null;
-  let bestCost: [number, number] = [Infinity, Infinity];
+  let bestCost: Cost = [Infinity, Infinity, Infinity, Infinity, Infinity];
   for (const c of candidates) {
     const k = cost(from, c, dir);
-    if (k[0] < bestCost[0] || (k[0] === bestCost[0] && k[1] < bestCost[1])) {
+    if (better(k, bestCost)) {
       best = c;
       bestCost = k;
     }

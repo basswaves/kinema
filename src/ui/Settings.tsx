@@ -41,6 +41,7 @@ import SoundSection from './SoundSection';
 import ScreenSection from './ScreenSection';
 import { capabilitiesNow, useCapabilities, type Capabilities } from '../capabilities';
 import { useClaimFocus } from './focus';
+import { useFocusGroup } from './focusGroups';
 import { setTvMode, useTvMode } from './tv';
 import { setLook, useLook, type LookSetting } from './lightLook';
 import {
@@ -1499,11 +1500,12 @@ export default function Settings({
  * did. Right from the list comes back to where one was in the section.
  */
 function SectionContent({ children }: { children: ReactNode }) {
-  const { ref, focusKey } = useFocusable({
-    focusKey: 'settings-content',
-    trackChildren: true,
-    saveLastFocusedChild: true,
-  });
+  // A panel: Right goes only to a control beside it in the same row, Up and
+  // Down to the nearest row (the owner's "neighbours only", NAV-MAP
+  // 2026-10-11) — Right from Scan now went round to Remove, Right from "On a
+  // TV" to a setting a row lower. Left from the left edge still reaches the
+  // list, and Up from the top row the bar.
+  const { ref, focusKey } = useFocusGroup('panel', { focusKey: 'settings-content' });
   return (
     <FocusContext.Provider value={focusKey}>
       <div className="settings-content" ref={ref}>

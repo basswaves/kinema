@@ -17,12 +17,17 @@
  * Quiet on purpose: one line each, in the flow of the page, reached with one
  * press of Down from the hero — never a dialog in front of what you came for.
  */
-import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
+import { FocusContext } from '@noriginmedia/norigin-spatial-navigation';
+import { useFocusGroup } from './focusGroups';
 import FocusButton from './FocusButton';
 import { count } from './format';
 import type { Upgrade } from './qualityNotice';
+import type { ScanTrouble } from './scanTrouble';
 
 interface Props {
+  /** The startup scan's problems, in words (scanTrouble.ts); null when none. */
+  scanTrouble: ScanTrouble | null;
+  onDismissScanTrouble: () => void;
   reviewCount: number;
   onReview: () => void;
   keyRejected: boolean;
@@ -39,6 +44,8 @@ interface Props {
 }
 
 export default function HomeNotices({
+  scanTrouble,
+  onDismissScanTrouble,
   reviewCount,
   onReview,
   keyRejected,
@@ -51,11 +58,22 @@ export default function HomeNotices({
   onFfmpeg,
   onDismissFfmpeg,
 }: Props) {
-  const empty = reviewCount === 0 && upgrades.length === 0 && !keyRejected && !ffmpegMissing;
-  // Not a place to move to while empty — see ContinueRail.tsx.
-  const { ref, focusKey } = useFocusable({
-    trackChildren: true,
-    saveLastFocusedChild: true,
+  const empty =
+    !scanTrouble && reviewCount === 0 && upgrades.length === 0 && !keyRejected && !ffmpegMissing;
+  // Not a place to move to while empty — see ContinueRail.tsx. Arriving
+  // the first time lands on the top notice's button, not on whichever is
+  // nearest the left edge.
+  const first = scanTrouble
+    ? 'notice-scan-ok'
+    : keyRejected
+      ? 'notice-tmdb-key'
+      : reviewCount > 0
+        ? 'notice-review'
+        : upgrades.length > 0
+          ? 'notice-apply'
+          : 'notice-ffmpeg';
+  const { ref, focusKey } = useFocusGroup<HTMLElement>('list', {
+    current: first,
     focusable: !empty,
   });
   if (empty) return null;
@@ -66,6 +84,29 @@ export default function HomeNotices({
   return (
     <FocusContext.Provider value={focusKey}>
       <section className="home-notices" ref={ref}>
+        {/* The startup scan's line, here on Home rather than above the page,
+            so a remote can put it away: OK, as the other notices are left
+            (owner, 2026-10-11). Amber, like the line it replaces elsewhere. */}
+        {scanTrouble && (
+          <div className="home-notice home-notice-scan">
+            <span className="home-notice-icon" aria-hidden="true">
+              !
+            </span>
+            <div className="home-notice-text">
+              {scanTrouble.text}
+              {scanTrouble.note && <span className="muted">. {scanTrouble.note}</span>}
+            </div>
+            <FocusButton
+              focusKey="notice-scan-ok"
+              className="btn-secondary"
+              keepInView="nearest"
+              onSelect={onDismissScanTrouble}
+            >
+              OK
+            </FocusButton>
+          </div>
+        )}
+
         {keyRejected && (
           <div className="home-notice">
             <span className="home-notice-icon" aria-hidden="true">

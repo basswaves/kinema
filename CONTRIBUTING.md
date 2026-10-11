@@ -195,9 +195,13 @@ port, so it can run beside the tests above):
 npm run test:nav
 ```
 
-It reports what the app does, and flags focus leaving a menu, ending under
-the top bar or off screen, and controls no arrow reaches or leaves. Read its
-map after changing how a screen is laid out. CI does not run it.
+It compares every move with the agreed answer in `e2e/navmap.expected.json`
+and fails on any difference; it also flags focus leaving a menu, ending under
+the top bar or off screen, and controls no arrow reaches or leaves. After
+changing how a screen is laid out, run the screens you touched
+(`NAV_ONLY=<screen id regex> NAV_SYSTEMS=windows npm run test:nav`), read
+the differences, and take a run as the new answer with `NAV_APPROVE=1` only
+when every changed move is one you meant. CI does not run it.
 
 CI runs all of the rest on every push — Windows, and Linux for x86 and ARM, with
 the WebKit tests on x86 Linux — so checking here is about finding out before

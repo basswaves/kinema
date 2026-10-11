@@ -20,6 +20,9 @@ interface Props {
 }
 
 export default function OnScreenKeyboard({ value, onChange }: Props) {
+  // Up from the results comes back to the last key used (NAV-MAP, agreed
+  // 2026-10-11): the results are only reached through the keys, so there
+  // always is one.
   const { ref, focusKey } = useFocusable({ trackChildren: true, saveLastFocusedChild: true });
 
   return (

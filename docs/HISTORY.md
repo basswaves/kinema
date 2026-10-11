@@ -2899,6 +2899,53 @@ rides out peaks), and a sound format the device cannot decode with no
 receiver to pass it to. Software decoding of those would bundle a native
 library, which "no third-party binaries" forbids; not now.
 
+## Where every arrow goes, agreed (2026-10-10 and 11)
+
+Up to here each move on a screen was answered by distance between buttons,
+which is right between big areas and wrong inside them often enough to be
+felt on every screen of a TV: Down from Back reached the nearest season
+instead of Play, Up from the first episode reached "Mark season watched",
+focus walked out of the Audio & subtitles panel, Up or Left from the
+player's Back left nothing focused at all.
+
+**First a map, then the owner's answers, then the code.** A checker presses
+every arrow from every control in the mock, as Windows, Linux and Android,
+and wrote what happens as a plain-words map. The owner went through the
+moves that looked wrong and chose an answer for each; those answers are now
+the checker's expected answer (`e2e/navmap.expected.json`), so a later
+change that moves the ring somewhere else fails until it is approved. The
+choices, in short:
+
+- **Arriving lands on what the area is about**: Up to the top bar is the
+  section you are in; Up from Home's notices is Play; Down from a series'
+  Play is the season shown; Up from the shelf's films is the order you
+  chose; Down from the order buttons is the first film.
+- **Neighbours only.** Right goes to a control beside it in the same row or
+  nowhere — never a jump to whatever is nearest a row lower — and Up or Down
+  to the next row, never past one. In that row it is the control under the
+  start of the one you came from: an earlier version went by overlap and
+  middles, and gave a different answer in the two browser engines for a
+  handful of moves, because the engines draw a word a few pixels wider or
+  narrower. Rows start at the same edge in both.
+- **Menus are closed and go round**: the track panel and the leave dialog
+  keep focus until Back, and Up on the top item is the bottom one.
+- **Ends stay put.** A press with nothing that way leaves focus where it is
+  (the player, a series' Back and Play, the first run and setup pages, which
+  are pages of their own with no way up to the top bar).
+- One exception kept on purpose: a series with one season has no season row,
+  so "Mark season watched" is reached by Up from the first episode, as
+  before.
+
+The startup scan's amber line, which only a click could dismiss, became one
+of Home's notices with an OK; elsewhere it stays a line. An item opened in
+"Needs attention" now scrolls what opened into sight.
+
+**Not changed, and why.** Making every button scroll itself into view by
+default was considered and not done: the rule measures the control against
+the page, and for a button in a floating dialog or the player that could
+scroll the page behind it. The buttons in lists that really scroll (the
+folder browser, network places) have it.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

@@ -340,14 +340,23 @@ for controls with stable focus keys — see GOTCHAS.
 distance between buttons, which is right between big areas and wrong inside
 them: Down from Back reached the nearest season instead of Play, focus walked
 out of the Audio & subtitles panel. So an area says what it is — a **menu**
-(focus cannot leave by arrows, Up/Down go round), a **row** (Left/Right
-inside; arriving always lands on its current item: Play, the active season),
-or a **list / grid / rail** (arriving lands where you last were) — and
-distance only decides which area is next. The geometry inside a group is
-`navGeometry.ts`, measured at the moment of the press. A navigation checker
-(`npm run test:nav`) presses every arrow from every control in the mock and
-writes the result as a plain-words map, so a move nobody intended shows up as
-a changed line rather than as a surprise on a TV.
+(focus cannot leave by arrows, Up/Down go round, Left/Right stay level: the
+track panel, the leave dialog), a **row** (Left/Right inside, stopping at
+its ends; arriving always lands on its current item: Play, the active
+season, the open section in the top bar), a **panel** (an area of rows: a
+Settings section, the player's controls, the first run — Left/Right only to
+a control beside it in the same row, Up/Down to the nearest row, never past
+one), or a **list / grid / rail** (arriving lands where you last were) — and
+distance only decides which area is next. The detail page orders its four
+areas (Back, the buttons, the season row, the episodes) explicitly instead.
+The geometry inside a group is `navGeometry.ts`, measured at the moment of
+the press: the nearest row that way first, then in it the control under the
+start of the one you came from (rows start at the same edge in every browser
+engine; a word's width does not), then the larger overlap. The navigation
+checker (`npm run test:nav`) presses every arrow from every control in the
+mock and compares each move with the agreed answer in
+`e2e/navmap.expected.json`, so a move nobody intended fails the run until
+someone approves it (`NAV_APPROVE=1`).
 
 **One rule for what is on screen, one for typing** (`focus.ts`). The focused
 control *and the heading of its group* — the rail's title, the section's

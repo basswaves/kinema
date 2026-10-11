@@ -16,9 +16,10 @@
 import { count } from '../ui/format';
 import { userError } from '../ui/errors';
 import { useFocusable } from '@noriginmedia/norigin-spatial-navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import FocusButton from '../ui/FocusButton';
 import FocusInput from '../ui/FocusInput';
+import { keepOnScreen } from '../ui/focus';
 import { listNeedsReview } from '../metadata/api';
 import type { MediaFile } from './api';
 import {
@@ -328,8 +329,18 @@ function GroupRow({
     }
   }, [summaryFocused, summaryRef]);
 
+  // Opened by remote, what opened is below the row and was left off screen
+  // (TV-FEEL N8): bring the opened row on screen, from its title down as far
+  // as fits, once it has been drawn.
+  const rowRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const frame = requestAnimationFrame(() => keepOnScreen(rowRef.current, 'nearest'));
+    return () => cancelAnimationFrame(frame);
+  }, [open]);
+
   return (
-    <div className={`fixmatch-row ${open ? 'open' : ''}`}>
+    <div ref={rowRef} className={`fixmatch-row ${open ? 'open' : ''}`}>
       <div
         ref={summaryRef}
         className={`fixmatch-summary ${summaryFocused ? 'focused' : ''}`}

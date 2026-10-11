@@ -45,11 +45,19 @@ describe('pickNext in a row', () => {
     expect(pickNext(row[2], row, 'right')).toBeNull();
   });
 
-  it('prefers the control straight ahead over a nearer one off to the side', () => {
-    const near = box('near', 0, 60); // just below, but off to the left
-    const ahead = box('ahead', 240, 90); // further down, straight below
+  // Never past a row (NAV-MAP 2026-10-11, "neighbours only"): the next row
+  // down wins even off to the side; straight ahead decides only within it.
+  it('goes to the next row down before one more in line further on', () => {
+    const near = box('near', 0, 60); // the next row, off to the left
+    const ahead = box('ahead', 240, 90); // a row further, straight below
     const from = box('from', 240, 0);
-    expect(pickNext(from, [near, ahead], 'down')).toBe('ahead');
+    expect(pickNext(from, [near, ahead], 'down')).toBe('near');
+  });
+
+  it('within the next row, prefers the one straight below', () => {
+    const left = box('left', 0, 60);
+    const below = box('below', 240, 62);
+    expect(pickNext(box('from', 240, 0), [left, below], 'down')).toBe('below');
   });
 });
 
@@ -79,5 +87,29 @@ describe('pickNext edge cases', () => {
     const short = box('short', 0, 0, 100, 40);
     const tall = box('tall', 120, 0, 100, 200);
     expect(pickNext(short, [tall], 'down')).toBeNull();
+  });
+});
+
+describe('pickNext between rows of choices', () => {
+  // Settings → Playback: a wide "As the file sets it" under Auto | Full.
+  const auto = box('auto', 443, 563, 107);
+  const full = box('full', 562, 563, 73);
+  const wide = box('wide', 443, 826, 214);
+
+  it('goes to the one most squarely above, not the nearer middle', () => {
+    expect(pickNext(wide, [auto, full], 'up')).toBe('auto');
+  });
+});
+
+describe('pickNext with a near tie', () => {
+  // Settings → Playback: "On a TV" over Full | Light, overlapping each by a
+  // few pixels' difference that the two browser engines draw differently.
+  const onTv = box('tv', 576, 321, 135);
+  const full = box('full', 562, 563, 73);
+  const light = box('light', 647, 563, 83);
+
+  it('goes to the first in reading order', () => {
+    expect(pickNext(onTv, [full, light], 'down')).toBe('full');
+    expect(pickNext(onTv, [light, full], 'down')).toBe('full');
   });
 });

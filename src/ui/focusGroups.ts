@@ -11,13 +11,22 @@
  * which area comes next:
  *
  * - **menu** — a panel, dialog or picker. Focus cannot leave it by arrows;
- *   Up on the top item goes round to the bottom one and back (`wrap`). Back
+ *   Up on the top item goes round to the bottom one and back (`wrap`), and
+ *   an arrow that does not go round stays level (Right from a track is
+ *   nothing, not the close button above it). Back
  *   closing it stays with the component that owns it, which knows what
  *   closing means.
  * - **row** — the detail page's buttons, a season row, the top bar. Left and
- *   Right move inside it; Up and Down leave it. Arriving from anywhere lands
- *   on its `current` item (Play, the active season, the open section), never
- *   on the nearest one and never on the one last left.
+ *   Right move inside it and stop at its ends (the owner's "neighbours only",
+ *   NAV-MAP 2026-10-11: Right from the last button is nothing, not a jump to
+ *   whatever is nearest a row lower); Up and Down leave it. Arriving from
+ *   anywhere lands on its `current` item (Play, the active season, the open
+ *   section), never on the nearest one and never on the one last left.
+ * - **panel** — an area laid out in rows of its own: a Settings section, the
+ *   player's controls. Left and Right go only to a control beside it in the
+ *   same row, otherwise nothing; Up and Down to the nearest control that way
+ *   (the owner's "neighbours only", 2026-10-11). Which arrows may leave it
+ *   is `stopAt` (none held by default; the player holds all four).
  * - **list** — a list, grid or rail. Arriving lands on the item last focused
  *   there, or `current` the first time; inside, the library's own geometry
  *   (or a resolver of the caller's, like CardGrid's) as before.
@@ -36,7 +45,7 @@ import {
 import { useCallback, useEffect } from 'react';
 import { pickNext, type Box } from './navGeometry';
 
-export type GroupKind = 'menu' | 'row' | 'list';
+export type GroupKind = 'menu' | 'row' | 'panel' | 'list';
 
 export type Wrap = 'vertical' | 'horizontal' | 'both' | 'none';
 
@@ -49,7 +58,15 @@ interface Options {
   focusable?: boolean;
   /** Menus only: which arrows go round at the ends. Up/Down by default. */
   wrap?: Wrap;
+  /** Rows and panels: the arrows that stop at the group's edge instead of
+   *  leaving it. A row holds Left and Right by default, a panel nothing. */
+  stopAt?: Direction[];
 }
+
+const ROW_STOPS: Direction[] = ['left', 'right'];
+/** For a group nothing leaves by arrows: the player, a page of its own. */
+export const ALL_ARROWS: Direction[] = ['up', 'down', 'left', 'right'];
+const NO_STOPS: Direction[] = [];
 
 function boxOf(component: FocusableComponent): Box | null {
   const node = component.node as HTMLElement | null | undefined;
@@ -93,7 +110,13 @@ export function resolveInGroup(
     else boxes.push(box);
   }
   if (!fromBox) return null;
-  const key = pickNext(fromBox, boxes, direction, kind === 'menu' && wraps(wrap, direction));
+  const sideways = direction === 'left' || direction === 'right';
+  const f = fromBox;
+  // Left and Right stay in the row: only controls level with this one. (A
+  // menu's track list is a column; Right from a track went up to "close".)
+  const level = sideways && (kind === 'panel' || (kind === 'menu' && !wraps(wrap, direction)));
+  const pool = level ? boxes.filter((b) => b.top < f.bottom && b.bottom > f.top) : boxes;
+  const key = pickNext(fromBox, pool, direction, kind === 'menu' && wraps(wrap, direction));
   return key === null ? null : (siblings.find((s) => s.focusKey === key) ?? null);
 }
 
@@ -107,8 +130,9 @@ export function resolveInGroup(
  */
 export function useFocusGroup<E extends HTMLElement = HTMLDivElement>(
   kind: GroupKind,
-  { focusKey, current, focusable = true, wrap = 'vertical' }: Options = {}
+  { focusKey, current, focusable = true, wrap = 'vertical', stopAt }: Options = {}
 ): UseFocusableResult<E> {
+  const stops = stopAt ?? (kind === 'row' ? ROW_STOPS : NO_STOPS);
   const resolve = useCallback(
     (direction: Direction, from: string, siblings: FocusableComponent[]) =>
       resolveInGroup(kind, wrap, direction, from, siblings),
@@ -123,7 +147,9 @@ export function useFocusGroup<E extends HTMLElement = HTMLDivElement>(
     // the person was.
     saveLastFocusedChild: kind !== 'row',
     preferredChildFocusKey: current,
-    isFocusBoundary: kind === 'menu',
+    // A menu holds every arrow; a row or a panel the ones in `stopAt`.
+    isFocusBoundary: kind === 'menu' || stops.length > 0,
+    focusBoundaryDirections: kind === 'menu' ? undefined : stops,
     // A list keeps the library's own search (or the caller's resolver on a
     // container inside it): replacing it would change every move on Home.
     nextFocusResolver: kind === 'list' ? undefined : resolve,

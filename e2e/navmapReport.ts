@@ -5,6 +5,7 @@
  */
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { compare, readExpected, type Filter } from './navmapExpected';
 import type { Dir, LeafInfo, Move, ScreenResult, SystemResult } from './navmapTypes';
 
 const ENGINES = ['edge', 'webkit'];
@@ -20,8 +21,9 @@ export function writeReports(
   dir: string,
   engine: string,
   _systems: SystemResult[],
-  read: (engine: string, system: string) => SystemResult | null
-): void {
+  read: (engine: string, system: string) => SystemResult | null,
+  filter: Filter
+): string[] {
   const byEngine: Record<string, SystemResult[]> = {};
   for (const e of ENGINES) {
     const list = ['windows', 'linux', 'android']
@@ -34,7 +36,13 @@ export function writeReports(
     JSON.stringify({ generatedBy: 'e2e/navmap.nav.ts', viewport: '1920x1080, TV mode on', engines: byEngine }, null, 1)
   );
   const primary = byEngine.edge ? 'edge' : byEngine.webkit ? 'webkit' : engine;
-  writeFileSync(join(dir, 'NAV-MAP.generated.md'), markdown(primary, byEngine));
+  // Against the expected answer: every engine that has results, but only this engine's differences fail the run.
+  const expectedMoves = readExpected();
+  const differences: Record<string, string[]> = {};
+  for (const [e, list] of Object.entries(byEngine)) differences[e] = compare(expectedMoves, list, filter, e);
+  for (const d of differences[engine] ?? []) console.log(`DIFFERENT  ${d}`);
+  writeFileSync(join(dir, 'NAV-MAP.generated.md'), markdown(primary, byEngine, differences));
+  return differences[engine] ?? [];
 }
 
 // ---- helpers ---------------------------------------------------------------
@@ -199,7 +207,7 @@ function countFlags(s: ScreenResult): string {
 
 // ---- the document ---------------------------------------------------------------
 
-function markdown(primary: string, byEngine: Record<string, SystemResult[]>): string {
+function markdown(primary: string, byEngine: Record<string, SystemResult[]>, differences: Record<string, string[]>): string {
   const systems = byEngine[primary] ?? [];
   const out: string[] = [];
   out.push('# Kinema navigation map (generated)');
@@ -207,7 +215,7 @@ function markdown(primary: string, byEngine: Record<string, SystemResult[]>): st
   out.push(
     `Written by \`npm run test:nav\` (e2e/navmap.nav.ts). Engine shown: **${primary === 'edge' ? 'Microsoft Edge (the engine Windows and Android use)' : 'WebKit (the engine Linux uses)'}**. ` +
       'Screen size 1920×1080 with the TV layout on. Every control was put in focus in turn and each arrow pressed once, with the keyboard only (no mouse). ' +
-      'This is **what the app does today**, not what it should do: nothing here is checked against an expected answer.'
+      'The moves are checked against the expected answer in e2e/navmap.expected.json (see "Against the expected answer" below).'
   );
   out.push('');
   out.push(
@@ -264,6 +272,16 @@ function markdown(primary: string, byEngine: Record<string, SystemResult[]>): st
     }
     out.push('');
   }
+  out.push('## Against the expected answer');
+  out.push('');
+  const all = Object.values(differences).flat();
+  if (all.length === 0) out.push('No difference from e2e/navmap.expected.json in what ran.');
+  else {
+    out.push('Format: system · screen · control · arrow: expected, got (engine). `·` means focus stays, `∅` that nothing has focus. Edit the file by hand to agree a move, or run with `NAV_APPROVE=1` to take this run as the answer.');
+    out.push('');
+    for (const d of all) out.push(`- ${d}`);
+  }
+  out.push('');
   out.push('## Flag counts per screen');
   out.push('');
   out.push('| System | Screen | Flags (not counting no-move) | no-move | unreachable | trapped |');

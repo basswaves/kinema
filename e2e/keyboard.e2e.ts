@@ -160,7 +160,7 @@ for (const [label, errors, notice] of [
   test(`the startup scan's notice: ${label}`, async ({ page }) => {
     await page.addInitScript((e) => localStorage.setItem('kinemaMockScanErrors', e), JSON.stringify(errors));
     await open(page, 'windows');
-    await expect(page.locator('.browse-notice')).toHaveText(notice);
+    await expect(page.locator('.home-notice-scan .home-notice-text')).toHaveText(notice);
     // Only a notice: focus stays where it was, and Play still plays.
     expect(await focused(page)).toContain('Play');
     await press(page, 'Enter');
@@ -172,11 +172,70 @@ for (const [label, errors, notice] of [
   test(`the startup scan's notice leaves the top bar one Up away: ${label}`, async ({ page }) => {
     await page.addInitScript((e) => localStorage.setItem('kinemaMockScanErrors', e), JSON.stringify(errors));
     await open(page, 'windows');
-    await expect(page.locator('.browse-notice')).toBeVisible();
+    await expect(page.locator('.home-notice-scan')).toBeVisible();
     await press(page, 'ArrowUp');
     await expect.poll(() => focused(page)).toBe('Home');
   });
+
+  // A remote puts it away: Down to its OK (owner, 2026-10-11), and the ring
+  // goes back to Play.
+  test(`the startup scan's notice goes with OK, by remote: ${label}`, async ({ page }) => {
+    await page.addInitScript((e) => localStorage.setItem('kinemaMockScanErrors', e), JSON.stringify(errors));
+    await open(page, 'windows');
+    await press(page, 'ArrowDown');
+    await expect.poll(() => focused(page)).toBe('OK');
+    await press(page, 'Enter');
+    await expect(page.locator('.home-notice-scan')).toHaveCount(0);
+    await expect.poll(() => focused(page)).toContain('Play');
+  });
 }
+
+/**
+ * Whether the focused control is wholly on screen, below the top bar. Its own
+ * box, without the zoom a focused control grows by (a few pixels past the
+ * edge is the zoom, not the control).
+ */
+function focusedOnScreen(page: Page): Promise<boolean> {
+  return page.evaluate(() => {
+    const ring = document.querySelector<HTMLElement>('.focused');
+    if (!ring) return false;
+    const bar = document.querySelector('.top-nav')?.getBoundingClientRect().bottom ?? 0;
+    const r = ring.getBoundingClientRect();
+    const middle = (r.top + r.bottom) / 2;
+    const top = middle - ring.offsetHeight / 2;
+    const bottom = middle + ring.offsetHeight / 2;
+    return top >= bar - 1 && bottom <= window.innerHeight + 1;
+  });
+}
+
+// TV-FEEL N9 and N8, at a TV's layout: Home's notice opens Settings with the
+// Review button in sight, and an item opened by remote brings what opened
+// into sight with it.
+test('needs attention by remote: the Review button and an opened item are on screen', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('kinemaMockReview', 'items'));
+  await open(page, 'windows');
+  await tvMode(page);
+  for (let i = 0; i < 4 && (await focused(page)) !== 'Review'; i++) await press(page, 'ArrowDown');
+  expect(await focused(page)).toBe('Review');
+  await press(page, 'Enter');
+  await expect.poll(() => focused(page)).toMatch(/^Review 3 items/);
+  await expect.poll(() => focusedOnScreen(page)).toBe(true);
+
+  // The queue is open already: Home's notice asked for it.
+  await press(page, 'ArrowDown');
+  await expect.poll(() => focused(page)).toContain('Fixture Movie');
+  await press(page, 'Enter');
+  const box = page.locator('.fixmatch-row.open .fixmatch-input');
+  await expect(box).toBeVisible();
+  await expect
+    .poll(() =>
+      box.evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        return r.top >= 0 && r.bottom <= window.innerHeight;
+      })
+    )
+    .toBe(true);
+});
 
 // Matched by hand afterwards (or with a TMDB key added since), nothing waits
 // any more, and Home stops saying that films do (owner, 2026-10-09).
@@ -190,7 +249,7 @@ test("the startup scan's notice: Wikipedia's line goes once nothing waits", asyn
     }
   }, JSON.stringify([busy]));
   await open(page, 'windows');
-  const notice = page.locator('.browse-notice');
+  const notice = page.locator('.home-notice-scan .home-notice-text');
   await expect(notice).toHaveText(
     'Wikipedia was busy, so some films wait to be matched until the next scan'
   );
@@ -865,8 +924,9 @@ test('Settings: Up and Down stay in the open section, Left goes to the list', as
   expect(seen).toContain('Add movies folder');
 
   // Left goes to the list, onto the open section (after the buttons to the
-  // left in the same row); Right comes back to where one was.
-  for (let i = 0; i < 6 && (await focused(page)) !== 'Run setup again'; i++) await press(page, 'ArrowDown');
+  // left in the same row); Right comes back to where one was. Down visits
+  // every row on the way, never skipping one (NAV-MAP 2026-10-11).
+  for (let i = 0; i < 12 && (await focused(page)) !== 'Run setup again'; i++) await press(page, 'ArrowDown');
   await expect.poll(() => focused(page)).toBe('Run setup again');
   let left = '';
   for (let i = 0; i < 4 && (await place()) === 'section'; i++) {
@@ -886,9 +946,14 @@ test("a series' page lands on Play even when the next episode is slow to find", 
 }) => {
   await page.addInitScript(() => localStorage.setItem('kinemaMockSlowNextUp', '600'));
   await open(page, 'windows');
-  // The hero is the fixture series; More info opens its page.
-  await press(page, 'ArrowRight');
-  await expect.poll(() => focused(page)).toBe('More info');
+  // The fixture series from the first rail: the hero is a different title
+  // each day (hero.ts), and on some days a film.
+  const card = async () => (await focused(page)) ?? '';
+  for (let i = 0; i < 8 && !(await card()).startsWith('Example'); i++) await press(page, 'ArrowDown');
+  for (const way of ['ArrowLeft', 'ArrowRight']) {
+    for (let i = 0; i < 4 && !(await card()).startsWith('Example Show'); i++) await press(page, way);
+  }
+  expect(await card()).toMatch(/^Example Show/);
   await press(page, 'Enter');
   await expect(page.locator('.detail')).toBeVisible();
   await expect.poll(() => focused(page)).toMatch(/^▶ (Play|Resume) S\d\dE\d\d/);
@@ -1208,10 +1273,14 @@ test('Android: the log is shared, and no folder is offered to open', async ({ pa
   await expect(advanced).not.toContainText('Open log folder');
   await expect(advanced).not.toContainText('Open the folder of copies');
   await expect(advanced).not.toContainText('mpv.log');
-  // Beside "Show developer tools", in the same row.
-  for (let i = 0; i < 20 && (await focused(page)) !== 'Show developer tools'; i++) {
+  // Beside "Show developer tools", in the same row. Down from the Restore
+  // buttons on the right lands on the nearer of the two.
+  const row = ['Show developer tools', 'Share the log'];
+  for (let i = 0; i < 20 && !row.includes((await focused(page)) ?? ''); i++) {
     await press(page, 'ArrowDown');
   }
+  if ((await focused(page)) === 'Share the log') await press(page, 'ArrowLeft');
+  await expect.poll(() => focused(page)).toBe('Show developer tools');
   await press(page, 'ArrowRight');
   await expect.poll(() => focused(page)).toBe('Share the log');
   await press(page, 'Enter');

@@ -13,8 +13,8 @@ import {
   FocusContext,
   getCurrentFocusKey,
   setFocus,
-  useFocusable,
 } from '@noriginmedia/norigin-spatial-navigation';
+import { useFocusGroup } from './focusGroups';
 import FocusButton from './FocusButton';
 import { powerAction, type PowerAction } from './api';
 import { userError } from './errors';
@@ -28,7 +28,9 @@ interface Props {
 
 export default function LeaveDialog({ onClose }: Props) {
   // A boundary, so the arrows cannot wander onto Home behind the dialog.
-  const { ref, focusKey } = useFocusable({ isFocusBoundary: true, trackChildren: true });
+  // A menu (NAV-MAP, agreed 2026-10-11): focus never leaves it, and Up on
+  // Close Kinema goes round to Cancel and back.
+  const { ref, focusKey } = useFocusGroup('menu');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const can = useCapabilities();

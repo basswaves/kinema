@@ -30,7 +30,6 @@ import {
   FocusContext,
   getCurrentFocusKey,
   setFocus,
-  useFocusable,
 } from '@noriginmedia/norigin-spatial-navigation';
 import FocusButton from '../ui/FocusButton';
 import { endsAtLabel } from '../ui/format';
@@ -38,6 +37,7 @@ import { useTvMode } from '../ui/tv';
 import type { PlaybackTarget } from './api';
 import { isPaused, seekBy, seekTo, setPaused } from './engine';
 import { PLAYER_PLAY_KEY, PLAYER_SHELL_KEY } from './focusKeys';
+import { ALL_ARROWS, useFocusGroup } from '../ui/focusGroups';
 import PlayerControls from './PlayerControls';
 import ResumeToast from './ResumeToast';
 import SkipButton from './SkipButton';
@@ -94,12 +94,14 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   } = useTracks({ target, fail });
 
   // Every control in the player hangs off this container, so the OSD has one
-  // place to aim focus at and one place to remember where it was.
-  const { ref: shellRef, focusKey: shellFocusKey } = useFocusable({
+  // place to aim focus at and one place to remember where it was. A panel
+  // that holds every arrow (NAV-MAP, agreed 2026-10-11): Up or Left from Back
+  // used to send focus out of the player to nothing at all; now a press with
+  // nothing that way stays put, and Left/Right stay in their row.
+  const { ref: shellRef, focusKey: shellFocusKey } = useFocusGroup('panel', {
     focusKey: PLAYER_SHELL_KEY,
-    trackChildren: true,
-    saveLastFocusedChild: true,
-    preferredChildFocusKey: PLAYER_PLAY_KEY,
+    current: PLAYER_PLAY_KEY,
+    stopAt: ALL_ARROWS,
   });
   const { osdVisible, osdFocus, osdFocusRef, showOsd, enterOsdFocus, leaveOsdFocus, revealOsd } =
     useOsd({ sessionRef, paused });

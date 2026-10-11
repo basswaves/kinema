@@ -14,8 +14,10 @@ import FocusButton from './FocusButton';
 import FirstRun from './FirstRun';
 import SetupPages from './SetupPages';
 import HomeNotices from './HomeNotices';
+import type { ScanTrouble } from './scanTrouble';
 import type { Upgrade } from './qualityNotice';
 import { useClaimFocus } from './focus';
+import { useFocusGroup } from './focusGroups';
 import type { ContinueItem } from '../player/api';
 import { parseGenres, type Title } from './api';
 import { pickHero } from './hero';
@@ -45,6 +47,8 @@ interface Props {
   onChooseUpgrades: () => void;
   onDismissUpgrades: () => void;
   ffmpegMissing: boolean;
+  scanTrouble: ScanTrouble | null;
+  onDismissScanTrouble: () => void;
   onFfmpeg: () => void;
   onDismissFfmpeg: () => void;
 }
@@ -86,6 +90,8 @@ export default function Home({
   onChooseUpgrades,
   onDismissUpgrades,
   ffmpegMissing,
+  scanTrouble,
+  onDismissScanTrouble,
   onFfmpeg,
   onDismissFfmpeg,
 }: Props) {
@@ -126,7 +132,9 @@ export default function Home({
       .slice(0, 8);
   }, [titles]);
 
-  useClaimFocus(HERO_PLAY_FOCUS_KEY, Boolean(hero) && !setupOpen);
+  // A page (focus.ts): Play, even from the top bar the library's own restore
+  // parked the ring on while the titles loaded.
+  useClaimFocus(HERO_PLAY_FOCUS_KEY, Boolean(hero) && !setupOpen, true);
 
   // Until finished or left, however soon the first scan fills the library
   // behind them: titles arriving must not take the questions away mid-answer.
@@ -149,6 +157,8 @@ export default function Home({
         {hero && <Hero title={hero} onPlay={onPlay} onSelect={onSelect} />}
 
         <HomeNotices
+          scanTrouble={scanTrouble}
+          onDismissScanTrouble={onDismissScanTrouble}
           reviewCount={reviewCount}
           onReview={onReview}
           keyRejected={keyRejected}
@@ -203,7 +213,9 @@ function Hero({
   onPlay: (title: Title) => void;
   onSelect: (title: Title) => void;
 }) {
-  const { ref, focusKey } = useFocusable({ trackChildren: true });
+  // A row landing on Play (NAV-MAP, agreed 2026-10-11): Up from a notice
+  // under it is Play, whichever notice button it came from.
+  const { ref, focusKey } = useFocusGroup<HTMLElement>('row', { current: HERO_PLAY_FOCUS_KEY });
 
   return (
     <FocusContext.Provider value={focusKey}>

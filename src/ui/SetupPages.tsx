@@ -33,6 +33,7 @@ import AccountSection from './AccountSection';
 import { OpenSubtitlesSection } from './SubtitlesSettings';
 import ExtrasSetup from './ExtrasSetup';
 import { scrollPageToTop, useClaimFocus } from './focus';
+import { useFocusGroup } from './focusGroups';
 
 /** 'open' while the pages are up, 'done' once finished or left. */
 export const SETUP_PAGES_KEY = 'setup_pages';
@@ -62,11 +63,14 @@ interface Props {
 }
 
 export default function SetupPages({ onClose }: Props) {
+  // A page of its own (NAV-MAP, agreed 2026-10-11): Up from Next or Finish
+  // later is nothing, not the top bar.
   const { ref, focusKey } = useFocusable({
     focusKey: SETUP_FOCUS_KEY,
     trackChildren: true,
     saveLastFocusedChild: false,
     preferredChildFocusKey: PAGE_FOCUS_KEY,
+    isFocusBoundary: true,
   });
   const can = useCapabilities();
   const scan = useScanStatus();
@@ -312,10 +316,10 @@ export default function SetupPages({ onClose }: Props) {
  */
 function PageBody({ id, children }: { id: string; children: ReactNode }) {
   const [hasControls, setHasControls] = useState(false);
-  const { ref, focusKey } = useFocusable<object, HTMLElement>({
+  // A panel: Up from an answer is the answer above it (Next only from the
+  // first), never a jump past the others to Next (NAV-MAP, 2026-10-11).
+  const { ref, focusKey } = useFocusGroup<HTMLElement>('panel', {
     focusKey: PAGE_FOCUS_KEY,
-    trackChildren: true,
-    saveLastFocusedChild: false,
     focusable: hasControls,
   });
 

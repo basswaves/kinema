@@ -16,6 +16,10 @@
 //! TheIntroDB is asked first because it is told the file's length and uses it
 //! to tell releases apart; IntroDB.app is not.
 //!
+//! One exception between the two services: a film's scene after the credits
+//! brings IntroDB.app's own credits start with it (`fill_from`), so the card
+//! that offers the jump never shows before those credits.
+//!
 //! **One rule, applied to both segments: local before remote.** Something
 //! measured against the actual bytes on this disk beats something timed by
 //! somebody against *a* copy of the episode. That is the same judgement the
@@ -79,7 +83,7 @@ const MIN_SKIPTRO_CONFIDENCE: f64 = 0.8;
 /// Changes whenever the *ranking* changes, so rows cached under the old rules
 /// are recomputed. Without it `local_key` covers every input but the code, and
 /// a new rule would not reach an episode until one of its sources moved.
-const RANKING_VERSION: &str = "rank3";
+const RANKING_VERSION: &str = "rank4";
 
 #[derive(Serialize, Clone, Copy, Debug, PartialEq)]
 pub struct Segment {
@@ -146,6 +150,19 @@ impl SkipMarkers {
             if let Some(scene) = found.post_credits {
                 self.post_credits = Some(closed(scene));
                 self.post_credits_source = Some(source.into());
+                // A scene after the credits is timed against *its own* service's
+                // credits, and the "skip to the scene" card is offered from where
+                // the credits start. Beside another community service's credits
+                // that card can show many minutes early, over the ending: one
+                // film had TheIntroDB's credits 13 minutes before IntroDB.app's,
+                // with the scene at the very end. So the pair stays together.
+                // Credits measured on this file (analysis, a sidecar) still win.
+                if self.credits_source.as_deref() == Some(FROM_INTRODB) && source != FROM_INTRODB {
+                    if let Some((start, end)) = found.credits {
+                        self.credits = Some(Segment { start, end });
+                        self.credits_source = Some(source.into());
+                    }
+                }
             }
         }
     }
@@ -1180,19 +1197,48 @@ mod tests {
         assert_eq!(markers.recap.unwrap().end, Some(40.0));
     }
 
-    /// A film's scene after the credits comes through beside credits from
-    /// another source; whether the two fit together is `skip.ts`'s question.
+    /// A film's scene after the credits keeps the credits of the service that
+    /// timed it. Real numbers: TheIntroDB had the credits 13 minutes before
+    /// IntroDB.app's, and the "skip to the scene" card, which shows from the
+    /// credits' start, came up over the film's ending.
     #[test]
-    fn the_scene_after_the_credits_is_carried_beside_other_credits() {
+    fn the_scene_after_the_credits_brings_its_own_credits() {
         let mut markers = SkipMarkers::default();
-        markers.fill_from(&answer(None, None, Some((7000.0, None)), None), FROM_INTRODB);
+        markers.fill_from(&answer(None, None, Some((7339.9, None)), None), FROM_INTRODB);
         markers.fill_from(
-            &answer(None, None, Some((7010.0, Some(7500.0))), Some((7500.0, 7560.0))),
+            &answer(None, None, Some((8128.7, Some(8662.3))), Some((8662.3, 8700.6))),
             FROM_INTRODB_APP,
         );
-        assert_eq!(markers.credits_source.as_deref(), Some(FROM_INTRODB));
+        assert_eq!(markers.credits_source.as_deref(), Some(FROM_INTRODB_APP));
+        assert_eq!(markers.credits.unwrap().start, 8128.7);
         assert_eq!(markers.post_credits_source.as_deref(), Some(FROM_INTRODB_APP));
-        assert_eq!(markers.post_credits, Some(Segment { start: 7500.0, end: Some(7560.0) }));
+        assert_eq!(markers.post_credits, Some(Segment { start: 8662.3, end: Some(8700.6) }));
+    }
+
+    /// Credits measured on this file are never swapped for a service's, scene
+    /// or no scene; and without a scene TheIntroDB's credits stand.
+    #[test]
+    fn measured_credits_and_scene_less_credits_are_left_alone() {
+        let mut measured = SkipMarkers {
+            credits: Some(Segment { start: 8000.0, end: None }),
+            credits_source: Some(FROM_ANALYSIS.into()),
+            ..Default::default()
+        };
+        measured.fill_from(
+            &answer(None, None, Some((8128.7, Some(8662.3))), Some((8662.3, 8700.6))),
+            FROM_INTRODB_APP,
+        );
+        assert_eq!(measured.credits_source.as_deref(), Some(FROM_ANALYSIS));
+        assert_eq!(measured.credits.unwrap().start, 8000.0);
+
+        let mut plain = SkipMarkers::default();
+        plain.fill_from(&answer(None, None, Some((7339.9, None)), None), FROM_INTRODB);
+        plain.fill_from(
+            &answer(None, None, Some((8128.7, Some(8662.3))), None),
+            FROM_INTRODB_APP,
+        );
+        assert_eq!(plain.credits_source.as_deref(), Some(FROM_INTRODB));
+        assert_eq!(plain.credits.unwrap().start, 7339.9);
     }
 
     /// A recap alone is still something to say.

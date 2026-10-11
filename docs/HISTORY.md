@@ -1990,6 +1990,19 @@ offered only when it starts after the credits and fits inside the file being
 played; that check needs the file's length, so it is made in the player
 (`checkedAgainstFile`), not in Rust.
 
+**A scene and the credits before it are one pair (2026-10-11).** The card
+that offers the jump shows from where the credits start. On a recent big
+film, TheIntroDB had the credits at 2 h 02 min and IntroDB.app at 2 h 15 min
+(its credits ending where the scene, at the very end, began), so the card —
+credits from the first, scene from the second — came up thirteen minutes
+early, over the ending. The two disagree and the data cannot say which is right
+in general, but the scene is timed against *its own* service's credits: when
+IntroDB.app supplies the scene, its credits start comes with it, replacing
+TheIntroDB's. Credits measured on the file itself (the app's analysis, a
+sidecar) still win over both, and a film with no scene keeps TheIntroDB's
+credits as before. `RANKING_VERSION` moved so rows cached under the old rule
+are recomputed.
+
 Two changes to the skip cache came with it. With two network sources, one
 "asked at" time could not say which was due, so each service's answer now has
 a row of its own (`remote_skip_answers`, schema 19). And the cache key now

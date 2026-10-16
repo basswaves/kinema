@@ -4,6 +4,13 @@ Every entry here cost a real debugging round. Most share a shape: **the code was
 correct and simply never ran, or failed silently in a place with no visible output.**
 Read this before touching the player.
 
+An entry describes a trap that is **still there** — in a library, a system, a
+tool, or the shape of this code. When the trap goes away (a fix that makes it
+impossible, an upgrade, the code it lived in removed), the entry goes too, and
+the story of the fix belongs in HISTORY.md. A bug that was fixed and cannot
+come back is not a gotcha. Last checked entry by entry against the code on
+2026-10-16.
+
 ---
 
 ## libmpv / tauri-plugin-libmpv
@@ -52,8 +59,10 @@ This is invisible: the new `case` looks right, nothing errors, events simply nev
 arrive. It cost a full round on next-episode autoplay while mpv's log proved the file
 was ending (`EOF code: 4`).
 
-**Do:** poll with `getProperty` for anything load-bearing. One property read per second
-is nothing next to a lost debugging round.
+**Do:** add the property to `observedProperties` in `engine.ts` and test it only
+after a full restart of the app — that is how `eof-reached` is heard now. Where a
+value is wanted only while something is on screen, polling with `getProperty` is
+the simpler answer, and the stats panel does that (once a second, while open).
 
 ### `keep-open=yes` means `end-file` never fires
 
@@ -241,6 +250,16 @@ React StrictMode double-invokes effects and HMR remounts components; either can 
 `window` (not module scope — Vite replaces the module on HMR). StrictMode is
 deliberately **off** in `src/main.tsx` for this reason.
 
+### Subtitle file names are not always the film's, exactly
+
+mpv's `sub-auto=fuzzy` takes a subtitle file whose name contains the
+film's. A release's own subtitle file said `7. 1` where the film said
+`7.1`, and was never offered — on Android, which took the same rule
+(`subtitle_files.rs`), or on the desktop. **Do:** compare the names with
+spaces, marks and capitals left out, and hand mpv the files its own search
+misses (`addSubtitlesBeside` in engine.ts) — not the others: a file handed
+over that mpv also finds itself is listed twice, and loses its language.
+
 ---
 
 ## Tauri
@@ -335,7 +354,7 @@ watching something during a scan would silently lose resume points.
 
 **Do:** `conn.busy_timeout(…)` on every connection. Use the rusqlite method
 rather than `PRAGMA busy_timeout`, which returns a row and so cannot go in an
-`execute_batch` (the same trap `journal_mode` already documents above).
+`execute_batch` (`PRAGMA journal_mode` is the same).
 
 **And:** bound how long any one transaction holds the write lock. The scanner
 commits every 500 files rather than once per root, and — more importantly —
@@ -358,6 +377,22 @@ the real file.
 **Do:** `file:…?mode=ro`, which reads the WAL and still cannot write. It needs
 the `-shm` file to be present and readable; when it is not, the open *fails
 loudly*, which is the right failure.
+
+### A WAL database's mtime is not its version
+
+Following from `immutable=1` above: `skiptro.db` can go untouched through a
+scan that adds hundreds of rows, because they land in `skiptro.db-wal`. Any
+cache keyed on the main file's size and mtime looks completely correct and
+never notices new data — the same shape of bug as a cache key that leaves out
+the video itself (Library and intro detection, "A file that is still
+arriving").
+
+**Do:** stamp the `-wal` file too. `skiptro::version_stamp` covers both, and
+there is a test that fails if the `-wal` is dropped from it.
+
+---
+
+## Library and intro detection
 
 ### A graceful fallback with nothing to show for it is a silent bug
 
@@ -473,16 +508,6 @@ is not, plus `parsed_season`. Falling back to the parsed title is also what lets
 detection work on the Needs attention queue, which is the one thing no other
 marker source can do.
 
-### A WAL database's mtime is not its version
-
-Following directly from the above: `skiptro.db` can go untouched through a scan
-that adds hundreds of rows, because they land in `skiptro.db-wal`. Any cache
-keyed on the main file's size and mtime looks completely correct and never
-notices new data — the same shape of bug as caching "no markers" forever.
-
-**Do:** stamp the `-wal` file too. `skiptro::version_stamp` covers both, and
-there is a test that fails if the `-wal` is dropped from it.
-
 ---
 
 ## Child processes
@@ -547,28 +572,6 @@ slice, and remux; ffprobe then reads it as a Dolby Vision stream.
 Every entry below is invisible with a mouse. Hovering re-establishes focus and
 clicking reaches anything, so the UI tests perfectly on a desk and is unusable
 from a sofa. **Test D-pad changes with the mouse physically untouched.**
-
-### A condition inside `try` switches the react-hooks rules off for the whole component
-
-The react-hooks rules run on the React Compiler, which cannot yet lower a
-condition — `?:`, `||`, `??`, `?.` — inside a `try` block. It does not report
-that; it skips the component. Every rule in the file goes quiet at once, and
-the only trace is a crop of "unused eslint-disable directive" warnings where
-disables that used to be needed no longer are. Found when adding "Find
-subtitles online" to the player. **Do:** keep `try` out of components and
-hooks — put the awaited work in a function outside that returns what to show
-(`onlineSearch` in useOnlineSubtitles.ts, `subtitlesShown` in engine.ts) —
-and treat a sudden batch of unused-disable warnings as the compiler bailing
-out, not as tidying to do.
-
-**To check rather than infer:** `npx eslint --rule '{"react-hooks/todo":"error"}'
-src` names every function the compiler could not lower. Not every entry there
-switches the rules off: the `try … finally` in useSkipMarkers.ts is listed,
-yet a setState put in an effect in that hook is still reported. Before
-concluding the rules have gone quiet, put a known violation in and see. And an
-unused disable can also mean the code moved: a state setter passed into a hook
-as a plain function is no longer known as a setter, so the disable that its
-call needed in the component is not needed there.
 
 ### A focus key that changes is never registered
 
@@ -811,43 +814,6 @@ does **not** mean "stay". **Do:** say which arrows a group holds with
 `useFocusGroup`); a held arrow with nothing that way leaves focus where it is.
 A row holds Left and Right, the player and a page of its own all four.
 
-### The navigation checker's walk is part of what it measures
-
-The checker stands on every control in turn and presses each arrow, so a
-group that remembers its last control (a rail, the letter pad) answers with
-wherever the walk last stood. Its first map said Up from a rail went to "the
-last card" of the rail above and Up from a search result to the key "8" — both
-were the memory working, the walk having just visited them. **Do:** before
-calling a move wrong, ask what the walk had just focused in the group it
-lands in.
-
-### An edit during a Playwright run reloads the page under it
-
-The tests run against the Vite dev server, which reloads a module the moment
-its file is saved. Saving a component while `test:nav` or `test:ui` is running
-reloads the page mid-screen: a screen comes back "not walked", or a flow fails
-at a step that has nothing to do with the change. **Do:** leave `src/` alone
-while a run is going (docs and notes are safe), and re-run the screen rather
-than reading anything into the failure.
-
-### A hidden browser pane never scrolls smoothly
-
-When testing `dev:mock` in a browser pane embedded in another program: while the pane is hidden,
-`requestAnimationFrame` never fires, so a `behavior: 'smooth'` scroll never
-starts. `document.visibilityState` still says `visible`, instant scrolls
-still work, and the result looks exactly like `keepInView` being broken — the
-focus ring walks off the screen and the page stays put. Make sure the pane is
-visible before believing any scroll result.
-
-### Two key presses 25 ms apart are one key press
-
-`Browse.tsx` sets `throttleKeypresses` with a 25 ms throttle, which is what
-keeps a held arrow from racing through a rail. A scripted test that presses
-Right and Enter back to back — as a browser tool's batch does — has the
-Enter dropped, and it looks exactly like a control that does not respond, or
-focus that will not move. No remote presses that fast. **Do:** wait between
-scripted presses before believing a key did nothing.
-
 ### A focus zoom can swallow the gap to the control below it
 
 Continue Watching's **Remove** sits below its card precisely so Down reaches it
@@ -869,19 +835,10 @@ covered the middle button entirely, so Right went straight from the first to
 the third. The row had lost its `gap` (below). **Do:** every row of buttons
 needs a real `gap`, not buttons that happen to touch.
 
-### A CSS block pasted into a selector list takes the list's rule with it
-
-`.settings-row,` was the first half of `.settings-row, .settings-toggle-row {
-display: flex; gap … }`. A later change inserted a new commented block between
-the two lines, so the stylesheet read `.settings-row, .choice-row { margin … }`
-and the settings rows silently lost their flex layout and their gap: no error,
-nothing in the diff that looks like a deletion. **Do:** when adding a block to
-`ui.css`, check the line above it does not end in a comma.
-
 ### A control overlaid on a card is unreachable, wherever you put it
 
-The corollary of the two entries above, and the one that decides layout. Spatial
-movement is geometric, so a button drawn *inside* another focusable's rectangle
+The corollary of "Focus cannot travel up into an overlay nav" and the focus
+zoom above, and the one that decides layout. Spatial movement is geometric, so a button drawn *inside* another focusable's rectangle
 — a ✕ in the corner of a card, a badge on a thumbnail — cannot be reached from
 it in **any** direction: right needs the candidate's left edge past the current
 right edge, up needs its bottom edge above the current top edge, and an overlay
@@ -900,7 +857,7 @@ control drawn *inside* another focusable. Going right requires
 `sibling.left >= current.right`; a button rendered within the row's own
 rectangle can never satisfy that, so adding a second `useFocusable` next to the
 row's produces a control that renders, styles, hovers and clicks — and that a
-D-pad simply cannot reach. Identical symptom to the four bare `<button>`s, and
+D-pad simply cannot reach. Identical symptom to a bare `<button>` (below), and
 identically invisible with a mouse.
 
 **Do:** make the row a **container** (`trackChildren`, `saveLastFocusedChild`)
@@ -914,7 +871,7 @@ A container is only worth having if it has a reachable child. An episode the
 library does not hold has neither a play target nor anything to mark, so it is
 rendered by `MissingEpisodeRow` with no focusable at all — a container whose
 children are all unfocusable becomes a landing spot that swallows focus and
-answers nothing, which looks exactly like the dead-key hang below.
+answers nothing, which looks exactly like the dead-key hang above.
 
 ### A bare `<button>` is invisible to a remote
 
@@ -992,9 +949,132 @@ parent's own search, which sees the whole grid as one block. A group with no
 cards is `focusable: false`, and names a `preferredChildFocusKey`, or focusing
 the group measures all its children after all.
 
+### An Enter a text field acts on must stop there
+
+A field's `onEnter` that answers at once (a sign-in against the mock) put
+the ring on the next screen's first button before the spatial library saw
+the same keydown, which then pressed that button too. **Do:** FocusInput
+stops the event when its `onEnter` takes it.
+
 ---
 
 ## Frontend
+
+### A condition inside `try` switches the react-hooks rules off for the whole component
+
+The react-hooks rules run on the React Compiler, which cannot yet lower a
+condition — `?:`, `||`, `??`, `?.` — inside a `try` block. It does not report
+that; it skips the component. Every rule in the file goes quiet at once, and
+the only trace is a crop of "unused eslint-disable directive" warnings where
+disables that used to be needed no longer are. Found when adding "Find
+subtitles online" to the player. **Do:** keep `try` out of components and
+hooks — put the awaited work in a function outside that returns what to show
+(`onlineSearch` in useOnlineSubtitles.ts, `subtitlesShown` in engine.ts) —
+and treat a sudden batch of unused-disable warnings as the compiler bailing
+out, not as tidying to do.
+
+**To check rather than infer:** `npx eslint --rule '{"react-hooks/todo":"error"}'
+src` names every function the compiler could not lower. Not every entry there
+switches the rules off: the `try … finally` in useSkipMarkers.ts is listed,
+yet a setState put in an effect in that hook is still reported. Before
+concluding the rules have gone quiet, put a known violation in and see. And an
+unused disable can also mean the code moved: a state setter passed into a hook
+as a plain function is no longer known as a setter, so the disable that its
+call needed in the component is not needed there.
+
+### A CSS block pasted into a selector list takes the list's rule with it
+
+`.settings-row,` was the first half of `.settings-row, .settings-toggle-row {
+display: flex; gap … }`. A later change inserted a new commented block between
+the two lines, so the stylesheet read `.settings-row, .choice-row { margin … }`
+and the settings rows silently lost their flex layout and their gap: no error,
+nothing in the diff that looks like a deletion. **Do:** when adding a block to
+`ui.css`, check the line above it does not end in a comma.
+
+### `process is not defined` from guessit-js
+
+guessit-js reads `process.env.DEBUG_*`. In Node those are harmlessly `undefined`; in a
+webview the bare `process` reference throws on the **first parse call**, so the parser
+appeared to work and find nothing. Fixed by a Vite `define` mapping `process.env` to
+`({})` — those three debug flags are its only `process` usage.
+
+**Lesson:** a library working under Node proves nothing about WebView2. Test in the app.
+
+### …and that `define` value must be `{}`, not `({})`
+
+The obvious fix has a second trap in it. esbuild requires a `define` value to be
+a JS literal or an entity name, and rejects `'({})'` with:
+
+```
+Invalid define value (must be an entity name or JS literal): ({})
+```
+
+`vite dev` never validates defines, so the parenthesised form worked perfectly in
+development while `vite build` — and therefore `tauri build`, which runs
+`npm run build` — could not produce a bundle at all. Nothing that runs day to
+day touches the failing path, so it stayed broken silently.
+
+**Do:** run `npm run build`, not just `npm run check`, before trusting that the
+app can still be shipped. `check` is `tsc + eslint` and never invokes the bundler.
+
+### Don't swallow errors in a parser or a command wrapper
+
+A parser that throws on every file looks *identical* to one that works and finds
+nothing. Surface failures; the `catch` that hides them costs more than it saves.
+
+### The spatial library marks every control it ever focused
+
+norigin sets `data-focused="true"` on a control when it focuses it, and takes
+it off again only when `shouldFocusDOMNode` is on — which Kinema leaves off.
+So the attribute means "was focused at some point while it was mounted", not
+"is focused". **Do:** read the `focused` class that FocusButton sets, never
+`[data-focused]`, in tests and styles alike.
+
+### Stale closures silently use old values
+
+`runMatch` read a `tmdbKey` captured before the key was entered, so matching fell back
+to OMDb while the UI showed TMDB as active. No error, just quietly wrong behaviour.
+ESLint's `react-hooks/exhaustive-deps` is set to **error** for this reason.
+
+**Better still:** read values that matter (API keys) from the database at use time
+rather than from component state.
+
+### The webview console is invisible from outside
+
+`src/devlog.ts` forwards `console.*`, uncaught errors and unhandled rejections to
+`app.log` (in `%APPDATA%\com.kinema.app\logs\`). Without it, frontend failures
+leave no external trace at all. The Rust side writes there too, through
+`crate::log!` — `eprintln!` reaches no console in a release build.
+
+### Confirmation at the top of a long page makes a working button look dead
+
+Settings writes every action's result to one `settings-note` banner under its
+heading. When Settings was one long page, **Save commands** sat about 300 lines
+further down, so pressing it saved three settings and put "Commands saved."
+entirely off screen. It was reported as a dead button and proposed for
+deletion; reading the handler was the only thing that showed it was not.
+Settings is one section at a time now, and those fields save themselves.
+
+**Do:** when a page is longer than a screen, put the confirmation next to the
+control, or remove the need to confirm — saving on change, as Settings does.
+
+**And:** an explicit save button next to fields that something *else* reads is a
+second trap on its own. Typing a new detect command and pressing **Detect**
+without saving ran the previous one, silently. `runDetect` flushes the fields
+before invoking Rust, so the debounce is a courtesy rather than a race.
+
+### A standard scrollbar property switches the styled one off
+
+WebView2, like Chrome, ignores every `::-webkit-scrollbar` rule on an element
+that sets `scrollbar-width` or `scrollbar-color` — and only the pseudo-elements
+can round the thumb and drop the arrow buttons. Adding `scrollbar-color` to
+"help" brings Windows' grey bar straight back. The rails and cast rows set
+`scrollbar-width: none` on purpose, to stay hidden. **Do:** style scrollbars
+with the pseudo-elements only (`ui.css`, after `.browse`).
+
+---
+
+## Testing and tools
 
 ### The dev server can go on serving a stylesheet from before an edit
 
@@ -1039,13 +1119,6 @@ a thousand test files, 2026-10-10) and the dev server watched them. All three
 now skip `.claude/` (`eslint.config.js`, `vite.config.ts`); a new tool that
 walks the project needs the same line.
 
-### A self-test presses keys and never lets go
-
-`selftest.ts` dispatches `keydown` only. Anything that acts on the key's
-release gets no release: the player's accelerating seek commits on `keyup`, so
-under a self-test it commits through its fallback instead, half a second after
-the last press. Plans that seek with the arrows should allow for that.
-
 ### A self-test's screenshots are of whatever window is in front
 
 `selftest.ps1` photographs the primary screen, not Kinema's window. Started
@@ -1070,37 +1143,6 @@ read mpv with a `probe` action while the file plays. The plan's own `probe`
 list runs after the player has closed, when there is no file and no sound
 output to ask about.
 
-### `process is not defined` from guessit-js
-
-guessit-js reads `process.env.DEBUG_*`. In Node those are harmlessly `undefined`; in a
-webview the bare `process` reference throws on the **first parse call**, so the parser
-appeared to work and find nothing. Fixed by a Vite `define` mapping `process.env` to
-`({})` — those three debug flags are its only `process` usage.
-
-**Lesson:** a library working under Node proves nothing about WebView2. Test in the app.
-
-### …and that `define` value must be `{}`, not `({})`
-
-The obvious fix has a second trap in it. esbuild requires a `define` value to be
-a JS literal or an entity name, and rejects `'({})'` with:
-
-```
-Invalid define value (must be an entity name or JS literal): ({})
-```
-
-`vite dev` never validates defines, so the parenthesised form worked perfectly in
-development while `vite build` — and therefore `tauri build`, which runs
-`npm run build` — could not produce a bundle at all. Nothing that runs day to
-day touches the failing path, so it stayed broken silently.
-
-**Do:** run `npm run build`, not just `npm run check`, before trusting that the
-app can still be shipped. `check` is `tsc + eslint` and never invokes the bundler.
-
-### Don't swallow errors in a parser or a command wrapper
-
-A parser that throws on every file looks *identical* to one that works and finds
-nothing. Surface failures; the `catch` that hides them costs more than it saves.
-
 ### Moving effects into hooks moves them in React's order
 
 A component's effects run in the order they are written; a hook's run where
@@ -1121,63 +1163,52 @@ effects changed place and why that is safe. A difference that appears is
 either a real change or the mock's instant answers; moving the one effect in
 the old code tells which.
 
-### The spatial library marks every control it ever focused
+### The navigation checker's walk is part of what it measures
 
-norigin sets `data-focused="true"` on a control when it focuses it, and takes
-it off again only when `shouldFocusDOMNode` is on — which Kinema leaves off.
-So the attribute means "was focused at some point while it was mounted", not
-"is focused". **Do:** read the `focused` class that FocusButton sets, never
-`[data-focused]`, in tests and styles alike.
+The checker stands on every control in turn and presses each arrow, so a
+group that remembers its last control (a rail, the letter pad) answers with
+wherever the walk last stood. Its first map said Up from a rail went to "the
+last card" of the rail above and Up from a search result to the key "8" — both
+were the memory working, the walk having just visited them. **Do:** before
+calling a move wrong, ask what the walk had just focused in the group it
+lands in.
 
-### Stale closures silently use old values
+### An edit during a Playwright run reloads the page under it
 
-`runMatch` read a `tmdbKey` captured before the key was entered, so matching fell back
-to OMDb while the UI showed TMDB as active. No error, just quietly wrong behaviour.
-ESLint's `react-hooks/exhaustive-deps` is set to **error** for this reason.
+The tests run against the Vite dev server, which reloads a module the moment
+its file is saved. Saving a component while `test:nav` or `test:ui` is running
+reloads the page mid-screen: a screen comes back "not walked", or a flow fails
+at a step that has nothing to do with the change. **Do:** leave `src/` alone
+while a run is going (docs and notes are safe), and re-run the screen rather
+than reading anything into the failure.
 
-**Better still:** read values that matter (API keys) from the database at use time
-rather than from component state.
+### A hidden browser pane never scrolls smoothly
 
-### The webview console is invisible from outside
+When testing `dev:mock` in a browser pane embedded in another program: while the pane is hidden,
+`requestAnimationFrame` never fires, so a `behavior: 'smooth'` scroll never
+starts. `document.visibilityState` still says `visible`, instant scrolls
+still work, and the result looks exactly like `keepInView` being broken — the
+focus ring walks off the screen and the page stays put. Make sure the pane is
+visible before believing any scroll result.
 
-`src/devlog.ts` forwards `console.*`, uncaught errors and unhandled rejections to
-`app.log` (in `%APPDATA%\com.kinema.app\logs\`). Without it, frontend failures
-leave no external trace at all. The Rust side writes there too, through
-`crate::log!` — `eprintln!` reaches no console in a release build.
+### Two key presses 25 ms apart are one key press
 
-### Confirmation at the top of a long page makes a working button look dead
+`Browse.tsx` sets `throttleKeypresses` with a 25 ms throttle, which is what
+keeps a held arrow from racing through a rail. A scripted test that presses
+Right and Enter back to back — as a browser tool's batch does — has the
+Enter dropped, and it looks exactly like a control that does not respond, or
+focus that will not move. No remote presses that fast. **Do:** wait between
+scripted presses before believing a key did nothing.
 
-Settings shows one `settings-note` banner directly under its `<h1>`, and every
-action on the page writes to it. That is fine near the top and useless near the
-bottom: **Save commands** sat roughly 300 lines of markup further down, so
-pressing it saved three settings and put "Commands saved." somewhere entirely
-off screen. It was reported as a dead button and proposed for deletion, and
-reading the handler is the only thing that showed it was not — there was no
-error, and the state really did persist.
+### Restoring files after a "without the fix" build can leave cargo on the old one
 
-**Do:** when the page is longer than a screen, either put the confirmation next
-to the control, or remove the need to confirm at all. The button is gone now —
-the three fields save themselves on a debounce, like every other control on the
-page — which is the better answer where it is available.
-
-**And:** an explicit save button next to fields that something *else* reads is a
-second trap on its own. Typing a new detect command and pressing **Detect**
-without saving ran the previous one, silently. `runDetect` now flushes the
-fields before invoking Rust, so the debounce is a courtesy rather than a race.
-
-**Note** the same banner still serves the shorter sections higher up, where it
-is genuinely visible from the control that wrote it.
+Copying the originals in, building, then copying the fixed files back and
+syncing from the worktree (rsync keeps the source's older times) leaves the
+sources *older* than the last build, so cargo keeps the experimental build
+and the tests fail for no visible reason. **Do:** `touch` the restored
+files.
 
 ---
-
-### A standard scrollbar property switches the styled one off
-
-WebView2, like Chrome, ignores every `::-webkit-scrollbar` rule on an element
-that sets `scrollbar-width` or `scrollbar-color` — and only the pseudo-elements
-can round the thumb and drop the arrow buttons. Adding `scrollbar-color` to
-"help" brings Windows' grey bar straight back. The rails and cast rows set
-`scrollbar-width: none` on purpose, to stay hidden. **Do:** style scrollbars
-with the pseudo-elements only (`ui.css`, after `.browse`).
 
 ## quick-xml (NFO parsing)
 
@@ -1247,6 +1278,8 @@ left its times on every episode already played, with no way to tell why.
 **Do:** anything that decides which sources may answer belongs in the cache
 key (`local_key`'s `remotes`).
 
+---
+
 ## SIMKL
 
 ### Nobody saying no looks exactly like nobody having answered yet
@@ -1275,6 +1308,8 @@ before refreshing; a self-test never talks to SIMKL.
 A typo in `scope` gets a working token that fails at the first write. **Do:**
 check the granted `scope` for `media:write` before storing a token.
 
+---
+
 ## OpenSubtitles
 
 ### A value equal to the default is answered with a redirect
@@ -1292,6 +1327,8 @@ add-on renews it after 20. There is no refresh token and no device approval,
 so renewing means the password. Kinema keeps it (DPAPI on Windows) and, when
 signing in again fails, carries on with the free allowance rather than
 failing the download.
+
+---
 
 ## Trakt
 
@@ -1321,6 +1358,8 @@ before doing anything else; a crash between the answer and the write loses the
 sign-in. A refresh refused because another process already used the token looks
 exactly like one revoked by the user — compare with what is stored first.
 
+---
+
 ## Output hardware (Windows)
 
 What the screens and the audio device can take. Every entry here is something
@@ -1347,8 +1386,8 @@ drift from mpv a "yes" stops meaning anything.
 at its default, **`target`**, mpv first adapts the picture to the peak Windows
 reports for the screen — which comes from the EDID and is often generic. `source`
 is what a disc player does: the film's own HDR10 metadata, and the TV tone maps.
-Until native output (HISTORY → Native output), `mpvOptions.ts` says "passes through
-untouched" and it does not.
+`mpvOptions.ts` sets `source`; before native output (HISTORY → Native output) it
+said "passes through untouched" while mpv used `target`, and nothing showed it.
 
 ### mpv sends HDR10 to an SDR screen, and Windows quietly converts it
 
@@ -1367,12 +1406,16 @@ stays SDR.
 
 ### The stats panel's HDR row asked for a property that does not exist
 
-`stats.ts` reads `target-params/gamma`. mpv's property is
+`stats.ts` read `target-params/gamma`. mpv's property is
 **`video-target-params`**; the other name returns nothing, and `describeHdr`
-treats nothing as "tone mapping". So every HDR file said "tone mapped" — on an
+treated nothing as "tone mapping". So every HDR file said "tone mapped" — on an
 HDR TV that was receiving HDR10 — and the panel whose whole purpose is to
 answer "passthrough or not?" could never say passthrough. Found from the test TV
 log, where the swap chain plainly went to `RGB_FULL_G2084_NONE_P2020`.
+
+The trap that stays: **mpv answers a property it does not have with nothing**,
+exactly as it answers one with no value yet. **Do:** never let "no answer" stand
+for one of the answers; `describeHdr` now says it does not know.
 
 **How to tell what really happened:** in `mpv.log`, "New swap chain
 configuration received from hint" gives the output colour space, and a
@@ -1507,6 +1550,8 @@ holds the device exclusively (`AUDCLNT_E_DEVICE_IN_USE`): report that as
 "busy", not as "no", or a receiver in use by something else looks like one that
 takes nothing.
 
+---
+
 ## Environment (Windows)
 
 ### Spawned shells inherit a stale PATH
@@ -1573,6 +1618,7 @@ file* — an installer that starts the app proves nothing.
 `cargo build` output is easy to misread when filtered. Compare the binary's mtime
 against the source file you just edited.
 
+---
 
 ## Linux, and building it from Windows
 
@@ -1601,10 +1647,14 @@ missing (and does not on Windows, where the filesystem already ignores case).
 
 ### Code only Windows uses is dead code to Linux's clippy
 
-Helpers shared by design but so far called only from a `#[cfg(windows)]`
-module fail `-D warnings` on Linux. `equipment.rs` and `display.rs` carry
-`#![cfg_attr(not(windows), allow(dead_code))]` until their Linux readers exist;
-remove it then. Windows' clippy still catches what is really unused.
+Helpers shared by design but called only from a `#[cfg(windows)]` module
+fail `-D warnings` on Linux (and the other way round). **Do:** allow it on
+those items by name — `#[cfg_attr(not(windows), allow(dead_code))]` on the
+function, as `display.rs` does for its two signal helpers and
+`audio_reserve.rs` for Linux's — and on a whole file only when all of it
+is one system's (`equipment/edid.rs`, Linux's EDID reader). A file-wide allow
+outlives its reason: `display.rs` kept one after Linux gained its own
+switcher, and it hid from Linux's clippy whatever that switcher stopped using.
 
 ### New files on Linux are readable by every account
 
@@ -1722,11 +1772,6 @@ test runner does — is taken by WebKitGTK as the user's, covered window or
 not: hover, dragging, its own double-click counting from the event times
 (`pointer/linux.rs`). Build it with the C functions: `gdk::Event::new`
 copies the new event and leaks the original, one per mouse move.
-
-### `console.info` never reaches app.log
-
-`devlog.ts` forwards `log`, `warn` and `error`. A diagnostic written with
-`info` or `debug` vanishes, and its absence looks like the code never ran.
 
 ### A covered WebKitGTK window stops producing snapshots
 
@@ -1897,6 +1942,8 @@ an 8-bit format while the TV is in HDR. The connector says what is sent:
 SDR); Hyprland's log (`debug:disable_logs = false`) says `[CM] Updating HDR
 metadata from surface`.
 
+---
+
 ## Android
 
 ### A plugin with no Android side breaks the build twice
@@ -2021,16 +2068,6 @@ subtitles never came on. Whether it happens is a matter of milliseconds
 that finds no tracks yet waits for them (`selectTrack` → `choose`); the
 film is the same, so its tracks are numbered the same.
 
-### Subtitle file names are not always the film's, exactly
-
-mpv's `sub-auto=fuzzy` takes a subtitle file whose name contains the
-film's. A release's own subtitle file said `7. 1` where the film said
-`7.1`, and was never offered — on Android, which took the same rule
-(`subtitle_files.rs`), or on the desktop. **Do:** compare the names with
-spaces, marks and capitals left out, and hand mpv the files its own search
-misses (`addSubtitlesBeside` in engine.ts) — not the others: a file handed
-over that mpv also finds itself is listed twice, and loses its language.
-
 ### Media3 1.11 ignores `setAudioCapabilities`
 
 Building the sink with `DefaultAudioSink.Builder.setAudioCapabilities(
@@ -2129,21 +2166,6 @@ Samba — inside most home NAS boxes — answers
 cannot finish a guest's sign-in ("session setup succeeded before SSPI
 authentication completed"), and panicked when two sign-ins ran at once on
 one connection; netshare signs in to one server one share at a time.
-
-### Restoring files after a "without the fix" build can leave cargo on the old one
-
-Copying the originals in, building, then copying the fixed files back and
-syncing from the worktree (rsync keeps the source's older times) leaves the
-sources *older* than the last build, so cargo keeps the experimental build
-and the tests fail for no visible reason. **Do:** `touch` the restored
-files.
-
-### An Enter a text field acts on must stop there
-
-A field's `onEnter` that answers at once (a sign-in against the mock) put
-the ring on the next screen's first button before the spatial library saw
-the same keydown, which then pressed that button too. **Do:** FocusInput
-stops the event when its `onEnter` takes it.
 
 ### Media3 says nothing about a file's tracks until it has read them
 

@@ -2959,6 +2959,48 @@ the page, and for a button in a floating dialog or the player that could
 scroll the page behind it. The buttons in lists that really scroll (the
 folder browser, network places) have it.
 
+## A big folder at once, posters that keep up, and GOTCHAS checked (2026-10-16)
+
+Three things found adding a large library in one go, and a tidy-up before
+new features.
+
+- **Needs attention waits for the matcher.** Every file waiting to be matched
+  counted as needing attention, so a big folder filled the queue the moment
+  it was parsed, and the count fell file by file as matching reached each
+  one. A file the matcher will still take up is not work for a person:
+  `lifecycle::NEEDS_ATTENTION` now counts what the matcher refused, could not
+  ask about, or will never take (no title, held by hand). And the number on
+  screen holds from the start of a scan until matching ends
+  (`reviewCount.ts`): refusals arriving one by one are not shown as they
+  come. A scan also matches all of a big folder now, in batches, where it
+  used to stop at the first 2,000 files until the next launch.
+- **One count for the whole app.** The top bar's badge, Home's notice and
+  Settings' button each read the number at their own moments, so fixing a
+  match in Settings left the badge above it unchanged until another tab was
+  opened. They share one store now.
+- **Posters at 780 pixels wide on a desktop** (owner, 2026-10-16, replacing
+  "Android only" from the optimisation pass). The desktop kept TMDB's
+  originals, 2000×3000 and 835 KB on average in the library measured, for a
+  card about 150 pixels wide. Measured in Chromium on twenty of them: 46 ms
+  and 17.4 MB to decode each at full size, 10 ms and 3.5 MB at 780. A shelf
+  of hundreds cannot keep that many decoded, so the webview dropped them and
+  decoded them again as it scrolled, and could not keep up. 780 is still more
+  than the detail page's poster needs on a 4K screen; backdrops, stills and
+  logos stay full size, being shown large and a few at a time. Posters
+  already cached are fetched again once, in the background, under the same
+  file names, the old one shown until the new arrives. Before the artwork
+  stage has stored them, cards fetch a 500-wide copy rather than the
+  original.
+- **GOTCHAS.md, entry by entry.** Every entry was checked against the code.
+  Two described traps since removed in code rather than worked around: a
+  self-test plan's key press now lets go of the key, and `console.info` and
+  `console.debug` reach `app.log`. Others had gone out of date (the long
+  Settings page, a property read since corrected, HDR mode before native
+  output) or gave advice the code had outgrown ("poll for anything
+  load-bearing" — the player now observes `eof-reached`). Entries about the
+  library, and about testing and tools, have sections of their own; and the
+  file now says what belongs in it: a trap that is still there.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

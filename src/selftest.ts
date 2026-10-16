@@ -483,7 +483,10 @@ export async function runSelfTest(plan: SelfTestPlan): Promise<void> {
         } else if (action.do === 'leak') {
           void sampleLeak(action.note, action.round);
         } else if (action.do === 'key' && action.key) {
+          // Pressed and let go, as a person does: the player's seek commits on
+          // the release, and with none it waited for its fallback instead.
           window.dispatchEvent(new KeyboardEvent('keydown', { key: action.key, bubbles: true }));
+          window.dispatchEvent(new KeyboardEvent('keyup', { key: action.key, bubbles: true }));
         } else if (action.do === 'seek' && action.to !== undefined) {
           void seekTo(action.to).catch((e) => note('seek-failed', String(e)));
         } else if (action.do === 'call' && action.fn) {

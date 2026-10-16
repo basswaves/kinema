@@ -23,10 +23,6 @@
 //! configuration is reloaded. Either way the restore below, at the end of the
 //! film or at the next launch, puts it back.
 
-// Some shared helpers (the signal check) serve only the Windows switcher.
-// Windows' clippy still reports anything that is genuinely unused.
-#![cfg_attr(not(windows), allow(dead_code))]
-
 use serde::{Deserialize, Serialize};
 
 /// Whether this build can change the screen's refresh rate, resolution and
@@ -123,6 +119,10 @@ fn describe(width: u32, height: u32, hz: u32) -> String {
     )
 }
 
+// The signal on the cable is read on Windows only (`ScreenNow.signal`); these
+// two are for its switcher. Allowed by name, so Linux's clippy still reports
+// anything else in this file that nothing uses.
+#[cfg_attr(not(windows), allow(dead_code))]
 fn describe_signal(signal: Option<(u32, u32, f64)>) -> String {
     match signal {
         Some((w, h, rate)) => format!("{w}×{h}@{}", crate::equipment::format_rate(rate)),
@@ -131,6 +131,7 @@ fn describe_signal(signal: Option<(u32, u32, f64)>) -> String {
 }
 
 /// Two signals are the same if size matches and the refresh is within 0.5 %.
+#[cfg_attr(not(windows), allow(dead_code))]
 fn same_signal(a: Option<(u32, u32, f64)>, b: Option<(u32, u32, f64)>) -> bool {
     match (a, b) {
         (Some((aw, ah, ar)), Some((bw, bh, br))) => {

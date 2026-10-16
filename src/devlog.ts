@@ -13,7 +13,7 @@
  */
 import { invoke } from '@tauri-apps/api/core';
 
-type Level = 'log' | 'warn' | 'error';
+type Level = 'debug' | 'info' | 'log' | 'warn' | 'error';
 
 /**
  * Provider keys, as they appear in a URL.
@@ -57,7 +57,9 @@ export function installDevLog() {
   if (installed) return;
   installed = true;
 
-  for (const level of ['log', 'warn', 'error'] as const) {
+  // Every level, `info` and `debug` included: a diagnostic written with either
+  // used to vanish, and its absence looked like the code never ran.
+  for (const level of ['debug', 'info', 'log', 'warn', 'error'] as const) {
     const original = console[level].bind(console);
     console[level] = (...args: unknown[]) => {
       original(...args);

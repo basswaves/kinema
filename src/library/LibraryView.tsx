@@ -39,6 +39,7 @@ import {
   type ArtworkStats,
   type StoredTitle,
 } from '../metadata/api';
+import { refreshReviewCount } from '../metadata/reviewCount';
 import {
   backfillTitleDetails,
   loadProviderKeys,
@@ -86,6 +87,9 @@ export default function LibraryView() {
       setFiles(f);
       setTitles(t);
       setArt(a);
+      // Every tool here can change what waits in Needs attention, and the
+      // badge in the top bar above this panel shows that number too.
+      await refreshReviewCount();
     } catch (e) {
       setError(String(e));
     }

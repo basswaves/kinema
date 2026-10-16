@@ -83,12 +83,12 @@ import {
   clearArtworkCache,
   openLogFolder,
   shareLog,
-  countNeedsReview,
   getSetting,
   setSetting,
   type ArtworkStats,
 } from '../metadata/api';
 import { BUILTIN_TMDB_KEY, builtinKeyRejected } from '../metadata/builtinKey';
+import { refreshReviewCount, useReviewCount } from '../metadata/reviewCount';
 import {
   CREDITS_TAIL_CHOICES,
   CREDITS_TAIL_KEY,
@@ -240,7 +240,7 @@ export default function Settings({
   const [roots, setRoots] = useState<LibraryRoot[]>([]);
   // Sign-ins kept for network shares Kinema opens itself (Android).
   const [logins, setLogins] = useState<ShareLogin[]>([]);
-  const [needsReview, setNeedsReview] = useState(0);
+  const needsReview = useReviewCount();
   const [art, setArt] = useState<ArtworkStats | null>(null);
   const [tmdbKey, setTmdbKey] = useState('');
   const [omdbKey, setOmdbKey] = useState('');
@@ -327,15 +327,14 @@ export default function Settings({
       // A count, not the file table. This used to pull 2,000 rows of eighteen
       // columns across the IPC boundary so it could call `.length` on a filter
       // of them — and silently under-reported on any library larger than that.
-      const [r, n, a, pending] = await Promise.all([
+      const [r, , a, pending] = await Promise.all([
         listLibraryRoots(),
-        countNeedsReview(),
+        refreshReviewCount(),
         artworkStats(),
         analysisBacklog(),
       ]);
       setRoots(r);
       if (capabilitiesNow()?.network_shares) setLogins(await shareLogins());
-      setNeedsReview(n);
       setArt(a);
       setBacklog(Object.fromEntries(pending));
     } catch (e) {

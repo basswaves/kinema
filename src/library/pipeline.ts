@@ -57,6 +57,8 @@ import { refreshTomatometer } from '../metadata/scores';
 
 /** Batched so a large library reports progress and never builds one huge IPC payload. */
 const PARSE_BATCH = 500;
+/** The same for matching, which reads whole rows to group them by title. */
+const MATCH_BATCH = 2000;
 
 export type ScanStage =
   | 'scanning'
@@ -312,8 +314,16 @@ export async function runScanPipeline(): Promise<ScanOutcome> {
     // re-opens the refusals it could change, and they belong in this list.
     await yieldToPlayback();
     await syncBuiltinKey();
-    const pending = await listUnmatched(2000);
-    if (pending.length > 0) {
+    // In batches, until none is left that this scan has not tried. It used to
+    // take the first 2,000 and stop: a bigger folder added at once had the
+    // rest wait for the next launch. A file whose provider did not answer is
+    // still listed after its try, so what was tried is remembered, not
+    // re-asked.
+    const tried = new Set<number>();
+    for (;;) {
+      const pending = (await listUnmatched(MATCH_BATCH)).filter((f) => !tried.has(f.id));
+      if (pending.length === 0) break;
+      for (const f of pending) tried.add(f.id);
       setStatus({ stage: 'matching', detail: '' });
       // Keys come from the database at the moment they are needed, never from
       // component state — see loadProviderKeys.
@@ -323,8 +333,8 @@ export async function runScanPipeline(): Promise<ScanOutcome> {
           detail: `${progress.groupsDone}/${progress.groupsTotal} · ${progress.currentTitle}`,
         })
       );
-      matched = outcome.matched;
-      unmatched = outcome.unmatched;
+      matched += outcome.matched;
+      unmatched += outcome.unmatched;
       errors.push(...outcome.errors);
     }
 

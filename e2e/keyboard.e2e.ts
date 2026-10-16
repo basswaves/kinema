@@ -265,6 +265,9 @@ test("the startup scan's notice: Wikipedia's line goes once nothing waits", asyn
   await expect.poll(() => focused(page)).toBe('Settings2');
   await press(page, 'Enter');
   await expect(page.locator('.settings-section').first()).toBeVisible();
+  // Settings read the queue again, and the badge above it follows at once —
+  // it used to keep its 2 until another tab was opened.
+  await expect(page.locator('.top-nav .nav-badge')).toHaveCount(0);
   await press(page, 'Escape');
   await expect.poll(() => focused(page)).toContain('Play');
   await expect(notice).toHaveCount(0);

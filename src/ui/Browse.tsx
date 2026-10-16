@@ -46,7 +46,7 @@ import {
   type PlaybackTarget,
 } from '../player/api';
 import { cacheArtwork, getSetting, setSetting } from '../metadata/api';
-import { countNeedsReview } from '../metadata/api';
+import { refreshReviewCount, useReviewCount } from '../metadata/reviewCount';
 import { applyUpgrades, dismissUpgrades, readUpgrades, type Upgrade } from './qualityNotice';
 import { dismissFfmpegNotice, readFfmpegNotice } from './ffmpegNotice';
 import { needsOwnTmdbKey } from '../metadata/builtinKey';
@@ -196,8 +196,8 @@ export default function Browse() {
   const [scanFailed, setScanFailed] = useState<ScanTrouble | null>(null);
   /** The startup scan's problems, put into words as they stand (scanTrouble.ts). */
   const [scanErrors, setScanErrors] = useState<string[]>([]);
-  /** Videos Kinema would not guess at, for the notice on Home. */
-  const [reviewCount, setReviewCount] = useState(0);
+  /** Videos Kinema would not guess at, for the notice on Home and the badge. */
+  const reviewCount = useReviewCount();
   const scanTrouble = scanFailed ?? describeScanTrouble(scanErrors, reviewCount > 0);
   const dismissScanTrouble = useCallback(() => {
     // OK by remote takes its own notice away: the ring goes to Play first, so
@@ -279,9 +279,7 @@ export default function Browse() {
       setResumable((shown) => keepSame(shown, resume, (item) => item.title_id));
       // Neither is worth an error on screen if it cannot be read: the notices
       // are extras, and Home is complete without them.
-      void countNeedsReview()
-        .then(setReviewCount)
-        .catch((e) => console.warn('review count:', e));
+      void refreshReviewCount().catch((e) => console.warn('review count:', e));
       void readUpgrades()
         .then((found) => setUpgrades((shown) => keepSame(shown, found)))
         .catch((e) => console.warn('equipment notice:', e));

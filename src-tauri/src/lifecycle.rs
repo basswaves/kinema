@@ -59,12 +59,20 @@ pub const MATCHABLE_WHERE: &str = "
       AND m.parsed_title IS NOT NULL
       AND m.match_hold = 0";
 
-/// What Needs attention counts as work: everything not yet resolved and still
-/// on disk. Untitled files are included on purpose — this queue is the one
-/// place such a file can be named by hand. Ignored files are not work, and are
-/// listed separately so they can be put back.
-pub const NEEDS_ATTENTION: &str =
-    "m.match_status IN ('parsed', 'unmatched', 'failed') AND m.missing = 0";
+/// What Needs attention counts as work: what the matcher looked at and could
+/// not settle, and what it will never take up by itself, still on disk.
+/// Untitled files are included on purpose — this queue is the one place such
+/// a file can be named by hand. Ignored files are not work, and are listed
+/// separately so they can be put back.
+///
+/// **Not** a file still waiting for the matcher. It used to be: a big folder
+/// added at once put every new file in the queue the moment it was parsed,
+/// and the count then fell, file by file, as the matcher reached each one —
+/// work handed to a person before the machine had even tried.
+pub const NEEDS_ATTENTION: &str = "m.missing = 0
+      AND (m.match_status IN ('unmatched', 'failed')
+           OR (m.match_status = 'parsed'
+               AND (m.parsed_title IS NULL OR m.match_hold = 1)))";
 
 /// One statement over many files, in one transaction.
 fn update(conn: &mut Connection, sql: &str, ids: &[i64], bind: impl Fn(i64) -> Vec<Box<dyn rusqlite::ToSql>>) -> rusqlite::Result<usize> {
@@ -404,6 +412,20 @@ mod tests {
         returned_to_review(&mut conn, &[1]).unwrap();
         assert_eq!(state(&conn, 1), ("parsed".into(), None, 0));
         assert_eq!(matchable(&conn), vec![1]);
+        // Back with the matcher, not yet with a person.
+        assert!(needing_attention(&conn).is_empty());
+    }
+
+    /// A file the matcher has not reached is not work for a person yet: a big
+    /// folder added at once must not fill the queue before matching starts.
+    /// One it will never reach — no title to search for — is.
+    #[test]
+    fn a_file_waiting_for_the_matcher_does_not_need_attention() {
+        let conn = library(&[1, 2]);
+        conn.execute("UPDATE media_files SET parsed_title = NULL WHERE id = 2", [])
+            .unwrap();
+        assert_eq!(matchable(&conn), vec![1]);
+        assert_eq!(needing_attention(&conn), vec![2]);
     }
 
     /// Ignoring is not a way round a hold: a held file that is ignored and put

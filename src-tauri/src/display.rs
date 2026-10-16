@@ -112,6 +112,8 @@ fn save_original(app: &tauri::AppHandle, original: Option<&Original>) -> Result<
     crate::settings::store(&conn, RESTORE_KEY, &json)
 }
 
+// The switchers' log lines; Android has none (the system switches itself).
+#[cfg(any(windows, target_os = "linux"))]
 fn describe(width: u32, height: u32, hz: u32) -> String {
     format!(
         "{width}×{height}@{}",

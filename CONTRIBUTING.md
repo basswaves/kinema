@@ -31,14 +31,14 @@ patches. Through [Issues](https://github.com/Basswaves/kinema/issues/new/choose)
   graphics card or device, and where the media is. Most problems here make no
   visible error, only a log line.
 - **"I tried it on this device"** — the [device report](https://github.com/Basswaves/kinema/issues/new?template=device_report.yml)
-  form, for a box, phone, TV, receiver, desktop or library that has not been
+  form, for a box, TV, receiver, desktop or library that has not been
   tried. "It works" is as useful as "it does not".
 - **An idea** — the [feature request](https://github.com/Basswaves/kinema/issues/new?template=feature_request.yml)
   form, after reading [the settled decisions](#settled-decisions--please-do-not-re-open).
 - **Something exploitable** — not an issue: [SECURITY.md](SECURITY.md).
 
 Android is an early version (since 0.10.0), tried on one TV box and the
-emulator, so reports from other boxes and phones are the most wanted. Bugs on
+emulator, so reports from other TV boxes, sticks and TVs are the most wanted. Bugs on
 one box or one desktop are fixed by making the code not need that box, not by
 adding code for it: see "On Linux, a stable base rather than a matrix" and "On Android, a
 stable base too" under [Settled decisions](#settled-decisions--please-do-not-re-open).
@@ -343,8 +343,10 @@ never ran, or ran and silently did nothing. Check for both by reflex:
    This covers **watching**: browsing, picking something, playing it, subtitles,
    resume, skipping an intro. That whole path has to work from a sofa with a
    D-pad and nothing else. It is not a requirement that *every* control in the
-   app be reachable that way — **Developer tools in Settings is mouse-only by
-   design**, and says so on screen. Please do not "fix" it.
+   app be reachable that way — **Developer tools in Settings is mouse-only on a
+   desktop by design**, and says so on screen. Please do not "fix" it. (On
+   Android there is no mouse, so what a bug report needs from there — Share the
+   log — is reachable by remote.)
 
 ## More than one platform
 
@@ -477,12 +479,17 @@ reasoning is in [docs/DESIGN.md](docs/DESIGN.md) and [docs/HISTORY.md](docs/HIST
   correctable, so that queue is load-bearing. A second source (Wikidata, for
   movies) is a fallback for when TMDB cannot be asked, never a way to accept
   what TMDB alone would not.
-- **Nothing that needs periodic maintenance.** This has to run untended for
-  years. `yt-dlp`, the Kodi YouTube resolver and an in-app embed with an ad
-  blocker were all rejected on exactly this ground. A read-only metadata service
-  behind a stable API, used on its own terms — TMDB, TVmaze, TheIntroDB,
-  IntroDB, Wikidata, IMDb's published ratings file — is not maintenance; a
-  scraper or a downloader is. The two skip-time services are asked about one
+- **Nothing that breaks by itself if left alone.** This has to run untended
+  for years: a copy that works today must go on working without anyone
+  touching it. A scraper, a stream resolver or anything that depends on a
+  service without a stable API fails that test, and `yt-dlp`, the Kodi YouTube
+  resolver and an in-app embed with an ad blocker were all rejected on exactly
+  this ground. A read-only metadata service behind a stable API, used on its
+  own terms — TMDB, TVmaze, TheIntroDB, IntroDB, Wikidata, IMDb's published
+  ratings file — passes it. Keeping dependencies current when Kinema itself is
+  updated (Android's player library and build tools, a patched library in
+  `src-tauri/vendor/`, a desktop's own interface) is ordinary upkeep, and
+  accepted. The two skip-time services are asked about one
   title at a time, when it is played, and never about a whole library.
 - **The detail page's badges describe the file, from the file.** Resolution,
   HDR, Dolby Vision, sound format and the rest are read with ffprobe and
@@ -504,22 +511,35 @@ reasoning is in [docs/DESIGN.md](docs/DESIGN.md) and [docs/HISTORY.md](docs/HIST
   Kinema never removes anything, which the service may have from elsewhere. No
   live "Watching now". Both sign in with a device flow (a code and a phone).
   Trakt keeps duplicate plays, so what it already has is never sent to it
-  again.
+  again. **Planned change:** Trakt will also give back where a film was
+  stopped, so it can be continued on another device ([roadmap](docs/ROADMAP.md));
+  this rule is rewritten when that is built. SIMKL stays one way.
 - **Subtitles from OpenSubtitles only when asked**, with one exception the
   user switches on: forced subtitles for a file that has none. Kept in app
   data, never beside the video; each file asked about once.
 - **Forced subtitles show with subtitles off**, in the language being spoken,
   as on a disc. A switch turns this off.
-- **No third-party binaries in the repo or the bundle.** The app may *invoke* a
-  tool the user installed themselves, at a path they chose. It ships nothing,
-  downloads nothing, and depends on nothing being present.
+- **No third-party binaries in the repo or the bundle, beyond the player
+  itself.** The Windows ZIP carries libmpv — an unmodified LGPL build, which
+  anyone may replace — and its small wrapper, because Kinema cannot play a
+  film without them; Linux uses the system's mpv, and Android Google's Media3.
+  Nothing else: the app may *invoke* a tool the user installed themselves, at
+  a path they chose. It downloads nothing, and depends on nothing else being
+  present.
   One exception, for building only: the Android project's
   `gradle/wrapper/gradle-wrapper.jar` (Gradle's own 59 KB starter, which
   every Android project keeps). It runs on the build machine and is never
   in the app.
 - **Sidecars are read, never written** by default. The reader stays so other
   producers of the format keep working.
-- **The window is transparent so mpv can render behind the webview.** Never give
+- **Android is for TV devices.** Boxes, sticks and TVs running Android TV or
+  Google TV, driven by a remote: the interface is always the TV layout. A phone
+  or tablet may run it, but is not designed or tested for; a report from one is
+  welcome, and a fix for one is made only where it costs the TV nothing.
+- **The window is transparent so mpv can render behind the webview** (on
+  Windows; on Linux mpv has a window of its own with the page drawn over it,
+  and on Android Media3 draws the film — the same page runs on all three, so
+  the rule holds everywhere). Never give
   `html`, `body` or `#root` an opaque background — it hides the video entirely.
   Full-screen browsing views paint their own background; the player must never
   paint over a video frame. Its one opaque surface is the black cover shown

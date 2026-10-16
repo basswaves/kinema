@@ -11,11 +11,16 @@ Ideas and reports are welcome as [issues](https://github.com/Basswaves/kinema/is
 
 ## Next
 
-**Android**, now an early version (beta) since 0.10.0: the badges on a film's
-page, intro detection from the audio, Blu-ray folders, disc images and 4K UHD
-`.m2ts` files, and a phone and more boxes to test on. Trakt resume points and
-Kinema as the default player for local media (Windows first) come after that.
-See [Other platforms](#other-platforms).
+**Blu-ray on Windows and Linux**, done properly: `.m2ts` files tried for
+real, `BDMV` folders and disc images played through mpv's own Blu-ray support
+where it can, and a clear message for an encrypted disc. Then **Kinema as the
+default video player** on Windows — open a file from Explorer, or drop it on
+the window — and then smaller things about how it feels on a TV.
+
+**Android**, an early version (beta) since 0.10.0, moves on as reports come
+in. Its open items: the badges on a film's page, intro detection from the
+audio, Blu-ray folders, disc images and 4K UHD `.m2ts` files. Trakt resume
+points come later. See [Other platforms](#other-platforms).
 
 ---
 
@@ -30,6 +35,18 @@ it, a setting that describes the display — "tone map for a display that really
 reaches N nits", off by default — would help. Windows' own figure for a display's
 brightness is often a round number rather than a measurement, so it would be
 entered rather than read.
+
+### An installer, and winget
+
+On Windows Kinema is a folder from a ZIP, and deleting the folder removes it.
+An installer is acceptable on one condition: uninstalling leaves nothing
+behind — the program, its shortcuts, the "Open with" entries, and the library
+and settings too, after asking. It matters once Kinema can be the default
+video player, because those entries live in Windows' registry and deleting a
+folder does not remove them. With an installer, Kinema could also be offered
+through winget, and perhaps other package managers — published by the release
+workflow, so a new version needs no hand work there. Automatic updates stay
+out either way.
 
 ### Smooth motion
 
@@ -51,19 +68,17 @@ reasons in full.
   Kinema shows what is in the file.
 - **A picture-quality preset menu.** The right settings depend on the file and
   the display, which Kinema can see; settings describe equipment, not taste.
-- **Anything that needs regular upkeep to keep working** — for example YouTube
+- **Anything that stops working by itself if left alone** — for example YouTube
   trailers in the app through a downloader. Trailers on your disk play in
   Kinema; others open in the browser.
 - **Bundled third-party programs.** ffmpeg and Skiptro can be used if you have
   installed them; Kinema never ships or downloads them.
 - **Looking up a whole library in TheIntroDB at once.** It is asked about one
   episode at a time, when that episode is played, on its terms.
-- **An installer or automatic updates.** On Windows Kinema is a folder; it
-  says when a new version is out and you download it when you choose. On
-  Linux the `.deb` and `.rpm` are the system's own package format, which is
-  how Linux users expect to install a program and what fetches mpv for them —
-  not an installer of Kinema's — and a folder is there too. No automatic
-  updates there either.
+- **Automatic updates.** Kinema says when a new version is out, and you
+  download it when you choose. On Linux the `.deb` and `.rpm` are the system's
+  own package format, which is how Linux users expect to install a program and
+  what fetches mpv for them, and a folder is there too.
 
 ---
 
@@ -97,7 +112,7 @@ tried on a small number of setups. Reports — from `app.log` and `mpv.log`
 useful contribution there is.
 
 - **Android on more devices.** An early version since 0.10.0, tried on one TV
-  box and the emulator: other boxes and phones, held keys and the on-screen
+  box and the emulator: other boxes, sticks and TVs, held keys and the on-screen
   keyboard on a real device, a very large library, and a TV that reports HDR
   differently are all untested. A short "I tried it on my device" report, even
   if everything worked, is the most useful thing there is.

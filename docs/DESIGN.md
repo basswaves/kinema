@@ -15,8 +15,9 @@ was built and why, and [ROADMAP.md](ROADMAP.md) for what is next.
 
 ## Architecture
 
-Single window. mpv renders into a **native child surface beneath the WebView2
-control**; the window and the entire CSS chain are transparent so React composites on
+Single window. On Windows, mpv renders into a **native child surface beneath the
+WebView2 control** (Linux and Android draw the film differently — see
+[Platforms](#platforms)); the window and the entire CSS chain are transparent so React composites on
 top. This is the whole architectural bet, and it works — but it means `html`, `body`
 and `#root` must never get an opaque background, or the video disappears completely.
 Full-screen browsing views paint their own background; the player must never
@@ -257,8 +258,8 @@ source's dynamic range, and mpv knows both. `spline36` up, `mitchell` down, with
 correctness passes; `scaler-resizes-only` means nothing touches the image at 1:1.
 
 **No machine-learning upscaling.** No FSRCNNX, RAVU, Anime4K, RTX VSR or Intel VSR.
-They synthesise detail that was never in the master. The path is vendor-neutral d3d11 —
-identical on NVIDIA, AMD and Intel — and light enough for a GTX 1060 / RX 480 at 4K.
+They synthesise detail that was never in the master. The path is vendor-neutral — d3d11
+on Windows, Vulkan or OpenGL on Linux, identical on NVIDIA, AMD and Intel — and light enough for a GTX 1060 / RX 480 at 4K.
 **Do not add ML upscaling or a quality-preset UI to this project.**
 
 **Do nothing unless necessary — in time as well as space.** `scaler-resizes-only`
@@ -278,9 +279,13 @@ strategy makes an uneven division even, and interpolating the difference away
 would invent frames nobody shot. So the panel names the cadence and the display
 mode that would remove it. The one switch offered, display-clock frame timing,
 removes drift and stray dropped frames but explicitly not the cadence — and
-resamples audio, which makes it incompatible with bitstream passthrough. It is
-the sole rendering preference in the app, and only because the right answer
-depends on hardware the code cannot see.
+resamples audio, which makes it inert while sound is sent straight to a receiver.
+It is in Settings only because the right answer depends on hardware the code
+cannot see — the rule every setting since follows: sound straight to the
+receiver, refresh matching and HDR each describe equipment, not taste. The
+one setting about the interface rather than the film is the Look
+(CONTRIBUTING, "Settled decisions"). Matching the screen's refresh rate to the
+film, where the screen allows it, is what removes the cadence.
 
 **HDR: decided per screen, per file.** Before each file the player asks whether the
 screen the window is on has HDR switched on. If so, the output is tagged HDR10 with the
@@ -537,6 +542,7 @@ the rendering settings, so the only question left is whether it is doing what it
 claims. `i` in the player, modelled on madVR's OSD, which gets two things right
 that a property dump does not: it reports the **cadence** rather than two frame
 rates in separate rows, and it lists the **render passes that actually ran**
+(where mpv reports them; where it does not, the panel says so)
 rather than the settings that were requested — different claims, and only the
 second answers "is anything touching my image?". All flat scalar reads, polled
 rather than observed, each one individually allowed to fail.

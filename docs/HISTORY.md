@@ -3001,6 +3001,40 @@ new features.
   library, and about testing and tools, have sections of their own; and the
   file now says what belongs in it: a trap that is still there.
 
+## The settled decisions, looked at again (2026-10-16)
+
+Kinema has grown from a Windows app into three systems, so every settled
+decision was read against what it is now and what is planned. Most stand
+unchanged. Four changed, by the owner's choice:
+
+- **"Nothing that needs periodic maintenance" became "nothing that breaks by
+  itself if left alone."** The rule was always about a working copy that
+  stops working untouched — a scraper, a stream resolver. Android's player
+  library and build tools, a patched SMB library and the Linux desktops'
+  interfaces need keeping current when Kinema is updated, and that is
+  ordinary upkeep. The rejections the rule was made for (yt-dlp and the rest)
+  are unchanged.
+- **Android is for TV devices.** The roadmap listed a phone to test on, while
+  everything about Android Kinema — the TV layout always, refresh matching
+  on by default, a remote — is shaped for a TV. Phones and tablets may run
+  it, best effort, not designed or tested for.
+- **An installer is acceptable**, where "no installer" stood, on one
+  condition: uninstalling leaves nothing behind. The old reason was a broken
+  installer build (the player's files landed in a folder Windows does not
+  look in), which is fixable; and once Kinema can be the default video
+  player, its "Open with" entries live in the registry, where deleting a
+  folder does not remove them. winget and other package managers are open
+  too, published by the release workflow. Automatic updates stay out.
+- **The rule on third-party binaries names the player.** It said nothing was
+  bundled, while the Windows ZIP has always carried libmpv and its wrapper;
+  the rule now says so.
+
+Also corrected, with no decision behind them: the roadmap's "Next" (Blu-ray
+on the desktop and Kinema as the default player come first, Android moves on
+as reports come in), Trakt's planned resume points mentioned beside the
+"one way" rule, and DESIGN.md's Windows-only wording for the window, the
+graphics path and the "sole" setting.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

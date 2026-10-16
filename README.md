@@ -443,11 +443,13 @@ Installed by hand ([above](#android)). It plays through Android's own media
 player (Media3) rather than mpv, so Dolby Vision and sound passed straight to
 a receiver are Android's to do; Kinema shows what Android reports and, where
 sound will not open, falls back rather than not playing. The interface is
-always the TV layout, and folders are chosen in Kinema's own browser.
+always the TV layout, and folders are chosen in Kinema's own browser. It is
+made for TV devices; a phone or tablet may run it, but is not designed or
+tested for.
 
 **Tested:** one TV box and the Android TV emulator, with a remote — library,
 matching, network shares, playback of HDR, Dolby Vision and 1080p `.m2ts`
-files, subtitles. **Not yet tested:** a phone, other boxes, held keys on the
+files, subtitles. **Not yet tested:** other boxes, held keys on the
 box and the on-screen keyboard. **Missing:** the badges on a film's page,
 intro detection from the audio, and Blu-ray folders, disc images and 4K UHD
 `.m2ts` files (Kinema says before Play when a file cannot be opened on the
@@ -529,7 +531,7 @@ report are welcome through
 
 - **A bug**, with the logs — [bug report](https://github.com/Basswaves/kinema/issues/new?template=bug_report.yml).
 - **"I tried it on this device"**, whether it worked or not — especially an
-  Android TV box or phone, a different TV or receiver, another Linux desktop,
+  Android TV box, a different TV or receiver, another Linux desktop,
   or a very large library —
   [device report](https://github.com/Basswaves/kinema/issues/new?template=device_report.yml).
   A report that says "works" is as useful as one that says "broken".

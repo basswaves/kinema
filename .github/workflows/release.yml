@@ -92,7 +92,9 @@ jobs:
           New-Item -ItemType Directory -Force out | Out-Null
           Compress-Archive -Path dist-app\* -DestinationPath "out\$zip"
           $hash = (Get-FileHash "out\$zip" -Algorithm SHA256).Hash.ToLower()
-          "$hash  $zip" | Out-File -Encoding ascii "out\$zip.sha256"
+          # LF, as sha256sum writes it: a CRLF line makes `sha256sum -c` on
+          # Linux look for a file whose name ends in a carriage return.
+          [IO.File]::WriteAllText("$PWD\out\$zip.sha256", "$hash  $zip`n")
 
       - uses: actions/upload-artifact@v7
         with:

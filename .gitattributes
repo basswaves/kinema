@@ -4,3 +4,7 @@
 # The same for Gradle's wrapper in the Android project, run from the WSL copy
 # and on CI's Linux runner.
 gradlew text eol=lf
+# Cargo writes these with LF whatever the checkout has, which left a change
+# git showed with identical bytes after every build.
+src-tauri/Cargo.toml text eol=lf
+src-tauri/Cargo.lock text eol=lf

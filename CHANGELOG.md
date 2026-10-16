@@ -12,6 +12,8 @@ makes no stability promises.
 - **Down in the player's details panel stays in the panel.** With a remote or
   the arrow keys, going down through the panel's facts could now and then jump
   to Pause instead of the next group.
+- **The Windows download's checksum file checks on Linux too.** Its line ended
+  in a Windows line break, so `sha256sum -c` looked for a file of the wrong name.
 
 ## [0.10.0] — 2026-10-11
 

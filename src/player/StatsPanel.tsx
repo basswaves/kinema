@@ -2,9 +2,10 @@
  * "Stats for nerds": what the pipeline is actually doing, as the engine says
  * it (mpv's properties, or Media3's own facts).
  */
-import { useFocusable } from '@noriginmedia/norigin-spatial-navigation';
+import { FocusContext, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import { useEffect } from 'react';
 import FocusButton from '../ui/FocusButton';
+import { useFocusGroup } from '../ui/focusGroups';
 import type { StatGroup } from './stats';
 
 /** Its close button, where the ring goes when a remote opened it (usePanels.ts). */
@@ -17,19 +18,26 @@ export default function StatsPanel({
   stats: StatGroup[];
   onClose: () => void;
 }) {
+  // A closed menu, like Audio & subtitles: Down from a group reaches the next
+  // group, never the player's controls. Left open to them, the next group and
+  // Pause were both "below", and while the panel was still scrolling the last
+  // group into view Pause could be the nearer one (CI's WebKit, 2026-10-16).
+  const { ref, focusKey } = useFocusGroup<HTMLElement>('menu');
   return (
-    <aside className="stats-panel">
-      <div className="stats-head">
-        <span>Stats for nerds</span>
-        <FocusButton focusKey={STATS_CLOSE_KEY} onSelect={onClose}>
-          close
-        </FocusButton>
-      </div>
-      {stats.length === 0 && <div className="stats-empty">reading…</div>}
-      {stats.map((group) => (
-        <Group key={group.heading} group={group} />
-      ))}
-    </aside>
+    <FocusContext.Provider value={focusKey}>
+      <aside className="stats-panel" ref={ref}>
+        <div className="stats-head">
+          <span>Stats for nerds</span>
+          <FocusButton focusKey={STATS_CLOSE_KEY} onSelect={onClose}>
+            close
+          </FocusButton>
+        </div>
+        {stats.length === 0 && <div className="stats-empty">reading…</div>}
+        {stats.map((group) => (
+          <Group key={group.heading} group={group} />
+        ))}
+      </aside>
+    </FocusContext.Provider>
   );
 }
 

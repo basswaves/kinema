@@ -7,6 +7,12 @@ makes no stability promises.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Down in the player's details panel stays in the panel.** With a remote or
+  the arrow keys, going down through the panel's facts could now and then jump
+  to Pause instead of the next group.
+
 ## [0.10.0] — 2026-10-11
 
 The first release with an Android TV version (an early version, below), and

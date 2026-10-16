@@ -814,6 +814,21 @@ does **not** mean "stay". **Do:** say which arrows a group holds with
 `useFocusGroup`); a held arrow with nothing that way leaves focus where it is.
 A row holds Left and Right, the player and a page of its own all four.
 
+### A panel that is not a closed group shares Down with the controls behind it
+
+The player's details panel ("Stats for nerds") failed a WebKit test about one
+run in twenty-five: Down from one group of facts to the next sometimes landed
+on **Pause**. The panel's groups had no group of their own, so they and the
+player's controls were all siblings, and Down chose between "the next group"
+and "Pause" by distance. While the panel was still smooth-scrolling the
+previous group into view, the next one could measure farther away than the
+control bar. Nothing failed; the ring just left the panel.
+
+**Do:** any panel drawn over the player or a page is `useFocusGroup('menu')`
+with its own `FocusContext.Provider`, as Audio & subtitles is. Inside a menu
+the group's own resolver measures only the panel's children, at the moment of
+the press, so nothing behind it is a candidate whatever is scrolling.
+
 ### A focus zoom can swallow the gap to the control below it
 
 Continue Watching's **Remove** sits below its card precisely so Down reaches it

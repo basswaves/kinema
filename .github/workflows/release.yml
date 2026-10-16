@@ -151,6 +151,35 @@ jobs:
           name: linux-${{ matrix.os }}
           path: dist-linux/*
 
+  fedora:
+    # The .rpm on a stock Fedora, as a user installs it: dnf has to find mpv
+    # and, through the weak dependency "(ffmpeg or ffmpeg-free)", Fedora's own
+    # ffmpeg-free, so the detail page's badges work without a second step.
+    # Not a step of `publish`: it says whether the release text's promise
+    # holds, and a Fedora mirror having a bad minute should not hold a
+    # release back.
+    needs: linux
+    runs-on: ubuntu-24.04
+    container: fedora:43
+
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: linux-ubuntu-24.04
+
+      # Fedora's container image turns weak dependencies off to stay small;
+      # an installed Fedora has them on, which is what this is checking.
+      - name: Install the .rpm with dnf
+        run: dnf install -y --setopt=install_weak_deps=True ./kinema-*.x86_64.rpm
+
+      - name: Check mpv and ffmpeg came with it
+        run: |
+          rpm -q "$(rpm -qp --qf '%{NAME}' ./kinema-*.x86_64.rpm)"
+          rpm -q mpv-libs
+          rpm -q ffmpeg-free || rpm -q ffmpeg
+          ffprobe -version | head -n 1
+          ffmpeg -hide_banner -decoders | grep -E ' (aac|ac3|eac3|truehd|dts) ' || true
+
   android:
     # The signed release APK, for sideloading on a TV box or a phone. Built
     # for 64-bit and 32-bit ARM (the boxes and phones; many TV boxes run a

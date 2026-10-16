@@ -31,6 +31,8 @@ import {
 } from '../library/folders';
 import { openLink } from './links';
 import FocusButton from './FocusButton';
+import { FfmpegInstallButton, FfmpegInstallStatus, FfmpegLacks } from './FfmpegInstall';
+import { FFMPEG_DOWNLOAD_URL, FFMPEG_INSTALL_WORDS, useFfmpegInstall } from './ffmpegInstallState';
 import { count, formatBytes } from './format';
 import FocusInput from './FocusInput';
 import BackupSection from './BackupSection';
@@ -115,7 +117,6 @@ const TMDB_KEY_URL = 'https://www.themoviedb.org/settings/api';
  * whole settings screen used to read.
  */
 const SKIPTRO_URL = 'https://github.com/MikeSiLVO/skiptro-releases';
-const FFMPEG_URL = 'https://ffmpeg.org/download.html';
 
 /**
  * How long the Skiptro command fields wait after the last keystroke before
@@ -294,6 +295,9 @@ export default function Settings({
   const [skiptroLoaded, setSkiptroLoaded] = useState(false);
   /** Whether the configured ffmpeg runs. Null until the first check answers. */
   const [ffmpeg, setFfmpeg] = useState<FfmpegStatus | null>(null);
+  /** The one-press install's last result, asked about again when it changes. */
+  const ffmpegInstall = useFfmpegInstall();
+  const ffmpegInstallReport = ffmpegInstall.report;
   /** The same guard for the provider keys, which now save themselves too. */
   const [keysLoaded, setKeysLoaded] = useState(false);
   const [keysSaved, setKeysSaved] = useState(false);
@@ -306,6 +310,10 @@ export default function Settings({
   const tvMode = useTvMode();
   const look = useLook();
   const can = useCapabilities();
+  /** Windows, ffmpeg missing, or an install under way: the one-press install. */
+  const offerFfmpegInstall = Boolean(
+    can?.installs_ffmpeg && ((ffmpeg !== null && !ffmpeg.available) || ffmpegInstall.running)
+  );
   const scan = useScanStatus();
 
   /** A newer release, if one is out; and whether looking for one is on. */
@@ -435,7 +443,8 @@ export default function Settings({
         .catch(() => setFfmpeg(null));
     }, SKIPTRO_SAVE_DEBOUNCE_MS);
     return () => window.clearTimeout(id);
-  }, [skiptroLoaded, ffmpegPath]);
+    // An install that ended is a reason to ask again: ffmpeg may be there now.
+  }, [skiptroLoaded, ffmpegPath, ffmpegInstallReport]);
 
   /**
    * The provider keys, on the same terms as the fields above.
@@ -1120,20 +1129,29 @@ export default function Settings({
                             `Everything else works normally.`}
                       </p>
                     )}
+                    <FfmpegLacks resolved={ffmpeg?.available ? ffmpeg.resolved : null} />
                     <p className="settings-hint">
                       ffmpeg is a free program for reading video and audio. Kinema does not include
                       it: install it yourself and Kinema finds it. It is also used once per file to
                       read the resolution, HDR and sound format shown on a title&rsquo;s page.
+                      {/* Offered only while it is missing: once found, there is
+                          nothing to install. */}
+                      {offerFfmpegInstall && <> {FFMPEG_INSTALL_WORDS}</>}
                     </p>
                     <div className="settings-row">
-                      <FocusButton
-                        keepInView="nearest"
-                        className="btn-secondary"
-                        onSelect={() => void openLink(FFMPEG_URL)}
-                      >
-                        Open the ffmpeg download page ↗
-                      </FocusButton>
+                      {offerFfmpegInstall ? (
+                        <FfmpegInstallButton focusKey="settings-ffmpeg-install" />
+                      ) : (
+                        <FocusButton
+                          keepInView="nearest"
+                          className="btn-secondary"
+                          onSelect={() => void openLink(FFMPEG_DOWNLOAD_URL)}
+                        >
+                          Open the ffmpeg download page ↗
+                        </FocusButton>
+                      )}
                     </div>
+                    <FfmpegInstallStatus />
                     </>
                   )}
 

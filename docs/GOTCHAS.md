@@ -1554,6 +1554,17 @@ takes nothing.
 
 ## Environment (Windows)
 
+### A running Kinema does not see a program installed after it started
+
+The same as the shell entry below, inside the app: a process keeps the `PATH`
+it was started with, so `Command::new("ffmpeg")` fails for an ffmpeg winget
+installed a minute ago — winget adds `%LOCALAPPDATA%\Microsoft\WinGet\Links`
+to the *user* `PATH` in the registry, which nothing running re-reads. No
+error, only "not found" until the next start. `ffmpeg.rs`
+(`installed_since_start`) looks in the registry's `PATH`, winget's links
+folder and its package folder when the bare name is not found. Anything else
+Kinema learns to install the same way needs the same.
+
 ### Spawned shells inherit a stale PATH
 
 Newly installed tools won't resolve. Refresh from the registry at the top of each shell:

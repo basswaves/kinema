@@ -49,6 +49,7 @@ import { cacheArtwork, getSetting, setSetting } from '../metadata/api';
 import { refreshReviewCount, useReviewCount } from '../metadata/reviewCount';
 import { applyUpgrades, dismissUpgrades, readUpgrades, type Upgrade } from './qualityNotice';
 import { dismissFfmpegNotice, readFfmpegNotice } from './ffmpegNotice';
+import { ffmpegInstalled, useFfmpegInstall } from './ffmpegInstallState';
 import { needsOwnTmdbKey } from '../metadata/builtinKey';
 import { availableUpdate } from './updates';
 import { scanTrouble as describeScanTrouble, type ScanTrouble } from './scanTrouble';
@@ -214,6 +215,8 @@ export default function Browse() {
   const [keyRejected, setKeyRejected] = useState(false);
   /** ffmpeg cannot be found and the notice has not been waved away. */
   const [ffmpegMissing, setFfmpegMissing] = useState(false);
+  /** Installed with the notice's own button: the notice goes at once. */
+  const ffmpegJustInstalled = ffmpegInstalled(useFfmpegInstall().report);
   /** A newer Kinema, for the dot on Settings. */
   const [hasUpdate, setHasUpdate] = useState(false);
   /** The setup pages are up on Home (SetupPages.tsx). */
@@ -684,7 +687,7 @@ export default function Browse() {
                 .then(() => setUpgrades([]))
                 .catch((e) => setError(userError(e)))
             }
-            ffmpegMissing={ffmpegMissing}
+            ffmpegMissing={ffmpegMissing && !ffmpegJustInstalled}
             scanTrouble={scanTrouble}
             onDismissScanTrouble={dismissScanTrouble}
             onFfmpeg={() => openView({ name: 'settings', section: 'ffmpeg' })}

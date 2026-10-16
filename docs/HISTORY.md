@@ -3035,6 +3035,62 @@ as reports come in), Trakt's planned resume points mentioned beside the
 "one way" rule, and DESIGN.md's Windows-only wording for the window, the
 graphics path and the "sole" setting.
 
+## ffmpeg with one press, on Windows (2026-10-16)
+
+Without ffmpeg a Windows user loses three of Kinema's best features — the
+picture and sound badges, the measured picture shape, and Kinema's own intro
+and credits detection — and until now Kinema could only say so and link to
+ffmpeg.org, which offers source code and a choice of other people's builds.
+Fine for someone technical; a wall for everyone else.
+
+Three ways were weighed. **Bundling ffmpeg** in the ZIP would add about
+100 MB and bend the rule on third-party binaries; it stays the fallback if
+winget proves unreliable. **Kinema downloading it itself** would break
+"downloads nothing", and a moved link would break it by itself — the rule
+that kept yt-dlp out. **Doing the work through libmpv** instead would be a
+large rewrite with unproven speed. The owner chose the fourth: **one press
+asks Windows' own package manager, winget**, to install Gyan's
+"essentials" build (`Gyan.FFmpeg.Essentials`), the Windows build ffmpeg's
+own site points to. Kinema still downloads nothing; winget fetches it,
+checks its hash and owns it afterwards. Uninstalling Kinema leaves it, since
+other programs may use it.
+
+- **Offered where ffmpeg is said to be missing**: the first run's Extras
+  page, Home's ffmpeg notice and Settings → Intro & credits — one shared
+  button (`FfmpegInstall.tsx`), reachable by mouse, keyboard and remote,
+  with one shared install behind it so a press in one place shows in all.
+- **Said before the press**: winget, the gyan.dev build, about 110 MB,
+  stays if Kinema is removed. Pressing is agreeing; the agreement flags
+  winget is given stand for that press and nothing else. Per user, so no
+  administrator prompt.
+- **Found without a restart.** A running program keeps the `PATH` it was
+  started with, and winget adds its folder to the user's `PATH` in the
+  registry. So when no path is set, Kinema also looks where an install made
+  since it started would be: the `PATH` as Windows has it now, winget's
+  links folder, and winget's own package folder (`ffmpeg.rs`). A path typed
+  in Settings still wins.
+- **Success means usable.** winget saying "installed" while Kinema still
+  cannot run ffmpeg is reported as a failure, in those words. Failures keep
+  winget's last lines, on screen and in `app.log`, and the download page
+  stays one press away. A Windows without winget gets that page and the
+  reason.
+- **The waiting work runs at once.** Reading files for their badges,
+  detection and measuring would otherwise wait for the next start; after an
+  install they run in the background straight away (`runFfmpegPasses`).
+- **Not while a film plays**, like the other background work.
+
+Linux has its package managers already: the `.deb` recommends `ffmpeg`.
+The `.rpm` recommended `ffmpeg` too — which stock Fedora does not have;
+its own package is `ffmpeg-free`, so the recommendation installed nothing.
+It is now `(ffmpeg or ffmpeg-free)`. Fedora's ffmpeg-free is built without
+HEVC and E-AC-3, and with H.264 only through Cisco's OpenH264 (from its
+recipe, `enable_decoders`). Rather than look broken with it, Kinema asks
+any ffmpeg it finds which of the formats it decodes itself are missing
+(`ffmpeg -decoders`) and says, in Settings and on the Extras page, what that
+costs: for that video, no measured picture shape, no black-frame credits
+search, no HDR10+ or Dolby Vision extra layer; for that sound, no intros
+found by listening.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

@@ -11,6 +11,7 @@ mod display;
 mod engine;
 mod equipment;
 mod ffmpeg;
+mod ffmpeg_install;
 mod files;
 mod history;
 mod imdb;
@@ -393,6 +394,8 @@ pub fn run() {
             detect::auto_detect,
             detect::analysis_backlog,
             ffmpeg::ffmpeg_status,
+            ffmpeg::ffmpeg_lacks,
+            ffmpeg_install::install_ffmpeg,
             skiptro::skiptro_found,
             probe::probe_library,
             imdb::refresh_imdb_ratings,

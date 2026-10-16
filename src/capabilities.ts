@@ -35,6 +35,9 @@ export interface Capabilities {
   /** Kinema can run programs the user installed (ffmpeg, ffprobe, Skiptro).
    * Where it cannot (Android), nothing offers them or says they are missing. */
   runs_programs: boolean;
+  /** ffmpeg can be installed with one press through the system's package
+   * manager (Windows' winget, ui/FfmpegInstall.tsx); elsewhere a link. */
+  installs_ffmpeg: boolean;
   /** The system puts its own keyboard on screen when a field takes typing
    * (Android): it opens on OK, not on arriving at a field (ui/typing.ts). */
   screen_keyboard: boolean;

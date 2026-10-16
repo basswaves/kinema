@@ -9,10 +9,10 @@
       "?": { "U": "·", "D": "▶ Play", "L": "Settings", "R": "·" },
       "▶ Play": { "U": "Home", "D": "Choose", "L": "·", "R": "More info" },
       "More info": { "U": "Home", "D": "Choose", "L": "▶ Play", "R": "·" },
-      "Choose": { "U": "▶ Play", "D": "How to add it", "L": "·", "R": "Not now #1" },
+      "Choose": { "U": "▶ Play", "D": "Install ffmpeg", "L": "·", "R": "Not now #1" },
       "Not now #1": { "U": "▶ Play", "D": "Not now #2", "L": "Choose", "R": "·" },
-      "How to add it": { "U": "Choose", "D": "Example Show #1", "L": "·", "R": "Not now #2" },
-      "Not now #2": { "U": "Not now #1", "D": "Example Show #1", "L": "How to add it", "R": "·" },
+      "Install ffmpeg": { "U": "Choose", "D": "Example Show #1", "L": "·", "R": "Not now #2" },
+      "Not now #2": { "U": "Not now #1", "D": "Example Show #1", "L": "Install ffmpeg", "R": "·" },
       "Example Show #1": { "U": "Not now #2", "D": "Example Show #2", "L": "·", "R": "Example Film #1" },
       "Example Film #1": { "U": "Not now #2", "D": "Example Show #2", "L": "Example Show #1", "R": "Example Saga #1" },
       "Example Saga #1": { "U": "Not now #2", "D": "Example Show #2", "L": "Example Film #1", "R": "·" },
@@ -192,10 +192,10 @@
     "settings-intros": {
       "✓After each scan": { "U": "Settings", "D": "ffmpeg", "L": "Intro & credits", "R": "Only when I press Detect" },
       "Only when I press Detect": { "U": "Settings", "D": "ffmpeg", "L": "✓After each scan", "R": "·" },
-      "ffmpeg": { "U": "✓After each scan", "D": "Open the ffmpeg download page ↗", "L": "Intro & credits", "R": "·" },
-      "Open the ffmpeg download page ↗": { "U": "ffmpeg", "D": "✓On #1", "L": "Intro & credits", "R": "·" },
-      "✓On #1": { "U": "Open the ffmpeg download page ↗", "D": "✓On #2", "L": "Intro & credits", "R": "Off #1" },
-      "Off #1": { "U": "Open the ffmpeg download page ↗", "D": "Off #2", "L": "✓On #1", "R": "·" },
+      "ffmpeg": { "U": "✓After each scan", "D": "Install ffmpeg", "L": "Intro & credits", "R": "·" },
+      "Install ffmpeg": { "U": "ffmpeg", "D": "✓On #1", "L": "Intro & credits", "R": "·" },
+      "✓On #1": { "U": "Install ffmpeg", "D": "✓On #2", "L": "Intro & credits", "R": "Off #1" },
+      "Off #1": { "U": "Install ffmpeg", "D": "Off #2", "L": "✓On #1", "R": "·" },
       "✓On #2": { "U": "✓On #1", "D": "Open the Skiptro page ↗", "L": "Intro & credits", "R": "Off #2" },
       "Off #2": { "U": "Off #1", "D": "Open the Skiptro page ↗", "L": "✓On #2", "R": "·" },
       "Open the Skiptro page ↗": { "U": "✓On #2", "D": "Detect now", "L": "Intro & credits", "R": "Choose Skiptro" },
@@ -300,9 +300,9 @@
       "Your OpenSubtitles password": { "U": "The username, not the email address", "D": "·", "L": "·", "R": "·" }
     },
     "setup-4": {
-      "Finish": { "U": "·", "D": "Open the ffmpeg download page ↗", "L": "·", "R": "·" },
-      "Open the ffmpeg download page ↗": { "U": "Finish", "D": "ffmpeg", "L": "·", "R": "·" },
-      "ffmpeg": { "U": "Open the ffmpeg download page ↗", "D": "Get a free key ↗", "L": "·", "R": "·" },
+      "Finish": { "U": "·", "D": "Install ffmpeg", "L": "·", "R": "·" },
+      "Install ffmpeg": { "U": "Finish", "D": "ffmpeg", "L": "·", "R": "·" },
+      "ffmpeg": { "U": "Install ffmpeg", "D": "Get a free key ↗", "L": "·", "R": "·" },
       "Get a free key ↗": { "U": "ffmpeg", "D": "OMDb API key", "L": "·", "R": "·" },
       "OMDb API key": { "U": "Get a free key ↗", "D": "·", "L": "·", "R": "·" }
     }

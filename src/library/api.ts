@@ -117,10 +117,11 @@ export const INTRODB_ENABLED_KEY = 'introdb_enabled';
 export const INTRODB_APP_ENABLED_KEY = 'introdb_app_enabled';
 
 /**
- * Setting key: where ffmpeg is. Empty means "whatever is on PATH".
+ * Setting key: where ffmpeg is. Empty means "whatever is on PATH" — and on
+ * Windows, where an install made since Kinema started put it (ffmpeg.rs).
  *
- * Needed only by this app's own intro/credits analysis, which decodes short
- * windows of audio with it. Nothing else in the app uses ffmpeg.
+ * Used by this app's own intro/credits analysis, by ffprobe beside it for a
+ * title's picture and sound details, and to measure each film's picture.
  */
 export const FFMPEG_PATH_KEY = 'ffmpeg_path';
 
@@ -139,6 +140,41 @@ export interface FfmpegStatus {
  */
 export const ffmpegStatus = (configured: string) =>
   invoke<FfmpegStatus>('ffmpeg_status', { configured });
+
+/**
+ * The formats this ffmpeg cannot decode, of those Kinema decodes itself
+ * (`hevc`, `h264`, `eac3`, `ac3`, `dts`, `truehd`); empty when it has them
+ * all or could not be asked. Fedora's own ffmpeg-free lacks HEVC and E-AC-3.
+ */
+export const ffmpegLacks = (configured: string) =>
+  invoke<string[]>('ffmpeg_lacks', { configured });
+
+/** How a one-press install of ffmpeg ended (ffmpeg_install.rs). */
+export type FfmpegInstallOutcome = 'installed' | 'already_installed' | 'no_winget' | 'failed';
+
+export interface FfmpegInstallReport {
+  outcome: FfmpegInstallOutcome;
+  /** What went wrong, in words, when it failed. */
+  reason: string | null;
+  exit_code: number | null;
+  /** winget's last lines, as it wrote them. */
+  tail: string[];
+  /** Whether Kinema can run ffmpeg now, asked after winget finished. */
+  ffmpeg: FfmpegStatus;
+}
+
+/** One line of the install's progress, in plain words. */
+export interface FfmpegInstallProgress {
+  line: string;
+}
+
+/**
+ * Install ffmpeg through Windows' winget (Windows only, `installs_ffmpeg`).
+ * Takes minutes; progress arrives as `ffmpeg-install-progress` events.
+ * Refused while a film plays.
+ */
+export const installFfmpeg = (configured: string) =>
+  invoke<FfmpegInstallReport>('install_ffmpeg', { configured });
 
 /** Whether Skiptro's database is where Kinema would read it (skiptro.rs). */
 export const skiptroFound = (configured: string) =>

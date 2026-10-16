@@ -52,10 +52,160 @@ pub(crate) fn no_window(command: &mut Command) {
 pub(crate) fn no_window(_command: &mut Command) {}
 
 /// The configured ffmpeg, or plain `ffmpeg` to be resolved through `PATH`.
+///
+/// On Windows, an ffmpeg that is not on the `PATH` Kinema started with is
+/// looked for where an install made *since* would be (`installed_since_start`)
+/// — the one-press install (`ffmpeg_install.rs`) puts it there while Kinema
+/// runs, and nobody should have to restart Kinema to have it found. A
+/// configured path always wins, found or not: it is what the person said.
 pub fn resolve(configured: Option<&str>) -> PathBuf {
     match configured.map(str::trim).filter(|s| !s.is_empty()) {
         Some(path) => PathBuf::from(path),
-        None => PathBuf::from("ffmpeg"),
+        None => installed_since_start().unwrap_or_else(|| PathBuf::from("ffmpeg")),
+    }
+}
+
+/// The program's file name in a folder; only Windows looks in folders itself.
+#[cfg(any(windows, test))]
+const FFMPEG_EXE: &str = "ffmpeg.exe";
+
+/// An ffmpeg Kinema's own `PATH` does not reach, or `None` — which includes
+/// "on Kinema's `PATH` already", where the bare name works as it always has.
+///
+/// **A program keeps the `PATH` it was started with.** winget puts its command
+/// links in `%LOCALAPPDATA%\Microsoft\WinGet\Links` and adds that folder to the
+/// *user's* `PATH` in the registry, which a running Kinema never sees (the
+/// same trap as docs/GOTCHAS.md, "Spawned shells inherit a stale PATH"). So,
+/// in order: the `PATH` as Windows has it now (machine, then user, as Windows
+/// joins them), winget's links folder, and winget's own package folder in
+/// case the links could not be made. Folders are only looked at, nothing is
+/// run, and nothing is written: the next start finds it on the `PATH` anyway.
+#[cfg(windows)]
+fn installed_since_start() -> Option<PathBuf> {
+    let started_with = std::env::var_os("PATH").unwrap_or_default();
+    if first_with_ffmpeg(std::env::split_paths(&started_with)).is_some() {
+        return None;
+    }
+    let mut dirs: Vec<PathBuf> = Vec::new();
+    for value in [registry::machine_path(), registry::user_path()].into_iter().flatten() {
+        dirs.extend(std::env::split_paths(&value));
+    }
+    if let Some(local) = std::env::var_os("LOCALAPPDATA") {
+        let winget = Path::new(&local).join("Microsoft").join("WinGet");
+        dirs.push(winget.join("Links"));
+        dirs.extend(winget_package_bins(&winget.join("Packages")));
+    }
+    first_with_ffmpeg(dirs)
+}
+
+#[cfg(not(windows))]
+fn installed_since_start() -> Option<PathBuf> {
+    None
+}
+
+/// `ffmpeg.exe` in the first of these folders that has one.
+#[cfg(any(windows, test))]
+fn first_with_ffmpeg(dirs: impl IntoIterator<Item = PathBuf>) -> Option<PathBuf> {
+    dirs.into_iter()
+        .filter(|dir| !dir.as_os_str().is_empty())
+        .map(|dir| dir.join(FFMPEG_EXE))
+        .find(|exe| exe.is_file())
+}
+
+/// The `bin` folders of every Gyan ffmpeg winget has unpacked:
+/// `Packages\Gyan.FFmpeg.Essentials_<source>\ffmpeg-<version>-essentials_build\bin`.
+/// Newest-named first, so of two versions left side by side the later wins.
+#[cfg(any(windows, test))]
+fn winget_package_bins(packages: &Path) -> Vec<PathBuf> {
+    let subdirs = |dir: &Path| -> Vec<PathBuf> {
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return Vec::new();
+        };
+        let mut found: Vec<PathBuf> =
+            entries.flatten().map(|e| e.path()).filter(|p| p.is_dir()).collect();
+        found.sort();
+        found.reverse();
+        found
+    };
+    subdirs(packages)
+        .into_iter()
+        .filter(|p| {
+            p.file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.to_ascii_lowercase().starts_with("gyan.ffmpeg"))
+        })
+        .flat_map(|package| subdirs(&package))
+        .map(|build| build.join("bin"))
+        .collect()
+}
+
+/// The `PATH` as Windows has it now, from where Windows keeps it.
+#[cfg(windows)]
+mod registry {
+    use std::ffi::OsString;
+    use std::os::windows::ffi::OsStringExt;
+    use windows::core::{w, PCWSTR};
+    use windows::Win32::System::Registry::{
+        RegGetValueW, HKEY, HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, RRF_RT_REG_EXPAND_SZ,
+        RRF_RT_REG_SZ,
+    };
+
+    pub fn machine_path() -> Option<OsString> {
+        read(
+            HKEY_LOCAL_MACHINE,
+            w!(r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment"),
+        )
+    }
+
+    pub fn user_path() -> Option<OsString> {
+        read(HKEY_CURRENT_USER, w!("Environment"))
+    }
+
+    /// One `Path` value, its `%LOCALAPPDATA%`-style parts expanded (RegGetValue
+    /// does that unless told not to).
+    fn read(root: HKEY, key: PCWSTR) -> Option<OsString> {
+        let flags = RRF_RT_REG_SZ | RRF_RT_REG_EXPAND_SZ;
+        let mut bytes: u32 = 0;
+        // SAFETY: a size query; every pointer is valid or absent.
+        let sized =
+            unsafe { RegGetValueW(root, key, w!("Path"), flags, None, None, Some(&mut bytes)) };
+        if sized.is_err() || bytes == 0 {
+            return None;
+        }
+        // Expanding can make it longer than the size first given; RegGetValue
+        // reports the expanded size, but leave room in case it changed between.
+        let mut buffer: Vec<u16> = vec![0; bytes as usize / 2 + 512];
+        let mut size = (buffer.len() * 2) as u32;
+        // SAFETY: `buffer` is `size` bytes long and lives across the call.
+        let read = unsafe {
+            RegGetValueW(
+                root,
+                key,
+                w!("Path"),
+                flags,
+                None,
+                Some(buffer.as_mut_ptr().cast()),
+                Some(&mut size),
+            )
+        };
+        if read.is_err() {
+            return None;
+        }
+        let len = buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len());
+        Some(OsString::from_wide(&buffer[..len]))
+    }
+
+    #[cfg(test)]
+    mod tests {
+        /// Every Windows has System32 on the machine `PATH`; reading it proves
+        /// the registry call and its expansion of `%SystemRoot%`.
+        #[test]
+        fn the_machine_path_is_read_and_expanded() {
+            let path = super::machine_path().expect("the machine PATH");
+            let text = path.to_string_lossy().to_ascii_lowercase();
+            assert!(text.contains("system32"), "got {text}");
+            assert!(!text.contains("%systemroot%"), "not expanded: {text}");
+        }
     }
 }
 
@@ -114,6 +264,72 @@ pub async fn ffmpeg_status(configured: Option<String>) -> Result<FfmpegStatus, S
             resolved: path.display().to_string(),
             available: is_available(&path),
         })
+    })
+    .await
+}
+
+/// The formats Kinema decodes itself and that some builds of ffmpeg leave
+/// out, each with the decoders that can do it. A system's own "free" build —
+/// Fedora's `ffmpeg-free` — has no HEVC or E-AC-3, and H.264 only through
+/// Cisco's OpenH264; ffmpeg picks whichever decoder it has, so any one counts.
+const NEEDED_DECODERS: [(&str, &[&str]); 6] = [
+    ("hevc", &["hevc"]),
+    ("h264", &["h264", "libopenh264"]),
+    ("eac3", &["eac3"]),
+    ("ac3", &["ac3", "ac3_fixed"]),
+    ("dts", &["dca"]),
+    ("truehd", &["truehd"]),
+];
+
+/// Which of [`NEEDED_DECODERS`] this ffmpeg cannot decode, by their first
+/// names (`hevc`, `eac3`, …). Empty when it has them all, **and** when it
+/// could not be asked: a missing answer is not a missing format.
+pub fn lacking_decoders(ffmpeg: &Path) -> Vec<&'static str> {
+    let mut command = Command::new(ffmpeg);
+    command
+        .args(["-hide_banner", "-decoders"])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null());
+    no_window(&mut command);
+    let Ok(output) = command.output() else {
+        return Vec::new();
+    };
+    if !output.status.success() {
+        return Vec::new();
+    }
+    lacking_in(&decoder_names(&String::from_utf8_lossy(&output.stdout)))
+}
+
+/// The decoder names in `ffmpeg -decoders`' list: below the `------` line,
+/// each line is its flags and then its name.
+fn decoder_names(text: &str) -> Vec<String> {
+    text.lines()
+        .skip_while(|line| !line.trim_start().starts_with("------"))
+        .skip(1)
+        .filter_map(|line| line.split_whitespace().nth(1).map(str::to_string))
+        .collect()
+}
+
+fn lacking_in(names: &[String]) -> Vec<&'static str> {
+    if names.is_empty() {
+        return Vec::new();
+    }
+    NEEDED_DECODERS
+        .iter()
+        .filter(|(_, any)| !any.iter().any(|d| names.iter().any(|n| n == d)))
+        .map(|(format, _)| *format)
+        .collect()
+}
+
+/// What Settings says about an ffmpeg that runs but cannot decode some
+/// formats (`lacking_decoders`). Asked only by the two places that show it —
+/// one `-decoders` call — never before a pass.
+#[tauri::command]
+pub async fn ffmpeg_lacks(configured: Option<String>) -> Result<Vec<String>, String> {
+    crate::jobs::off_main(move || {
+        let path = resolve(configured.as_deref());
+        Ok(lacking_decoders(&path).into_iter().map(str::to_string).collect())
     })
     .await
 }
@@ -297,10 +513,108 @@ mod tests {
         assert_eq!(parse_black_line("black_start:110.0 black_duration:1.7", 0.0), None);
     }
 
+    /// Only away from Windows: there, an ffmpeg installed on this computer
+    /// since the tests started would rightly be found by its full path.
+    #[cfg(not(windows))]
     #[test]
     fn an_unset_path_falls_back_to_the_one_on_path() {
         assert_eq!(resolve(None), PathBuf::from("ffmpeg"));
         assert_eq!(resolve(Some("   ")), PathBuf::from("ffmpeg"));
+    }
+
+    /// The shape of `ffmpeg -decoders` (8.x), cut down.
+    const DECODERS: &str = "Decoders:
+ V..... = Video
+ A..... = Audio
+ ------
+ V....D h264                 H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10
+ V....D hevc                 HEVC (High Efficiency Video Coding)
+ V....D hevc_cuvid           Nvidia CUVID HEVC decoder (codec hevc)
+ A....D ac3                  ATSC A/52A (AC-3)
+ A....D eac3                 ATSC A/52B (AC-3, E-AC-3)
+ A....D dca                  DCA (DTS Coherent Acoustics) (codec dts)
+ A....D truehd               TrueHD
+";
+
+    #[test]
+    fn a_full_build_lacks_nothing() {
+        assert!(lacking_in(&decoder_names(DECODERS)).is_empty());
+    }
+
+    /// Fedora's ffmpeg-free: no HEVC, no E-AC-3, H.264 through OpenH264 only.
+    #[test]
+    fn a_free_build_lacks_hevc_and_e_ac_3() {
+        let text = DECODERS
+            .replace(" V....D hevc                 HEVC (High Efficiency Video Coding)\n", "")
+            .replace(" A....D eac3                 ATSC A/52B (AC-3, E-AC-3)\n", "")
+            .replace(" h264 ", " libopenh264 ");
+        // A hardware decoder named after HEVC is not the decoder ffmpeg uses.
+        assert_eq!(lacking_in(&decoder_names(&text)), ["hevc", "eac3"]);
+    }
+
+    #[test]
+    fn no_list_is_no_answer_not_everything_missing() {
+        assert!(lacking_in(&decoder_names("")).is_empty());
+        assert!(lacking_in(&decoder_names("Decoders:\n ------\n")).is_empty());
+    }
+
+    /// A fresh, empty folder of this test's own under the system's temp folder.
+    fn scratch(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("kinema-ffmpeg-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn put_ffmpeg(dir: &Path) -> PathBuf {
+        std::fs::create_dir_all(dir).unwrap();
+        let exe = dir.join(FFMPEG_EXE);
+        std::fs::write(&exe, b"").unwrap();
+        exe
+    }
+
+    #[test]
+    fn the_first_folder_with_ffmpeg_wins() {
+        let root = scratch("order");
+        let (empty, first, second) = (root.join("empty"), root.join("first"), root.join("second"));
+        std::fs::create_dir_all(&empty).unwrap();
+        let wanted = put_ffmpeg(&first);
+        put_ffmpeg(&second);
+        let missing = root.join("not-there");
+        assert_eq!(
+            first_with_ffmpeg([PathBuf::new(), missing, empty, first, second]),
+            Some(wanted)
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn no_folder_with_ffmpeg_finds_nothing() {
+        let root = scratch("none");
+        assert_eq!(first_with_ffmpeg([root.clone(), root.join("nope")]), None);
+        // A folder *named* ffmpeg.exe is not the program.
+        std::fs::create_dir_all(root.join("dir").join(FFMPEG_EXE)).unwrap();
+        assert_eq!(first_with_ffmpeg([root.join("dir")]), None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// winget's package folder as a portable zip install leaves it, when the
+    /// command links could not be made: only Gyan's ffmpeg, newest first.
+    #[test]
+    fn winget_package_folders_are_found_newest_first() {
+        let packages = scratch("packages");
+        let essentials = packages.join("Gyan.FFmpeg.Essentials_Microsoft.Winget.Source_8wekyb3d8bbwe");
+        let old = put_ffmpeg(&essentials.join("ffmpeg-8.0-essentials_build").join("bin"));
+        let new = put_ffmpeg(&essentials.join("ffmpeg-9.0.1-essentials_build").join("bin"));
+        put_ffmpeg(&packages.join("Someone.Else_x").join("ffmpeg-1-build").join("bin"));
+        std::fs::write(packages.join("Gyan.FFmpeg.stray-file"), b"").unwrap();
+
+        let bins = winget_package_bins(&packages);
+        assert_eq!(bins.len(), 2, "{bins:?}");
+        assert_eq!(first_with_ffmpeg(bins), Some(new));
+        assert!(old.is_file());
+        assert!(winget_package_bins(&packages.join("missing")).is_empty());
+        let _ = std::fs::remove_dir_all(&packages);
     }
 
     #[test]

@@ -341,8 +341,9 @@ one skippable, with **Finish later** to go straight to the library:
 - **Accounts:** SIMKL or Trakt, to keep a record of what you finish, and
   OpenSubtitles.
 - **Extras:** [ffmpeg](https://ffmpeg.org), which Kinema uses for intros,
-  credits and a title's picture and sound details but does not include, and
-  an OMDb key for Rotten Tomatoes scores.
+  credits and a title's picture and sound details but does not include — on
+  Windows one press installs it for you — and an OMDb key for Rotten Tomatoes
+  scores.
 
 Everything on them is in Settings too, and Settings → Library → **Run setup
 again** brings the pages back. After the first scan, Kinema scans once at
@@ -360,7 +361,8 @@ of keys and remote buttons.
 ## Optional extras
 
 None of these are bundled, downloaded or required. Each one adds a feature, and
-without it that feature is skipped and everything else carries on.
+without it that feature is skipped and everything else carries on. (On Windows,
+ffmpeg is the one Kinema can install for you, with a button — see below.)
 
 | | What it adds | Without it |
 |---|---|---|
@@ -371,8 +373,23 @@ without it that feature is skipped and everything else carries on.
 These two are for Windows and Linux; Android has no way to run them, and its
 intro skips come from the two community databases below.
 
-Put ffmpeg on your `PATH`, or point Settings at it. Skiptro is configured the
-same way, at whatever path you installed it to — point Kinema at `skiptro.exe`,
+**ffmpeg on Windows:** press **Install ffmpeg** — on the first run's Extras
+page, Home's ffmpeg notice, or Settings → Intro & credits. Kinema asks Windows'
+own app installer, winget, to install the Windows build from
+[gyan.dev](https://www.gyan.dev/ffmpeg/builds/) that ffmpeg's site points to
+(about 110 MB), for your user only, with no administrator prompt. Kinema finds
+it straight away and reads your files with it in the background. It is then a
+program of its own: it stays if Kinema is removed, and `winget uninstall
+Gyan.FFmpeg.Essentials` removes it. A Windows without winget gets the download
+page instead.
+
+Elsewhere — or to use a copy you already have — put ffmpeg on your `PATH`, or
+point Settings at it. On Linux the `.deb` and `.rpm` packages recommend it.
+Fedora's own `ffmpeg-free` leaves out HEVC and E-AC-3; Kinema says in Settings
+what that costs, and RPM Fusion's full `ffmpeg` has them.
+
+Skiptro is configured the same way as a copy of ffmpeg you have, at whatever
+path you installed it to — point Kinema at `skiptro.exe`,
 the command-line one, not `Skiptro-Desktop.exe`.
 
 **TheIntroDB** and **IntroDB** are on by default and need nothing installed.

@@ -9,6 +9,9 @@
  * its work by what is not stored yet — so the next scan, which runs at every
  * start, does what was skipped.
  *
+ * On Windows (`installs_ffmpeg`) the page offers to install it with one press,
+ * through winget (FfmpegInstall.tsx); elsewhere it links to ffmpeg's page.
+ *
  * Where Kinema cannot run programs (Android, `runs_programs`), ffmpeg is not
  * offered at all: nobody could install it there, and the page is the OMDb
  * key alone.
@@ -18,6 +21,8 @@
  */
 import { useEffect, useState } from 'react';
 import { openLink } from './links';
+import { FfmpegInstallButton, FfmpegInstallStatus, FfmpegLacks } from './FfmpegInstall';
+import { FFMPEG_INSTALL_WORDS, useFfmpegInstall } from './ffmpegInstallState';
 import { FFMPEG_PATH_KEY, ffmpegStatus, type FfmpegStatus } from '../library/api';
 import { getSetting, setSetting } from '../metadata/api';
 import { useCapabilities } from '../capabilities';
@@ -25,14 +30,15 @@ import FocusButton from './FocusButton';
 import FocusInput from './FocusInput';
 import { userError } from './errors';
 
-const FFMPEG_URL = 'https://ffmpeg.org/download.html';
 const OMDB_KEY_URL = 'https://www.omdbapi.com/apikey.aspx';
 const OMDB_KEY = 'omdb_api_key';
 /** How long the ffmpeg field rests before it is checked again. */
 const CHECK_AFTER_MS = 600;
 
 export default function ExtrasSetup() {
-  const programs = Boolean(useCapabilities()?.runs_programs);
+  const can = useCapabilities();
+  const programs = Boolean(can?.runs_programs);
+  const installReport = useFfmpegInstall().report;
   const [loaded, setLoaded] = useState(false);
   const [ffmpegPath, setFfmpegPath] = useState('');
   const [ffmpeg, setFfmpeg] = useState<FfmpegStatus | null>(null);
@@ -84,8 +90,9 @@ export default function ExtrasSetup() {
       window.clearTimeout(id);
     };
     // `checked` only chooses the first delay; it is not a reason to ask again.
+    // An install that ended is: ffmpeg may be there now.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loaded, ffmpegPath, programs]);
+  }, [loaded, ffmpegPath, programs, installReport]);
 
   const save = (key: string, value: string) => {
     setError(null);
@@ -127,20 +134,23 @@ export default function ExtrasSetup() {
         {ffmpeg && !ffmpeg.available && (
           <>
             <p className="settings-hint">
-              Kinema does not include it: install it yourself, now or later. The next scan, which
-              runs every time Kinema starts, then does everything that was skipped.
+              {can?.installs_ffmpeg
+                ? `${FFMPEG_INSTALL_WORDS} Or install it yourself, now or later: the next scan, which runs every time Kinema starts, then does everything that was skipped.`
+                : 'Kinema does not include it: install it yourself, now or later. The next scan, which runs every time Kinema starts, then does everything that was skipped.'}
             </p>
             <div className="settings-row">
-              <FocusButton
-                className="btn-secondary"
-                keepInView="nearest"
-                onSelect={() => void openLink(FFMPEG_URL)}
-              >
-                Open the ffmpeg download page ↗
-              </FocusButton>
+              <FfmpegInstallButton
+                focusKey="setup-ffmpeg-install"
+                className={can?.installs_ffmpeg ? 'btn-primary' : 'btn-secondary'}
+              />
             </div>
+            <FfmpegInstallStatus />
           </>
         )}
+        {/* Said once it is found, too: the install's own line goes with the
+            block above, and "reading your files" is worth knowing. */}
+        {ffmpeg?.available && installReport && <FfmpegInstallStatus />}
+        <FfmpegLacks resolved={ffmpeg?.available ? ffmpeg.resolved : null} />
         {askPath && (
           <label className="settings-field">
             <span>

@@ -525,7 +525,10 @@ reasoning is in [docs/DESIGN.md](docs/DESIGN.md) and [docs/HISTORY.md](docs/HIST
   film without them; Linux uses the system's mpv, and Android Google's Media3.
   Nothing else: the app may *invoke* a tool the user installed themselves, at
   a path they chose. It downloads nothing, and depends on nothing else being
-  present.
+  present. On Windows one button installs ffmpeg: Kinema still downloads
+  nothing itself — on that press, and only then, it asks Windows' own package
+  manager (winget) to install Gyan's build, which then belongs to winget, not
+  to Kinema, and stays if Kinema is removed.
   One exception, for building only: the Android project's
   `gradle/wrapper/gradle-wrapper.jar` (Gradle's own 59 KB starter, which
   every Android project keeps). It runs on the build machine and is never

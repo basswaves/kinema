@@ -19,7 +19,7 @@
       },
       "rpm": {
         "depends": ["mpv-libs"],
-        "recommends": ["ffmpeg"],
+        "recommends": ["(ffmpeg or ffmpeg-free)"],
         "files": {
           "/usr/lib/kinema/libmpv-wrapper.so": "lib/libmpv-wrapper.so"
         }

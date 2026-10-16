@@ -2231,6 +2231,19 @@ html {
   color: #e8a838;
 }
 
+/* winget's own last lines under a failed ffmpeg install (FfmpegInstall.tsx):
+   what a person would paste into a bug report, so kept as written. */
+.ffmpeg-install-tail {
+  margin: 0.25rem 0 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.375rem;
+  background: rgba(255, 255, 255, 0.06);
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 /*
  * SIMKL sign-in (SimklSection.tsx): the QR code beside the code to type. The
  * code is big because this is read across a room; the QR code sits on white,

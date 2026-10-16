@@ -18,8 +18,11 @@
  * press of Down from the hero — never a dialog in front of what you came for.
  */
 import { FocusContext } from '@noriginmedia/norigin-spatial-navigation';
+import { useCapabilities } from '../capabilities';
 import { useFocusGroup } from './focusGroups';
 import FocusButton from './FocusButton';
+import { FfmpegInstallButton, FfmpegInstallStatus } from './FfmpegInstall';
+import { FFMPEG_INSTALL_WORDS } from './ffmpegInstallState';
 import { count } from './format';
 import type { Upgrade } from './qualityNotice';
 import type { ScanTrouble } from './scanTrouble';
@@ -42,6 +45,7 @@ interface Props {
   onChoose: () => void;
   onDismiss: () => void;
   ffmpegMissing: boolean;
+  /** Settings' ffmpeg section, where it cannot be installed from Home. */
   onFfmpeg: () => void;
   onDismissFfmpeg: () => void;
 }
@@ -75,6 +79,8 @@ export default function HomeNotices({
         : upgrades.length > 0
           ? 'notice-apply'
           : 'notice-ffmpeg';
+  // Windows installs ffmpeg from the notice itself (FfmpegInstall.tsx).
+  const installs = Boolean(useCapabilities()?.installs_ffmpeg);
   const { ref, focusKey } = useFocusGroup<HTMLElement>('list', {
     current: first,
     focusable: !empty,
@@ -216,19 +222,26 @@ export default function HomeNotices({
               <span className="muted">
                 {' '}
                 Without it a title&rsquo;s page has no picture and sound details, and Kinema
-                cannot find intros and credits by itself. Everything else works. ffmpeg is a free
-                program you install yourself; Kinema never installs anything.
+                cannot find intros and credits by itself. Everything else works.{' '}
+                {installs
+                  ? `ffmpeg is a free program. ${FFMPEG_INSTALL_WORDS}`
+                  : 'ffmpeg is a free program you install yourself; Kinema never installs anything.'}
               </span>
+              {installs && <FfmpegInstallStatus />}
             </div>
             <div className="home-notice-actions">
-              <FocusButton
-                focusKey="notice-ffmpeg"
-                className="btn-primary"
-                keepInView="nearest"
-                onSelect={onFfmpeg}
-              >
-                How to add it
-              </FocusButton>
+              {installs ? (
+                <FfmpegInstallButton focusKey="notice-ffmpeg" />
+              ) : (
+                <FocusButton
+                  focusKey="notice-ffmpeg"
+                  className="btn-primary"
+                  keepInView="nearest"
+                  onSelect={onFfmpeg}
+                >
+                  How to add it
+                </FocusButton>
+              )}
               <FocusButton
                 focusKey="notice-ffmpeg-dismiss"
                 className="btn-secondary"

@@ -45,6 +45,10 @@ pub struct Capabilities {
     /// Skiptro for intros. An Android app cannot run another program, so
     /// there nothing offers them.
     pub runs_programs: bool,
+    /// ffmpeg can be installed with one press, through the system's own
+    /// package manager (Windows' winget, ffmpeg_install.rs). Elsewhere the
+    /// interface links to ffmpeg's download page as before.
+    pub installs_ffmpeg: bool,
     /// The system puts its own keyboard on screen whenever a text field takes
     /// typing (Android). Kinema then lets a field take typing without it, and
     /// opens it only when OK is pressed on the field (ui/typing.ts).
@@ -125,6 +129,7 @@ fn work_out() -> Capabilities {
         folder_picker: cfg!(desktop),
         system_output: cfg!(target_os = "android"),
         runs_programs: cfg!(desktop),
+        installs_ffmpeg: cfg!(windows),
         screen_keyboard: cfg!(mobile),
         opens_folders: cfg!(desktop),
         shares_files: cfg!(target_os = "android"),
@@ -198,6 +203,7 @@ mod tests {
         assert_eq!(c.system, "Windows");
         assert!(c.equipment_detection && c.audio_direct && c.display_switching && c.sleep && c.shut_down);
         assert!(c.windowed && c.folder_picker && !c.system_output && c.runs_programs);
+        assert!(c.installs_ffmpeg);
         assert!(!c.screen_keyboard && c.opens_folders && !c.shares_files && !c.network_shares);
         assert!(!c.back_button);
         // The rendering path the whole of docs/DESIGN.md is written about.

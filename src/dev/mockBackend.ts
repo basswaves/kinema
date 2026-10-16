@@ -818,6 +818,15 @@ const NO_ACCOUNT_APPS = flag('kinemaMockNoAccountApps') === '1';
  * first question.
  */
 const SLOW_FFMPEG = flag('kinemaMockSlowFfmpeg') === '1';
+/**
+ * The one-press ffmpeg install (Windows): `kinemaMockWinget` is `missing` for
+ * a Windows without winget, `fail` for an install that fails; otherwise it
+ * installs, in about two seconds, after which ffmpeg is found.
+ * `kinemaMockFfmpegFound=1`: ffmpeg is there from the start.
+ */
+const WINGET = flag('kinemaMockWinget');
+let ffmpegInstalled = flag('kinemaMockFfmpegFound') === '1';
+const MOCK_FFMPEG_PATH = 'C:\\Users\\you\\AppData\\Local\\Microsoft\\WinGet\\Links\\ffmpeg.exe';
 /** Under `kinemaMockEmpty`: whether a folder has been added, then scanned,
  * and which (the picker's, or the one chosen in Kinema's own browser). */
 const emptyLibrary = { hasRoot: !EMPTY, scanned: false, path: 'C:\\fixture' };
@@ -1126,6 +1135,7 @@ const handlers: Record<string, Handler> = {
         folder_picker: false,
         system_output: true,
         runs_programs: false,
+        installs_ffmpeg: false,
         screen_keyboard: true,
         opens_folders: false,
         shares_files: true,
@@ -1150,6 +1160,7 @@ const handlers: Record<string, Handler> = {
       folder_picker: true,
       system_output: false,
       runs_programs: true,
+      installs_ffmpeg: full,
       screen_keyboard: false,
       opens_folders: true,
       shares_files: false,
@@ -1169,8 +1180,44 @@ const handlers: Record<string, Handler> = {
     if (flag('kinemaMockPowerFail') === '1') throw new Error('Windows would not go to sleep');
     return null;
   },
+  install_ffmpeg: async () => {
+    const say = (line: string) => emitEvent('ffmpeg-install-progress', { line });
+    const pause = () => new Promise((resolve) => window.setTimeout(resolve, 400));
+    const missing = { resolved: 'ffmpeg', available: false };
+    if (WINGET === 'missing') {
+      return { outcome: 'no_winget', reason: null, exit_code: null, tail: [], ffmpeg: missing };
+    }
+    say('Found ffmpeg in Windows’ app installer');
+    await pause();
+    say('Downloading ffmpeg: 55.5 MB of 111 MB');
+    await pause();
+    if (WINGET === 'fail') {
+      return {
+        outcome: 'failed',
+        reason: 'The download failed. Check the internet connection and try again.',
+        exit_code: 0x8a150008 | 0,
+        tail: ['Downloading https://example.invalid/ffmpeg.zip', 'Installer failed to download'],
+        ffmpeg: missing,
+      };
+    }
+    say('Unpacking ffmpeg');
+    await pause();
+    say('Installed');
+    ffmpegInstalled = true;
+    return {
+      outcome: 'installed',
+      reason: null,
+      exit_code: 0,
+      tail: ['Successfully installed'],
+      ffmpeg: { resolved: MOCK_FFMPEG_PATH, available: true },
+    };
+  },
+  // `kinemaMockFfmpegLacks=hevc,eac3`: an ffmpeg like Fedora's ffmpeg-free.
+  ffmpeg_lacks: () => (flag('kinemaMockFfmpegLacks') ?? '').split(',').filter(Boolean),
   ffmpeg_status: () => {
-    const status = { resolved: 'ffmpeg', available: false };
+    const status = ffmpegInstalled
+      ? { resolved: MOCK_FFMPEG_PATH, available: true }
+      : { resolved: 'ffmpeg', available: false };
     return SLOW_FFMPEG
       ? new Promise((resolve) => window.setTimeout(() => resolve(status), 3000))
       : status;

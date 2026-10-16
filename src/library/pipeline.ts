@@ -409,7 +409,48 @@ export async function runScanPipeline(): Promise<ScanOutcome> {
     return { status: 'failed', error: String(e) };
   } finally {
     setStatus(null);
+    // ffmpeg arrived while this scan ran; what it skipped before then is
+    // done now rather than at the next start.
+    if (ffmpegArrived) {
+      ffmpegArrived = false;
+      void runFfmpegPasses();
+    }
   }
+}
+
+/** ffmpeg was installed while a scan was running (see {@link runFfmpegPasses}). */
+let ffmpegArrived = false;
+
+/**
+ * The three stages that need ffmpeg — examining, detecting, measuring — run
+ * now, in the background, because ffmpeg has just been installed
+ * (ui/ffmpegInstallState.ts). They would otherwise wait for the next scan, at the
+ * next start, and the install would look as if it had done nothing.
+ *
+ * Each picks its work by what is not stored yet, so nothing is done twice.
+ * During a scan they wait for it to end and run then: a scan that reached
+ * examining before ffmpeg came skipped it, and one that had not yet uses it
+ * anyway, so the run after costs a few queries.
+ */
+export async function runFfmpegPasses(): Promise<void> {
+  if (status !== null) {
+    ffmpegArrived = true;
+    return;
+  }
+  // Claimed at once, so a scan started meanwhile sees one running.
+  setStatus({ stage: 'examining', detail: '' });
+  const errors: string[] = [];
+  try {
+    await yieldToPlayback();
+    await runProbe(errors);
+    await yieldToPlayback();
+    await runAutoDetect(errors);
+    await yieldToPlayback();
+    await runMeasure(errors);
+  } finally {
+    setStatus(null);
+  }
+  if (errors.length > 0) console.warn('after installing ffmpeg:', errors);
 }
 
 /** Whether there is anything worth scanning — used to explain an empty library. */

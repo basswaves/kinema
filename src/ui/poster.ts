@@ -33,3 +33,18 @@ export function posterState(title: Title): PosterState {
     !title.watched && p !== null && p >= MIN_PROGRESS && p < MAX_PROGRESS ? p : null;
   return { watched: title.watched, progress, badge: null };
 }
+
+const TMDB_ORIGINAL = 'https://image.tmdb.org/t/p/original/';
+
+/**
+ * The address to fetch a TMDB poster from when it is not cached yet, at a
+ * size the screen can use. The library keeps the original's address, and an
+ * original is 2000×3000 — on a card a hundred and fifty pixels wide, during a
+ * first scan, before the artwork stage has stored the smaller copy
+ * (artwork.rs, `rendition`). Any other address is returned as it is.
+ */
+export function sizedPoster(url: string | null, size: 'w500' | 'w780'): string | null {
+  return url?.startsWith(TMDB_ORIGINAL)
+    ? `https://image.tmdb.org/t/p/${size}/${url.slice(TMDB_ORIGINAL.length)}`
+    : url;
+}

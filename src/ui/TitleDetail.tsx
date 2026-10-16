@@ -14,6 +14,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { openLink } from './links';
 import Art from './Art';
+import { sizedPoster } from './poster';
 import FocusButton from './FocusButton';
 import FocusGroup from './FocusGroup';
 import MediaBadges, { BadgeRows } from './MediaBadges';
@@ -410,7 +411,7 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
             <Art
               className="detail-poster"
               local={shown.poster_path}
-              remote={shown.poster_url}
+              remote={sizedPoster(shown.poster_url, 'w780')}
             />
             <div className="detail-info">
               <h1>{title.title}</h1>

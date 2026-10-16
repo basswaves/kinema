@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Title } from './api';
-import { posterState } from './poster';
+import { posterState, sizedPoster } from './poster';
 
 const base: Title = {
   id: 1,
@@ -46,5 +46,23 @@ describe('posterState', () => {
       progress: null,
       badge: null,
     });
+  });
+});
+
+describe('sizedPoster', () => {
+  it('asks TMDB for a smaller copy of an original', () => {
+    expect(sizedPoster('https://image.tmdb.org/t/p/original/abc.jpg', 'w500')).toBe(
+      'https://image.tmdb.org/t/p/w500/abc.jpg'
+    );
+  });
+
+  it('leaves any other address as it is', () => {
+    expect(sizedPoster('https://image.tmdb.org/t/p/w185/abc.jpg', 'w500')).toBe(
+      'https://image.tmdb.org/t/p/w185/abc.jpg'
+    );
+    expect(sizedPoster('https://static.tvmaze.com/a.jpg', 'w780')).toBe(
+      'https://static.tvmaze.com/a.jpg'
+    );
+    expect(sizedPoster(null, 'w500')).toBeNull();
   });
 });

@@ -7,7 +7,7 @@ import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-naviga
 import { memo, useEffect, useRef } from 'react';
 import Art from './Art';
 import type { Title } from './api';
-import { posterState } from './poster';
+import { posterState, sizedPoster } from './poster';
 import { keepOnScreen } from './focus';
 
 interface Props {
@@ -60,7 +60,7 @@ export default memo(function Card({ title, onSelect, focusKey: key, note }: Prop
         <div className="card-art">
           <Art
             local={title.poster_path}
-            remote={title.poster_url}
+            remote={sizedPoster(title.poster_url, 'w500')}
             lazy
             fallback={<div className="card-art-empty">{title.title}</div>}
           />

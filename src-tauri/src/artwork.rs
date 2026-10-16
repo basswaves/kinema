@@ -159,31 +159,79 @@ const TMDB_ORIGINAL: &str = "https://image.tmdb.org/t/p/original/";
 /// Whether this device takes smaller copies: a TV, not a monitor.
 const SMALL_COPIES: bool = cfg!(target_os = "android");
 
+/// The size of TMDB poster kept on a TV (`small`) or a desktop — see [`rendition`].
+const fn poster_size(small: bool) -> &'static str {
+    if small {
+        "w500"
+    } else {
+        "w780"
+    }
+}
+
+/// The size of TMDB poster this device keeps.
+const POSTER_SIZE: &str = poster_size(SMALL_COPIES);
+
 /// The address to download a picture from. The library keeps the original's
-/// address (it is the cache's key, and what a desktop fetches); on a TV a
-/// smaller copy of a TMDB picture is enough, so the size in its path is
-/// swapped. Sizes are what a 1080p to 4K screen shows a card at, not the
-/// picture's own: posters 500 wide, backdrops 1280, episode stills 780,
-/// title logos 500 (TMDB keeps those at full size, 0.8 MB on average for
-/// 400 films — more than every other picture together).
+/// address (it is the cache's key); a smaller copy of a TMDB picture is
+/// fetched where the original is more than any screen shows, so the size in
+/// its path is swapped. Sizes are what a 1080p to 4K screen shows a picture
+/// at, not the picture's own.
+///
+/// On a TV: posters 500 wide, backdrops 1280, episode stills 780, title
+/// logos 500 (TMDB keeps those at full size, 0.8 MB on average for 400 films
+/// — more than every other picture together).
+///
+/// On a desktop, posters only, at 780 (owner, 2026-10-16): TMDB's originals
+/// are 2000×3000 and a card shows one about 150 pixels wide. Each took 24 MB
+/// of memory to draw, so a shelf of hundreds was dropped and drawn again as
+/// it scrolled, and the pictures could not keep up. 780 is still more than
+/// the detail page's poster needs on a 4K screen. Backdrops, stills and logos
+/// stay full size there: they are shown large, a few at a time.
+///
 /// TVmaze's are kept as they are: its smaller copies are 210–250 wide, soft
 /// on a TV, and its originals are small already. A picture that is not one
 /// of those kinds (a logo, a face) is returned as it is.
 fn rendition(url: &str, kind: Kind, small: bool) -> String {
-    if !small {
+    let Some(file) = url.strip_prefix(TMDB_ORIGINAL) else {
         return url.to_string();
+    };
+    let size = match (kind, small) {
+        (Kind::Poster, _) => poster_size(small),
+        (Kind::Backdrop, true) => "w1280",
+        (Kind::Still, true) => "w780",
+        (Kind::Logo, true) => "w500",
+        _ => return url.to_string(),
+    };
+    format!("https://image.tmdb.org/t/p/{size}/{file}")
+}
+
+/// The setting that says which poster size the cache holds.
+const POSTER_SIZE_KEY: &str = "artwork_poster_size";
+
+/// When the size of poster this device keeps has changed, mark every cached
+/// TMDB poster as due, once. The refresh that TMDB's age limit already needs
+/// then fetches each again at the new size, a pass at a time, under the row
+/// and file name it has — so the old picture is shown until the new one is
+/// written. Desktops kept 2000×3000 originals until 2026-10.
+fn resize_posters_once(conn: &Connection, known: &[(String, Kind)]) -> rusqlite::Result<()> {
+    if crate::settings::setting(conn, POSTER_SIZE_KEY).as_deref() == Some(POSTER_SIZE) {
+        return Ok(());
     }
-    if let Some(file) = url.strip_prefix(TMDB_ORIGINAL) {
-        let size = match kind {
-            Kind::Poster => "w500",
-            Kind::Backdrop => "w1280",
-            Kind::Still => "w780",
-            Kind::Logo => "w500",
-            Kind::Other => return url.to_string(),
-        };
-        return format!("https://image.tmdb.org/t/p/{size}/{file}");
+    let tx = conn.unchecked_transaction()?;
+    {
+        let mut due = tx.prepare("UPDATE artwork_cache SET fetched_at = 0 WHERE url = ?1")?;
+        for (url, kind) in known {
+            if *kind == Kind::Poster && url.starts_with(TMDB_ORIGINAL) {
+                due.execute([url])?;
+            }
+        }
     }
-    url.to_string()
+    tx.execute(
+        "INSERT INTO settings (key, value) VALUES (?1, ?2)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        params![POSTER_SIZE_KEY, POSTER_SIZE],
+    )?;
+    tx.commit()
 }
 
 /// Claim a row — and therefore a unique id — for every URL that still needs
@@ -435,7 +483,9 @@ pub async fn cache_artwork(app: tauri::AppHandle) -> Result<CacheResult, String>
             let known = {
                 let db = app.state::<Db>();
                 let conn = db.0.lock().map_err(to_string_err)?;
-                all_urls(&conn).map_err(to_string_err)?
+                let known = all_urls(&conn).map_err(to_string_err)?;
+                resize_posters_once(&conn, &known).map_err(to_string_err)?;
+                known
             };
             let urls: Vec<String> = known.iter().map(|(u, _)| u.clone()).collect();
             let pending = reserve(&app, &urls)?;
@@ -589,7 +639,10 @@ pub fn use_this_systems_separator(conn: &rusqlite::Connection) -> rusqlite::Resu
 
 #[cfg(test)]
 mod tests {
-    use super::{extension, past_tmdb_age, rendition, use_this_systems_separator, Kind};
+    use super::{
+        extension, past_tmdb_age, rendition, resize_posters_once, use_this_systems_separator, Kind,
+        TMDB_ORIGINAL,
+    };
     use crate::metadata::TMDB_MAX_AGE_SECS;
 
     #[test]
@@ -645,17 +698,68 @@ mod tests {
         }
     }
 
+    /// A desktop gets a smaller poster, and every other picture as it is.
     #[test]
-    fn a_desktop_keeps_the_original() {
+    fn a_desktop_keeps_the_original_but_for_posters() {
+        let tmdb = "https://image.tmdb.org/t/p/original/abc.jpg";
+        assert_eq!(
+            rendition(tmdb, Kind::Poster, false),
+            "https://image.tmdb.org/t/p/w780/abc.jpg"
+        );
+        for kind in [Kind::Backdrop, Kind::Still, Kind::Logo, Kind::Other] {
+            assert_eq!(rendition(tmdb, kind, false), tmdb);
+        }
+        let maze = "https://static.tvmaze.com/uploads/images/original_untouched/1/2.jpg";
         for kind in [Kind::Poster, Kind::Backdrop, Kind::Still, Kind::Logo, Kind::Other] {
-            for url in [
-                "https://image.tmdb.org/t/p/original/abc.jpg",
-                "https://static.tvmaze.com/uploads/images/original_untouched/1/2.jpg",
-            ] {
-                assert_eq!(rendition(url, kind, false), url);
-            }
+            assert_eq!(rendition(maze, kind, false), maze);
         }
         assert_eq!(super::SMALL_COPIES, cfg!(target_os = "android"));
+    }
+
+    /// A change of poster size makes the cached TMDB posters due once, and
+    /// nothing else; the second pass changes nothing.
+    #[test]
+    fn a_new_poster_size_fetches_the_posters_again_once() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+             CREATE TABLE artwork_cache (url TEXT PRIMARY KEY, local_path TEXT NOT NULL,
+                                         bytes INTEGER NOT NULL, fetched_at INTEGER NOT NULL);",
+        )
+        .unwrap();
+        let poster = format!("{TMDB_ORIGINAL}p.jpg");
+        let backdrop = format!("{TMDB_ORIGINAL}b.jpg");
+        let maze = "https://static.tvmaze.com/p.jpg".to_string();
+        for url in [&poster, &backdrop, &maze] {
+            conn.execute(
+                "INSERT INTO artwork_cache VALUES (?1, 'artwork/1.jpg', 1, 500)",
+                [url],
+            )
+            .unwrap();
+        }
+        let known = vec![
+            (poster.clone(), Kind::Poster),
+            (backdrop.clone(), Kind::Backdrop),
+            (maze.clone(), Kind::Poster),
+        ];
+        let fetched = |url: &str| -> i64 {
+            conn.query_row("SELECT fetched_at FROM artwork_cache WHERE url = ?1", [url], |r| {
+                r.get(0)
+            })
+            .unwrap()
+        };
+
+        resize_posters_once(&conn, &known).unwrap();
+        assert_eq!(fetched(&poster), 0, "due again");
+        assert_eq!(fetched(&backdrop), 500);
+        assert_eq!(fetched(&maze), 500, "not TMDB's: no other size to fetch");
+        assert!(past_tmdb_age(&poster, 0, 1_000_000_000));
+
+        // Fetched again at the new size: the setting is there, nothing is undone.
+        conn.execute("UPDATE artwork_cache SET fetched_at = 900 WHERE url = ?1", [&poster])
+            .unwrap();
+        resize_posters_once(&conn, &known).unwrap();
+        assert_eq!(fetched(&poster), 900);
     }
 
     #[test]

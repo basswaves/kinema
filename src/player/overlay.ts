@@ -8,6 +8,10 @@
  * visible removes the overlay instead. Never more than one is asked for at a
  * time; app.log says what they cost when the player closes.
  *
+ * Only the parts with something visible go to mpv: each run of visible rows
+ * (a band, `overlay.rs`) is an overlay of its own, drawn where it sits on the
+ * page, so the film between the top and bottom bars is never copied.
+ *
  * Once a photo has come back empty — the controls hidden, which is most of a
  * film — no more are taken until the page changes (`watchForChanges`): at 4K
  * each photo is 33 MB to copy and compare, for a picture of nothing.
@@ -22,6 +26,13 @@ import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { mpvCommand, readProperty } from './engine';
 
+/** Rows `y` to `y + height` of the photo, at `offset` in its file. */
+export interface Band {
+  y: number;
+  height: number;
+  offset: number;
+}
+
 interface OverlayFrame {
   changed: boolean;
   empty: boolean;
@@ -29,10 +40,40 @@ interface OverlayFrame {
   width: number;
   height: number;
   stride: number;
+  bands: Band[];
 }
 
 const INTERVAL_MS = 100;
+/** The first overlay id; each band takes the next (overlay.rs: at most four). */
 const ID = 0;
+
+/**
+ * The `overlay-add` arguments for each band of a photo `width` pixels wide,
+ * of which the top `rows` are drawn, shown `scale` times its size on mpv's
+ * screen (null: drawn at its own size, for an mpv that cannot scale). Bands
+ * below `rows` are left out, and one that runs past it is cut there.
+ */
+export function bandArgs(
+  path: string,
+  bands: Band[],
+  width: number,
+  rows: number,
+  stride: number,
+  scale: { x: number; y: number } | null
+): (string | number)[][] {
+  return bands
+    .filter((b) => b.y < rows)
+    .map((b, i) => {
+      const height = Math.min(b.height, rows - b.y);
+      const picture = [ID + i, 0, 0, path, b.offset, 'bgra', width, height, stride];
+      if (!scale) {
+        picture[2] = b.y;
+        return picture;
+      }
+      picture[2] = Math.round(b.y * scale.y);
+      return [...picture, Math.round(width * scale.x), Math.max(1, Math.round(height * scale.y))];
+    });
+}
 
 /**
  * Page (CSS) pixels per pixel of mpv's window, as the page was last drawn —
@@ -171,6 +212,15 @@ export function startOverlay(): () => void {
   let stopped = false;
   let busy = false;
   let shown = false;
+  // How many overlay ids the last drawing used, so fewer bands remove the rest.
+  let drawnBands = 0;
+  const removeFrom = async (count: number) => {
+    // Each on its own: one refused must not leave the others drawn.
+    for (let i = count; i < drawnBands; i++) {
+      await mpvCommand('overlay-remove', [ID + i]).catch(() => undefined);
+    }
+    drawnBands = Math.min(drawnBands, count);
+  };
   let warned = false;
   let scaled = true;
   // Whether the page may have changed since the last photo. While nothing is
@@ -210,11 +260,19 @@ export function startOverlay(): () => void {
       const frame = await invoke<OverlayFrame>('overlay_frame');
       if (stopped || !frame.changed) return;
       if (frame.empty) {
-        if (shown) await mpvCommand('overlay-remove', [ID]);
+        if (shown) await removeFrom(0);
         shown = false;
         return;
       }
-      const picture = [ID, 0, 0, frame.path, 0, 'bgra', frame.width, frame.height, frame.stride];
+      // Each band in turn; then the ids a bigger drawing used and this does not.
+      // Counted as each goes, so one that fails half-way is still removed later.
+      const draw = async (all: (string | number)[][]) => {
+        for (const [i, args] of all.entries()) {
+          await handTo(args);
+          drawnBands = Math.max(drawnBands, i + 1);
+        }
+        await removeFrom(all.length);
+      };
       const w = (await readProperty<number>('osd-width', 'int64')) || frame.width;
       const h = (await readProperty<number>('osd-height', 'int64')) || frame.height;
       // Laid out in the film's shape, and only that drawn — the same rows
@@ -228,9 +286,9 @@ export function startOverlay(): () => void {
         console.log(`overlay: page ${sizes}`);
       }
       if (scaled) {
-        const drawn = whole ? picture : [ID, 0, 0, frame.path, 0, 'bgra', box.width, box.height, frame.stride];
         try {
-          await handTo([...drawn, w, h]);
+          const scale = { x: w / box.width, y: h / box.height };
+          await draw(bandArgs(frame.path, frame.bands, box.width, box.height, frame.stride, scale));
           shown = true;
           drawnScale = videoToPageScale(box, { width: w, height: h }, window.devicePixelRatio || 1);
           return;
@@ -259,7 +317,7 @@ export function startOverlay(): () => void {
           return;
         }
       }
-      await handTo(picture);
+      await draw(bandArgs(frame.path, frame.bands, frame.width, frame.height, frame.stride, null));
       shown = true;
       // Drawn at its own size: one device pixel of the page per pixel of mpv's.
       drawnScale = videoToPageScale(frame, frame, window.devicePixelRatio || 1);
@@ -287,7 +345,7 @@ export function startOverlay(): () => void {
     console.log(`overlay: ${photos} photos in ${secs} s${each}`);
     setStage(null);
     drawnScale = null;
-    if (shown) void mpvCommand('overlay-remove', [ID]).catch(() => undefined);
+    if (shown) void removeFrom(0).catch(() => undefined);
     if (madeFullscreen) void getCurrentWindow().setFullscreen(false).catch(() => undefined);
     void invoke('overlay_reset').catch(() => undefined);
   };

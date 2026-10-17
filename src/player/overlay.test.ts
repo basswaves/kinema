@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { scalesOverlays, stageFor, videoToPageScale } from './overlay';
+import { bandArgs, scalesOverlays, stageFor, videoToPageScale } from './overlay';
 
 describe('scalesOverlays', () => {
   it('reads the versions that take a size to scale to', () => {
@@ -59,5 +59,32 @@ describe('videoToPageScale', () => {
     // Sway's oversized float: the page drawn from a 1600 × 900 box across 1920 × 1080.
     const s = videoToPageScale({ width: 1600, height: 900 }, { width: 1920, height: 1080 }, 1);
     expect([1920 * s.x, 1080 * s.y]).toEqual([1600, 900]);
+  });
+});
+
+describe('bandArgs', () => {
+  const bars = [
+    { y: 0, height: 100, offset: 0 },
+    { y: 900, height: 180, offset: 100 * 7680 },
+  ];
+
+  it('draws each band where it sits, scaled to mpv', () => {
+    expect(bandArgs('/f', bars, 1920, 1080, 7680, { x: 2, y: 2 })).toEqual([
+      [0, 0, 0, '/f', 0, 'bgra', 1920, 100, 7680, 3840, 200],
+      [1, 0, 1800, '/f', 768000, 'bgra', 1920, 180, 7680, 3840, 360],
+    ]);
+  });
+
+  it('draws them at their own size for an mpv that cannot scale', () => {
+    expect(bandArgs('/f', bars, 1920, 1080, 7680, null)[1]).toEqual([
+      1, 0, 900, '/f', 768000, 'bgra', 1920, 180, 7680,
+    ]);
+  });
+
+  it('leaves out what is below the film-shaped box, and cuts what runs past it', () => {
+    const drawn = bandArgs('/f', bars, 1920, 1000, 7680, { x: 1, y: 1 });
+    expect(drawn).toHaveLength(2);
+    expect(drawn[1][7]).toBe(100);
+    expect(bandArgs('/f', bars, 1920, 800, 7680, { x: 1, y: 1 })).toHaveLength(1);
   });
 });

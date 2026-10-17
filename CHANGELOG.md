@@ -5,11 +5,28 @@ Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [semantic
 versioning](https://semver.org/), with the usual caveat that a `0.x` release
 makes no stability promises.
 
-## [Unreleased]
+## [0.11.0] — 2026-10-17
 
-- **Add without a match.** In Needs attention, a film or show no database lists (a home video, a fan edit) can be kept under its own name and year, in Movies or TV shows; a later episode of a kept show joins it. Its page has Rename, and Find a match sends it back to the queue.
+For Windows and Linux: Blu-ray folders and disc images, Kinema as the video
+player Windows opens files with, a Windows installer, ffmpeg in one press,
+and titles kept without a match. Android is unchanged apart from the shared
+fixes. The library is upgraded (schema 23); a safety copy is made first.
 
 ### Added
+
+- **Add without a match.** In Needs attention, a film or show no database
+  lists (a home video, a fan edit) can be kept under its own name and year,
+  in Movies or TV shows; a later episode of a kept show joins it. Its page
+  has Rename, and Find a match sends it back to the queue.
+- **ffmpeg in one press on Windows.** Without ffmpeg, a film's page has no
+  picture and sound badges and Kinema cannot find intros and credits from
+  the sound itself. The first run's Extras page, Home's notice and Settings →
+  Intro & credits now offer to install it through winget, Windows' own
+  package manager (Gyan's build, about 110 MB, for your account only; it
+  stays if Kinema is removed). Kinema finds it without a restart. Without
+  winget, the download page opens instead. On Linux, the `.rpm` now
+  recommends ffmpeg (or Fedora's ffmpeg-free), and Settings says what an
+  ffmpeg that cannot decode some formats costs.
 
 - **A Windows installer**, `kinema-<version>-windows-x64-setup.exe`, beside
   the ZIP (the ZIP stays). It installs for your own Windows account without an
@@ -46,6 +63,16 @@ makes no stability promises.
 
 ### Fixed
 
+- **A long shelf of posters keeps up when scrolled** on Windows and Linux.
+  Posters were kept at their full 2000 × 3000 size for cards about 150
+  pixels wide; they are now 780 wide, about a fifth of the work to draw.
+  Posters already saved are fetched again once, in the background.
+- **Needs attention counts only what is really waiting for you.** Adding a
+  big folder put every new file there at once and the number then fell file
+  by file; now only what the matcher refused or cannot match is counted, and
+  the number holds until matching ends. The top bar, Home and Settings show
+  the same number. A scan now matches all of a big folder, where it stopped
+  after the first 2,000 files until the next start.
 - **TV mode is the same size on every screen.** On a 4K TV with Windows
   scaling at 300 %, TV mode came out half as big again as it was drawn, so
   less fitted — the detail page's picture, sound and file badges ran off the

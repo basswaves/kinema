@@ -11,11 +11,14 @@ Ideas and reports are welcome as [issues](https://github.com/Basswaves/kinema/is
 
 ## Next
 
-Smaller things about how it feels on a TV. (Done for the next release: a
+More of Kinema as a player for any video, not only a matched library: the
+next and previous file in a folder when a video was opened from Explorer;
+**Videos** folders for home videos and clips, with a picture taken from the
+file; browsing folders inside Kinema; and playlists. (Done in 0.11.0: a
 Windows installer beside the ZIP; Blu-ray folders and disc images on Windows
-and Linux; and Kinema as a video player on Windows — open a file from
-Explorer, or drop it on the window; and a film or show no database lists,
-kept under its own name from Needs attention.)
+and Linux; Kinema as a video player on Windows — open a file from Explorer,
+or drop it on the window; and a film or show no database lists, kept under
+its own name from Needs attention.)
 
 **Android**, an early version (beta) since 0.10.0, moves on as reports come
 in. Its open items: the badges on a film's page, intro detection from the
@@ -38,11 +41,11 @@ entered rather than read.
 
 ### winget, and other package managers
 
-The Windows installer is built (for the next release): it leaves nothing
-behind when removed — the program, its shortcuts, the "Open with" entries, and
-the library and settings too, after asking. A winget package, `Basswaves.Kinema`,
-is ready, and its first submission is planned with the next release; it will
-bring ffmpeg along, for the badges. Other package managers may follow. The
+The Windows installer came with 0.11.0: it leaves nothing behind when
+removed — the program, its shortcuts, the "Open with" entries, and the library
+and settings too, after asking. A winget package, `Basswaves.Kinema`, is
+ready, and its first submission follows the 0.11.0 release; it brings ffmpeg
+along, for the badges. Other package managers may follow. The
 release workflow writes and checks the package's description on every build, so
 a new version needs little hand work there. Automatic updates stay out.
 

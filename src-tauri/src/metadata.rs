@@ -289,9 +289,9 @@ pub fn reset_matches(db: tauri::State<Db>) -> Result<usize, String> {
     let conn = db.0.lock().map_err(to_string_err)?;
     let n = crate::lifecycle::reset_matches(&conn).map_err(to_string_err)?;
 
-    // Episodes cascade via the foreign key. Nothing still points at a title:
-    // matched files were just reset, and every other status has no link.
-    conn.execute("DELETE FROM titles", [])
+    // Episodes cascade via the foreign key. Nothing still points at a title
+    // but the ones kept without a match, which the reset leaves alone.
+    conn.execute("DELETE FROM titles WHERE provider <> 'local'", [])
         .map_err(to_string_err)?;
     Ok(n)
 }

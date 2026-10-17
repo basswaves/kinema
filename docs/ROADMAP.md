@@ -14,7 +14,8 @@ Ideas and reports are welcome as [issues](https://github.com/Basswaves/kinema/is
 Smaller things about how it feels on a TV. (Done for the next release: a
 Windows installer beside the ZIP; Blu-ray folders and disc images on Windows
 and Linux; and Kinema as a video player on Windows — open a file from
-Explorer, or drop it on the window.)
+Explorer, or drop it on the window; and a film or show no database lists,
+kept under its own name from Needs attention.)
 
 **Android**, an early version (beta) since 0.10.0, moves on as reports come
 in. Its open items: the badges on a film's page, intro detection from the

@@ -125,6 +125,8 @@ export default function FixMatch({ onChanged }: Props) {
         await onChanged(message);
         setOpenKey(null);
       } catch (e) {
+        // Nothing left the queue, or it is unknown what did: the ring stays.
+        refocus.current = false;
         setError(userError(e));
       } finally {
         setBusy(false);

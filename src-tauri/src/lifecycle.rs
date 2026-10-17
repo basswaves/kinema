@@ -198,13 +198,17 @@ pub fn reopen_refusals(conn: &Connection) -> rusqlite::Result<usize> {
 
 /// Developer tools: match everything again from scratch. Files that were
 /// matched or refused go back to the matcher; ignored, failed and held
-/// decisions are kept.
+/// decisions are kept — and so are titles kept without a match, which are a
+/// person's decision too (local_title.rs): the matcher would only refuse them
+/// again, and the names typed for them would be lost.
 pub fn reset_matches(conn: &Connection) -> rusqlite::Result<usize> {
     conn.execute(
         "UPDATE media_files
             SET title_id = NULL, match_confidence = NULL, match_reason = NULL,
                 match_status = 'parsed'
-          WHERE match_status IN ('matched', 'unmatched') AND match_hold = 0",
+          WHERE match_status IN ('matched', 'unmatched') AND match_hold = 0
+            AND NOT EXISTS (SELECT 1 FROM titles t
+                             WHERE t.id = media_files.title_id AND t.provider = 'local')",
         [],
     )
 }

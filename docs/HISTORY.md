@@ -3288,6 +3288,48 @@ The rest of the owner's TV findings that the desktop could settle.
   takes 12 ms and the rest 33 ms (two frames): not a desktop problem. The
   box's figure stays an Android item.
 
+## Add without a match (2026-10-17)
+
+Local media phase 3 (the owner's plan of 2026-10-05, decision 3: unmatched
+films and shows stay in Movies and TV shows). Some of what waits in Needs
+attention will never be found — a home recording, a fan edit, a show no
+database lists. The only answers were to leave it waiting or to ignore it off
+every screen. Needs attention now has **Add without a match**: a name (the
+file's, to start with) and a year, kept as a film or a series by the Movie /
+TV series button the search already has.
+
+- **Nothing is guessed, so the 0.75 / 0.05 rule is untouched.** A kept title
+  is a person's decision, like a title linked by hand.
+- **No schema change.** A kept title is an ordinary `titles` row with
+  `provider = 'local'` (`local_title.rs`), so resume points, watched ticks,
+  Continue Watching and search work as for any title. It has **no IMDb or
+  TMDB id**, which is what keeps it from going anywhere: SIMKL and Trakt find
+  titles by those ids, so nothing is queued for them; TheIntroDB, IntroDB.app,
+  IMDb's ratings and Rotten Tomatoes have nothing to look up; the six-month
+  TMDB refresh asks only about `tmdb` rows. No picture yet — the frame from
+  the file waits for local media phase 2, which needs the same thing.
+- **Only a kind that can show the files.** A series page lists a file by its
+  season and episode numbers and a film page plays one file, so a series
+  whose file names carry no numbers, or several episodes kept as one film,
+  would have left files on no screen. Both are refused with a sentence saying
+  why (found by the review of the first version).
+- **A later episode joins its series.** The next episode of a kept show
+  arrives in Needs attention on its own; kept under the same name, it joins
+  the title kept before it rather than making a second card.
+- **Its page has Rename and Find a match.** Find a match sends the files back
+  to Needs attention, held like an unlinked match so the matcher does not just
+  refuse them again, and opens the queue. The row's key is the group's lowest
+  file id, so its watch history comes back if it is kept again.
+- **Reset all matches keeps them**, like the other decisions made by hand —
+  the matcher would only refuse them again, and the names typed would be lost.
+- After a group leaves the queue, the ring goes to the next group; it used to
+  fall back to a button far up the page (Link did the same).
+
+Proven: Rust tests for adding, renaming, sending back, the kind check, joining
+and the reset; e2e flows by keyboard and by mouse in WebKit and Edge (CI runs
+them on Linux WebKit too). Not tried in the real app against a real library —
+the backend is the same SQL the tests run on a migrated database.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

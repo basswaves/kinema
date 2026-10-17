@@ -58,7 +58,46 @@ fn clean_year(year: Option<i64>) -> Result<Option<i64>, String> {
     }
 }
 
+/// Whether these files can be shown as the kind asked for, or why not.
+///
+/// A series page lists a file only by its season and episode numbers
+/// (`metadata::episodes_for`), and a film page plays one file. So a series
+/// whose files have no numbers, or several episodes kept as one film, would
+/// leave files on no screen at all — out of Needs attention and unreachable.
+fn check_kind(conn: &Connection, file_ids: &[i64], is_series: bool) -> Result<(), String> {
+    let mut unnumbered = 0;
+    let mut numbered = 0;
+    for &id in file_ids {
+        let (season, episode): (Option<i64>, Option<i64>) = conn
+            .query_row(
+                "SELECT parsed_season, parsed_episode FROM media_files WHERE id = ?1",
+                [id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .map_err(to_string_err)?;
+        if season.is_some() && episode.is_some() {
+            numbered += 1;
+        } else {
+            unnumbered += 1;
+        }
+    }
+    if is_series && unnumbered > 0 {
+        return Err(
+            "Kinema could not read a season and episode number from every file name              (S01E01), so it could not place them as episodes. Keep them as a movie,              or rename the files."
+                .into(),
+        );
+    }
+    if !is_series && file_ids.len() > 1 && numbered > 0 {
+        return Err("These are episodes. Keep them as a TV series.".into());
+    }
+    Ok(())
+}
+
 /// Keep these files as one local title. Returns the title's id.
+///
+/// A local title of the same kind and name (and, for a film, year) is joined
+/// rather than made twice: the next episode of a kept series arrives in Needs
+/// attention on its own, and belongs with the ones kept before it.
 pub fn add(
     conn: &mut Connection,
     file_ids: &[i64],
@@ -69,27 +108,55 @@ pub fn add(
     let name = clean_name(name)?;
     let year = clean_year(year)?;
     let first = *file_ids.iter().min().ok_or("No files to add.")?;
+    check_kind(conn, file_ids, is_series)?;
     let kind = if is_series { "series" } else { "movie" };
-    let provider_id = format!("{kind}-{first}");
 
-    conn.execute(
-        "INSERT INTO titles (kind, provider, provider_id, title, year, fetched_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)
-         ON CONFLICT(provider, provider_id) DO UPDATE SET
-            title = excluded.title, year = excluded.year",
-        params![kind, PROVIDER, provider_id, name, year, now_secs()],
-    )
-    .map_err(to_string_err)?;
-    let title_id: i64 = conn
+    let existing: Option<i64> = conn
         .query_row(
-            "SELECT id FROM titles WHERE provider = ?1 AND provider_id = ?2",
-            params![PROVIDER, provider_id],
+            "SELECT id FROM titles
+              WHERE provider = ?1 AND kind = ?2 AND lower(title) = lower(?3)
+                AND (kind = 'series' OR year IS ?4)
+              ORDER BY id LIMIT 1",
+            params![PROVIDER, kind, name, year],
             |r| r.get(0),
         )
+        .optional()
         .map_err(to_string_err)?;
+    let (title_id, made) = match existing {
+        Some(id) => (id, false),
+        None => {
+            let provider_id = format!("{kind}-{first}");
+            conn.execute(
+                "INSERT INTO titles (kind, provider, provider_id, title, year, fetched_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+                 ON CONFLICT(provider, provider_id) DO UPDATE SET
+                    title = excluded.title, year = excluded.year",
+                params![kind, PROVIDER, provider_id, name, year, now_secs()],
+            )
+            .map_err(to_string_err)?;
+            let id = conn
+                .query_row(
+                    "SELECT id FROM titles WHERE provider = ?1 AND provider_id = ?2",
+                    params![PROVIDER, provider_id],
+                    |r| r.get(0),
+                )
+                .map_err(to_string_err)?;
+            (id, true)
+        }
+    };
 
     // A person's decision, like a link made in Fix match: no score to record.
-    lifecycle::matched(conn, file_ids, title_id, None, Some(ADDED_REASON)).map_err(to_string_err)?;
+    if let Err(e) = lifecycle::matched(conn, file_ids, title_id, None, Some(ADDED_REASON)) {
+        // No row left behind with nothing in it.
+        if made {
+            let _ = conn.execute(
+                "DELETE FROM titles WHERE id = ?1
+                   AND NOT EXISTS (SELECT 1 FROM media_files WHERE title_id = ?1)",
+                [title_id],
+            );
+        }
+        return Err(to_string_err(e));
+    }
     crate::history::restore(conn, file_ids).map_err(to_string_err)?;
     Ok(title_id)
 }
@@ -245,6 +312,45 @@ mod tests {
         // Nothing a provider refresh or a tracking service would pick up.
         let stale = crate::metadata::stale_titles(&conn, i64::MAX / 2, 100).unwrap();
         assert!(stale.iter().all(|t| t.id != id));
+    }
+
+    #[test]
+    fn files_are_only_kept_as_a_kind_that_can_show_them() {
+        let mut conn = library();
+        conn.execute("UPDATE media_files SET parsed_season = NULL WHERE id = 13", [])
+            .unwrap();
+        // A series page lists files by season and episode: 13 has no season.
+        assert!(add(&mut conn, &[11, 13], true, "Our Holiday", None).is_err());
+        // Two episodes as one film: one of them would be on no screen.
+        assert!(add(&mut conn, &[11, 12], false, "Our Holiday", None).is_err());
+        assert_eq!(needing_attention(&conn), 3, "nothing changed");
+        // One numbered file as a film is fine: the film page plays it.
+        assert!(add(&mut conn, &[11], false, "Our Holiday", None).is_ok());
+    }
+
+    #[test]
+    fn a_later_episode_joins_the_series_kept_before_it() {
+        let mut conn = library();
+        let first = add(&mut conn, &[11, 12], true, "Our Holiday", None).unwrap();
+        let later = add(&mut conn, &[13], true, "our holiday", None).unwrap();
+        assert_eq!(first, later);
+        let (count, name): (i64, String) = conn
+            .query_row(
+                "SELECT COUNT(*), MAX(title) FROM titles WHERE provider = 'local'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!((count, name.as_str()), (1, "Our Holiday"), "the first name stays");
+    }
+
+    #[test]
+    fn reset_matches_keeps_titles_kept_without_a_match() {
+        let mut conn = library();
+        let id = add(&mut conn, &[11, 12], true, "Our Holiday", None).unwrap();
+        lifecycle::reset_matches(&conn).unwrap();
+        let (status, title, _, _) = file(&conn, 11);
+        assert_eq!((status.as_str(), title), ("matched", Some(id)));
     }
 
     #[test]

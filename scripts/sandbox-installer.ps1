@@ -108,14 +108,34 @@ public static class Win {
     [DllImport("user32.dll")] public static extern bool EnumChildWindows(IntPtr parent, EnumProc f, IntPtr l);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
     [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
-    public static IntPtr Child(IntPtr parent, string text) {
+    [DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc f, IntPtr l);
+    [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+    [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
+    static string Text(IntPtr h) { var s = new StringBuilder(256); GetWindowText(h, s, 256); return s.ToString().Replace("&", ""); }
+    // A control whose text contains `text`, or is exactly it when `exact`
+    // (a button: "Uninstall" is also inside "will be uninstalled from").
+    public static IntPtr Child(IntPtr parent, string text, bool exact = false) {
         IntPtr found = IntPtr.Zero;
         EnumChildWindows(parent, (h, l) => {
-            var s = new StringBuilder(256); GetWindowText(h, s, 256);
-            if (s.ToString().Replace("&", "").IndexOf(text, StringComparison.OrdinalIgnoreCase) >= 0) { found = h; return false; }
+            var t = Text(h);
+            var hit = exact ? string.Equals(t, text, StringComparison.OrdinalIgnoreCase)
+                            : t.IndexOf(text, StringComparison.OrdinalIgnoreCase) >= 0;
+            if (hit) { found = h; return false; }
             return true;
         }, IntPtr.Zero);
         return found;
+    }
+    // The visible top-level windows of these processes, by title: the
+    // uninstaller runs from a copy of itself in the temporary folder, under
+    // another name, and its title is NSIS's, not one to guess.
+    public static List<KeyValuePair<IntPtr, string>> WindowsOf(HashSet<uint> pids) {
+        var list = new List<KeyValuePair<IntPtr, string>>();
+        EnumWindows((h, l) => {
+            uint pid; GetWindowThreadProcessId(h, out pid);
+            if (pids.Contains(pid) && IsWindowVisible(h)) list.Add(new KeyValuePair<IntPtr, string>(h, Text(h)));
+            return true;
+        }, IntPtr.Zero);
+        return list;
     }
 }
 "@
@@ -188,23 +208,44 @@ try {
     Say "5 installed again; library there: $(Test-Path (Join-Path $data 'library.db'))"
     Start-Process (Join-Path $installDir 'uninstall.exe')
     $window = [IntPtr]::Zero
-    foreach ($i in 1..30) {
+    $box = [IntPtr]::Zero
+    $seen = @{}
+    foreach ($i in 1..40) {
         Start-Sleep -Seconds 1
-        $window = [Win]::FindWindow($null, 'Kinema Uninstall')
-        if ($window -ne [IntPtr]::Zero -and [Win]::Child($window, 'application data') -ne [IntPtr]::Zero) { break }
+        $pids = New-Object 'System.Collections.Generic.HashSet[uint32]'
+        Get-Process | Where-Object { $_.ProcessName -match '^(Un_|Au_|uninstall)' } | ForEach-Object { [void]$pids.Add([uint32]$_.Id) }
+        foreach ($w in [Win]::WindowsOf($pids)) {
+            if (-not $seen.ContainsKey($w.Value)) { $seen[$w.Value] = $true; Say "  uninstaller window seen: '$($w.Value)'" }
+            $b = [Win]::Child($w.Key, 'application data')
+            if ($b -ne [IntPtr]::Zero) { $window = $w.Key; $box = $b; break }
+        }
+        if ($box -ne [IntPtr]::Zero) { break }
     }
-    $box = if ($window -ne [IntPtr]::Zero) { [Win]::Child($window, 'application data') } else { [IntPtr]::Zero }
     Say "  uninstaller window: $($window -ne [IntPtr]::Zero); checkbox: $($box -ne [IntPtr]::Zero)"
     if ($box -ne [IntPtr]::Zero) {
         $sb = New-Object System.Text.StringBuilder 256; [Win]::GetWindowText($box, $sb, 256) | Out-Null
         Say "  checkbox reads: $sb; ticked at first: $([Win]::SendMessage($box, 0xF0, [IntPtr]::Zero, [IntPtr]::Zero))"
         [Win]::SendMessage($box, 0xF5, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null
         Say "  ticked now: $([Win]::SendMessage($box, 0xF0, [IntPtr]::Zero, [IntPtr]::Zero))"
-        [Win]::SendMessage([Win]::Child($window, 'Uninstall'), 0xF5, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null
+        $go = [Win]::Child($window, 'Uninstall', $true)
+        Say "  Uninstall button: $($go -ne [IntPtr]::Zero)"
+        [Win]::SendMessage($go, 0xF5, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null
+        # The last page waits for Finish or Close; pressed until the
+        # uninstaller is gone.
+        $deadline = (Get-Date).AddSeconds(120)
+        while ((Get-Date) -lt $deadline) {
+            Start-Sleep -Seconds 2
+            $pids = New-Object 'System.Collections.Generic.HashSet[uint32]'
+            Get-Process | Where-Object { $_.ProcessName -match '^(Un_|Au_|uninstall)' } | ForEach-Object { [void]$pids.Add([uint32]$_.Id) }
+            if ($pids.Count -eq 0) { break }
+            foreach ($w in [Win]::WindowsOf($pids)) {
+                foreach ($label in 'Finish', 'Close') {
+                    $btn = [Win]::Child($w.Key, $label, $true)
+                    if ($btn -ne [IntPtr]::Zero) { [Win]::SendMessage($btn, 0xF5, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null }
+                }
+            }
+        }
         Say "  uninstall finished: $(WaitUninstalled)"
-        Start-Sleep -Seconds 3
-        $close = [Win]::FindWindow($null, 'Kinema Uninstall')
-        if ($close -ne [IntPtr]::Zero) { [Win]::SendMessage([Win]::Child($close, 'Close'), 0xF5, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null }
     }
     Places '  after uninstall with the library ticked:'
     & reg export HKCU\Software (Join-Path $here 'after-all.reg') /y | Out-Null

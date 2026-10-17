@@ -8,3 +8,6 @@ gradlew text eol=lf
 # git showed with identical bytes after every build.
 src-tauri/Cargo.toml text eol=lf
 src-tauri/Cargo.lock text eol=lf
+# The packages' desktop entry template: read on Linux by the bundler, and
+# by a test that looks for its lines on every system.
+src-tauri/linux/*.desktop text eol=lf

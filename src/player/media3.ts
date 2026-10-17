@@ -77,7 +77,7 @@ const readable = (path: string) =>
  * a film opens, and does not look for them itself as mpv does. A folder that
  * cannot be read means none, never a film that will not open.
  */
-export async function open(path: string, start: number | null) {
+export async function open(path: string, start: number | null, share: number | null = null) {
   const url = isShare(path) ? await readable(path) : null;
   const found = await invoke<SubtitleFile[]>('subtitle_files', { path }).catch((e) => {
     console.warn('media3: subtitle files beside the film not looked for', e);
@@ -91,7 +91,7 @@ export async function open(path: string, start: number | null) {
       hearingImpaired: f.hearing_impaired,
     }))
   );
-  return call('open', { path, start, url, subtitles });
+  return call('open', { path, start, startShare: share, url, subtitles });
 }
 
 /**

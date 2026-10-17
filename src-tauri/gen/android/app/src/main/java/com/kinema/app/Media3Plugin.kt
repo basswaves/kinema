@@ -23,6 +23,7 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.Timeline
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.text.CueGroup
 import androidx.media3.common.Tracks
@@ -71,6 +72,12 @@ class OpenArgs {
   var url: String? = null
   /** Seconds to start at, or null for the beginning. */
   var start: Double? = null
+  /**
+   * Or the share of the file (0–1) to start at, when that is all Kinema
+   * knows: a resume point from Trakt on a film never played on this device
+   * (trakt_resume.rs). Applied as soon as Media3 knows the length.
+   */
+  var startShare: Double? = null
   /** Subtitle files of its own beside the film, found by the core (subtitle_files.rs). */
   var subtitles: Array<SubtitleArg> = arrayOf()
 }
@@ -213,6 +220,8 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
   private var started = false
   /** A seek was asked for: the next time the player is ready, playback has restarted. */
   private var seeking = false
+  /** The share of the file to open at, until Media3 knows its length (`OpenArgs.startShare`). */
+  private var pendingShare: Double? = null
   /**
    * Whether to play, kept across files as mpv keeps `pause`: the player
    * pauses before a file opens so the screen can switch first (engine.ts).
@@ -339,6 +348,15 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
       perf.tick()
       main.postDelayed(this, 250)
     }
+  }
+
+  /** Go to the share of the file asked for at open, once its length is known. */
+  private fun applyShare(p: ExoPlayer) {
+    val share = pendingShare ?: return
+    val d = p.duration
+    if (d == C.TIME_UNSET || d <= 0) return
+    pendingShare = null
+    p.seekTo((d * share).toLong())
   }
 
   private fun ensurePlayer(): ExoPlayer {
@@ -534,9 +552,16 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
       p.trackSelectionParameters = p.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, true).build()
     }
     p.addListener(object : Player.Listener {
+      // The length arrives with the timeline, before the first frame: the
+      // moment to go to a share of it.
+      override fun onTimelineChanged(timeline: Timeline, reason: Int) {
+        applyShare(p)
+      }
+
       override fun onPlaybackStateChanged(state: Int) {
         when (state) {
           Player.STATE_READY -> {
+            applyShare(p)
             val d = p.duration
             emit("duration") { put("value", if (d > 0) d / 1000.0 else JSONObject.NULL) }
             if (seeking) {
@@ -924,6 +949,7 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
         item = media
         subtitleView?.setCues(emptyList())
         val start = args.start
+        pendingShare = if (start == null) args.startShare?.takeIf { it > 0.0 && it < 1.0 } else null
         if (start != null) p.setMediaItem(media, (start * 1000).toLong())
         else p.setMediaItem(media)
         perf.open()

@@ -265,6 +265,7 @@ pub fn continue_items(
                 episode_name: Some(r.get(3)?),
                 position_secs: r.get(4)?,
                 duration_secs: r.get(5)?,
+                fraction: None,
                 image_url: None,
                 image_path: cached_frame(frames, id),
                 updated_at: r.get(6)?,

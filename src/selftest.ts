@@ -29,7 +29,9 @@ import {
   listenMpvEvents,
   mpvCommand,
   mpvGet,
+  nowPlaying,
   onPlaybackEvent,
+  openFile,
   playerFacts,
   readChapters,
   readTracks,
@@ -238,6 +240,16 @@ const CALLABLE: Record<string, (...args: never[]) => Promise<unknown>> = {
   // device the way the track panel does.
   readTracks,
   chooseTrack,
+  // A resume point from Trakt known only as a share of the file
+  // (trakt_resume.rs): the open file opened again at that share of its own
+  // length, and where it then is — whichever engine plays.
+  openAtShare: async (share: number) => {
+    const { path } = await nowPlaying();
+    if (!path) throw new Error('nothing is open');
+    await openFile(path, null, share);
+    await new Promise((done) => window.setTimeout(done, 4000));
+    return nowPlaying();
+  },
   showSubtitles,
   addSubtitle,
   setVolume,

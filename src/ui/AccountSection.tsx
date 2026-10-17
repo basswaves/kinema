@@ -11,6 +11,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { openLink } from './links';
+import ChoiceRow from './ChoiceRow';
 import ConfirmButton from './ConfirmButton';
 import FocusButton from './FocusButton';
 import FocusInput from './FocusInput';
@@ -25,6 +26,7 @@ import {
   SIMKL_CLIENT_ID_KEY,
   TRAKT_CLIENT_ID_KEY,
   TRAKT_CLIENT_SECRET_KEY,
+  TRAKT_RESUME_KEY,
   type AccountStatus,
   type DeviceCode,
   type Service,
@@ -86,12 +88,23 @@ export default function AccountSection({ service }: { service: Service }) {
   /** When the code runs out, by the clock — polling stops there whatever the service says. */
   const deadline = useRef(0);
 
+  /**
+   * Trakt's resume switch, read with the status so the row appears with the
+   * buttons under it: one drawn a moment later was skipped by Up from
+   * Disconnect, the spatial library still placing Disconnect where it was.
+   */
+  const [resumeOn, setResumeOn] = useState(true);
   const refresh = useCallback(() => {
-    api
-      .status()
-      .then(setStatus)
+    Promise.all([
+      api.status(),
+      service === 'trakt' ? getSetting(TRAKT_RESUME_KEY) : Promise.resolve(null),
+    ])
+      .then(([s, resume]) => {
+        setResumeOn(resume !== '0');
+        setStatus(s);
+      })
       .catch((e: unknown) => setError(userError(e)));
-  }, [api]);
+  }, [api, service]);
 
   useEffect(() => {
     refresh();
@@ -288,6 +301,9 @@ export default function AccountSection({ service }: { service: Service }) {
                 ? `Everything is sent; last on ${day(status.last_sent_at)}.`
                 : 'Everything is sent.'}
           </p>
+          {service === 'trakt' && (
+            <ResumeAcrossDevices on={resumeOn} setOn={setResumeOn} onError={setError} />
+          )}
           <div className="settings-row">
             <ConfirmButton
               keepInView="nearest"
@@ -333,6 +349,40 @@ export default function AccountSection({ service }: { service: Service }) {
         </>
       )}
     </section>
+  );
+}
+
+/**
+ * Trakt only: continue on one device where a film was stopped on another
+ * (trakt_resume.rs). On while Trakt is connected; this turns it off. SIMKL
+ * stays one way, so it has no such row.
+ */
+function ResumeAcrossDevices({
+  on,
+  setOn,
+  onError,
+}: {
+  on: boolean;
+  setOn: (on: boolean) => void;
+  onError: (message: string) => void;
+}) {
+  return (
+    <ChoiceRow
+      label="Continue where you stopped on another device"
+      choices={[
+        { value: 'on', label: 'On' },
+        { value: 'off', label: 'Off' },
+      ]}
+      value={on ? 'on' : 'off'}
+      onChange={(v) => {
+        setOn(v === 'on');
+        void setSetting(TRAKT_RESUME_KEY, v === 'on' ? '1' : '0').catch((e: unknown) =>
+          onError(userError(e))
+        );
+      }}
+      note="When you stop a film or an episode part-way, Trakt is told where; a title's page and Continue Watching here pick up where another device stopped, whichever is newer."
+      hint="Trakt keeps a percentage, so a copy of a different length resumes at the same share of it. Videos and titles kept without a match are never sent."
+    />
   );
 }
 

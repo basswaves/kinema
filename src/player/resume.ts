@@ -23,3 +23,17 @@ export function resumePoint(progress: Progress | null): number | null {
   }
   return progress.position_secs;
 }
+
+/**
+ * Where to resume as a share of the file, when only the share is known — a
+ * resume point from Trakt on a copy never played here. Null whenever
+ * `resumePoint` has seconds to offer instead.
+ */
+export function resumeShare(progress: Progress | null): number | null {
+  if (!progress || progress.completed || resumePoint(progress) !== null) return null;
+  const share = progress.fraction;
+  if (share === null || share === undefined || !(share > 0.005) || share >= RESUME_MAX_FRACTION) {
+    return null;
+  }
+  return share;
+}

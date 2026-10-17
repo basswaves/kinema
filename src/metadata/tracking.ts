@@ -2,8 +2,9 @@
  * The watch-tracking services — the typed side of `src-tauri/src/simkl.rs`
  * and `src-tauri/src/trakt.rs`.
  *
- * One way: Kinema tells an account what was finished, and nothing comes back.
- * Everything that talks to a service is in Rust; this is the page's half of
+ * Kinema tells an account what was finished. The one thing read back is
+ * Trakt's resume points (trakt_resume.rs); SIMKL stays one way. Everything
+ * that talks to a service is in Rust; this is the page's half of
  * signing in, and what it shows. Both services answer the same five commands,
  * named after them (`simkl_status`, `trakt_status`, …).
  */
@@ -15,6 +16,8 @@ export type Service = 'simkl' | 'trakt';
 export const SIMKL_CLIENT_ID_KEY = 'simkl_client_id';
 export const TRAKT_CLIENT_ID_KEY = 'trakt_client_id';
 export const TRAKT_CLIENT_SECRET_KEY = 'trakt_client_secret';
+/** Continue across devices through Trakt (trakt_resume.rs): '0' is off, else on. */
+export const TRAKT_RESUME_KEY = 'trakt_resume';
 
 export interface AccountStatus {
   /** This copy of Kinema has an app for the service, so connecting is possible. */

@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use std::path::Path;
 
 /// The schema this build understands. Bump it with every new `SCHEMA_V*`.
-pub const SCHEMA_VERSION: i64 = 24;
+pub const SCHEMA_VERSION: i64 = 25;
 
 /// What can go wrong opening the library.
 ///
@@ -735,6 +735,17 @@ CREATE TABLE video_dismissed (
 );
 "#;
 
+/// Schema version 25: a resume point known only as a share of the file.
+///
+/// Trakt keeps where a film was paused as a percentage (`trakt_resume.rs`).
+/// A copy that has been played here knows its length and gets seconds; one
+/// that has not — the usual case on a second device — keeps the percentage
+/// here, and the player opens the file at that share of its own length. A
+/// position saved here clears it.
+const SCHEMA_V25: &str = r#"
+ALTER TABLE playback_state ADD COLUMN fraction REAL;
+"#;
+
 /// How long a statement waits for the write lock before giving up.
 ///
 /// Load-bearing from the moment there is more than one connection. SQLite
@@ -951,7 +962,7 @@ pub(crate) const MIGRATIONS: [&str; SCHEMA_VERSION as usize] = [
     SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6, SCHEMA_V7, SCHEMA_V8,
     SCHEMA_V9, SCHEMA_V10, SCHEMA_V11, SCHEMA_V12, SCHEMA_V13, SCHEMA_V14,
     SCHEMA_V15, SCHEMA_V16, SCHEMA_V17, SCHEMA_V18, SCHEMA_V19,
-    SCHEMA_V20, SCHEMA_V21, SCHEMA_V22, SCHEMA_V23, SCHEMA_V24,
+    SCHEMA_V20, SCHEMA_V21, SCHEMA_V22, SCHEMA_V23, SCHEMA_V24, SCHEMA_V25,
 ];
 
 /// Bring the database up to [`SCHEMA_VERSION`].
@@ -1287,6 +1298,28 @@ mod tests {
         assert_eq!(last(1), Some(2));
         assert_eq!(last(2), None);
         assert_eq!(last(3), None, "an unparsable parsed_json must not fail the upgrade");
+    }
+
+    /// Resume points from before Trakt's percentages stay as they were.
+    #[test]
+    fn the_v25_upgrade_keeps_resume_points_with_no_share() {
+        let conn = at_version(24);
+        conn.execute_batch(
+            r#"INSERT INTO library_roots (id, path, kind, added_at) VALUES (1, 'C:/m', 'movies', 0);
+               INSERT INTO media_files (id, root_id, path, parent_dir, file_name, extension,
+                   size_bytes, modified_at, first_seen_at, last_seen_at)
+               VALUES (1, 1, 'a', 'C:/m', 'a', 'mkv', 1, 0, 0, 0);
+               INSERT INTO playback_state (file_id, position_secs, duration_secs, completed, updated_at)
+               VALUES (1, 600, 7200, 0, 10);"#,
+        )
+        .unwrap();
+        migrate(&conn).unwrap();
+        let row: (f64, Option<f64>) = conn
+            .query_row("SELECT position_secs, fraction FROM playback_state WHERE file_id = 1", [], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })
+            .unwrap();
+        assert_eq!(row, (600.0, None));
     }
 
     /// Existing watch state becomes episode history: one row per episode a

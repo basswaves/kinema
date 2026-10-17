@@ -129,7 +129,9 @@ function ContinueCardBody({
 
   const percent = item.duration_secs
     ? Math.min(100, (item.position_secs / item.duration_secs) * 100)
-    : 0;
+    : item.fraction
+      ? Math.min(100, item.fraction * 100)
+      : 0;
 
   const subtitle =
     item.kind === 'video'

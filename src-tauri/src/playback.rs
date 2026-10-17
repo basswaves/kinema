@@ -17,6 +17,11 @@ pub struct Progress {
     pub position_secs: f64,
     pub duration_secs: Option<f64>,
     pub completed: bool,
+    /// Where to resume as a share of the file (0–1), when that is all that is
+    /// known: a resume point from Trakt on a copy never played here
+    /// (`trakt_resume.rs`). The player opens the file at that share of its
+    /// own length.
+    pub fraction: Option<f64>,
 }
 
 #[derive(Serialize)]
@@ -31,6 +36,8 @@ pub struct ContinueItem {
     pub episode_name: Option<String>,
     pub position_secs: f64,
     pub duration_secs: Option<f64>,
+    /// As [`Progress::fraction`]: the card's bar when the length is unknown.
+    pub fraction: Option<f64>,
     pub image_url: Option<String>,
     pub image_path: Option<String>,
     pub updated_at: i64,
@@ -126,6 +133,7 @@ pub fn save_progress(
     position_secs: f64,
     duration_secs: Option<f64>,
     credits_start: Option<f64>,
+    leaving: Option<bool>,
 ) -> Result<(), String> {
     let mut completed = is_complete(position_secs, duration_secs, credits_start);
 
@@ -152,7 +160,8 @@ pub fn save_progress(
             position_secs = excluded.position_secs,
             duration_secs = excluded.duration_secs,
             completed     = excluded.completed,
-            updated_at    = excluded.updated_at",
+            updated_at    = excluded.updated_at,
+            fraction      = NULL",
         params![
             file_id,
             position_secs,
@@ -165,6 +174,11 @@ pub fn save_progress(
     // The episode's, and every other copy's — see `history`.
     if crate::history::remember(&conn, file_id).map_err(to_string_err)? > 0 {
         crate::tracking::send_soon(&app);
+    }
+    // The player's last save as it leaves the file: Trakt hears where it
+    // stopped, for another device to continue from.
+    if leaving == Some(true) {
+        crate::trakt_resume::left(&app, file_id);
     }
     Ok(())
 }
@@ -196,7 +210,8 @@ pub fn set_watched(
              VALUES (?1, 0, NULL, 1, ?2)
              ON CONFLICT(file_id) DO UPDATE SET
                 completed  = 1,
-                updated_at = excluded.updated_at",
+                updated_at = excluded.updated_at,
+                fraction   = NULL",
             params![file_id, now_secs()],
         )
     } else {
@@ -218,13 +233,15 @@ pub fn set_watched(
 pub fn get_progress(db: tauri::State<Db>, file_id: i64) -> Result<Option<Progress>, String> {
     let conn = db.0.lock().map_err(to_string_err)?;
     conn.query_row(
-        "SELECT position_secs, duration_secs, completed FROM playback_state WHERE file_id = ?1",
+        "SELECT position_secs, duration_secs, completed, fraction
+           FROM playback_state WHERE file_id = ?1",
         params![file_id],
         |r| {
             Ok(Progress {
                 position_secs: r.get(0)?,
                 duration_secs: r.get(1)?,
                 completed: r.get::<_, i64>(2)? != 0,
+                fraction: r.get(3)?,
             })
         },
     )
@@ -286,6 +303,7 @@ fn loose_progress(
                 position_secs: r.get(0)?,
                 duration_secs: r.get(1)?,
                 completed: r.get::<_, i64>(2)? != 0,
+                fraction: None,
             })
         },
     )
@@ -373,7 +391,8 @@ const CONTINUE_SELECT: &str = "
            COALESCE(p.updated_at, 0),
            (SELECT :art || a.local_path FROM artwork_cache a
              WHERE a.url = COALESCE(e.still_url, t.backdrop_url, t.poster_url)
-               AND a.local_path <> '')
+               AND a.local_path <> ''),
+           p.fraction
       FROM media_files m
       JOIN titles t ON t.id = m.title_id
       LEFT JOIN playback_state p ON p.file_id = m.id
@@ -396,6 +415,7 @@ fn map_continue(r: &rusqlite::Row) -> rusqlite::Result<ContinueItem> {
         image_url: r.get(10)?,
         updated_at: r.get(11)?,
         image_path: r.get(12)?,
+        fraction: r.get(13)?,
         // Set by the caller: the projection cannot tell which branch asked.
         is_next_up: false,
         video_dir: None,
@@ -479,7 +499,7 @@ pub fn continue_watching(
         let sql = format!(
             "{CONTINUE_SELECT}
               WHERE p.completed = 0
-                AND p.position_secs >= :min
+                AND (p.position_secs >= :min OR p.fraction IS NOT NULL)
                 AND m.missing = 0
               -- Copies of one episode share a timestamp (see `history`); the
               -- one that was actually played knows its length, so it wins.
@@ -846,6 +866,7 @@ mod tests {
             episode_name: None,
             position_secs: 0.0,
             duration_secs: None,
+            fraction: None,
             image_url: None,
             image_path: None,
             updated_at,

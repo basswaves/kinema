@@ -42,6 +42,7 @@ import {
   episodeLabel,
   firstUnwatchedEpisode,
   dismissContinue,
+  traktResumeSync,
   type ContinueItem,
   type PlaybackTarget,
 } from '../player/api';
@@ -424,6 +425,21 @@ export default function Browse() {
       return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
+  }, [view.name, load]);
+
+  // Home's Continue rail: where another device stopped, from Trakt (read at
+  // most every two minutes, trakt_resume.rs). Read again only if it changed.
+  useEffect(() => {
+    if (view.name !== 'home') return;
+    let cancelled = false;
+    traktResumeSync()
+      .then((changed) => {
+        if (!cancelled && changed > 0) void load();
+      })
+      .catch((e) => console.warn('trakt: resume points not read', e));
+    return () => {
+      cancelled = true;
+    };
   }, [view.name, load]);
 
   // Fill in any artwork that is not cached yet, then reload so the local copies

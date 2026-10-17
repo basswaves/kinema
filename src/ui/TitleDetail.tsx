@@ -30,9 +30,10 @@ import {
   firstUnwatchedEpisode,
   getProgress,
   setWatched,
+  traktResumeSync,
   type EpisodeRef,
 } from '../player/api';
-import { resumePoint } from '../player/resume';
+import { resumePoint, resumeShare } from '../player/resume';
 import { formatTime } from './format';
 import {
   findLocalTrailer,
@@ -276,13 +277,27 @@ export default function TitleDetailView({ title, onPlayFile, onBack, onFindMatch
    * there is something to start over from.
    */
   const [resumeAt, setResumeAt] = useState<number | null>(null);
+  /** Or the share of the file, when only Trakt's percentage is known here. */
+  const [resumeAtShare, setResumeAtShare] = useState<number | null>(null);
   const primaryFileId = primary?.fileId ?? null;
   useEffect(() => {
     if (primaryFileId === null) return;
     let cancelled = false;
-    getProgress(primaryFileId)
-      .then((progress) => !cancelled && setResumeAt(resumePoint(progress)))
-      .catch((e) => console.warn('resume lookup failed', e));
+    const read = () =>
+      getProgress(primaryFileId)
+        .then((progress) => {
+          if (cancelled) return;
+          setResumeAt(resumePoint(progress));
+          setResumeAtShare(resumeShare(progress));
+        })
+        .catch((e) => console.warn('resume lookup failed', e));
+    void read();
+    // Where another device stopped, from Trakt — read again if it changed.
+    traktResumeSync()
+      .then((changed) => {
+        if (changed > 0) void read();
+      })
+      .catch((e) => console.warn('trakt: resume points not read', e));
     return () => {
       cancelled = true;
     };
@@ -581,10 +596,12 @@ export default function TitleDetailView({ title, onPlayFile, onBack, onFindMatch
                   >
                     {resumeAt !== null
                       ? `▶ Resume${primary.what} from ${formatTime(resumeAt)}`
-                      : `▶ Play${primary.what}`}
+                      : resumeAtShare !== null
+                        ? `▶ Resume${primary.what} at ${Math.round(resumeAtShare * 100)} %`
+                        : `▶ Play${primary.what}`}
                   </FocusButton>
                 )}
-                {primary && resumeAt !== null && (
+                {primary && (resumeAt !== null || resumeAtShare !== null) && (
                   <FocusButton
                     className="btn-secondary"
                     keepInView="page-top"

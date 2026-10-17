@@ -58,6 +58,7 @@ mod stream;
 mod subtitle_files;
 mod tracking;
 mod trakt;
+mod trakt_resume;
 mod trailer;
 mod updates;
 mod util;
@@ -381,6 +382,7 @@ pub fn run() {
             trakt::trakt_poll_connect,
             trakt::trakt_cancel_connect,
             trakt::trakt_disconnect,
+            trakt_resume::trakt_resume_sync,
             opensubtitles::opensubtitles_status,
             opensubtitles::opensubtitles_sign_in,
             opensubtitles::opensubtitles_sign_out,

@@ -29,9 +29,14 @@ export function useProgressSave({
   useEffect(() => {
     if (fileId === null && !byPath) return;
     // Not in the library: kept by path and size instead (opened.rs).
-    const save = (position: number, total: number | null, creditsStart: number | null) =>
+    const save = (
+      position: number,
+      total: number | null,
+      creditsStart: number | null,
+      leaving = false
+    ) =>
       fileId !== null
-        ? saveProgress(fileId, position, total, creditsStart)
+        ? saveProgress(fileId, position, total, creditsStart, leaving)
         : saveLooseProgress(path, position, total);
 
     // Only a file that is open has a position of its own worth saving.
@@ -58,7 +63,7 @@ export function useProgressSave({
       // outgoing file's position. Copying it into the effect would be stale.
       const { position, total, creditsStart } = current();
       if (position > 0) {
-        void save(position, total, creditsStart).catch(() => undefined);
+        void save(position, total, creditsStart, true).catch(() => undefined);
       }
     };
   }, [fileId, path, byPath, sessionRef, countedCreditsStart]);

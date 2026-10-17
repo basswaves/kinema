@@ -104,7 +104,7 @@ fn request(
     r
 }
 
-async fn post(client_id: &str, path: &str, access: Option<&str>, body: &Value) -> Result<(u16, Value), String> {
+pub(crate) async fn post(client_id: &str, path: &str, access: Option<&str>, body: &Value) -> Result<(u16, Value), String> {
     let http = http().ok_or("could not start a web request")?;
     let response = request(&http, tauri_plugin_http::reqwest::Method::POST, path, client_id, access)
         .body(body.to_string())
@@ -116,8 +116,38 @@ async fn post(client_id: &str, path: &str, access: Option<&str>, body: &Value) -
     Ok((status, serde_json::from_str(&text).unwrap_or(Value::Null)))
 }
 
-async fn get(client_id: &str, path: &str, access: &str) -> Result<(u16, Value), String> {
+pub(crate) async fn get(client_id: &str, path: &str, access: &str) -> Result<(u16, Value), String> {
     get_paged(client_id, path, access).await.map(|(status, _, body)| (status, body))
+}
+
+/// A DELETE: a resume point Trakt keeps, once it is no longer one
+/// (`trakt_resume.rs`).
+pub(crate) async fn delete(client_id: &str, path: &str, access: &str) -> Result<u16, String> {
+    let http = http().ok_or("could not start a web request")?;
+    let response = request(&http, tauri_plugin_http::reqwest::Method::DELETE, path, client_id, Some(access))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(response.status().as_u16())
+}
+
+/// The app's id and a usable access token, when Kinema may talk to Trakt now:
+/// not a self-test, connected, and the sign-in still good.
+pub(crate) async fn signed_in(app: &tauri::AppHandle) -> Result<Option<(String, String)>, String> {
+    if !tracking::allowed() {
+        return Ok(None);
+    }
+    let (keys, tokens) = {
+        let db = app.state::<Db>();
+        let conn = db.0.lock().map_err(to_string_err)?;
+        if !tracking::connected(&conn, TRAKT) {
+            return Ok(None);
+        }
+        let Some(keys) = self::app(&conn) else { return Ok(None) };
+        let Some(tokens) = read_tokens(&conn, TRAKT) else { return Ok(None) };
+        (keys, tokens)
+    };
+    Ok(usable_access(app, &keys, tokens).await?.map(|access| (keys.0, access)))
 }
 
 /// A GET, with how many pages the list has (`X-Pagination-Page-Count`, 1 when
@@ -243,7 +273,7 @@ async fn usable_access(
 // ---- what to send ---------------------------------------------------------------
 
 /// Trakt's ids: IMDb as text, TMDB as a number.
-fn ids(imdb_id: &Option<String>, tmdb_id: &Option<String>) -> Value {
+pub(crate) fn ids(imdb_id: &Option<String>, tmdb_id: &Option<String>) -> Value {
     let mut ids = serde_json::Map::new();
     if let Some(imdb) = imdb_id {
         ids.insert("imdb".into(), json!(imdb));

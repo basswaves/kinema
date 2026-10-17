@@ -531,7 +531,31 @@ function mockFileFacts(fileId: number) {
 /** Episodes the provider lists that the library does not hold. */
 const MISSING = [{ titleId: SAGA_ID, season: 0, episode: 1, name: 'Behind the scenes' }];
 
-const playback = new Map<number, { position: number; duration: number | null; completed: boolean; updated: number }>();
+const playback = new Map<
+  number,
+  { position: number; duration: number | null; completed: boolean; updated: number; fraction?: number }
+>();
+
+/**
+ * The stand-in Trakt's one resume point (trakt_resume.rs): the film, paused
+ * 40 % in on "another device", taken once Trakt is connected unless the film
+ * has been played here since.
+ */
+const traktPaused = { fraction: 0.4, taken: false };
+function traktResumeSync(): number {
+  if (!accounts.trakt.connected || traktPaused.taken || settings.get('trakt_resume') === '0') return 0;
+  traktPaused.taken = true;
+  const film = files.find((f) => f.titleId === FILM_ID);
+  if (!film || playback.has(film.id)) return 0;
+  playback.set(film.id, {
+    position: 0,
+    duration: null,
+    completed: false,
+    updated: ++clock,
+    fraction: traktPaused.fraction,
+  });
+  return 1;
+}
 const prefs = new Map<number, TitlePrefs>();
 const dismissed = new Map<number, number>();
 const settings = new Map<string, string>([['tmdb_api_key', 'fixture']]);
@@ -1286,8 +1310,16 @@ const handlers: Record<string, Handler> = {
   // playback
   get_progress: (a): Progress | null => {
     const row = playback.get(num(a, 'fileId'));
-    return row ? { position_secs: row.position, duration_secs: row.duration, completed: row.completed } : null;
+    return row
+      ? {
+          position_secs: row.position,
+          duration_secs: row.duration,
+          completed: row.completed,
+          fraction: row.fraction ?? null,
+        }
+      : null;
   },
+  trakt_resume_sync: () => traktResumeSync(),
   save_progress: (a) =>
     saveProgress(
       num(a, 'fileId'),

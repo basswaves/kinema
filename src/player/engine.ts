@@ -350,8 +350,16 @@ let clipLanguages: Record<string, string> = {};
  * a file that cannot be played says so later, as an `ended` event with
  * reason `error`.
  */
-export async function openFile(path: string, start: number | null): Promise<void> {
-  if (isMedia3()) return media3.open(path, start);
+/**
+ * Open a file, at `start` seconds or else at `share` (0–1) of its length — a
+ * resume point from Trakt on a copy whose length is not known here.
+ */
+export async function openFile(
+  path: string,
+  start: number | null,
+  share: number | null = null
+): Promise<void> {
+  if (isMedia3()) return media3.open(path, start, share);
   const source = await invoke<DiscSource>('disc_source', { path }).catch(
     (e): DiscSource => {
       console.warn('player: could not ask whether this is a disc', e);
@@ -364,7 +372,13 @@ export async function openFile(path: string, start: number | null): Promise<void
   // `loadfile <url> <flags> <index> <options>`: the per-file `start` option
   // opens the file at the resume point. The index argument (-1, "no playlist
   // position") is required before options since mpv 0.38.
-  const at = start === null ? [] : ['replace', '-1', `start=${start}`];
+  // mpv takes a share as a percentage of the file's own length.
+  const at =
+    start !== null
+      ? ['replace', '-1', `start=${start}`]
+      : share !== null
+        ? ['replace', '-1', `start=${(share * 100).toFixed(3)}%`]
+        : [];
   if (source.disc) {
     // Through `set`, a plain string: a path in the per-file options would
     // need quoting for every comma a folder name can hold.

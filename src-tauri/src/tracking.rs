@@ -540,9 +540,60 @@ pub fn iso8601(secs: i64) -> String {
     )
 }
 
+/// Unix seconds from a time the services write — `2015-01-25T22:01:32.000Z`,
+/// fractions and an offset allowed — or `None` for anything else. The reverse
+/// of [`iso8601`] (Hinnant's `days_from_civil`).
+pub fn parse_iso8601(text: &str) -> Option<i64> {
+    let text = text.trim();
+    let num = |s: &str| s.parse::<i64>().ok();
+    let (date, time) = text.split_once('T')?;
+    let mut d = date.splitn(3, '-');
+    let (year, month, day) = (num(d.next()?)?, num(d.next()?)?, num(d.next()?)?);
+    // The clock, then any fraction of a second and the offset from UTC.
+    let clock_end = time.find(|c: char| !(c.is_ascii_digit() || c == ':')).unwrap_or(time.len());
+    let (clock, rest) = time.split_at(clock_end);
+    let mut c = clock.splitn(3, ':');
+    let (hour, minute, second) = (num(c.next()?)?, num(c.next()?)?, num(c.next().unwrap_or("0"))?);
+    let rest = rest.trim_start_matches(|ch: char| ch == '.' || ch.is_ascii_digit());
+    let offset = match rest {
+        "" | "Z" | "z" => 0,
+        _ => {
+            let sign = match rest.as_bytes()[0] {
+                b'+' => 1,
+                b'-' => -1,
+                _ => return None,
+            };
+            let (h, m) = rest[1..].split_once(':').unwrap_or((&rest[1..], "0"));
+            sign * (num(h)? * 3600 + num(m)? * 60)
+        }
+    };
+    if !(1..=12).contains(&month) || !(1..=31).contains(&day) || hour > 23 || minute > 59 || second > 60 {
+        return None;
+    }
+    let y = if month <= 2 { year - 1 } else { year };
+    let era = y.div_euclid(400);
+    let yoe = y.rem_euclid(400);
+    let mp = if month > 2 { month - 3 } else { month + 9 };
+    let doy = (153 * mp + 2) / 5 + day - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    let days = era * 146_097 + doe - 719_468;
+    Some(days * 86_400 + hour * 3600 + minute * 60 + second - offset)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn times_the_services_write_are_read_back() {
+        for secs in [0, 1_422_223_292, 1_760_000_000, 951_782_400] {
+            assert_eq!(parse_iso8601(&iso8601(secs)), Some(secs));
+        }
+        assert_eq!(parse_iso8601("2015-01-25T22:01:32.000Z"), Some(1_422_223_292));
+        assert_eq!(parse_iso8601("2015-01-25T23:01:32+01:00"), Some(1_422_223_292));
+        assert_eq!(parse_iso8601("yesterday"), None);
+        assert_eq!(parse_iso8601("2015-13-25T22:01:32Z"), None);
+    }
 
     fn db() -> Connection {
         let conn = Connection::open_in_memory().unwrap();

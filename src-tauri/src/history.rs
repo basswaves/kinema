@@ -175,7 +175,8 @@ fn set_own_state(conn: &Connection, file_id: i64, state: State) -> rusqlite::Res
          ON CONFLICT(file_id) DO UPDATE SET
             position_secs = excluded.position_secs,
             completed     = excluded.completed,
-            updated_at    = excluded.updated_at",
+            updated_at    = excluded.updated_at,
+            fraction      = NULL",
         params![file_id, state.position_secs, state.completed as i64, state.updated_at],
     )?;
     Ok(())

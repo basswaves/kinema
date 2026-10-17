@@ -6,6 +6,12 @@ export interface Progress {
   position_secs: number;
   duration_secs: number | null;
   completed: boolean;
+  /**
+   * Where to resume as a share of the file (0–1), when that is all that is
+   * known: a resume point from Trakt on a copy never played on this device
+   * (trakt_resume.rs). The player opens the file at that share of its length.
+   */
+  fraction?: number | null;
 }
 
 export interface ContinueItem {
@@ -19,6 +25,8 @@ export interface ContinueItem {
   episode_name: string | null;
   position_secs: number;
   duration_secs: number | null;
+  /** As Progress.fraction: the bar when the length is not known here. */
+  fraction?: number | null;
   image_url: string | null;
   /** Cached copy of exactly the image `image_url` points at. */
   image_path: string | null;
@@ -146,8 +154,19 @@ export const saveProgress = (
   fileId: number,
   positionSecs: number,
   durationSecs: number | null,
-  creditsStart: number | null = null
-) => invoke<void>('save_progress', { fileId, positionSecs, durationSecs, creditsStart });
+  creditsStart: number | null = null,
+  /** The player's last save as it leaves the file: Trakt hears where it stopped. */
+  leaving = false
+) =>
+  invoke<void>('save_progress', { fileId, positionSecs, durationSecs, creditsStart, leaving });
+
+/**
+ * Take Trakt's resume points onto the library where they are newer — on a
+ * title's page and Home's Continue rail. Read at most every two minutes;
+ * nothing when Trakt is not connected or the switch is off. How many files
+ * changed, so the page reads them again.
+ */
+export const traktResumeSync = () => invoke<number>('trakt_resume_sync');
 
 export const getProgress = (fileId: number) => invoke<Progress | null>('get_progress', { fileId });
 

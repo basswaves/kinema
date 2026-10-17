@@ -43,7 +43,7 @@ import { startOverlay } from './overlay';
 import { applyRememberedStepDown } from './stepDown';
 import { useStepDown } from './useStepDown';
 import { handMouseToPage, startPointerFollowingControls } from './pageMouse';
-import { resumePoint } from './resume';
+import { resumePoint, resumeShare } from './resume';
 import { readSound, soundLost, soundLostNotice, type SoundSnapshot } from './soundWatch';
 import { audioFallbackNotice } from './systemOutput';
 import {
@@ -108,6 +108,8 @@ export function usePlaybackEngine({
   const audioFallback = useRef(0);
   /** The resume point handed to mpv with the load, for the toast once it opens. */
   const pendingSeek = useRef<number | null>(null);
+  /** Or, when only that is known, the share of the file to open at (resumeShare). */
+  const pendingShare = useRef<number | null>(null);
   /**
    * Frame-timing mode, in a ref rather than state because it is applied inside
    * the mpv event listener — reading it from a closure would apply whatever the
@@ -141,6 +143,7 @@ export function usePlaybackEngine({
         if (cancelled) return;
 
         pendingSeek.current = null;
+        pendingShare.current = null;
 
         // Decide the resume point *before* loading, and hand it to mpv as part
         // of the load. It used to be applied as a seek once `file-loaded`
@@ -158,6 +161,7 @@ export function usePlaybackEngine({
               ? await getProgress(target.fileId)
               : await getLooseProgress(target.path).catch(() => null);
           pendingSeek.current = resumePoint(stored);
+          pendingShare.current = resumeShare(stored);
         }
 
         // Before the file, so its first frame is already rendered for the
@@ -184,7 +188,7 @@ export function usePlaybackEngine({
         // paused and waits for the screen — see displaySwitch.ts.
         const hold = await mayswitch().catch(() => false);
         if (hold) await setPaused(true);
-        await openFile(target.path, start);
+        await openFile(target.path, start, pendingShare.current);
         if (hold) {
           await matchScreen();
           if (cancelled) return;
@@ -290,8 +294,10 @@ export function usePlaybackEngine({
             return;
           }
           // The resume point went to mpv with the load; say so on screen.
-          const resumed = pendingSeek.current;
+          // Opened at a share of the file: where that came to is the position.
+          const resumed = pendingSeek.current ?? (pendingShare.current !== null ? pos : null);
           pendingSeek.current = null;
+          pendingShare.current = null;
           // Open *before* the rest, not after. Everything below is per-file
           // polish — track languages, frame timing, chapters — and any one of
           // them throwing must not leave the file unable to offer a Skip button.

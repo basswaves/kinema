@@ -15,12 +15,13 @@
  */
 import { count } from '../ui/format';
 import { userError } from '../ui/errors';
-import { useFocusable } from '@noriginmedia/norigin-spatial-navigation';
+import { setFocus, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import FocusButton from '../ui/FocusButton';
 import FocusInput from '../ui/FocusInput';
 import { keepOnScreen } from '../ui/focus';
-import { listNeedsReview } from '../metadata/api';
+import { addWithoutMatch, listNeedsReview } from '../metadata/api';
+import { readLocalName, shelfOf } from './localTitle';
 import type { MediaFile } from './api';
 import {
   applyMatch,
@@ -55,6 +56,9 @@ interface Props {
  * anything is hidden.
  */
 const QUEUE_LIMIT = 2000;
+
+/** A group's row, so the ring can be put on it. */
+const rowKey = (group: FileGroup) => `fixmatch-row:${group.key}`;
 
 export default function FixMatch({ onChanged }: Props) {
   const [files, setFiles] = useState<MediaFile[]>([]);
@@ -95,12 +99,25 @@ export default function FixMatch({ onChanged }: Props) {
     [files]
   );
 
+  /**
+   * Set when a group was dealt with: its row goes, and the ring with it, to
+   * wherever the focus library falls back to — a control far up the page.
+   * By remote the next group is what comes next, so the ring goes there.
+   */
+  const refocus = useRef(false);
+  useEffect(() => {
+    if (!refocus.current) return;
+    refocus.current = false;
+    if (pending.length > 0) setFocus(rowKey(pending[0]));
+  }, [pending]);
+
   const run = useCallback(
     async (work: () => Promise<string>) => {
       setBusy(true);
       setError(null);
       try {
         const message = await work();
+        refocus.current = true;
         // Re-read the queue here, then let Settings update the count and show
         // the message. Both have to happen: this component owns the list and
         // Settings owns the number beside the button that opens it.
@@ -174,6 +191,17 @@ export default function FixMatch({ onChanged }: Props) {
               return `Ignored ${count(group.files.length, 'file')}.`;
             })
           }
+          onKeep={(name, year, isSeries) =>
+            void run(async () => {
+              await addWithoutMatch(
+                group.files.map((f) => f.id),
+                isSeries,
+                name,
+                year
+              );
+              return `Added “${name}” to ${shelfOf(isSeries)} without a match.`;
+            })
+          }
         />
       ))}
 
@@ -223,6 +251,9 @@ export default function FixMatch({ onChanged }: Props) {
  * first.
  */
 function adviceFor(reason: string): string {
+  if (/^added without a match, then sent back/.test(reason)) {
+    return 'You sent this back from its own title to find a match. Search for it below, or add it without one again.';
+  }
   if (/^unlinked by hand/.test(reason)) {
     return 'You unlinked this from a wrong title. It waits here until you pick the right one below.';
   }
@@ -261,6 +292,7 @@ function GroupRow({
   onToggle,
   onLink,
   onIgnore,
+  onKeep,
 }: {
   group: FileGroup;
   busy: boolean;
@@ -268,6 +300,8 @@ function GroupRow({
   onToggle: () => void;
   onLink: (provider: Provider, candidate: Candidate, isSeries: boolean) => void;
   onIgnore: () => void;
+  /** Keep the group as a title of its own, under this name, year and kind. */
+  onKeep: (name: string, year: number | null, isSeries: boolean) => void;
 }) {
   const [query, setQuery] = useState(group.title);
   const [isSeries, setIsSeries] = useState(group.isSeries);
@@ -282,6 +316,21 @@ function GroupRow({
   const [used, setUsed] = useState<{ provider: Provider; isSeries: boolean } | null>(null);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  // Named from the file to start with (the parsed title, or the file name when
+  // there was none) — editable, since a file name is rarely what anyone calls
+  // a home video.
+  const [localName, setLocalName] = useState(group.title);
+  const [localYear, setLocalYear] = useState(group.year ? String(group.year) : '');
+  const [localError, setLocalError] = useState<string | null>(null);
+  const keep = useCallback(() => {
+    const read = readLocalName(localName, localYear);
+    if (typeof read === 'string') {
+      setLocalError(read);
+      return;
+    }
+    setLocalError(null);
+    onKeep(read.name, read.year, isSeries);
+  }, [localName, localYear, isSeries, onKeep]);
 
   // Reasons are the scorer's own words, and they are genuinely diagnostic —
   // "title 78%, year off by 2" tells you exactly what happened. What they do
@@ -320,6 +369,7 @@ function GroupRow({
   // its own right rather than as a button, because it carries the title and the
   // refusal reason and needs to read as a row, not a control strip.
   const { ref: summaryRef, focused: summaryFocused } = useFocusable<object, HTMLDivElement>({
+    focusKey: rowKey(group),
     onEnterPress: onToggle,
   });
 
@@ -447,6 +497,37 @@ function GroupRow({
               </div>
             </>
           )}
+
+          {/* For what no database will ever list — a home video, a fan edit.
+              Nothing is looked up or guessed: the name is the person's, so the
+              matching rule is untouched (LOCAL-MEDIA.md phase 3). Kind follows
+              the Movie / TV series button above. */}
+          <div className="fixmatch-local">
+            <p className="muted">
+              Not in any database? Keep it under its own name, with no picture or description.
+              Find a match stays on its page.
+            </p>
+            <div className="fixmatch-search">
+              <FocusInput
+                className="fixmatch-input"
+                value={localName}
+                onChange={setLocalName}
+                onEnter={keep}
+                placeholder="Name"
+              />
+              <FocusInput
+                className="fixmatch-input fixmatch-year"
+                value={localYear}
+                onChange={setLocalYear}
+                onEnter={keep}
+                placeholder="Year"
+              />
+              <FocusButton keepInView="nearest" disabled={busy} onSelect={keep}>
+                Add without a match
+              </FocusButton>
+            </div>
+            {localError && <div className="fixmatch-error">{localError}</div>}
+          </div>
         </div>
       )}
     </div>

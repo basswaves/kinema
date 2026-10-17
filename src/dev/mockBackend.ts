@@ -892,8 +892,67 @@ const backListeners: string[] = [];
  */
 const reviewCount = (): number =>
   flag('kinemaMockReview') === 'items'
-    ? REVIEW_ITEMS.length
+    ? reviewItems().length
     : Number(flag('kinemaMockReview') ?? 0) || 0;
+/** Review items kept as titles of their own (`add_without_match`). */
+const keptLocally = new Set<number>();
+const reviewItems = () => REVIEW_ITEMS.filter((f) => !keptLocally.has(f.id));
+/** local_title.rs, in memory: the title row and its files, as the scan would have them. */
+function addWithoutMatch(fileIds: number[], isSeries: boolean, name: string, year: number | null) {
+  if (!name.trim()) throw new Error('A title needs a name.');
+  const id = 20_000 + Math.min(...fileIds);
+  titles.push({
+    ...titles[1],
+    id,
+    kind: isSeries ? 'series' : 'movie',
+    provider: 'local',
+    title: name.trim(),
+    year,
+    overview: null,
+    genres: null,
+    certification: null,
+    imdb_rating: null,
+    imdb_votes: null,
+    tomatometer: null,
+    rating: null,
+    runtime_mins: null,
+    poster_url: null,
+    poster_path: null,
+    backdrop_url: null,
+    backdrop_path: null,
+    logo_url: null,
+    logo_path: null,
+    file_count: fileIds.length,
+    added_at: 1000,
+  });
+  for (const item of REVIEW_ITEMS.filter((f) => fileIds.includes(f.id))) {
+    keptLocally.add(item.id);
+    files.push({
+      id: item.id,
+      titleId: id,
+      path: item.path,
+      season: isSeries ? item.parsed_season : null,
+      episode: isSeries ? item.parsed_episode : null,
+      duration: 1500,
+      markers: null,
+    });
+  }
+  return id;
+}
+/** Back to the review queue, and the title gone (local_title.rs `release`). */
+function releaseLocal(titleId: number): number {
+  const at = titles.findIndex((t) => t.id === titleId && t.provider === 'local');
+  if (at < 0) throw new Error('Only a title added without a match can be sent back.');
+  titles.splice(at, 1);
+  let n = 0;
+  for (let i = files.length - 1; i >= 0; i--) {
+    if (files[i].titleId !== titleId) continue;
+    keptLocally.delete(files[i].id);
+    files.splice(i, 1);
+    n++;
+  }
+  return n;
+}
 /**
  * `kinemaMockReview=items`: three plausible files wait in the queue, and
  * `list_needs_review` lists them (the navigation checker opens one). Only that
@@ -1055,7 +1114,22 @@ const handlers: Record<string, Handler> = {
       .filter((f) => f.season === num(a, 'season'))
       .map((f) => ({ file_id: f.id, ...mockFileFacts(f.id) })),
   list_unmatched: () => [],
-  list_needs_review: () => (flag('kinemaMockReview') === 'items' ? REVIEW_ITEMS : []),
+  list_needs_review: () => (flag('kinemaMockReview') === 'items' ? reviewItems() : []),
+  add_without_match: (a) =>
+    addWithoutMatch(
+      a.fileIds as number[],
+      Boolean(a.isSeries),
+      String(a.name ?? ''),
+      (a.year as number | null) ?? null
+    ),
+  rename_local_title: (a) => {
+    const title = titles.find((t) => t.id === num(a, 'titleId') && t.provider === 'local');
+    if (!title) throw new Error('Only a title added without a match can be renamed.');
+    title.title = String(a.name);
+    title.year = (a.year as number | null) ?? null;
+    return null;
+  },
+  find_match_for_local: (a) => releaseLocal(num(a, 'titleId')),
   count_needs_review: () => reviewCount(),
   latest_release: () =>
     UPDATE ? { version: UPDATE, url: 'https://github.com/Basswaves/kinema/releases' } : null,

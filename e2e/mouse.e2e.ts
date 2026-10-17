@@ -184,3 +184,37 @@ test('Android: a network drive by mouse, signed in to with clicks and typing', a
   await expect(browser).toHaveCount(0);
   await expect(page.locator('.root-path')).toHaveText('smb://nas/tv/Example Show');
 });
+
+// LOCAL-MEDIA.md phase 3 by mouse: kept without a match, renamed, and sent
+// back to Needs attention — clicks and typing only.
+test('add without a match by mouse, rename it, and send it back', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.removeItem('kinemaMockSystem');
+    localStorage.setItem('kinemaMockReview', 'items');
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Review', exact: true }).click();
+  await page.locator('.fixmatch-summary', { hasText: 'Fixture Movie' }).click();
+  const row = page.locator('.fixmatch-row.open');
+  await row.getByPlaceholder('Name').fill('The Wedding');
+  await row.getByPlaceholder('Year').fill('2021');
+  await row.getByRole('button', { name: 'Add without a match' }).click();
+  await expect(page.getByText('Added “The Wedding” to Movies without a match.')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Movies', exact: true }).click();
+  await page.locator('.card', { hasText: 'The Wedding' }).first().click();
+  await expect(page.locator('.detail h1')).toHaveText('The Wedding');
+  await expect(page.locator('.detail-meta')).toContainText('2021');
+
+  await page.getByRole('button', { name: 'Rename' }).click();
+  await page.getByPlaceholder('Year').fill('20x1');
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByText('20x1 does not look like a year.')).toBeVisible();
+  await page.getByPlaceholder('Name').fill('Our Wedding');
+  await page.getByPlaceholder('Year').fill('');
+  await page.getByRole('button', { name: 'Save' }).click();
+  await expect(page.locator('.detail h1')).toHaveText('Our Wedding');
+
+  await page.getByRole('button', { name: 'Find a match' }).click();
+  await expect(page.locator('.fixmatch-title', { hasText: 'Fixture Movie' })).toHaveCount(1);
+});

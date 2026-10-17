@@ -225,7 +225,7 @@ test('needs attention by remote: the Review button and an opened item are on scr
   await press(page, 'ArrowDown');
   await expect.poll(() => focused(page)).toContain('Fixture Movie');
   await press(page, 'Enter');
-  const box = page.locator('.fixmatch-row.open .fixmatch-input');
+  const box = page.locator('.fixmatch-row.open .fixmatch-input').first();
   await expect(box).toBeVisible();
   await expect
     .poll(() =>
@@ -235,6 +235,65 @@ test('needs attention by remote: the Review button and an opened item are on scr
       })
     )
     .toBe(true);
+});
+
+// LOCAL-MEDIA.md phase 3: what no database lists is kept under its own name,
+// renamed on its own page, and sent back to be matched after all — the whole
+// way by remote.
+test('add without a match, rename it, and send it back to find a match', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('kinemaMockReview', 'items'));
+  await open(page, 'windows');
+  const placeholder = () =>
+    page.evaluate(() => document.querySelector('.focused')?.getAttribute('placeholder'));
+  for (let i = 0; i < 4 && (await focused(page)) !== 'Review'; i++) await press(page, 'ArrowDown');
+  await press(page, 'Enter');
+  await expect.poll(() => focused(page)).toMatch(/^Review 3 items/);
+
+  // The series' row, opened; under its search, the name it came with.
+  await press(page, 'ArrowDown');
+  await expect.poll(() => focused(page)).toContain('Fixture Movie');
+  await press(page, 'ArrowDown');
+  await expect.poll(() => focused(page)).toContain('Sample Series');
+  await press(page, 'Enter');
+  for (let i = 0; i < 4 && (await placeholder()) !== 'Name'; i++) await press(page, 'ArrowDown');
+  expect(await placeholder()).toBe('Name');
+  await expect(page.locator('.fixmatch-local .fixmatch-input').first()).toHaveValue('Sample Series');
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.type('Our Holiday');
+  await press(page, 'Enter');
+  await expect(page.getByText('Added “Our Holiday” to TV shows without a match.')).toBeVisible();
+  // Gone from the queue, and the ring on what is left rather than lost.
+  await expect.poll(() => focused(page)).toContain('Fixture Movie');
+  await expect(page.locator('.fixmatch-title', { hasText: 'Sample Series' })).toHaveCount(0);
+
+  // In TV shows, newest first.
+  for (let i = 0; i < 8 && !(await focused(page))?.startsWith('Settings'); i++) {
+    await press(page, 'ArrowUp');
+  }
+  await press(page, 'ArrowLeft', 2);
+  await expect.poll(() => focused(page)).toBe('TV shows');
+  await press(page, 'Enter');
+  await expect.poll(() => focused(page)).toContain('Our Holiday');
+  await press(page, 'Enter');
+  await expect.poll(() => focused(page)).toBe('▶ Play S02E03');
+
+  // Renamed in place.
+  await press(page, 'ArrowRight');
+  await expect.poll(() => focused(page)).toBe('Rename');
+  await press(page, 'Enter');
+  await expect.poll(placeholder).toBe('Name');
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.type('Summer by the Sea');
+  await press(page, 'Enter');
+  await expect(page.locator('.detail h1')).toHaveText('Summer by the Sea');
+  await expect.poll(() => focused(page)).toBe('Rename');
+
+  // Find a match: back in the queue, which opens on its Review button.
+  await press(page, 'ArrowRight');
+  await expect.poll(() => focused(page)).toBe('Find a match');
+  await press(page, 'Enter');
+  await expect.poll(() => focused(page)).toMatch(/^Review 3 items/);
+  await expect(page.locator('.fixmatch-title', { hasText: 'Sample Series' })).toHaveCount(1);
 });
 
 // Matched by hand afterwards (or with a TMDB key added since), nothing waits

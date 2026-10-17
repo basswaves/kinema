@@ -9,6 +9,7 @@ import { userError } from './errors';
 import {
   useFocusable,
   FocusContext,
+  setFocus,
   type FocusableComponent,
 } from '@noriginmedia/norigin-spatial-navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -16,6 +17,9 @@ import { openLink } from './links';
 import Art from './Art';
 import { sizedPoster } from './poster';
 import FocusButton from './FocusButton';
+import FocusInput from './FocusInput';
+import { findMatchForLocal, renameLocalTitle } from '../metadata/api';
+import { readLocalName } from '../library/localTitle';
 import FocusGroup from './FocusGroup';
 import MediaBadges, { BadgeRows } from './MediaBadges';
 import HeavyFileNotice from './HeavyFileNotice';
@@ -55,6 +59,11 @@ interface Props {
   title: Title;
   onPlayFile: (request: PlayRequest) => void;
   onBack: () => void;
+  /**
+   * A title kept without a match was sent back to Needs attention; the page
+   * it was on no longer exists. Opens the review queue in its place.
+   */
+  onFindMatch?: () => void;
 }
 
 /**
@@ -82,6 +91,8 @@ const DETAIL_FIRST_EPISODE_KEY = 'detail-first-episode';
  */
 const DETAIL_BACK_KEY = 'detail-back';
 const DETAIL_ACTIONS_KEY = 'detail-actions';
+const RENAME_INPUT_KEY = 'detail-rename-input';
+const RENAME_BUTTON_KEY = 'detail-rename-button';
 const DETAIL_SEASONS_KEY = 'detail-seasons';
 const DETAIL_EPISODES_KEY = 'detail-episodes';
 const DETAIL_AREAS = [DETAIL_BACK_KEY, DETAIL_ACTIONS_KEY, DETAIL_SEASONS_KEY, DETAIL_EPISODES_KEY];
@@ -143,7 +154,19 @@ function progressPercent(episode: Episode): number | null {
   return pct >= 1 ? Math.min(pct, 100) : null;
 }
 
-export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
+export default function TitleDetailView({ title, onPlayFile, onBack, onFindMatch }: Props) {
+  /**
+   * A title kept without a match (`provider = 'local'`, local_title.rs): its
+   * name and year are the person's, so they can change them here, and send it
+   * back to Needs attention to be matched after all.
+   */
+  const isLocal = title.provider === 'local';
+  /** The name and year as renamed on this page, until the list is read again. */
+  const [named, setNamed] = useState<{ title: string; year: number | null } | null>(null);
+  const name = named?.title ?? title.title;
+  const year = named ? named.year : title.year;
+  const [renaming, setRenaming] = useState<{ name: string; year: string } | null>(null);
+  const [renameError, setRenameError] = useState<string | null>(null);
   const [detail, setDetail] = useState<TitleDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [season, setSeason] = useState<number | null>(null);
@@ -237,15 +260,15 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
       const code = `S${String(nextUp.season).padStart(2, '0')}E${String(nextUp.episode).padStart(2, '0')}`;
       return {
         path: nextUp.path,
-        label: episodeLabel(title.title, nextUp.season, nextUp.episode),
+        label: episodeLabel(name, nextUp.season, nextUp.episode),
         fileId: nextUp.file_id,
         episodeName: nextUp.name,
         what: ` ${code}`,
       };
     }
     if (!detail?.movie_path) return null;
-    return { path: detail.movie_path, label: title.title, fileId: detail.movie_file_id, what: '' };
-  }, [title.kind, title.title, nextUp, detail]);
+    return { path: detail.movie_path, label: name, fileId: detail.movie_file_id, what: '' };
+  }, [title.kind, name, nextUp, detail]);
 
   /**
    * Where that would resume, by the player's own rule — so "Resume 1:02:14"
@@ -379,13 +402,57 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
   // filling in.
   const shown = detail?.title ?? title;
 
+  const startRename = useCallback(() => {
+    setRenameError(null);
+    setRenaming({ name, year: year ? String(year) : '' });
+  }, [name, year]);
+  // Into the name field once it is drawn, the way a remote would expect.
+  // Only when the form opens, not at every keystroke in it.
+  const renamingOpen = renaming !== null;
+  useEffect(() => {
+    if (!renamingOpen) return;
+    // A frame later: the field has to be laid out before the focus library
+    // can measure it, and the Rename button it replaces has just gone.
+    const frame = requestAnimationFrame(() => setFocus(RENAME_INPUT_KEY));
+    return () => cancelAnimationFrame(frame);
+  }, [renamingOpen]);
+  const endRename = useCallback(() => {
+    setRenaming(null);
+    setRenameError(null);
+    requestAnimationFrame(() => setFocus(RENAME_BUTTON_KEY));
+  }, []);
+  const saveRename = useCallback(async () => {
+    if (!renaming) return;
+    const read = readLocalName(renaming.name, renaming.year);
+    if (typeof read === 'string') {
+      setRenameError(read);
+      return;
+    }
+    try {
+      await renameLocalTitle(title.id, read.name, read.year);
+      setNamed({ title: read.name, year: read.year });
+      endRename();
+    } catch (e) {
+      setRenameError(userError(e));
+    }
+  }, [renaming, title.id, endRename]);
+  const sendToFindMatch = useCallback(async () => {
+    try {
+      await findMatchForLocal(title.id);
+      onFindMatch?.();
+    } catch (e) {
+      setError(userError(e));
+    }
+  }, [title.id, onFindMatch]);
+
   // Whether the row under the title has anything to land on: a series with
   // nothing to continue and no trailer has no buttons there at all.
   const hasActions =
     primary !== null ||
     (title.kind !== 'series' && detail?.movie_file_id != null) ||
     trailerPath !== null ||
-    Boolean(shown.trailer_key);
+    Boolean(shown.trailer_key) ||
+    isLocal;
 
   return (
     <FocusContext.Provider value={focusKey}>
@@ -414,7 +481,7 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
               remote={sizedPoster(shown.poster_url, 'w780')}
             />
             <div className="detail-info">
-              <h1>{title.title}</h1>
+              <h1>{name}</h1>
               <div className="detail-meta">
                 {/* The age rating boxed, as a disc case or a TV guide shows
                     it, so it reads as a rating rather than one more word. */}
@@ -424,7 +491,7 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
                   </span>
                 )}
                 {[
-                  title.year,
+                  year,
                   runtimeLabel(title.runtime_mins),
                   title.kind === 'series' ? `${ownedCount} episodes in library` : null,
                   title.kind === 'series' && watchedCount > 0
@@ -469,6 +536,36 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
                 focusable={hasActions}
                 className="detail-actions"
               >
+                {renaming ? (
+                  <>
+                    <FocusInput
+                      focusKey={RENAME_INPUT_KEY}
+                      className="detail-rename-input"
+                      value={renaming.name}
+                      onChange={(v) => setRenaming({ ...renaming, name: v })}
+                      onEnter={() => void saveRename()}
+                      placeholder="Name"
+                    />
+                    <FocusInput
+                      className="detail-rename-input detail-rename-year"
+                      value={renaming.year}
+                      onChange={(v) => setRenaming({ ...renaming, year: v })}
+                      onEnter={() => void saveRename()}
+                      placeholder="Year"
+                    />
+                    <FocusButton
+                      className="btn-primary"
+                      keepInView="page-top"
+                      onSelect={() => void saveRename()}
+                    >
+                      Save
+                    </FocusButton>
+                    <FocusButton className="btn-secondary" keepInView="page-top" onSelect={endRename}>
+                      Cancel
+                    </FocusButton>
+                  </>
+                ) : (
+                  <>
                 {/* A series and a film need different questions asked.
                     `detail.movie_path` is the largest file by size, which for a
                     series is whichever episode happens to be biggest — often a
@@ -550,7 +647,32 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
                     Trailer · opens in your browser ↗
                   </FocusButton>
                 )}
+
+                {/* Kept without a match: the name is the person's to change,
+                    and the match can still be found (LOCAL-MEDIA.md phase 3). */}
+                {isLocal && (
+                  <FocusButton
+                    focusKey={RENAME_BUTTON_KEY}
+                    className="btn-secondary"
+                    keepInView="page-top"
+                    onSelect={startRename}
+                  >
+                    Rename
+                  </FocusButton>
+                )}
+                {isLocal && (
+                  <FocusButton
+                    className="btn-secondary"
+                    keepInView="page-top"
+                    onSelect={() => void sendToFindMatch()}
+                  >
+                    Find a match
+                  </FocusButton>
+                )}
+                  </>
+                )}
               </FocusGroup>
+              {renameError && <div className="detail-error">{renameError}</div>}
               {/* Under Play, about the file it would play; only on Android, and
                   only when that file is far above what Android says the
                   device's video chip is made for (heavyFile.ts). */}
@@ -672,7 +794,7 @@ export default function TitleDetailView({ title, onPlayFile, onBack }: Props) {
                       episode.file_path &&
                       onPlayFile({
                         path: episode.file_path,
-                        label: episodeLabel(title.title, episode.season, episode.episode),
+                        label: episodeLabel(name, episode.season, episode.episode),
                         fileId: episode.file_id,
                         episodeName: episode.name,
                       })

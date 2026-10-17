@@ -169,3 +169,25 @@ export const listWikidataFilms = (limit: number) =>
 export const adoptProvider = (titleId: number, provider: string, providerId: string) =>
   invoke<boolean>('adopt_provider', { titleId, provider, providerId });
 
+
+/*
+ * Local titles — films and shows kept without a match (local_title.rs). The
+ * name and year are a person's; nothing is looked up, so the matching rule is
+ * untouched.
+ */
+
+/** Keep a Needs attention group as a title of its own. Returns its id. */
+export const addWithoutMatch = (
+  fileIds: number[],
+  isSeries: boolean,
+  name: string,
+  year: number | null
+) => invoke<number>('add_without_match', { fileIds, isSeries, name, year });
+
+/** Another name or year for a local title. */
+export const renameLocalTitle = (titleId: number, name: string, year: number | null) =>
+  invoke<void>('rename_local_title', { titleId, name, year });
+
+/** Send a local title's files back to Needs attention to be matched after all. */
+export const findMatchForLocal = (titleId: number) =>
+  invoke<number>('find_match_for_local', { titleId });

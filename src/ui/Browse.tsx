@@ -799,6 +799,9 @@ export default function Browse() {
           <TitleDetailView
             title={view.title}
             onBack={goBack}
+            onFindMatch={() =>
+              setStack((s) => replace(s, { name: 'settings', section: 'review' }))
+            }
             onPlayFile={(request) =>
               void startPlayback({
                 ...request,

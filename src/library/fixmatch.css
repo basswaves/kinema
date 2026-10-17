@@ -259,3 +259,19 @@
   gap: 0.375rem;
   margin-top: 0.25rem;
 }
+
+/* Add without a match: under the search, apart from it, since it is the
+   answer when searching has failed. */
+.fixmatch-local {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.fixmatch-local p {
+  margin: 0 0 0.5rem;
+}
+
+.fixmatch-input.fixmatch-year {
+  flex: 0 0 6rem;
+}

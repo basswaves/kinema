@@ -7,6 +7,8 @@ makes no stability promises.
 
 ## [Unreleased]
 
+- **Add without a match.** In Needs attention, a film or show no database lists (a home video, a fan edit) can be kept under its own name and year, in Movies or TV shows. Its page has Rename, and Find a match sends it back to the queue.
+
 ### Added
 
 - **A Windows installer**, `kinema-<version>-windows-x64-setup.exe`, beside

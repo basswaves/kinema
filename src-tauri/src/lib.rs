@@ -23,6 +23,7 @@ mod introdb_app;
 mod jobs;
 mod library;
 mod lifecycle;
+mod local_title;
 mod metadata;
 #[cfg(target_os = "linux")]
 mod desktop;
@@ -396,6 +397,9 @@ pub fn run() {
             lifecycle::ignore_files,
             lifecycle::return_to_review,
             lifecycle::unlink_files,
+            local_title::add_without_match,
+            local_title::rename_local_title,
+            local_title::find_match_for_local,
             metadata::list_titles,
             metadata::get_title_detail,
             metadata::list_unmatched,

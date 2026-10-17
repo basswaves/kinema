@@ -615,7 +615,7 @@ pub const TMDB_MAX_AGE_SECS: i64 = 170 * 24 * 60 * 60;
 
 /// Titles whose TMDB data is older than `TMDB_MAX_AGE_SECS`, oldest first.
 /// Only TMDB's: TVmaze and OMDb set no such limit.
-fn stale_titles(
+pub(crate) fn stale_titles(
     conn: &rusqlite::Connection,
     now: i64,
     limit: i64,

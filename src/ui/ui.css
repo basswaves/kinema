@@ -66,25 +66,18 @@ html {
 }
 
 /*
- * TV mode was drawn for a 1080p screen. On a bigger one the system does not
- * scale up — a 4K TV on GNOME, which keeps a large TV at 100 % because its
- * pixels are not dense, or on Windows at 100 % — the same 23.2px came out half
- * the size it was drawn at (seen on the Linux test stick). So past 1080p it
- * grows with the screen; at or below it nothing changes. 1.2083vw is 23.2px at
- * 1,920 wide, 2.1481vh is 23.2px at 1,080 high.
+ * TV mode is the layout drawn for a 1080p TV, scaled to the screen, up and
+ * down, on every platform: 1.2083vw is 23.2px at 1,920 wide, 2.1481vh is
+ * 23.2px at 1,080 high. TV mode fills the screen, so the window is the screen.
+ *
+ * The desktop used to keep 23.2px as a floor and only grow past 1080p. That
+ * floor stacked on the system's own scaling: a 4K TV at Windows' 300 % gives
+ * the page 1,280 × 720, and 23.2px there drew everything half as big again as
+ * the same layout on the TV box, so the detail page's badges ran off the
+ * bottom of the screen (owner, TV-FEEL.md L1). Android, given a 1080p TV as
+ * 960 × 540, had the same fault and the same fix first (2026-10-04).
  */
 :root[data-tv='on'] {
-  font-size: max(calc(16px * var(--ui-scale)), min(1.2083vw, 2.1481vh));
-}
-
-/*
- * Where Kinema is only ever on a TV (Android), the page is the whole TV,
- * whatever size the system says it is: the 1080p drawing, scaled to it, up
- * and down. Android gives a 1080p TV to the page as 960 × 540 at twice the
- * density, so the floor above made everything twice the size it was drawn
- * at, and little fitted (owner, 2026-10-04: the same as the TV PC).
- */
-:root[data-tv='on'][data-tv-only] {
   font-size: min(1.2083vw, 2.1481vh);
 }
 

@@ -11,12 +11,14 @@ Ideas and reports are welcome as [issues](https://github.com/Basswaves/kinema/is
 
 ## Next
 
-More of Kinema as a player for any video, not only a matched library: the
-browsing folders inside Kinema; playlists; and the picture and sound badges
+More of Kinema as a player for any video, not only a matched library:
+playlists; and the picture and sound badges
 for a video. (Done since 0.11.0, not yet released: Trakt resume points, so a
 film stopped on one device continues on another; the next and previous file in
-a folder when a video was opened from Explorer; and **Videos** folders for home
-videos and clips, with a picture taken from the file, under a Library tab. Done in 0.11.0: a
+a folder when a video was opened from Explorer; **Videos** folders for home
+videos and clips, with a picture taken from the file, under a Library tab; and
+**Folders**, browsing drives and shares inside Kinema and playing anything in
+them. Done in 0.11.0: a
 Windows installer beside the ZIP; Blu-ray folders and disc images on Windows
 and Linux; Kinema as a video player on Windows — open a file from Explorer,
 or drop it on the window; and a film or show no database lists, kept under
@@ -168,5 +170,3 @@ useful contribution there is.
   without a key.
 - **Files whose container reports the wrong length.** One such file is known;
   if they turn out to be common, Kinema could compare with ffprobe's length.
-- **The stats panel's render passes**, which the current mpv build does not
-  report; the rows show what was asked for rather than what ran.

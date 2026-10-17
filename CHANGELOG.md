@@ -45,6 +45,18 @@ makes no stability promises.
   has Settings → Playback → Add Kinema to the app menu, which puts it in the
   app menu and in Open With for your account only, and can take it out again.
 
+- **Folders, inside Kinema.** The Library page has a Folders tile that opens
+  a page for browsing your drives and network shares and playing any video
+  in them, on Windows, Linux and Android. It starts with places: your drives
+  (named as the system names them), your library folders, and the network. On
+  a desktop, type an address such as `\\server\share` (Windows) or any folder
+  path (Linux); the system signs in, and addresses that opened are kept under
+  "Opened before". Inside a folder, "Add this folder to the library" asks
+  whether it holds movies, TV shows or videos and scans straight away. A
+  video in a library folder plays as the library's own file (resume, languages,
+  Skip intro); any other plays as a video of its own. Back goes up a level,
+  and back from a film returns to its folder with the film selected.
+
 - **Trakt resume across devices.** With Trakt connected, Kinema continues on
   one device where a film or episode was stopped on another. It is on while
   Trakt is connected; Settings → Accounts → Trakt, "Continue where you stopped
@@ -64,6 +76,9 @@ makes no stability promises.
 ### Fixed
 
 - A video whose file name starts with `-`, opened with Kinema, was passed over.
+- The stats panel (`i`) said "Render passes: not reported by this VO" on
+  Windows and Linux although mpv measures them. It now lists the passes that
+  ran on the last frame, with their times.
 
 ### Library
 

@@ -28,11 +28,26 @@ This is a property of the *format*, not of `track-list`. Every other list-shaped
 property is the same trap: `chapter-list`, `playlist`, `vo-passes`,
 `demuxer-cache-state`. `readChapters` (engine.ts) reads `chapters` for the count
 and then `chapter-list/N/time` and `chapter-list/N/title` as scalars, for exactly
-this reason. `src/player/stats.ts` is scalars throughout and reads no list
-property whole.
+this reason. `src/player/stats.ts` is scalars throughout; its one list,
+`vo-passes`, is read as a string (below).
 
 The crash is silent from JS — no exception, the process just dies. Symptom: exit code
 5 / `STATUS_ACCESS_VIOLATION` shortly after an action, nothing in the console.
+
+### `vo-passes` has no sub-properties
+
+`vo-passes/fresh/count`, `vo-passes/fresh/0/desc` and the like answer "error
+accessing property" on every mpv build, gpu-next included, which does measure
+its passes. Unlike `track-list`, the property implements only a whole read
+(`mp_property_vo_passes` refuses the sub-key action, and mpv has no generic
+fallback). The stats panel read it that way for months and showed "not
+reported by this VO" while the passes were there.
+
+**Do:** read `vo-passes` in `string` format. mpv prints a node property as its
+JSON (`{"fresh":[{"desc","last","avg","peak","count","samples"}],"redraw":[…]}`,
+times in nanoseconds) — a flat string across the FFI boundary, not the node
+format above. `parseRenderPasses` in `stats.ts`. Before reading any other list
+property by index, check that it accepts sub-paths.
 
 ### `sid` / `aid` fail in **both** directions
 
@@ -723,6 +738,18 @@ class — not only by the key; look again after the restore window
 spends a navigation key pressed onto dead focus on putting focus back on the
 current view's landing spot. It logs `focus: recovered …` when it fires, so a
 new route into this state shows up in `app.log` instead of as a dead remote.
+
+### A page's claim takes the ring back after a return has finished
+
+Back from the player to the Folders page put the ring on the first file, not
+the film just played. No error: the return worked, and then the page's own
+claim (`useClaimFocus(…, page = true)`) took the ring again at its second look,
+about 450 ms later, once `returnFocusTo` had finished.
+
+**Do:** a page that claims focus must claim nothing when a return was pending
+as it mounted (`hasPendingReturn` at mount). And key the claim per level, here
+a small `Landing` component with `key={level}`, so each folder gets its own
+count of "has the person pressed anything since arriving".
 
 ### `scrollIntoView({ block: 'nearest' })` is a no-op once on screen
 

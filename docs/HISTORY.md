@@ -473,12 +473,14 @@ and the note names the display mode that would fix it.
 **It lists the render passes that actually ran.** Every other row reports what
 was *requested*; `vo-passes` reports what libplacebo executed on the last frame,
 with timings. Those are different claims, and only the second answers "is
-anything touching my image?". Read as indexed scalars with the sub-path probed
-rather than assumed — it moved between mpv versions. This gpu-next build does
-not implement it at all, so rather than omit the section — indistinguishable
-from "no passes ran" — the panel states that the VO does not report them and
-carries the error, leaving what remains reading honestly as *requested* settings
-rather than observed ones.
+anything touching my image?". It was first read as indexed scalars, and the
+panel said for months that this gpu-next build does not report its passes. It
+does: `vo-passes` has no sub-properties at all, so every indexed read failed
+(GOTCHAS). It is now read whole as a string, mpv's JSON of it (2026-10-18).
+Where a VO really reports none, rather than omit the section —
+indistinguishable from "no passes ran" — the panel states that the VO does not
+report them and carries the error, leaving what remains reading honestly as
+*requested* settings rather than observed ones.
 
 Beyond that it reports the source (resolution, codec, pixel format and bit depth,
 frame rate, bitrate, scan type and whether the deinterlacer engaged), the display
@@ -3399,6 +3401,37 @@ neither a film nor a show.
   removed Continue Watching cards), with the usual safety copy. Tried on a copy
   of a real 0.11.0 library: every file kept.
 - Not built yet: picture and sound badges for a video.
+
+## Library → Folders (2026-10-18)
+
+Phase 4 of the local-media plan: browse drives and shares inside Kinema and
+play anything found there.
+
+- **A page, not a dialog.** It is a Library tile that opens a Kinema page, so
+  it works with a remote or a mouse on all three systems, and Back and the
+  focus ring behave as on every other page. The browser's position is kept in
+  the view itself, so Back from a film returns to its folder with the ring on
+  that film.
+- **Typed addresses on desktops, no network scan.** Windows and Linux already
+  sign in to shares and mount them; Kinema does not reimplement that. An
+  address (`\\server\share`, `//server/share`, or any folder path on Linux) is
+  opened with the system's own sign-in, and the ones that opened are kept,
+  newest first, six at most. Android has no such mounts, so it keeps Kinema's
+  own Network drives, the same as its folder browser.
+- **Names are read from drives, except network ones.** A drive is named as
+  Explorer names it ("Films (D:)"). A network drive's name is not read: a
+  server that has gone would hold the whole list up. Drives with no media are
+  left out, with Windows' "no disk" box suppressed for that thread. Linux
+  reads `/proc/self/mounts` and the GVfs folder, so a share a file manager
+  opened is found too. The list is built off the main thread.
+- **A video plays as the library's own when a library folder holds it**, so
+  resume, languages and Skip intro work. Otherwise it is a video of its own,
+  by the same path as a file opened from outside Kinema.
+- **Adding a folder scans at once.** The person has just said what it holds;
+  making them go to Settings to start a scan would be a step with no purpose.
+  Library folders inside it can be merged, as in Settings.
+- Proven by unit tests, four keyboard flows and the navigation map on all three
+  systems. Not tried on a real network share or a real Android device.
 
 ## Trakt resume across devices (2026-10-17)
 

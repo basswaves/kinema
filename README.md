@@ -180,7 +180,8 @@ audio and subtitles, volume. Back steps back to wherever you came from.
   release name; nothing else is.
 - **Keeps home videos and clips apart.** A Videos folder holds what is neither
   a film nor a show, never matched, each with a picture taken from the file,
-  under the Library tab.
+  under the Library tab. Library → Folders browses your drives and shares
+  inside Kinema and plays any video in them.
 - **Remembers where you were**, per file, and offers the next episode.
 - **Tells SIMKL and Trakt what you watched**, if you connect them: whatever you
   finish in Kinema is added to your account. Connecting is a code on screen and a

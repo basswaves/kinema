@@ -3167,8 +3167,15 @@ library or not.
   so a release build rewrites an offer that names another place at launch;
   a development build never does, or it would take over the copy in use.
 - **Tested in Windows Sandbox**, never on a PC whose settings matter
-  (`scripts/sandbox-default-player.ps1`). The registry code's own test runs
-  on a scratch key whose `Classes` Windows never reads.
+  (`scripts/sandbox-default-player.ps1`): started for a 12-second clip,
+  Kinema showed its first frame 1.5 s after starting (4.6–7.3 s on the first
+  start of a fresh Windows, WebView2's own first run included) and closed by
+  itself; a running Kinema took a second one's video; Offer wrote every
+  entry, Kinema started through the command it registered, and Remove left
+  nothing of Kinema's — only Windows' own display-name cache for the program,
+  which Windows writes for any program that runs. Default apps opened, but
+  behind Kinema's window, so its page was not seen. The registry code's own
+  test runs on a scratch key whose `Classes` Windows never reads.
 - **Not yet:** the next and previous file in a loose video's folder (the
   player's episode buttons are episode-shaped), and `MimeType` in the Linux
   packages' menu entry. On Linux a file on the command line, a second start

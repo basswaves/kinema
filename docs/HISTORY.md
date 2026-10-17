@@ -3091,6 +3091,45 @@ costs: for that video, no measured picture shape, no black-frame credits
 search, no HDR10+ or Dolby Vision extra layer; for that sound, no intros
 found by listening.
 
+## Blu-ray on Windows and Linux (2026-10-17)
+
+Tried first with the files people actually have — two 4K UHD `.m2ts` films
+(HDR10, PQ) and a 1080p one, all on a network share — and they simply played:
+picture, sound, seeking, no frames dropped. What they lacked was languages and
+chapters, which a Blu-ray keeps outside the stream.
+
+Then what Kinema did not do at all. A disc folder (`BDMV`) never reached the
+library — `bdmv` was in the scan's list of folders to skip — and an `.iso` was
+handed to mpv as a plain file, which fails. Both now play through mpv's own
+Blu-ray support (libbluray): `bd://`, with the disc as `bluray-device`. mpv
+picks the longest playlist, which is the film, and gives its chapters and the
+disc's track languages. No menus: they need Java (BD-J), and Kinema's own pages
+are the menu.
+
+Decided along the way:
+
+- **A disc folder is one title**, recorded with the extension `bdmv`, its size
+  the sum of its clips. Except when a loose video beside `BDMV` is bigger than
+  every clip in it — a common way of keeping a disc, with the film moved out
+  and the folder left holding menus and extras. That loose file stays the
+  title, exactly as before; played as a disc it would open a menu clip.
+- **Encrypted discs (AACS, BD+) are not played and are named as such.** Kinema
+  ships no decryption and asks for none. The reason exists only in mpv's log,
+  so that is where it is read from, and the message quotes mpv's line. Where a
+  system's libbluray can open a disc by its own arrangements, Kinema does not
+  stand in its way: it reports failures, it does not predict them.
+- **Badges for a disc folder come from its biggest clip**, read by ffprobe as
+  any file. An image has none — ffprobe cannot read inside it, and badges
+  describe the file, from the file.
+- **Not on Android**: Media3 has no Blu-ray support, so there a disc folder is
+  skipped as before.
+
+Test media: no whole disc folder or image was at hand, so one was built — the
+metadata of a real disc with the start of its film as the main clip, an image
+of it written with Windows' own IMAPI2 (UDF 2.50), and a copy with an `AACS`
+folder added, which libbluray takes for an encrypted disc. A real encrypted disc
+was not tried.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

@@ -312,6 +312,37 @@ export async function onPlaybackEvent(handle: (event: PlaybackEvent) => void): P
   };
 }
 
+// ---- Blu-ray discs ------------------------------------------------------------
+//
+// A disc folder or image is opened as `bd://` with `bluray-device` set to it:
+// mpv plays neither when given the path itself (disc.rs says what was
+// measured). mpv's `path` is then `bd://`, so the disc's own path is kept here
+// for `openPath`.
+
+/** How a library entry is opened, from `disc_source` in disc.rs. */
+interface DiscSource {
+  disc: boolean;
+  /** A loose Blu-ray clip's track languages by PID, from its disc's CLPI. */
+  languages: Record<string, string>;
+  /** For a disc: where mpv's log stood as it was opened. */
+  log_mark: number | null;
+}
+
+/** Why a disc did not open, as mpv's log says (disc.rs). */
+export interface DiscFailure {
+  /** `AACS` or `BD+` when mpv said the disc is encrypted with it. */
+  protection: string | null;
+  /** mpv's own words. */
+  said: string[];
+}
+
+/** The disc that is open, or being opened, as `bd://`; null for a file. */
+let openDisc: string | null = null;
+/** Where mpv's log stood as that disc was opened. */
+let discLogMark = 0;
+/** Languages for the open file's tracks where the file itself has none. */
+let clipLanguages: Record<string, string> = {};
+
 /**
  * Open `path`, replacing whatever was playing, at `start` seconds if given.
  *
@@ -321,10 +352,36 @@ export async function onPlaybackEvent(handle: (event: PlaybackEvent) => void): P
  */
 export async function openFile(path: string, start: number | null): Promise<void> {
   if (isMedia3()) return media3.open(path, start);
+  const source = await invoke<DiscSource>('disc_source', { path }).catch(
+    (e): DiscSource => {
+      console.warn('player: could not ask whether this is a disc', e);
+      return { disc: false, languages: {}, log_mark: null };
+    }
+  );
+  openDisc = source.disc ? path : null;
+  discLogMark = source.log_mark ?? 0;
+  clipLanguages = source.languages;
   // `loadfile <url> <flags> <index> <options>`: the per-file `start` option
   // opens the file at the resume point. The index argument (-1, "no playlist
   // position") is required before options since mpv 0.38.
-  await command('loadfile', start === null ? [path] : [path, 'replace', '-1', `start=${start}`]);
+  const at = start === null ? [] : ['replace', '-1', `start=${start}`];
+  if (source.disc) {
+    // Through `set`, a plain string: a path in the per-file options would
+    // need quoting for every comma a folder name can hold.
+    await command('set', ['bluray-device', path]);
+    await command('loadfile', ['bd://', ...at]);
+  } else {
+    await command('loadfile', [path, ...at]);
+  }
+}
+
+/**
+ * Why the disc just tried did not open, or null — also for a file that is
+ * not a disc, whose reason mpv's end-file event already gives.
+ */
+export async function discFailure(): Promise<DiscFailure | null> {
+  if (isMedia3() || openDisc === null) return null;
+  return invoke<DiscFailure | null>('disc_failure', { from: discLogMark }).catch(() => null);
 }
 
 /** Close the file. Nothing plays afterwards; the engine stays up. */
@@ -364,7 +421,8 @@ export async function seekBy(seconds: number): Promise<void> {
 /** The file that is open, or null. */
 export async function openPath(): Promise<string | null> {
   if (isMedia3()) return (await media3.state()).path;
-  return ((await getProperty('path', 'string')) as string | null) ?? null;
+  const path = ((await getProperty('path', 'string')) as string | null) ?? null;
+  return path?.startsWith('bd://') && openDisc !== null ? openDisc : path;
 }
 
 /**
@@ -516,6 +574,10 @@ export interface Track {
 export async function readTracks(): Promise<Track[]> {
   if (isMedia3()) return media3.tracks();
   const count = (await readProperty<number>('track-list/count', 'int64')) ?? 0;
+  // A loose Blu-ray clip's languages are in its disc's CLPI, keyed by PID —
+  // which is mpv's `src-id` for a transport stream's track. Read only then.
+  const languages = clipLanguages;
+  const joinLanguages = Object.keys(languages).length > 0;
 
   const read = async (i: number): Promise<Track | null> => {
     const at = (field: string) => `track-list/${i}/${field}`;
@@ -532,6 +594,7 @@ export async function readTracks(): Promise<Track[]> {
       channels,
       profile,
       hearingImpaired,
+      sourceId,
     ] = await Promise.all([
       readProperty<string>(at('type'), 'string'),
       readProperty<number>(at('id'), 'int64'),
@@ -545,13 +608,14 @@ export async function readTracks(): Promise<Track[]> {
       readProperty<number>(at('demux-channel-count'), 'int64'),
       readProperty<string>(at('codec-profile'), 'string'),
       readProperty<boolean>(at('hearing-impaired'), 'flag'),
+      joinLanguages ? readProperty<number>(at('src-id'), 'int64') : null,
     ]);
     if (!type) return null;
     return {
       id: id ?? i,
       type,
       title: title ?? undefined,
-      lang: lang ?? undefined,
+      lang: lang ?? (sourceId !== null ? languages[String(sourceId)] : undefined),
       codec: codec ?? undefined,
       selected: selected ?? false,
       forced: forced ?? false,

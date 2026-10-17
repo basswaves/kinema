@@ -11,11 +11,10 @@ Ideas and reports are welcome as [issues](https://github.com/Basswaves/kinema/is
 
 ## Next
 
-**Blu-ray on Windows and Linux**, done properly: `.m2ts` files tried for
-real, `BDMV` folders and disc images played through mpv's own Blu-ray support
-where it can, and a clear message for an encrypted disc. Then **Kinema as the
-default video player** on Windows — open a file from Explorer, or drop it on
-the window — and then smaller things about how it feels on a TV.
+**Kinema as the default video player** on Windows — open a file from
+Explorer, or drop it on the window — then an installer beside the ZIP, and
+then smaller things about how it feels on a TV. (Blu-ray folders and disc
+images on Windows and Linux are done, for the next release.)
 
 **Android**, an early version (beta) since 0.10.0, moves on as reports come
 in. Its open items: the badges on a film's page, intro detection from the

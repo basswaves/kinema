@@ -243,6 +243,32 @@ shown before the jump.
 start=<secs>`. The `-1` is the playlist index, which mpv 0.38 put in front of the
 per-file options; without it the options are read as the index.
 
+### A Blu-ray disc opens only as `bd://`, and its failures are only in the log
+
+`loadfile <disc.iso>` and `loadfile <disc>/BDMV/index.bdmv` both fail with
+nothing but `end-file` reason `error` (Windows libmpv, 2026-10-17). What plays
+a disc folder or an image is `bd://` with the `bluray-device` option set to
+it — through `set`, a plain string, rather than the per-file options, where a
+comma in a folder name would need quoting. Two things follow:
+
+- **mpv's `path` is then `bd://`**, never the disc. Anything comparing the
+  open path with the file it meant to open (`samePath`) refuses it, and the
+  file never counts as open. `openPath` in engine.ts answers with the disc's
+  own path instead.
+- **Why a disc did not open is not in any event.** An encrypted disc gives
+  the same bare `error` as a missing one; the reason is a log line,
+  `[e][bd] AACS encryption detected but cannot find libaacs.` (Windows) or,
+  where libaacs is installed but cannot decrypt, `[e][bd] AACS error: …`
+  (Ubuntu), with libaacs's own words on stderr, not in the log. `disc.rs`
+  reads it from the end of `mpv.log`, waiting up to a second, since mpv
+  writes the log from a thread of its own.
+
+A Blu-ray `.m2ts` played as a file has **no track languages and no
+chapters**: they are in the disc's CLPI and MPLS files. Played as `bd://`,
+libbluray supplies both. A loose clip with its CLPI still beside it gets its
+languages from there, joined on mpv's `src-id`, which for a transport stream
+is the PID.
+
 ### Initialising mpv twice corrupts native state
 
 React StrictMode double-invokes effects and HMR remounts components; either can call

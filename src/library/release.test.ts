@@ -40,6 +40,13 @@ describe('sourceLabel', () => {
     expect(label(name)).toBe(expected);
   });
 
+  it('calls a disc folder a Blu-ray disc, whatever its name says', () => {
+    expect(sourceLabel(readRelease(['A.Film.2019.COMPLETE.UHD.BLURAY-GRP'], 'bdmv'))).toBe(
+      'UHD Blu-ray disc'
+    );
+    expect(sourceLabel(readRelease(['A Film (2019)'], 'bdmv'))).toBe('Blu-ray disc');
+  });
+
   it('says nothing for a name that says nothing', () => {
     expect(label('A Film (2019).mkv')).toBeNull();
   });

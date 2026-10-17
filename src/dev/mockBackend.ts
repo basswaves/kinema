@@ -1212,6 +1212,9 @@ const handlers: Record<string, Handler> = {
       ffmpeg: { resolved: MOCK_FFMPEG_PATH, available: true },
     };
   },
+  // No Blu-ray discs in the fake library: every file opens as itself.
+  disc_source: () => ({ disc: false, languages: {}, log_mark: null }),
+  disc_failure: () => null,
   // `kinemaMockFfmpegLacks=hevc,eac3`: an ffmpeg like Fedora's ffmpeg-free.
   ffmpeg_lacks: () => (flag('kinemaMockFfmpegLacks') ?? '').split(',').filter(Boolean),
   ffmpeg_status: () => {

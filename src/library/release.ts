@@ -25,7 +25,7 @@ export interface Release {
   remux: boolean;
   /** Re-encoded from a stream rather than downloaded as sent (WEBRip). */
   rip: boolean;
-  /** A whole disc as one file (`.iso`). */
+  /** A whole disc: an image (`.iso`) or a disc folder (`BDMV`, disc.rs). */
   disc: boolean;
   /** The streaming service a web release came from, as guessit names it. */
   service: string | null;
@@ -70,7 +70,7 @@ export function readRelease(
     source: null,
     remux: false,
     rip: false,
-    disc: extension.toLowerCase() === 'iso',
+    disc: ['iso', 'bdmv'].includes(extension.toLowerCase()),
     service: null,
     editions: [],
     auro3d: false,
@@ -106,6 +106,9 @@ export function readRelease(
 
     if (AURO_3D.test(name)) release.auro3d = true;
   }
+
+  // A disc folder is a Blu-ray whatever its name says: `BDMV` is that format's.
+  if (extension.toLowerCase() === 'bdmv') release.source ??= 'Blu-ray';
 
   return release;
 }

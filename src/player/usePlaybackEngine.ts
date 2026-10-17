@@ -21,6 +21,7 @@ import { matchHdrToDisplay } from './displayHdr';
 import { mayswitch, restoreScreen } from './displaySwitch';
 import {
   addSubtitlesBeside,
+  discFailure,
   fitWindowForPlayer,
   hasMpv,
   hasReachedEnd,
@@ -42,7 +43,13 @@ import { useStepDown } from './useStepDown';
 import { handMouseToPage, startPointerFollowingControls } from './pageMouse';
 import { resumePoint } from './resume';
 import { audioFallbackNotice } from './systemOutput';
-import { loadFailedMessage, samePath, type Event, type Session } from './session';
+import {
+  discFailedMessage,
+  loadFailedMessage,
+  samePath,
+  type Event,
+  type Session,
+} from './session';
 
 /**
  * The longest the black cover may stay up waiting for a first frame. A file
@@ -296,7 +303,16 @@ export function usePlaybackEngine({
         // away fails here and nowhere else — without this, a black screen
         // reading `--:-- / --:--`, indistinguishable from a hang.
         if (event.reason === 'error') {
-          dispatch({ type: 'error', message: loadFailedMessage(event.detail) });
+          // A disc's reason is only in mpv's log (an encrypted one, most
+          // often); the wait for it is short, and its answer is dropped if
+          // another file was started meanwhile.
+          const failed = sessionRef.current.path;
+          const { detail } = event;
+          void discFailure().then((disc) => {
+            if (sessionRef.current.path !== failed) return;
+            const message = disc ? discFailedMessage(disc) : loadFailedMessage(detail);
+            dispatch({ type: 'error', message });
+          });
           // Reveal the controls and leave them up: nothing is playing, so there
           // is nothing for them to cover, and Back is the way out.
           revealOsd();

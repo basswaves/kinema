@@ -382,11 +382,11 @@ pub async fn measure_pictures(app: tauri::AppHandle) -> Result<MeasureReport, St
             }
 
             // Offline right now is not unmeasurable; see probe.rs.
-            let path = Path::new(&file.path);
+            let path = crate::disc::readable(Path::new(&file.path));
             if !path.is_file() {
                 continue;
             }
-            let shape = measure(&ffmpeg, path, &file.details);
+            let shape = measure(&ffmpeg, &path, &file.details);
             if shape.is_some() {
                 report.measured += 1;
                 if let Some(season) = file.season {

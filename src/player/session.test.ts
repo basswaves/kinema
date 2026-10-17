@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   initialSession,
+  discFailedMessage,
   loadFailedMessage,
   reduce,
   samePath,
@@ -196,5 +197,23 @@ describe('loadFailedMessage', () => {
   it('says what usually causes it when the engine gave none', () => {
     expect(loadFailedMessage()).toContain('may have been moved or deleted');
     expect(loadFailedMessage('')).toContain('may have been moved or deleted');
+  });
+});
+
+describe('discFailedMessage', () => {
+  it('names the encryption mpv found, in its own words', () => {
+    const message = discFailedMessage({
+      protection: 'AACS',
+      said: ['AACS encryption detected but cannot find libaacs.'],
+    });
+    expect(message).toContain('encrypted (AACS)');
+    expect(message).toContain('“AACS encryption detected but cannot find libaacs.”');
+  });
+
+  it('passes on what mpv said about any other failure', () => {
+    expect(discFailedMessage({ protection: null, said: ['title not found'] })).toBe(
+      'Could not play this disc. The player said: “title not found”'
+    );
+    expect(discFailedMessage({ protection: null, said: [] })).toContain('may be incomplete');
   });
 });

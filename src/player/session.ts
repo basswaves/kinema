@@ -18,6 +18,7 @@
  * the countdown. Those are derived from this state (`skip.ts` decides what is
  * active from `open` and `timePos`) rather than being part of the file's life.
  */
+import type { DiscFailure } from './engine';
 
 export interface Session {
   /** The file this session is for — the player's target. */
@@ -116,6 +117,25 @@ export function loadFailedMessage(detail?: string): string {
     ? `Could not play this file: ${detail}`
     : 'Could not play this file. It may have been moved or deleted, ' +
         'or the drive it is on may be unavailable.';
+}
+
+/**
+ * A Blu-ray disc that did not open, said from what mpv's log gave as the
+ * reason. An encrypted disc is named as one, with the system mpv named:
+ * Kinema cannot decrypt a disc and says so rather than a vaguer failure.
+ */
+export function discFailedMessage(failure: DiscFailure): string {
+  const said = failure.said.length ? ` The player said: “${failure.said.join(' ')}”` : '';
+  if (failure.protection) {
+    return (
+      `This disc is encrypted (${failure.protection}), and Kinema plays only ` +
+      `Blu-ray discs that are not.${said}`
+    );
+  }
+  return said
+    ? `Could not play this disc.${said}`
+    : 'Could not play this disc. It may be incomplete, or the drive it is on ' +
+        'may be unavailable.';
 }
 
 /**

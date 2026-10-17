@@ -451,8 +451,9 @@ code is arranged for one.
 | HDR switched on for an HDR film | ✓ | ✓ on GNOME and KDE Plasma, by Hyprland itself, and on Sway 1.12 or later (not yet tried on a real TV); needs a driver that offers HDR ([above](#linux)) | by Android itself |
 | Sleep / shut down | ✓ | ✓ where the system allows it without a password (logind) | — |
 | Badges on a film's page, intro detection from the audio | ✓ | ✓ | not yet |
-| Blu-ray `.m2ts` files | play through mpv, not yet tested | play through mpv, not yet tested | 1080p plays; 4K UHD not yet |
-| Blu-ray folders (`BDMV`), disc images (`.iso`) | not yet | not yet | not yet |
+| Blu-ray `.m2ts` files | ✓ 1080p and 4K UHD HDR; track languages where the disc's `BDMV` folder is beside the file | plays through mpv, not yet tried with a whole film | 1080p plays; 4K UHD not yet |
+| Blu-ray folders (`BDMV`), disc images (`.iso`) | ✓ the main film, with chapters and track languages; no menus | ✓ through the system's mpv | not yet |
+| Encrypted Blu-ray discs (AACS, BD+) | not played; Kinema says so | not played; Kinema says so | — |
 
 ### Android (early version)
 

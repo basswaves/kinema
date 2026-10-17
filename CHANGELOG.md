@@ -7,6 +7,17 @@ makes no stability promises.
 
 ## [Unreleased]
 
+### Added
+
+- **Blu-ray disc folders and disc images play.** A folder holding a disc's
+  `BDMV` is now one film in the library, and an `.iso` of a Blu-ray plays as
+  the disc — the main film, with its chapters and the languages of its sound
+  and subtitle tracks. Menus are not shown. An encrypted disc is not played;
+  Kinema says so, in mpv's own words, instead of a vague failure.
+- **Blu-ray `.m2ts` files know their languages** when the disc's `BDMV`
+  folder is still beside them, so remembered sound and subtitle choices find
+  the right tracks.
+
 ### Fixed
 
 - **Down in the player's details panel stays in the panel.** With a remote or

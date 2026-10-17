@@ -214,10 +214,19 @@ fn walk_local(
     // another drive is part of it, as people arrange libraries on Linux (and
     // with links and junctions on Windows). A link that loops back on itself
     // is skipped below, said once in the log, not reported every scan.
-    let walker = WalkDir::new(root)
+    //
+    // A Blu-ray disc folder — `BDMV` inside it — is one title on the desktop,
+    // played through mpv's Blu-ray support (disc.rs). Folders come before
+    // files in each listing so `BDMV` is met before the files beside it,
+    // which are then left out when the disc is the title. Android's player
+    // cannot play a disc, so there `BDMV` stays skipped like the other disc
+    // structure folders.
+    let discs_play = cfg!(desktop);
+    let mut walker = WalkDir::new(root)
         .follow_links(true)
+        .sort_by(|a, b| b.file_type().is_dir().cmp(&a.file_type().is_dir()))
         .into_iter()
-        .filter_entry(|e| {
+        .filter_entry(move |e| {
             if e.depth() == 0 {
                 return true;
             }
@@ -225,13 +234,16 @@ fn walk_local(
                 return !e
                     .file_name()
                     .to_str()
-                    .map(is_skipped_dir)
+                    .map(|name| {
+                        is_skipped_dir(name) && !(discs_play && crate::disc::is_bdmv_name(name))
+                    })
                     .unwrap_or(false);
             }
             true
         });
+    let mut discs: HashSet<std::path::PathBuf> = HashSet::new();
 
-    for entry in walker {
+    while let Some(entry) = walker.next() {
         let entry = match entry {
             Ok(e) => e,
             Err(e) if e.loop_ancestor().is_some() => {
@@ -244,7 +256,40 @@ fn walk_local(
             }
         };
 
+        let is_bdmv = entry.depth() > 0
+            && entry.file_type().is_dir()
+            && entry.file_name().to_str().is_some_and(crate::disc::is_bdmv_name);
+        if is_bdmv {
+            // Nothing inside is a title of its own: menus, extras, the clips.
+            walker.skip_current_dir();
+            let Some(folder) = entry.path().parent() else { continue };
+            if let Some(disc) = crate::disc::disc_folder(folder) {
+                discs.insert(folder.to_path_buf());
+                // Never above the library folder: a disc that *is* the library
+                // folder (one film added as its own folder) sits in it, as a
+                // file at its top does.
+                let parent = if entry.depth() == 1 { Some(folder) } else { folder.parent() };
+                found(Ok(SeenFile {
+                    parent_dir: parent
+                        .map(|p| p.to_string_lossy().to_string())
+                        .unwrap_or_default(),
+                    file_name: folder
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_default(),
+                    extension: crate::disc::FOLDER_EXTENSION.to_string(),
+                    path: folder.to_string_lossy().to_string(),
+                    size: disc.size as i64,
+                    modified: disc.modified,
+                }))?;
+            }
+            continue;
+        }
+
         if !entry.file_type().is_file() || !is_video(entry.path()) {
+            continue;
+        }
+        if entry.path().parent().is_some_and(|p| discs.contains(p)) {
             continue;
         }
 
@@ -689,6 +734,54 @@ mod tests {
         let path: String = conn.query_row("SELECT path FROM media_files", [], |r| r.get(0)).unwrap();
         assert!(path.ends_with("Show/Season 1/Show.S01E01.mkv"), "{path}");
         let _ = std::fs::remove_dir_all(&elsewhere);
+    }
+
+    /// A whole disc folder is one title; one whose film was moved out beside
+    /// its `BDMV` keeps that film as the title, as before; nothing inside a
+    /// `BDMV` is a title of its own.
+    #[test]
+    fn disc_folders_are_one_title_each() {
+        let mut conn = database("discs");
+        let root: String = conn
+            .query_row("SELECT path FROM library_roots WHERE id = 1", [], |r| r.get(0))
+            .unwrap();
+        let root = Path::new(&root);
+        let disc = |name: &str| {
+            let stream = root.join(name).join("BDMV").join("STREAM");
+            std::fs::create_dir_all(&stream).unwrap();
+            std::fs::write(root.join(name).join("BDMV").join("index.bdmv"), b"INDX").unwrap();
+            std::fs::write(stream.join("00001.m2ts"), vec![0; 2000]).unwrap();
+            std::fs::write(stream.join("00002.m2ts"), vec![0; 500]).unwrap();
+        };
+        disc("Whole.Disc.2018.1080p.BluRay");
+        disc("Moved.Out.2018.1080p.BluRay");
+        std::fs::write(root.join("Moved.Out.2018.1080p.BluRay").join("00800.m2ts"), vec![0; 9000])
+            .unwrap();
+        std::fs::create_dir_all(root.join("Plain (2019)")).unwrap();
+        std::fs::write(root.join("Plain (2019)").join("Plain.2019.mkv"), b"x").unwrap();
+
+        let mut report = ScanReport::default();
+        scan_root(&mut conn, 1, &root.to_string_lossy(), &mut report).unwrap();
+        assert!(report.errors.is_empty(), "{:?}", report.errors);
+        let mut rows: Vec<(String, String, String, i64)> = conn
+            .prepare("SELECT file_name, extension, parent_dir, size_bytes FROM media_files")
+            .unwrap()
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap();
+        rows.sort();
+        let root = root.to_string_lossy().to_string();
+        if cfg!(desktop) {
+            assert_eq!(
+                rows,
+                vec![
+                    ("00800.m2ts".into(), "m2ts".into(), format!("{root}{}Moved.Out.2018.1080p.BluRay", std::path::MAIN_SEPARATOR), 9000),
+                    ("Plain.2019.mkv".into(), "mkv".into(), format!("{root}{}Plain (2019)", std::path::MAIN_SEPARATOR), 1),
+                    ("Whole.Disc.2018.1080p.BluRay".into(), "bdmv".into(), root.clone(), 2500),
+                ]
+            );
+        }
     }
 
     /// The test database's root folder, and a file recorded under it as an

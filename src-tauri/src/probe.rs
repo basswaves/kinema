@@ -869,12 +869,13 @@ pub async fn probe_library(app: tauri::AppHandle) -> Result<ProbeReport, String>
             // unplugged — is not a file ffprobe failed on. Recording it as one
             // would keep it from being read until the file changed, which a
             // file on a sleeping NAS never does. Left for the next scan.
-            let path = Path::new(&file.path);
+            // A disc folder is read through its film's clip (disc.rs).
+            let path = crate::disc::readable(Path::new(&file.path));
             if !path.is_file() {
                 continue;
             }
 
-            let result = probe(&ffmpeg, path);
+            let result = probe(&ffmpeg, &path);
             match &result {
                 Ok(_) => report.read += 1,
                 Err(e) => {

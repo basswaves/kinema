@@ -7,6 +7,7 @@ mod artwork;
 mod backup;
 mod db;
 mod detect;
+mod disc;
 mod display;
 mod engine;
 mod equipment;
@@ -398,6 +399,8 @@ pub fn run() {
             ffmpeg_install::install_ffmpeg,
             skiptro::skiptro_found,
             probe::probe_library,
+            disc::disc_source,
+            disc::disc_failure,
             imdb::refresh_imdb_ratings,
             omdb::list_titles_needing_scores,
             omdb::save_omdb_scores,

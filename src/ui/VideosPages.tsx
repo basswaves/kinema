@@ -2,8 +2,9 @@
  * The Library tab and a Videos folder's page (LOCAL-MEDIA.md phase 2 and
  * decision 1).
  *
- * The Library page holds one tile per Videos folder — and, as they are built,
- * Folders and Playlists — so the top bar never grows again. A Videos folder's
+ * The Library page holds one tile per Videos folder, then Folders
+ * (FoldersPage.tsx) — and, once it is built, Playlists — so the top bar never
+ * grows again. A Videos folder's
  * page shows its files as they lie on disk: its own files first, then one group
  * per sub-folder, each with Play all, which plays through the group by the same
  * previous/next steps an episode uses (`videos::adjacent`).
@@ -38,10 +39,12 @@ const VIDEOS_FOCUS_KEY = 'videos-page';
 export function LibraryPage({
   roots,
   onOpen,
+  onFolders,
   onSettings,
 }: {
   roots: LibraryRoot[];
   onOpen: (root: LibraryRoot) => void;
+  onFolders: () => void;
   onSettings: () => void;
 }) {
   const { ref, focusKey } = useFocusable({
@@ -50,7 +53,7 @@ export function LibraryPage({
     saveLastFocusedChild: true,
   });
   const folders = videosRoots(roots);
-  useClaimFocus(folders[0] ? `library:${folders[0].id}` : 'library:settings', true, true);
+  useClaimFocus(folders[0] ? `library:${folders[0].id}` : 'library:folders', true, true);
 
   return (
     <FocusContext.Provider value={focusKey}>
@@ -69,6 +72,15 @@ export function LibraryPage({
               <span className="library-tile-meta">{count(root.file_count, 'video')}</span>
             </FocusButton>
           ))}
+          <FocusButton
+            focusKey="library:folders"
+            label="Folders"
+            className="library-tile library-tile-folders"
+            onSelect={onFolders}
+          >
+            <span className="library-tile-name">Folders</span>
+            <span className="library-tile-meta">Drives, network, anything to play</span>
+          </FocusButton>
         </div>
         {folders.length === 0 && (
           <p className="muted library-empty">

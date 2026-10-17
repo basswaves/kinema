@@ -308,8 +308,9 @@
       "OMDb API key": { "U": "Get a free key ↗", "D": "·", "L": "·", "R": "·" }
     },
     "library": {
-      "Home videos": { "U": "Library", "D": "Library folders", "L": "·", "R": "·" },
-      "Library folders": { "U": "Home videos", "D": "·", "L": "·", "R": "·" }
+      "Home videos": { "U": "Library", "D": "Library folders", "L": "·", "R": "Folders" },
+      "Folders": { "U": "Library", "D": "Library folders", "L": "Home videos", "R": "·" },
+      "Library folders": { "U": "Home videos", "D": "·", "L": "·", "R": "Folders" }
     },
     "videos": {
       "← Back": { "U": "Library", "D": "Birthday 2024-05-02", "L": "·", "R": "▶ Play all #1" },
@@ -320,6 +321,22 @@
       "clip 1": { "U": "▶ Play all #2", "D": "·", "L": "·", "R": "clip 2" },
       "clip 2": { "U": "Garden", "D": "·", "L": "clip 1", "R": "clip 10" },
       "clip 10": { "U": "Garden", "D": "·", "L": "clip 2", "R": "·" }
+    },
+    "folders": {
+      "VideosYour own folder": { "U": "Library", "D": "Local disk (C:)Drive", "L": "·", "R": "·" },
+      "Local disk (C:)Drive": { "U": "VideosYour own folder", "D": "Media (D:)Drive", "L": "·", "R": "·" },
+      "Media (D:)Drive": { "U": "Local disk (C:)Drive", "D": "fixtureTV shows", "L": "·", "R": "·" },
+      "fixtureTV shows": { "U": "Media (D:)Drive", "D": "Home videosVideos", "L": "·", "R": "·" },
+      "Home videosVideos": { "U": "fixtureTV shows", "D": "\\\\server\\share", "L": "·", "R": "·" },
+      "Open": { "U": "Home videosVideos", "D": "·", "L": "\\\\server\\share", "R": "·" },
+      "\\\\server\\share": { "U": "Home videosVideos", "D": "·", "L": "·", "R": "Open" }
+    },
+    "folders-in": {
+      "Add this folder to the library": { "U": "Library", "D": "PhoneFolder", "L": "·", "R": "Up a folder" },
+      "Up a folder": { "U": "Library", "D": "PhoneFolder", "L": "Add this folder to the library", "R": "·" },
+      "PhoneFolder": { "U": "Add this folder to the library", "D": "Birthday.mp4Play", "L": "·", "R": "·" },
+      "Birthday.mp4Play": { "U": "PhoneFolder", "D": "Garden.movPlay", "L": "·", "R": "·" },
+      "Garden.movPlay": { "U": "Birthday.mp4Play", "D": "·", "L": "·", "R": "·" }
     }
   },
   "linux": {
@@ -616,8 +633,9 @@
       "OMDb API key": { "U": "Get a free key ↗", "D": "·", "L": "·", "R": "·" }
     },
     "library": {
-      "Home videos": { "U": "Library", "D": "Library folders", "L": "·", "R": "·" },
-      "Library folders": { "U": "Home videos", "D": "·", "L": "·", "R": "·" }
+      "Home videos": { "U": "Library", "D": "Library folders", "L": "·", "R": "Folders" },
+      "Folders": { "U": "Library", "D": "Library folders", "L": "Home videos", "R": "·" },
+      "Library folders": { "U": "Home videos", "D": "·", "L": "·", "R": "Folders" }
     },
     "videos": {
       "← Back": { "U": "Library", "D": "Birthday 2024-05-02", "L": "·", "R": "▶ Play all #1" },
@@ -628,6 +646,22 @@
       "clip 1": { "U": "▶ Play all #2", "D": "·", "L": "·", "R": "clip 2" },
       "clip 2": { "U": "Garden", "D": "·", "L": "clip 1", "R": "clip 10" },
       "clip 10": { "U": "Garden", "D": "·", "L": "clip 2", "R": "·" }
+    },
+    "folders": {
+      "VideosYour own folder": { "U": "Library", "D": "Local disk (C:)Drive", "L": "·", "R": "·" },
+      "Local disk (C:)Drive": { "U": "VideosYour own folder", "D": "Media (D:)Drive", "L": "·", "R": "·" },
+      "Media (D:)Drive": { "U": "Local disk (C:)Drive", "D": "fixtureTV shows", "L": "·", "R": "·" },
+      "fixtureTV shows": { "U": "Media (D:)Drive", "D": "Home videosVideos", "L": "·", "R": "·" },
+      "Home videosVideos": { "U": "fixtureTV shows", "D": "\\\\server\\share", "L": "·", "R": "·" },
+      "Open": { "U": "Home videosVideos", "D": "·", "L": "\\\\server\\share", "R": "·" },
+      "\\\\server\\share": { "U": "Home videosVideos", "D": "·", "L": "·", "R": "Open" }
+    },
+    "folders-in": {
+      "Add this folder to the library": { "U": "Library", "D": "PhoneFolder", "L": "·", "R": "Up a folder" },
+      "Up a folder": { "U": "Library", "D": "PhoneFolder", "L": "Add this folder to the library", "R": "·" },
+      "PhoneFolder": { "U": "Add this folder to the library", "D": "Birthday.mp4Play", "L": "·", "R": "·" },
+      "Birthday.mp4Play": { "U": "PhoneFolder", "D": "Garden.movPlay", "L": "·", "R": "·" },
+      "Garden.movPlay": { "U": "Birthday.mp4Play", "D": "·", "L": "·", "R": "·" }
     }
   },
   "android": {
@@ -883,8 +917,9 @@
       "Save key": { "U": "TMDB API key", "D": "·", "L": "·", "R": "·" }
     },
     "library": {
-      "Home videos": { "U": "Library", "D": "Library folders", "L": "·", "R": "·" },
-      "Library folders": { "U": "Home videos", "D": "·", "L": "·", "R": "·" }
+      "Home videos": { "U": "Library", "D": "Library folders", "L": "·", "R": "Folders" },
+      "Folders": { "U": "Library", "D": "Library folders", "L": "Home videos", "R": "·" },
+      "Library folders": { "U": "Home videos", "D": "·", "L": "·", "R": "Folders" }
     },
     "videos": {
       "← Back": { "U": "Library", "D": "Birthday 2024-05-02", "L": "·", "R": "▶ Play all #1" },
@@ -895,6 +930,20 @@
       "clip 1": { "U": "▶ Play all #2", "D": "·", "L": "·", "R": "clip 2" },
       "clip 2": { "U": "Garden", "D": "·", "L": "clip 1", "R": "clip 10" },
       "clip 10": { "U": "Garden", "D": "·", "L": "clip 2", "R": "·" }
+    },
+    "folders": {
+      "USB driveUSB drive or card": { "U": "Library", "D": "Internal shared storageThis device", "L": "·", "R": "·" },
+      "Internal shared storageThis device": { "U": "USB driveUSB drive or card", "D": "fixtureTV shows", "L": "·", "R": "·" },
+      "fixtureTV shows": { "U": "Internal shared storageThis device", "D": "Home videosVideos", "L": "·", "R": "·" },
+      "Home videosVideos": { "U": "fixtureTV shows", "D": "Network drivesA NAS, or a folder shared by a compu", "L": "·", "R": "·" },
+      "Network drivesA NAS, or a folder shared by a compu": { "U": "Home videosVideos", "D": "·", "L": "·", "R": "·" }
+    },
+    "folders-in": {
+      "Add this folder to the library": { "U": "Library", "D": "FilmsFolder", "L": "·", "R": "Up a folder" },
+      "Up a folder": { "U": "Library", "D": "FilmsFolder", "L": "Add this folder to the library", "R": "·" },
+      "FilmsFolder": { "U": "Add this folder to the library", "D": "PhotosFolder", "L": "·", "R": "·" },
+      "PhotosFolder": { "U": "FilmsFolder", "D": "TVFolder", "L": "·", "R": "·" },
+      "TVFolder": { "U": "PhotosFolder", "D": "·", "L": "·", "R": "·" }
     }
   }
 }

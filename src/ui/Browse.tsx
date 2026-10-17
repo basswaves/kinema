@@ -67,7 +67,8 @@ import {
   type VideoItem,
 } from '../library/videos';
 import { LibraryPage, VideosPage, VideoTile } from './VideosPages';
-import { launchRequest, listenForVideos, type OpenRequest } from '../library/opened';
+import FoldersPage, { type FolderSpot } from './FoldersPage';
+import { launchRequest, listenForVideos, targetFor, type OpenRequest } from '../library/opened';
 import { keepSame } from './keepSame';
 import { searchTitles, type SearchHit } from './search';
 import { arrangeGrid, GRID_SORTS, gridSettingKey, parseGridSetting, type GridSort } from './gridSort';
@@ -126,6 +127,8 @@ type View =
   | { name: 'home' | 'library' | 'search' | 'settings'; section?: SettingsTarget }
   // One Videos folder, from a tile on the Library page.
   | { name: 'videos'; root: LibraryRoot }
+  // Library → Folders, and where in it (FoldersPage.tsx).
+  | { name: 'folders'; at: FolderSpot | null }
   | { name: 'detail'; title: Title }
   // Ids rather than the titles themselves, so the grid keeps showing current
   // rows after a reload rather than a snapshot taken when it was opened.
@@ -749,7 +752,7 @@ export default function Browse() {
               ? view.kind === 'movie'
                 ? 'movies'
                 : 'tv'
-              : view.name === 'videos'
+              : view.name === 'videos' || view.name === 'folders'
                 ? 'library'
                 : view.name
           }
@@ -848,7 +851,27 @@ export default function Browse() {
           <LibraryPage
             roots={roots}
             onOpen={(root) => openView({ name: 'videos', root })}
+            onFolders={() => openView({ name: 'folders', at: null })}
             onSettings={() => openView({ name: 'settings', section: 'videos' })}
+          />
+        )}
+
+        {view.name === 'folders' && (
+          <FoldersPage
+            at={view.at}
+            roots={roots}
+            onMove={(at) => setStack((s) => replace(s, { name: 'folders', at }))}
+            onPlay={(path) => {
+              const from = getCurrentFocusKey();
+              // Only if still on Folders when the library has answered.
+              void targetFor(path).then((target) =>
+                setStack((s) =>
+                  current(s).name === 'folders' ? open(s, { name: 'player', target }, from) : s
+                )
+              );
+            }}
+            onBack={goBack}
+            onLibraryChanged={() => void load()}
           />
         )}
 

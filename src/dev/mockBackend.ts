@@ -858,6 +858,9 @@ const LOOSE_FOLDER = [
   'D:\\Videos\\Holiday 2020.mkv',
 ];
 
+/** Folders added from Library → Folders, after the fixture's own. */
+const addedRoots: { id: number; path: string; kind: string; name: string | null; file_count: number }[] = [];
+
 /** The video "started for" has been taken (opened_at_launch). */
 let openedTaken = false;
 /** Resume points of videos outside the library, by path. */
@@ -928,7 +931,26 @@ const emptyLibrary = { hasRoot: !EMPTY, scanned: false, path: 'C:\\fixture' };
  */
 const STORAGE_REFUSED = flag('kinemaMockStorageRefused') === '1';
 const storage = { read: 'prompt', allFiles: 'off', asked: 0 };
-const mockDrives: Record<string, { folders: string[]; videos: number }> = {
+const mockDrives: Record<string, { folders: string[]; videos: number; files?: string[] }> = {
+  // A desktop's drives, for Library → Folders (places.rs folder_places): the
+  // fixture's own folder, a loose folder of videos, and one not in the library.
+  'C:\\': { folders: ['fixture', 'Users'], videos: 0, files: [] },
+  'C:\\Users': { folders: [], videos: 0, files: [] },
+  'C:\\Users\\me\\Videos': { folders: ['Phone'], videos: 2, files: ['Birthday.mp4', 'Garden.mov'] },
+  'C:\\Users\\me\\Videos\\Phone': { folders: [], videos: 0, files: [] },
+  'C:\\fixture': { folders: ['Example Show'], videos: 0, files: [] },
+  'C:\\fixture\\Example Show': { folders: ['Season 1'], videos: 0, files: [] },
+  'C:\\fixture\\Example Show\\Season 1': {
+    folders: [],
+    videos: 5,
+    files: [1, 2, 3, 4, 5].map((e) => `Example.Show.S01E0${e}.mkv`),
+  },
+  'D:\\': { folders: ['Concerts', 'Videos'], videos: 0, files: [] },
+  'D:\\Videos': { folders: [], videos: 3, files: ['Beach.mkv', 'Holiday 2019.mkv', 'Holiday 2020.mkv'] },
+  'D:\\Concerts': { folders: [], videos: 2, files: ['Live 2019.mkv', 'Live 2021.mkv'] },
+  // A share typed as an address, read with Windows' own sign-in.
+  '\\\\nas\\films': { folders: ['A film (2001)'], videos: 0, files: [] },
+  '\\\\nas\\films\\A film (2001)': { folders: [], videos: 1, files: ['A film (2001).mkv'] },
   '/storage/1A2B-3C4D': { folders: ['Films', 'Photos', 'TV'], videos: 0 },
   '/storage/1A2B-3C4D/Films': { folders: ['A film (2001)', 'Another film (2003)'], videos: 0 },
   '/storage/1A2B-3C4D/Films/A film (2001)': { folders: [], videos: 1 },
@@ -1162,6 +1184,7 @@ const handlers: Record<string, Handler> = {
           ...(flag('kinemaMockNoVideos') === '1' || EMPTY
             ? []
             : [{ ...VIDEOS_ROOT, file_count: mockVideos.length }]),
+          ...addedRoots,
         ]
       : [],
   list_videos: () => mockVideos.map(videoItem),
@@ -1191,6 +1214,12 @@ const handlers: Record<string, Handler> = {
   save_parse_results: () => 0,
   library_stats: () => ({ total: files.length, unparsed: 0, parsed: 0, missing: 0, total_bytes: 0 }),
   add_library_root: (a) => {
+    // A library that has its folder already gains another (Library → Folders).
+    if (emptyLibrary.hasRoot && !EMPTY) {
+      const id = 20 + addedRoots.length;
+      addedRoots.push({ id, path: String(a.path), kind: String(a.kind), name: (a.name as string) ?? null, file_count: 0 });
+      return id;
+    }
     emptyLibrary.hasRoot = true;
     emptyLibrary.path = String(a.path ?? emptyLibrary.path);
     return 1;
@@ -1787,8 +1816,16 @@ const handlers: Record<string, Handler> = {
     }
     const listing = mockDrives[path];
     if (!listing) throw new Error(`could not read ${String(a.path)}`);
-    return listing;
+    return {
+      ...listing,
+      files: listing.files ?? Array.from({ length: listing.videos }, (_, i) => `Video ${i + 1}.mkv`),
+    };
   },
+  folder_places: () => [
+    { path: 'C:\\Users\\me\\Videos', name: 'Videos', kind: 'home' },
+    { path: 'C:\\', name: 'Local disk (C:)', kind: 'drive' },
+    { path: 'D:\\', name: 'Media (D:)', kind: 'drive' },
+  ],
 };
 
 /**

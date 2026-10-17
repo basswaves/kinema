@@ -3629,6 +3629,32 @@ kbd {
   max-width: 40rem;
 }
 
+/* Library → Folders (FoldersPage.tsx): the folder browser's own list, on a
+   page. One column, so Up and Down walk it as they do in the dialog. */
+.folders-page {
+  max-width: 52rem;
+}
+
+.folders-section {
+  margin-bottom: 1.5rem;
+}
+
+.folders-heading {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  opacity: 0.75;
+}
+
+.folders-add {
+  margin-bottom: 1rem;
+}
+
+.folders-add p {
+  margin: 0 0 0.75rem;
+  overflow-wrap: anywhere;
+}
+
 .videos-group-head {
   display: flex;
   align-items: center;

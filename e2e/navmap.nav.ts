@@ -632,6 +632,28 @@ async function walkSystem(ctx: Ctx): Promise<void> {
     return w(p, 'videos', 'A Videos folder (its own files, then a group per sub-folder)', KB);
   });
 
+  // Library → Folders: the places, then the first one opened.
+  const toFolders = async (p: Page) => {
+    if (!(await openFromTopBar(p, 'Library'))) return false;
+    await quiet(p);
+    await press(p, 'ArrowRight');
+    await press(p, 'Enter');
+    await p.waitForFunction("window.__nav.leaves().some((l) => l.key.startsWith('folders-place:'))", undefined, { timeout: 8000 });
+    await quiet(p);
+    return true;
+  };
+  await screen(ctx, 'folders', 'Folders (drives, library folders, network)', {}, async (p) => {
+    if (!(await toFolders(p))) return null;
+    return w(p, 'folders', 'Folders (drives, library folders, network)', KB);
+  });
+  await screen(ctx, 'folders-in', 'Folders: inside a folder (add, up, folders, videos)', {}, async (p) => {
+    if (!(await toFolders(p))) return null;
+    await press(p, 'Enter');
+    await p.waitForFunction("window.__nav.leaves().some((l) => l.key === 'folders-up')", undefined, { timeout: 8000 });
+    await quiet(p);
+    return w(p, 'folders-in', 'Folders: inside a folder (add, up, folders, videos)', KB);
+  });
+
   await screen(ctx, 'search', 'Search (an empty query lists every title)', {}, async (p) => {
     if (!(await openFromTopBar(p, 'Search'))) return null;
     await quiet(p);

@@ -341,6 +341,7 @@ pub fn run() {
             updates::latest_release,
             capabilities::capabilities,
             places::list_folders,
+            places::folder_places,
             netshare::list_shares,
             netshare::check_server,
             share_logins::save_share_login,

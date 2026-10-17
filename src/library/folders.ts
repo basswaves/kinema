@@ -31,6 +31,63 @@ export interface Listing {
   folders: string[];
   /** Videos directly inside it. */
   videos: number;
+  /** Their names (Library → Folders plays them). */
+  files: string[];
+}
+
+/** Where Library → Folders starts on a desktop (places.rs `folder_places`). */
+export interface DesktopPlace {
+  path: string;
+  name: string;
+  kind: 'drive' | 'removable' | 'disc' | 'network' | 'home';
+}
+
+export const folderPlaces = (): Promise<DesktopPlace[]> => invoke<DesktopPlace[]>('folder_places');
+
+/**
+ * The separator a path is written with: a Windows path's backslash, else `/`
+ * (Linux, Android, `smb://`). Kept, so a file's path is the one the library
+ * stored and Kinema knows it as that library file.
+ */
+export function separatorOf(path: string): '\\' | '/' {
+  return /^[A-Za-z]:/.test(path) || path.startsWith('\\\\') ? '\\' : '/';
+}
+
+/** `base` and the names below it, as one path: `D:\` + `Films` → `D:\Films`. */
+export function joinPath(base: string, names: string[]): string {
+  const sep = separatorOf(base);
+  return names.reduce((path, name) => (path.endsWith(sep) ? path + name : path + sep + name), base);
+}
+
+/**
+ * A typed network address as Windows reads it: `//nas/films` and
+ * `\\nas\films\` both → `\\nas\films`. Anything else as typed, less spaces
+ * around it.
+ */
+export function typedAddress(text: string): string {
+  const trimmed = text.trim();
+  if (!/^(\\\\|\/\/)[^\\/]/.test(trimmed)) return trimmed;
+  return trimmed.replace(/\//g, '\\').replace(/\\+$/, '');
+}
+
+/**
+ * The library folder `path` is in, or is: a Windows path compared as
+ * Windows compares names, without regard to case.
+ */
+export function rootHolding<R extends { path: string }>(roots: R[], path: string): R | null {
+  const sep = separatorOf(path);
+  // Windows reads either slash, and does not mind the case.
+  const fold = (p: string) => {
+    const same = sep === '\\' ? p.replace(/\//g, '\\').toLowerCase() : p;
+    return same.length > 1 && same.endsWith(sep) && !/^[a-z]:\\$/i.test(same) ? same.slice(0, -1) : same;
+  };
+  const target = fold(path);
+  return (
+    roots.find((r) => {
+      const root = fold(r.path);
+      return target === root || target.startsWith(root.endsWith(sep) ? root : root + sep);
+    }) ?? null
+  );
 }
 
 /**

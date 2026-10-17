@@ -139,7 +139,7 @@ export default function FolderBrowser({ request }: { request: FolderRequest }) {
       .catch((e: unknown) => {
         if (!live) return;
         setError(userError(e));
-        setListing({ folders: [], videos: 0 });
+        setListing({ folders: [], videos: 0, files: [] });
       });
     return () => {
       live = false;

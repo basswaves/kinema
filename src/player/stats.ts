@@ -25,7 +25,8 @@
  *    deserialises nested maps across the FFI boundary and takes the whole
  *    process down with STATUS_ACCESS_VIOLATION, silently, from JS. Every value
  *    here is a flat scalar or an indexed sub-key, exactly as `tracks.ts` reads
- *    the track list.
+ *    the track list — except `vo-passes`, which has no sub-keys and is read
+ *    as a string, mpv's JSON of the node.
  *  - **Every read may fail.** Property names move between mpv and libplacebo
  *    versions, and reading one in a format its handler does not implement
  *    throws rather than returning null (the `sid`/`aid` lesson). `safeGet`
@@ -447,50 +448,53 @@ export function describeHdr(f: HdrFacts, system?: string | null): StatRow {
   };
 }
 
+/** Enough to cover a full chain without turning the panel into a wall. */
+const MAX_PASSES = 24;
+
 /**
- * The render passes libplacebo actually executed on the last frame.
- *
+ * The render passes libplacebo actually executed on the last fresh frame,
+ * from `vo-passes` read whole as a string — which mpv answers with the
+ * property's JSON. Its sub-paths (`vo-passes/fresh/count` and the like) are
+ * refused on every mpv build: the property only answers a whole read
+ * (GOTCHAS, "vo-passes has no sub-properties"). Times are in nanoseconds.
+ */
+export function parseRenderPasses(json: string | null): StatRow[] {
+  let fresh: unknown;
+  try {
+    fresh = (JSON.parse(json ?? '') as { fresh?: unknown }).fresh;
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(fresh)) return [];
+
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+  const rows: StatRow[] = [];
+  for (const pass of fresh.slice(0, MAX_PASSES) as Array<Record<string, unknown>>) {
+    const desc = typeof pass?.desc === 'string' ? pass.desc : '';
+    if (!desc) continue;
+    const peak = num(pass.peak);
+    rows.push({
+      label: desc,
+      value: elapsed(num(pass.avg)),
+      note: peak === null ? undefined : `peak ${elapsed(peak)}`,
+    });
+  }
+  if (rows.length > 0 && fresh.length > MAX_PASSES) {
+    rows.push({ label: `… and ${fresh.length - MAX_PASSES} more`, value: '' });
+  }
+  return rows;
+}
+
+/**
  * madVR's most useful panel, and the only honest answer to "is anything
  * touching my image?" — every other row here reports what was *requested*.
- * Read as indexed scalars, never as the `vo-passes` node.
- *
- * The sub-path moved between mpv versions, so the shape is probed rather than
- * assumed; an unsupported build simply contributes no rows.
+ * Read as a string, never as the `vo-passes` node.
  */
 async function readRenderPasses(): Promise<{ rows: StatRow[]; unavailable: string | null }> {
-  /** Enough to cover a full chain without turning the panel into a wall. */
-  const MAX_PASSES = 24;
-
-  const roots = ['vo-passes/fresh', 'vo-passes'];
-  let firstError: string | null = null;
-
-  for (const root of roots) {
-    const { value: count, error } = await probe<number>(`${root}/count`, 'int64');
-    if (firstError === null && error !== null) firstError = error;
-    if (count === null || count <= 0) continue;
-
-    const rows: StatRow[] = [];
-    for (let i = 0; i < Math.min(count, MAX_PASSES); i++) {
-      const desc = await readProperty<string>(`${root}/${i}/desc`, 'string');
-      if (!desc) continue;
-      const avg = await readProperty<number>(`${root}/${i}/avg`, 'double');
-      const peak = await readProperty<number>(`${root}/${i}/peak`, 'double');
-      rows.push({
-        label: desc,
-        value: elapsed(avg),
-        note: peak === null ? undefined : `peak ${elapsed(peak)}`,
-      });
-    }
-
-    if (rows.length > 0) {
-      if (count > MAX_PASSES) {
-        rows.push({ label: `… and ${count - MAX_PASSES} more`, value: '' });
-      }
-      return { rows, unavailable: null };
-    }
-  }
-
-  return { rows: [], unavailable: firstError ?? 'no passes reported' };
+  const { value, error } = await probe<string>('vo-passes', 'string');
+  const rows = parseRenderPasses(value);
+  if (rows.length > 0) return { rows, unavailable: null };
+  return { rows: [], unavailable: error ?? 'no passes reported' };
 }
 
 /** Everything the webview can say about the panel it is being drawn on. */
@@ -867,8 +871,7 @@ export async function readPlaybackStats(): Promise<StatGroup[]> {
         chromaRow,
         ...[describeStepDown(currentStepDown(), hdrSource)].filter((r): r is StatRow => r !== null),
         // An absent value is itself the finding here, so it says so rather than
-        // leaving a hole. gpu-next does not implement `vo-passes` on every
-        // build, and "no section" and "no passes ran" look identical.
+        // leaving a hole: "no section" and "no passes ran" look identical.
         ...(passes.unavailable
           ? [
               {

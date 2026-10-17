@@ -4,6 +4,7 @@ import {
   describeDolbyVision,
   describeHdr,
   hwdecNote,
+  parseRenderPasses,
   type HdrFacts,
 } from './stats';
 
@@ -100,5 +101,42 @@ describe('hwdecNote', () => {
   it('has nothing to add for a direct decoder', () => {
     expect(hwdecNote('d3d11va')).toBeUndefined();
     expect(hwdecNote('vaapi')).toBeUndefined();
+  });
+});
+
+describe('parseRenderPasses', () => {
+  /** The shape this build's libmpv answers `vo-passes` with, read as a string. */
+  const pass = (desc: string, avg: number, peak: number) => ({
+    desc,
+    last: avg,
+    avg,
+    peak,
+    count: 2,
+    samples: [avg, avg],
+  });
+
+  it('lists the passes of the last fresh frame, not the redraws', () => {
+    const json = JSON.stringify({
+      fresh: [pass('color decoding', 8761, 14336), pass('upload frame', 2_500_000, 3_000_000)],
+      redraw: [pass('frame mixing (1 frame)', 0, 0)],
+    });
+    expect(parseRenderPasses(json)).toEqual([
+      { label: 'color decoding', value: '8.8 µs', note: 'peak 14.3 µs' },
+      { label: 'upload frame', value: '2.50 ms', note: 'peak 3.00 ms' },
+    ]);
+  });
+
+  it('caps a long chain and says how many more ran', () => {
+    const fresh = Array.from({ length: 30 }, (_, i) => pass(`pass ${i}`, 1000, 1000));
+    const rows = parseRenderPasses(JSON.stringify({ fresh, redraw: [] }));
+    expect(rows).toHaveLength(25);
+    expect(rows[24].label).toBe('… and 6 more');
+  });
+
+  it('gives nothing for no answer, no passes or something else', () => {
+    expect(parseRenderPasses(null)).toEqual([]);
+    expect(parseRenderPasses('')).toEqual([]);
+    expect(parseRenderPasses('{"fresh":[],"redraw":[]}')).toEqual([]);
+    expect(parseRenderPasses('- color decoding: last 8us')).toEqual([]);
   });
 });

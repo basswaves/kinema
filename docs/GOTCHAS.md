@@ -1653,17 +1653,32 @@ in `app.log` — and `mpv.log` does not exist yet either.
 
 **Do:** copy both DLLs next to the exe. `scripts/build-app.ps1` does.
 
-**And this is why the Tauri bundler is switched off.** `bundle.active` is
-`false` in `tauri.conf.json`, and it used to be `true` with
+**And this is why the Tauri bundler is off in `tauri.conf.json`**
+(`bundle.active` is `false`; only `tauri.installer.conf.json`, passed with
+`--config`, turns it on, with the DLLs mapped beside the exe). It used to be `true` with
 `"resources": ["lib/**/*"]` — which installs the pair into `<install>/lib/`,
 exactly the layout described above. An MSI or NSIS build from `tauri build`
 therefore produced an app that installed cleanly, launched cleanly, and then
 failed the moment you pressed Play, with nothing in either log. Nobody had ever
 run it, because `build-app.ps1` passes `--no-bundle`.
 
-If you ever want a real installer, the DLLs have to reach the install directory
-itself rather than a subfolder, and the result must be tested by *playing a
-file* — an installer that starts the app proves nothing.
+The installer (2026-10-17) is built from `tauri.installer.conf.json`, which maps
+the DLLs to sit beside the exe, and it was tested by *playing a file* — an
+installer that starts the app proves nothing. Keep it that way.
+
+### A clean Windows lacks `VCRUNTIME140.dll`, and error 126 blames the wrong file
+
+The plugin's prebuilt `libmpv-wrapper.dll` needs Microsoft's Visual C++ runtime
+(`VCRUNTIME140.dll`), which a fresh Windows may not have. Then the player cannot
+start: "Failed to load libmpv-wrapper", Windows error 126, "module not found".
+That error names the wrapper, which is there, and not the runtime it needs,
+which is not. The ZIP had this fault too, and it hid for a long time because
+every PC used for testing already had the runtime, and the Sandbox harnesses
+copied `vcruntime140.dll` in.
+**Do:** Windows builds the wrapper from its pinned source with the C runtime
+built in (`scripts/build-mpv-wrapper.sh`, `crt-static`), and `kinema.exe` has
+its own built in already. **Never copy a runtime into a test sandbox** — it
+hides exactly this.
 
 ### Verify a Rust rebuild by timestamp
 

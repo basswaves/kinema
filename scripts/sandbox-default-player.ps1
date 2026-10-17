@@ -54,10 +54,9 @@ Copy-Item $exe $app
 foreach ($dll in 'libmpv-2.dll', 'libmpv-wrapper.dll') {
     Copy-Item (Join-Path $root "src-tauri\lib\$dll") $app
 }
-foreach ($dll in 'vcruntime140.dll', 'vcruntime140_1.dll') {
-    $from = Join-Path $env:WINDIR "System32\$dll"
-    if (Test-Path $from) { Copy-Item $from $app }
-}
+# No VCRUNTIME140.dll copied in: a clean sandbox lacking it is the point. The
+# wrapper from scripts/build-mpv-wrapper.sh has its runtime built in; the
+# plugin's own wrapper does not, and fails to load here (error 126).
 Copy-Item $Short (Join-Path $stage 'short.mkv')
 Copy-Item $Long (Join-Path $stage 'long.mkv')
 

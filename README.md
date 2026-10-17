@@ -11,7 +11,7 @@ Windows 11, Linux and Android TV boxes, used with a mouse, a keyboard or a TV
 remote. Close it and nothing is left running.
 
 **[Download](https://github.com/Basswaves/kinema/releases/latest)** for
-**Windows 11** (a ZIP, no installer), **Linux** (`.deb`, `.rpm` or a folder,
+**Windows 11** (an installer or a ZIP), **Linux** (`.deb`, `.rpm` or a folder,
 x86-64 and ARM) or **Android TV** (an early version, installed by hand) ·
 [Install](#install) · [What it does](#what-it-does) ·
 [Platform support](#platform-support) ·
@@ -220,15 +220,27 @@ tinyMediaManager or Kodi, and treats them as authoritative.
 ## Install
 
 Everything is on the [Releases](https://github.com/Basswaves/kinema/releases)
-page: a ZIP for Windows, packages for Linux ([below](#linux)), and an `.apk`
+page: an installer and a ZIP for Windows, packages for Linux ([below](#linux)), and an `.apk`
 for Android TV ([below](#android-early-version)).
 
-On Windows, download the ZIP, extract it anywhere, and run `kinema.exe`.
-There is no installer — it is a folder, and deleting the folder uninstalls it.
+On Windows you can use either file:
+
+- **The installer** (`kinema-<version>-windows-x64-setup.exe`) installs Kinema
+  for your own Windows account only, so it does not ask for an administrator.
+  It adds a Start menu entry and a desktop shortcut, and lists Kinema in
+  Settings → Apps. If Windows lacks Microsoft's WebView2 (most have it), the
+  installer fetches it from Microsoft. To remove Kinema, use Settings → Apps.
+  That removes the program, the shortcuts and the "Offer Kinema as a video
+  player" entries in Windows. It then asks, with a box you must tick, whether
+  to delete your library and settings too; left unticked, they stay. Installing
+  a newer version over it keeps everything.
+- **The ZIP** needs no installing: extract it anywhere and run `kinema.exe`. It
+  is a folder, and deleting the folder removes it (use Settings → Playback →
+  Remove first if you added Kinema as a video player).
 
 ### Windows will ask once whether to run it
 
-The first time you open `kinema.exe`, Windows shows a blue box: **"Windows
+The first time you open the installer or `kinema.exe`, Windows shows a blue box: **"Windows
 protected your PC"**. Click **More info**, then **Run anyway**. Windows
 remembers, and does not ask again.
 
@@ -238,17 +250,18 @@ is the same box for any small program from an independent developer, and it is
 not a warning that something was found.
 
 You should not have to take that on faith, so every release publishes a
-checksum beside the ZIP. To check the file you downloaded is the one that was
-published, run this in PowerShell in your Downloads folder and compare the
-result with the one on the release page:
+checksum beside the installer and the ZIP. To check the file you downloaded is
+the one that was published, run this in PowerShell in your Downloads folder and
+compare the result with the one on the release page:
 
 ```powershell
+Get-FileHash .\kinema-*-windows-x64-setup.exe -Algorithm SHA256
 Get-FileHash .\kinema-*-windows-x64.zip -Algorithm SHA256
 ```
 
 Kinema asks GitHub for the latest version number when it starts, and says in
 Settings when a newer one is out. It never downloads or installs anything by
-itself — you download the new ZIP when you choose to.
+itself — you download the new installer or ZIP when you choose to.
 
 ### Linux
 

@@ -1,0 +1,69 @@
+# Submits a published release's installer to winget (microsoft/winget-pkgs),
+# as a pull request from the owner's account. Started by hand only, after the
+# release is published: a submission is public, so it is the owner's to start.
+#
+# The manifest is written again from the file on the published release
+# (scripts/winget-manifest.ps1, the same script release.yml validates with), so
+# what is submitted is exactly what users download. Microsoft's own tool,
+# wingetcreate, opens the pull request; it makes the fork of winget-pkgs under
+# the token's account the first time. WINGET_TOKEN is a classic GitHub token
+# of the owner's with only `public_repo`, kept as a repository secret.
+name: winget
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'The published release to submit, e.g. 0.11.0'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  submit:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check the token is set
+        shell: pwsh
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        run: if (-not $env:WINGET_TOKEN) { throw 'The WINGET_TOKEN repository secret is not set.' }
+
+      - name: Download the published installer
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          gh release download "v$env:VERSION" --pattern "kinema-$env:VERSION-windows-x64-setup.exe*" --dir release
+          $setup = "release\kinema-$env:VERSION-windows-x64-setup.exe"
+          $hash = (Get-FileHash $setup -Algorithm SHA256).Hash.ToLower()
+          $published = (Get-Content "$setup.sha256" -Raw).Split(' ')[0].Trim()
+          if ($hash -ne $published) { throw "The installer's hash $hash is not the release's $published." }
+          "SETUP_SHA=$hash" >> $env:GITHUB_ENV
+
+      - name: Write and validate the manifest
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          $date = (gh release view "v$env:VERSION" --json publishedAt --jq .publishedAt).Substring(0, 10)
+          ./scripts/winget-manifest.ps1 -Version $env:VERSION -Sha256 $env:SETUP_SHA -OutDir winget -ReleaseDate $date
+          winget validate --manifest winget
+          if ($LASTEXITCODE -ne 0) { throw "winget validate failed ($LASTEXITCODE)." }
+          Get-Content winget\*.yaml
+
+      - name: Submit to winget-pkgs
+        shell: pwsh
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          Invoke-WebRequest https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
+          .\wingetcreate.exe submit --prtitle "Basswaves.Kinema version $env:VERSION" --token $env:WINGET_TOKEN winget
+          if ($LASTEXITCODE -ne 0) { throw "wingetcreate submit failed ($LASTEXITCODE)." }

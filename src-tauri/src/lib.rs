@@ -7,6 +7,7 @@ mod artwork;
 mod backup;
 mod db;
 mod default_player;
+pub use default_player::uninstall_cleanup;
 mod detect;
 mod disc;
 mod display;

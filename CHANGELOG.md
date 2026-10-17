@@ -9,6 +9,14 @@ makes no stability promises.
 
 ### Added
 
+- **A Windows installer**, `kinema-<version>-windows-x64-setup.exe`, beside
+  the ZIP (the ZIP stays). It installs for your own Windows account without an
+  administrator, adds a Start menu entry and a desktop shortcut, and is listed
+  in Settings → Apps. If Windows has no WebView2, it fetches it from Microsoft.
+  Uninstalling removes the program, the shortcuts, Kinema's entries in
+  Windows' "Open with" and Default apps lists; it asks first, with a box left unticked, before
+  deleting your library and settings. Installing a newer version over it keeps
+  everything. Every release publishes a checksum for it.
 - **Kinema opens videos from File Explorer.** Open a video with Kinema, or
   drop one on its window, and it plays — whether or not it is in your
   library. One in the library plays as itself, with its resume point and
@@ -30,6 +38,10 @@ makes no stability promises.
 
 ### Fixed
 
+- **The player starts on a Windows without Microsoft's Visual C++ runtime.**
+  On a fresh Windows the player could fail to load at all ("Failed to load
+  libmpv-wrapper"). The small file that connects Kinema to the player now
+  carries what it needs. This affected the ZIP too.
 - **Down in the player's details panel stays in the panel.** With a remote or
   the arrow keys, going down through the panel's facts could now and then jump
   to Pause instead of the next group.

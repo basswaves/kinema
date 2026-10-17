@@ -3181,6 +3181,54 @@ library or not.
   packages' menu entry. On Linux a file on the command line, a second start
   and a drop already work.
 
+## A Windows installer, and a wrapper that starts on a clean Windows (2026-10-17)
+
+The owner's decision of 2026-10-16: an installer is acceptable if uninstalling
+leaves nothing behind. It matters now that Kinema can be offered as a video
+player, because that offer lives in Windows' registry and deleting a folder
+does not remove it.
+
+- **Tauri's NSIS bundler, with the DLLs mapped beside the exe.** It is a
+  maintained way to get an uninstaller and an Apps entry without writing our own,
+  and its config is a separate file (`tauri.installer.conf.json`) so the
+  ordinary build and the ZIP are unchanged. The old trap (the bundler put the
+  DLLs in a subfolder, where Windows does not look; GOTCHAS) is why the
+  resources are mapped explicitly, and why it was tested by playing a file.
+- **Per user, no administrator.** `%LOCALAPPDATA%\Kinema`, the current account's
+  Start menu and desktop; the same scope as the offer, which is written under
+  the account's own registry.
+- **The uninstall reuses Kinema's own Remove.** The uninstaller runs
+  `kinema.exe --uninstall-cleanup`, only if the offer names this copy, rather
+  than mirroring the list of keys in NSIS. Two lists would drift apart, and the
+  one in Rust already has a test. Windows' own leftovers are cleared beside it:
+  the MuiCache name lines, the install-location key, and the Start tile and
+  jump-list entries Windows keeps for the app id (`hooks.nsh`) — "nothing left
+  behind" includes what Windows wrote about us. The library and settings go only
+  after a box, unticked, is ticked; an update keeps everything.
+- **WebView2 is fetched only when missing**, from Microsoft (the owner's
+  choice: a page that opens to nothing is worse than a short download).
+- **The winget manifest is written by hand** (`scripts/winget-manifest.ps1`),
+  not by a generator, so nothing changes under it; `winget validate` runs on
+  every release build. It depends on the ffmpeg package, so winget brings
+  ffmpeg for the badges; removing Kinema leaves ffmpeg. **Submitting is the
+  owner's press**: a separate workflow, run only after a release is published,
+  that re-hashes the published file. The first submission is planned with 0.11.0.
+- **Proven in Windows Sandbox** (`scripts/sandbox-installer.ps1`): a silent
+  install, Kinema played a 12-second clip and closed by itself, and a silent
+  uninstall removed the program, shortcuts, Apps entry and all 74 registry lines
+  of the offer, keeping the library because nobody was asked. A sandbox with no
+  WebView2 got it during the install (56 s). **Not proven by a run:** the
+  ticked-box path that deletes the library (Tauri's own uninstaller code,
+  read, not clicked), and the Start tile and jump-list cleanup, added after the run.
+- **The finding that came with it:** the plugin's prebuilt `libmpv-wrapper.dll`
+  needs `VCRUNTIME140.dll`; a fresh Windows can lack it, and the player then
+  fails to start with error 126. The ZIP had been affected all along. The
+  Sandbox harnesses had copied the runtime in, which hid it. Windows now builds
+  the wrapper from the same pinned source as Linux, with the C runtime built in
+  (GOTCHAS), and the copy is gone from the player harness
+  (`sandbox-default-player.ps1`; the ffmpeg one still copies it, for a test
+  binary rather than the app).
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

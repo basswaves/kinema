@@ -16,15 +16,18 @@ installs themselves.
 The player is [libmpv](https://mpv.io). It is **not** in this repository and
 **not** built from here. `npx tauri-plugin-libmpv-api setup-lib` downloads a
 prebuilt **LGPL** configuration of `libmpv-2.dll` from
-[zhongfly/mpv-winbuild](https://github.com/zhongfly/mpv-winbuild), together with
-the plugin's own `libmpv-wrapper.dll`, into `src-tauri/lib/`.
+[zhongfly/mpv-winbuild](https://github.com/zhongfly/mpv-winbuild) into
+`src-tauri/lib/`. The plugin's wrapper, `libmpv-wrapper.dll` (**LGPL-2.1**),
+is not the plugin's prebuilt one: the release builds it unmodified from source
+with `scripts/build-mpv-wrapper.sh`, as on Linux (see below), with the C runtime
+built in so it starts on a Windows that lacks Microsoft's.
 
 Two consequences worth stating plainly:
 
 - The library is **loaded dynamically at runtime** and is not statically linked,
   so linking against it does not impose copyleft obligations on Kinema's own
   MIT-licensed source.
-- Because the release ZIP redistributes that unmodified LGPL binary, the LGPL's
+- Because the release ZIP and installer redistribute that unmodified LGPL binary, the LGPL's
   relinking condition applies to it. It is satisfied by construction: the DLL
   sits beside the executable and **may be replaced with any compatible build of
   libmpv** without rebuilding Kinema. Source for the library is available from

@@ -7,13 +7,15 @@
 # everything and publishes nothing — the files are left as the run's
 # artifacts, to check a change to this workflow without a release.
 #
-# Windows: deliberately not an installer. `scripts/build-app.ps1` copies both
-# native DLLs *beside* the exe, because `libmpv-2.dll` is resolved by
-# Windows' own search order, which begins at the executable's directory and
-# never looks in the directory the wrapper was loaded from. The Tauri bundler
-# puts them in `lib/`, which loads the wrapper and then fails to find mpv — so
-# the bundler is off in tauri.conf.json, and on only for Linux
-# (tauri.linux.conf.json).
+# Windows: the portable ZIP and a per-user installer, built from the same exe.
+# Both have the two native DLLs *beside* the exe, because `libmpv-2.dll` is
+# resolved by Windows' own search order, which begins at the executable's
+# directory and never looks in the directory the wrapper was loaded from.
+# `scripts/build-app.ps1` copies them for the ZIP; the installer maps them
+# there (tauri.installer.conf.json), and its uninstaller takes everything away
+# again (src-tauri/windows/hooks.nsh). The bundler is off in tauri.conf.json,
+# so an ordinary build makes no installer. The winget manifest for the
+# installer is written and validated here, and submitted only by winget.yml.
 #
 # Linux: the system's own mpv, declared as a dependency of the packages, so
 # there are no media libraries here to keep patched. See
@@ -53,6 +55,13 @@ jobs:
       - name: Fetch the native playback libraries
         run: npx tauri-plugin-libmpv-api setup-lib
 
+      # The plugin's wrapper DLL needs VCRUNTIME140.dll, which a fresh Windows
+      # may lack; this one, from the same pinned source as Linux's, has the
+      # runtime built in. Replaces the fetched one.
+      - name: Build the mpv wrapper
+        shell: bash
+        run: bash scripts/build-mpv-wrapper.sh
+
       # Kinema's own TMDB key (src/metadata/builtinKey.ts), from a repository
       # secret so it is never in the source. A release without it would still
       # run, as a build from source does, but would leave movies unidentified
@@ -67,7 +76,7 @@ jobs:
       # Explicit -NoShortcut as well as the CI guard inside the script: a
       # runner has no desktop, and a COM call for a shortcut nobody will ever
       # click is a failure point in exchange for nothing.
-      - name: Build the portable app
+      - name: Build the portable app and the installer
         env:
           VITE_TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
           # Kinema's SIMKL app ID (src-tauri/src/simkl.rs), compiled in. Not a
@@ -82,7 +91,7 @@ jobs:
           KINEMA_TRAKT_CLIENT_SECRET: ${{ secrets.TRAKT_CLIENT_SECRET }}
           # Kinema's OpenSubtitles app key (opensubtitles.rs). Optional too.
           KINEMA_OPENSUBTITLES_API_KEY: ${{ secrets.OPENSUBTITLES_API_KEY }}
-        run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-app.ps1 -NoShortcut
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-app.ps1 -NoShortcut -Installer
 
       - name: Package
         shell: pwsh
@@ -95,6 +104,30 @@ jobs:
           # LF, as sha256sum writes it: a CRLF line makes `sha256sum -c` on
           # Linux look for a file whose name ends in a carriage return.
           [IO.File]::WriteAllText("$PWD\out\$zip.sha256", "$hash  $zip`n")
+          $setup = "kinema-$version-windows-x64-setup.exe"
+          $built = @(Get-ChildItem src-tauri\target\release\bundle\nsis\*-setup.exe)
+          if ($built.Count -ne 1) { throw "Expected one installer, found: $($built.Name -join ', ')" }
+          Copy-Item $built[0].FullName "out\$setup"
+          $setupHash = (Get-FileHash "out\$setup" -Algorithm SHA256).Hash.ToLower()
+          [IO.File]::WriteAllText("$PWD\out\$setup.sha256", "$setupHash  $setup`n")
+          "VERSION=$version" >> $env:GITHUB_ENV
+          "SETUP_SHA=$setupHash" >> $env:GITHUB_ENV
+
+      # Not attached to the release: winget.yml submits it, once the release
+      # is published and the owner says so. Written for every build so a
+      # mistake in it shows here, not on submission day.
+      - name: Write and validate the winget manifest
+        shell: pwsh
+        run: |
+          ./scripts/winget-manifest.ps1 -Version $env:VERSION -Sha256 $env:SETUP_SHA -OutDir winget
+          if (-not (Get-Command winget -ErrorAction SilentlyContinue)) { throw 'winget is not on this runner.' }
+          winget validate --manifest winget
+          if ($LASTEXITCODE -ne 0) { throw "winget validate failed ($LASTEXITCODE)." }
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: winget-manifest
+          path: winget/*
 
       - uses: actions/upload-artifact@v7
         with:
@@ -312,6 +345,10 @@ jobs:
           path: files
           merge-multiple: true
 
+      # The winget manifest is for winget.yml, not a file for users.
+      - name: Leave the winget manifest out
+        run: rm -f files/Basswaves.Kinema*.yaml
+
       - name: Read the checksums for the notes
         run: |
           cd files
@@ -319,6 +356,7 @@ jobs:
           {
             echo "VERSION=$version"
             echo "WIN_SHA=$(cut -d' ' -f1 kinema-$version-windows-x64.zip.sha256)"
+            echo "SETUP_SHA=$(cut -d' ' -f1 kinema-$version-windows-x64-setup.exe.sha256)"
           } >> "$GITHUB_ENV"
 
       - name: Publish release
@@ -329,12 +367,20 @@ jobs:
           body: |
             ## Windows
 
-            Download `kinema-${{ env.VERSION }}-windows-x64.zip`, extract it
-            anywhere, and run `kinema.exe`. No installer, nothing written
+            **Installer:** download `kinema-${{ env.VERSION }}-windows-x64-setup.exe`
+            and run it. It installs for your Windows account only (no
+            administrator) and adds Kinema to the Start menu. Uninstall it
+            from Settings → Apps: it removes the program, its shortcuts and its
+            "Open with" entries, and asks before deleting your library and
+            settings.
+
+            **Portable:** or download `kinema-${{ env.VERSION }}-windows-x64.zip`,
+            extract it anywhere, and run `kinema.exe`. Nothing is written
             outside the folder and your app data.
 
             **Windows 11.** Needs the WebView2 runtime, which ships with
-            Windows 11 — nothing to install separately.
+            Windows 11; on a PC without it the installer fetches it from
+            Microsoft, and the ZIP needs it installed first.
 
             #### Windows will ask once whether to run it
 
@@ -344,10 +390,12 @@ jobs:
             workflow built, run this in PowerShell where you downloaded it:
 
             ```powershell
+            Get-FileHash .\kinema-${{ env.VERSION }}-windows-x64-setup.exe -Algorithm SHA256
             Get-FileHash .\kinema-${{ env.VERSION }}-windows-x64.zip -Algorithm SHA256
             ```
 
-            Expected: `${{ env.WIN_SHA }}`
+            Expected: `${{ env.SETUP_SHA }}` for the installer,
+            `${{ env.WIN_SHA }}` for the ZIP.
 
             ## Linux
 

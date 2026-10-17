@@ -30,7 +30,11 @@
 param(
     # Skip the desktop shortcut. Set automatically on CI, where there is no
     # desktop to put one on and the build only wants the portable folder.
-    [switch]$NoShortcut
+    [switch]$NoShortcut,
+    # Also build the per-user installer (tauri.installer.conf.json) from the
+    # same exe, into src-tauri/target/release/bundle/nsis. Its uninstaller
+    # removes everything again (src-tauri/windows/hooks.nsh).
+    [switch]$Installer
 )
 
 $ErrorActionPreference = 'Stop'
@@ -99,7 +103,12 @@ if (-not $env:KINEMA_OPENSUBTITLES_API_KEY) {
 Write-Host 'Building release binary (this takes a few minutes the first time)...'
 Push-Location $root
 try {
-    npm run tauri build -- --no-bundle
+    if ($Installer) {
+        npm run tauri build -- --config src-tauri/tauri.installer.conf.json
+    }
+    else {
+        npm run tauri build -- --no-bundle
+    }
     if ($LASTEXITCODE -ne 0) { throw "tauri build failed with exit code $LASTEXITCODE." }
 }
 finally {

@@ -188,6 +188,34 @@ mod registry {
         true
     }
 
+    /// The names of a key's values; none when it is not there.
+    pub fn value_names(key: &str) -> Vec<String> {
+        let key = HSTRING::from(key);
+        let mut handle = HKEY::default();
+        // SAFETY: valid pointers; the handle is closed below.
+        let opened = unsafe { RegOpenKeyExW(HKEY_CURRENT_USER, &key, None, KEY_READ, &mut handle) };
+        if opened.is_err() {
+            return Vec::new();
+        }
+        let mut names = Vec::new();
+        // The longest name a value can have, so no name ends the list early.
+        let mut buffer = vec![0u16; 16384];
+        for index in 0.. {
+            let mut len = buffer.len() as u32;
+            // SAFETY: an open handle and a buffer of `len` characters.
+            let got = unsafe {
+                RegEnumValueW(handle, index, Some(PWSTR(buffer.as_mut_ptr())), &mut len, None, None, None, None)
+            };
+            if got.is_err() {
+                break;
+            }
+            names.push(String::from_utf16_lossy(&buffer[..len as usize]));
+        }
+        // SAFETY: the handle opened above.
+        let _ = unsafe { RegCloseKey(handle) };
+        names
+    }
+
     /// A key and everything under it. Gone already is fine.
     pub fn delete_tree(key: &str) {
         let key = HSTRING::from(key);
@@ -366,6 +394,33 @@ pub fn refresh() {
     }
 }
 
+/// Windows' own cache of program names, one pair of values per program the
+/// shell has started (`<path>.FriendlyAppName`, `<path>.ApplicationCompany`).
+/// Windows writes it whether or not Kinema was ever offered as a player.
+#[cfg(windows)]
+const MUI_CACHE: &str = r"Software\Classes\Local Settings\Software\Microsoft\Windows\Shell\MuiCache";
+
+/// Run by the installer's uninstaller (`kinema.exe --uninstall-cleanup`, see
+/// `src-tauri/windows/hooks.nsh`) before it deletes the program: the offer, if
+/// it names this copy of Kinema, and Windows' cached name for this copy. An
+/// offer naming another copy (a ZIP elsewhere) is that copy's, and stays.
+/// Silent: it runs before anything else in the process, with no log open.
+pub fn uninstall_cleanup() {
+    #[cfg(windows)]
+    {
+        let Ok((exe, name)) = offer::exe() else { return };
+        if !offer::stale(BASE, &exe) {
+            offer::remove(BASE, &name);
+        }
+        let prefix = format!("{}.", exe.to_lowercase());
+        for value in registry::value_names(MUI_CACHE) {
+            if value.to_lowercase().starts_with(&prefix) {
+                registry::delete_value(MUI_CACHE, &value);
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -412,6 +467,9 @@ mod tests {
             "",
         ))
         .unwrap();
+        let mut names = registry::value_names(&format!(r"{base}\Classes\.mkv\OpenWithProgids"));
+        names.sort();
+        assert_eq!(names, ["Kinema.Video", "Other.Player"]);
 
         offer::remove(&base, "kinema.exe");
         assert!(!offer::is_offered(&base));

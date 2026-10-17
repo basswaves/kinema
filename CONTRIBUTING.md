@@ -63,6 +63,12 @@ Fetch the native playback libraries — ~95 MB, never committed, see
 npx tauri-plugin-libmpv-api setup-lib
 ```
 
+The plugin's prebuilt `libmpv-wrapper.dll` needs Microsoft's Visual C++ runtime,
+which a fresh Windows can lack (the player then fails to load). Releases
+replace it with one built from the same pinned source as on Linux, with the
+runtime built in; `release.yml` runs `scripts/build-mpv-wrapper.sh` after
+`setup-lib`. For a build you hand to someone else, do the same.
+
 Then:
 
 ```bash
@@ -92,6 +98,25 @@ Android TV banner (`res/drawable-xhdpi/banner.png`, 320×180) is not made by
 that command: its drawing is `src-tauri/icons/banner.svg`, exported to that
 PNG by hand. Its lettering is Segoe UI Semibold, named rather than included,
 so export it on Windows.
+
+### The Windows installer
+
+Each release carries a ZIP and a per-user installer
+(`kinema-<version>-windows-x64-setup.exe`). The installer is Tauri's NSIS
+bundler, configured by `src-tauri/tauri.installer.conf.json` and the hooks in
+`src-tauri/windows/hooks.nsh`; `scripts\build-app.ps1 -Installer` builds it,
+and `release.yml` does the same, writes its `.sha256` and adds it to the release
+text. It installs to `%LOCALAPPDATA%\Kinema` with no administrator, and
+fetches WebView2 only when it is missing. An installer is acceptable on one
+condition: uninstalling leaves nothing behind. The uninstaller runs
+`kinema.exe --uninstall-cleanup` (the same removal as Settings → Remove, only
+if the "video player" offer names this copy) and clears Windows' own leftovers
+for the app; it asks before deleting the library and settings. Test it in
+Windows Sandbox with `scripts\sandbox-installer.ps1` — a clean Windows is the
+point, so do not copy runtime files into the sandbox. The winget manifest is
+written by `scripts/winget-manifest.ps1` and checked with `winget validate` on
+every release build; submitting it is a separate, manual workflow
+(`winget.yml`), run by the maintainer after a release is published.
 
 ## Verifying
 
@@ -520,8 +545,9 @@ reasoning is in [docs/DESIGN.md](docs/DESIGN.md) and [docs/HISTORY.md](docs/HIST
 - **Forced subtitles show with subtitles off**, in the language being spoken,
   as on a disc. A switch turns this off.
 - **No third-party binaries in the repo or the bundle, beyond the player
-  itself.** The Windows ZIP carries libmpv — an unmodified LGPL build, which
-  anyone may replace — and its small wrapper, because Kinema cannot play a
+  itself.** The Windows ZIP and installer carry libmpv — an unmodified LGPL
+  build, which anyone may replace — and its small wrapper (built unmodified
+  from its pinned source), because Kinema cannot play a
   film without them; Linux uses the system's mpv, and Android Google's Media3.
   Nothing else: the app may *invoke* a tool the user installed themselves, at
   a path they chose. It downloads nothing, and depends on nothing else being

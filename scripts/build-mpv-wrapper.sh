@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
-# Build the libmpv plugin's wrapper for Linux from its source, and put it
-# where the Linux packages and the folder download take it from:
-# src-tauri/lib/libmpv-wrapper.so.
+# Build the libmpv plugin's wrapper from its source, and put it where the
+# builds take it from: src-tauri/lib/libmpv-wrapper.so on Linux, and on
+# Windows (Git Bash) src-tauri/lib/libmpv-wrapper.dll, over the one
+# `npx tauri-plugin-libmpv-api setup-lib` fetched.
+#
+# Windows: with Microsoft's C runtime built in (crt-static). The plugin's own
+# DLL needs VCRUNTIME140.dll, which a fresh Windows may not have; without it
+# the player cannot start at all ("Failed to load libmpv-wrapper", error 126),
+# as a clean Windows Sandbox showed (2026-10-17). kinema.exe has its runtime
+# built in already (Tauri does that).
 #
 # From source, not downloaded: Kinema ships no third-party binary it did not
 # build (CONTRIBUTING, settled decisions). Pinned to a commit, not a tag —
@@ -25,8 +32,16 @@ trap 'rm -rf "$work"' EXIT
 git clone --quiet "$REPO" "$work"
 git -C "$work" -c advice.detachedHead=false checkout --quiet "$COMMIT"
 
-cargo build --release --manifest-path "$work/Cargo.toml"
-
 mkdir -p "$root/src-tauri/lib"
-cp "$work/target/release/libmpv_wrapper.so" "$root/src-tauri/lib/libmpv-wrapper.so"
-echo "built $root/src-tauri/lib/libmpv-wrapper.so from $COMMIT"
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*)
+    RUSTFLAGS="-C target-feature=+crt-static" cargo build --release --manifest-path "$work/Cargo.toml"
+    cp "$work/target/release/mpv_wrapper.dll" "$root/src-tauri/lib/libmpv-wrapper.dll"
+    echo "built $root/src-tauri/lib/libmpv-wrapper.dll from $COMMIT"
+    ;;
+  *)
+    cargo build --release --manifest-path "$work/Cargo.toml"
+    cp "$work/target/release/libmpv_wrapper.so" "$root/src-tauri/lib/libmpv-wrapper.so"
+    echo "built $root/src-tauri/lib/libmpv-wrapper.so from $COMMIT"
+    ;;
+esac

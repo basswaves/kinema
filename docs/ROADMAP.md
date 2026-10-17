@@ -11,9 +11,9 @@ Ideas and reports are welcome as [issues](https://github.com/Basswaves/kinema/is
 
 ## Next
 
-An **installer** beside the ZIP, then smaller things about how it feels on a
-TV. (Done for the next release: Blu-ray folders and disc images on Windows
-and Linux, and Kinema as a video player on Windows — open a file from
+Smaller things about how it feels on a TV. (Done for the next release: a
+Windows installer beside the ZIP; Blu-ray folders and disc images on Windows
+and Linux; and Kinema as a video player on Windows — open a file from
 Explorer, or drop it on the window.)
 
 **Android**, an early version (beta) since 0.10.0, moves on as reports come
@@ -35,17 +35,15 @@ reaches N nits", off by default — would help. Windows' own figure for a displa
 brightness is often a round number rather than a measurement, so it would be
 entered rather than read.
 
-### An installer, and winget
+### winget, and other package managers
 
-On Windows Kinema is a folder from a ZIP, and deleting the folder removes it.
-An installer is acceptable on one condition: uninstalling leaves nothing
-behind — the program, its shortcuts, the "Open with" entries, and the library
-and settings too, after asking. It matters once Kinema can be the default
-video player, because those entries live in Windows' registry and deleting a
-folder does not remove them. With an installer, Kinema could also be offered
-through winget, and perhaps other package managers — published by the release
-workflow, so a new version needs no hand work there. Automatic updates stay
-out either way.
+The Windows installer is built (for the next release): it leaves nothing
+behind when removed — the program, its shortcuts, the "Open with" entries, and
+the library and settings too, after asking. A winget package, `Basswaves.Kinema`,
+is ready, and its first submission is planned with the next release; it will
+bring ffmpeg along, for the badges. Other package managers may follow. The
+release workflow writes and checks the package's description on every build, so
+a new version needs little hand work there. Automatic updates stay out.
 
 ### Smooth motion
 

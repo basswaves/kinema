@@ -20,6 +20,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 /// The event a second Kinema's file arrives on, for the page (`opened.ts`).
+/// Desktop only: Android keeps one Kinema by itself and has no second start.
+#[cfg(desktop)]
 pub const EVENT: &str = "open-video";
 
 /// The file Kinema was started for, until the page has taken it.

@@ -53,18 +53,19 @@ pub fn started_ms() -> u64 {
 /// The playable video among a command line's arguments: the first that is one.
 /// Relative paths are taken from `cwd`, the folder the command was given in.
 /// Switches (`-…`, `/…` that is not a path) are passed over, as Windows and
-/// the WebView sometimes add their own.
+/// the WebView sometimes add their own: they are not playable files.
 pub fn from_args<I>(args: I, cwd: &Path) -> Option<PathBuf>
 where
     I: IntoIterator<Item = OsString>,
 {
     args.into_iter()
         .skip(1)
-        .filter(|a| !a.to_string_lossy().starts_with('-'))
         .map(|a| {
             let p = PathBuf::from(a);
             if p.is_absolute() { p } else { cwd.join(p) }
         })
+        // A flag is skipped by not being a playable file, not by its dash: a
+        // video may be called "-clip.mkv".
         .find_map(|p| playable(&p))
 }
 
@@ -182,9 +183,12 @@ mod tests {
         let dir = scratch("args");
         std::fs::write(dir.join("notes.txt"), b"x").unwrap();
         std::fs::write(dir.join("A film.mkv"), b"x").unwrap();
+        std::fs::write(dir.join("-clip.mkv"), b"x").unwrap();
         let args = ["kinema.exe", "--flag", "notes.txt", "A film.mkv", "missing.mkv"]
             .map(OsString::from);
         assert_eq!(from_args(args, &dir), Some(dir.join("A film.mkv")));
+        let args = ["kinema.exe", "--flag", "-clip.mkv"].map(OsString::from);
+        assert_eq!(from_args(args, &dir), Some(dir.join("-clip.mkv")));
         // The program's own name is never the file, even when it is a video's.
         assert_eq!(from_args([OsString::from(dir.join("A film.mkv"))], &dir), None);
         assert_eq!(from_args(["kinema.exe"].map(OsString::from), &dir), None);

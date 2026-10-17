@@ -3,7 +3,7 @@
 use crate::util::{now_secs, to_string_err};
 use crate::artwork::path_prefix;
 use crate::library::Db;
-use rusqlite::{named_params, params};
+use rusqlite::{named_params, params, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -321,6 +321,16 @@ fn store_loose(
     completed: bool,
     now: i64,
 ) -> rusqlite::Result<()> {
+    // Saved every few seconds while playing: only a new row can push the
+    // table past its size, so only then is it pruned.
+    let known = conn
+        .query_row(
+            "SELECT 1 FROM loose_playback WHERE path = ?1 AND size = ?2",
+            params![path, size],
+            |_| Ok(()),
+        )
+        .optional()?
+        .is_some();
     conn.execute(
         "INSERT INTO loose_playback (path, size, position_secs, duration_secs, completed, updated_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6)
@@ -331,6 +341,9 @@ fn store_loose(
             updated_at    = excluded.updated_at",
         params![path, size, position_secs, duration_secs, completed as i64, now],
     )?;
+    if known {
+        return Ok(());
+    }
     conn.execute(
         "DELETE FROM loose_playback WHERE rowid NOT IN
             (SELECT rowid FROM loose_playback ORDER BY updated_at DESC, rowid DESC LIMIT ?1)",

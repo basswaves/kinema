@@ -5,6 +5,12 @@ Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [semantic
 versioning](https://semver.org/), with the usual caveat that a `0.x` release
 makes no stability promises.
 
+## [Unreleased]
+
+### Fixed
+
+- A video whose file name starts with `-`, opened with Kinema, was passed over.
+
 ## [0.11.0] — 2026-10-17
 
 For Windows and Linux: Blu-ray folders and disc images, Kinema as the video

@@ -99,6 +99,9 @@ src-tauri/src/
                  the queue in batches. Nothing is read back
   trakt.rs       Trakt, the same, except that it reads the account's watched
                  list once at connect — Trakt keeps duplicate plays
+  trakt_resume.rs Trakt's resume points: reads the account's list (kept two
+                 minutes), keeps the newer position, sends a stop below 80 %,
+                 removes the point when something is finished here
   nfo.rs         Reads NFO sidecars (MediaElch, tinyMediaManager, Kodi) and
                  writes them only on the explicit export
   lifecycle.rs   Every status a media file can have and every way between
@@ -508,6 +511,15 @@ never happened. At connect, Kinema reads the account's watched films and
 episodes and queues only the rest; if the account cannot be read, the history
 waits rather than going blind. Its refresh tokens are single-use, so a new pair
 is stored the moment it arrives.
+
+**Trakt also gives back where you stopped.** With Trakt connected, one request
+for the account's playback list is made when a title's page opens or Continue
+Watching loads, and kept two minutes. A Trakt position replaces the local one
+only if it is newer. Leaving a title part-way sends a stop with its progress,
+which Trakt saves as a pause; at 80 % or more nothing is sent, since Trakt
+would count a play. Trakt keeps a percentage, stored as `playback_state.fraction`
+where the copy's length is unknown, and the player opens at that share of the
+file. Videos, unmatched titles and self-tests are never involved.
 
 **Forced subtitles are not "subtitles on."** Subtitles off means no full
 subtitles; it has never meant missing what is said in another language. So a

@@ -531,14 +531,23 @@ reasoning is in [docs/DESIGN.md](docs/DESIGN.md) and [docs/HISTORY.md](docs/HIST
   library's rows kept. Rotten Tomatoes needs OMDb, and only with the user's own
   key — a key built into every copy would exhaust OMDb's daily allowance for
   everyone within hours.
-- **SIMKL and Trakt are one way, and only add.** What is finished in Kinema is
-  added to the user's history there; nothing comes back, and un-watching in
-  Kinema never removes anything, which the service may have from elsewhere. No
-  live "Watching now". Both sign in with a device flow (a code and a phone).
-  Trakt keeps duplicate plays, so what it already has is never sent to it
-  again. **Planned change:** Trakt will also give back where a film was
-  stopped, so it can be continued on another device ([roadmap](docs/ROADMAP.md));
-  this rule is rewritten when that is built. SIMKL stays one way.
+- **SIMKL is one way, and only adds. Trakt is the same for history, and also
+  gives back resume points.** What is finished in Kinema is added to the user's
+  history there; un-watching in Kinema never removes anything, which the service
+  may have from elsewhere. No live "Watching now". Both sign in with a device
+  flow (a code and a phone). Trakt keeps duplicate plays, so what it already has
+  is never sent to it again. Nothing is read back from SIMKL. From Trakt only
+  resume points are read, so a film stopped on one device continues on another:
+  on while Trakt is connected, with one switch in Settings → Accounts to turn it
+  off. The newer position wins, never the older (a finish here after the pause
+  stays finished). It is read when a title's page opens and when Continue
+  Watching loads — one request for the account's list, kept two minutes, never
+  a bulk fetch at start. Leaving a title part-way sends a stop with its
+  progress, which Trakt keeps as a pause; at 80 % or more Trakt would count a
+  play, and finished items already go through the history, so that is never
+  sent. No scrobble start, so no "Watching now". Finishing here removes Trakt's
+  resume point. Videos, titles kept without a match and files holding two
+  episodes are never sent or matched, and a self-test never talks to Trakt.
 - **Subtitles from OpenSubtitles only when asked**, with one exception the
   user switches on: forced subtitles for a file that has none. Kept in app
   data, never beside the video; each file asked about once.

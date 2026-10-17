@@ -790,6 +790,20 @@ where it will be first, call `updateAllLayouts()`, and only then `setFocus`
 (`SetupPages.tsx`, `landOn`). And run a keyboard flow that lands this way in
 a short window (`page.setViewportSize`), where the scroll makes it fail.
 
+### A control drawn a moment after its neighbours is skipped by Up
+
+Found 2026-10-17 with Trakt's resume row in Settings → Accounts. The row read
+its setting itself and appeared a few milliseconds after the Disconnect button
+under it. norigin had measured Disconnect where it was before the row pushed
+it down, so Up from Disconnect sometimes went past the row to the section
+above — about one run in three in WebKit, never with a mouse.
+
+**Do:** read what a group of controls needs together and draw them in the same
+render (`AccountSection.tsx` reads the switch with the account's status), rather
+than letting one fetch its own data after the rest are on screen. A keyboard
+flow that moves onto such a control straight after it appears catches it;
+repeat it (`--repeat-each`) before calling it passing.
+
 ### Focusing an empty container draws no ring anywhere
 
 `setFocus` on a container with no focusable children focuses the container

@@ -45,13 +45,29 @@ makes no stability promises.
   has Settings → Playback → Add Kinema to the app menu, which puts it in the
   app menu and in Open With for your account only, and can take it out again.
 
+- **Trakt resume across devices.** With Trakt connected, Kinema continues on
+  one device where a film or episode was stopped on another. It is on while
+  Trakt is connected; Settings → Accounts → Trakt, "Continue where you stopped
+  on another device", turns it off. The newer position wins, never the older,
+  and something finished here after the pause stays finished. Trakt is asked
+  when a title's page opens and when Home's Continue Watching loads, once for
+  the whole list, and the answer is kept two minutes. Leaving a film or
+  episode part-way sends the position; at 80 % or more nothing is sent, since
+  Trakt would count that as a play, and finished items go through the history
+  as before. Finishing something here removes Trakt's resume point for it.
+  There is still no "Watching now". Where this copy's length is not known (it
+  was never played on this device), the share Trakt keeps is used and the title
+  page says "Resume at 40 %". Videos, titles kept without a match and files
+  holding two episodes are never sent or matched. SIMKL stays one way. Android
+  has it too.
+
 ### Fixed
 
 - A video whose file name starts with `-`, opened with Kinema, was passed over.
 
 ### Library
 
-The library is upgraded (schema 24); a safety copy is made first.
+The library is upgraded (schema 25); a safety copy is made first.
 
 ## [0.11.0] — 2026-10-17
 

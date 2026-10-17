@@ -13,9 +13,10 @@ Ideas and reports are welcome as [issues](https://github.com/Basswaves/kinema/is
 
 More of Kinema as a player for any video, not only a matched library: the
 browsing folders inside Kinema; playlists; and the picture and sound badges
-for a video. (Done since 0.11.0: the next and previous file in a folder when
-a video was opened from Explorer, and **Videos** folders for home videos and
-clips, with a picture taken from the file, under a Library tab. Done in 0.11.0: a
+for a video. (Done since 0.11.0, not yet released: Trakt resume points, so a
+film stopped on one device continues on another; the next and previous file in
+a folder when a video was opened from Explorer; and **Videos** folders for home
+videos and clips, with a picture taken from the file, under a Library tab. Done in 0.11.0: a
 Windows installer beside the ZIP; Blu-ray folders and disc images on Windows
 and Linux; Kinema as a video player on Windows — open a file from Explorer,
 or drop it on the window; and a film or show no database lists, kept under
@@ -23,8 +24,7 @@ its own name from Needs attention.)
 
 **Android**, an early version (beta) since 0.10.0, moves on as reports come
 in. Its open items: the badges on a film's page, intro detection from the
-audio, Blu-ray folders, disc images and 4K UHD `.m2ts` files. Trakt resume
-points come later. See [Other platforms](#other-platforms).
+audio, Blu-ray folders, disc images and 4K UHD `.m2ts` files. See [Other platforms](#other-platforms).
 
 ---
 
@@ -151,7 +151,9 @@ useful contribution there is.
   across many releases, is the question a report answers.
 - **Trakt with a real account.** Connecting, comparing the history with what
   the account has, and later finishes are built and tested against a stand-in
-  and Trakt's documented answers. SIMKL has been used for real.
+  and Trakt's documented answers. Resume points were checked once against a real
+  account (the list read, one pause sent and removed). SIMKL has been used for
+  real.
 - **Recaps, and a film's scene after the credits**, from TheIntroDB and
   IntroDB during real playback. Both are built and tested against recorded
   answers; neither has been watched on a real file. A note of where Skip

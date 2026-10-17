@@ -184,7 +184,9 @@ audio and subtitles, volume. Back steps back to wherever you came from.
 - **Remembers where you were**, per file, and offers the next episode.
 - **Tells SIMKL and Trakt what you watched**, if you connect them: whatever you
   finish in Kinema is added to your account. Connecting is a code on screen and a
-  tap on your phone.
+  tap on your phone. With Trakt connected, Kinema also continues where you
+  stopped on another device (a switch in Settings turns it off); SIMKL only
+  receives.
 - **Keeps a safety copy** of your watch history, resume points and hand-made
   matches once a week, and puts one back from Settings if the library is ever
   damaged.
@@ -431,7 +433,10 @@ also have Kinema fetch forced subtitles by itself for files without them.
 **Trakt** works the same way, beside SIMKL in Settings → Accounts, with one
 difference: Trakt keeps every play it is sent, so when you connect Kinema first
 asks what your Trakt account already has and sends only the rest. A free Trakt
-account can be connected to only one app besides Trakt's own.
+account can be connected to only one app besides Trakt's own. Trakt also gives
+back where you stopped a film or episode, so it continues on your other
+devices; the newer position wins. Settings → Accounts → Trakt, "Continue where
+you stopped on another device", turns that off. SIMKL is only ever sent to.
 
 ## Platform support
 

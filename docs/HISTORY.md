@@ -2091,6 +2091,9 @@ The comparison now reads every page of films and asks each show for its
 progress; run read-only against the same account it finds all 80 and would
 send none. See GOTCHAS.
 
+It is no longer one way for resume points: see "Trakt resume across devices"
+near the end.
+
 ## Subtitles from OpenSubtitles, and forced subtitles with subtitles off
 
 The owner wanted it before the next release, and added the part that mattered
@@ -3396,6 +3399,41 @@ neither a film nor a show.
   removed Continue Watching cards), with the usual safety copy. Tried on a copy
   of a real 0.11.0 library: every file kept.
 - Not built yet: picture and sound badges for a video.
+
+## Trakt resume across devices (2026-10-17)
+
+The owner asked for it on 2026-10-09, after the viability review: a film
+stopped on one device should continue on another, which is much of what makes
+a library feel like one thing. Decided on 2026-10-17: on whenever Trakt is
+connected, with one switch to turn it off; the newer position wins; it is read
+when a title's page opens and when Continue Watching loads; a pause is sent
+when the player leaves a title part-way; no "Watching now". SIMKL stays one
+way, so the settled rule about both was rewritten.
+
+Checking Trakt's API blueprint (2026-10-17) settled the sending side. There is
+no separate pause call. A stop below 80 % is saved as a pause, and a stop at
+80 % or more is counted as a play in the history. Kinema already sends
+finished items through the history and Trakt keeps duplicate plays, so a stop
+at 80 % or more would be a second play. It is therefore never sent. For the
+same reason there is no start call, which is also what keeps "Watching now"
+out. Finishing something here removes Trakt's resume point for it, so another
+device does not offer to continue something already watched.
+
+Trakt keeps a percentage, not a time. Where the copy's length is known (it was
+played here before, or read by ffprobe at scan time) the point is that share of
+it, five seconds early. A second device usually has never played its copy, and
+Android has no ffprobe, so the length is often unknown. Rather than guess, the
+percentage itself is kept in a new column, `playback_state.fraction` (schema
+25), and the player opens the file at that share of its own length: mpv's
+`start=NN%`, and Media3 seeking once it knows the length. The title page says
+"Resume at 40 %" in that case, because no time is known.
+
+It was checked against a real account once: the resume list was read, one pause
+was sent for a never-played film (Trakt answered "pause" and the history was
+untouched), Kinema's parser read Trakt's real answer, the point landed on the
+right copy in a copy of a real library, and was then removed. The rest is
+proven by tests against Trakt-shaped answers, a keyboard flow, and the upgrade
+(23 to 25) on a copy of a real library.
 
 ## Open items
 

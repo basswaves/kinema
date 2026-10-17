@@ -3229,6 +3229,65 @@ does not remove it.
   (`sandbox-default-player.ps1`; the ffmpeg one still copies it, for a test
   binary rather than the app).
 
+## TV-feel leftovers on the desktop (2026-10-17)
+
+The rest of the owner's TV findings that the desktop could settle.
+
+- **TV mode is one rule everywhere: the 1080p drawing scaled to the screen.**
+  The desktop kept TV mode's 23.2px root as a floor and only grew past 1080p;
+  Android had already dropped the floor (2026-10-04). On the TV PC — a 4K TV
+  at Windows' 300 %, so the page is 1,280 × 720 — the floor stacked on
+  Windows' own scaling and drew everything half as big again as on the box,
+  which is what the owner saw: "TV mode on the TV PC is bigger than on the
+  box and hides more", the detail page's badges not fitting (TV-FEEL L1). The
+  badge row itself already wrapped; it was the size. At 1080p and 100 %
+  nothing changes (seen on the TV PC, which was at 1080p that day: every badge
+  row on screen); the 4K-at-300 % case was checked in the mock at the same
+  page size, 1,280 × 720, not on the TV. TV mode always fills the screen, so a window smaller than
+  the screen in TV mode is not a case to design for.
+- **The film pauses when its sound goes away (P3).** Only what mpv itself
+  reports, read every 2 s while a film plays: the device the sound was sent
+  to leaving mpv's device list (a device never seen in the list never
+  counts, so a name spelt differently cannot pause a film), or the sound
+  output closing (read twice, a second apart, so a track change's reopen does
+  not count). Paused with a notice that stays while paused; **never resumed
+  by itself** — Play applies the sound plan again and reopens the output, and
+  the usual fallbacks take over if the device is still gone. Whether a given
+  receiver shows up as either when switched off depends on the receiver
+  (many keep HDMI alive in standby); where neither happens, nothing happens,
+  and every change in mpv's device list is in app.log either way.
+  **Proven on the test TV and receiver** (owner switching the receiver off
+  mid-film, sound bitstreamed straight to it): Windows took the receiver's
+  HDMI sound device out of the list, Kinema paused about a second later with
+  the notice, the receiver's standby pass-through brought the picture back,
+  and Play after the receiver was on again reopened the sound on it. The
+  owner saw the notice go before the receiver was back; that was the
+  12-second notice timeout, now held while paused.
+- **Studio logos: an enclosed plate.** The Warner Bros. shield is a gold
+  outline and gold letters on a blue plate; whitened, it was a white shield.
+  New rule: when the dark part of a two-tone logo never touches the logo's
+  see-through surroundings (the shield measures 0; the lowest of 40 other
+  real logos was 0.019), the light part shows in white and the plate goes
+  see-through, as the logo's own one-colour version does. Dark lettering on
+  nothing touches the surroundings everywhere, so a name can never be lost
+  this way. Checked on all 443 studio logos of a real library: only the
+  shield changed; lowering the "fully opaque" share from 0.98 to 0.97 added
+  one more, a white plate with dark lettering and soft edges (0.978), and no
+  other logo lies between 0.962 and 0.98.
+- **Linux: only the visible rows of the page go to mpv.** The page photo
+  is cut into bands of rows with anything visible (at most four, joined across
+  gaps under 64 rows); only those rows are written, and each is its own
+  `overlay-add` where it sits. Measured headless at 3840×2160 with the
+  controls up for 22 s: 318 MB written instead of 1,526 MB, and mpv took each
+  picture in 9.8 ms instead of 29.9 ms; the photo itself still costs what it
+  did (~27 ms), since WebKitGTK only photographs the whole page. Run with
+  Ubuntu's mpv 0.37, which cannot scale overlays, so the scaled path (0.38
+  and later) is proven by unit tests only.
+- **The 0.65 s first Left on Home** was measured on the Android box with a
+  393-title library. On the desktop, with the same library, the first Left
+  takes 12 ms and the rest 33 ms (two frames): not a desktop problem. The
+  box's figure stays an Android item.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

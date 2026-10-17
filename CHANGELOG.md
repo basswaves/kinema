@@ -35,9 +35,27 @@ makes no stability promises.
 - **Blu-ray `.m2ts` files know their languages** when the disc's `BDMV`
   folder is still beside them, so remembered sound and subtitle choices find
   the right tracks.
+- **The film pauses when the sound has nowhere to go** (Windows and Linux).
+  If the sound device a film plays through disappears, or the player's sound
+  output closes, mid-film — a USB headset unplugged, an AV receiver that
+  takes its input away when switched off — the film pauses and says so until you
+  press Play, which opens the sound again. Not every receiver tells the PC it went off;
+  where nothing changes, the film plays on as before.
 
 ### Fixed
 
+- **TV mode is the same size on every screen.** On a 4K TV with Windows
+  scaling at 300 %, TV mode came out half as big again as it was drawn, so
+  less fitted — the detail page's picture, sound and file badges ran off the
+  bottom. TV mode is now the 1080p layout scaled to the screen, as on
+  Android.
+- **Two more studio logos keep their lettering.** The Warner Bros. shield was
+  a white shape with nothing in it; it now shows the shield's outline and
+  "WB". A logo with dark lettering on a white plate whose edges fade
+  (Weed Road Pictures) was a white rectangle; its lettering now shows.
+- **Lighter player controls on Linux.** With the controls up, only the parts
+  of the page that show anything are handed to the player — about a fifth of
+  what was copied ten times a second before, at 4K.
 - **The player starts on a Windows without Microsoft's Visual C++ runtime.**
   On a fresh Windows the player could fail to load at all ("Failed to load
   libmpv-wrapper"). The small file that connects Kinema to the player now

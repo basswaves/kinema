@@ -245,7 +245,7 @@ export default function FirstRun({ onScan }: Props) {
               {roots.map((root) => (
                 <li key={root.id}>
                   <span className={`root-kind ${root.kind}`}>
-                    {root.kind === 'tv' ? 'TV' : 'Movies'}
+                    {root.kind === 'tv' ? 'TV' : root.kind === 'videos' ? 'Videos' : 'Movies'}
                   </span>
                   <span className="root-path">{root.path}</span>
                 </li>

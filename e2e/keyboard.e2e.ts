@@ -93,6 +93,31 @@ test('an episode plays, pauses and rolls on to the next', async ({ page }) => {
   await expect.poll(async () => (await mpv(page)).path).toContain('S01E02');
 });
 
+test('a Videos folder: Library, Play all through a sub-folder, then on to the next', async ({
+  page,
+}) => {
+  await open(page, 'windows');
+  // Up to the top bar, along to Library: one press at a time, as a remote.
+  await press(page, 'ArrowUp');
+  for (let i = 0; i < 6 && (await focused(page)) !== 'Library'; i++) await press(page, 'ArrowRight');
+  expect(await focused(page)).toBe('Library');
+  await press(page, 'Enter');
+  await expect.poll(() => focused(page)).toContain('Home videos');
+  await press(page, 'Enter');
+  // The folder's own files first, then the sub-folder's group under them.
+  await expect.poll(() => focused(page)).toContain('Birthday 2024-05-02');
+  await press(page, 'ArrowDown');
+  expect(await focused(page)).toContain('Play all');
+  await press(page, 'Enter');
+
+  await expect.poll(async () => (await mpv(page)).path).toContain('Summer trip/clip 1.mp4');
+  // The next step is the folder's next file, in file-manager order.
+  await expect(page.locator('button[title^="Next: clip 2 "]')).toBeAttached();
+  await press(page, 'n');
+  await expect.poll(async () => (await mpv(page)).path).toContain('clip 2.mp4');
+  await expect(page.locator('button[title^="Next: clip 10 "]')).toBeAttached();
+});
+
 test('Linux: straight to the receiver takes its card for the film and gives it back', async ({
   page,
 }) => {
@@ -270,7 +295,7 @@ test('add without a match, rename it, and send it back to find a match', async (
   for (let i = 0; i < 8 && !(await focused(page))?.startsWith('Settings'); i++) {
     await press(page, 'ArrowUp');
   }
-  await press(page, 'ArrowLeft', 2);
+  await press(page, 'ArrowLeft', 3);
   await expect.poll(() => focused(page)).toBe('TV shows');
   await press(page, 'Enter');
   await expect.poll(() => focused(page)).toContain('Our Holiday');
@@ -319,7 +344,7 @@ test("the startup scan's notice: Wikipedia's line goes once nothing waits", asyn
   // pushing Home down, and the ring vanished.
   await press(page, 'ArrowUp');
   await expect.poll(() => focused(page)).toBe('Home');
-  await press(page, 'ArrowRight', 4);
+  await press(page, 'ArrowRight', 5);
   // With its badge: still 2 to review when Home was read.
   await expect.poll(() => focused(page)).toBe('Settings2');
   await press(page, 'Enter');
@@ -359,7 +384,7 @@ for (const [system, sections] of [
     await open(page, system);
     await press(page, 'ArrowUp', 2);
     await expect.poll(() => focused(page)).toBe('Home');
-    await press(page, 'ArrowRight', 4);
+    await press(page, 'ArrowRight', 5);
     await expect.poll(() => focused(page)).toBe('Settings');
     await press(page, 'Enter');
     await press(page, 'ArrowDown');
@@ -383,7 +408,7 @@ test('Settings → Playback: Look is Auto, Full or Light, by remote, and Light d
 }) => {
   await open(page, 'windows');
   await press(page, 'ArrowUp', 2);
-  await press(page, 'ArrowRight', 4);
+  await press(page, 'ArrowRight', 5);
   await expect.poll(() => focused(page)).toBe('Settings');
   await press(page, 'Enter');
   await press(page, 'ArrowDown');
@@ -542,7 +567,7 @@ test('first run: where to watch, a folder, then the setup pages, all by remote',
   // Settings → Library → Run setup again brings the pages back.
   await press(page, 'ArrowUp', 2);
   await expect.poll(() => focused(page)).toBe('Home');
-  await press(page, 'ArrowRight', 4);
+  await press(page, 'ArrowRight', 5);
   await press(page, 'Enter');
   await press(page, 'ArrowDown');
   await expect.poll(() => focused(page)).toBe('Library');
@@ -639,7 +664,7 @@ test('Android: Picture & sound is one switch, on, and says what the system does'
   await page.goto('/');
   await expect.poll(() => focused(page)).toContain('Play');
   await press(page, 'ArrowUp', 2);
-  await press(page, 'ArrowRight', 4);
+  await press(page, 'ArrowRight', 5);
   await expect.poll(() => focused(page)).toBe('Settings');
   await press(page, 'Enter');
   await press(page, 'ArrowDown');
@@ -745,7 +770,7 @@ test('Android: always the TV layout, never asked', async ({ page }) => {
 
   // Settings → Playback has no desk-or-TV row, and the key list no F11.
   await press(page, 'ArrowUp', 2);
-  await press(page, 'ArrowRight', 4);
+  await press(page, 'ArrowRight', 5);
   await expect.poll(() => focused(page)).toBe('Settings');
   await press(page, 'Enter');
   await press(page, 'ArrowDown');
@@ -944,7 +969,7 @@ test('Windows: a failed install says why, with Try again and the download page',
 test('Windows: Settings installs ffmpeg, and its status turns green', async ({ page }) => {
   await open(page, 'windows');
   await press(page, 'ArrowUp', 2);
-  await press(page, 'ArrowRight', 4);
+  await press(page, 'ArrowRight', 5);
   await expect.poll(() => focused(page)).toBe('Settings');
   await press(page, 'Enter');
   await press(page, 'ArrowDown');
@@ -1009,7 +1034,7 @@ test("an ffmpeg without HEVC or E-AC-3 (Fedora's own) is found, and what it cost
   // Found, so Home has nothing to say about it.
   await expect(page.locator('body')).not.toContainText('need ffmpeg');
   await press(page, 'ArrowUp', 2);
-  await press(page, 'ArrowRight', 4);
+  await press(page, 'ArrowRight', 5);
   await expect.poll(() => focused(page)).toBe('Settings');
   await press(page, 'Enter');
   await press(page, 'ArrowDown');
@@ -1043,7 +1068,7 @@ test('Android: nothing offers ffmpeg or Skiptro, which an Android app cannot run
   await expect(page.locator('body')).not.toContainText('need ffmpeg');
 
   await press(page, 'ArrowUp', 2);
-  await press(page, 'ArrowRight', 4);
+  await press(page, 'ArrowRight', 5);
   await expect.poll(() => focused(page)).toBe('Settings');
   await press(page, 'Enter');
   await press(page, 'ArrowDown');
@@ -1106,7 +1131,7 @@ test('Settings: Up and Down stay in the open section, Left goes to the list', as
   await page.setViewportSize({ width: 960, height: 540 });
   await open(page, 'windows');
   await press(page, 'ArrowUp', 2);
-  await press(page, 'ArrowRight', 4);
+  await press(page, 'ArrowRight', 5);
   await expect.poll(() => focused(page)).toBe('Settings');
   await press(page, 'Enter');
   await press(page, 'ArrowDown');
@@ -1223,7 +1248,7 @@ test('reading on and back never leaves the ring half under the top bar', async (
   // back, left that button half under the see-through bar at the page's end.
   await open(page, 'windows');
   await press(page, 'ArrowUp', 2);
-  await press(page, 'ArrowRight', 4);
+  await press(page, 'ArrowRight', 5);
   await press(page, 'Enter');
   await press(page, 'ArrowDown');
   for (let i = 0; i < 4 && (await focused(page)) !== 'Picture & sound'; i++) await press(page, 'ArrowDown');
@@ -1365,7 +1390,7 @@ test('on a slow computer every quick Up still moves the ring', async ({ page }) 
   await open(page, 'windows');
   await page.setViewportSize({ width: 1280, height: 300 });
   await press(page, 'ArrowUp', 2);
-  await press(page, 'ArrowRight', 4);
+  await press(page, 'ArrowRight', 5);
   await press(page, 'Enter');
   await press(page, 'ArrowDown');
   for (let i = 0; i < 4 && (await focused(page)) !== 'Picture & sound'; i++) await press(page, 'ArrowDown');

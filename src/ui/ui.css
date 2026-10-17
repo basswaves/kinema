@@ -3572,3 +3572,133 @@ kbd {
 :root[data-look='light'][data-tv='on'] .continue-body.focused .continue-art {
   box-shadow: 0 0 0 0.5rem rgba(0, 0, 0, 0.55);
 }
+
+/* ---- The Library page and a Videos folder (VideosPages.tsx) ---------------
+   Tiles are 16:9, as the frames on them are; buttons, so the focus ring and
+   the press are FocusButton's own. */
+.library-tiles,
+.videos-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  margin: 1rem 0 1.5rem;
+}
+
+.library-tile,
+.video-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.375rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.library-tile {
+  justify-content: flex-end;
+  width: 16.75rem;
+  height: 9.4375rem;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  background: linear-gradient(135deg, #2a2a33, #17171b);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+
+.library-tile.focused,
+.video-tile.focused .video-tile-art {
+  outline: var(--focus-ring) solid #fff;
+  outline-offset: 2px;
+}
+
+.library-tile-name {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.library-tile-meta,
+.video-tile-date {
+  font-size: 0.8125rem;
+  opacity: 0.7;
+}
+
+.library-empty {
+  max-width: 40rem;
+}
+
+.videos-group-head {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.videos-group-head h3 {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+.video-tile {
+  width: 16.75rem;
+}
+
+.video-tile-art {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  background: #17171b;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+
+.video-tile-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* The plain picture: where no frame has been taken yet, or can be. */
+.video-tile-plain {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 2rem;
+  opacity: 0.35;
+}
+
+.video-tile-watched {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.65);
+  font-size: 0.8125rem;
+}
+
+.video-tile-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.root-kind.videos {
+  background: rgba(70, 130, 220, 0.35);
+}
+
+.settings-videos-name {
+  margin: 1rem 0;
+}
+
+.search-videos-heading {
+  margin: 2rem 0 0;
+  font-size: 1.125rem;
+}

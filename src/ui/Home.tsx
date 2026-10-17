@@ -35,6 +35,8 @@ interface Props {
   onSeeAll: (heading: string, titles: Title[]) => void;
   /** Start the first scan, from the first-run panel. */
   onFirstScan: () => void;
+  /** A Videos folder with something in it: a library, if not of titles. */
+  hasVideos?: boolean;
   /** The setup pages are up, in front of everything else here. */
   setupOpen: boolean;
   onSetupClosed: () => void;
@@ -79,6 +81,7 @@ export default function Home({
   onRemoveResumable,
   onSeeAll,
   onFirstScan,
+  hasVideos = false,
   setupOpen,
   onSetupClosed,
   reviewCount,
@@ -144,7 +147,9 @@ export default function Home({
   // gets the setup panel rather than a sentence pointing at Settings. It also
   // covers the other way to arrive here — every root removed — where the same
   // two controls are exactly what is needed.
-  if (titles.length === 0) {
+  // A library of videos alone (videos.ts) is not a first run: Home shows its
+  // Continue Watching, and the videos themselves are on the Library page.
+  if (titles.length === 0 && !hasVideos) {
     // Nothing rather than the setup panel while the first read is in flight:
     // the view behind is already opaque, and a blank moment is better than a
     // panel that flashes up at every launch and takes focus with it.

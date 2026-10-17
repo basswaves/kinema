@@ -1,13 +1,16 @@
 /** Typed wrappers around the Rust library commands. */
 import { invoke } from '@tauri-apps/api/core';
 
-export type LibraryKind = 'movies' | 'tv';
+/** Films, shows, and Videos folders (videos.ts). */
+export type LibraryKind = 'movies' | 'tv' | 'videos';
 
 export interface LibraryRoot {
   id: number;
   path: string;
   kind: LibraryKind;
   file_count: number;
+  /** A Videos folder's name on its tile; null for films and shows. */
+  name?: string | null;
 }
 
 export interface MediaFile {
@@ -63,8 +66,9 @@ export interface ParseResultPayload {
   raw_json: string | null;
 }
 
-export const addLibraryRoot = (path: string, kind: LibraryKind) =>
-  invoke<number>('add_library_root', { path, kind });
+/** `name`: a Videos folder's, else the folder's own (videos.rs). */
+export const addLibraryRoot = (path: string, kind: LibraryKind, name?: string) =>
+  invoke<number>('add_library_root', { path, kind, name: name ?? null });
 
 export const libraryRootsInside = (path: string) =>
   invoke<LibraryRoot[]>('library_roots_inside', { path });

@@ -46,6 +46,7 @@ import SoundSection from './SoundSection';
 import ScreenSection from './ScreenSection';
 import { capabilitiesNow, useCapabilities, type Capabilities } from '../capabilities';
 import { useClaimFocus } from './focus';
+import { lastPart } from '../library/videos';
 import { useFocusGroup } from './focusGroups';
 import { setTvMode, useTvMode } from './tv';
 import { setLook, useLook, type LookSetting } from './lightLook';
@@ -179,7 +180,12 @@ const TMDB_KEY_INPUT_KEY = 'settings-tmdb-key';
 const FFMPEG_INPUT_KEY = 'settings-ffmpeg';
 
 /** Where Home's notices can open Settings: the review queue, the TMDB key or ffmpeg. */
-export type SettingsTarget = 'review' | 'tmdb-key' | 'ffmpeg' | 'picture';
+export type SettingsTarget = 'review' | 'tmdb-key' | 'ffmpeg' | 'picture' | 'videos';
+
+/** Add Videos folder, where the Library page's button lands. */
+const ADD_VIDEOS_KEY = 'settings:add-videos';
+/** The name row that follows picking a Videos folder. */
+const VIDEOS_NAME_KEY = 'settings:videos-name';
 
 type SectionId = 'library' | 'playback' | 'picture' | 'intros' | 'accounts' | 'advanced';
 
@@ -235,7 +241,9 @@ export default function Settings({
         ? TMDB_KEY_INPUT_KEY
         : openSection === 'ffmpeg'
           ? FFMPEG_INPUT_KEY
-          : `settings-nav:${section}`,
+          : openSection === 'videos'
+            ? ADD_VIDEOS_KEY
+            : `settings-nav:${section}`,
     true
   );
 
@@ -576,12 +584,22 @@ export default function Settings({
 
   /** A picked folder that holds folders already added: merge them, or not. */
   const [mergeOffer, setMergeOffer] = useState<MergeOfferState | null>(null);
+  /** A Videos folder picked and waiting for its name (videos.rs). */
+  const [videosFolder, setVideosFolder] = useState<{ path: string; name: string } | null>(null);
   const pickFolder = useCallback(
     async (kind: LibraryKind) => {
       setError(null);
       try {
-        const selected = await chooseFolder(kind === 'tv' ? 'TV' : 'movies');
+        const selected = await chooseFolder(
+          kind === 'tv' ? 'TV' : kind === 'videos' ? 'videos' : 'movies'
+        );
         if (!selected) return;
+        if (kind === 'videos') {
+          // Named before it is added: a folder called "Camera" says little on
+          // a tile. Its own name to start with.
+          setVideosFolder({ path: selected, name: lastPart(selected) });
+          return;
+        }
         const inside = await rootsToMerge(selected, kind);
         if (inside.length > 0) {
           setMergeOffer({ path: selected, kind, inside });
@@ -590,6 +608,26 @@ export default function Settings({
         await addLibraryRoot(selected, kind);
         await refresh();
         setNote(`Added ${selected}. Scan to pick up its files.`);
+      } catch (e) {
+        setError(userError(e));
+      }
+    },
+    [refresh]
+  );
+
+  const addVideosFolder = useCallback(
+    async (folder: { path: string; name: string }) => {
+      setVideosFolder(null);
+      setError(null);
+      try {
+        const inside = await rootsToMerge(folder.path, 'videos');
+        if (inside.length > 0) {
+          setMergeOffer({ path: folder.path, kind: 'videos', inside });
+          return;
+        }
+        await addLibraryRoot(folder.path, 'videos', folder.name);
+        await refresh();
+        setNote(`Added ${folder.name}. It is on the Library page once it has been scanned.`);
       } catch (e) {
         setError(userError(e));
       }
@@ -678,9 +716,12 @@ export default function Settings({
                       {roots.map((root) => (
                         <li key={root.id}>
                           <span className={`root-kind ${root.kind}`}>
-                            {root.kind === 'tv' ? 'TV' : 'Movies'}
+                            {root.kind === 'tv' ? 'TV' : root.kind === 'videos' ? 'Videos' : 'Movies'}
                           </span>
-                          <span className="root-path">{root.path}</span>
+                          <span className="root-path">
+                            {root.kind === 'videos' && root.name ? `${root.name} · ` : ''}
+                            {root.path}
+                          </span>
                           <span className="muted">{count(root.file_count, 'file')}</span>
                           <ConfirmButton
                             keepInView="nearest"
@@ -697,6 +738,15 @@ export default function Settings({
                         </li>
                       ))}
                     </ul>
+                  )}
+
+                  {videosFolder && (
+                    <VideosName
+                      folder={videosFolder}
+                      onChange={(name) => setVideosFolder({ ...videosFolder, name })}
+                      onAdd={() => void addVideosFolder(videosFolder)}
+                      onCancel={() => setVideosFolder(null)}
+                    />
                   )}
 
                   {mergeOffer && (
@@ -721,6 +771,14 @@ export default function Settings({
                       onSelect={() => void pickFolder('tv')}
                     >
                       Add TV folder
+                    </FocusButton>
+                    <FocusButton
+                      focusKey={ADD_VIDEOS_KEY}
+                      keepInView="nearest"
+                      className="btn-secondary"
+                      onSelect={() => void pickFolder('videos')}
+                    >
+                      Add Videos folder
                     </FocusButton>
                     {/* During the scan's detection pass — minutes of work nobody
                         asked for by name — this same button stops it. The same
@@ -1616,5 +1674,47 @@ function SectionList({
         ))}
       </nav>
     </FocusContext.Provider>
+  );
+}
+
+/**
+ * The name a Videos folder gets on its tile, asked right after it is picked.
+ * Its own row of controls, claimed when it appears, so a remote lands in the
+ * box rather than back on the button that opened the folder browser.
+ */
+function VideosName({
+  folder,
+  onChange,
+  onAdd,
+  onCancel,
+}: {
+  folder: { path: string; name: string };
+  onChange: (name: string) => void;
+  onAdd: () => void;
+  onCancel: () => void;
+}) {
+  useClaimFocus(VIDEOS_NAME_KEY, true);
+  return (
+    <div className="settings-videos-name">
+      <p className="settings-intro">
+        A name for <span className="root-path">{folder.path}</span> on the Library page:
+      </p>
+      <div className="settings-row">
+        <FocusInput
+          focusKey={VIDEOS_NAME_KEY}
+          className="settings-input"
+          value={folder.name}
+          onChange={onChange}
+          onEnter={onAdd}
+          placeholder="Home videos"
+        />
+        <FocusButton keepInView="nearest" className="btn-primary" onSelect={onAdd}>
+          Add
+        </FocusButton>
+        <FocusButton keepInView="nearest" className="btn-secondary" onSelect={onCancel}>
+          Cancel
+        </FocusButton>
+      </div>
+    </div>
   );
 }

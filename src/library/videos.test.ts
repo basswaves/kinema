@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { groupVideos, playAllStart, videoDate, videoName, type VideoItem } from './videos';
+import { groupVideos, playAllStart, searchVideos, videoDate, videoName, type VideoItem } from './videos';
 
 const item = (id: number, dir: string, name: string, completed = false): VideoItem => ({
   id,
@@ -47,5 +47,13 @@ describe('videos', () => {
     expect(playAllStart(group)?.id).toBe(2);
     const [done] = groupVideos([item(1, '/v', 'a.mp4', true)], '/v');
     expect(playAllStart(done)?.id).toBe(1);
+  });
+});
+
+describe('searchVideos', () => {
+  it('finds videos by every word of their name', () => {
+    const list = [item(1, '/v', 'Summer_trip clip.mp4'), item(2, '/v', 'Garden.mov')];
+    expect(searchVideos(list, 'trip sum').map((v) => v.id)).toEqual([1]);
+    expect(searchVideos(list, 'g')).toEqual([]);
   });
 });

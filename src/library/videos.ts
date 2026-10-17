@@ -4,7 +4,8 @@
  * how a page names, dates and groups the files.
  */
 import { invoke } from '@tauri-apps/api/core';
-import type { TitlePrefs } from '../player/api';
+import type { PlaybackTarget, TitlePrefs } from '../player/api';
+import type { LibraryRoot } from './api';
 
 export interface VideoItem {
   id: number;
@@ -107,9 +108,36 @@ export function groupVideos(items: VideoItem[], root: string): VideoGroup[] {
 }
 
 /**
+ * Videos whose name holds every word of `query`, case ignored; nothing for a
+ * query shorter than two letters, as a title search would drown in them.
+ */
+export function searchVideos(videos: VideoItem[], query: string): VideoItem[] {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (query.trim().length < 2) return [];
+  return videos.filter((v) => {
+    const name = videoName(v.file_name).toLowerCase();
+    return words.every((w) => name.includes(w));
+  });
+}
+
+/**
  * Where Play all starts in a group: the first video not yet finished, else
  * the first — as a show's Play does with its episodes.
  */
 export function playAllStart(group: VideoGroup): VideoItem | null {
   return group.items.find((v) => !v.completed) ?? group.items[0] ?? null;
 }
+
+/** What a video plays as: its own name on top, steps through its folder. */
+export function videoTarget(video: VideoItem): PlaybackTarget {
+  return {
+    path: video.path,
+    label: videoName(video.file_name),
+    fileId: video.id,
+    titleId: null,
+    video: true,
+  };
+}
+
+/** The Videos folders among the library folders. */
+export const videosRoots = (roots: LibraryRoot[]) => roots.filter((r) => r.kind === 'videos');

@@ -539,7 +539,7 @@ pub fn continue_watching(
 
     hide_dismissed(&conn, &mut items)?;
     // Videos (`videos.rs`): part-watched ones, one card per folder.
-    let frames = std::path::PathBuf::from(&art).join("frames");
+    let frames = crate::videos::frames_in(std::path::Path::new(&art));
     items.extend(crate::videos::continue_items(&conn, &frames, MIN_RESUME_SECS)?);
     items.sort_by_key(|item| std::cmp::Reverse(item.updated_at));
     items.truncate(limit.max(0) as usize);

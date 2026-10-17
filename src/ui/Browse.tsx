@@ -56,6 +56,16 @@ import { scanTrouble as describeScanTrouble, type ScanTrouble } from './scanTrou
 import { runScanPipeline, useScanStatus } from '../library/pipeline';
 import { setPlaybackActive } from '../library/playback';
 import { getTitleDetail, listTitles, powerAction, type Title } from './api';
+import { listLibraryRoots, type LibraryRoot } from '../library/api';
+import {
+  dismissContinueVideo,
+  listAllVideos,
+  searchVideos,
+  videoName,
+  videoTarget,
+  type VideoItem,
+} from '../library/videos';
+import { LibraryPage, VideosPage, VideoTile } from './VideosPages';
 import { launchRequest, listenForVideos, type OpenRequest } from '../library/opened';
 import { keepSame } from './keepSame';
 import { searchTitles, type SearchHit } from './search';
@@ -94,13 +104,16 @@ installScrollPace();
 installReadOn();
 
 /** The nav entries, in order. Detail and player are reached, not navigated to. */
-type NavTarget = 'home' | 'movies' | 'tv' | 'search' | 'settings';
+type NavTarget = 'home' | 'movies' | 'tv' | 'library' | 'search' | 'settings';
 
 /** The top bar, in order. Movies and TV shows open the whole shelf as a grid. */
 const NAV_ITEMS: [NavTarget, string][] = [
   ['home', 'Home'],
   ['movies', 'Movies'],
   ['tv', 'TV shows'],
+  // Everything else — Videos folders, and later Folders and Playlists — is a
+  // tile on this page, so the bar never grows again (LOCAL-MEDIA.md, decision 1).
+  ['library', 'Library'],
   ['search', 'Search'],
   ['settings', 'Settings'],
 ];
@@ -109,7 +122,9 @@ const NAV_ITEMS: [NavTarget, string][] = [
 type View =
   // `section` opens Settings on the review queue, or on the TMDB key field,
   // from the notices on Home.
-  | { name: 'home' | 'search' | 'settings'; section?: SettingsTarget }
+  | { name: 'home' | 'library' | 'search' | 'settings'; section?: SettingsTarget }
+  // One Videos folder, from a tile on the Library page.
+  | { name: 'videos'; root: LibraryRoot }
   | { name: 'detail'; title: Title }
   // Ids rather than the titles themselves, so the grid keeps showing current
   // rows after a reload rather than a snapshot taken when it was opened.
@@ -161,6 +176,8 @@ export default function Browse() {
    */
   const [loaded, setLoaded] = useState(false);
   const [resumable, setResumable] = useState<ContinueItem[]>([]);
+  /** The library folders; the Library page's tiles are the Videos ones. */
+  const [roots, setRoots] = useState<LibraryRoot[]>([]);
   // Started for a video (opened.ts): the player first, Home only beneath it.
   const [stack, setStack] = useState<Entry<View>[]>(() => {
     const home: Entry<View> = { view: { name: 'home' }, returnFocus: null };
@@ -311,11 +328,13 @@ export default function Browse() {
       // first list so Home never shows the library for a moment before them.
       const setup = setupLooked.current ? null : getSetting(SETUP_PAGES_KEY).catch(() => null);
       setupLooked.current = true;
-      const [list, resume, setupState] = await Promise.all([
+      const [list, resume, setupState, folders] = await Promise.all([
         listTitles(),
         continueWatching(20),
         setup,
+        listLibraryRoots(),
       ]);
+      setRoots((shown) => keepSame(shown, folders, (r) => r.id));
       if (setupState === 'open') setSetupOpen(true);
       // A title with no files left is not watchable — unlinking a wrong match
       // leaves the cached title row behind, and it should not show up as a
@@ -325,7 +344,10 @@ export default function Browse() {
       // thousand identical cards again is the slowest thing a weak box does.
       const watchable = list.filter((t) => t.file_count > 0);
       setTitles((shown) => keepSame(shown, watchable, (t) => t.id));
-      setResumable((shown) => keepSame(shown, resume, (item) => item.title_id));
+      // A video's card has no title (title_id 0): its file tells it apart.
+      setResumable((shown) =>
+        keepSame(shown, resume, (item) => (item.kind === 'video' ? -item.file_id : item.title_id))
+      );
       // Neither is worth an error on screen if it cannot be read: the notices
       // are extras, and Home is complete without them.
       void refreshReviewCount().catch((e) => console.warn('review count:', e));
@@ -393,7 +415,13 @@ export default function Browse() {
    * from a film would otherwise still show it as unwatched.
    */
   useEffect(() => {
-    if (view.name !== 'home' && view.name !== 'grid' && view.name !== 'search') return;
+    if (
+      view.name !== 'home' &&
+      view.name !== 'grid' &&
+      view.name !== 'search' &&
+      view.name !== 'library'
+    )
+      return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [view.name, load]);
@@ -596,9 +624,15 @@ export default function Browse() {
    */
   const removeResumable = useCallback(
     async (item: ContinueItem) => {
-      setResumable((current) => current.filter((i) => i.title_id !== item.title_id));
+      setResumable((current) =>
+        current.filter((i) =>
+          item.kind === 'video' ? i.file_id !== item.file_id : i.title_id !== item.title_id
+        )
+      );
       try {
-        await dismissContinue(item.title_id);
+        // A video's card is put away by its folder (videos.rs).
+        if (item.kind === 'video') await dismissContinueVideo(item.file_id);
+        else await dismissContinue(item.title_id);
       } catch (e) {
         setError(userError(e));
       }
@@ -610,6 +644,19 @@ export default function Browse() {
   );
 
   const results = useMemo(() => searchTitles(titles, query), [titles, query]);
+  // Videos are not titles: Search reads them when it opens (videos.ts).
+  const [allVideos, setAllVideos] = useState<VideoItem[]>([]);
+  useEffect(() => {
+    if (view.name !== 'search') return;
+    let live = true;
+    void listAllVideos()
+      .then((list) => live && setAllVideos(list))
+      .catch((e) => console.warn('search: videos unavailable', e));
+    return () => {
+      live = false;
+    };
+  }, [view.name]);
+  const videoResults = useMemo(() => searchVideos(allVideos, query), [allVideos, query]);
 
   /** Resolve a grid's stored ids, keeping the order the rail had them in. */
   const gridTitles = useMemo(() => {
@@ -682,7 +729,13 @@ export default function Browse() {
       <FocusContext.Provider value={shellFocusKey}>
         <TopNav
           active={
-            view.name === 'grid' && view.kind ? (view.kind === 'movie' ? 'movies' : 'tv') : view.name
+            view.name === 'grid' && view.kind
+              ? view.kind === 'movie'
+                ? 'movies'
+                : 'tv'
+              : view.name === 'videos'
+                ? 'library'
+                : view.name
           }
           reviewCount={reviewCount}
           hasUpdate={hasUpdate}
@@ -724,6 +777,7 @@ export default function Browse() {
             onPlay={(title) => void playTitle(title)}
             onRemoveResumable={(item) => void removeResumable(item)}
             onFirstScan={firstScan}
+            hasVideos={roots.some((r) => r.kind === 'videos' && r.file_count > 0)}
             setupOpen={setupOpen}
             onSetupClosed={closeSetup}
             reviewCount={reviewCount}
@@ -753,15 +807,37 @@ export default function Browse() {
             }
             onSeeAll={openGrid}
             onResume={(item) =>
-              void startPlayback({
-                path: item.path,
-                label: episodeLabel(item.title, item.season, item.episode),
-                fileId: item.file_id,
-                episodeName: item.episode_name,
-                titleId: item.title_id,
-              })
+              void startPlayback(
+                item.kind === 'video'
+                  ? {
+                      path: item.path,
+                      label: videoName(item.episode_name ?? item.path),
+                      fileId: item.file_id,
+                      titleId: null,
+                      video: true,
+                    }
+                  : {
+                      path: item.path,
+                      label: episodeLabel(item.title, item.season, item.episode),
+                      fileId: item.file_id,
+                      episodeName: item.episode_name,
+                      titleId: item.title_id,
+                    }
+              )
             }
           />
+        )}
+
+        {view.name === 'library' && (
+          <LibraryPage
+            roots={roots}
+            onOpen={(root) => openView({ name: 'videos', root })}
+            onSettings={() => openView({ name: 'settings', section: 'videos' })}
+          />
+        )}
+
+        {view.name === 'videos' && (
+          <VideosPage root={view.root} onPlay={(target) => void startPlayback(target)} onBack={goBack} />
         )}
 
         {view.name === 'search' && (
@@ -769,7 +845,9 @@ export default function Browse() {
             query={query}
             onQueryChange={setQuery}
             results={results}
+            videos={videoResults}
             onSelect={openDetail}
+            onPlayVideo={(video) => void startPlayback(videoTarget(video))}
           />
         )}
 
@@ -1019,12 +1097,16 @@ function SearchView({
   query,
   onQueryChange,
   results,
+  videos,
   onSelect,
+  onPlayVideo,
 }: {
   query: string;
   onQueryChange: (v: string) => void;
   results: SearchHit[];
+  videos: VideoItem[];
   onSelect: (title: Title) => void;
+  onPlayVideo: (video: VideoItem) => void;
 }) {
   const { ref, focusKey } = useFocusable({
     focusKey: 'search-view',
@@ -1041,7 +1123,19 @@ function SearchView({
         {tv && <OnScreenKeyboard value={query} onChange={onQueryChange} />}
         <p className="muted search-hint">Titles, actors, genres or a year.</p>
         <CardGrid name="search" entries={results} onSelect={onSelect} />
-        {results.length === 0 && <p className="muted center">No matches.</p>}
+        {videos.length > 0 && (
+          <>
+            <h3 className="search-videos-heading">Videos</h3>
+            <div className="videos-tiles">
+              {videos.map((video) => (
+                <VideoTile key={video.id} video={video} onPlay={() => onPlayVideo(video)} />
+              ))}
+            </div>
+          </>
+        )}
+        {results.length === 0 && videos.length === 0 && (
+          <p className="muted center">No matches.</p>
+        )}
       </div>
     </FocusContext.Provider>
   );

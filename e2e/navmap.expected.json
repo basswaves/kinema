@@ -3,8 +3,9 @@
     "home": {
       "Home": { "U": "·", "D": "▶ Play", "L": "·", "R": "Movies" },
       "Movies": { "U": "·", "D": "▶ Play", "L": "Home", "R": "TV shows" },
-      "TV shows": { "U": "·", "D": "▶ Play", "L": "Movies", "R": "Search" },
-      "Search": { "U": "·", "D": "▶ Play", "L": "TV shows", "R": "Settings" },
+      "TV shows": { "U": "·", "D": "▶ Play", "L": "Movies", "R": "Library" },
+      "Library": { "U": "·", "D": "▶ Play", "L": "TV shows", "R": "Search" },
+      "Search": { "U": "·", "D": "▶ Play", "L": "Library", "R": "Settings" },
       "Settings": { "U": "·", "D": "▶ Play", "L": "Search", "R": "?" },
       "?": { "U": "·", "D": "▶ Play", "L": "Settings", "R": "·" },
       "▶ Play": { "U": "Home", "D": "Choose", "L": "·", "R": "More info" },
@@ -305,14 +306,29 @@
       "ffmpeg": { "U": "Install ffmpeg", "D": "Get a free key ↗", "L": "·", "R": "·" },
       "Get a free key ↗": { "U": "ffmpeg", "D": "OMDb API key", "L": "·", "R": "·" },
       "OMDb API key": { "U": "Get a free key ↗", "D": "·", "L": "·", "R": "·" }
+    },
+    "library": {
+      "Home videos": { "U": "Library", "D": "Library folders", "L": "·", "R": "·" },
+      "Library folders": { "U": "Home videos", "D": "·", "L": "·", "R": "·" }
+    },
+    "videos": {
+      "← Back": { "U": "Library", "D": "Birthday 2024-05-02", "L": "·", "R": "▶ Play all #1" },
+      "▶ Play all #1": { "U": "← Back", "D": "Birthday 2024-05-02", "L": "← Back", "R": "Garden" },
+      "Birthday 2024-05-02": { "U": "▶ Play all #1", "D": "▶ Play all #2", "L": "·", "R": "Garden" },
+      "Garden": { "U": "▶ Play all #1", "D": "clip 2", "L": "Birthday 2024-05-02", "R": "clip 10" },
+      "▶ Play all #2": { "U": "Birthday 2024-05-02", "D": "clip 1", "L": "← Back", "R": "clip 2" },
+      "clip 1": { "U": "▶ Play all #2", "D": "·", "L": "·", "R": "clip 2" },
+      "clip 2": { "U": "Garden", "D": "·", "L": "clip 1", "R": "clip 10" },
+      "clip 10": { "U": "Garden", "D": "·", "L": "clip 2", "R": "·" }
     }
   },
   "linux": {
     "home": {
       "Home": { "U": "·", "D": "▶ Play", "L": "·", "R": "Movies" },
       "Movies": { "U": "·", "D": "▶ Play", "L": "Home", "R": "TV shows" },
-      "TV shows": { "U": "·", "D": "▶ Play", "L": "Movies", "R": "Search" },
-      "Search": { "U": "·", "D": "▶ Play", "L": "TV shows", "R": "Settings" },
+      "TV shows": { "U": "·", "D": "▶ Play", "L": "Movies", "R": "Library" },
+      "Library": { "U": "·", "D": "▶ Play", "L": "TV shows", "R": "Search" },
+      "Search": { "U": "·", "D": "▶ Play", "L": "Library", "R": "Settings" },
       "Settings": { "U": "·", "D": "▶ Play", "L": "Search", "R": "?" },
       "?": { "U": "·", "D": "▶ Play", "L": "Settings", "R": "·" },
       "▶ Play": { "U": "Home", "D": "Choose", "L": "·", "R": "More info" },
@@ -598,14 +614,29 @@
       "ffmpeg": { "U": "Open the ffmpeg download page ↗", "D": "Get a free key ↗", "L": "·", "R": "·" },
       "Get a free key ↗": { "U": "ffmpeg", "D": "OMDb API key", "L": "·", "R": "·" },
       "OMDb API key": { "U": "Get a free key ↗", "D": "·", "L": "·", "R": "·" }
+    },
+    "library": {
+      "Home videos": { "U": "Library", "D": "Library folders", "L": "·", "R": "·" },
+      "Library folders": { "U": "Home videos", "D": "·", "L": "·", "R": "·" }
+    },
+    "videos": {
+      "← Back": { "U": "Library", "D": "Birthday 2024-05-02", "L": "·", "R": "▶ Play all #1" },
+      "▶ Play all #1": { "U": "← Back", "D": "Birthday 2024-05-02", "L": "← Back", "R": "Garden" },
+      "Birthday 2024-05-02": { "U": "▶ Play all #1", "D": "▶ Play all #2", "L": "·", "R": "Garden" },
+      "Garden": { "U": "▶ Play all #1", "D": "clip 2", "L": "Birthday 2024-05-02", "R": "clip 10" },
+      "▶ Play all #2": { "U": "Birthday 2024-05-02", "D": "clip 1", "L": "← Back", "R": "clip 2" },
+      "clip 1": { "U": "▶ Play all #2", "D": "·", "L": "·", "R": "clip 2" },
+      "clip 2": { "U": "Garden", "D": "·", "L": "clip 1", "R": "clip 10" },
+      "clip 10": { "U": "Garden", "D": "·", "L": "clip 2", "R": "·" }
     }
   },
   "android": {
     "home": {
       "Home": { "U": "·", "D": "▶ Play", "L": "·", "R": "Movies" },
       "Movies": { "U": "·", "D": "▶ Play", "L": "Home", "R": "TV shows" },
-      "TV shows": { "U": "·", "D": "▶ Play", "L": "Movies", "R": "Search" },
-      "Search": { "U": "·", "D": "▶ Play", "L": "TV shows", "R": "Settings" },
+      "TV shows": { "U": "·", "D": "▶ Play", "L": "Movies", "R": "Library" },
+      "Library": { "U": "·", "D": "▶ Play", "L": "TV shows", "R": "Search" },
+      "Search": { "U": "·", "D": "▶ Play", "L": "Library", "R": "Settings" },
       "Settings": { "U": "·", "D": "▶ Play", "L": "Search", "R": "?" },
       "?": { "U": "·", "D": "▶ Play", "L": "Settings", "R": "·" },
       "▶ Play": { "U": "Home", "D": "Example Show #1", "L": "·", "R": "More info" },
@@ -850,6 +881,20 @@
       "Get a free key ↗": { "U": "Add movies folder", "D": "TMDB API key", "L": "·", "R": "·" },
       "TMDB API key": { "U": "Get a free key ↗", "D": "Save key", "L": "·", "R": "·" },
       "Save key": { "U": "TMDB API key", "D": "·", "L": "·", "R": "·" }
+    },
+    "library": {
+      "Home videos": { "U": "Library", "D": "Library folders", "L": "·", "R": "·" },
+      "Library folders": { "U": "Home videos", "D": "·", "L": "·", "R": "·" }
+    },
+    "videos": {
+      "← Back": { "U": "Library", "D": "Birthday 2024-05-02", "L": "·", "R": "▶ Play all #1" },
+      "▶ Play all #1": { "U": "← Back", "D": "Birthday 2024-05-02", "L": "← Back", "R": "Garden" },
+      "Birthday 2024-05-02": { "U": "▶ Play all #1", "D": "▶ Play all #2", "L": "·", "R": "Garden" },
+      "Garden": { "U": "▶ Play all #1", "D": "clip 2", "L": "Birthday 2024-05-02", "R": "clip 10" },
+      "▶ Play all #2": { "U": "Birthday 2024-05-02", "D": "clip 1", "L": "← Back", "R": "clip 2" },
+      "clip 1": { "U": "▶ Play all #2", "D": "·", "L": "·", "R": "clip 2" },
+      "clip 2": { "U": "Garden", "D": "·", "L": "clip 1", "R": "clip 10" },
+      "clip 10": { "U": "Garden", "D": "·", "L": "clip 2", "R": "·" }
     }
   }
 }

@@ -587,7 +587,58 @@ function episodesOf(titleId: number): FixtureFile[] {
     .sort((a, b) => (a.season! - b.season!) * 1000 + (a.episode! - b.episode!));
 }
 
+// ---- a Videos folder (videos.rs) -------------------------------------------
+// Root 2: two files of its own and a sub-folder of three, the last unnamed by a
+// date so the file's own date shows. Ids from 9001, clear of the fixture's.
+const VIDEOS_ROOT = { id: 2, path: 'D:/Videos', kind: 'videos', name: 'Home videos' };
+const mockVideos = [
+  { id: 9001, dir: 'D:/Videos', name: 'Birthday 2024-05-02.mp4' },
+  { id: 9002, dir: 'D:/Videos', name: 'Garden.mov' },
+  { id: 9003, dir: 'D:/Videos/Summer trip', name: 'clip 1.mp4' },
+  { id: 9004, dir: 'D:/Videos/Summer trip', name: 'clip 2.mp4' },
+  { id: 9005, dir: 'D:/Videos/Summer trip', name: 'clip 10.mp4' },
+];
+const videoPrefs = new Map<string, TitlePrefs>();
+
+function videoItem(v: (typeof mockVideos)[number]) {
+  const row = playback.get(v.id);
+  return {
+    id: v.id,
+    path: `${v.dir}/${v.name}`,
+    parent_dir: v.dir,
+    file_name: v.name,
+    // Noon, so the day is the same in every time zone a test runs in.
+    modified_at: 1_699_963_200,
+    position_secs: row?.position ?? 0,
+    duration_secs: row?.duration ?? null,
+    completed: row?.completed ?? false,
+    frame: null,
+  };
+}
+
+function adjacentVideo(fileId: number, forward: boolean): EpisodeRef | null {
+  const here = mockVideos.find((v) => v.id === fileId);
+  if (!here) return null;
+  const folder = mockVideos
+    .filter((v) => v.dir === here.dir)
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  const index = folder.findIndex((v) => v.id === fileId) + (forward ? 1 : -1);
+  const next = folder[index];
+  return next
+    ? {
+        file_id: next.id,
+        path: `${next.dir}/${next.name}`,
+        season: 0,
+        episode: index + 1,
+        name: next.name,
+        title: next.dir.split('/').pop() ?? next.dir,
+        video: true,
+      }
+    : null;
+}
+
 function adjacent(fileId: number, forward: boolean): EpisodeRef | null {
+  if (fileId > 9000) return adjacentVideo(fileId, forward);
   const file = fileById(fileId);
   if (!file || file.season === null) return null;
   const list = episodesOf(file.titleId);
@@ -1078,8 +1129,33 @@ const handlers: Record<string, Handler> = {
   // finds the fixture, as a real first run would.
   list_library_roots: () =>
     emptyLibrary.hasRoot
-      ? [{ id: 1, path: emptyLibrary.path, kind: 'tv', file_count: files.length }]
+      ? [
+          { id: 1, path: emptyLibrary.path, kind: 'tv', file_count: files.length },
+          // `kinemaMockNoVideos=1`: no Videos folder, for the Library page's
+          // empty state.
+          // Not in an empty library's first run either: one folder added
+          // there is one folder.
+          ...(flag('kinemaMockNoVideos') === '1' || EMPTY
+            ? []
+            : [{ ...VIDEOS_ROOT, file_count: mockVideos.length }]),
+        ]
       : [],
+  list_videos: () => mockVideos.map(videoItem),
+  list_all_videos: () => mockVideos.map(videoItem),
+  video_frame: () => null,
+  get_video_prefs: (a) =>
+    videoPrefs.get(String(mockVideos.find((v) => v.id === num(a, 'fileId'))?.dir)) ?? {
+      audio_lang: null,
+      sub_lang: null,
+      sub_enabled: true,
+      chosen: false,
+    },
+  set_video_prefs: (a) => {
+    const dir = mockVideos.find((v) => v.id === num(a, 'fileId'))?.dir;
+    if (dir) videoPrefs.set(dir, { ...(a.prefs as TitlePrefs), chosen: true });
+    return null;
+  },
+  dismiss_continue_video: () => null,
   scan_library: () => {
     if (emptyLibrary.hasRoot) emptyLibrary.scanned = true;
     return {

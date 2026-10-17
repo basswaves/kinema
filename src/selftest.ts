@@ -15,6 +15,7 @@
  * than reaching into the player, so what it reports is what a viewer would
  * have seen, and it keeps working whatever the player looks like inside.
  */
+import { listAllVideos, videoFrame } from './library/videos';
 import { invoke } from '@tauri-apps/api/core';
 import {
   availableMonitors,
@@ -182,6 +183,19 @@ const CALLABLE: Record<string, (...args: never[]) => Promise<unknown>> = {
   addWithoutMatch,
   renameLocalTitle,
   findMatchForLocal,
+  // Videos folders (videos.rs): a folder added as kind 'videos' with
+  // addLibraryRoot, scanned, then every video's frame taken in the real app —
+  // through its second libmpv handle — with how long each took.
+  listAllVideos,
+  takeVideoFrames: async () => {
+    const out: { id: number; frame: string | null; ms: number }[] = [];
+    for (const video of await listAllVideos()) {
+      const started = performance.now();
+      const frame = await videoFrame(video.id);
+      out.push({ id: video.id, frame, ms: Math.round(performance.now() - started) });
+    }
+    return out;
+  },
   // Offering Kinema to Windows as a video player and taking it back, as the
   // Settings buttons do (default_player.rs) — for a run in Windows Sandbox,
   // never on a PC whose own settings matter.

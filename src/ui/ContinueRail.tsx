@@ -6,6 +6,7 @@
  * information. Poster cards would make a half-watched episode look like a
  * fresh show.
  */
+import { videoName } from '../library/videos';
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { useEffect } from 'react';
 import Art from './Art';
@@ -115,7 +116,8 @@ function ContinueCardBody({
   // Keyed by title, not file: after watching, the card for this show comes
   // back holding the next episode, and Back should land on it.
   const { ref, focused } = useFocusable<object, HTMLDivElement>({
-    focusKey: `continue:${item.title_id}`,
+    // A video's card (videos.rs) has no title; its file is its key.
+    focusKey: item.kind === 'video' ? `continue:v${item.file_id}` : `continue:${item.title_id}`,
     onEnterPress: () => onResume(item),
   });
 
@@ -130,7 +132,9 @@ function ContinueCardBody({
     : 0;
 
   const subtitle =
-    item.season !== null && item.episode !== null
+    item.kind === 'video'
+      ? videoName(item.episode_name ?? '')
+      : item.season !== null && item.episode !== null
       ? `S${String(item.season).padStart(2, '0')}E${String(item.episode).padStart(2, '0')}${
           item.episode_name ? ` · ${item.episode_name}` : ''
         }`

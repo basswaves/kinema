@@ -617,6 +617,21 @@ async function walkSystem(ctx: Ctx): Promise<void> {
     return w(p, 'tv', 'TV shows (the whole shelf)', KB);
   });
 
+  await screen(ctx, 'library', 'Library (a tile per Videos folder)', {}, async (p) => {
+    if (!(await openFromTopBar(p, 'Library'))) return null;
+    await quiet(p);
+    return w(p, 'library', 'Library (a tile per Videos folder)', KB);
+  });
+
+  await screen(ctx, 'videos', 'A Videos folder (its own files, then a group per sub-folder)', {}, async (p) => {
+    if (!(await openFromTopBar(p, 'Library'))) return null;
+    await quiet(p);
+    await press(p, 'Enter');
+    await p.waitForFunction("window.__nav.leaves().some((l) => l.key.startsWith('video:'))", undefined, { timeout: 8000 });
+    await quiet(p);
+    return w(p, 'videos', 'A Videos folder (its own files, then a group per sub-folder)', KB);
+  });
+
   await screen(ctx, 'search', 'Search (an empty query lists every title)', {}, async (p) => {
     if (!(await openFromTopBar(p, 'Search'))) return null;
     await quiet(p);

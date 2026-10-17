@@ -296,14 +296,20 @@ pub fn dismiss_continue_video(db: tauri::State<Db>, file_id: i64) -> Result<(), 
 
 // ---- a frame from the file ---------------------------------------------------
 
-/// Where frames are kept, under app data. Not the artwork cache: nothing here
-/// came from a URL.
+/// Where frames are kept: the artwork folder, the one place the page may load
+/// pictures from (`assetProtocol.scope` in tauri.conf.json), under names no
+/// downloaded picture has. Not rows of the artwork cache — nothing here came
+/// from a URL — so clearing the cache takes them too, and they are taken again.
+pub fn frames_in(data_dir: &Path) -> PathBuf {
+    data_dir.join("artwork")
+}
+
 fn frames_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    Ok(crate::data_dir(app)?.join("frames"))
+    Ok(frames_in(&crate::data_dir(app)?))
 }
 
 fn frame_path(frames: &Path, file_id: i64) -> PathBuf {
-    frames.join(format!("{file_id}.jpg"))
+    frames.join(format!("frame-{file_id}.jpg"))
 }
 
 fn cached_frame(frames: &Path, file_id: i64) -> Option<String> {

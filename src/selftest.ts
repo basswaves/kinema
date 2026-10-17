@@ -40,6 +40,7 @@ import {
 import { capabilitiesNow } from './capabilities';
 import { countCallbacks, expandActions } from './selftestPlan';
 import { setTvMode } from './ui/tv';
+import { offerAsPlayer, playerOffer, removeAsPlayer } from './ui/api';
 import { simklStatus, traktStatus } from './metadata/tracking';
 import { findSubtitles } from './player/onlineSubtitles';
 import {
@@ -170,6 +171,12 @@ const CALLABLE: Record<string, (...args: never[]) => Promise<unknown>> = {
   recordRefusal,
   returnToReview,
   unlinkFiles,
+  // Offering Kinema to Windows as a video player and taking it back, as the
+  // Settings buttons do (default_player.rs) — for a run in Windows Sandbox,
+  // never on a PC whose own settings matter.
+  playerOffer,
+  offerAsPlayer,
+  removeAsPlayer,
   // Settings the player reads when a file opens — sound, display — so a plan
   // can set them on the copied library before opening the player (`openAfter`).
   setSetting,

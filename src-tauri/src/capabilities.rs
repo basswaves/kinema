@@ -49,6 +49,10 @@ pub struct Capabilities {
     /// package manager (Windows' winget, ffmpeg_install.rs). Elsewhere the
     /// interface links to ffmpeg's download page as before.
     pub installs_ffmpeg: bool,
+    /// Kinema can offer itself to the system as a video player, for the
+    /// user to choose in the system's own settings (Windows' Default apps,
+    /// default_player.rs).
+    pub offers_player: bool,
     /// The system puts its own keyboard on screen whenever a text field takes
     /// typing (Android). Kinema then lets a field take typing without it, and
     /// opens it only when OK is pressed on the field (ui/typing.ts).
@@ -130,6 +134,7 @@ fn work_out() -> Capabilities {
         system_output: cfg!(target_os = "android"),
         runs_programs: cfg!(desktop),
         installs_ffmpeg: cfg!(windows),
+        offers_player: cfg!(windows),
         screen_keyboard: cfg!(mobile),
         opens_folders: cfg!(desktop),
         shares_files: cfg!(target_os = "android"),

@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use std::path::Path;
 
 /// The schema this build understands. Bump it with every new `SCHEMA_V*`.
-pub const SCHEMA_VERSION: i64 = 22;
+pub const SCHEMA_VERSION: i64 = 23;
 
 /// What can go wrong opening the library.
 ///
@@ -686,6 +686,28 @@ CREATE TABLE subtitle_files (
 CREATE INDEX idx_subtitle_files ON subtitle_files(media_file_id, language, forced);
 "#;
 
+/// Schema version 23: resume points for videos that are not in the library.
+///
+/// A video opened from the file manager, the command line or dropped on the
+/// window plays whether or not a library folder holds it (`opened.rs`). Those
+/// have no `media_files` row to hang a `playback_state` on, so they are kept
+/// here by path **and size**: a different file saved under the same name (a
+/// better copy, a finished download) starts from the beginning rather than at
+/// a position in some other file. Only the newest rows are kept
+/// (`playback::LOOSE_KEEP`); nothing here is history anyone asked for.
+const SCHEMA_V23: &str = r#"
+CREATE TABLE loose_playback (
+    path          TEXT    NOT NULL,
+    size          INTEGER NOT NULL,
+    position_secs REAL    NOT NULL,
+    duration_secs REAL,
+    completed     INTEGER NOT NULL DEFAULT 0,
+    updated_at    INTEGER NOT NULL,
+    PRIMARY KEY (path, size)
+);
+CREATE INDEX idx_loose_updated ON loose_playback(updated_at DESC);
+"#;
+
 /// How long a statement waits for the write lock before giving up.
 ///
 /// Load-bearing from the moment there is more than one connection. SQLite
@@ -902,7 +924,7 @@ pub(crate) const MIGRATIONS: [&str; SCHEMA_VERSION as usize] = [
     SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6, SCHEMA_V7, SCHEMA_V8,
     SCHEMA_V9, SCHEMA_V10, SCHEMA_V11, SCHEMA_V12, SCHEMA_V13, SCHEMA_V14,
     SCHEMA_V15, SCHEMA_V16, SCHEMA_V17, SCHEMA_V18, SCHEMA_V19,
-    SCHEMA_V20, SCHEMA_V21, SCHEMA_V22,
+    SCHEMA_V20, SCHEMA_V21, SCHEMA_V22, SCHEMA_V23,
 ];
 
 /// Bring the database up to [`SCHEMA_VERSION`].

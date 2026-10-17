@@ -36,6 +36,7 @@ import { FFMPEG_DOWNLOAD_URL, FFMPEG_INSTALL_WORDS, useFfmpegInstall } from './f
 import { count, formatBytes } from './format';
 import FocusInput from './FocusInput';
 import BackupSection from './BackupSection';
+import VideoPlayerSection from './VideoPlayerSection';
 import AccountSection, { AccountAppFields } from './AccountSection';
 import { ForcedSubtitleRows, OpenSubtitlesSection } from './SubtitlesSettings';
 import ConfirmButton from './ConfirmButton';
@@ -942,6 +943,7 @@ export default function Settings({
             )}
 
             {section === 'playback' && (
+              <>
               <section className="settings-section">
                 <h2>Playback</h2>
                 {/* Without a window there is no desk to choose (tv.ts). */}
@@ -1039,6 +1041,8 @@ export default function Settings({
                   }
                 />
               </section>
+              {can?.offers_player && <VideoPlayerSection />}
+              </>
             )}
 
             {section === 'picture' && (

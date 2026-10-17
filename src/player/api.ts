@@ -41,6 +41,11 @@ export interface PlaybackTarget {
   episodeName?: string | null;
   /** Ignore the stored position: "Play from start". */
   fromStart?: boolean;
+  /**
+   * A video opened from outside the library (opened.ts): resumed by its path
+   * and size. Other targets with no file — a trailer — are not resumed.
+   */
+  resumeByPath?: boolean;
 }
 
 /** Enough to play a neighbouring episode and label it, in either direction. */
@@ -134,6 +139,13 @@ export const saveProgress = (
 ) => invoke<void>('save_progress', { fileId, positionSecs, durationSecs, creditsStart });
 
 export const getProgress = (fileId: number) => invoke<Progress | null>('get_progress', { fileId });
+
+/** The resume point of a video that is not in the library, by path and size. */
+export const getLooseProgress = (path: string) =>
+  invoke<Progress | null>('get_loose_progress', { path });
+
+export const saveLooseProgress = (path: string, positionSecs: number, durationSecs: number | null) =>
+  invoke<void>('save_loose_progress', { path, positionSecs, durationSecs });
 
 /**
  * Mark a file watched or unwatched by hand.

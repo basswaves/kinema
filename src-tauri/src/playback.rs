@@ -230,6 +230,115 @@ pub fn get_progress(db: tauri::State<Db>, file_id: i64) -> Result<Option<Progres
     })
 }
 
+/// How many resume points for videos outside the library are kept. Each is a
+/// few dozen bytes; the cap is there so a folder of home videos opened one by
+/// one over the years never becomes a table nobody can see or clear.
+const LOOSE_KEEP: i64 = 1000;
+
+/// The size that, with the path, names a video outside the library: the
+/// file's, or for a Blu-ray folder every clip together (as the scan counts
+/// it). `None` when it cannot be read — nothing is resumed or saved for a file
+/// that is not there.
+fn loose_size(path: &std::path::Path) -> Option<i64> {
+    // A disc folder's size means listing its clips, perhaps over a network:
+    // once per folder, not at every save while it plays.
+    static LAST_DISC: std::sync::Mutex<Option<(std::path::PathBuf, i64)>> =
+        std::sync::Mutex::new(None);
+    let meta = crate::files::metadata(path).ok()?;
+    if !meta.is_dir {
+        return i64::try_from(meta.len).ok();
+    }
+    let mut last = LAST_DISC.lock().ok()?;
+    if let Some((_, size)) = last.as_ref().filter(|(p, _)| p == path) {
+        return Some(*size);
+    }
+    let size = i64::try_from(crate::disc::disc_folder(path).map_or(0, |d| d.size)).ok()?;
+    *last = Some((path.to_path_buf(), size));
+    Some(size)
+}
+
+/// The resume point of a video that is not in the library (schema 23).
+#[tauri::command]
+pub fn get_loose_progress(db: tauri::State<Db>, path: String) -> Result<Option<Progress>, String> {
+    let Some(size) = loose_size(std::path::Path::new(&path)) else {
+        return Ok(None);
+    };
+    let conn = db.0.lock().map_err(to_string_err)?;
+    loose_progress(&conn, &path, size).map_err(to_string_err)
+}
+
+fn loose_progress(
+    conn: &rusqlite::Connection,
+    path: &str,
+    size: i64,
+) -> rusqlite::Result<Option<Progress>> {
+    conn.query_row(
+        "SELECT position_secs, duration_secs, completed FROM loose_playback
+          WHERE path = ?1 AND size = ?2",
+        params![path, size],
+        |r| {
+            Ok(Progress {
+                position_secs: r.get(0)?,
+                duration_secs: r.get(1)?,
+                completed: r.get::<_, i64>(2)? != 0,
+            })
+        },
+    )
+    .map(Some)
+    .or_else(|e| match e {
+        rusqlite::Error::QueryReturnedNoRows => Ok(None),
+        other => Err(other),
+    })
+}
+
+/// Store the resume point of a video that is not in the library. Finished by
+/// the same rule as a library file's; nothing is sent to SIMKL or Trakt, as
+/// nothing says what the video is.
+#[tauri::command]
+pub fn save_loose_progress(
+    db: tauri::State<Db>,
+    path: String,
+    position_secs: f64,
+    duration_secs: Option<f64>,
+) -> Result<(), String> {
+    let file = std::path::Path::new(&path);
+    let Some(size) = loose_size(file) else {
+        return Ok(());
+    };
+    let completed = is_complete(position_secs, duration_secs, None)
+        && !still_being_written(file, now_secs());
+    let conn = db.0.lock().map_err(to_string_err)?;
+    store_loose(&conn, &path, size, position_secs, duration_secs, completed, now_secs())
+        .map_err(to_string_err)
+}
+
+fn store_loose(
+    conn: &rusqlite::Connection,
+    path: &str,
+    size: i64,
+    position_secs: f64,
+    duration_secs: Option<f64>,
+    completed: bool,
+    now: i64,
+) -> rusqlite::Result<()> {
+    conn.execute(
+        "INSERT INTO loose_playback (path, size, position_secs, duration_secs, completed, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+         ON CONFLICT(path, size) DO UPDATE SET
+            position_secs = excluded.position_secs,
+            duration_secs = excluded.duration_secs,
+            completed     = excluded.completed,
+            updated_at    = excluded.updated_at",
+        params![path, size, position_secs, duration_secs, completed as i64, now],
+    )?;
+    conn.execute(
+        "DELETE FROM loose_playback WHERE rowid NOT IN
+            (SELECT rowid FROM loose_playback ORDER BY updated_at DESC, rowid DESC LIMIT ?1)",
+        params![LOOSE_KEEP],
+    )?;
+    Ok(())
+}
+
 /// Shared projection for a Continue Watching card, so the two sources — a
 /// part-watched file and the next episode to start — cannot drift into
 /// describing the same card differently.
@@ -655,6 +764,46 @@ pub fn set_title_prefs(
 #[cfg(test)]
 mod tests {
     use super::{decode_episode_key, dismiss, encode_episode_key, hide_dismissed, is_complete};
+    use super::{loose_progress, store_loose, LOOSE_KEEP};
+
+    fn loose_library() -> rusqlite::Connection {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        crate::db::migrate(&conn).unwrap();
+        conn
+    }
+
+    /// A video outside the library resumes by path and size: the same name
+    /// holding a different file starts again.
+    #[test]
+    fn a_loose_video_resumes_only_when_path_and_size_match() {
+        let conn = loose_library();
+        store_loose(&conn, "D:/Videos/Holiday.mkv", 1000, 600.0, Some(3600.0), false, 1).unwrap();
+        let got = loose_progress(&conn, "D:/Videos/Holiday.mkv", 1000).unwrap().unwrap();
+        assert_eq!(got.position_secs, 600.0);
+        assert!(!got.completed);
+        assert!(loose_progress(&conn, "D:/Videos/Holiday.mkv", 2000).unwrap().is_none());
+        assert!(loose_progress(&conn, "D:/Videos/Other.mkv", 1000).unwrap().is_none());
+
+        store_loose(&conn, "D:/Videos/Holiday.mkv", 1000, 3500.0, Some(3600.0), true, 2).unwrap();
+        let got = loose_progress(&conn, "D:/Videos/Holiday.mkv", 1000).unwrap().unwrap();
+        assert_eq!(got.position_secs, 3500.0);
+        assert!(got.completed);
+    }
+
+    /// Only the newest are kept, so the table cannot grow for ever.
+    #[test]
+    fn only_the_newest_loose_resume_points_are_kept() {
+        let conn = loose_library();
+        for i in 0..LOOSE_KEEP + 5 {
+            store_loose(&conn, &format!("D:/V/{i}.mkv"), 1, 100.0, None, false, i).unwrap();
+        }
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM loose_playback", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, LOOSE_KEEP);
+        assert!(loose_progress(&conn, "D:/V/0.mkv", 1).unwrap().is_none());
+        assert!(loose_progress(&conn, &format!("D:/V/{}.mkv", LOOSE_KEEP + 4), 1).unwrap().is_some());
+    }
     use super::ContinueItem;
 
     fn card(title_id: i64, updated_at: i64, next_up: bool) -> ContinueItem {

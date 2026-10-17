@@ -3,6 +3,7 @@ import App from './App';
 import { installDevLog } from './devlog';
 import { loadCapabilities } from './capabilities';
 import { installBackButton } from './backButton';
+import { loadLaunchRequest } from './library/opened';
 
 /**
  * Deliberately NOT wrapped in React.StrictMode.
@@ -18,7 +19,11 @@ function start(): void {
   // Asked now, answered long before Leave or Settings can be opened.
   void loadCapabilities();
   void installBackButton();
-  ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(<App />);
+  // A video Kinema was started for decides the first view (opened.ts): asked
+  // before drawing, so Home never shows for a moment first.
+  void loadLaunchRequest().then(() =>
+    ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(<App />)
+  );
 }
 
 // `npm run dev:mock` runs the whole UI in an ordinary browser against a fake

@@ -59,6 +59,7 @@ import { useSkipMarkers } from './useSkipMarkers';
 import { useTracks } from './useTracks';
 import { useUpNext } from './useUpNext';
 import { useVolume } from './useVolume';
+import { noteFirstFrame } from '../library/opened';
 
 interface Props {
   target: PlaybackTarget;
@@ -178,7 +179,13 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   // ---- the file itself ----------------------------------------------------
   // The progress save before the engine: leaving the player, the position is
   // read for saving before playback is stopped.
-  useProgressSave({ fileId: target.fileId, sessionRef, countedCreditsStart });
+  useProgressSave({
+    fileId: target.fileId,
+    path: target.path,
+    byPath: target.resumeByPath === true,
+    sessionRef,
+    countedCreditsStart,
+  });
   usePlaybackEngine({
     target,
     session,
@@ -284,6 +291,10 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   // ---- volume -------------------------------------------------------------
   const { volume, muted, receiver, setVolumeLevel, changeVolume, toggleMute, volumeKey } =
     useVolume({ fail, showOsd, osdVisible, path: target.path, frameShown: session.frameShown });
+  // How long a double-click took to become a picture, for the log (opened.ts).
+  useEffect(() => {
+    if (session.frameShown) noteFirstFrame(target.path);
+  }, [session.frameShown, target.path]);
 
   // ---- keyboard -----------------------------------------------------------
   usePlayerKeys({

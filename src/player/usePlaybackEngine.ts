@@ -8,7 +8,7 @@
 import { useEffect, useLayoutEffect, useRef, type Dispatch, type RefObject } from 'react';
 import { capabilitiesNow } from '../capabilities';
 import { getSetting } from '../metadata/api';
-import { getProgress, type PlaybackTarget } from './api';
+import { getLooseProgress, getProgress, type PlaybackTarget } from './api';
 import {
   applyAudioPlan,
   applyFallback,
@@ -138,8 +138,13 @@ export function usePlaybackEngine({
         //
         // "Play from start" skips it; the stored position is overwritten as
         // soon as this playback saves its own.
-        if (target.fileId !== null && !target.fromStart) {
-          pendingSeek.current = resumePoint(await getProgress(target.fileId));
+        // A video from outside the library resumes by its path and size.
+        if (!target.fromStart && (target.fileId !== null || target.resumeByPath)) {
+          const stored =
+            target.fileId !== null
+              ? await getProgress(target.fileId)
+              : await getLooseProgress(target.path).catch(() => null);
+          pendingSeek.current = resumePoint(stored);
         }
 
         // Before the file, so its first frame is already rendered for the
@@ -180,7 +185,16 @@ export function usePlaybackEngine({
     return () => {
       cancelled = true;
     };
-  }, [target.path, target.fileId, target.fromStart, fail, matchScreen, dispatch, setNotice]);
+  }, [
+    target.path,
+    target.fileId,
+    target.fromStart,
+    target.resumeByPath,
+    fail,
+    matchScreen,
+    dispatch,
+    setNotice,
+  ]);
 
   /**
    * The newest versions of the callbacks the mpv listeners call.

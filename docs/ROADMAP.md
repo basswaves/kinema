@@ -11,10 +11,10 @@ Ideas and reports are welcome as [issues](https://github.com/Basswaves/kinema/is
 
 ## Next
 
-**Kinema as the default video player** on Windows — open a file from
-Explorer, or drop it on the window — then an installer beside the ZIP, and
-then smaller things about how it feels on a TV. (Blu-ray folders and disc
-images on Windows and Linux are done, for the next release.)
+An **installer** beside the ZIP, then smaller things about how it feels on a
+TV. (Done for the next release: Blu-ray folders and disc images on Windows
+and Linux, and Kinema as a video player on Windows — open a file from
+Explorer, or drop it on the window.)
 
 **Android**, an early version (beta) since 0.10.0, moves on as reports come
 in. Its open items: the badges on a film's page, intro detection from the

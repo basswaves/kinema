@@ -55,7 +55,8 @@ import { availableUpdate } from './updates';
 import { scanTrouble as describeScanTrouble, type ScanTrouble } from './scanTrouble';
 import { runScanPipeline, useScanStatus } from '../library/pipeline';
 import { setPlaybackActive } from '../library/playback';
-import { getTitleDetail, listTitles, type Title } from './api';
+import { getTitleDetail, listTitles, powerAction, type Title } from './api';
+import { launchRequest, listenForVideos, type OpenRequest } from '../library/opened';
 import { keepSame } from './keepSame';
 import { searchTitles, type SearchHit } from './search';
 import { arrangeGrid, GRID_SORTS, gridSettingKey, parseGridSetting, type GridSort } from './gridSort';
@@ -160,10 +161,20 @@ export default function Browse() {
    */
   const [loaded, setLoaded] = useState(false);
   const [resumable, setResumable] = useState<ContinueItem[]>([]);
-  const [stack, setStack] = useState<Entry<View>[]>([
-    { view: { name: 'home' }, returnFocus: null },
-  ]);
+  // Started for a video (opened.ts): the player first, Home only beneath it.
+  const [stack, setStack] = useState<Entry<View>[]>(() => {
+    const home: Entry<View> = { view: { name: 'home' }, returnFocus: null };
+    const opened = launchRequest();
+    return opened ? [home, { view: { name: 'player', target: opened.target }, returnFocus: null }] : [home];
+  });
   const view = current(stack);
+  /**
+   * Kinema was started to play a file: when it is done — it ends, or Back —
+   * Kinema closes rather than showing Home (LOCAL-MEDIA.md, decision 2).
+   * Already running when a file came, it goes back to where it was.
+   */
+  const closeWhenDone = useRef(launchRequest()?.launched ?? false);
+  const [closing, setClosing] = useState(false);
 
   /** Open a view on top of this one; Back returns here, to `from`. */
   const openView = useCallback((next: View, from: string | null = getCurrentFocusKey()) => {
@@ -229,7 +240,7 @@ export default function Browse() {
   useEffect(() => {
     let live = true;
     void selfTestPlan()
-      .then((plan) => (plan ? null : availableUpdate()))
+      .then((plan) => (plan || closeWhenDone.current ? null : availableUpdate()))
       .then((release) => live && setHasUpdate(release !== null));
     return () => {
       live = false;
@@ -245,6 +256,41 @@ export default function Browse() {
     (target: PlaybackTarget) => openView({ name: 'player', target }),
     [openView]
   );
+
+  /**
+   * A video opened while Kinema runs — passed on by a second Kinema started
+   * for it, or dropped on the window. It plays on top of whatever is open, and
+   * Back returns there; over a film already playing, it takes its place.
+   */
+  useEffect(
+    () =>
+      listenForVideos(({ target }: OpenRequest) => {
+        const from = getCurrentFocusKey();
+        setStack((s) =>
+          current(s).name === 'player'
+            ? replace(s, { name: 'player', target })
+            : open(s, { name: 'player', target }, from)
+        );
+      }),
+    []
+  );
+
+  /** Leaving the player: Back, or Kinema closes if it was started for the file. */
+  const exitPlayer = useCallback(() => {
+    if (closeWhenDone.current) setClosing(true);
+    else goBack();
+  }, [goBack]);
+
+  // The player has gone by now, and with it the save of where the video was
+  // left (useProgressSave's cleanup). A moment for that to be written, then
+  // Kinema closes.
+  useEffect(() => {
+    if (!closing) return;
+    const id = window.setTimeout(() => {
+      void powerAction('close').catch((e) => console.warn('could not close Kinema', e));
+    }, 300);
+    return () => window.clearTimeout(id);
+  }, [closing]);
 
   // The shell owns the nav↔content rule, because it is the only component that
   // is a parent of both. The nav and the search view get their containers in
@@ -359,8 +405,11 @@ export default function Browse() {
     let cancelled = false;
     // A self-test works on a copy of the library and must not download
     // anything into it or spend time on it — see src/selftest.ts.
+    // Nor when started for a video: Kinema closes once it is done.
     selfTestPlan()
-      .then((plan) => (plan ? { stored: 0, failed: 0 } : cacheArtwork()))
+      .then((plan) =>
+        plan || closeWhenDone.current ? { stored: 0, failed: 0 } : cacheArtwork()
+      )
       .then((result) => {
         if (result.failed > 0) console.warn(`artwork: ${result.failed} download(s) failed`);
         if (!cancelled && result.stored > 0) void load();
@@ -397,8 +446,10 @@ export default function Browse() {
     let cancelled = false;
     // Never under a self-test: the scan would end by running Skiptro and
     // ffmpeg over the real media, which is the opposite of a harmless test.
+    // Nor when started for a video: it would read every library folder for
+    // a Kinema that closes as soon as the video is done.
     selfTestPlan()
-      .then((plan) => (plan ? null : runScanPipeline()))
+      .then((plan) => (plan || closeWhenDone.current ? null : runScanPipeline()))
       .then((outcome) => {
         if (cancelled || outcome === null) return;
         if (outcome.status === 'failed') {
@@ -607,6 +658,9 @@ export default function Browse() {
     return () => setPlaybackActive(false);
   }, [inPlayer]);
 
+  // Black, as the player's own cover is, for the moment before Kinema closes.
+  if (closing) return <div className="player-cover" />;
+
   if (view.name === 'player') {
     return (
       <Player
@@ -614,7 +668,8 @@ export default function Browse() {
         onPlayTarget={(target) => setStack((s) => replace(s, { name: 'player', target }))}
         // Back to the page Play was pressed on. Home re-reads the library
         // whenever it is shown, so what just played is reflected there too.
-        onExit={goBack}
+        // Started for the file, Kinema closes instead.
+        onExit={exitPlayer}
       />
     );
   }

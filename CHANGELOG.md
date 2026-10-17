@@ -9,6 +9,16 @@ makes no stability promises.
 
 ### Added
 
+- **Kinema opens videos from File Explorer.** Open a video with Kinema, or
+  drop one on its window, and it plays — whether or not it is in your
+  library. One in the library plays as itself, with its resume point and
+  languages; any other is remembered where you stopped. Started for a video,
+  Kinema goes straight to the player and closes when the video ends or you
+  press Back; already open, it plays the video and then goes back to where
+  you were. On Windows, Settings → Playback → **Offer Kinema as a video
+  player** adds it to Open with and to Default apps, where you choose what it
+  opens; **Remove** takes it out again. The library is upgraded (schema 23)
+  to remember videos that are not in it; a safety copy is made first.
 - **Blu-ray disc folders and disc images play.** A folder holding a disc's
   `BDMV` is now one film in the library, and an `.iso` of a Blu-ray plays as
   the disc — the main film, with its chapters and the languages of its sound

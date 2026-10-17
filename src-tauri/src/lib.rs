@@ -6,6 +6,7 @@ mod capabilities;
 mod artwork;
 mod backup;
 mod db;
+mod default_player;
 mod detect;
 mod disc;
 mod display;
@@ -35,6 +36,7 @@ mod nfo;
 mod overlay;
 mod pointer;
 mod omdb;
+mod opened;
 mod opensubtitles;
 mod places;
 mod playback;
@@ -216,6 +218,7 @@ const REVEAL_FALLBACK: std::time::Duration = std::time::Duration::from_secs(4);
 pub fn run() {
     // First, so a panic anywhere after this, on any thread, is written down.
     applog::install_panic_hook();
+    opened::mark_start();
     applog::forward_library_logs();
     // The page is photographed for mpv while mpv's window covers it
     // (overlay.rs), and a covered WebKitGTK window stops producing snapshots
@@ -242,12 +245,26 @@ pub fn run() {
     // `singleTask`), and the plugin has no mobile side.
     #[cfg(desktop)]
     if !cfg!(debug_assertions) && selftest::plan_path().is_none() {
-        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
             log!("a second Kinema was started; bringing this one forward");
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.unminimize();
                 let _ = window.show();
                 let _ = window.set_focus();
+            }
+            // Started for a video (opened.rs): this one plays it instead.
+            let args = args.into_iter().map(std::ffi::OsString::from);
+            if let Some(path) = opened::from_args(args, std::path::Path::new(&cwd)) {
+                log!("opened: {} passed on by a second Kinema", path.display());
+                use tauri::Emitter;
+                let _ = app.emit(
+                    opened::EVENT,
+                    opened::Opened {
+                        path: path.to_string_lossy().into_owned(),
+                        launched: false,
+                        started_ms: opened::started_ms(),
+                    },
+                );
             }
         }));
     }
@@ -273,6 +290,17 @@ pub fn run() {
                 // only add an invisible second failure.
                 std::process::exit(1);
             }
+            // A video Kinema was started for (opened.rs), for the page to
+            // take. Read before the page asks, which is after this returns.
+            let cwd = std::env::current_dir().unwrap_or_default();
+            let at_launch = opened::from_args(std::env::args_os(), &cwd);
+            if let Some(path) = &at_launch {
+                log!("opened: started for {}", path.display());
+            }
+            app.manage(opened::AtLaunch(Mutex::new(at_launch)));
+            // An offer to Windows naming a folder Kinema has moved from.
+            default_player::refresh();
+
             // Network sign-ins kept from before, unlocked for the shares
             // Kinema opens itself.
             share_logins::load(app.handle());
@@ -382,6 +410,15 @@ pub fn run() {
             artwork::clear_artwork_cache,
             playback::save_progress,
             playback::get_progress,
+            playback::get_loose_progress,
+            playback::save_loose_progress,
+            opened::opened_at_launch,
+            opened::playable_path,
+            opened::library_file,
+            default_player::player_offer,
+            default_player::offer_as_player,
+            default_player::open_default_apps,
+            default_player::remove_as_player,
             playback::set_watched,
             playback::continue_watching,
             playback::dismiss_continue,

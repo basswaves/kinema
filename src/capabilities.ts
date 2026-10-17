@@ -38,6 +38,9 @@ export interface Capabilities {
   /** ffmpeg can be installed with one press through the system's package
    * manager (Windows' winget, ui/FfmpegInstall.tsx); elsewhere a link. */
   installs_ffmpeg: boolean;
+  /** Kinema can offer itself to the system as a video player, for the user to
+   * choose in its own settings (Windows' Default apps, default_player.rs). */
+  offers_player: boolean;
   /** The system puts its own keyboard on screen when a field takes typing
    * (Android): it opens on OK, not on arriving at a field (ui/typing.ts). */
   screen_keyboard: boolean;

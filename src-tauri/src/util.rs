@@ -30,6 +30,14 @@ pub fn now_secs() -> i64 {
         .unwrap_or(0)
 }
 
+/// Milliseconds since the Unix epoch, for timings that span processes.
+pub fn now_millis() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
 /// Does this folder name look like a season folder rather than a show's own?
 ///
 /// `Season 1`, `season 02`, `Staffel 3`, `Specials`, `S01`, `s1` — and not

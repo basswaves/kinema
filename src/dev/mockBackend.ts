@@ -776,6 +776,13 @@ export function listenerCounts(): Record<string, number> {
  * as its problems. `kinemaMockTitles=N` adds N more films to the library, for
  * checking how the shelves and search behave on a big one.
  */
+/** The video "started for" has been taken (opened_at_launch). */
+let openedTaken = false;
+/** Resume points of videos outside the library, by path. */
+const looseProgress = new Map<string, { position: number; duration: number | null }>();
+let playerOffered = false;
+let defaultAppsOpened = 0;
+
 function flag(name: string): string | null {
   try {
     return localStorage.getItem(name);
@@ -1060,6 +1067,56 @@ const handlers: Record<string, Handler> = {
   artwork_stats: () => ({ files: 0, bytes: 0, failed: 0 }),
   find_local_trailer: () => null,
 
+  // A video opened from outside (opened.rs). `kinemaMockOpen` is the path
+  // Kinema was "started for", answered once per page load as the real one is.
+  opened_at_launch: () => {
+    const path = flag('kinemaMockOpen');
+    if (!path || openedTaken) return null;
+    openedTaken = true;
+    return { path, launched: true };
+  },
+  library_file: (a) => {
+    const file = files.find((f) => f.path === a.path);
+    if (!file) return null;
+    const title = titleById(file.titleId);
+    return {
+      file_id: file.id,
+      title_id: file.titleId,
+      title: title?.title ?? null,
+      season: file.season ?? null,
+      episode: file.episode ?? null,
+      episode_name: file.episode ? `Episode ${file.episode}` : null,
+    };
+  },
+  playable_path: (a) =>
+    (a.paths as string[]).find((p) => /\.(mkv|mp4|m2ts|iso|avi|webm)$/i.test(p)) ?? null,
+  get_loose_progress: (a): Progress | null => {
+    const row = looseProgress.get(String(a.path));
+    return row ? { position_secs: row.position, duration_secs: row.duration, completed: false } : null;
+  },
+  save_loose_progress: (a) => {
+    looseProgress.set(String(a.path), {
+      position: num(a, 'positionSecs'),
+      duration: (a.durationSecs as number | null) ?? null,
+    });
+    return null;
+  },
+  // Offering Kinema to Windows (default_player.rs): a flag, and the presses.
+  player_offer: () => ({ offered: playerOffered }),
+  offer_as_player: () => {
+    playerOffered = true;
+    defaultAppsOpened += 1;
+    return null;
+  },
+  open_default_apps: () => {
+    defaultAppsOpened += 1;
+    return null;
+  },
+  remove_as_player: () => {
+    playerOffered = false;
+    return null;
+  },
+
   // playback
   get_progress: (a): Progress | null => {
     const row = playback.get(num(a, 'fileId'));
@@ -1136,6 +1193,7 @@ const handlers: Record<string, Handler> = {
         system_output: true,
         runs_programs: false,
         installs_ffmpeg: false,
+        offers_player: false,
         screen_keyboard: true,
         opens_folders: false,
         shares_files: true,
@@ -1161,6 +1219,7 @@ const handlers: Record<string, Handler> = {
       system_output: false,
       runs_programs: true,
       installs_ffmpeg: full,
+      offers_player: full,
       screen_keyboard: false,
       opens_folders: true,
       shares_files: false,
@@ -1560,6 +1619,13 @@ export function installMockBackend(): void {
     files,
     listenerCounts,
     storage,
+    looseProgress,
+    /** A second Kinema passing a video on (opened.rs `EVENT`). */
+    openVideo: (path: string) => emitEvent('open-video', { path, launched: false }),
+    /** Files dropped on the window, as Tauri reports them. */
+    dropFiles: (paths: string[]) =>
+      emitEvent('tauri://drag-drop', { paths, position: { x: 10, y: 10 } }),
+    playerOffer: () => ({ offered: playerOffered, defaultAppsOpened }),
   };
   document.title = 'Kinema (mock backend)';
 }

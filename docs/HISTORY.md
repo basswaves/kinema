@@ -3130,6 +3130,50 @@ of it written with Windows' own IMAPI2 (UDF 2.50), and a copy with an `AACS`
 folder added, which libbluray takes for an encrypted disc. A real encrypted disc
 was not tried.
 
+## Kinema as a video player on Windows (2026-10-17)
+
+Local media phase 1 (the owner's plan of 2026-10-05): a video opened from File
+Explorer, passed on the command line or dropped on the window plays, in the
+library or not.
+
+- **A file in the library plays as that file** — found by its path, without
+  case on Windows, where Explorer does not always give the case the scan
+  found — so its resume point, languages and Skip intro all work. Anything
+  else is a **loose video**: named from its file, resumed by **path and
+  size** in a table of its own (schema 23, `loose_playback`). The size is
+  there so a different file saved under the same name starts from the
+  beginning rather than at a position in some other film. Only the newest
+  thousand are kept; nothing is sent to SIMKL or Trakt, as nothing says what
+  a loose video is.
+- **Started for a video, Kinema closes when it is done** (the owner's
+  decision 2): the player is the first view — the file is asked for before
+  anything is drawn, so Home never flashes — and the end of the file or Back
+  closes the app, after a moment for the resume point to be written. Already
+  running, it plays the video over whatever was open and Back returns there;
+  over a film already playing, it takes its place. A second Kinema started
+  for a video hands it to the first through the single-instance plugin and
+  ends.
+- **No library scan when started for a video.** The startup scan and the
+  artwork pass read every library folder, a NAS included, for a Kinema that
+  closes as soon as the video ends. They run at the next ordinary start.
+- **Offered, never made the default.** Windows protects the choice of
+  default app; a program can only say what it opens. Settings → Playback →
+  Offer Kinema as a video player writes that for this account (HKCU, no
+  administrator): a `Kinema.Video` ProgID, Kinema in each scanned type's
+  `OpenWithProgids`, its name under `Applications`, and `Capabilities` +
+  `RegisteredApplications` for Default apps, which it then opens on Kinema's
+  page. Remove deletes all of it and the type keys it leaves empty, and
+  nothing that holds another program's entries. The ZIP's folder can move,
+  so a release build rewrites an offer that names another place at launch;
+  a development build never does, or it would take over the copy in use.
+- **Tested in Windows Sandbox**, never on a PC whose settings matter
+  (`scripts/sandbox-default-player.ps1`). The registry code's own test runs
+  on a scratch key whose `Classes` Windows never reads.
+- **Not yet:** the next and previous file in a loose video's folder (the
+  player's episode buttons are episode-shaped), and `MimeType` in the Linux
+  packages' menu entry. On Linux a file on the command line, a second start
+  and a drop already work.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

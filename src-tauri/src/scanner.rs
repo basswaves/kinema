@@ -70,12 +70,22 @@ fn mtime_secs(meta: &std::fs::Metadata) -> i64 {
         .unwrap_or(0)
 }
 
-pub(crate) fn is_video(path: &Path) -> bool {
-    let is_container = path
-        .extension()
+/// Whether `path` has one of the extensions the library scans for.
+pub(crate) fn has_video_extension(path: &Path) -> bool {
+    path.extension()
         .and_then(|e| e.to_str())
-        .map(|e| VIDEO_EXTENSIONS.contains(&e.to_lowercase().as_str()))
-        .unwrap_or(false);
+        .is_some_and(|e| VIDEO_EXTENSIONS.contains(&e.to_lowercase().as_str()))
+}
+
+/// The extensions the library scans for, for the file types Kinema offers
+/// to open (`default_player.rs`).
+#[cfg_attr(not(windows), allow(dead_code))]
+pub(crate) fn video_extensions() -> &'static [&'static str] {
+    VIDEO_EXTENSIONS
+}
+
+pub(crate) fn is_video(path: &Path) -> bool {
+    let is_container = has_video_extension(path);
 
     if !is_container {
         return false;

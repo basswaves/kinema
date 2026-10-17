@@ -60,6 +60,7 @@ import { useTracks } from './useTracks';
 import { useUpNext } from './useUpNext';
 import { useVolume } from './useVolume';
 import { noteFirstFrame } from '../library/opened';
+import { isSoundLostNotice } from './soundWatch';
 
 interface Props {
   target: PlaybackTarget;
@@ -202,11 +203,13 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   });
 
   // A notice about the sound says its piece and goes; the film is playing.
+  // Except the one saying the film paused because the sound went away: while
+  // paused, it is the only thing that tells whoever comes back why.
   useEffect(() => {
-    if (!notice) return;
+    if (!notice || (paused && isSoundLostNotice(notice))) return;
     const id = window.setTimeout(() => setNotice(null), AUDIO_NOTICE_MS);
     return () => window.clearTimeout(id);
-  }, [notice]);
+  }, [notice, paused]);
 
   // ---- controls -----------------------------------------------------------
   /** Resolves to whether it is paused now, or null if mpv did not answer. */

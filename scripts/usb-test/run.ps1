@@ -32,7 +32,9 @@ foreach ($plan in Get-ChildItem $here -Recurse -Filter plan.json) {
   $spec = Get-Content $plan.FullName -Raw | ConvertFrom-Json
   $shots = if ($spec.usbShots) { [string]$spec.usbShots } else { '8000,16000,26000' }
   $divisor = if ($spec.usbShotDivisor) { [int]$spec.usbShotDivisor } else { 4 }
-  & (Join-Path $here 'selftest.ps1') -Plan $plan.FullName -Exe $exe -ShotsAt $shots -ShotDivisor $divisor -TimeoutSeconds 120
+  # And a longer limit for a plan that waits on a person ("usbTimeout").
+  $timeout = if ($spec.usbTimeout) { [int]$spec.usbTimeout } else { 120 }
+  & (Join-Path $here 'selftest.ps1') -Plan $plan.FullName -Exe $exe -ShotsAt $shots -ShotDivisor $divisor -TimeoutSeconds $timeout
   Start-Sleep -Seconds 5
   $summary += "After ${name}: $([System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Size)"
   $dest = Join-Path $out "auto-$name"

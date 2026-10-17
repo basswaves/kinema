@@ -180,6 +180,27 @@ export function describePlan(plan: AudioPlan): string {
 let lastApplied = '';
 
 /**
+ * The device the sound is going to, as mpv names it and as a person would,
+ * when Kinema knows it: the one named in the plan, or Windows' default when
+ * the plan says `auto` there. Null where `auto` is a sound server that picks
+ * for itself (Linux), and after a fallback. For soundWatch.ts.
+ */
+let soundDevice: { mpv: string; name: string } | null = null;
+export const currentSoundDevice = () => soundDevice;
+
+/** Which device `plan` sends the sound to, given the one it was made for. */
+export function deviceInUse(
+  plan: AudioPlan,
+  device: AudioDevice | null
+): { mpv: string; name: string } | null {
+  if (!device) return null;
+  if (plan.device === mpvDeviceName(device.id)) return { mpv: plan.device, name: device.name };
+  if (plan.device === 'auto' && device.is_default)
+    return { mpv: mpvDeviceName(device.id), name: device.name };
+  return null;
+}
+
+/**
  * Straight to an ALSA device (Linux): ask the sound server to let go of its
  * card first, or mpv finds it busy (audio_reserve.rs). Every file, not only
  * when the plan changes — leaving the player gives the card back. Anything
@@ -208,11 +229,16 @@ export async function releaseAudioDevice(): Promise<void> {
  *
  * Never applied mid-file: mpv reads these when it opens the audio output,
  * which it does per file — leaving the player sends `stop`, which closes it.
+ * The one exception is `force`, after the sound went away mid-film
+ * (soundWatch.ts): applied again, then the track chosen again to reopen it.
  */
-export async function applyAudioPlan(): Promise<AudioPlan> {
+export async function applyAudioPlan(force = false): Promise<AudioPlan> {
+  if (force) lastApplied = '';
   const settings = await readAudioSettings();
   const equipment = await getEquipment().catch(() => null);
-  const plan = planAudio(settings, targetDevice(equipment, settings.deviceId));
+  const device = targetDevice(equipment, settings.deviceId);
+  const plan = planAudio(settings, device);
+  soundDevice = deviceInUse(plan, device);
   await holdDevice(plan);
   const key = JSON.stringify(plan);
   if (key !== lastApplied) {
@@ -243,6 +269,7 @@ export async function applyFallback(step: number, trackId: number): Promise<bool
   await setAll(plan);
   // Forget what was applied, so the next file puts the real plan back.
   lastApplied = '';
+  soundDevice = null;
   // Selecting the track again is what reopens the output with the new
   // settings; mpv dropped it when the first open failed.
   await chooseTrack('audio', trackId);

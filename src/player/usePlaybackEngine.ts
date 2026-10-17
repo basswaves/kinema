@@ -12,6 +12,7 @@ import { getLooseProgress, getProgress, type PlaybackTarget } from './api';
 import {
   applyAudioPlan,
   applyFallback,
+  currentSoundDevice,
   fallbackNotice,
   noSoundNotice,
   releaseAudioDevice,
@@ -21,6 +22,7 @@ import { matchHdrToDisplay } from './displayHdr';
 import { mayswitch, restoreScreen } from './displaySwitch';
 import {
   addSubtitlesBeside,
+  chooseTrack,
   discFailure,
   fitWindowForPlayer,
   hasMpv,
@@ -42,6 +44,7 @@ import { applyRememberedStepDown } from './stepDown';
 import { useStepDown } from './useStepDown';
 import { handMouseToPage, startPointerFollowingControls } from './pageMouse';
 import { resumePoint } from './resume';
+import { readSound, soundLost, soundLostNotice, type SoundSnapshot } from './soundWatch';
 import { audioFallbackNotice } from './systemOutput';
 import {
   discFailedMessage,
@@ -59,6 +62,14 @@ import {
 const COVER_MAX_MS = 8000;
 /** How long after playback starts to check that the sound actually opened. */
 const AUDIO_CHECK_MS = 1500;
+/** How often the sound output is read while a film plays (soundWatch.ts). */
+const SOUND_WATCH_MS = 2000;
+/**
+ * A closed output is read again after this, so a track change's reopen does
+ * not count — exclusive mode reopening for another bitstream can take a
+ * second or two.
+ */
+const SOUND_CONFIRM_MS = 3000;
 
 export function usePlaybackEngine({
   target,
@@ -103,6 +114,8 @@ export function usePlaybackEngine({
    * setting was when that listener was registered.
    */
   const videoSync = useRef<string>(VIDEO_SYNC_MODES.audio);
+  /** The sound check below, for the sound watch to run after it reopens the sound. */
+  const checkAudio = useRef<(() => void) | null>(null);
 
   // ---- load, resume, and apply remembered tracks --------------------------
   useEffect(() => {
@@ -242,6 +255,7 @@ export function usePlaybackEngine({
           }
         })();
       }, AUDIO_CHECK_MS);
+    checkAudio.current = checkAudioSoon;
 
     onPlaybackEvent((event) => {
       if (event.type === 'restarted') {
@@ -361,6 +375,7 @@ export function usePlaybackEngine({
 
     return () => {
       disposed = true;
+      checkAudio.current = null;
       unlisten?.();
     };
     // Every one of these is the same object for the player's life — refs,
@@ -389,6 +404,76 @@ export function usePlaybackEngine({
     }, 1000);
     return () => window.clearInterval(id);
   }, [sessionRef, dispatch]);
+
+  /**
+   * The sound output going away mid-film: pause and say so (soundWatch.ts).
+   * Read only while a film plays; paused, there is nothing to stop. Play
+   * after such a pause applies the sound plan again and chooses the track
+   * again, which reopens the output — on the same device if it is back, and
+   * through the sound check's fallbacks if it is not.
+   */
+  const soundGone = useRef(false);
+  // A new file opens its own sound: nothing to reopen for it.
+  useEffect(() => {
+    soundGone.current = false;
+  }, [session.seq]);
+  const playing = session.open && session.frameShown && !session.paused && !session.ended;
+  useEffect(() => {
+    if (!playing || !hasMpv() || capabilitiesNow()?.system_output) return;
+    let live = true;
+    let timer = 0;
+    let before: SoundSnapshot | null = null;
+    let seen = '';
+
+    if (soundGone.current) {
+      soundGone.current = false;
+      setNotice(null);
+      void (async () => {
+        await applyAudioPlan(true).catch((e) => console.warn('audio: plan not applied', e));
+        const track = lastAid.current;
+        if (track !== null) await chooseTrack('audio', track).catch(() => undefined);
+        console.log('audio: sound reopened after it went away');
+        // The fallbacks from the start again: this is a new output.
+        audioFallback.current = 0;
+        checkAudio.current?.();
+      })();
+    }
+
+    const read = async () => {
+      const now = await readSound().catch(() => null);
+      if (!live || !now) return;
+      // What mpv lists, once per film and at every change: app.log then shows
+      // what a receiver going off did, whether or not it paused anything.
+      const list = `${now.devices?.join(', ') ?? '(not readable)'}; output ${now.ao ?? 'none'}`;
+      if (list !== seen) {
+        console.log(`audio: devices ${list}`);
+        seen = list;
+      }
+      let lost = before ? soundLost(currentSoundDevice()?.mpv ?? null, before, now) : null;
+      if (lost === 'output') {
+        await new Promise((done) => window.setTimeout(done, SOUND_CONFIRM_MS));
+        if (!live) return;
+        const again = await readSound().catch(() => null);
+        if (!again || again.ao) lost = null;
+      }
+      if (lost) {
+        const device = currentSoundDevice();
+        console.warn(`audio: ${lost === 'device' ? `${device?.mpv} left the list` : 'the output closed'}; paused`);
+        soundGone.current = true;
+        await setPaused(true).catch(() => undefined);
+        setNotice(soundLostNotice(lost === 'device' ? (device?.name ?? null) : null));
+        revealOsd();
+        return;
+      }
+      before = now;
+      timer = window.setTimeout(() => void read(), SOUND_WATCH_MS);
+    };
+    timer = window.setTimeout(() => void read(), SOUND_WATCH_MS);
+    return () => {
+      live = false;
+      window.clearTimeout(timer);
+    };
+  }, [playing, session.seq, lastAid, setNotice, revealOsd]);
 
   /**
    * The file ended — once per session, whichever of the three signals said so

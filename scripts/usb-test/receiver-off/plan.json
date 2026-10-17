@@ -1,0 +1,25 @@
+{
+  "label": "Automatic test: the detail page, then a film while the receiver goes off and on",
+  "path": "",
+  "fileId": null,
+  "titleId": null,
+  "openAfter": 9999,
+  "seconds": 240,
+  "usbShots": "16000,45000,100000,150000,215000",
+  "usbShotDivisor": 2,
+  "usbTimeout": 300,
+  "actions": [
+    { "at": 0.6, "do": "call", "fn": "setTvMode", "args": [true], "note": "TV mode, the way the owner watches; the library's own sound settings are kept" },
+    { "at": 8, "do": "key", "key": "ArrowRight", "note": "Home's hero: from Play to More info" },
+    { "at": 9, "do": "key", "key": "Enter", "note": "the hero's detail page" },
+    { "at": 15, "do": "mark", "note": "detail page: every badge row should be on screen (L1)" },
+    { "at": 20, "do": "key", "key": "Enter", "note": "Play: the film starts" },
+    { "at": 40, "do": "probe", "args": ["current-ao", "audio-device", "audio-out-params/format", "audio-device-list/count"], "note": "the sound before" },
+    { "at": 60, "do": "mark", "note": "from now: the person turns the receiver off, waits half a minute, turns it on again" },
+    { "at": 150, "do": "probe", "args": ["current-ao", "audio-device", "audio-out-params/format", "audio-device-list/count", "pause"], "note": "the sound after" },
+    { "at": 200, "do": "key", "key": " ", "note": "Play again if it paused (pauses it if it never did)" },
+    { "at": 212, "do": "probe", "args": ["current-ao", "audio-device", "audio-out-params/format", "pause"], "note": "the sound once played again" },
+    { "at": 230, "do": "key", "key": "Escape", "note": "out of the player" }
+  ],
+  "probe": ["current-ao", "audio-device"]
+}

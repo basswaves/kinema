@@ -365,10 +365,12 @@ pub async fn video_frame(
 
 /// How wide a frame is kept: a tile is never drawn wider than this on a 4K
 /// screen at the TV layout's scale, and 480 px keeps each file near 10 KB.
+#[cfg(not(target_os = "android"))]
 const FRAME_WIDTH: u32 = 480;
 
 /// Where in the file the frame is taken: past an opening title or a fade from
 /// black, which a frame at the very start would show.
+#[cfg(not(target_os = "android"))]
 const FRAME_AT_PERCENT: u32 = 20;
 
 #[cfg(not(target_os = "android"))]

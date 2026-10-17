@@ -83,7 +83,9 @@ fn check_kind(conn: &Connection, file_ids: &[i64], is_series: bool) -> Result<()
     }
     if is_series && unnumbered > 0 {
         return Err(
-            "Kinema could not read a season and episode number from every file name              (S01E01), so it could not place them as episodes. Keep them as a movie,              or rename the files."
+            "Kinema could not read a season and episode number from every file name \
+             (S01E01), so it could not place them as episodes. Keep them as a movie, \
+             or rename the files."
                 .into(),
         );
     }

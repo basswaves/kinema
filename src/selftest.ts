@@ -58,12 +58,16 @@ import { runScanPipeline } from './library/pipeline';
 import { saveShareLogin } from './library/folders';
 import { refreshTomatometer } from './metadata/scores';
 import {
+  addWithoutMatch,
   cacheArtwork,
+  findMatchForLocal,
   ignoreFileIds,
+  listNeedsReview,
   listUnmatched,
   recordMatch,
   recordProviderFailure,
   recordRefusal,
+  renameLocalTitle,
   returnToReview,
   setSetting,
   unlinkFiles,
@@ -171,6 +175,13 @@ const CALLABLE: Record<string, (...args: never[]) => Promise<unknown>> = {
   recordRefusal,
   returnToReview,
   unlinkFiles,
+  // Add without a match (local_title.rs): keep a refused group as a title of
+  // its own, rename it, and send it back to be matched — as Needs attention
+  // and the title's page do.
+  listNeedsReview,
+  addWithoutMatch,
+  renameLocalTitle,
+  findMatchForLocal,
   // Offering Kinema to Windows as a video player and taking it back, as the
   // Settings buttons do (default_player.rs) — for a run in Windows Sandbox,
   // never on a PC whose own settings matter.

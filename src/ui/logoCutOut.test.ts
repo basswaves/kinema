@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { cutOut, letteringSplit, plateBrightness, removePlate } from './logoCutOut';
+import {
+  cutOut,
+  enclosedPlateSplit,
+  keepLight,
+  letteringSplit,
+  plateBrightness,
+  removePlate,
+} from './logoCutOut';
 
 type Rgba = [number, number, number, number];
 
@@ -82,5 +89,67 @@ describe('a logo that is solid all over', () => {
       return [[v, v, v, 255], 20];
     });
     expect(plateBrightness(logo(...greys))).toBeNull();
+  });
+});
+
+/**
+ * A 20 × 20 logo drawn from a picture: `.` see-through, `o` the outline's
+ * colour, `#` the plate's. Rows repeat to fill the height.
+ */
+function drawn(rows: string[], outline: Rgba, plate: Rgba): Uint8ClampedArray {
+  const colour = { '.': CLEAR, o: outline, '#': plate } as Record<string, Rgba>;
+  const full = Array.from({ length: 20 }, (_, y) => rows[Math.floor((y * rows.length) / 20)]);
+  return new Uint8ClampedArray(full.flatMap((row) => [...row].flatMap((c) => colour[c])));
+}
+
+const GOLD: Rgba = [240, 190, 30, 255];
+const NAVY: Rgba = [20, 40, 140, 255];
+
+describe('enclosedPlateSplit', () => {
+  // A gold shield edge round a blue plate, gold letters on it.
+  const shield = [
+    '....................',
+    '..oooooooooooooooo..',
+    '..o##############o..',
+    '..o##oo######oo##o..',
+    '..o##oo######oo##o..',
+    '..o##############o..',
+    '..o##############o..',
+    '...o############o...',
+    '....o##########o....',
+    '.....oooooooooo.....',
+  ];
+
+  it('finds a plate the outline closes all round', () => {
+    expect(enclosedPlateSplit(drawn(shield, GOLD, NAVY), 20)).not.toBeNull();
+  });
+
+  it('leaves a plate open to the surroundings alone', () => {
+    const open = shield.map((row) => row.replace(/^\.\.o/, '..#'));
+    expect(enclosedPlateSplit(drawn(open, GOLD, NAVY), 20)).toBeNull();
+  });
+
+  it('never takes dark lettering on nothing for a plate', () => {
+    const lettering = [
+      '....................',
+      '.##..##..###..#.....',
+      '.##..##..#.#..#.....',
+      '.######..###..#..oo.',
+      '.##..##..#....#..oo.',
+      '....................',
+    ];
+    expect(enclosedPlateSplit(drawn(lettering, GOLD, BLACK), 20)).toBeNull();
+  });
+
+  it('leaves two close colours alone', () => {
+    expect(enclosedPlateSplit(drawn(shield, [60, 70, 160, 255], NAVY), 20)).toBeNull();
+  });
+});
+
+describe('keepLight', () => {
+  it('turns the outline white and the plate see-through', () => {
+    const pixels = logo([GOLD, 1], [NAVY, 1], [CLEAR, 1]);
+    keepLight(pixels, 0.45);
+    expect([...pixels]).toEqual([255, 255, 255, 255, 255, 255, 255, 0, 255, 255, 255, 0]);
   });
 });

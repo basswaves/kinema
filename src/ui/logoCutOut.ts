@@ -18,6 +18,16 @@
  * block whatever its lettering, so nothing is lost by taking the plate away
  * instead: what differs from the plate shows in white, the plate itself
  * disappears (`plateBrightness`, `removePlate`).
+ *
+ * And one more: a light outline with a dark plate inside it, and the
+ * lettering in the light colour too — the Warner Bros. shield, gold on blue.
+ * Whitened, outline, plate and letters are one white shield. Here the light
+ * part is the logo and the plate is only its ground, so the light part shows
+ * in white and the plate goes see-through, as the logo's own one-colour
+ * version does (`enclosedPlateSplit`, `keepLight`). What makes it safe is that
+ * the plate is *enclosed*: it never touches the logo's see-through
+ * surroundings. Dark lettering on nothing touches them everywhere, so a logo
+ * whose dark part is its name can never lose it this way.
  */
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { useEffect, useState } from 'react';
@@ -40,11 +50,10 @@ const FEATHER = 0.1;
 
 const luminance = (r: number, g: number, b: number) => (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
 
-/**
- * The brightness above which a pixel is lettering to cut out, or null when the
- * logo is not light lettering on a plate. `pixels` is RGBA, as a canvas gives.
- */
-export function letteringSplit(pixels: Uint8ClampedArray): number | null {
+/** How a logo's solid pixels split into two brightnesses (Otsu), or null. */
+function twoTones(
+  pixels: Uint8ClampedArray
+): { separation: number; dark: number; light: number; share: number } | null {
   const hist = new Array<number>(BINS).fill(0);
   let n = 0;
   for (let i = 0; i < pixels.length; i += 4) {
@@ -76,10 +85,20 @@ export function letteringSplit(pixels: Uint8ClampedArray): number | null {
       best = { between, dark: dark / BINS, light: light / BINS, share: 1 - w };
     }
   }
-
   const { between, dark, light, share } = best;
+  return { separation: between / variance, dark, light, share };
+}
+
+/**
+ * The brightness above which a pixel is lettering to cut out, or null when the
+ * logo is not light lettering on a plate. `pixels` is RGBA, as a canvas gives.
+ */
+export function letteringSplit(pixels: Uint8ClampedArray): number | null {
+  const tones = twoTones(pixels);
+  if (!tones) return null;
+  const { separation, dark, light, share } = tones;
   const plate =
-    between / variance >= TWO_TONE &&
+    separation >= TWO_TONE &&
     light >= LETTERING &&
     light - dark >= CONTRAST &&
     share >= SHARE_MIN &&
@@ -89,8 +108,13 @@ export function letteringSplit(pixels: Uint8ClampedArray): number | null {
   return plate ? (dark + light) / 2 : null;
 }
 
-/** A logo this much of which is solid has nothing see-through to speak of. */
-const OPAQUE_SHARE = 0.98;
+/**
+ * A logo this much of which is solid has nothing see-through to speak of.
+ * 0.98 missed a white plate with black lettering at 0.978, its edge softened
+ * to see-through (Weed Road Pictures); of the library's 443 studio logos,
+ * none other lies between 0.962 and 0.98.
+ */
+const OPAQUE_SHARE = 0.97;
 /** The plate is the biggest area of one brightness: at least this much. */
 const PLATE_SHARE = 0.3;
 /** A difference from the plate's brightness below this is still the plate… */
@@ -139,6 +163,60 @@ export function cutOut(pixels: Uint8ClampedArray, split: number): void {
   }
 }
 
+/**
+ * The most of a plate's pixels that may touch the see-through surroundings
+ * and still count as enclosed: anti-aliasing, not an open edge. The Warner
+ * Bros. shield measures 0; of 40 other real studio logos, the lowest was 0.019.
+ */
+const ENCLOSED = 0.005;
+
+/**
+ * The brightness that splits a light outline from the dark plate it encloses,
+ * or null for every other logo. `pixels` is RGBA, `width` the logo's width.
+ */
+export function enclosedPlateSplit(pixels: Uint8ClampedArray, width: number): number | null {
+  const tones = twoTones(pixels);
+  if (!tones) return null;
+  const { separation, dark, light, share } = tones;
+  if (
+    separation < TWO_TONE ||
+    light - dark < CONTRAST ||
+    share < PLATE_SHARE ||
+    share > 1 - PLATE_SHARE
+  ) {
+    return null;
+  }
+  const split = (dark + light) / 2;
+  const height = Math.floor(pixels.length / 4 / width);
+  const solidAt = (x: number, y: number) =>
+    x >= 0 && y >= 0 && x < width && y < height && pixels[(y * width + x) * 4 + 3] >= SOLID;
+  let plate = 0;
+  let touching = 0;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      if (pixels[i + 3] < SOLID || luminance(pixels[i], pixels[i + 1], pixels[i + 2]) >= split) {
+        continue;
+      }
+      plate++;
+      if (!solidAt(x - 1, y) || !solidAt(x + 1, y) || !solidAt(x, y - 1) || !solidAt(x, y + 1)) {
+        touching++;
+      }
+    }
+  }
+  return plate > 0 && touching / plate <= ENCLOSED ? split : null;
+}
+
+/** The logo's light part in white with the plate see-through, in place. */
+export function keepLight(pixels: Uint8ClampedArray, split: number): void {
+  for (let i = 0; i < pixels.length; i += 4) {
+    const l = luminance(pixels[i], pixels[i + 1], pixels[i + 2]);
+    const kept = Math.min(1, Math.max(0, (l - (split - FEATHER)) / (2 * FEATHER)));
+    pixels[i] = pixels[i + 1] = pixels[i + 2] = 255;
+    pixels[i + 3] = Math.round(pixels[i + 3] * kept);
+  }
+}
+
 /** One look per logo, for as long as Kinema runs. */
 const looked = new Map<string, Promise<string | null>>();
 
@@ -166,8 +244,11 @@ async function lookAt(sources: string[]): Promise<string | null> {
       context.drawImage(img, 0, 0);
       const data = context.getImageData(0, 0, canvas.width, canvas.height);
       const split = letteringSplit(data.data);
+      const enclosed = split === null ? enclosedPlateSplit(data.data, canvas.width) : null;
       if (split !== null) {
         cutOut(data.data, split);
+      } else if (enclosed !== null) {
+        keepLight(data.data, enclosed);
       } else {
         const plate = plateBrightness(data.data);
         if (plate === null) return null;

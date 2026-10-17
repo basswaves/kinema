@@ -222,6 +222,19 @@ describe('OMDb Rotten Tomatoes score', () => {
     expect(await ask(200, body)).toBe(83);
   });
 
+  /** A series is read the same way; OMDb lists one for only a few of them. */
+  it('reads a series Tomatometer when OMDb has one', async () => {
+    const body = {
+      Response: 'True',
+      Type: 'series',
+      Ratings: [
+        { Source: 'Internet Movie Database', Value: '9.0/10' },
+        { Source: 'Rotten Tomatoes', Value: '96%' },
+      ],
+    };
+    expect(await ask(200, body)).toBe(96);
+  });
+
   it('says none when OMDb has none, as for most series', async () => {
     expect(await ask(200, { Response: 'True', Ratings: [] })).toBeNull();
     expect(await ask(200, { Response: 'False', Error: 'Incorrect IMDb ID.' })).toBeNull();

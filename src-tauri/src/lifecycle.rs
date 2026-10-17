@@ -222,7 +222,8 @@ pub fn reset_parses(conn: &Connection) -> rusqlite::Result<usize> {
                 parsed_year = NULL, parsed_season = NULL, parsed_episode = NULL,
                 parsed_kind = NULL, parsed_from = NULL, parsed_json = NULL,
                 parsed_episode_last = NULL,
-                title_id = NULL, match_confidence = NULL, match_reason = NULL",
+                title_id = NULL, match_confidence = NULL, match_reason = NULL
+          WHERE match_status <> 'video'",
         [],
     )
 }

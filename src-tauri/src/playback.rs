@@ -38,6 +38,8 @@ pub struct ContinueItem {
     /// part-watched. The card has no progress to draw and must not claim any:
     /// a bar sitting at 0% reads as "something went wrong", not as "not started".
     pub is_next_up: bool,
+    /// A video's own folder (`videos.rs`); `None` on a film's or a show's card.
+    pub video_dir: Option<String>,
 }
 
 /// Enough to play a neighbouring episode and label it. Used in both directions
@@ -50,6 +52,9 @@ pub struct EpisodeRef {
     pub episode: i64,
     pub name: Option<String>,
     pub title: String,
+    /// A file in a Videos folder (`videos::adjacent`): `title` is its folder,
+    /// `name` the file's name, `episode` its place in the folder.
+    pub video: bool,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -393,6 +398,7 @@ fn map_continue(r: &rusqlite::Row) -> rusqlite::Result<ContinueItem> {
         image_path: r.get(12)?,
         // Set by the caller: the projection cannot tell which branch asked.
         is_next_up: false,
+        video_dir: None,
     })
 }
 
@@ -532,6 +538,9 @@ pub fn continue_watching(
     }
 
     hide_dismissed(&conn, &mut items)?;
+    // Videos (`videos.rs`): part-watched ones, one card per folder.
+    let frames = std::path::PathBuf::from(&art).join("frames");
+    items.extend(crate::videos::continue_items(&conn, &frames, MIN_RESUME_SECS)?);
     items.sort_by_key(|item| std::cmp::Reverse(item.updated_at));
     items.truncate(limit.max(0) as usize);
     Ok(items)
@@ -647,6 +656,7 @@ fn adjacent_from(
                 episode: r.get(3)?,
                 name: r.get(4)?,
                 title: r.get(5)?,
+                video: false,
             })
         },
     )
@@ -663,6 +673,11 @@ fn adjacent_episode(
     file_id: i64,
     forward: bool,
 ) -> Result<Option<EpisodeRef>, String> {
+    // A video steps through its own folder (`videos.rs`), as an episode
+    // through its season.
+    if crate::videos::is_video(conn, file_id) {
+        return crate::videos::adjacent(conn, file_id, forward);
+    }
     let current: Option<(i64, i64, i64, i64)> = conn
         .query_row(
             "SELECT title_id, parsed_season, parsed_episode,
@@ -835,6 +850,7 @@ mod tests {
             image_path: None,
             updated_at,
             is_next_up: next_up,
+            video_dir: None,
         }
     }
 

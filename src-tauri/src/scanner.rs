@@ -422,7 +422,10 @@ fn write_batch(
             "INSERT INTO media_files
                 (root_id, path, parent_dir, file_name, extension, size_bytes,
                  modified_at, first_seen_at, last_seen_at, missing, match_status)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8, 0, 'unparsed')",
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8, 0,
+                     -- A Videos folder's files are never parsed (videos.rs).
+                     (SELECT CASE kind WHEN 'videos' THEN 'video' ELSE 'unparsed' END
+                        FROM library_roots WHERE id = ?1))",
         )?;
         // Only for a file that comes back after being flagged missing. An
         // unchanged file that was never missing is not written at all: this
@@ -568,6 +571,26 @@ mod tests {
             size,
             modified,
         }
+    }
+
+    /// A Videos folder's files are never parsed, so never reach Needs attention.
+    #[test]
+    fn a_videos_folder_s_files_are_never_queued_for_parsing() {
+        let mut conn = database("videos-kind");
+        let mut report = ScanReport::default();
+        write_batch(&mut conn, 1, 0, &[seen(1, 1)], &mut report).unwrap();
+        conn.execute("UPDATE library_roots SET kind = 'videos' WHERE id = 1", []).unwrap();
+        let mut other = seen(2, 2);
+        other.path = r"C:\media\Holiday.mp4".into();
+        write_batch(&mut conn, 1, 0, &[other], &mut report).unwrap();
+        let status = |path: &str| -> String {
+            conn.query_row("SELECT match_status FROM media_files WHERE path = ?1", params![path], |r| r.get(0))
+                .unwrap()
+        };
+        assert_eq!(status(r"C:\media\Show S01E01.mkv"), "unparsed");
+        assert_eq!(status(r"C:\media\Holiday.mp4"), "video");
+        crate::lifecycle::reset_parses(&conn).unwrap();
+        assert_eq!(status(r"C:\media\Holiday.mp4"), "video", "re-parsing leaves videos alone");
     }
 
     /// Record the file, then say it was watched to the end.

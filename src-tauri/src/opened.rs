@@ -152,7 +152,7 @@ fn neighbours_in_folder(path: &Path) -> FolderNeighbours {
 
 /// Names compared as a file manager does: runs of digits by their value
 /// ("Part 2" before "Part 10"), letters without case.
-fn natural_cmp(a: &str, b: &str) -> std::cmp::Ordering {
+pub(crate) fn natural_cmp(a: &str, b: &str) -> std::cmp::Ordering {
     use std::cmp::Ordering;
     let (mut x, mut y) = (a.chars().peekable(), b.chars().peekable());
     let digits = |it: &mut std::iter::Peekable<std::str::Chars>| {

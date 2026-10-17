@@ -63,6 +63,9 @@ smb = { version = "0.12.1", default-features = false, features = ["sign", "encry
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 # The player engine (engine.rs).
 tauri-plugin-libmpv = "0.3.2"
+# A second libmpv handle for a Videos tile's frame (videos.rs). Already
+# compiled in through the libmpv plugin at this version.
+libloading = "0.8"
 # Tauri's own plugin, so that starting Kinema twice brings the first window
 # forward instead of opening a second one (see `run` in lib.rs).
 tauri-plugin-single-instance = "2"

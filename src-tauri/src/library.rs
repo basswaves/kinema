@@ -24,6 +24,27 @@ pub struct LibraryRoot {
     pub path: String,
     pub kind: String,
     pub file_count: i64,
+    /// What a Videos folder is called on its tile (`videos.rs`); `None` for
+    /// films and shows, which need none.
+    pub name: Option<String>,
+}
+
+/// The library folder kinds: films, shows, and Videos folders (`videos.rs`).
+fn check_kind(kind: &str) -> Result<(), String> {
+    if kind == "movies" || kind == "tv" || kind == crate::videos::KIND {
+        Ok(())
+    } else {
+        Err(format!("unknown library kind: {kind}"))
+    }
+}
+
+/// A Videos folder's name: the one given, else the folder's own.
+fn root_name(kind: &str, path: &str, given: Option<String>) -> Option<String> {
+    if kind != crate::videos::KIND {
+        return None;
+    }
+    let given = given.map(|n| n.trim().to_string()).filter(|n| !n.is_empty());
+    Some(given.unwrap_or_else(|| crate::videos::folder_name(path)))
 }
 
 #[derive(Serialize)]
@@ -105,10 +126,9 @@ pub async fn add_library_root(
     db: tauri::State<'_, Db>,
     path: String,
     kind: String,
+    name: Option<String>,
 ) -> Result<i64, String> {
-    if kind != "movies" && kind != "tv" {
-        return Err(format!("unknown library kind: {kind}"));
-    }
+    check_kind(&kind)?;
     let probe = path.clone();
     if !crate::jobs::off_main(move || Ok(crate::files::is_dir(std::path::Path::new(&probe)))).await? {
         return Err(format!("not a directory: {path}"));
@@ -155,8 +175,8 @@ pub async fn add_library_root(
     }
 
     conn.execute(
-        "INSERT OR IGNORE INTO library_roots (path, kind, added_at) VALUES (?1, ?2, ?3)",
-        params![&path, &kind, now_secs()],
+        "INSERT OR IGNORE INTO library_roots (path, kind, added_at, name) VALUES (?1, ?2, ?3, ?4)",
+        params![&path, &kind, now_secs(), root_name(&kind, &path, name)],
     )
     .map_err(to_string_err)?;
 
@@ -203,9 +223,7 @@ pub async fn merge_library_roots(
     path: String,
     kind: String,
 ) -> Result<i64, String> {
-    if kind != "movies" && kind != "tv" {
-        return Err(format!("unknown library kind: {kind}"));
-    }
+    check_kind(&kind)?;
     let probe = path.clone();
     if !crate::jobs::off_main(move || Ok(crate::files::is_dir(std::path::Path::new(&probe)))).await? {
         return Err(format!("not a directory: {path}"));
@@ -239,8 +257,9 @@ fn merge_roots(conn: &mut rusqlite::Connection, path: &str, kind: &str) -> Resul
 
     let tx = conn.transaction().map_err(to_string_err)?;
     tx.execute(
-        "INSERT INTO library_roots (path, kind, added_at) VALUES (?1, ?2, ?3)",
-        params![path, kind, now_secs()],
+        "INSERT INTO library_roots (path, kind, added_at, name) VALUES (?1, ?2, ?3, ?4)",
+        // A Videos folder keeps the name of the first one merged into it.
+        params![path, kind, now_secs(), inside.iter().find_map(|r| r.name.clone())],
     )
     .map_err(to_string_err)?;
     let new_id = tx.last_insert_rowid();
@@ -275,7 +294,7 @@ fn list_roots(conn: &rusqlite::Connection) -> Result<Vec<LibraryRoot>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT r.id, r.path, r.kind,
-                    (SELECT COUNT(*) FROM media_files m WHERE m.root_id = r.id)
+                    (SELECT COUNT(*) FROM media_files m WHERE m.root_id = r.id), r.name
              FROM library_roots r ORDER BY r.id",
         )
         .map_err(to_string_err)?;
@@ -287,6 +306,7 @@ fn list_roots(conn: &rusqlite::Connection) -> Result<Vec<LibraryRoot>, String> {
                 path: r.get(1)?,
                 kind: r.get(2)?,
                 file_count: r.get(3)?,
+                name: r.get(4)?,
             })
         })
         .map_err(to_string_err)?;

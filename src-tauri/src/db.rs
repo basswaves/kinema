@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use std::path::Path;
 
 /// The schema this build understands. Bump it with every new `SCHEMA_V*`.
-pub const SCHEMA_VERSION: i64 = 23;
+pub const SCHEMA_VERSION: i64 = 24;
 
 /// What can go wrong opening the library.
 ///
@@ -708,6 +708,33 @@ CREATE TABLE loose_playback (
 CREATE INDEX idx_loose_updated ON loose_playback(updated_at DESC);
 "#;
 
+/// Schema version 24: Videos folders (LOCAL-MEDIA.md phase 2, `videos.rs`).
+///
+/// A third kind of library folder, `videos`, holding what is neither a film
+/// nor a show — home recordings, concerts, downloads. It is given a **name**
+/// when added, because a folder called `Camera` says little on a tile. Its
+/// files are never parsed or matched (`match_status = 'video'`), so they never
+/// reach Needs attention.
+///
+/// Track choices for a video are kept per **folder** (`video_prefs`, keyed by
+/// the file's own folder) where a film's are kept per title; and a video's
+/// Continue Watching card is put away per folder (`video_dismissed`), as a
+/// show's is per title.
+const SCHEMA_V24: &str = r#"
+ALTER TABLE library_roots ADD COLUMN name TEXT;
+CREATE TABLE video_prefs (
+    dir         TEXT    PRIMARY KEY,
+    audio_lang  TEXT,
+    sub_lang    TEXT,
+    sub_enabled INTEGER NOT NULL DEFAULT 1,
+    updated_at  INTEGER NOT NULL
+);
+CREATE TABLE video_dismissed (
+    dir          TEXT    PRIMARY KEY,
+    dismissed_at INTEGER NOT NULL
+);
+"#;
+
 /// How long a statement waits for the write lock before giving up.
 ///
 /// Load-bearing from the moment there is more than one connection. SQLite
@@ -924,7 +951,7 @@ pub(crate) const MIGRATIONS: [&str; SCHEMA_VERSION as usize] = [
     SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6, SCHEMA_V7, SCHEMA_V8,
     SCHEMA_V9, SCHEMA_V10, SCHEMA_V11, SCHEMA_V12, SCHEMA_V13, SCHEMA_V14,
     SCHEMA_V15, SCHEMA_V16, SCHEMA_V17, SCHEMA_V18, SCHEMA_V19,
-    SCHEMA_V20, SCHEMA_V21, SCHEMA_V22, SCHEMA_V23,
+    SCHEMA_V20, SCHEMA_V21, SCHEMA_V22, SCHEMA_V23, SCHEMA_V24,
 ];
 
 /// Bring the database up to [`SCHEMA_VERSION`].
@@ -1014,6 +1041,31 @@ mod tests {
             )
             .unwrap();
         assert_eq!(old, 0);
+    }
+
+    /// The upgrade test a schema change needs, on a copy of a real library:
+    /// `KINEMA_UPGRADE_COPY=<copy of library.db> cargo test -- --ignored
+    /// a_real_library_copy`. Never point it at the library itself.
+    #[test]
+    #[ignore]
+    fn a_real_library_copy_upgrades_with_a_safety_copy_first() {
+        let Ok(path) = std::env::var("KINEMA_UPGRADE_COPY") else { return };
+        let path = std::path::PathBuf::from(path);
+        let before: i64 = Connection::open(&path)
+            .unwrap()
+            .query_row("PRAGMA user_version", [], |r| r.get(0))
+            .unwrap();
+        let conn = open(&path).unwrap();
+        assert_eq!(version_of(&conn), SCHEMA_VERSION);
+        let backups = path.parent().unwrap().join(BACKUP_DIR);
+        let copies: Vec<_> = std::fs::read_dir(&backups).unwrap().flatten().collect();
+        assert!(!copies.is_empty(), "a safety copy before the upgrade");
+        let copy = Connection::open(copies[0].path()).unwrap();
+        assert_eq!(version_of(&copy), before, "the safety copy is the library as it was");
+        let files: i64 = conn.query_row("SELECT COUNT(*) FROM media_files", [], |r| r.get(0)).unwrap();
+        let kept: i64 = copy.query_row("SELECT COUNT(*) FROM media_files", [], |r| r.get(0)).unwrap();
+        assert_eq!(files, kept);
+        println!("upgraded {before} -> {SCHEMA_VERSION}, {files} files kept, copy {:?}", copies[0].file_name());
     }
 
     fn version_of(conn: &Connection) -> i64 {

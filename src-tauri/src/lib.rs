@@ -61,6 +61,7 @@ mod trakt;
 mod trailer;
 mod updates;
 mod util;
+mod videos;
 
 use library::{Db, ScanDb};
 use std::sync::Mutex;
@@ -434,6 +435,12 @@ pub fn run() {
             playback::first_unwatched_episode,
             playback::get_title_prefs,
             playback::set_title_prefs,
+            videos::list_videos,
+            videos::list_all_videos,
+            videos::video_frame,
+            videos::get_video_prefs,
+            videos::set_video_prefs,
+            videos::dismiss_continue_video,
             skip::get_skip_markers,
             detect::detect_intros,
             detect::auto_detect,

@@ -3330,6 +3330,39 @@ and the reset; e2e flows by keyboard and by mouse in WebKit and Edge (CI runs
 them on Linux WebKit too). Not tried in the real app against a real library —
 the backend is the same SQL the tests run on a migrated database.
 
+## Finishing local media phase 1 (2026-10-17)
+
+- **Previous and next file for a video outside the library.** The player's
+  previous/next were episode-shaped; they are now *steps* — an episode, or a
+  file beside a loose video in its own folder — so the buttons, `n`/`p` and
+  a remote's track keys work the same for both. The folder is listed once
+  when the video starts, off the main thread and with the listing's own file
+  types (a share costs no request per file), and sorted as a file manager
+  does: numbers by value, letters without case. The **end of a loose video
+  still ends playback**; playing a folder through is Play all's job
+  (phase 2), and Kinema started for one video still closes after it.
+- **Linux "Open with".** The packages' `.desktop` comes from Kinema's own
+  template (`src-tauri/linux/kinema.desktop`): Tauri's template has no field
+  code and its documented variables have no MIME list, so `Exec=… %F` and
+  `MimeType=` are written there, and a test keeps that list equal to
+  `app_menu.rs`'s. The `.tar.gz` folder gets Settings → Playback → Add Kinema
+  to the app menu: an XDG desktop entry and the icon in the user's hicolor
+  theme, `update-desktop-database` where the system has it, rewritten at
+  launch if the folder moved (as the Windows offer is), and Remove that
+  touches only an entry carrying Kinema's own mark and an icon with Kinema's
+  own bytes. No desktop is asked anything of its own; choosing the default
+  stays the file manager's. The template is pinned to LF in `.gitattributes`
+  — a Windows checkout would otherwise put a CR in the packages built from
+  the WSL copy.
+- **Add without a match through the real app**, on a copy of the library: a
+  film and three episodes refused, kept as titles of their own, the film
+  renamed, and Find a match sending the show back to Needs attention with its
+  files (the self-test can call all three now).
+- Review leftovers: a relative file name starting with `-` is no longer
+  taken for a switch (switches are skipped by not being playable files), and
+  loose resume points are pruned only when a new one is added, not on every
+  save.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

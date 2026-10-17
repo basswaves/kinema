@@ -677,6 +677,16 @@ pub async fn get_skip_markers(
 ) -> Result<Option<SkipMarkers>, String> {
     let video = PathBuf::from(&path);
 
+    // A Videos folder's file has no intro to skip and nothing for TheIntroDB
+    // or IntroDB.app to look up (videos.rs).
+    if let Some(id) = file_id {
+        let db = app.state::<Db>();
+        let conn = db.0.lock().map_err(to_string_err)?;
+        if crate::videos::is_video(&conn, id) {
+            return Ok(None);
+        }
+    }
+
     // Everything the database is needed for, taken in one lock and then let go.
     // The lookups below are awaits, and a held guard across an await is how a
     // UI freezes on a slow network.

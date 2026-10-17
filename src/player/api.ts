@@ -1,4 +1,5 @@
 /** Typed wrappers around the Rust playback commands. */
+import { videoName } from '../library/videos';
 import { invoke } from '@tauri-apps/api/core';
 
 export interface Progress {
@@ -29,6 +30,8 @@ export interface ContinueItem {
    * bug, not as "not started yet".
    */
   is_next_up: boolean;
+  /** A video's folder (kind `video`): `episode_name` is its file name. */
+  video_dir?: string | null;
 }
 
 /** What the player is asked to play: a file, its label, and where it belongs. */
@@ -46,6 +49,11 @@ export interface PlaybackTarget {
    * and size. Other targets with no file — a trailer — are not resumed.
    */
   resumeByPath?: boolean;
+  /**
+   * A file in a Videos folder (videos.ts): track choices are kept per folder,
+   * and previous/next step through that folder.
+   */
+  video?: boolean;
 }
 
 /** Enough to play a neighbouring episode and label it, in either direction. */
@@ -56,6 +64,8 @@ export interface EpisodeRef {
   episode: number;
   name: string | null;
   title: string;
+  /** A video in the same folder (videos.rs): `name` is its file name. */
+  video?: boolean;
 }
 
 export interface Segment {
@@ -123,6 +133,7 @@ export function episodeLabel(
 
 /** The label an episode carries into the player, shared with the browsing UI. */
 export function episodeRefLabel(episode: EpisodeRef): string {
+  if (episode.video) return videoName(episode.name ?? episode.path);
   return episodeLabel(episode.title, episode.season, episode.episode);
 }
 

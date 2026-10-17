@@ -5,7 +5,8 @@
  * in the track panel, which is remembered for the whole title.
  */
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
-import { getTitlePrefs, setTitlePrefs, type PlaybackTarget } from './api';
+import { getTitlePrefs, setTitlePrefs, type PlaybackTarget, type TitlePrefs } from './api';
+import { getVideoPrefs, setVideoPrefs } from '../library/videos';
 import {
   chooseTrack as playTrack,
   openPath,
@@ -19,6 +20,20 @@ import { forcedSubtitle, loadSubtitle } from './onlineSubtitles';
 import { samePath } from './session';
 import { chooseTracks, forcedTrack, readLanguageDefaults, spokenTrack } from './trackChoice';
 
+/**
+ * Whose track choices apply: a title's, or for a video its folder's
+ * (videos.ts); none for a trailer or a file outside the library.
+ */
+function prefsOf(titleId: number | null, videoFile: number | null): Promise<TitlePrefs | null> {
+  if (videoFile !== null) return getVideoPrefs(videoFile);
+  return titleId !== null ? getTitlePrefs(titleId) : Promise.resolve(null);
+}
+
+function storePrefs(titleId: number | null, videoFile: number | null, prefs: TitlePrefs) {
+  if (videoFile !== null) return setVideoPrefs(videoFile, prefs);
+  return titleId !== null ? setTitlePrefs(titleId, prefs) : Promise.resolve();
+}
+
 export function useTracks({
   target,
   fail,
@@ -27,6 +42,8 @@ export function useTracks({
   fail: (e: unknown) => void;
 }) {
   const [tracks, setTracks] = useState<Track[]>([]);
+  /** A video's file, whose folder keeps its track choices. */
+  const videoFile = target.video ? target.fileId : null;
   /** The subtitle language from Settings, or Windows' when subtitles are off. */
   const [wantedSubLang, setWantedSubLang] = useState<string | null>(null);
   const [sid, setSid] = useState<number | null>(null);
@@ -51,7 +68,7 @@ export function useTracks({
     let showForced = true;
     try {
       const [prefs, defaults] = await Promise.all([
-        target.titleId !== null ? getTitlePrefs(target.titleId) : Promise.resolve(null),
+        prefsOf(target.titleId, videoFile),
         readLanguageDefaults(),
       ]);
       showForced = defaults.forced;
@@ -104,7 +121,7 @@ export function useTracks({
         }
       })();
     }
-  }, [target.titleId, target.fileId, target.path]);
+  }, [target.titleId, target.fileId, target.path, videoFile]);
 
   /** Put a fetched subtitle on screen and bring the track list up to date. */
   const showFetched = useCallback(
@@ -136,9 +153,9 @@ export function useTracks({
           }
         }
 
-        if (target.titleId !== null) {
-          const current = await getTitlePrefs(target.titleId);
-          await setTitlePrefs(target.titleId, {
+        const current = await prefsOf(target.titleId, videoFile);
+        if (current) {
+          await storePrefs(target.titleId, videoFile, {
             audio_lang: kind === 'audio' ? (track?.lang ?? null) : current.audio_lang,
             sub_lang: kind === 'sub' ? (track?.lang ?? null) : current.sub_lang,
             sub_enabled: kind === 'sub' ? track !== null : current.sub_enabled,
@@ -148,7 +165,7 @@ export function useTracks({
         fail(e);
       }
     },
-    [target.titleId, fail]
+    [target.titleId, videoFile, fail]
   );
 
   /** Read the list again, for the track panel as it opens. */

@@ -743,6 +743,14 @@ pub struct Found {
     pub offers: Vec<Offer>,
 }
 
+/// OpenSubtitles is off for a Videos folder's files (videos.rs): a home
+/// recording has no subtitles anywhere to find.
+fn is_video(app: &tauri::AppHandle, file_id: i64) -> Result<bool, String> {
+    let db = app.state::<Db>();
+    let conn = db.0.lock().map_err(to_string_err)?;
+    Ok(crate::videos::is_video(&conn, file_id))
+}
+
 /// "Find subtitles online": search, fetch the best, and hand back the rest.
 ///
 /// A subtitle already fetched for this file in this language is used again
@@ -755,6 +763,9 @@ pub async fn find_subtitles(
     path: String,
     language: String,
 ) -> Result<Option<Found>, String> {
+    if is_video(&app, file_id)? {
+        return Ok(None);
+    }
     let offers = search(&app, file_id, &path, &language, false).await?;
     let earlier = {
         let db = app.state::<Db>();
@@ -793,6 +804,9 @@ pub async fn forced_subtitle(
     path: String,
     language: String,
 ) -> Result<Option<String>, String> {
+    if is_video(&app, file_id)? {
+        return Ok(None);
+    }
     {
         let db = app.state::<Db>();
         let conn = db.0.lock().map_err(to_string_err)?;

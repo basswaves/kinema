@@ -146,8 +146,9 @@ export function useUpNext({
         path: episode.path,
         label: episodeRefLabel(episode),
         fileId: episode.file_id,
-        episodeName: episode.name,
+        episodeName: episode.video ? null : episode.name,
         titleId: target.titleId,
+        video: episode.video,
       });
     },
     [onPlayTarget, target.titleId]
@@ -165,6 +166,7 @@ export function useUpNext({
           label: episodeRefLabel(upNext),
           fileId: upNext.file_id,
           titleId: target.titleId,
+          video: upNext.video,
         });
       }
       setCountdown(null);

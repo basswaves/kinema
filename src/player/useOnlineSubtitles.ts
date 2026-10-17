@@ -155,7 +155,8 @@ export function useOnlineSubtitles({
   );
 
   // What the track panel offers, or nothing when there is nothing to offer.
-  return online.available && target.fileId !== null && onlineLanguage
+  // Never for a Videos folder's file (videos.rs): nothing to find online.
+  return online.available && target.fileId !== null && !target.video && onlineLanguage
     ? {
         language: onlineLanguage,
         canChangeLanguage: onlineLanguages.length > 1,

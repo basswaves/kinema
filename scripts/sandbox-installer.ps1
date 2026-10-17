@@ -36,6 +36,8 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$Short,
+    # An installer to test instead of the local build's: one from a draft release.
+    [string]$Installer = '',
     [int]$TimeoutMinutes = 20
 )
 
@@ -46,7 +48,7 @@ $sandbox = Join-Path $env:WINDIR 'System32\WindowsSandbox.exe'
 if (-not (Test-Path $sandbox)) {
     throw 'Windows Sandbox is not switched on (Windows Features -> Windows Sandbox).'
 }
-$setup = @(Get-ChildItem (Join-Path $root 'src-tauri\target\release\bundle\nsis\*-setup.exe'))
+$setup = if ($Installer) { @(Get-Item $Installer) } else { @(Get-ChildItem (Join-Path $root 'src-tauri\target\release\bundle\nsis\*-setup.exe')) }
 if ($setup.Count -ne 1) { throw 'Expected one installer in src-tauri\target\release\bundle\nsis.' }
 
 $stage = Join-Path $env:TEMP ('kinema-sandbox-installer-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
@@ -91,7 +93,7 @@ function Places($label) {
 function WaitUninstalled {
     $deadline = (Get-Date).AddSeconds(120)
     while ((Get-Date) -lt $deadline) {
-        $busy = Get-Process | Where-Object { $_.ProcessName -match '^(Un_|Au_|uninstall)' }
+        $busy = Get-Process | Where-Object { $_.ProcessName -match '^(Un|Un_\w*|Au_\w*|uninstall)$' }
         if (-not (Test-Path (Join-Path $installDir 'uninstall.exe')) -and -not $busy) { return $true }
         Start-Sleep -Seconds 2
     }
@@ -213,7 +215,7 @@ try {
     foreach ($i in 1..40) {
         Start-Sleep -Seconds 1
         $pids = New-Object 'System.Collections.Generic.HashSet[uint32]'
-        Get-Process | Where-Object { $_.ProcessName -match '^(Un_|Au_|uninstall)' } | ForEach-Object { [void]$pids.Add([uint32]$_.Id) }
+        Get-Process | Where-Object { $_.ProcessName -match '^(Un|Un_\w*|Au_\w*|uninstall)$' } | ForEach-Object { [void]$pids.Add([uint32]$_.Id) }
         foreach ($w in [Win]::WindowsOf($pids)) {
             if (-not $seen.ContainsKey($w.Value)) { $seen[$w.Value] = $true; Say "  uninstaller window seen: '$($w.Value)'" }
             $b = [Win]::Child($w.Key, 'application data')
@@ -236,7 +238,7 @@ try {
         while ((Get-Date) -lt $deadline) {
             Start-Sleep -Seconds 2
             $pids = New-Object 'System.Collections.Generic.HashSet[uint32]'
-            Get-Process | Where-Object { $_.ProcessName -match '^(Un_|Au_|uninstall)' } | ForEach-Object { [void]$pids.Add([uint32]$_.Id) }
+            Get-Process | Where-Object { $_.ProcessName -match '^(Un|Un_\w*|Au_\w*|uninstall)$' } | ForEach-Object { [void]$pids.Add([uint32]$_.Id) }
             if ($pids.Count -eq 0) { break }
             foreach ($w in [Win]::WindowsOf($pids)) {
                 foreach ($label in 'Finish', 'Close') {

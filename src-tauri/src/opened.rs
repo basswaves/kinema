@@ -103,6 +103,91 @@ pub fn playable_path(paths: Vec<String>) -> Option<String> {
         .map(|p| p.to_string_lossy().into_owned())
 }
 
+/// The videos either side of one in its own folder, for the player's
+/// previous/next on a video played from outside the library.
+#[derive(Serialize, Debug, PartialEq, Default)]
+pub struct FolderNeighbours {
+    pub prev: Option<String>,
+    pub next: Option<String>,
+}
+
+/// The video files beside `path`, in the order a file manager lists them.
+/// Read when the video starts, off the main thread: the folder may be on a
+/// slow share, and nothing waits on it but the two buttons.
+#[tauri::command]
+pub async fn folder_neighbours(path: String) -> FolderNeighbours {
+    tauri::async_runtime::spawn_blocking(move || neighbours_in_folder(Path::new(&path)))
+        .await
+        .unwrap_or_default()
+}
+
+fn neighbours_in_folder(path: &Path) -> FolderNeighbours {
+    let (Some(dir), Some(own)) = (path.parent(), path.file_name()) else {
+        return FolderNeighbours::default();
+    };
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return FolderNeighbours::default();
+    };
+    let mut names: Vec<String> = entries
+        .flatten()
+        // The listing's own file type, so a folder on a share costs no request
+        // per file; a link is followed to see what it points at.
+        .filter(|e| match e.file_type() {
+            Ok(t) if t.is_symlink() => e.path().is_file(),
+            Ok(t) => t.is_file(),
+            Err(_) => false,
+        })
+        .filter(|e| crate::scanner::has_video_extension(&e.path()))
+        .filter_map(|e| e.file_name().into_string().ok())
+        .collect();
+    names.sort_by(|a, b| natural_cmp(a, b));
+    let own = own.to_string_lossy();
+    let same = |n: &String| if cfg!(windows) { n.eq_ignore_ascii_case(&own) } else { *n == own };
+    let Some(at) = names.iter().position(same) else {
+        return FolderNeighbours::default();
+    };
+    let full = |i: usize| names.get(i).map(|n| dir.join(n).to_string_lossy().into_owned());
+    FolderNeighbours { prev: at.checked_sub(1).and_then(full), next: full(at + 1) }
+}
+
+/// Names compared as a file manager does: runs of digits by their value
+/// ("Part 2" before "Part 10"), letters without case.
+fn natural_cmp(a: &str, b: &str) -> std::cmp::Ordering {
+    use std::cmp::Ordering;
+    let (mut x, mut y) = (a.chars().peekable(), b.chars().peekable());
+    let digits = |it: &mut std::iter::Peekable<std::str::Chars>| {
+        let mut run = String::new();
+        while let Some(c) = it.peek().copied().filter(char::is_ascii_digit) {
+            run.push(c);
+            it.next();
+        }
+        run
+    };
+    loop {
+        match (x.peek().copied(), y.peek().copied()) {
+            (None, None) => return a.cmp(b),
+            (None, Some(_)) => return Ordering::Less,
+            (Some(_), None) => return Ordering::Greater,
+            (Some(c), Some(d)) if c.is_ascii_digit() && d.is_ascii_digit() => {
+                let (m, n) = (digits(&mut x), digits(&mut y));
+                let (m, n) = (m.trim_start_matches('0'), n.trim_start_matches('0'));
+                let by_value = m.len().cmp(&n.len()).then_with(|| m.cmp(n));
+                if by_value != Ordering::Equal {
+                    return by_value;
+                }
+            }
+            (Some(c), Some(d)) => {
+                let by_letter = c.to_lowercase().cmp(d.to_lowercase());
+                if by_letter != Ordering::Equal {
+                    return by_letter;
+                }
+                x.next();
+                y.next();
+            }
+        }
+    }
+}
+
 /// A library file, to play as itself.
 #[derive(Serialize, Debug, PartialEq)]
 pub struct LibraryFile {
@@ -193,6 +278,34 @@ mod tests {
         assert_eq!(from_args([OsString::from(dir.join("A film.mkv"))], &dir), None);
         assert_eq!(from_args(["kinema.exe"].map(OsString::from), &dir), None);
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn the_videos_either_side_are_in_file_manager_order() {
+        let dir = scratch("folder");
+        for name in ["Part 10.mkv", "part 2.mp4", "Part 1.mkv", "notes.txt", "Part 3.srt"] {
+            std::fs::write(dir.join(name), b"x").unwrap();
+        }
+        std::fs::create_dir_all(dir.join("Part 5.mkv")).unwrap();
+        let got = neighbours_in_folder(&dir.join("part 2.mp4"));
+        assert_eq!(got.prev, Some(dir.join("Part 1.mkv").to_string_lossy().into_owned()));
+        assert_eq!(got.next, Some(dir.join("Part 10.mkv").to_string_lossy().into_owned()));
+        let first = neighbours_in_folder(&dir.join("Part 1.mkv"));
+        assert_eq!(first.prev, None);
+        let last = neighbours_in_folder(&dir.join("Part 10.mkv"));
+        assert_eq!(last.next, None);
+        // A file that is not there has no neighbours, rather than a guess.
+        assert_eq!(neighbours_in_folder(&dir.join("gone.mkv")), FolderNeighbours::default());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn names_compare_by_number_value_and_without_case() {
+        use std::cmp::Ordering::*;
+        assert_eq!(natural_cmp("Part 2", "Part 10"), Less);
+        assert_eq!(natural_cmp("part 2", "Part 1"), Greater);
+        assert_eq!(natural_cmp("Clip 007", "Clip 7b"), Less);
+        assert_eq!(natural_cmp("a", "a1"), Less);
     }
 
     #[test]

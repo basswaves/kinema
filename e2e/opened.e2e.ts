@@ -127,3 +127,50 @@ test('already running: a passed-on video plays over Home, resumes, and a dropped
   // It took the other's place: one Back is Home.
   await backOut(page, async () => (await page.locator('.home').count()) > 0);
 });
+
+test('a video outside the library steps to the files beside it: keys, remote and mouse', async ({
+  page,
+}) => {
+  await page.addInitScript((path) => {
+    localStorage.removeItem('kinemaMockSystem');
+    localStorage.setItem('kinemaMockOpen', path);
+  }, HOLIDAY);
+  await page.goto('/');
+  await expect(page.locator('.player')).toBeAttached();
+  await expect.poll(async () => (await mpv(page)).path).toBe(HOLIDAY);
+
+  // Both neighbours in the folder are offered, by their own names.
+  await expect(page.getByRole('button', { name: 'Previous file: Beach' })).toBeAttached();
+  await expect(page.getByRole('button', { name: 'Next file: Holiday 2020' })).toBeAttached();
+
+  // `n` on a keyboard: the next file, as a video of its own.
+  await press(page, 'n');
+  await expect.poll(async () => (await mpv(page)).path).toBe('D:\\Videos\\Holiday 2020.mkv');
+  await expect(page.locator('.player-label')).toContainText('Holiday 2020');
+  // The last in the folder: nothing after it.
+  await expect(page.getByRole('button', { name: /^Previous file/ })).toBeAttached();
+  await expect(page.getByRole('button', { name: /^Next file/ })).toHaveCount(0);
+
+  // A remote's transport key goes back.
+  await press(page, 'MediaTrackPrevious');
+  await expect.poll(async () => (await mpv(page)).path).toBe(HOLIDAY);
+
+  // D-pad: Down into the controls, then along to Previous file and OK.
+  await press(page, 'ArrowDown');
+  const previous = page.getByRole('button', { name: 'Previous file: Beach' });
+  await expect
+    .poll(async () => {
+      if (await previous.evaluate((el) => el.classList.contains('focused'))) return true;
+      await press(page, 'ArrowLeft');
+      return previous.evaluate((el) => el.classList.contains('focused'));
+    })
+    .toBe(true);
+  await press(page, 'Enter');
+  await expect.poll(async () => (await mpv(page)).path).toBe('D:\\Videos\\Beach.mkv');
+  await expect(page.getByRole('button', { name: /^Previous file/ })).toHaveCount(0);
+
+  // A mouse on the Next button.
+  await page.mouse.move(400, 300);
+  await page.getByRole('button', { name: 'Next file: Holiday 2019' }).click();
+  await expect.poll(async () => (await mpv(page)).path).toBe(HOLIDAY);
+});

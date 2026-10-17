@@ -1,9 +1,22 @@
 /**
  * The episodes either side of the one playing, for the previous/next buttons,
- * `n` and `p`, and whether there is anything for Up next to offer.
+ * `n` and `p`, and whether there is anything for Up next to offer; and for a
+ * video played from outside the library, the files either side in its folder.
  */
 import { useEffect, useState } from 'react';
-import { nextEpisode, previousEpisode, type EpisodeRef } from './api';
+import { folderNeighbours, nextEpisode, previousEpisode, type EpisodeRef } from './api';
+
+/** Where previous or next goes: an episode, or a file in the same folder. */
+export interface Step {
+  kind: 'episode' | 'file';
+  name: string;
+  play: () => void;
+}
+
+export interface Steps {
+  prev: Step | null;
+  next: Step | null;
+}
 
 export function useNeighbours(fileId: number | null) {
   /** The episodes either side of this file, or null where there is none. */
@@ -40,4 +53,35 @@ export function useNeighbours(fileId: number | null) {
   }, [fileId]);
 
   return neighbours;
+}
+
+/**
+ * The video files either side of `path` in its own folder, in the order a
+ * file manager lists them; `null` for a library file, which has episodes
+ * instead. Cleared on every change of file, as above.
+ */
+export function useFolderNeighbours(path: string | null) {
+  const [files, setFiles] = useState<{ prev: string | null; next: string | null }>({
+    prev: null,
+    next: null,
+  });
+
+  useEffect(() => {
+    /* eslint-disable-next-line react-hooks/set-state-in-effect */
+    setFiles({ prev: null, next: null });
+    if (path === null) return;
+
+    let cancelled = false;
+    void folderNeighbours(path)
+      .then((found) => {
+        if (!cancelled) setFiles(found);
+      })
+      .catch((e) => console.warn('files beside the video unavailable', e));
+
+    return () => {
+      cancelled = true;
+    };
+  }, [path]);
+
+  return files;
 }

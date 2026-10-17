@@ -7,7 +7,8 @@
  *    end of the file, and stopping when the player closes
  *  - useProgressSave: the resume point, kept current
  *  - useTracks, useOnlineSubtitles: audio and subtitles, remembered per title
- *  - useNeighbours, useSkipMarkers, useUpNext: the episodes either side,
+ *  - useNeighbours, useSkipMarkers, useUpNext: the episodes (or, outside the
+ *    library, the files in the folder) either side,
  *    skipping the intro, a recap and the credits, and the next episode
  *  - useOsd, usePanels: the controls and who has the arrow keys; the track
  *    and stats panels
@@ -24,7 +25,7 @@
  * is the cover shown *before* a file's first frame, which exists precisely
  * because a transparent window with no frame up shows the desktop.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   doesFocusableExist,
   FocusContext,
@@ -34,7 +35,7 @@ import {
 import FocusButton from '../ui/FocusButton';
 import { endsAtLabel } from '../ui/format';
 import { useTvMode } from '../ui/tv';
-import type { PlaybackTarget } from './api';
+import { episodeRefLabel, type EpisodeRef, type PlaybackTarget } from './api';
 import { isPaused, seekBy, seekTo, setPaused } from './engine';
 import { PLAYER_PLAY_KEY, PLAYER_SHELL_KEY } from './focusKeys';
 import { ALL_ARROWS, useFocusGroup } from '../ui/focusGroups';
@@ -45,7 +46,7 @@ import { skipPromptFor } from './skip';
 import StatsPanel from './StatsPanel';
 import TrackPanel from './TrackPanel';
 import UpNextCard from './UpNextCard';
-import { useNeighbours } from './useNeighbours';
+import { useFolderNeighbours, useNeighbours, type Step, type Steps } from './useNeighbours';
 import { useOnlineSubtitles } from './useOnlineSubtitles';
 import { useOsd, useOsdIdleLeave } from './useOsd';
 import { usePanels } from './usePanels';
@@ -59,7 +60,7 @@ import { useSkipMarkers } from './useSkipMarkers';
 import { useTracks } from './useTracks';
 import { useUpNext } from './useUpNext';
 import { useVolume } from './useVolume';
-import { noteFirstFrame } from '../library/opened';
+import { nameOf, noteFirstFrame, targetFor } from '../library/opened';
 import { isSoundLostNotice } from './soundWatch';
 
 interface Props {
@@ -169,6 +170,24 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   // to leave after ten seconds, which on an intro offered from 0:00 would
   // remove it before the intro had even begun; it now stays until the intro is
   // over, and the seek that skipping performs is what removes it.
+
+  // Previous/next: the episodes either side, or for a video outside the
+  // library the files beside it in its folder (LOCAL-MEDIA.md phase 1).
+  const folder = useFolderNeighbours(target.resumeByPath ? target.path : null);
+  const steps = useMemo<Steps>(() => {
+    const episode = (e: EpisodeRef | null): Step | null =>
+      e && { kind: 'episode', name: episodeRefLabel(e), play: () => playNeighbour(e) };
+    const file = (path: string | null): Step | null =>
+      path === null
+        ? null
+        : { kind: 'file', name: nameOf(path), play: () => void targetFor(path).then(onPlayTarget) };
+    return {
+      prev: episode(neighbours.prev) ?? file(folder.prev),
+      next: episode(neighbours.next) ?? file(folder.next),
+    };
+  }, [neighbours, folder, playNeighbour, onPlayTarget]);
+  const hasPrev = steps.prev !== null;
+  const hasNext = steps.next !== null;
 
   const skipPrompt = skipPromptFor(active, {
     autoSkip,
@@ -310,8 +329,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     skipPrompt,
     performSkip,
     upNext,
-    neighbours,
-    playNeighbour,
+    steps,
     osdFocus,
     enterOsdFocus,
     leaveOsdFocus,
@@ -363,8 +381,8 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     hasUpNext,
     showStats,
     showTracks,
-    neighbours.prev,
-    neighbours.next,
+    hasPrev,
+    hasNext,
   ]);
 
   const endsAt = endsAtLabel(timePos, duration, now);
@@ -466,7 +484,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         timePos={timePos}
         duration={duration}
         paused={paused}
-        neighbours={neighbours}
+        steps={steps}
         showTracks={showTracks}
         volume={volume}
         muted={muted}
@@ -480,7 +498,6 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         onDragEnd={onDragEnd}
         onSeekBy={onSeekBy}
         onTogglePause={onTogglePause}
-        onPlayNeighbour={playNeighbour}
         onTracks={onTracks}
         onVolumeChange={changeVolume}
         onVolumeSet={setVolumeLevel}

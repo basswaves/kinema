@@ -177,6 +177,10 @@ export const nextEpisode = (fileId: number) =>
 export const previousEpisode = (fileId: number) =>
   invoke<EpisodeRef | null>('previous_episode', { fileId });
 
+/** The video files either side of `path` in its folder (opened.rs). */
+export const folderNeighbours = (path: string) =>
+  invoke<{ prev: string | null; next: string | null }>('folder_neighbours', { path });
+
 /**
  * What pressing Play on a series should start: the earliest episode not yet
  * seen, or the first one if the whole run has been.

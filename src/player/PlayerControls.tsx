@@ -7,7 +7,7 @@ import { memo } from 'react';
 import FocusButton from '../ui/FocusButton';
 import { formatTime } from '../ui/format';
 import { setShortcutsOpen } from '../ui/shortcutsState';
-import { episodeRefLabel, type EpisodeRef } from './api';
+import type { Steps } from './useNeighbours';
 import { PLAYER_PLAY_KEY, PLAYER_TRACKS_KEY } from './focusKeys';
 import {
   BackTenIcon,
@@ -32,8 +32,11 @@ interface Props {
   timePos: number | null;
   duration: number | null;
   paused: boolean;
-  /** The episodes either side; a button is drawn only for one that exists. */
-  neighbours: { prev: EpisodeRef | null; next: EpisodeRef | null };
+  /**
+   * The episodes either side, or for a video outside the library the files
+   * beside it; a button is drawn only for one that exists.
+   */
+  steps: Steps;
   showTracks: boolean;
   volume: number;
   muted: boolean;
@@ -52,7 +55,6 @@ interface Props {
   onDragEnd: (seconds: number | null) => void;
   onSeekBy: (seconds: number) => void;
   onTogglePause: () => void;
-  onPlayNeighbour: (episode: EpisodeRef) => void;
   /** Audio & subtitles: opens the track panel, or closes it. */
   onTracks: () => void;
   onVolumeChange: (delta: number) => void;
@@ -65,7 +67,7 @@ function PlayerControls({
   timePos,
   duration,
   paused,
-  neighbours,
+  steps,
   showTracks,
   volume,
   muted,
@@ -79,7 +81,6 @@ function PlayerControls({
   onDragEnd,
   onSeekBy,
   onTogglePause,
-  onPlayNeighbour,
   onTracks,
   onVolumeChange,
   onVolumeSet,
@@ -144,14 +145,14 @@ function PlayerControls({
           </FocusButton>
         </div>
         <div className="player-group player-group-centre">
-          {/* Rendered only for episodes that genuinely have a neighbour, so
-              these never appear on a film or at the ends of a run. */}
-          {neighbours.prev && (
+          {/* Rendered only where there genuinely is a neighbour, so these
+              never appear on a film or at the ends of a run or a folder. */}
+          {steps.prev && (
             <FocusButton
               className="icon-button"
-              label={`Previous episode: ${episodeRefLabel(neighbours.prev)}`}
-              title={`Previous: ${episodeRefLabel(neighbours.prev)} (P)`}
-              onSelect={() => onPlayNeighbour(neighbours.prev as EpisodeRef)}
+              label={`Previous ${steps.prev.kind}: ${steps.prev.name}`}
+              title={`Previous: ${steps.prev.name} (P)`}
+              onSelect={steps.prev.play}
             >
               <PreviousIcon />
             </FocusButton>
@@ -181,12 +182,12 @@ function PlayerControls({
           >
             <ForwardTenIcon />
           </FocusButton>
-          {neighbours.next && (
+          {steps.next && (
             <FocusButton
               className="icon-button"
-              label={`Next episode: ${episodeRefLabel(neighbours.next)}`}
-              title={`Next: ${episodeRefLabel(neighbours.next)} (N)`}
-              onSelect={() => onPlayNeighbour(neighbours.next as EpisodeRef)}
+              label={`Next ${steps.next.kind}: ${steps.next.name}`}
+              title={`Next: ${steps.next.name} (N)`}
+              onSelect={steps.next.play}
             >
               <NextIcon />
             </FocusButton>

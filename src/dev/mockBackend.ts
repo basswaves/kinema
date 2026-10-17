@@ -776,6 +776,13 @@ export function listenerCounts(): Record<string, number> {
  * as its problems. `kinemaMockTitles=N` adds N more films to the library, for
  * checking how the shelves and search behave on a big one.
  */
+/** The videos in the folder an outside video is played from. */
+const LOOSE_FOLDER = [
+  'D:\\Videos\\Beach.mkv',
+  'D:\\Videos\\Holiday 2019.mkv',
+  'D:\\Videos\\Holiday 2020.mkv',
+];
+
 /** The video "started for" has been taken (opened_at_launch). */
 let openedTaken = false;
 /** Resume points of videos outside the library, by path. */
@@ -1164,6 +1171,15 @@ const handlers: Record<string, Handler> = {
   },
   playable_path: (a) =>
     (a.paths as string[]).find((p) => /\.(mkv|mp4|m2ts|iso|avi|webm)$/i.test(p)) ?? null,
+  // A folder of videos outside the library, in file-manager order, for the
+  // player's previous/next file (opened.rs folder_neighbours).
+  folder_neighbours: (a) => {
+    const at = LOOSE_FOLDER.indexOf(String(a.path));
+    return {
+      prev: at > 0 ? LOOSE_FOLDER[at - 1] : null,
+      next: at >= 0 && at < LOOSE_FOLDER.length - 1 ? LOOSE_FOLDER[at + 1] : null,
+    };
+  },
   get_loose_progress: (a): Progress | null => {
     const row = looseProgress.get(String(a.path));
     return row ? { position_secs: row.position, duration_secs: row.duration, completed: false } : null;

@@ -7,6 +7,14 @@ makes no stability promises.
 
 ## [Unreleased]
 
+### Added
+
+- **Previous and next file for a video outside the library.** A video opened
+  from the file manager or dropped on the window now has previous/next
+  buttons, `p`/`n` and a remote's track keys for the videos beside it in its
+  folder, in the order the file manager lists them. The end of a video still
+  ends playback, as before.
+
 ### Fixed
 
 - A video whose file name starts with `-`, opened with Kinema, was passed over.

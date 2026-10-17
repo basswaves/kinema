@@ -419,6 +419,7 @@ pub fn run() {
             playback::save_loose_progress,
             opened::opened_at_launch,
             opened::playable_path,
+            opened::folder_neighbours,
             opened::library_file,
             default_player::player_offer,
             default_player::offer_as_player,

@@ -7,6 +7,7 @@
  */
 import { useEffect } from 'react';
 import type { EpisodeRef } from './api';
+import type { Steps } from './useNeighbours';
 import { setPaused } from './engine';
 import type { ActiveSkip } from './skip';
 import { VOLUME_STEP } from './volume';
@@ -27,8 +28,7 @@ export function usePlayerKeys({
   skipPrompt,
   performSkip,
   upNext,
-  neighbours,
-  playNeighbour,
+  steps,
   osdFocus,
   enterOsdFocus,
   leaveOsdFocus,
@@ -59,8 +59,8 @@ export function usePlayerKeys({
   performSkip: () => Promise<void>;
   /** The Up next card showing, which OK plays. */
   upNext: EpisodeRef | null;
-  neighbours: { prev: EpisodeRef | null; next: EpisodeRef | null };
-  playNeighbour: (episode: EpisodeRef) => void;
+  /** Previous/next: episodes, or the files beside a video outside the library. */
+  steps: Steps;
   /** The controls hold the arrows: then they, and OK, belong to the spatial system. */
   osdFocus: boolean;
   enterOsdFocus: () => void;
@@ -132,21 +132,21 @@ export function usePlayerKeys({
           e.preventDefault();
           scrubBy(e.key === 'ArrowLeft' ? -1 : 1, e.repeat);
           break;
-        // Episode stepping. `n`/`p` for a keyboard; the media-key names are
+        // Episode (or file) stepping. `n`/`p` for a keyboard; the media-key names are
         // what the transport buttons on a TV remote actually send, and a remote
         // has no letters to press instead.
         case 'n':
         case 'MediaTrackNext':
-          if (neighbours.next) {
+          if (steps.next) {
             e.preventDefault();
-            playNeighbour(neighbours.next);
+            steps.next.play();
           }
           break;
         case 'p':
         case 'MediaTrackPrevious':
-          if (neighbours.prev) {
+          if (steps.prev) {
             e.preventDefault();
-            playNeighbour(neighbours.prev);
+            steps.prev.play();
           }
           break;
         // The transport keys on a remote or a keyboard's media row. Handled in
@@ -237,8 +237,7 @@ export function usePlayerKeys({
     skipPrompt,
     performSkip,
     upNext,
-    neighbours,
-    playNeighbour,
+    steps,
     osdFocus,
     enterOsdFocus,
     leaveOsdFocus,

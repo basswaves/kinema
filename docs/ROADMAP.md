@@ -12,9 +12,10 @@ Ideas and reports are welcome as [issues](https://github.com/Basswaves/kinema/is
 ## Next
 
 More of Kinema as a player for any video, not only a matched library: the
-next and previous file in a folder when a video was opened from Explorer;
-**Videos** folders for home videos and clips, with a picture taken from the
-file; browsing folders inside Kinema; and playlists. (Done in 0.11.0: a
+browsing folders inside Kinema; playlists; and the picture and sound badges
+for a video. (Done since 0.11.0: the next and previous file in a folder when
+a video was opened from Explorer, and **Videos** folders for home videos and
+clips, with a picture taken from the file, under a Library tab. Done in 0.11.0: a
 Windows installer beside the ZIP; Blu-ray folders and disc images on Windows
 and Linux; Kinema as a video player on Windows — open a file from Explorer,
 or drop it on the window; and a film or show no database lists, kept under

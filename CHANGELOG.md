@@ -9,6 +9,32 @@ makes no stability promises.
 
 ### Added
 
+- **Videos folders.** A third kind of library folder, for what is neither a
+  film nor a show: home recordings, concerts, downloads. Settings → Library →
+  Add Videos folder, then give it a name (it starts as the folder's own).
+  Its files are never matched, so they never land in Needs attention, and
+  re-parsing leaves them alone.
+- **A Library tab.** The top bar is now Home, Movies, TV shows, Library,
+  Search, Settings, ?. Library has one tile for each Videos folder, and is
+  where folders and playlists will go, so the bar does not grow again.
+- **A Videos folder's page.** Its own files first, then one group for each
+  sub-folder with Play all, which starts at the first video you have not
+  finished. Each video is a tile with a frame taken from the file, its name,
+  its date (from a date in the name such as 2024-05-02, else the file's own)
+  and a progress bar or a tick. On Android, and where no frame can be taken,
+  the tile has a plain picture. Clearing the artwork cache removes the frames
+  too; they are taken again.
+- **Previous and next through a video's folder.** The buttons, `n`/`p` and
+  Up next step through the videos beside it in file-manager order (clip 2
+  before clip 10), as they do for episodes.
+- **Videos are remembered like the rest.** Resume, watched, Continue Watching
+  (one card for each folder, removable) and Search (a Videos row) all cover
+  them. They never become Home's big picture, and a library of videos alone
+  is not treated as a first run. Audio and subtitle choices are remembered
+  for each folder instead of each title.
+- **Services stay out of videos.** No intro or credits skipping, no
+  OpenSubtitles, and nothing sent to SIMKL or Trakt, since a video has no
+  title to send.
 - **Previous and next file for a video outside the library.** A video opened
   from the file manager or dropped on the window now has previous/next
   buttons, `p`/`n` and a remote's track keys for the videos beside it in its
@@ -22,6 +48,10 @@ makes no stability promises.
 ### Fixed
 
 - A video whose file name starts with `-`, opened with Kinema, was passed over.
+
+### Library
+
+The library is upgraded (schema 24); a safety copy is made first.
 
 ## [0.11.0] — 2026-10-17
 

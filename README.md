@@ -178,6 +178,9 @@ audio and subtitles, volume. Back steps back to wherever you came from.
   ratio measured from the picture itself, so a 2.39:1 film in a 16:9 file says
   2.39:1. Where it came from (UHD Blu-ray remux, WEB-DL…) is read from the
   release name; nothing else is.
+- **Keeps home videos and clips apart.** A Videos folder holds what is neither
+  a film nor a show, never matched, each with a picture taken from the file,
+  under the Library tab.
 - **Remembers where you were**, per file, and offers the next episode.
 - **Tells SIMKL and Trakt what you watched**, if you connect them: whatever you
   finish in Kinema is added to your account. Connecting is a code on screen and a

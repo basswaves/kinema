@@ -315,6 +315,15 @@ forward slashes is correct on Windows.
 `$APPDATA` here means the *app's* data directory
 (`…\Roaming\com.kinema.app`), not the OS `%APPDATA%`.
 
+### A picture outside the asset scope renders as nothing
+
+The page may load pictures only from the asset protocol's scope,
+`$APPDATA/artwork/*`. A file written anywhere else gets a perfectly good
+`convertFileSrc()` URL, the image simply never shows, and nothing is logged.
+That is why the frames taken from videos live in `artwork/` as
+`frame-<id>.jpg`, beside the posters, and not in a folder of their own (which
+would also need `/**`, see above). Put any new kind of picture there.
+
 ### The content security policy refuses things without a word
 
 `tauri.conf.json` sets a CSP: scripts from the app only, images from the app,
@@ -1722,6 +1731,13 @@ function, as `display.rs` does for its two signal helpers and
 is one system's (`equipment/edid.rs`, Linux's EDID reader). A file-wide allow
 outlives its reason: `display.rs` kept one after Linux gained its own
 switcher, and it hid from Linux's clippy whatever that switcher stopped using.
+
+### A constant used only off Android is dead code to Android's clippy
+
+A constant (or helper) used only inside `cfg(not(target_os = "android"))` code
+passes every local check and fails CI's Android clippy under `-D warnings`.
+Nothing on a desktop shows it. **Do:** give the item the same `cfg`, as the
+frame constants for Videos have.
 
 ### New files on Linux are readable by every account
 

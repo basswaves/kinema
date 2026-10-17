@@ -3363,6 +3363,40 @@ the backend is the same SQL the tests run on a migrated database.
   loose resume points are pruned only when a new one is added, not on every
   save.
 
+## Videos folders and the Library tab (2026-10-17)
+
+Phase 2 of the local-media plan: a third kind of library folder, for what is
+neither a film nor a show.
+
+- **One Library tab, not more tabs.** The top bar already fills the width of a
+  TV layout. Videos, and later Folders and Playlists, go inside one Library
+  page (one tile for each), so the bar is Home, Movies, TV shows, Library,
+  Search, Settings, ? and never grows again.
+- **Never matched.** A wrong match is worse than none, and a home recording
+  has nothing to match against. Videos files are not parsed, never reach
+  Needs attention, and re-parsing leaves them alone. The name is the file name
+  without its extension, with separators as spaces; the date comes from a date
+  in the name, else the file's own.
+- **The frame comes from a second libmpv first.** It runs with `vo=image`, one
+  file at a time, and waits while a film plays. Measured over a network share
+  it took 0.65 to 1 s a file, ffmpeg 1.2 s; on local files in the real app 45
+  to 123 ms. mpv is always there on a desktop and ffmpeg is optional, so ffmpeg
+  is only the fallback. Where neither works, and always on Android (no mpv
+  there), the tile has a plain picture. Frames are kept in the artwork folder
+  because the page can load pictures from nowhere else (GOTCHAS, Tauri).
+- **Steps reuse the episode path.** Previous, next, `n`/`p` and Up next ask the
+  same functions episodes do, which now also answer for a video: its own
+  folder, in file-manager order. A second mechanism would have drifted.
+- **Track choices are kept for each folder.** Videos have no title to hang
+  them on, and a folder of recordings usually shares one language setup.
+- **Services are off.** Intro and credits skipping, OpenSubtitles, SIMKL and
+  Trakt all need a title to look up or send, and a video has none. Videos
+  never become Home's hero, and a library of videos alone is not a first run.
+- **Library upgrade** to schema 24 (a name for each folder, track choices,
+  removed Continue Watching cards), with the usual safety copy. Tried on a copy
+  of a real 0.11.0 library: every file kept.
+- Not built yet: picture and sound badges for a video.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

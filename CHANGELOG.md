@@ -14,6 +14,10 @@ makes no stability promises.
   buttons, `p`/`n` and a remote's track keys for the videos beside it in its
   folder, in the order the file manager lists them. The end of a video still
   ends playback, as before.
+- **"Open with" on Linux.** The `.deb` and `.rpm` now list Kinema for video
+  files, so a file manager offers it under Open With. The `.tar.gz` folder
+  has Settings → Playback → Add Kinema to the app menu, which puts it in the
+  app menu and in Open With for your account only, and can take it out again.
 
 ### Fixed
 

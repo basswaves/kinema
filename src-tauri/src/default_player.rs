@@ -1,4 +1,6 @@
-//! Offering Kinema to Windows as a video player (Settings → Playback).
+//! Offering Kinema to Windows as a video player (Settings → Playback). On
+//! Linux the same button puts the unpacked folder in the app menu and in
+//! "Open with" (`app_menu.rs`); the packages do that themselves.
 //!
 //! Windows does not let a program make itself the default for anything: the
 //! choice is the user's, made in Settings → Default apps, and protected so no
@@ -326,7 +328,11 @@ pub fn player_offer() -> PlayerOffer {
     {
         PlayerOffer { offered: offer::is_offered(BASE) }
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "linux")]
+    {
+        PlayerOffer { offered: crate::app_menu::is_added() }
+    }
+    #[cfg(not(any(windows, target_os = "linux")))]
     {
         PlayerOffer { offered: false }
     }
@@ -343,10 +349,17 @@ pub fn offer_as_player(app: tauri::AppHandle) -> Result<(), String> {
         crate::log!("default player: offered to Windows ({exe})");
         open_default_apps(app)
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "linux")]
     {
         let _ = app;
-        Err("Only Windows is offered a video player this way.".into())
+        crate::app_menu::add()?;
+        crate::log!("default player: Kinema added to the app menu");
+        Ok(())
+    }
+    #[cfg(not(any(windows, target_os = "linux")))]
+    {
+        let _ = app;
+        Err("Only Windows and Linux are offered a video player this way.".into())
     }
 }
 
@@ -372,7 +385,13 @@ pub fn remove_as_player() -> Result<(), String> {
         }
         Ok(())
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "linux")]
+    {
+        crate::app_menu::remove()?;
+        crate::log!("default player: Kinema taken out of the app menu");
+        Ok(())
+    }
+    #[cfg(not(any(windows, target_os = "linux")))]
     {
         Ok(())
     }
@@ -391,6 +410,10 @@ pub fn refresh() {
                 Err(e) => crate::log!("default player: could not update the offer: {e}"),
             }
         }
+    }
+    #[cfg(target_os = "linux")]
+    if !cfg!(debug_assertions) && crate::selftest::plan_path().is_none() {
+        crate::app_menu::refresh();
     }
 }
 

@@ -6,6 +6,7 @@ mod capabilities;
 mod artwork;
 mod backup;
 mod db;
+mod app_menu;
 mod default_player;
 pub use default_player::uninstall_cleanup;
 mod detect;

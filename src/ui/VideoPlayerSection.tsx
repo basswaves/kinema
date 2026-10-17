@@ -1,6 +1,7 @@
 /**
  * Settings → Playback → Opening videos: offering Kinema to Windows as a video
- * player (default_player.rs), and taking the offer back.
+ * player (default_player.rs), and taking the offer back. On Linux, the
+ * unpacked folder's way to the app menu and "Open with" (app_menu.rs).
  *
  * Windows does not let a program make itself the default; the offer puts
  * Kinema in each video type's "Open with" and in Default apps, and opens
@@ -13,7 +14,7 @@ import FocusButton from './FocusButton';
 import { userError } from './errors';
 import { offerAsPlayer, openDefaultApps, playerOffer, removeAsPlayer } from './api';
 
-export default function VideoPlayerSection() {
+export default function VideoPlayerSection({ linux }: { linux: boolean }) {
   const [offered, setOffered] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,11 +40,41 @@ export default function VideoPlayerSection() {
     <section className="settings-section">
       <h2>Opening videos</h2>
       <p className="settings-intro">
-        Kinema plays any video you open with it from File Explorer, or drop on its window, whether
+        Kinema plays any video you open with it from {linux ? 'your file manager' : 'File Explorer'},
+        or drop on its window, whether
         or not it is in your library. One in the library plays as itself; any other is remembered
         where you stopped. Started for a video, Kinema closes when the video is done.
       </p>
-      {offered === null && !error ? null : offered ? (
+      {offered === null && !error ? null : linux ? (
+        <>
+          <div className="settings-row">
+            {offered ? (
+              <ConfirmButton
+                keepInView="nearest"
+                className="btn-secondary"
+                confirmLabel="Yes, take Kinema out"
+                onConfirm={() => run(removeAsPlayer)}
+              >
+                Take Kinema out of the app menu
+              </ConfirmButton>
+            ) : (
+              <FocusButton
+                keepInView="nearest"
+                className="btn-secondary"
+                onSelect={() => run(offerAsPlayer)}
+              >
+                Add Kinema to the app menu
+              </FocusButton>
+            )}
+          </div>
+          <p className="settings-hint">
+            {offered
+              ? 'Kinema is in the app menu and in Open with for video files, from this folder. '
+              : 'Puts this folder’s Kinema in the app menu and in Open with for video files. '}
+            Your file manager is where you choose which program opens each kind of video.
+          </p>
+        </>
+      ) : offered ? (
         <>
           <div className="settings-row">
             <FocusButton

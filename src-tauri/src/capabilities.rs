@@ -51,7 +51,8 @@ pub struct Capabilities {
     pub installs_ffmpeg: bool,
     /// Kinema can offer itself to the system as a video player, for the
     /// user to choose in the system's own settings (Windows' Default apps,
-    /// default_player.rs).
+    /// default_player.rs), or on Linux put the unpacked folder in the app
+    /// menu and "Open with" (app_menu.rs; the packages do it themselves).
     pub offers_player: bool,
     /// The system puts its own keyboard on screen whenever a text field takes
     /// typing (Android). Kinema then lets a field take typing without it, and
@@ -134,7 +135,7 @@ fn work_out() -> Capabilities {
         system_output: cfg!(target_os = "android"),
         runs_programs: cfg!(desktop),
         installs_ffmpeg: cfg!(windows),
-        offers_player: cfg!(windows),
+        offers_player: cfg!(windows) || (cfg!(target_os = "linux") && !crate::app_menu::packaged()),
         screen_keyboard: cfg!(mobile),
         opens_folders: cfg!(desktop),
         shares_files: cfg!(target_os = "android"),

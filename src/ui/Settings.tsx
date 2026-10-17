@@ -1041,7 +1041,7 @@ export default function Settings({
                   }
                 />
               </section>
-              {can?.offers_player && <VideoPlayerSection />}
+              {can?.offers_player && <VideoPlayerSection linux={can.system === 'Linux'} />}
               </>
             )}
 

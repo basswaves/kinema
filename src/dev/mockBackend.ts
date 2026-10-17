@@ -1309,7 +1309,8 @@ const handlers: Record<string, Handler> = {
       system_output: false,
       runs_programs: true,
       installs_ffmpeg: full,
-      offers_player: full,
+      // Linux as the unpacked folder, which offers the app-menu entry.
+      offers_player: true,
       screen_keyboard: false,
       opens_folders: true,
       shares_files: false,

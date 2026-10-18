@@ -13,7 +13,7 @@ Ideas and reports are welcome as [issues](https://github.com/Basswaves/kinema/is
 
 More of Kinema as a player for any video, not only a matched library:
 the picture and sound badges for a video; and, for playlists, shuffle and
-repeat, later. (Done since 0.11.0, not yet released: Trakt resume points, so a
+repeat, later. (Done in 0.12.0: Trakt resume points, so a
 film stopped on one device continues on another; the next and previous file in
 a folder when a video was opened from Explorer; **Videos** folders for home
 videos and clips, with a picture taken from the file, under a Library tab; and
@@ -47,7 +47,8 @@ entered rather than read.
 The Windows installer came with 0.11.0: it leaves nothing behind when
 removed — the program, its shortcuts, the "Open with" entries, and the library
 and settings too, after asking. A winget package, `Basswaves.Kinema`, is
-ready, and its first submission follows the 0.11.0 release; it brings ffmpeg
+ready; its first submission was made after 0.11.0 and is waiting for review
+by winget's volunteer moderators. It brings ffmpeg
 along, for the badges. Other package managers may follow. The
 release workflow writes and checks the package's description on every build, so
 a new version needs little hand work there. Automatic updates stay out.

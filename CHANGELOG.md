@@ -7,6 +7,16 @@ makes no stability promises.
 
 ## [Unreleased]
 
+## [0.12.0] — 2026-10-18
+
+For Windows and Linux: Videos folders and a Library tab, Folders (browse
+drives and shares inside Kinema), Playlists with `.m3u` import and export,
+Trakt resume across devices, previous and next file for a video opened from
+outside the library, and Open With on Linux. Android gets the Library
+screens, Folders, playlists and Trakt resume, but not `.m3u` import and
+export, and its video tiles show a plain picture. The library is upgraded
+(schema 26); a safety copy is made first.
+
 ### Added
 
 - **Videos folders.** A third kind of library folder, for what is neither a
@@ -15,8 +25,8 @@ makes no stability promises.
   Its files are never matched, so they never land in Needs attention, and
   re-parsing leaves them alone.
 - **A Library tab.** The top bar is now Home, Movies, TV shows, Library,
-  Search, Settings, ?. Library has one tile for each Videos folder, and is
-  where folders and playlists will go, so the bar does not grow again.
+  Search, Settings, ?. Library has tiles for Videos folders, Folders and
+  Playlists, so the bar does not grow again.
 - **A Videos folder's page.** Its own files first, then one group for each
   sub-folder with Play all, which starts at the first video you have not
   finished. Each video is a tile with a frame taken from the file, its name,
@@ -44,7 +54,6 @@ makes no stability promises.
   files, so a file manager offers it under Open With. The `.tar.gz` folder
   has Settings → Playback → Add Kinema to the app menu, which puts it in the
   app menu and in Open With for your account only, and can take it out again.
-
 - **Folders, inside Kinema.** The Library page has a Folders tile that opens
   a page for browsing your drives and network shares and playing any video
   in them, on Windows, Linux and Android. It starts with places: your drives
@@ -56,7 +65,6 @@ makes no stability promises.
   video in a library folder plays as the library's own file (resume, languages,
   Skip intro); any other plays as a video of its own. Back goes up a level,
   and back from a film returns to its folder with the film selected.
-
 - **Playlists.** The Library page has a Playlists tile beside Videos folders
   and Folders. It shows a tile for each playlist, the one touched last first,
   "+ New playlist" (you type the name) and, on desktops, "Import .m3u…". A
@@ -81,7 +89,6 @@ makes no stability promises.
   addresses are read. Export writes `#EXTM3U` with a length, a name and the
   path for each item. Import and export are on Windows and Linux, not yet
   Android. The library upgrades to schema 26 with the usual safety copy.
-
 - **Trakt resume across devices.** With Trakt connected, Kinema continues on
   one device where a film or episode was stopped on another. It is on while
   Trakt is connected; Settings → Accounts → Trakt, "Continue where you stopped
@@ -107,7 +114,7 @@ makes no stability promises.
 
 ### Library
 
-The library is upgraded (schema 25); a safety copy is made first.
+The library is upgraded (schema 26); a safety copy is made first.
 
 ## [0.11.0] — 2026-10-17
 

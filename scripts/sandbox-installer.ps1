@@ -311,7 +311,10 @@ foreach ($wait in 4, 4, 8, 8, 15) { Start-Sleep -Seconds $wait; Move-Sandbox }
 $result = Join-Path $stage 'result.txt'
 $deadline = (Get-Date).AddMinutes($TimeoutMinutes)
 while ((Get-Date) -lt $deadline) {
-    if ((Test-Path $result) -and (Select-String -Path $result -Pattern '^DONE$' -Quiet)) { break }
+    # The sandbox may be writing the file at that moment: a read it refuses
+    # is not the end, only a try for the next round.
+    $done = try { (Test-Path $result) -and (Select-String -Path $result -Pattern '^DONE$' -Quiet -ErrorAction Stop) } catch { $false }
+    if ($done) { break }
     Start-Sleep -Seconds 10
     Move-Sandbox
 }

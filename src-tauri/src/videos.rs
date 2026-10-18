@@ -351,6 +351,10 @@ pub async fn video_frame(
     let Some(path) = path else { return Ok(None) };
 
     let _one = TAKING.lock().await;
+    // Taken while this one waited its turn (the same tile asked twice).
+    if let Some(found) = cached_frame(&frames, file_id) {
+        return Ok(Some(found));
+    }
     crate::jobs::wait_while_playing_async().await;
     let target = frame_path(&frames, file_id);
     let taken = crate::jobs::off_main(move || {

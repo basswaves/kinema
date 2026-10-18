@@ -26,6 +26,7 @@ use crate::util::{now_secs, to_string_err};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use tauri::Manager;
 
 /// One item, as the playlist page, the Home rail and the player use it.
 #[derive(Serialize, Debug, Clone)]
@@ -185,10 +186,17 @@ fn summaries(conn: &Connection, art: &str, frames: &Path) -> Result<Vec<Playlist
 }
 
 /// The playable item after (or before) `item_id`, skipping files the last scan
-/// did not find. None at either end: a playlist plays once through.
-fn step(items: &[PlaylistEntry], item_id: i64, forward: bool) -> Option<PlaylistEntry> {
+/// did not find and files outside the library that are no longer there
+/// (`exists`, asked only of those). None at either end: a playlist plays once
+/// through.
+fn step(
+    items: &[PlaylistEntry],
+    item_id: i64,
+    forward: bool,
+    exists: impl Fn(&Path) -> bool,
+) -> Option<PlaylistEntry> {
     let here = items.iter().position(|e| e.item_id == item_id)?;
-    let playable = |e: &&PlaylistEntry| !e.missing;
+    let playable = |e: &&PlaylistEntry| !e.missing && (e.file_id.is_some() || exists(Path::new(&e.path)));
     if forward {
         items[here + 1..].iter().find(playable).cloned()
     } else {
@@ -218,6 +226,19 @@ fn create(conn: &Connection, name: &str) -> Result<i64, String> {
 
 fn add(conn: &Connection, playlist_id: i64, items: &[NewItem]) -> Result<Added, String> {
     let tx = conn.unchecked_transaction().map_err(to_string_err)?;
+    let result = add_rows(&tx, playlist_id, items)?;
+    tx.commit().map_err(to_string_err)?;
+    Ok(result)
+}
+
+/// [`add`] inside a transaction the caller holds.
+fn add_rows(tx: &Connection, playlist_id: i64, items: &[NewItem]) -> Result<Added, String> {
+    // The same file twice is the same name as the system compares names.
+    let same_path = if cfg!(windows) {
+        "SELECT EXISTS (SELECT 1 FROM playlist_items WHERE playlist_id = ?1 AND path = ?2 COLLATE NOCASE)"
+    } else {
+        "SELECT EXISTS (SELECT 1 FROM playlist_items WHERE playlist_id = ?1 AND path = ?2)"
+    };
     let mut next: i64 = tx
         .query_row(
             "SELECT COALESCE(MAX(position), 0) + 1 FROM playlist_items WHERE playlist_id = ?1",
@@ -228,11 +249,7 @@ fn add(conn: &Connection, playlist_id: i64, items: &[NewItem]) -> Result<Added, 
     let mut result = Added { added: 0, already: 0 };
     for item in items {
         let there: bool = tx
-            .query_row(
-                "SELECT EXISTS (SELECT 1 FROM playlist_items WHERE playlist_id = ?1 AND path = ?2)",
-                params![playlist_id, item.path],
-                |r| r.get(0),
-            )
+            .query_row(same_path, params![playlist_id, item.path], |r| r.get(0))
             .map_err(to_string_err)?;
         if there {
             result.already += 1;
@@ -246,8 +263,7 @@ fn add(conn: &Connection, playlist_id: i64, items: &[NewItem]) -> Result<Added, 
         next += 1;
         result.added += 1;
     }
-    touch(&tx, playlist_id)?;
-    tx.commit().map_err(to_string_err)?;
+    touch(tx, playlist_id)?;
     Ok(result)
 }
 
@@ -426,8 +442,11 @@ fn import(conn: &Connection, list: &Path, exists: impl Fn(&Path) -> bool) -> Res
             result.skipped += 1;
         }
     }
-    result.id = create(conn, &result.name)?;
-    add(conn, result.id, &items)?;
+    // One transaction: a failure leaves no empty playlist behind.
+    let tx = conn.unchecked_transaction().map_err(to_string_err)?;
+    result.id = create(&tx, &result.name)?;
+    add_rows(&tx, result.id, &items)?;
+    tx.commit().map_err(to_string_err)?;
     Ok(result)
 }
 
@@ -511,17 +530,25 @@ pub fn set_playlist_current(db: tauri::State<Db>, playlist_id: i64, item_id: i64
     Ok(())
 }
 
+/// Off the main thread, and with the library let go before a file outside it
+/// is looked for: that may be on a share that is not answering.
 #[tauri::command]
-pub fn playlist_step(
+pub async fn playlist_step(
     app: tauri::AppHandle,
-    db: tauri::State<Db>,
     playlist_id: i64,
     item_id: i64,
     forward: bool,
 ) -> Result<Option<PlaylistEntry>, String> {
-    let (art, frames) = places(&app)?;
-    let conn = db.0.lock().map_err(to_string_err)?;
-    Ok(step(&entries(&conn, playlist_id, &art, &frames)?, item_id, forward))
+    crate::jobs::off_main(move || {
+        let (art, frames) = places(&app)?;
+        let items = {
+            let db = app.state::<Db>();
+            let conn = db.0.lock().map_err(to_string_err)?;
+            entries(&conn, playlist_id, &art, &frames)?
+        };
+        Ok(step(&items, item_id, forward, Path::is_file))
+    })
+    .await
 }
 
 /// Write the playlist as `.m3u` to `path`; the number of items written.
@@ -536,10 +563,26 @@ pub fn export_playlist(db: tauri::State<Db>, playlist_id: i64, path: String) -> 
 }
 
 /// Read a `.m3u` (or `.m3u8`) into a new playlist named after the file.
+///
+/// Off the main thread, and every named file is looked for before the library
+/// is locked: a list of files on a share that is not answering waits on the
+/// network, never holding up the player or the pages.
 #[tauri::command]
-pub fn import_playlist(db: tauri::State<Db>, path: String) -> Result<Imported, String> {
-    let conn = db.0.lock().map_err(to_string_err)?;
-    import(&conn, Path::new(&path), |p| p.is_file())
+pub async fn import_playlist(app: tauri::AppHandle, path: String) -> Result<Imported, String> {
+    crate::jobs::off_main(move || {
+        let list = Path::new(&path);
+        let text = std::fs::read(list).map_err(|e| format!("{}: {e}", list.display()))?;
+        let base = list.parent().unwrap_or(Path::new(""));
+        let present: std::collections::HashSet<PathBuf> = read_m3u(&String::from_utf8_lossy(&text), base)
+            .into_iter()
+            .flatten()
+            .filter(|p| p.is_file())
+            .collect();
+        let db = app.state::<Db>();
+        let conn = db.0.lock().map_err(to_string_err)?;
+        import(&conn, list, |p| present.contains(p))
+    })
+    .await
 }
 
 #[cfg(test)]
@@ -608,10 +651,31 @@ mod tests {
         add(&conn, id, &[item("C:/tv/s01e02.mkv", Some(3)), item("C:/m/film.mkv", Some(1)), item("C:/tv/s01e01.mkv", Some(2))]).unwrap();
         conn.execute("UPDATE media_files SET missing = 1 WHERE id = 1", []).unwrap();
         let items = listed(&conn, id);
-        let next = step(&items, items[0].item_id, true).unwrap();
+        let there = |_: &Path| true;
+        let next = step(&items, items[0].item_id, true, there).unwrap();
         assert_eq!(next.file_id, Some(2), "the playlist's order, not the show's; the missing film skipped");
-        assert_eq!(step(&items, items[2].item_id, false).unwrap().file_id, Some(3));
-        assert!(step(&items, items[2].item_id, true).is_none(), "the end of the playlist ends it");
+        assert_eq!(step(&items, items[2].item_id, false, there).unwrap().file_id, Some(3));
+        assert!(step(&items, items[2].item_id, true, there).is_none(), "the end of the playlist ends it");
+    }
+
+    #[test]
+    fn a_file_outside_the_library_that_is_gone_is_stepped_over() {
+        let conn = library();
+        let id = create(&conn, "x").unwrap();
+        add(&conn, id, &[item("C:/m/film.mkv", Some(1)), item("D:/gone.mkv", None), item("D:/here.mkv", None)])
+            .unwrap();
+        let items = listed(&conn, id);
+        let next = step(&items, items[0].item_id, true, |p| p == Path::new("D:/here.mkv")).unwrap();
+        assert_eq!(next.path, "D:/here.mkv");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn the_same_file_spelled_in_another_case_is_not_added_twice() {
+        let conn = library();
+        let id = create(&conn, "x").unwrap();
+        add(&conn, id, &[item("d:/Clips/a.mkv", None)]).unwrap();
+        assert_eq!(add(&conn, id, &[item("D:/clips/A.mkv", None)]).unwrap(), Added { added: 0, already: 1 });
     }
 
     #[test]

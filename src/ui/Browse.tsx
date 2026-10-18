@@ -560,6 +560,7 @@ export default function Browse() {
               label: plan.label ?? 'Self-test',
               fileId: plan.fileId,
               titleId: plan.titleId,
+              playlist: plan.playlist,
             },
           },
           null

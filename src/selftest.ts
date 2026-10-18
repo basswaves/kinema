@@ -16,6 +16,7 @@
  * have seen, and it keeps working whatever the player looks like inside.
  */
 import { listAllVideos, videoFrame } from './library/videos';
+import { addToPlaylist, createPlaylist, playlistEntries } from './library/playlists';
 import { invoke } from '@tauri-apps/api/core';
 import {
   availableMonitors,
@@ -204,6 +205,11 @@ const CALLABLE: Record<string, (...args: never[]) => Promise<unknown>> = {
   playerOffer,
   offerAsPlayer,
   removeAsPlayer,
+  // Playlists (playlists.rs): one made and filled on the copied library, so
+  // the plan's `playlist` plays through it in the real player.
+  createPlaylist,
+  addToPlaylist,
+  playlistEntries,
   // Settings the player reads when a file opens — sound, display — so a plan
   // can set them on the copied library before opening the player (`openAfter`).
   setSetting,
@@ -334,6 +340,12 @@ export interface SelfTestPlan {
   fileId: number | null;
   titleId: number | null;
   label?: string;
+  /**
+   * Play the file as an item of this playlist (playlists.rs): previous, next
+   * and Up next then follow the playlist. Made earlier in the run with the
+   * playlist calls below, before `openAfter` opens the player.
+   */
+  playlist?: { id: number; item: number };
   /** How long to run before writing the report and quitting. */
   seconds: number;
   /** Defaults to true: a test run should not play sound through the speakers. */

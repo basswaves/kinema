@@ -3433,6 +3433,34 @@ play anything found there.
 - Proven by unit tests, four keyboard flows and the navigation map on all three
   systems. Not tried on a real network share or a real Android device.
 
+## Playlists (2026-10-18)
+
+Phase 5 of the local-media plan: lists of files in an order the person chooses.
+
+- **Adding through page buttons and the player's panel, not a "+" on every row
+  or tile** (owner). A "+" on each one would add a focus stop for every item,
+  and a remote would have to cross all of them to get anywhere. The buttons sit
+  where a person already is: a film's page, a show's page (the season shown),
+  each Play all on a Videos folder, and the player's Audio & subtitles panel.
+- **Files outside the library are kept as loose files, not dropped** (owner).
+  An imported list that names a file no library folder holds would otherwise
+  lose items without the person having done anything. They resume by path, as a
+  file opened from Folders does. Missing files and web addresses are left out,
+  and counted in the message, since there is nothing to play.
+- **Home's rail tiles open the playlist rather than playing at once** (owner).
+  The person sees the order and where it will carry on before anything starts.
+- **An item keeps its path as well as the library file id** (`ON DELETE SET
+  NULL`). Removing a library folder must never empty a playlist, and a file
+  scanned in again is found by its path.
+- **A name is made for you in the player.** Its keys leave no room to type
+  (Backspace closes the panel, letters are shortcuts), so a new playlist is
+  "Playlist 2" and so on, renamed on its own page.
+- **Plays once through; shuffle and repeat are later.** Neighbours come from
+  the playlist, not the show's order or the folder.
+- Two traps found on the way are in GOTCHAS (a control that turns disabled
+  under the ring; two buttons above a row of tiles).
+- Schema 26. Upgrade tried from schema 23 (0.11.0) and 25.
+
 ## Trakt resume across devices (2026-10-17)
 
 The owner asked for it on 2026-10-09, after the viability review: a film

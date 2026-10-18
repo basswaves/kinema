@@ -57,6 +57,31 @@ makes no stability promises.
   Skip intro); any other plays as a video of its own. Back goes up a level,
   and back from a film returns to its folder with the film selected.
 
+- **Playlists.** The Library page has a Playlists tile beside Videos folders
+  and Folders. It shows a tile for each playlist, the one touched last first,
+  "+ New playlist" (you type the name) and, on desktops, "Import .m3u…". A
+  playlist's page has ▶ Play, or "▶ Carry on: <item>", which goes on from the
+  item last started, or the one after it if that was finished; Rename; Export
+  .m3u… (desktops); and Delete, which asks first. Each item has play, ↑, ↓ and
+  Remove. Items not found at the last scan are greyed and skipped when playing.
+  Add with "+ Playlist" on a film's page, on a show's page (the season shown:
+  its episodes on disk, in order), beside each Play all on a Videos folder's
+  page, and "Add to a playlist ›" in the player's Audio & subtitles panel,
+  which adds exactly what is playing — an episode, a video, or a file opened
+  from outside the library. The same file is never added twice. In the player a
+  new playlist is named "Playlist 2" and so on, since the player's keys leave
+  no room for typing; rename it on its page. Previous and next, `n` and `p`,
+  and Up next follow the playlist, not the show or the folder. A playlist plays
+  once through; there is no shuffle or repeat yet. Home has a Playlists rail
+  after Continue Watching whenever a playlist exists, and a tile opens the
+  playlist. Importing `.m3u`: files the library holds play as themselves;
+  other files that exist are kept as loose files and resume by path; files
+  that are missing and web addresses are left out and counted in the message.
+  Relative paths are read against the list's own folder, and `file://`
+  addresses are read. Export writes `#EXTM3U` with a length, a name and the
+  path for each item. Import and export are on Windows and Linux, not yet
+  Android. The library upgrades to schema 26 with the usual safety copy.
+
 - **Trakt resume across devices.** With Trakt connected, Kinema continues on
   one device where a film or episode was stopped on another. It is on while
   Trakt is connected; Settings → Accounts → Trakt, "Continue where you stopped

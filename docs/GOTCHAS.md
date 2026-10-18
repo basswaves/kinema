@@ -1047,6 +1047,25 @@ the ring on the next screen's first button before the spatial library saw
 the same keydown, which then pressed that button too. **Do:** FocusInput
 stops the event when its `onEnter` takes it.
 
+### A control that turns disabled under the ring strands it there
+
+On the playlist page, ↑ on the first row was disabled, since nothing is above
+it. Pressing ↑ on the second row moved that item to the top; its ↑ became
+disabled while it held the focus, and no arrow moved the ring any more. No
+error, no log line. **Do:** Up at the top and Down at the bottom are no-ops, not
+disabled. Never disable a control that can hold the focus as a result of its
+own press.
+
+### Two buttons in a heading above a row of tiles: engines disagree which tile is nearer
+
+On a Videos folder's page, "+ Playlist" sat beside Play all, so the two buttons
+lay between two tiles. Down picked the second tile in Edge and the first in
+WebKit; the navigation checker caught it. **Do:** make the heading a `row`
+focus group, arrived at on Play all, and the tiles a `list` group, arrived at
+on the first video, so the groups decide the move and not which tile is a
+pixel nearer. A list group alone was not enough: leaving a list upwards uses
+the list's whole box and skipped the heading's own Play all.
+
 ---
 
 ## Frontend

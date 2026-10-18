@@ -521,6 +521,21 @@ would count a play. Trakt keeps a percentage, stored as `playback_state.fraction
 where the copy's length is unknown, and the player opens at that share of the
 file. Videos, unmatched titles and self-tests are never involved.
 
+**Playlists are lists of files, in the order the person chose.** `playlists.rs`
+holds them in `playlists` and `playlist_items` (schema 26). An item keeps its
+path as well as the library file id (`ON DELETE SET NULL`), so removing a
+library folder never empties a playlist and a file scanned in again is found by
+its path. An item can be a library file, a video, or a loose file from
+outside the library; the same file is never added twice. Playing one asks
+`playlist_step` for the item before and after, and the answer reaches the
+player as `PlaybackTarget.playlist` and `EpisodeRef.target`, which
+`useNeighbours.ts` and `useUpNext.ts` read: previous, next, `n`/`p` and Up next
+follow the playlist, not the show's episode order or the folder. A playlist
+plays once through. `.m3u` import and export are in `playlists.rs` too, only
+where the system has a file picker. The pages are `PlaylistsPages.tsx` (the
+tiles and a playlist's own page) and `PlaylistPicker.tsx` (choosing where to
+add, from a page or from the player's panel).
+
 **Forced subtitles are not "subtitles on."** Subtitles off means no full
 subtitles; it has never meant missing what is said in another language. So a
 forced track in the language being spoken shows whenever full subtitles do

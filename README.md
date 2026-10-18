@@ -182,6 +182,8 @@ audio and subtitles, volume. Back steps back to wherever you came from.
   a film nor a show, never matched, each with a picture taken from the file,
   under the Library tab. Library → Folders browses your drives and shares
   inside Kinema and plays any video in them.
+- **Playlists.** Put films, episodes and videos in an order you choose and play
+  them through; import and export `.m3u` lists on Windows and Linux.
 - **Remembers where you were**, per file, and offers the next episode.
 - **Tells SIMKL and Trakt what you watched**, if you connect them: whatever you
   finish in Kinema is added to your account. Connecting is a code on screen and a

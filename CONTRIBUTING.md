@@ -423,9 +423,12 @@ These are conclusions, not open questions. If a change seems to require breaking
 one, say so in the issue rather than working around it quietly. The full
 reasoning is in [docs/DESIGN.md](docs/DESIGN.md) and [docs/HISTORY.md](docs/HISTORY.md).
 
-- **No machine-learning upscaling.** No FSRCNNX, RAVU, Anime4K, RTX VSR, Intel
-  VSR. They synthesise detail that was never in the master. Classical resampling
-  only.
+- **No machine-learning upscaling — for now.** No FSRCNNX, RAVU, Anime4K, RTX
+  VSR, Intel VSR. They synthesise detail that was never in the master. Classical
+  resampling only. Since 2026-10-18 this is **being considered, not decided**
+  (see the roadmap): only a shader that runs on every graphics card, chosen by
+  the app, never a slider, and never one tied to one GPU maker. Please do not
+  add one without the decision being made first.
 - **Nothing invents frames or detail.** No frame interpolation. 24p judder on a
   60 Hz panel is reported by the stats panel and deliberately not "fixed".
 - **No quality-preset UI.** The right settings depend on the frame and the
@@ -509,7 +512,9 @@ reasoning is in [docs/DESIGN.md](docs/DESIGN.md) and [docs/HISTORY.md](docs/HIST
   touching it. A scraper, a stream resolver or anything that depends on a
   service without a stable API fails that test, and `yt-dlp`, the Kodi YouTube
   resolver and an in-app embed with an ad blocker were all rejected on exactly
-  this ground. A read-only metadata service behind a stable API, used on its
+  this ground. YouTube's own embedded player, ads and all, is accepted
+  (2026-10-18) because it fails safe: when YouTube refuses to play, the
+  trailer opens in the browser, as it always has. A read-only metadata service behind a stable API, used on its
   own terms — TMDB, TVmaze, TheIntroDB, IntroDB, Wikidata, IMDb's published
   ratings file — passes it. Keeping dependencies current when Kinema itself is
   updated (Android's player library and build tools, a patched library in

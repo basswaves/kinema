@@ -3496,6 +3496,82 @@ right copy in a copy of a real library, and was then removed. The rest is
 proven by tests against Trakt-shaped answers, a keyboard flow, and the upgrade
 (23 to 25) on a copy of a real library.
 
+## Machine-learning upscaling, reopened as a question (2026-10-18)
+
+The owner asked whether the AI upscaling that some streaming boxes are bought
+for could come to Kinema, working on graphics cards from about NVIDIA's 10
+series on, integrated ones included. What was found, from what was known rather
+than measured:
+
+- The best-known one belongs to one box's chip; nothing in a PC player can use
+  it. Its nearest PC relatives (RTX Video Super Resolution, Intel's and AMD's
+  video upscalers) each run on one maker's recent cards only, which breaks the
+  vendor-neutral rule. madVR's NGU is closed and Windows-only.
+- What fits technically is a shader run through libplacebo on any card
+  (FSRCNNX, RAVU, ArtCNN, nnedi3). The good ones are heavy at 1080p → 4K on
+  integrated graphics and borderline on an entry-level card from that era, so
+  the step-down on a slow GPU (D6) would often take them off again.
+- Purists are divided: the ones who tune madVR and mpv value clean edges with
+  nothing added and tend to dislike "enhancement". Those boxes also carry a
+  detail slider, which the no-preset rule would rule out by itself.
+
+The recommendation was to leave the rule as it was. The owner chose otherwise,
+knowingly: Kinema is for people who never think about any of this as much as
+for enthusiasts, and an upscaler that people actually buy equipment for should
+not be ruled out. So it moved from "Not planned" to "Being considered" on the
+roadmap, in the one shape that could fit Kinema — an edge-reconstructing
+shader that runs on every graphics card, used only where the card has room for
+it, chosen by the app, never a slider, named in the details panel, the first
+thing D6 drops. The settled "no ML upscaling" rule now reads "for now"; nothing
+is built until it is decided.
+
+## 3D films, looked into (2026-10-18)
+
+Prompted by SyLC, a Windows player that decodes both eyes of a 3D Blu-ray, and
+an r/htpc guide to full HD frame packing from a PC. Kinema had no 3D handling:
+side-by-side and top-and-bottom files showed as two squeezed pictures, and 3D
+Blu-ray (MVC) played as 2D without saying so. Decided, in order:
+
+- **3D shown correctly in 2D first**, on every platform: detected from the
+  file's own stereo tag, the name only as a fallback; one eye, full size; a
+  "3D" badge, and the details panel says it is shown in 2D.
+- **Real 3D without the graphics driver's help.** Driver stereo — what
+  PowerDVD and madVR used to switch a screen into 3D — is optional in Windows'
+  driver model, was removed from NVIDIA's drivers in 2019 and is unclear on
+  AMD and Intel, so it would break the vendor-neutral rule. The guide's
+  approach needs none of it: with the screen in a 1920×2205 mode that the user
+  creates once, the player simply draws the left eye above the right with a
+  45-line gap, which is what frame packing is; many projectors switch to 3D on
+  that mode by themselves. Kinema reads the mode back and uses full HD frame
+  packing when it sees it; otherwise half-resolution side by side or top and
+  bottom, which every 3D display takes and which VR headsets show through
+  Virtual Desktop. Subtitles and controls have to be drawn once per eye.
+- **3D Blu-ray in real 3D later, on edge264.** ffmpeg has had an open request
+  for MVC since about 2010 and is not expected to gain it. edge264 decodes MVC
+  under a BSD licence but has no stable release yet (planned for 2027). SyLC
+  shows how it can be fitted together (its own decoder on edge264, its own
+  demuxer, audio and clock from libmpv). Its code is GPL and is not taken.
+- **Not wanted:** SyLC's AI 2D-to-3D conversion (the owner). Standalone VR
+  headsets would need a VR app of their own, outside "Android is for TV
+  devices". On Android, which has no MVC decoder and no standard way into 3D,
+  Kinema does the 2D fix and passes side-by-side files through.
+
+## YouTube trailers in the app, after all (2026-10-18)
+
+The in-app YouTube player was turned down at the start mainly for its ads,
+since blocking them is a treadmill (see "Playback" near the top). The owner
+asked again and chose to accept the ads: leaving Kinema for a trailer is the
+worse experience. What makes it fit "nothing that breaks by itself" is that it
+fails safe. It is YouTube's official, documented embedded player (the IFrame
+API, on youtube-nocookie.com), not a scraper. When YouTube refuses — embedding
+turned off by the uploader, an age-restricted trailer, or a change to YouTube's
+embed rules like the 2025 one that broke many apps' players with "Error 153" —
+the trailer opens in the browser, as it always did. On Android the trailer goes
+to the YouTube app, which TV boxes have and which has no ads for Premium
+subscribers; a TV box often has no browser, so this also fixes a trailer that
+had nowhere to open. Local trailer files still come first. Ads are never
+blocked, and Settings says that YouTube stores data once a trailer plays.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

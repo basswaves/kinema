@@ -263,7 +263,9 @@ correctness passes; `scaler-resizes-only` means nothing touches the image at 1:1
 **No machine-learning upscaling.** No FSRCNNX, RAVU, Anime4K, RTX VSR or Intel VSR.
 They synthesise detail that was never in the master. The path is vendor-neutral — d3d11
 on Windows, Vulkan or OpenGL on Linux, identical on NVIDIA, AMD and Intel — and light enough for a GTX 1060 / RX 480 at 4K.
-**Do not add ML upscaling or a quality-preset UI to this project.**
+**Do not add a quality-preset UI to this project.** ML upscaling is on the roadmap
+under "Being considered" (2026-10-18) — only a vendor-neutral shader the app chooses
+by itself, never a slider — and is not to be added until that is decided.
 
 **Do nothing unless necessary — in time as well as space.** `scaler-resizes-only`
 keeps every luma scaler out of the path when the frame is already at output size;

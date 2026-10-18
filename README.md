@@ -461,7 +461,8 @@ see [When something goes wrong](#when-something-goes-wrong).
 
 **Android TV**, since 0.10.0, as an early version (beta): see
 [Android (early version)](#android-early-version) for what is tested and what
-is missing. macOS is not planned by the author; a port is welcome, and
+is missing. **macOS** is planned for later, after the Windows, Linux and
+Android work in hand; a port is welcome sooner, and
 [CONTRIBUTING.md](CONTRIBUTING.md) ("More than one platform") says how the
 code is arranged for one.
 
@@ -588,7 +589,7 @@ says how to build, check and submit one. Anything exploitable goes to
 ## Known limitations
 
 - **Android is an early version.** See [above](#android-early-version) for
-  what is untested and missing. macOS is not planned (see
+  what is untested and missing. macOS is planned for later (see
   [Platform support](#platform-support)).
 - **Tested on a small number of setups.** HDR passthrough, bitstreaming to a
   receiver and display switching have been confirmed on a 4K HDR TV with an AV

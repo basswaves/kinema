@@ -32,15 +32,26 @@ audio, Blu-ray folders, disc images and 4K UHD `.m2ts` files. See [Other platfor
 
 ## Being considered
 
-### Tone mapping for projectors and HGIG TVs
+### Projectors: tone mapping, screen shape and calibration
 
 Kinema sends HDR to the TV as it was mastered and lets the TV fit it to its
-panel, as a disc player does. For projectors (often 100–200 nits, with weak
-tone mapping of their own) and TVs set to HGIG, which expect the source to do
-it, a setting that describes the display — "tone map for a display that really
-reaches N nits", off by default — would help. Windows' own figure for a display's
-brightness is often a round number rather than a measurement, so it would be
-entered rather than read.
+panel, as a disc player does. Projectors (often 100–200 nits, with weak tone
+mapping of their own) and TVs set to HGIG expect the source to do it. Planned,
+as settings that describe the equipment rather than taste:
+
+- **Brightness and contrast** — how bright the projector really is and how
+  deep its black goes — so Kinema's frame-by-frame tone mapping fits it.
+  Windows' own brightness figure is often a round number rather than a
+  measurement, so it is entered rather than read.
+- **Screen shape** — 16:9, or a wide 2.35/2.40 screen filled by zooming or
+  an anamorphic lens. Films fill the height, and subtitles and Kinema's
+  controls move inside the picture so nothing lands on the masked area;
+  shape changes inside a film (IMAX scenes) are followed.
+- **Calibration** — a 3D LUT or ICC profile made with DisplayCAL, Calman or
+  ColourSpace, loaded per display.
+
+Sharpening, "detail enhancement", vivid colour modes and motion smoothing are
+not planned: they are taste or invented detail.
 
 ### winget, and other package managers
 
@@ -62,6 +73,37 @@ added to the picture that was not in the source — so it is a decision to be ma
 deliberately, not an improvement to switch on. Matching the refresh rate, which
 Kinema already does, avoids the problem where the screen allows it.
 
+### 3D films
+
+Today a side-by-side or top-and-bottom 3D file shows as two squeezed
+pictures, and a 3D Blu-ray plays in 2D without saying so. First, every 3D
+file will be shown correctly in 2D, with a "3D" badge. Then real 3D on
+projectors and 3D TVs: full HD for each eye when the screen is set to the
+1920×2205 frame-packing mode (made once in the graphics card's own settings;
+Kinema recognises it), and half-resolution side by side or top and bottom
+otherwise — which also covers VR headsets through a PC, with Virtual Desktop's
+3D mode. 3D Blu-ray in real 3D needs a decoder for its second eye (MVC), which
+ffmpeg does not have; the plan is to build on
+[edge264](https://github.com/tvlabs/edge264) once it has a stable release.
+Switching a screen into 3D through the graphics driver is not planned: that
+support is optional, differs between NVIDIA, AMD and Intel, and has partly been
+removed.
+
+### Machine-learning upscaling
+
+Some streaming boxes are bought for their AI upscaling alone, and Kinema is
+meant as much for people who want that as for purists. The well-known ones
+cannot be used here: they belong to one chip or one graphics maker, and
+Kinema behaves the same on AMD, Intel and NVIDIA. What could fit is a shader
+that runs on any graphics card through mpv, of the kind that redraws edges
+cleanly rather than adding texture the film never had, used only where the
+graphics card has room for it, chosen by Kinema rather than by a slider, and
+named in the details panel (`i`) whenever it is on. The good ones are heavy
+for integrated graphics at 4K, and every one of them draws some detail of its
+own, which goes against one of Kinema's principles — so, as with smooth
+motion, it is a decision to be made deliberately. Until then Kinema upscales
+with classical filters, which add nothing.
+
 ---
 
 ## Not planned
@@ -69,12 +111,14 @@ Kinema already does, avoids the problem where the screen allows it.
 These have been considered and turned down; [HISTORY.md](HISTORY.md) has the
 reasons in full.
 
-- **Machine-learning upscaling or sharpening**, and **frame interpolation**.
-  Kinema shows what is in the file.
+- **Frame interpolation**, and **sharpening as a matter of taste** — a slider
+  or a "detail" setting. Kinema shows what is in the file. (Machine-learning
+  upscaling chosen by Kinema itself is under [Being considered](#machine-learning-upscaling).)
 - **A picture-quality preset menu.** The right settings depend on the file and
   the display, which Kinema can see; settings describe equipment, not taste.
 - **Anything that stops working by itself if left alone** — for example YouTube
-  trailers in the app through a downloader. Trailers on your disk play in
+  trailers in the app through a downloader or with ads blocked. (YouTube's own
+  player in the app, with its ads, is planned.) Trailers on your disk play in
   Kinema; others open in the browser.
 - **Bundled third-party programs.** ffmpeg and Skiptro can be used if you have
   installed them; Kinema never ships or downloads them.
@@ -104,8 +148,16 @@ in the Linux player as it does on Windows.
 engine (Media3) for Dolby Vision and passthrough on TV boxes: the interface,
 the library, network shares, subtitles and playing a film work, tried on one TV
 box and the emulator. What is missing and untested is listed in the
-[README](../README.md#android-early-version). macOS is not planned by the author; a port is
-welcome. See [Platform support](../README.md#platform-support).
+[README](../README.md#android-early-version).
+
+**macOS** is planned for later, once the Windows, Linux and Android work in
+hand is done; a port is welcome sooner. What is known so far: the interface
+and library carry over; whether the video can sit beneath Kinema's page as on
+Windows needs a trial first (Linux's own-window mode is the fallback); macOS
+cannot pass TrueHD or DTS-HD to a receiver, so those would be decoded and
+said so; the first builds would be unsigned, which macOS only lets open after one
+step the first time (to be explained with the build). See
+[Platform support](../README.md#platform-support).
 
 ---
 

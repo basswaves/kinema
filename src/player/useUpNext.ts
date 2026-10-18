@@ -11,6 +11,7 @@ import {
   type EpisodeRef,
   type PlaybackTarget,
 } from './api';
+import { entryRef, playlistStep } from '../library/playlists';
 import type { Session } from './session';
 import type { SkipKind } from './skip';
 
@@ -65,7 +66,8 @@ export function useUpNext({
    * naturally, or because its credits were skipped.
    */
   const handlePlaybackEnded = useCallback(async () => {
-    if (target.fileId === null) {
+    const playlist = target.playlist;
+    if (target.fileId === null && !playlist) {
       await exit();
       return;
     }
@@ -73,10 +75,16 @@ export function useUpNext({
     // Mark it finished so it leaves Continue Watching rather than sitting
     // there at 99%.
     const total = sessionRef.current.duration;
-    if (total) await saveProgress(target.fileId, total, total).catch(() => undefined);
+    if (total && target.fileId !== null) {
+      await saveProgress(target.fileId, total, total).catch(() => undefined);
+    }
 
     try {
-      const next = await nextEpisode(target.fileId);
+      // A playlist's next item, asked now: the list may have changed since
+      // the file began.
+      const next = playlist
+        ? await playlistStep(playlist.id, playlist.item, true).then((e) => e && entryRef(e, playlist.id))
+        : await nextEpisode(target.fileId as number);
       if (next) {
         setUpNext(next);
         setCountdown(NEXT_EPISODE_COUNTDOWN);
@@ -86,7 +94,7 @@ export function useUpNext({
     } catch {
       await exit();
     }
-  }, [target.fileId, exit, sessionRef]);
+  }, [target.fileId, target.playlist, exit, sessionRef]);
 
   /**
    * Offer the next episode as soon as the credits start, without ending the
@@ -142,14 +150,16 @@ export function useUpNext({
   /** Jump straight to a neighbouring episode, keeping the show's identity. */
   const playNeighbour = useCallback(
     (episode: EpisodeRef) => {
-      onPlayTarget({
-        path: episode.path,
-        label: episodeRefLabel(episode),
-        fileId: episode.file_id,
-        episodeName: episode.video ? null : episode.name,
-        titleId: target.titleId,
-        video: episode.video,
-      });
+      onPlayTarget(
+        episode.target ?? {
+          path: episode.path,
+          label: episodeRefLabel(episode),
+          fileId: episode.file_id,
+          episodeName: episode.video ? null : episode.name,
+          titleId: target.titleId,
+          video: episode.video,
+        }
+      );
     },
     [onPlayTarget, target.titleId]
   );
@@ -161,13 +171,15 @@ export function useUpNext({
       /* Timer-driven state machine, not state derived from render. */
       /* eslint-disable react-hooks/set-state-in-effect */
       if (upNext) {
-        onPlayTarget({
-          path: upNext.path,
-          label: episodeRefLabel(upNext),
-          fileId: upNext.file_id,
-          titleId: target.titleId,
-          video: upNext.video,
-        });
+        onPlayTarget(
+          upNext.target ?? {
+            path: upNext.path,
+            label: episodeRefLabel(upNext),
+            fileId: upNext.file_id,
+            titleId: target.titleId,
+            video: upNext.video,
+          }
+        );
       }
       setCountdown(null);
       setUpNext(null);

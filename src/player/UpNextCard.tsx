@@ -26,8 +26,9 @@ export default function UpNextCard({
       <div className="up-next-body">
         <div className="up-next-label">Up next</div>
         <div className="up-next-title">
-          {episode.video ? (
-            // A video in the same folder (videos.rs): its own name says it.
+          {episode.video || episode.target ? (
+            // A video in the same folder (videos.rs), or a playlist's next
+            // item, whatever it is: its own name says it.
             episodeRefLabel(episode)
           ) : (
             <>

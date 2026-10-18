@@ -62,6 +62,11 @@ export interface PlaybackTarget {
    * and previous/next step through that folder.
    */
   video?: boolean;
+  /**
+   * Played from a playlist (playlists.ts): previous, next and Up next follow
+   * the playlist from `item` instead of the show or the folder.
+   */
+  playlist?: { id: number; item: number };
 }
 
 /** Enough to play a neighbouring episode and label it, in either direction. */
@@ -74,6 +79,8 @@ export interface EpisodeRef {
   title: string;
   /** A video in the same folder (videos.rs): `name` is its file name. */
   video?: boolean;
+  /** The next item of a playlist: played as this, and named by its label. */
+  target?: PlaybackTarget;
 }
 
 export interface Segment {
@@ -141,6 +148,7 @@ export function episodeLabel(
 
 /** The label an episode carries into the player, shared with the browsing UI. */
 export function episodeRefLabel(episode: EpisodeRef): string {
+  if (episode.target) return episode.target.label;
   if (episode.video) return videoName(episode.name ?? episode.path);
   return episodeLabel(episode.title, episode.season, episode.episode);
 }

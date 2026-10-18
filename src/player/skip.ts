@@ -181,15 +181,20 @@ export function skipPromptFor(
     : null;
 }
 
-/** What the Skip button says. */
-export function skipLabel(prompt: ActiveSkip): string {
+/**
+ * What the Skip button says. `nextIsEpisode` is false when what comes next is
+ * a playlist's next item or a video beside this one: it is not an episode.
+ */
+export function skipLabel(prompt: ActiveSkip, nextIsEpisode = true): string {
   return prompt.kind === 'intro'
     ? 'Skip intro'
     : prompt.kind === 'recap'
       ? 'Skip recap'
       : prompt.toScene
         ? 'Skip to the scene after the credits'
-        : 'Next episode ›';
+        : nextIsEpisode
+          ? 'Next episode ›'
+          : 'Next ›';
 }
 
 /** Whether markers are worth acting on at all. */

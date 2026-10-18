@@ -136,7 +136,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   });
 
   // ---- the episodes either side, skipping, and Up next ---------------------
-  const neighbours = useNeighbours(target.fileId);
+  const neighbours = useNeighbours(target.fileId, target.playlist);
   const {
     active,
     activeKey,
@@ -173,7 +173,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
 
   // Previous/next: the episodes either side, or for a video outside the
   // library the files beside it in its folder (LOCAL-MEDIA.md phase 1).
-  const folder = useFolderNeighbours(target.resumeByPath ? target.path : null);
+  const folder = useFolderNeighbours(target.resumeByPath && !target.playlist ? target.path : null);
   const steps = useMemo<Steps>(() => {
     const episode = (e: EpisodeRef | null): Step | null =>
       e && { kind: 'episode', name: episodeRefLabel(e), play: () => playNeighbour(e) };
@@ -458,7 +458,13 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         />
       )}
 
-      {skipPrompt && <SkipButton prompt={skipPrompt} onSkip={() => void performSkip()} />}
+      {skipPrompt && (
+        <SkipButton
+          prompt={skipPrompt}
+          nextIsEpisode={!neighbours.next?.target && !neighbours.next?.video}
+          onSkip={() => void performSkip()}
+        />
+      )}
 
       {/* Deliberately outside the OSD: the panel is for watching numbers move
           while the video plays, so hiding it with the idle timer would defeat
@@ -476,6 +482,11 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           online={onlinePanel}
           onClose={closeTracks}
           onDetails={openStatsFromTracks}
+          playlistItem={
+            target.fileId !== null || target.resumeByPath
+              ? { path: target.path, file_id: target.fileId }
+              : null
+          }
         />
       )}
 

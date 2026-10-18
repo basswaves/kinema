@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use std::path::Path;
 
 /// The schema this build understands. Bump it with every new `SCHEMA_V*`.
-pub const SCHEMA_VERSION: i64 = 25;
+pub const SCHEMA_VERSION: i64 = 26;
 
 /// What can go wrong opening the library.
 ///
@@ -746,6 +746,32 @@ const SCHEMA_V25: &str = r#"
 ALTER TABLE playback_state ADD COLUMN fraction REAL;
 "#;
 
+/// Schema version 26: playlists (LOCAL-MEDIA.md phase 5, `playlists.rs`).
+///
+/// An item keeps its **path** as well as the library file it was: a file the
+/// library no longer holds (its folder removed, or one that was never in it —
+/// an imported `.m3u` keeps those as loose files) still plays by path, and a
+/// file scanned in again is found by that path. `ON DELETE SET NULL` rather
+/// than a cascade, so removing a library folder never empties a playlist.
+/// `current_item` is the item last started, where Play carries on.
+const SCHEMA_V26: &str = r#"
+CREATE TABLE playlists (
+    id           INTEGER PRIMARY KEY,
+    name         TEXT    NOT NULL,
+    current_item INTEGER,
+    created_at   INTEGER NOT NULL,
+    updated_at   INTEGER NOT NULL
+);
+CREATE TABLE playlist_items (
+    id          INTEGER PRIMARY KEY,
+    playlist_id INTEGER NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
+    position    INTEGER NOT NULL,
+    file_id     INTEGER REFERENCES media_files(id) ON DELETE SET NULL,
+    path        TEXT    NOT NULL
+);
+CREATE INDEX idx_playlist_items ON playlist_items(playlist_id, position);
+"#;
+
 /// How long a statement waits for the write lock before giving up.
 ///
 /// Load-bearing from the moment there is more than one connection. SQLite
@@ -963,6 +989,7 @@ pub(crate) const MIGRATIONS: [&str; SCHEMA_VERSION as usize] = [
     SCHEMA_V9, SCHEMA_V10, SCHEMA_V11, SCHEMA_V12, SCHEMA_V13, SCHEMA_V14,
     SCHEMA_V15, SCHEMA_V16, SCHEMA_V17, SCHEMA_V18, SCHEMA_V19,
     SCHEMA_V20, SCHEMA_V21, SCHEMA_V22, SCHEMA_V23, SCHEMA_V24, SCHEMA_V25,
+    SCHEMA_V26,
 ];
 
 /// Bring the database up to [`SCHEMA_VERSION`].
@@ -1298,6 +1325,36 @@ mod tests {
         assert_eq!(last(1), Some(2));
         assert_eq!(last(2), None);
         assert_eq!(last(3), None, "an unparsable parsed_json must not fail the upgrade");
+    }
+
+    /// A 0.11.0 library (schema 23) and an R3 one (25) both gain playlists,
+    /// empty, and a playlist item outlives the library file it named.
+    #[test]
+    fn the_v26_upgrade_adds_empty_playlists_from_23_and_25() {
+        for from in [23, 25] {
+            let conn = at_version(from);
+            conn.execute_batch(
+                r#"INSERT INTO library_roots (id, path, kind, added_at) VALUES (1, 'C:/m', 'movies', 0);
+                   INSERT INTO media_files (id, root_id, path, parent_dir, file_name, extension,
+                       size_bytes, modified_at, first_seen_at, last_seen_at)
+                   VALUES (1, 1, 'C:/m/a.mkv', 'C:/m', 'a.mkv', 'mkv', 1, 0, 0, 0);"#,
+            )
+            .unwrap();
+            migrate(&conn).unwrap();
+            assert_eq!(version_of(&conn), SCHEMA_VERSION);
+            let lists: i64 = conn.query_row("SELECT COUNT(*) FROM playlists", [], |r| r.get(0)).unwrap();
+            assert_eq!(lists, 0, "from {from}");
+            conn.execute_batch(
+                "INSERT INTO playlists (id, name, created_at, updated_at) VALUES (1, 'x', 0, 0);
+                 INSERT INTO playlist_items (playlist_id, position, file_id, path) VALUES (1, 1, 1, 'C:/m/a.mkv');
+                 DELETE FROM library_roots;",
+            )
+            .unwrap();
+            let kept: (i64, Option<i64>) = conn
+                .query_row("SELECT COUNT(*), MAX(file_id) FROM playlist_items", [], |r| Ok((r.get(0)?, r.get(1)?)))
+                .unwrap();
+            assert_eq!(kept, (1, None), "from {from}: kept by path, the file forgotten");
+        }
     }
 
     /// Resume points from before Trakt's percentages stay as they were.

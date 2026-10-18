@@ -1,7 +1,10 @@
 /**
  * The audio and subtitle panel in the player.
  */
-import { FocusContext } from '@noriginmedia/norigin-spatial-navigation';
+import { FocusContext, setFocus } from '@noriginmedia/norigin-spatial-navigation';
+import { useState } from 'react';
+import { PlaylistChoices } from '../ui/PlaylistPicker';
+import type { NewItem } from '../library/playlists';
 import { useFocusGroup } from '../ui/focusGroups';
 import FocusButton from '../ui/FocusButton';
 import type { Track } from './engine';
@@ -34,6 +37,7 @@ const MAX_OFFERS = 8;
 
 /** Focus is aimed at the panel the moment it opens — see Player. */
 export const TRACK_PANEL_KEY = 'player-track-panel';
+const ADD_KEY = 'player-track-panel:playlist';
 
 /**
  * Audio and subtitle selection.
@@ -59,6 +63,7 @@ export default function TrackPanel({
   onClose,
   onDetails,
   online,
+  playlistItem,
 }: {
   audioTracks: Track[];
   subTracks: Track[];
@@ -73,7 +78,15 @@ export default function TrackPanel({
    */
   onDetails: () => void;
   online?: OnlineSubtitles | null;
+  /**
+   * What is playing, to add to a playlist (LOCAL-MEDIA.md phase 5): here, as
+   * Playback details is, so the bar does not grow. None for a trailer.
+   */
+  playlistItem?: NewItem | null;
 }) {
+  const [adding, setAdding] = useState(false);
+  const [added, setAdded] = useState<string | null>(null);
+
   // A closed menu (NAV-MAP N1, agreed 2026-10-11): focus never walks out to
   // the controls behind it; Up on the top goes round to the bottom and back;
   // Back closes it (Player.tsx).
@@ -164,6 +177,34 @@ export default function TrackPanel({
         <FocusButton className="track-option" keepInView="nearest" onSelect={onDetails}>
           Playback details ›
         </FocusButton>
+        {/* The playlists open under the button rather than in place of the
+            panel, so the ring is moved back onto it before they go
+            (docs/GOTCHAS.md, focus parked on an unmounted component). A new
+            playlist made here is named for itself: the player's keys rule
+            out typing. */}
+        {playlistItem && (
+          <FocusButton
+            focusKey={ADD_KEY}
+            className="track-option"
+            keepInView="nearest"
+            onSelect={() => setAdding((open) => !open)}
+          >
+            {adding ? 'Add to a playlist ⌄' : 'Add to a playlist ›'}
+          </FocusButton>
+        )}
+        {adding && playlistItem && (
+          <PlaylistChoices
+            items={[playlistItem]}
+            typing={false}
+            buttonClass="track-option track-playlist"
+            onDone={(message) => {
+              void setFocus(ADD_KEY);
+              setAdding(false);
+              setAdded(message);
+            }}
+          />
+        )}
+        {added && <p className="track-note">{added}</p>}
       </aside>
     </FocusContext.Provider>
   );

@@ -7,14 +7,17 @@ import { skipLabel, type ActiveSkip } from './skip';
 
 export default function SkipButton({
   prompt,
+  nextIsEpisode,
   onSkip,
 }: {
   prompt: ActiveSkip;
+  /** False for a playlist's next item or the next video (skip.ts). */
+  nextIsEpisode: boolean;
   onSkip: () => void;
 }) {
   return (
     <FocusButton className="skip-button" onSelect={onSkip}>
-      {skipLabel(prompt)}
+      {skipLabel(prompt, nextIsEpisode)}
     </FocusButton>
   );
 }

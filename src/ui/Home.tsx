@@ -10,6 +10,7 @@ import { useMemo, useState } from 'react';
 import Art from './Art';
 import Rail from './Rail';
 import ContinueRail from './ContinueRail';
+import { PlaylistsRail } from './PlaylistsPages';
 import FocusButton from './FocusButton';
 import FirstRun from './FirstRun';
 import SetupPages from './SetupPages';
@@ -37,6 +38,8 @@ interface Props {
   onFirstScan: () => void;
   /** A Videos folder with something in it: a library, if not of titles. */
   hasVideos?: boolean;
+  /** A playlist's tile on its rail (PlaylistsPages.tsx). */
+  onOpenPlaylist: (id: number) => void;
   /** The setup pages are up, in front of everything else here. */
   setupOpen: boolean;
   onSetupClosed: () => void;
@@ -82,6 +85,7 @@ export default function Home({
   onSeeAll,
   onFirstScan,
   hasVideos = false,
+  onOpenPlaylist,
   setupOpen,
   onSetupClosed,
   reviewCount,
@@ -180,6 +184,7 @@ export default function Home({
         {/* First rail, as on any streaming service: the thing you were most
             recently in the middle of is what you probably want. */}
         <ContinueRail items={resumable} onResume={onResume} onRemove={onRemoveResumable} />
+        <PlaylistsRail onOpen={onOpenPlaylist} />
 
         <Rail
           heading="Recently added"

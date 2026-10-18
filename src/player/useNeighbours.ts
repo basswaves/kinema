@@ -1,10 +1,12 @@
 /**
  * The episodes either side of the one playing, for the previous/next buttons,
- * `n` and `p`, and whether there is anything for Up next to offer; and for a
- * video played from outside the library, the files either side in its folder.
+ * `n` and `p`, and whether there is anything for Up next to offer; for an
+ * item of a playlist, the items either side in it; and for a video played
+ * from outside the library, the files either side in its folder.
  */
 import { useEffect, useState } from 'react';
-import { folderNeighbours, nextEpisode, previousEpisode, type EpisodeRef } from './api';
+import { entryRef, playlistStep, setPlaylistCurrent } from '../library/playlists';
+import { folderNeighbours, nextEpisode, previousEpisode, type EpisodeRef, type PlaybackTarget } from './api';
 
 /** Where previous or next goes: an episode, or a file in the same folder. */
 export interface Step {
@@ -18,12 +20,14 @@ export interface Steps {
   next: Step | null;
 }
 
-export function useNeighbours(fileId: number | null) {
+export function useNeighbours(fileId: number | null, playlist?: PlaybackTarget['playlist']) {
   /** The episodes either side of this file, or null where there is none. */
   const [neighbours, setNeighbours] = useState<{
     prev: EpisodeRef | null;
     next: EpisodeRef | null;
   }>({ prev: null, next: null });
+  const playlistId = playlist?.id;
+  const playlistItem = playlist?.item;
 
   /**
    * What is either side of this episode.
@@ -38,9 +42,26 @@ export function useNeighbours(fileId: number | null) {
     // is worse than one that appears a moment late.
     /* eslint-disable-next-line react-hooks/set-state-in-effect */
     setNeighbours({ prev: null, next: null });
-    if (fileId === null) return;
-
     let cancelled = false;
+
+    // From a playlist: its order, and this item is where its Play carries on.
+    if (playlistId !== undefined && playlistItem !== undefined) {
+      void setPlaylistCurrent(playlistId, playlistItem).catch((e) =>
+        console.warn('playlist place not kept', e)
+      );
+      const near = (forward: boolean) =>
+        playlistStep(playlistId, playlistItem, forward).then((e) => e && entryRef(e, playlistId));
+      void Promise.all([near(false), near(true)])
+        .then(([prev, next]) => {
+          if (!cancelled) setNeighbours({ prev, next });
+        })
+        .catch((e) => console.warn('playlist neighbours unavailable', e));
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (fileId === null) return;
     void Promise.all([previousEpisode(fileId), nextEpisode(fileId)])
       .then(([prev, next]) => {
         if (!cancelled) setNeighbours({ prev, next });
@@ -50,7 +71,7 @@ export function useNeighbours(fileId: number | null) {
     return () => {
       cancelled = true;
     };
-  }, [fileId]);
+  }, [fileId, playlistId, playlistItem]);
 
   return neighbours;
 }

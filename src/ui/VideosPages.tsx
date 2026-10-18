@@ -3,7 +3,7 @@
  * decision 1).
  *
  * The Library page holds one tile per Videos folder, then Folders
- * (FoldersPage.tsx) — and, once it is built, Playlists — so the top bar never
+ * (FoldersPage.tsx) and Playlists (PlaylistsPages.tsx), so the top bar never
  * grows again. A Videos folder's
  * page shows its files as they lie on disk: its own files first, then one group
  * per sub-folder, each with Play all, which plays through the group by the same
@@ -17,6 +17,9 @@ import { FocusContext, useFocusable } from '@noriginmedia/norigin-spatial-naviga
 import { useEffect, useMemo, useState } from 'react';
 import FocusButton from './FocusButton';
 import Art from './Art';
+import FocusGroup from './FocusGroup';
+import { PlaylistDialog } from './PlaylistPicker';
+import type { NewItem } from '../library/playlists';
 import { useClaimFocus } from './focus';
 import { count } from './format';
 import type { LibraryRoot } from '../library/api';
@@ -40,11 +43,13 @@ export function LibraryPage({
   roots,
   onOpen,
   onFolders,
+  onPlaylists,
   onSettings,
 }: {
   roots: LibraryRoot[];
   onOpen: (root: LibraryRoot) => void;
   onFolders: () => void;
+  onPlaylists: () => void;
   onSettings: () => void;
 }) {
   const { ref, focusKey } = useFocusable({
@@ -72,6 +77,15 @@ export function LibraryPage({
               <span className="library-tile-meta">{count(root.file_count, 'video')}</span>
             </FocusButton>
           ))}
+          <FocusButton
+            focusKey="library:playlists"
+            label="Playlists"
+            className="library-tile library-tile-playlists"
+            onSelect={onPlaylists}
+          >
+            <span className="library-tile-name">Playlists</span>
+            <span className="library-tile-meta">Films, episodes and videos in your order</span>
+          </FocusButton>
           <FocusButton
             focusKey="library:folders"
             label="Folders"
@@ -151,6 +165,9 @@ export function VideosPage({
   }, [missing]);
 
   const groups = useMemo(() => groupVideos(videos ?? [], root.path), [videos, root.path]);
+  /** A group being added to a playlist, and the sentence after. */
+  const [adding, setAdding] = useState<{ what: string; items: NewItem[] } | null>(null);
+  const [added, setAdded] = useState<string | null>(null);
   const first = groups[0]?.items[0];
   useClaimFocus(first ? `video:${first.id}` : 'videos:back', videos !== null, true);
 
@@ -171,13 +188,27 @@ export function VideosPage({
           </h2>
         </div>
         {failed && <p className="muted">{failed}</p>}
+        {added && <p className="muted videos-added">{added}</p>}
+        {adding && (
+          <PlaylistDialog
+            items={adding.items}
+            what={adding.what}
+            onClose={(message) => {
+              setAdding(null);
+              setAdded(message);
+            }}
+          />
+        )}
         {videos !== null && videos.length === 0 && (
           <p className="muted">No videos here yet. Kinema scans this folder every time it starts.</p>
         )}
         {groups.map((group) => (
           <section key={group.dir} className="videos-group">
             {(group.name || groups.length > 1) && (
-              <div className="videos-group-head">
+              // A row that is arrived at on Play all, and left by its own box:
+              // + Playlist beside it lies between two tiles, and the engines
+              // disagreed on which was nearer.
+              <FocusGroup kind="row" current={`video-group:${group.dir}`} className="videos-group-head">
                 <h3>{group.name || 'In this folder'}</h3>
                 <FocusButton
                   focusKey={`video-group:${group.dir}`}
@@ -189,13 +220,28 @@ export function VideosPage({
                 >
                   ▶ Play all
                 </FocusButton>
-              </div>
+                <FocusButton
+                  className="btn-secondary"
+                  onSelect={() =>
+                    setAdding({
+                      what: group.name ? `“${group.name}”` : 'these videos',
+                      items: group.items.map((v) => ({ path: v.path, file_id: v.id })),
+                    })
+                  }
+                >
+                  + Playlist
+                </FocusButton>
+              </FocusGroup>
             )}
-            <div className="videos-tiles">
+            <FocusGroup
+              kind="list"
+              current={group.items[0] ? `video:${group.items[0].id}` : undefined}
+              className="videos-tiles"
+            >
               {group.items.map((video) => (
                 <VideoTile key={video.id} video={video} onPlay={onPlay} />
               ))}
-            </div>
+            </FocusGroup>
           </section>
         ))}
       </div>

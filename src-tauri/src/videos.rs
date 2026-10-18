@@ -305,7 +305,7 @@ pub fn frames_in(data_dir: &Path) -> PathBuf {
     data_dir.join("artwork")
 }
 
-fn frames_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+pub(crate) fn frames_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Ok(frames_in(&crate::data_dir(app)?))
 }
 
@@ -313,7 +313,7 @@ fn frame_path(frames: &Path, file_id: i64) -> PathBuf {
     frames.join(format!("frame-{file_id}.jpg"))
 }
 
-fn cached_frame(frames: &Path, file_id: i64) -> Option<String> {
+pub(crate) fn cached_frame(frames: &Path, file_id: i64) -> Option<String> {
     let path = frame_path(frames, file_id);
     path.is_file().then(|| path.to_string_lossy().into_owned())
 }

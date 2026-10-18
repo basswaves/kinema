@@ -67,6 +67,7 @@ import {
   type VideoItem,
 } from '../library/videos';
 import { LibraryPage, VideosPage, VideoTile } from './VideosPages';
+import { PlaylistPage, PlaylistsPage } from './PlaylistsPages';
 import FoldersPage, { type FolderSpot } from './FoldersPage';
 import { launchRequest, listenForVideos, targetFor, type OpenRequest } from '../library/opened';
 import { keepSame } from './keepSame';
@@ -127,6 +128,9 @@ type View =
   | { name: 'home' | 'library' | 'search' | 'settings'; section?: SettingsTarget }
   // One Videos folder, from a tile on the Library page.
   | { name: 'videos'; root: LibraryRoot }
+  // Library → Playlists, and one playlist (PlaylistsPages.tsx).
+  | { name: 'playlists' }
+  | { name: 'playlist'; id: number }
   // Library → Folders, and where in it (FoldersPage.tsx).
   | { name: 'folders'; at: FolderSpot | null }
   | { name: 'detail'; title: Title }
@@ -752,7 +756,7 @@ export default function Browse() {
               ? view.kind === 'movie'
                 ? 'movies'
                 : 'tv'
-              : view.name === 'videos' || view.name === 'folders'
+              : ['videos', 'folders', 'playlists', 'playlist'].includes(view.name)
                 ? 'library'
                 : view.name
           }
@@ -797,6 +801,7 @@ export default function Browse() {
             onRemoveResumable={(item) => void removeResumable(item)}
             onFirstScan={firstScan}
             hasVideos={roots.some((r) => r.kind === 'videos' && r.file_count > 0)}
+            onOpenPlaylist={(id) => openView({ name: 'playlist', id })}
             setupOpen={setupOpen}
             onSetupClosed={closeSetup}
             reviewCount={reviewCount}
@@ -852,6 +857,7 @@ export default function Browse() {
             roots={roots}
             onOpen={(root) => openView({ name: 'videos', root })}
             onFolders={() => openView({ name: 'folders', at: null })}
+            onPlaylists={() => openView({ name: 'playlists' })}
             onSettings={() => openView({ name: 'settings', section: 'videos' })}
           />
         )}
@@ -873,6 +879,14 @@ export default function Browse() {
             onBack={goBack}
             onLibraryChanged={() => void load()}
           />
+        )}
+
+        {view.name === 'playlists' && (
+          <PlaylistsPage onOpen={(id) => openView({ name: 'playlist', id })} onBack={goBack} />
+        )}
+
+        {view.name === 'playlist' && (
+          <PlaylistPage id={view.id} onPlay={(target) => void startPlayback(target)} onBack={goBack} />
         )}
 
         {view.name === 'videos' && (

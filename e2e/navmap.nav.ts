@@ -636,7 +636,8 @@ async function walkSystem(ctx: Ctx): Promise<void> {
   const toFolders = async (p: Page) => {
     if (!(await openFromTopBar(p, 'Library'))) return false;
     await quiet(p);
-    await press(p, 'ArrowRight');
+    // Past the Videos folder and Playlists.
+    await press(p, 'ArrowRight', 2);
     await press(p, 'Enter');
     await p.waitForFunction("window.__nav.leaves().some((l) => l.key.startsWith('folders-place:'))", undefined, { timeout: 8000 });
     await quiet(p);
@@ -652,6 +653,29 @@ async function walkSystem(ctx: Ctx): Promise<void> {
     await p.waitForFunction("window.__nav.leaves().some((l) => l.key === 'folders-up')", undefined, { timeout: 8000 });
     await quiet(p);
     return w(p, 'folders-in', 'Folders: inside a folder (add, up, folders, videos)', KB);
+  });
+
+  // Library → Playlists, then one playlist (the mock's "Evening").
+  const PLAYLISTS = { flags: { kinemaMockPlaylists: '1' } };
+  const toPlaylists = async (p: Page) => {
+    if (!(await openFromTopBar(p, 'Library'))) return false;
+    await quiet(p);
+    await press(p, 'ArrowRight');
+    await press(p, 'Enter');
+    await p.waitForFunction("window.__nav.leaves().some((l) => l.key.startsWith('playlist:'))", undefined, { timeout: 8000 });
+    await quiet(p);
+    return true;
+  };
+  await screen(ctx, 'playlists', 'Playlists (a tile each, new, import)', PLAYLISTS, async (p) => {
+    if (!(await toPlaylists(p))) return null;
+    return w(p, 'playlists', 'Playlists (a tile each, new, import)', KB);
+  });
+  await screen(ctx, 'playlist', 'A playlist (play, rename, export, delete; rows of play, up, down, remove)', PLAYLISTS, async (p) => {
+    if (!(await toPlaylists(p))) return null;
+    await press(p, 'Enter');
+    await p.waitForFunction("window.__nav.leaves().some((l) => l.key.startsWith('playlist-item:'))", undefined, { timeout: 8000 });
+    await quiet(p);
+    return w(p, 'playlist', 'A playlist (play, rename, export, delete; rows of play, up, down, remove)', KB);
   });
 
   await screen(ctx, 'search', 'Search (an empty query lists every title)', {}, async (p) => {

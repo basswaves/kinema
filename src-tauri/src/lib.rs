@@ -42,6 +42,7 @@ mod omdb;
 mod opened;
 mod opensubtitles;
 mod places;
+mod playlists;
 mod playback;
 mod power;
 mod probe;
@@ -438,6 +439,18 @@ pub fn run() {
             playback::first_unwatched_episode,
             playback::get_title_prefs,
             playback::set_title_prefs,
+            playlists::list_playlists,
+            playlists::playlist_entries,
+            playlists::create_playlist,
+            playlists::rename_playlist,
+            playlists::delete_playlist,
+            playlists::add_to_playlist,
+            playlists::remove_playlist_item,
+            playlists::move_playlist_item,
+            playlists::set_playlist_current,
+            playlists::playlist_step,
+            playlists::export_playlist,
+            playlists::import_playlist,
             videos::list_videos,
             videos::list_all_videos,
             videos::video_frame,

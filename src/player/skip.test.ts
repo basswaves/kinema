@@ -461,5 +461,6 @@ describe('skipLabel', () => {
     expect(skipLabel(at('recap'))).toBe('Skip recap');
     expect(skipLabel(at('credits', true))).toBe('Skip to the scene after the credits');
     expect(skipLabel(at('credits'))).toBe('Next episode ›');
+    expect(skipLabel(at('credits'), false)).toBe('Next ›');
   });
 });

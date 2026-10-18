@@ -1145,6 +1145,102 @@ const mockDetection = (() => {
 // ---- the command table ----------------------------------------------------
 
 type Args = Record<string, unknown>;
+// ---- playlists (playlists.rs) -------------------------------------------------
+// In memory. `kinemaMockPlaylists=1` starts with one: two episodes, the film
+// and a video, so the page, Home's rail and the player's steps have something.
+interface MockPlaylist {
+  id: number;
+  name: string;
+  current: number | null;
+  updated: number;
+  items: { item_id: number; path: string; file_id: number | null }[];
+}
+const playlists: MockPlaylist[] = [];
+let playlistSeq = 0;
+let playlistTick = 0;
+function mockPlaylistAdd(list: MockPlaylist, items: { path: string; file_id: number | null }[]) {
+  let added = 0;
+  let already = 0;
+  for (const item of items) {
+    if (list.items.some((i) => i.path === item.path)) already++;
+    else {
+      list.items.push({ item_id: ++playlistSeq, path: item.path, file_id: item.file_id });
+      added++;
+    }
+  }
+  list.updated = ++playlistTick;
+  return { added, already };
+}
+function mockPlaylistMake(name: string): MockPlaylist {
+  const list: MockPlaylist = { id: ++playlistSeq, name, current: null, updated: ++playlistTick, items: [] };
+  playlists.push(list);
+  return list;
+}
+if (flag('kinemaMockPlaylists') === '1') {
+  const list = mockPlaylistMake('Evening');
+  const pick = (id: number) => {
+    const f = fileById(id);
+    return f ? [{ path: f.path, file_id: f.id }] : [];
+  };
+  const video = mockVideos[1];
+  mockPlaylistAdd(list, [
+    ...pick(102),
+    ...pick(201),
+    { path: `${video.dir}/${video.name}`, file_id: video.id },
+    ...pick(101),
+  ]);
+}
+function mockEntry(item: MockPlaylist['items'][number]) {
+  const base = {
+    item_id: item.item_id,
+    path: item.path,
+    file_id: item.file_id,
+    title_id: null as number | null,
+    title: null as string | null,
+    season: null as number | null,
+    episode: null as number | null,
+    episode_name: null as string | null,
+    image_url: null,
+    image_path: null,
+    missing: false,
+  };
+  const row = item.file_id === null ? undefined : playback.get(item.file_id);
+  const progress = {
+    position_secs: row?.position ?? 0,
+    duration_secs: row?.duration ?? null,
+    completed: row?.completed ?? false,
+  };
+  if (item.file_id === null) return { ...base, ...progress, kind: 'loose' };
+  if (item.file_id > 9000) return { ...base, ...progress, kind: 'video' };
+  const file = fileById(item.file_id);
+  const title = file ? titleById(file.titleId) : null;
+  if (!file || !title) return { ...base, ...progress, kind: 'file' };
+  const episode = file.season !== null;
+  return {
+    ...base,
+    ...progress,
+    kind: episode ? 'episode' : 'film',
+    title_id: title.id,
+    title: title.title,
+    season: file.season,
+    episode: file.episode,
+    episode_name: episode ? `Episode ${file.episode}` : null,
+  };
+}
+function mockSummary(list: MockPlaylist) {
+  return {
+    id: list.id,
+    name: list.name,
+    count: list.items.length,
+    current_item: list.current,
+    image_url: null,
+    image_path: null,
+    updated_at: list.updated,
+  };
+}
+const playlistOf = (id: number) => playlists.find((p) => p.id === id);
+const playlistHolding = (itemId: number) => playlists.find((p) => p.items.some((i) => i.item_id === itemId));
+
 type Handler = (args: Args) => unknown;
 
 /**
@@ -1187,6 +1283,64 @@ const handlers: Record<string, Handler> = {
           ...addedRoots,
         ]
       : [],
+  list_playlists: () => [...playlists].sort((a, b) => b.updated - a.updated).map(mockSummary),
+  playlist_entries: (a) => playlistOf(num(a, 'playlistId'))?.items.map(mockEntry) ?? [],
+  create_playlist: (a) => mockPlaylistMake(String(a.name).trim() || 'Playlist').id,
+  rename_playlist: (a) => {
+    const list = playlistOf(num(a, 'playlistId'));
+    if (list) list.name = String(a.name).trim();
+    return null;
+  },
+  delete_playlist: (a) => {
+    const at = playlists.findIndex((p) => p.id === num(a, 'playlistId'));
+    if (at >= 0) playlists.splice(at, 1);
+    return null;
+  },
+  add_to_playlist: (a) => {
+    const list = playlistOf(num(a, 'playlistId'));
+    return list
+      ? mockPlaylistAdd(list, a.items as { path: string; file_id: number | null }[])
+      : { added: 0, already: 0 };
+  },
+  remove_playlist_item: (a) => {
+    const list = playlistHolding(num(a, 'itemId'));
+    if (list) {
+      list.items = list.items.filter((i) => i.item_id !== num(a, 'itemId'));
+      if (list.current === num(a, 'itemId')) list.current = null;
+    }
+    return null;
+  },
+  move_playlist_item: (a) => {
+    const list = playlistHolding(num(a, 'itemId'));
+    if (!list) return null;
+    const at = list.items.findIndex((i) => i.item_id === num(a, 'itemId'));
+    const to = at + (a.up ? -1 : 1);
+    if (to >= 0 && to < list.items.length) {
+      [list.items[at], list.items[to]] = [list.items[to], list.items[at]];
+    }
+    return null;
+  },
+  set_playlist_current: (a) => {
+    const list = playlistOf(num(a, 'playlistId'));
+    if (list) {
+      list.current = num(a, 'itemId');
+      list.updated = ++playlistTick;
+    }
+    return null;
+  },
+  playlist_step: (a) => {
+    const list = playlistOf(num(a, 'playlistId'));
+    if (!list) return null;
+    const at = list.items.findIndex((i) => i.item_id === num(a, 'itemId'));
+    const next = at < 0 ? undefined : list.items[at + (a.forward ? 1 : -1)];
+    return next ? mockEntry(next) : null;
+  },
+  export_playlist: (a) => playlistOf(num(a, 'playlistId'))?.items.length ?? 0,
+  import_playlist: () => {
+    const list = mockPlaylistMake('Imported');
+    mockPlaylistAdd(list, [{ path: 'E:/Elsewhere/clip.mp4', file_id: null }]);
+    return { id: list.id, name: list.name, library: 0, loose: 1, skipped: 1 };
+  },
   list_videos: () => mockVideos.map(videoItem),
   list_all_videos: () => mockVideos.map(videoItem),
   video_frame: () => null,

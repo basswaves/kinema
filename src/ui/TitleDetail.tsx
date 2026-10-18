@@ -23,6 +23,8 @@ import { readLocalName } from '../library/localTitle';
 import FocusGroup from './FocusGroup';
 import MediaBadges, { BadgeRows } from './MediaBadges';
 import HeavyFileNotice from './HeavyFileNotice';
+import { PlaylistDialog } from './PlaylistPicker';
+import type { NewItem } from '../library/playlists';
 import { useSeasonBadges } from './seasonBadges';
 import { keepOnScreen, useClaimFocus } from './focus';
 import {
@@ -331,6 +333,22 @@ export default function TitleDetailView({ title, onPlayFile, onBack, onFindMatch
     () => detail?.episodes.filter((e) => e.season === season) ?? [],
     [detail, season]
   );
+
+  /**
+   * What + Playlist adds (LOCAL-MEDIA.md phase 5): the film, or the episodes
+   * of the season shown that are here, in order. A single episode is added
+   * from the player.
+   */
+  const playlistItems = useMemo((): NewItem[] => {
+    if (title.kind === 'series') {
+      return visibleEpisodes.flatMap((e) =>
+        e.file_id !== null && e.file_path ? [{ path: e.file_path, file_id: e.file_id }] : []
+      );
+    }
+    return detail?.movie_path ? [{ path: detail.movie_path, file_id: detail.movie_file_id }] : [];
+  }, [title.kind, visibleEpisodes, detail]);
+  const [playlistOpen, setPlaylistOpen] = useState(false);
+  const [playlistNote, setPlaylistNote] = useState<string | null>(null);
 
   /**
    * Look for a trailer file on disk, anchored on any video we hold for this
@@ -686,10 +704,37 @@ export default function TitleDetailView({ title, onPlayFile, onBack, onFindMatch
                     Find a match
                   </FocusButton>
                 )}
+
+                {playlistItems.length > 0 && (
+                  <FocusButton
+                    className="btn-secondary"
+                    keepInView="page-top"
+                    onSelect={() => setPlaylistOpen(true)}
+                  >
+                    + Playlist
+                  </FocusButton>
+                )}
                   </>
                 )}
               </FocusGroup>
               {renameError && <div className="detail-error">{renameError}</div>}
+              {playlistNote && <div className="detail-note">{playlistNote}</div>}
+              {playlistOpen && (
+                <PlaylistDialog
+                  items={playlistItems}
+                  what={
+                    title.kind !== 'series'
+                      ? 'the film'
+                      : season === 0
+                        ? 'the specials'
+                        : `season ${season ?? ''}`
+                  }
+                  onClose={(message) => {
+                    setPlaylistOpen(false);
+                    setPlaylistNote(message);
+                  }}
+                />
+              )}
               {/* Under Play, about the file it would play; only on Android, and
                   only when that file is far above what Android says the
                   device's video chip is made for (heavyFile.ts). */}

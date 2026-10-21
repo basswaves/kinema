@@ -454,6 +454,11 @@ reasoning is in [docs/DESIGN.md](docs/DESIGN.md) and [docs/HISTORY.md](docs/HIST
   the setting is there because a device that is weak in a way it cannot
   report should not be stuck with the choice. Nothing else becomes a preset
   because of it.
+  **The expert drawer (planned, 2026-10-21) follows the same line:** it lists
+  every decision made for a film and a screen with the reason, and lets
+  someone correct a *fact* about their equipment that Kinema read wrongly —
+  never a matter of taste. The defaults must stay right for people who never
+  open it.
 - **When a graphics card cannot keep up, the desktop player steps down — and
   only then.** The picture Kinema aims for is the full one. But a card that
   drops frames shows a stuttering film, which is further from the creator's
@@ -573,6 +578,12 @@ reasoning is in [docs/DESIGN.md](docs/DESIGN.md) and [docs/HISTORY.md](docs/HIST
   `gradle/wrapper/gradle-wrapper.jar` (Gradle's own 59 KB starter, which
   every Android project keeps). It runs on the build machine and is never
   in the app.
+- **Say what leaves the computer.** Kinema is to have one page listing every
+  service it can contact, what it sends, when, and the switch that stops it
+  (planned, 2026-10-21). A change that makes Kinema contact a new service, or
+  send something new to one, updates that page in the same pull request; a
+  check is planned that fails when the code contacts a host the page does not
+  list.
 - **Sidecars are read, never written** by default. The reader stays so other
   producers of the format keep working.
 - **Android is for TV devices.** Boxes, sticks and TVs running Android TV or
@@ -596,3 +607,8 @@ boxes in the template — particularly the two failure modes above.
 
 If you are unsure whether something fits, open an issue first. A question costs
 less than a rewrite.
+
+Translations are not planned by the project itself, but a pull request that
+brings Kinema to your language is welcome. Open an issue first: the interface's
+text has to be gathered in one place before it can be translated, and that is
+best agreed before anyone starts.

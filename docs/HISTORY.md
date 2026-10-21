@@ -3572,6 +3572,53 @@ subscribers; a TV box often has no browser, so this also fixes a trailer that
 had nowhere to open. Local trailer files still come first. Ads are never
 blocked, and Settings says that YouTube stores data once a trailer plays.
 
+## A longer plan, seen through newcomers' eyes (2026-10-21)
+
+The plan was reviewed by imagining two people finding Kinema through a web
+search: a home-theatre enthusiast with a receiver, a projector and a NAS of
+remuxes, and someone used to streaming services who wants to own their films.
+Most of what they would miss went onto the roadmap. The order: films and TV
+first, since they are used every evening; accurate playback — Dolby Vision, 3D,
+projectors — close behind, because it is what Kinema is; music, profiles, sync
+and a Jellyfin source further out. Decisions made along the way:
+
+- **Translations are not planned; pull requests are welcome.** Nearly everyone
+  who uses software like this reads English and is used to programs in it,
+  and every translation is work on every release. If someone wants Kinema in
+  their language, the text can be gathered for them then.
+- **No separate beta and stable releases.** Before 1.0 every release is in
+  effect a beta. Nothing in Kinema ever has to be updated, every version
+  stays downloadable, and each is built to keep working for years, so anyone
+  who finds a version they are happy with can simply stay on it.
+- **An expert drawer, with overrides for facts about the equipment.** The
+  rule that settings describe the equipment and never taste stands; what is
+  new is a place, deeper in Settings, that lists every decision Kinema made
+  for a film and a screen with the reason, and lets someone correct a fact
+  Kinema got wrong ("this TV really peaks at 800 nits"). It is for
+  troubleshooting and edge cases. The defaults remain the point: most people
+  should never need to open it.
+- **Reference clips for checking a setup are downloaded when asked, from
+  their official source, never bundled** — the same spirit as ffmpeg's
+  install button, and only after their licences are checked.
+- **A page of what leaves the computer, kept honest by a test.** Every service
+  Kinema can contact, what it sends and the switch that stops it. Such a page
+  goes stale silently, so the plan is a check that fails when the code
+  contacts a host the page does not list.
+- **Moving a library to another computer must not disturb SIMKL, Trakt or a
+  later sync**: what was already sent stays sent, nothing is sent again, and
+  no sign-in travels in the file.
+- **Themes and layouts, reconsidered.** Turned down on 2026-10-19 when Ventic's
+  themes were compared; the owner reopened it. Only the interface, never the
+  film's picture; theme files are styles and settings, never scripts; they use
+  documented names so that an update does not break them, and a theme that no
+  longer fits falls back to the default and says so.
+- **A Jellyfin server as a source, played directly.** Kodi can be the front of
+  a Jellyfin library, and so could Kinema: browsing it beside local folders,
+  playing the original file and never a transcode, with Kinema's own badges,
+  skipping and output handling. Jellyfin's API is open and documented; Plex
+  needs a check of its terms and stability first. The earlier viability review
+  had said "later, not now"; it is now on the plan for later.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

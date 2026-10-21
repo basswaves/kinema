@@ -11,9 +11,66 @@ Ideas and reports are welcome as [issues](https://github.com/Basswaves/kinema/is
 
 ## Next
 
-More of Kinema as a player for any video, not only a matched library:
-the picture and sound badges for a video; and, for playlists, shuffle and
-repeat, later. (Done in 0.12.0: Trakt resume points, so a
+The order, roughly. Films and TV shows come first, because they are what
+Kinema is used for every evening; playing every file as accurately as the
+equipment allows is what Kinema is, so that work follows close behind.
+
+**Ready for newcomers.** A signed Windows download, straight from the
+[website](https://basswaves.github.io/kinema/) without a detour through
+GitHub; a **Send a report** button that packs the logs into one file; a guide
+to how Kinema reads file and folder names, and one to getting your own
+Blu-rays into a library; Settings arranged by what you want to do rather than
+by the names of the services behind it, with a search box; and a page saying
+plainly **what leaves your computer** — every service Kinema can talk to, what
+it sends, and the switch that stops it. Plus small fixes: copying text, a
+right-click menu of Kinema's own, language codes in the track menus, adding a
+single episode to a playlist.
+
+**Everyday films and TV.** Subtitle size and background; two subtitle
+languages at once, for language learners and mixed households; a delay
+setting per sound device, for receivers and TVs that hold the sound back; a
+chapter list in the player; audio description and other accessibility
+preferences; subtitle timing, by hand and automatic; pictures on the seek bar;
+volume levelling and a dialogue boost for decoded sound. For choosing: a
+**Play something** button; **smart collections** built from what Kinema
+measured in each file ("everything in Dolby Vision", "Atmos films I have not
+seen"); favourites and a watchlist; actor pages; a richer title page. For the
+library: two copies of one film shown as versions of it; importing what you
+have watched, and where you stopped, from Kodi, Jellyfin, Plex and Emby; and
+moving a whole library to a new computer. Shuffle and repeat for playlists,
+and the picture and sound badges for a video.
+
+**Plays anything, accurately.** Dolby Vision checked end to end on the
+desktop; 3D (below); more of the raw facts — what the TV and receiver said
+about themselves, and the exact player settings chosen — as text you can copy
+into a forum post; an **expert drawer** listing every decision Kinema made and
+why, with overrides for facts about your equipment (never for taste), for
+troubleshooting and edge cases; a live bitrate graph and an HDR brightness
+graph; and **Check my setup**, which plays short reference clips (downloaded
+when you ask, from their official source) and reports what really reached the
+screen and the receiver. The projector work below.
+
+**Evenings and ownership.** Channels made from your own library, with
+something already playing when you turn one on; a health page for your
+collection — files gone, changed or unreadable, a share that keeps dropping
+out, films that exist on one disk only; a cinema evening, with a trailer from
+your own shelf before the feature; a watching diary; a shelf for the physical
+side of a collection — editions, and discs not yet ripped; Home Assistant,
+so the lights follow the film; and your phone as a keyboard, remote and second
+screen, with no app to install.
+
+**Further out.** Music — a good player first (a library, bit-perfect and
+gapless playback, a window showing the signal path), the specialist parts
+later; profiles for each person in a household; syncing watch state through a
+WebDAV folder of your own; a Jellyfin server as a source beside your folders,
+played directly, never transcoded (Plex after a check of its terms); and
+themes and layouts for the interface — never for the film's picture.
+
+**Being looked into, nothing promised:** handing a film over to Kinema on
+another TV in the house; watching together with a friend, each from their own
+copy; and searching in plain words ("the heist film with the twist").
+
+(Done in 0.12.0: Trakt resume points, so a
 film stopped on one device continues on another; the next and previous file in
 a folder when a video was opened from Explorer; **Videos** folders for home
 videos and clips, with a picture taken from the file, under a Library tab; and
@@ -124,6 +181,11 @@ reasons in full.
   installed them; Kinema never ships or downloads them.
 - **Looking up a whole library in TheIntroDB at once.** It is asked about one
   episode at a time, when that episode is played, on its terms.
+- **Translations of the interface.** Kinema is in English, which nearly everyone
+  who uses software like it reads, and a translation is work on every release.
+  A pull request from someone who wants Kinema in their language is welcome;
+  open an issue first, since the interface's text would need gathering in one
+  place before it can be translated.
 - **Automatic updates.** Kinema says when a new version is out, and you
   download it when you choose. On Linux the `.deb` and `.rpm` are the system's
   own package format, which is how Linux users expect to install a program and

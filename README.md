@@ -150,7 +150,7 @@ series, what the season on screen holds, and which episodes differ — and
 beside the year are its age rating and its IMDb, Rotten Tomatoes and TMDB
 scores. Posters everywhere show what you have watched.
 
-![The player's controls: seek bar, the transport in the middle, audio and subtitles and volume at the right, with the list of audio tracks open, each led by its language code](docs/images/player.jpg)
+![The player's controls: seek bar, the transport in the middle, audio and subtitles and volume at the right, with the list of audio tracks open](docs/images/player.jpg)
 
 A remote works the way it does on any streaming app: **OK** pauses, **←/→**
 seek (hold to go faster), and **↑/↓** bring up the controls — the seek bar,

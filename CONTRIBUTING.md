@@ -109,7 +109,7 @@ and `release.yml` does the same, writes its `.sha256` and adds it to the release
 text. It installs to `%LOCALAPPDATA%\Kinema` with no administrator, and
 fetches WebView2 only when it is missing. An installer is acceptable on one
 condition: uninstalling leaves nothing behind. The uninstaller runs
-`kinema.exe --uninstall-cleanup` (the same removal as Settings → Remove, only
+`kinema.exe --uninstall-cleanup` (the same removal as Settings → Playback → Opening videos → Remove, only
 if the "video player" offer names this copy) and clears Windows' own leftovers
 for the app; it asks before deleting the library and settings. Test it in
 Windows Sandbox with `scripts\sandbox-installer.ps1` — a clean Windows is the

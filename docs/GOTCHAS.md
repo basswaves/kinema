@@ -826,7 +826,7 @@ a short window (`page.setViewportSize`), where the scroll makes it fail.
 
 ### A control drawn a moment after its neighbours is skipped by Up
 
-Found 2026-10-17 with Trakt's resume row in Settings → Accounts. The row read
+Found 2026-10-17 with Trakt's resume row in Settings → Keep track of what I watch. The row read
 its setting itself and appeared a few milliseconds after the Disconnect button
 under it. norigin had measured Disconnect where it was before the row pushed
 it down, so Up from Disconnect sometimes went past the row to the section
@@ -844,7 +844,7 @@ repeat it (`--repeat-each`) before calling it passing.
 itself. Containers render no `focused` class, so there is no ring, and every
 arrow press goes nowhere — the watchdog in `focus.ts` "recovers" onto the
 view's landing spot, which descends into the same empty container again. The
-Accounts setup page in a build without SIMKL's or Trakt's app and without an
+Keep track of what you watch setup page in a build without SIMKL's or Trakt's app and without an
 OpenSubtitles key (every build but a release) has nothing to press: two
 seconds after arriving the ring vanished for good, and the box's log said
 `recovered from a dead focus key onto setup-pages` fifty times a minute.

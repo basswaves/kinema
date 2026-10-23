@@ -131,7 +131,7 @@
       "name": "Does Kinema collect data about me?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "No accounts, no telemetry, no analytics. Kinema asks metadata services about the titles in your library, and asks GitHub once per launch for the latest version number (you can turn that off in Settings). The full list of what it connects to is in SECURITY.md."
+        "text": "No accounts, no telemetry, no analytics. Kinema asks metadata services about the titles in your library, and asks GitHub once per launch for the latest version number (you can turn that off in Settings → Advanced → Look for new versions). The full list of what it connects to, what it sends and what stops it is on the page https://basswaves.github.io/kinema/privacy.html, and in Kinema under Settings → Privacy."
       }
     },
     {
@@ -147,7 +147,7 @@
       "name": "Windows says “Windows protected your PC”. Is that a problem?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "It appears once because Kinema is not code-signed, which needs a paid certificate. It is the same box any small program from an independent developer shows, and it does not mean something was found. Click More info, then Run anyway. Every release publishes a checksum beside the ZIP so you can check the file is the one that was published."
+        "text": "It appears once because Kinema is not code-signed, which needs a paid certificate. It is the same box any small program from an independent developer shows, and it does not mean something was found. Click More info, then Run anyway. Every release publishes a checksum beside each file, so you can check that the one you downloaded is the one that was published."
       }
     },
     {
@@ -177,6 +177,7 @@
       <a href="#setup">Sets itself up</a>
       <a href="#for-you">Is it for you?</a>
       <a href="#faq">FAQ</a>
+      <a href="privacy.html">Privacy</a>
     </nav>
     <span class="tc" id="tc" aria-hidden="true">0:00:00 / 1:58:59</span>
     <a class="btn small primary" data-dl href="#download">Download</a>
@@ -278,7 +279,7 @@
     <h2 class="rv">You don't need to know what 24p is.</h2>
     <div class="split">
       <div>
-        <p class="intro rv">Getting a film to look and sound right at home depends on things most people have never heard of: whether the screen switches to the film's 24 frames a second or shows it with judder, whether HDR is on, which sound formats the receiver can take untouched, which subtitles should show. Enthusiasts spend hours on this in MPC-HC or Kodi. Everyone else never does, and gets a picture or sound that is a little wrong without ever knowing.</p>
+        <p class="intro rv">Getting a film to look and sound right at home depends on things most people have never heard of: whether the screen switches to the film's 24 frames a second or shows it with judder, whether HDR is on, which sound formats the receiver can take untouched, which subtitles should show. Enthusiasts spend hours on this in MPC-HC or Kodi. Everyone else never does, and gets a picture or sound that is a little wrong without ever knowing. Settings are grouped by what you want to do, with a search box at the top.</p>
         <p class="intro rv"><strong>Kinema asks your equipment what it can do, and sets things up from the answer.</strong></p>
         <ul class="ticks rv">
           <li><span class="n">01</span><div><b>The screen matches the film</b><span>Its refresh rate for smooth 24p, and HDR switched on for an HDR film.</span></div></li>
@@ -330,9 +331,9 @@
       <div class="rv"><span class="k">03</span><h3>Remembers where you were</h3><p>Per file, and offers the next episode. Posters show what you have watched.</p></div>
       <div class="rv"><span class="k">04</span><h3>Skips intros, recaps and credits</h3><p>From community databases, chapter markers, or by comparing a season's audio. Where a film has a scene after its credits, Skip takes you straight to it.</p></div>
       <div class="rv"><span class="k">05</span><h3>Subtitles that fit</h3><p>In your language when the audio is in another, forced subtitles for foreign lines, and online search when a file has none in yours.</p></div>
-      <div class="rv"><span class="k">06</span><h3>Plays through mpv</h3><p>Hardware decoding, HDR tone mapping, PGS subtitles and 4K remuxes. On Android it uses Android's own media player, which takes Dolby Vision and receiver sound from the system.</p></div>
+      <div class="rv"><span class="k">06</span><h3>Plays through mpv</h3><p>Hardware decoding, HDR converted for screens that cannot show it, the picture-based subtitles of Blu-ray discs, and untouched 4K disc copies (remuxes). On Android it uses Android's own media player, which takes Dolby Vision and receiver sound from the system.</p></div>
       <div class="rv"><span class="k">07</span><h3>Works from the sofa</h3><p>Browsing, search with an on-screen keyboard, playing, subtitles and resume all work with a D-pad. The TV layout fills the screen with bigger text.</p></div>
-      <div class="rv"><span class="k">08</span><h3>Yours, and offline</h3><p>Posters and descriptions are cached locally. No account, no telemetry, and a weekly safety copy of your watch history and resume points.</p></div>
+      <div class="rv"><span class="k">08</span><h3>Yours, and offline</h3><p>Posters and descriptions are cached locally. No account, no telemetry, and a weekly safety copy of your watch history and resume points. Settings → Privacy lists every service Kinema can contact, what it sends and what stops it.</p></div>
       <div class="rv"><span class="k">09</span><h3>Tracks what you watch, if you want</h3><p>Connect SIMKL or Trakt and what you finish is added to your account. Nothing else is sent, and it stays off until you connect it.</p></div>
     </div>
   </div>
@@ -356,7 +357,7 @@
         <h3>Probably not, if you want…</h3>
         <p class="sub">Better to know before you download.</p>
         <ul>
-          <li><b>Your library on every screen in the house, or on the road.</b> With no server, a film plays on the device Kinema runs on. Several devices can read the same NAS, but each keeps its own library and its own place in a film.</li>
+          <li><b>Your library on every screen in the house, or on the road.</b> With no server, a film plays on the device Kinema runs on. Several devices can read the same NAS (a network drive), but each keeps its own library and its own place in a film.</li>
           <li><b>Streaming-service apps or an add-on store.</b> Kinema plays the files you own. Keeping that kind of thing working is a job of its own, and Kinema is built to run for years without one.</li>
           <li><b>A tuning bench.</b> If you enjoy comparing upscalers and writing shader chains, Kinema takes those decisions away on purpose: no quality presets, no machine-learning upscaling, no frame interpolation.</li>
           <li><b>Apple TV, iPhone or iPad.</b> Not planned. A Mac version is possible one day, with no promise attached.</li>
@@ -397,6 +398,7 @@
         <p><b>Installer or ZIP?</b> The installer, if you are unsure. It installs for your account only (no administrator) with a Start menu entry, and Settings → Apps removes it completely; it asks before deleting your library and settings. A newer version installs over it and keeps everything.</p>
         <p>The ZIP, if you want everything in one folder (a USB stick, nothing installed): extract it anywhere and run <code>kinema.exe</code>. Deleting the folder removes it.</p>
         <p>Windows asks once (“Windows protected your PC”) because Kinema is not code-signed, which is the same box any small independent program gets. Click <b>More info</b>, then <b>Run anyway</b>. This applies to both.</p>
+        <p>To check a download, run <code>Get-FileHash .\kinema-windows-x64-setup.exe -Algorithm SHA256</code> in PowerShell and compare it with the matching .sha256 file.</p>
         <div class="btns">
           <a class="btn primary" href="https://github.com/basswaves/kinema/releases/latest/download/kinema-windows-x64-setup.exe">Download the installer</a>
           <a class="btn secondary" href="https://github.com/basswaves/kinema/releases/latest/download/kinema-windows-x64.zip">Portable ZIP</a>
@@ -442,9 +444,9 @@
       <details><summary>Does it play 4K HDR, Dolby Vision, Atmos, DTS-HD and TrueHD?</summary><div class="a">Yes. On a screen that supports HDR it shows HDR, and on one that does not it converts the picture to look as close to SDR as it can. Atmos, DTS:X and TrueHD can be sent untouched to a receiver that takes them. If a Dolby Vision file needs a decoder your setup does not have, Kinema plays the HDR10 base layer and says so, rather than claiming a picture it did not show. A playback details panel (press <kbd>i</kbd>) shows what is really happening.</div></details>
       <details><summary>Which systems does it run on?</summary><div class="a">Windows 11, Linux (Ubuntu 24.04 or later, Debian 13 and Fedora through packages, other distributions through a folder, on x86-64 and ARM) and Android TV, which is an early version installed by hand. macOS is not available yet.</div></details>
       <details><summary>Do I need an account or an internet connection?</summary><div class="a">No account. Posters and descriptions come from TMDB through a key Kinema carries, and once fetched they are kept on your device, so browsing works offline. SIMKL, Trakt and OpenSubtitles are optional and stay off until you connect them.</div></details>
-      <details><summary>Does Kinema collect data about me?</summary><div class="a">No accounts, no telemetry, no analytics. Kinema asks metadata services about the titles in your library, and asks GitHub once per launch for the latest version number (you can turn that off in Settings). The full list of what it connects to is in <a href="https://github.com/basswaves/kinema/blob/master/SECURITY.md">SECURITY.md</a>.</div></details>
+      <details><summary>Does Kinema collect data about me?</summary><div class="a">No accounts, no telemetry, no analytics. Kinema asks metadata services about the titles in your library, and asks GitHub once per launch for the latest version number (you can turn that off in Settings → Advanced → Look for new versions). The full list of what it connects to, what it sends and what stops it is on the <a href="privacy.html">What leaves your computer</a> page, and in Kinema under Settings → Privacy.</div></details>
       <details><summary>Will it change or move my files?</summary><div class="a">No. Your files are only read, never renamed, moved or written to. The one exception is an optional export of .nfo files that you have to press yourself.</div></details>
-      <details><summary>Windows says “Windows protected your PC”. Is that a problem?</summary><div class="a">It appears once because Kinema is not code-signed, which needs a paid certificate. It is the same box any small program from an independent developer shows, and it does not mean something was found. Click More info, then Run anyway. Every release publishes a checksum beside the ZIP so you can check the file is the one that was published.</div></details>
+      <details><summary>Windows says “Windows protected your PC”. Is that a problem?</summary><div class="a">It appears once because Kinema is not code-signed, which needs a paid certificate. It is the same box any small program from an independent developer shows, and it does not mean something was found. Click More info, then Run anyway. Every release publishes a checksum beside each file, so you can check that the one you downloaded is the one that was published.</div></details>
       <details><summary>Was Kinema made with AI?</summary><div class="a">Yes. It is built by one person together with Claude, Anthropic's AI coding assistant, which writes the code under the author's direction. The checking is out in the open: automated tests on every change, scripted sessions through the real app and player, and every design decision written down with its reasons.</div></details>
     </div>
   </div>

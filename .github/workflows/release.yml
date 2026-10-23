@@ -400,8 +400,9 @@ jobs:
 
             Kinema is not code-signed, so the first time you open it Windows
             shows *"Windows protected your PC"*. Click **More info**, then
-            **Run anyway**; Windows remembers. To check you got the file this
-            workflow built, run this in PowerShell where you downloaded it:
+            **Run anyway**; Windows remembers. To check that the file you
+            downloaded is the one that was published, run this in PowerShell
+            in the folder you downloaded it to:
 
             ```powershell
             Get-FileHash .\kinema-windows-x64-setup.exe -Algorithm SHA256
@@ -410,6 +411,7 @@ jobs:
 
             Expected: `${{ env.SETUP_SHA }}` for the installer,
             `${{ env.WIN_SHA }}` for the ZIP.
+            The two must match exactly. Each file also has a `.sha256` beside it.
 
             ## Linux
 
@@ -430,10 +432,12 @@ jobs:
             ```
 
             **Anything else:** unpack `kinema-linux-x86_64.tar.gz`
-            and run `./kinema`; its README.txt names the two libraries to
-            install. HDR on Wayland needs mpv 0.40 or later — Ubuntu 26.04,
-            Debian 13, Fedora 43 and Arch have it. Each file has a `.sha256`
-            beside it to check the download with `sha256sum -c`.
+            and run `./kinema`; its README.txt names the two libraries (mpv
+            and WebKitGTK) to install. HDR on Wayland needs mpv 0.40 or later — Ubuntu 26.04,
+            Debian 13, Fedora 43 and Arch have it.
+
+            To check a download, put the file and its `.sha256` in one folder
+            and run `sha256sum -c <file>.sha256` there.
 
             ## Android (early version)
 

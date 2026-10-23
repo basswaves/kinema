@@ -7,7 +7,7 @@ Worth stating up front, because it is unusually small:
 - **No server, no daemon, no network listener.** Nothing accepts a connection.
 - **No accounts, no telemetry, no analytics.** Nothing is sent anywhere about
   what you watch — unless you connect SIMKL or Trakt yourself, in Settings →
-  Accounts. Then the films and episodes you finish, and when, are sent to that
+  Keep track of what I watch. Then the films and episodes you finish, and when, are sent to that
   account (`src-tauri/src/simkl.rs`, `src-tauri/src/trakt.rs`), and nothing
   else is; for Trakt, Kinema also reads which films and episodes the account
   has already watched, once, so as not to send them twice. Disconnecting ends

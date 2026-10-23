@@ -150,7 +150,7 @@ series, what the season on screen holds, and which episodes differ — and
 beside the year are its age rating and its IMDb, Rotten Tomatoes and TMDB
 scores. Posters everywhere show what you have watched.
 
-![The player's controls: seek bar, the transport in the middle, audio and subtitles and volume at the right, with the list of audio tracks open](docs/images/player.jpg)
+![The player's controls: seek bar, the transport in the middle, audio and subtitles and volume at the right, with the list of audio tracks open, each led by its language code](docs/images/player.jpg)
 
 A remote works the way it does on any streaming app: **OK** pauses, **←/→**
 seek (hold to go faster), and **↑/↓** bring up the controls — the seek bar,
@@ -184,7 +184,8 @@ audio and subtitles, volume. Back steps back to wherever you came from.
   drives and shares inside Kinema and plays any video in them; at a desk the
   same tile is **Add a folder**, which opens the system's folder window.
 - **Playlists.** Put films, episodes and videos in an order you choose and play
-  them through; import and export `.m3u` lists on Windows and Linux.
+  them through; import and export `.m3u` lists on Windows and Linux. Add a whole season, or
+  one episode with the + on its row.
 - **Remembers where you were**, per file, and offers the next episode.
 - **Tells SIMKL and Trakt what you watched**, if you connect them: whatever you
   finish in Kinema is added to your account. Connecting is a code on screen and a
@@ -262,7 +263,7 @@ On Windows you can use either file:
   a newer version over it keeps everything.
 - **The ZIP** needs no installing: extract it anywhere and run `kinema.exe`. It
   is a folder, and deleting the folder removes it (use Settings → Playback →
-  Remove first if you added Kinema as a video player).
+  Opening videos → Remove first if you offered Kinema as a video player).
 
 ### Windows will ask once whether to run it
 

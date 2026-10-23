@@ -15,15 +15,11 @@ The order, roughly. Films and TV shows come first, because they are what
 Kinema is used for every evening; playing every file as accurately as the
 equipment allows is what Kinema is, so that work follows close behind.
 
-**Ready for newcomers.** A signed Windows download, straight from the
-[website](https://basswaves.github.io/kinema/) without a detour through
-GitHub; a **Send a report** button that packs the logs into one file; a guide
-to how Kinema reads file and folder names, and one to getting your own
-Blu-rays into a library; and a page saying
-plainly **what leaves your computer** — every service Kinema can talk to, what
-it sends, and the switch that stops it. Plus small fixes: copying text, a
-right-click menu of Kinema's own, language codes in the track menus, adding a
-single episode to a playlist.
+**Ready for newcomers.** A code-signed Windows download, so Windows no longer
+asks whether to run it — waiting on a free signing service for open-source
+projects. The rest of this step (direct downloads from the
+[website](https://basswaves.github.io/kinema/), Send a report, the guides and
+the "what leaves your computer" page) is in the next release.
 
 **Everyday films and TV.** Subtitle size and background; two subtitle
 languages at once, for language learners and mixed households; a delay

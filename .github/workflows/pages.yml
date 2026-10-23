@@ -27,9 +27,35 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/configure-pages@v6
-      - uses: actions/upload-pages-artifact@v5
+      # The download buttons point at files with fixed names, which GitHub
+      # serves from the newest release. If that release does not have one of
+      # them yet (for instance an older release with versioned names), the
+      # button would lead to a 404. So list every file the pages link to, and
+      # if the newest release lacks any, say which, and leave the live site as
+      # it is. Run this workflow by hand once the release is published.
+      - id: links
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          grep -ohE 'releases/latest/download/[A-Za-z0-9._-]+' site/*.html | sed 's|.*/||' | sort -u > wanted.txt
+          gh release view --repo ${{ github.repository }} --json assets --jq '.assets[].name' | sort -u > have.txt
+          missing=$(comm -23 wanted.txt have.txt | tr '\n' ' ')
+          if [ -n "$missing" ]; then
+            echo "::warning::The site was not published. The latest release lacks: $missing"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.links.outputs.ok == 'true'
+        uses: actions/configure-pages@v6
+      # The privacy page shows the same text as Settings → Privacy, so it
+      # reads the app's own file instead of keeping a second copy in site/.
+      - if: steps.links.outputs.ok == 'true'
+        run: cp src/trust/whatLeaves.json site/whatLeaves.json
+      - if: steps.links.outputs.ok == 'true'
+        uses: actions/upload-pages-artifact@v5
         with:
           path: site
       - id: deployment
+        if: steps.links.outputs.ok == 'true'
         uses: actions/deploy-pages@v5

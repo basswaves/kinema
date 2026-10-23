@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How Kinema reads file names — Kinema</title>
+<meta name="description" content="How Kinema works out what a file is from its folder and file name, why it sometimes refuses to guess, and how to fix the files in Needs attention.">
+<link rel="canonical" href="https://basswaves.github.io/kinema/file-names.html">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#0a0a0c">
+<meta name="color-scheme" content="dark">
+
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-48.png" type="image/png" sizes="48x48">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Kinema">
+<meta property="og:title" content="How Kinema reads file names — Kinema">
+<meta property="og:description" content="How Kinema works out what a file is from its folder and file name, why it sometimes refuses to guess, and how to fix the files in Needs attention.">
+<meta property="og:url" content="https://basswaves.github.io/kinema/file-names.html">
+<meta property="og:image" content="https://basswaves.github.io/kinema/img/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="How Kinema reads file names — Kinema">
+<meta name="twitter:description" content="How Kinema works out what a file is from its folder and file name, why it sometimes refuses to guess, and how to fix the files in Needs attention.">
+<meta name="twitter:image" content="https://basswaves.github.io/kinema/img/og.jpg">
+
+<script>document.documentElement.className+=" js"</script>
+<link rel="stylesheet" href="style.css">
+<style>
+main h1{font-size:clamp(2.2rem,6vw,3.6rem);max-width:22ch}
+main h2{font-size:clamp(1.5rem,3.4vw,2rem);margin-top:48px;max-width:none}
+main .list{max-width:44rem;margin:18px 0 0;padding-left:1.2em;color:#cfcfd8;display:grid;gap:10px}
+main .ex{max-width:44rem;margin:18px 0 0;padding:14px 18px;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow-x:auto}
+main code{font-family:var(--mono);font-size:.92em;color:#fff;overflow-wrap:anywhere}
+</style>
+</head>
+<body id="top">
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="top">
+  <div class="wrap bar">
+    <a class="brand" href="./" aria-label="Kinema, back to the top">
+      <svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="112" fill="#0a0a0c" stroke="#26262c" stroke-width="10"/><rect x="102" y="104" width="104" height="304" rx="12" fill="#fff"/><g fill="#0a0a0c"><rect x="116" y="124" width="20" height="26" rx="4"/><rect x="116" y="192" width="20" height="26" rx="4"/><rect x="116" y="260" width="20" height="26" rx="4"/><rect x="116" y="328" width="20" height="26" rx="4"/><rect x="172" y="124" width="20" height="26" rx="4"/><rect x="172" y="192" width="20" height="26" rx="4"/><rect x="172" y="260" width="20" height="26" rx="4"/><rect x="172" y="328" width="20" height="26" rx="4"/></g><path d="M222 256 L342 104 L410 104 L290 256 L410 408 L342 408 Z" fill="#e50914"/></svg>
+      <span>Kinema</span>
+    </a>
+    <nav aria-label="Main">
+      <a href="./#why">Why Kinema</a>
+      <a href="./#setup">Sets itself up</a>
+      <a href="./#for-you">Is it for you?</a>
+      <a href="./#faq">FAQ</a>
+    </nav>
+    <a class="btn small primary" href="./#download">Download</a>
+  </div>
+</header>
+
+<main id="main">
+<section>
+  <div class="wrap">
+    <p class="chap">Guide · Library</p>
+    <h1>How Kinema reads file names</h1>
+    <p class="intro">Kinema finds out what a file is from its folder and its file name, looks that up on TMDB (and TVmaze for shows), and only accepts a match it is sure of. Anything it is not sure of waits in <b>Needs attention</b> (Settings → Library), where you can fix it by hand or by renaming the file.</p>
+
+    <h2>Films</h2>
+    <p class="intro">The name that always works is the title, then the year in brackets, in a folder of its own:</p>
+    <pre class="ex"><code>Example Film (2019)/Example Film (2019).mkv</code></pre>
+    <p class="intro">Kinema also copes with release-style names, where dots stand in for spaces and tags follow the year. It reads the title and year and ignores the tags. All of these come out as the film <code>Example Film</code>, 2019:</p>
+    <ul class="list">
+      <li><code>Example.Film.2019.1080p.BluRay.x264-GRP.mkv</code></li>
+      <li><code>Example Film (2019) [1080p].mkv</code></li>
+      <li><code>Example.Film.2019.Directors.Cut.2160p.WEB-DL.mkv</code></li>
+    </ul>
+    <p class="intro">Source and edition tags such as BluRay or Director's Cut are not part of the title search. Kinema reads them separately, for the badges on a film's page.</p>
+
+    <h2>TV shows</h2>
+    <p class="intro">The layout that always works is a folder per show, a folder per season, and the season and episode number in the file name:</p>
+    <pre class="ex"><code>Example Show/Season 01/Example Show S01E01.mkv</code></pre>
+    <p class="intro">Other forms read the same way:</p>
+    <ul class="list">
+      <li><code>Example Show 1x03.mkv</code> is season 1, episode 3.</li>
+      <li><code>Example Show - S02E05 - Episode name.mkv</code> is season 2, episode 5. The tail is ignored.</li>
+      <li><code>Example.Show.S01E01E02.1080p.mkv</code> and <code>Example Show S01E01-E03.mkv</code> are files holding several episodes. Kinema keeps the first and last, so none shows as missing.</li>
+      <li><code>Example.Show.S00E01.Special.mkv</code> is season 0, which is where specials go.</li>
+      <li><code>Example Show - 105.mkv</code> is read as season 1, episode 5.</li>
+    </ul>
+    <p class="intro">If the file name is only numbering, such as <code>S01E01.mkv</code> inside <code>Example Show/Season 1</code>, Kinema takes the show's name from the folder above the season folder. It never goes up to the library folder itself, because that is not a show.</p>
+
+    <h2>When the file name and the folder disagree</h2>
+    <p class="intro">Kinema reads both the file name and the name of the folder it sits in, and uses whichever gives the better title. A title of three letters or more, and a year, both count in a name's favour; for shows, so do a season and an episode number. On a tie the file name wins. So a file called only <code>1080p.BluRay.x264-GRP.mkv</code> inside <code>Example Film (2019)</code> is fine: the folder has the title and the year. A title that is only a resolution, a codec or a number is thrown away.</p>
+
+    <h2>What helps when a match is refused</h2>
+    <ul class="list">
+      <li><b>Add the year.</b> A matching year raises the score; a year that is two or more years off lowers it sharply. Without a year, two films with the same name are hard to tell apart.</li>
+      <li><b>Name the folder or the file properly.</b> One of the two should hold the real title. Keep each film in its own folder, so the folder name can be trusted.</li>
+      <li><b>Add an NFO file.</b> An NFO sidecar from MediaElch, tinyMediaManager or Kodi, next to the video, is treated as the answer. If it holds a TMDB or IMDb number (for shows also a TheTVDB number), Kinema uses that number and does no searching or scoring at all. If it holds only a title and year, those are searched for in place of the file name, and the usual bar still applies.</li>
+      <li><b>Fix it in Needs attention.</b> Each entry says why Kinema did not choose. Search for the right title, pick the Movie or TV series button if needed, and press <b>Link</b> beside the correct result; every file in that group is linked at once. If the title is in no database, keep it under its own name and year, with no picture or description. If it should not be in the library at all, choose <b>Ignore these</b>. Ignored files can be shown again.</li>
+    </ul>
+
+    <h2>Why Kinema refuses instead of guessing</h2>
+    <p class="intro">A match is accepted only when its score is at least 0.75 and it beats the runner-up by at least 0.05. If the best result is too weak, or two results are too close to call, the file goes to Needs attention. A wrong poster and description on your film is worse than none, and every refusal can be fixed by hand.</p>
+
+    <h2>Extras, samples and trailers</h2>
+    <p class="intro">Folders named <code>extras</code>, <code>featurettes</code>, <code>behind the scenes</code>, <code>deleted scenes</code>, <code>interviews</code>, <code>scenes</code>, <code>shorts</code>, <code>trailers</code>, <code>other</code>, <code>sample</code> and <code>samples</code> are skipped when scanning, so what is inside does not become a title of its own. Neither does a file whose name ends in <code>-trailer</code>, <code>.trailer</code> or <code>_trailer</code>, or is just <code>trailer</code>. These are found as the film's local trailer instead.</p>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <div>
+      <a class="brand" href="./"><svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="112" fill="#0a0a0c" stroke="#26262c" stroke-width="10"/><rect x="102" y="104" width="104" height="304" rx="12" fill="#fff"/><path d="M222 256 L342 104 L410 104 L290 256 L410 408 L342 408 Z" fill="#e50914"/></svg><span>Kinema</span></a>
+      <p>A free local media library and video player. MIT licence. This page loads nothing from other sites and has no analytics.</p>
+    </div>
+    <div>
+      <h4>Project</h4>
+      <ul>
+        <li><a href="https://github.com/basswaves/kinema">Source on GitHub</a></li>
+        <li><a href="https://github.com/basswaves/kinema/releases/latest">Latest release</a></li>
+        <li><a href="https://github.com/basswaves/kinema/blob/master/CHANGELOG.md">Changelog</a></li>
+        <li><a href="https://github.com/basswaves/kinema/blob/master/docs/ROADMAP.md">Roadmap</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Guides</h4>
+      <ul>
+        <li><a href="file-names.html">How Kinema reads file names</a></li>
+        <li><a href="blu-ray.html">Getting your Blu-rays into Kinema</a></li>
+        <li><a href="privacy.html">What leaves your computer</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Help &amp; feedback</h4>
+      <ul>
+        <li><a href="https://github.com/basswaves/kinema/discussions">Discussions</a></li>
+        <li><a href="https://github.com/basswaves/kinema/issues/new/choose">Report a bug or a device</a></li>
+        <li><a href="https://github.com/basswaves/kinema/blob/master/SECURITY.md">Security &amp; privacy</a></li>
+        <li><a href="https://github.com/basswaves/kinema/blob/master/CONTRIBUTING.md">Contributing</a></li>
+      </ul>
+    </div>
+    <p class="legal">This product uses the TMDB API but is not endorsed or certified by TMDB. Kodi, Plex, Jellyfin, VLC, MPC-HC, Dolby, Dolby Vision, Dolby Atmos, DTS and other names are trademarks of their respective owners; Kinema is not affiliated with or endorsed by any of them, and names them only to say what it works with or is compared to. Film posters and artwork in the screenshots belong to their owners.</p>
+  </div>
+</footer>
+</body>
+</html>

@@ -226,6 +226,23 @@ telling the truth about 24p on a 60 Hz panel.
 It reads [NFO sidecar files](docs/DESIGN.md) if you have them, from MediaElch,
 tinyMediaManager or Kodi, and treats them as authoritative.
 
+### How Kinema reads file names
+
+Kinema works out what a file is from its folder and file name. Two layouts
+always work:
+
+- Films: `Title (Year)/Title (Year).mkv`
+- Episodes: `Show/Season 01/Show S01E01.mkv`
+
+Release-style names with dots and tags (`Title.2019.1080p.BluRay-GRP.mkv`)
+are fine too, and a folder with the title can carry a file with only tags.
+An NFO file beside the video, holding a TMDB or IMDb number, settles the match.
+
+Kinema only accepts a match it is sure of. A file it would be guessing at goes
+to Settings → Library → Needs attention, where you search and link the right
+title, keep it under its own name, or ignore it. The full guide is at
+<https://basswaves.github.io/kinema/file-names.html>.
+
 ## Install
 
 Everything is on the [Releases](https://github.com/Basswaves/kinema/releases)

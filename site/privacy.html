@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What leaves your computer — Kinema</title>
+<meta name="description" content="Every service Kinema can talk to, what it sends, when, and what stops it. The same text Kinema shows in Settings → Privacy.">
+<link rel="canonical" href="https://basswaves.github.io/kinema/privacy.html">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#0a0a0c">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-48.png" type="image/png" sizes="48x48">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<script>document.documentElement.className+=" js"</script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body id="top">
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="top">
+  <div class="wrap bar">
+    <a class="brand" href="./" aria-label="Kinema, back to the top">
+      <svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="112" fill="#0a0a0c" stroke="#26262c" stroke-width="10"/><rect x="102" y="104" width="104" height="304" rx="12" fill="#fff"/><g fill="#0a0a0c"><rect x="116" y="124" width="20" height="26" rx="4"/><rect x="116" y="192" width="20" height="26" rx="4"/><rect x="116" y="260" width="20" height="26" rx="4"/><rect x="116" y="328" width="20" height="26" rx="4"/><rect x="172" y="124" width="20" height="26" rx="4"/><rect x="172" y="192" width="20" height="26" rx="4"/><rect x="172" y="260" width="20" height="26" rx="4"/><rect x="172" y="328" width="20" height="26" rx="4"/></g><path d="M222 256 L342 104 L410 104 L290 256 L410 408 L342 408 Z" fill="#e50914"/></svg>
+      <span>Kinema</span>
+    </a>
+    <nav aria-label="Main">
+      <a href="./#why">Why Kinema</a>
+      <a href="./#setup">Sets itself up</a>
+      <a href="./#for-you">Is it for you?</a>
+      <a href="./#faq">FAQ</a>
+    </nav>
+    <a class="btn small primary" data-dl href="./#download">Download</a>
+  </div>
+</header>
+
+<main id="main">
+<div class="wrap page">
+  <h1 id="title">What leaves your computer</h1>
+  <p id="intro"></p>
+  <p class="note">This is the same text Kinema shows in Settings → Privacy. A test fails when the code contacts a host this list lacks, so the list stays true.</p>
+  <div id="services"></div>
+  <div id="links"></div>
+  <p id="local"></p>
+  <noscript><p>This page needs JavaScript to show the list. You can read it as a file on <a href="https://github.com/basswaves/kinema/blob/master/src/trust/whatLeaves.json">GitHub</a>.</p></noscript>
+</div>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <div>
+      <a class="brand" href="./"><svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="112" fill="#0a0a0c" stroke="#26262c" stroke-width="10"/><rect x="102" y="104" width="104" height="304" rx="12" fill="#fff"/><path d="M222 256 L342 104 L410 104 L290 256 L410 408 L342 408 Z" fill="#e50914"/></svg><span>Kinema</span></a>
+      <p>A free local media library and video player. MIT licence. This page loads nothing from other sites and has no analytics.</p>
+    </div>
+    <div>
+      <h4>Project</h4>
+      <ul>
+        <li><a href="https://github.com/basswaves/kinema">Source on GitHub</a></li>
+        <li><a href="https://github.com/basswaves/kinema/releases/latest">Latest release</a></li>
+        <li><a href="https://github.com/basswaves/kinema/blob/master/CHANGELOG.md">Changelog</a></li>
+        <li><a href="https://github.com/basswaves/kinema/blob/master/docs/ROADMAP.md">Roadmap</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Guides</h4>
+      <ul>
+        <li><a href="file-names.html">How Kinema reads file names</a></li>
+        <li><a href="blu-ray.html">Getting your Blu-rays into Kinema</a></li>
+        <li><a href="privacy.html">What leaves your computer</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Help &amp; feedback</h4>
+      <ul>
+        <li><a href="https://github.com/basswaves/kinema/discussions">Discussions</a></li>
+        <li><a href="https://github.com/basswaves/kinema/issues/new/choose">Report a bug or a device</a></li>
+        <li><a href="https://github.com/basswaves/kinema/blob/master/SECURITY.md">Security &amp; privacy</a></li>
+        <li><a href="https://github.com/basswaves/kinema/blob/master/CONTRIBUTING.md">Contributing</a></li>
+      </ul>
+    </div>
+    <p class="legal">This product uses the TMDB API but is not endorsed or certified by TMDB. Kodi, Plex, Jellyfin, VLC, MPC-HC, Dolby, Dolby Vision, Dolby Atmos, DTS and other names are trademarks of their respective owners; Kinema is not affiliated with or endorsed by any of them, and names them only to say what it works with or is compared to. Film posters and artwork in the screenshots belong to their owners.</p>
+  </div>
+</footer>
+
+<script>
+(function(){
+  function el(tag,text,cls){var e=document.createElement(tag);if(text!=null)e.textContent=text;if(cls)e.className=cls;return e}
+  function hosts(list){var p=el("p",null,"line");p.appendChild(el("b","Hosts: "));list.forEach(function(h,i){if(i)p.appendChild(document.createTextNode(" "));p.appendChild(el("code",h))});return p}
+  function line(label,text){var p=el("p",null,"line");p.appendChild(el("b",label+": "));p.appendChild(document.createTextNode(text));return p}
+  fetch("whatLeaves.json").then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(d){
+    document.getElementById("title").textContent=d.title;
+    document.getElementById("intro").textContent=d.intro;
+    var box=document.getElementById("services");
+    d.services.forEach(function(s){
+      box.appendChild(el("h2",s.name));
+      box.appendChild(hosts(s.hosts));
+      box.appendChild(line("What it sends",s.sends));
+      box.appendChild(line("When",s.when));
+      box.appendChild(line("What stops it",s.stop));
+    });
+    var l=document.getElementById("links");
+    l.appendChild(el("h2","Links that open in your browser"));
+    l.appendChild(el("p",d.links.intro));
+    d.links.hosts.forEach(function(h){var p=el("p",null,"line");p.appendChild(el("code",h.host));p.appendChild(document.createTextNode(" – "+h["for"]));l.appendChild(p)});
+    document.getElementById("local").textContent=d.local;
+  }).catch(function(){
+    var p=el("p",null);p.appendChild(document.createTextNode("The list could not be loaded. Read it on "));
+    var a=el("a","GitHub");a.href="https://github.com/basswaves/kinema/blob/master/src/trust/whatLeaves.json";p.appendChild(a);p.appendChild(document.createTextNode("."));
+    document.getElementById("services").appendChild(p);
+  });
+})();
+</script>
+</body>
+</html>

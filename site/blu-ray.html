@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Getting your Blu-rays into Kinema — Kinema</title>
+<meta name="description" content="A plain guide for newcomers: rip your own Blu-ray and 4K UHD discs to MKV with MakeMKV, name the files, and see what Kinema does with them.">
+<link rel="canonical" href="https://basswaves.github.io/kinema/blu-ray.html">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta name="theme-color" content="#0a0a0c">
+<meta name="color-scheme" content="dark">
+
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-48.png" type="image/png" sizes="48x48">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Kinema">
+<meta property="og:title" content="Getting your Blu-rays into Kinema">
+<meta property="og:description" content="Rip your own discs to MKV with MakeMKV, name the files, and play them in Kinema.">
+<meta property="og:url" content="https://basswaves.github.io/kinema/blu-ray.html">
+<meta property="og:image" content="https://basswaves.github.io/kinema/img/og.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Getting your Blu-rays into Kinema">
+<meta name="twitter:description" content="Rip your own discs to MKV with MakeMKV, name the files, and play them in Kinema.">
+<meta name="twitter:image" content="https://basswaves.github.io/kinema/img/og.jpg">
+
+<script>document.documentElement.className+=" js"</script>
+<link rel="stylesheet" href="style.css">
+<style>.page ol,.page ul{color:var(--muted);max-width:46rem;padding-left:1.3em;margin:0 0 12px}.page li{margin:0 0 6px}.page .faq{margin-top:20px}</style>
+</head>
+<body id="top">
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="top">
+  <div class="wrap bar">
+    <a class="brand" href="./" aria-label="Kinema, back to the top">
+      <svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="112" fill="#0a0a0c" stroke="#26262c" stroke-width="10"/><rect x="102" y="104" width="104" height="304" rx="12" fill="#fff"/><g fill="#0a0a0c"><rect x="116" y="124" width="20" height="26" rx="4"/><rect x="116" y="192" width="20" height="26" rx="4"/><rect x="116" y="260" width="20" height="26" rx="4"/><rect x="116" y="328" width="20" height="26" rx="4"/><rect x="172" y="124" width="20" height="26" rx="4"/><rect x="172" y="192" width="20" height="26" rx="4"/><rect x="172" y="260" width="20" height="26" rx="4"/><rect x="172" y="328" width="20" height="26" rx="4"/></g><path d="M222 256 L342 104 L410 104 L290 256 L410 408 L342 408 Z" fill="#e50914"/></svg>
+      <span>Kinema</span>
+    </a>
+    <nav aria-label="Main">
+      <a href="./#why">Why Kinema</a>
+      <a href="./#setup">Sets itself up</a>
+      <a href="./#for-you">Is it for you?</a>
+      <a href="./#faq">FAQ</a>
+    </nav>
+    <a class="btn small primary" href="./#download">Download</a>
+  </div>
+</header>
+
+<main id="main" class="page">
+  <div class="wrap">
+    <p class="chap">Guide</p>
+    <h1>Getting your Blu-rays into Kinema</h1>
+    <p>Kinema plays video files. It does not copy discs. This guide is for someone who owns Blu-rays or 4K UHD discs and has never ripped one: use MakeMKV to turn the disc into an MKV file with the picture and sound untouched, put the file in a folder Kinema scans, and play it.</p>
+    <p class="note" style="margin-top:0">Copying discs you own is legal in some countries and not in others. Check the rules where you live.</p>
+
+    <h2>What you need</h2>
+    <ul>
+      <li><b>A drive.</b> Any Blu-ray drive for Blu-rays. 4K UHD discs need a drive MakeMKV can read them with; see the 4K section.</li>
+      <li><b>MakeMKV</b>, for Windows, macOS or Linux. Its home page says all features, Blu-ray included, are free during its beta, and that opening DVDs is free. For the current terms, see <a href="https://www.makemkv.com/">MakeMKV's own site</a>.</li>
+      <li><b>Space.</b> Very roughly 20 to 50 GB for a Blu-ray film and 50 to 100 GB for a 4K UHD film.</li>
+      <li><b>Kinema</b>, with the folder you rip into added as a library folder (it can be a local disk, a USB drive or a NAS).</li>
+    </ul>
+
+    <h2>Ripping a film</h2>
+    <ol>
+      <li>Put the disc in, start MakeMKV and click the big drive icon. It reads the disc and lists the titles.</li>
+      <li>Pick the main film. It is usually the longest title. Discs with several cuts, or with the film split into many pieces, list more than one long title; look at each title's length and chapter count, choose the version you want, and compare if unsure.</li>
+      <li>Open that title and tick the tracks you want. Keep the lossless sound track (for example TrueHD or Atmos, or DTS-HD Master Audio), plus any ordinary track you want as a fallback. Keep the subtitle languages you use, and the forced subtitle track if there is one: it holds the lines in another language that are meant to show even with subtitles off.</li>
+      <li>Choose an output folder with enough space, then click Make MKV. It takes a while, because the drive is read at its own pace.</li>
+    </ol>
+    <p>This is a remux: the video and audio are copied as they are, not re-encoded, so nothing is lost. The file is only put in a different container.</p>
+
+    <h2>4K UHD discs</h2>
+    <p>Not every drive can read 4K UHD discs for MakeMKV. Its forum keeps the current advice on which drives work, so check there before buying anything. No drive models are named here because that advice changes.</p>
+    <p>On such a disc the picture is HDR10 and often Dolby Vision as well. Many Dolby Vision discs are profile 7, which is an HDR10 picture plus extra layers. Where the device has no decoder for profile 7, Kinema plays the HDR10 base layer and says so in the playback details. It never claims a Dolby Vision picture it did not show. The details panel also names the HDR format of the file, HDR10+ included.</p>
+
+    <h2>TV series discs</h2>
+    <p>Each episode shows up as its own title, usually of similar length. Tick the episodes and leave out the extras, then rename the files to <code>Show S01E01.mkv</code>, <code>Show S01E02.mkv</code> and so on. MakeMKV lists titles in disc order, which is normally episode order but worth checking against the booklet.</p>
+
+    <h2>Names and folders</h2>
+    <p>Kinema works out what a file is from its folder and file names. A film:</p>
+    <p><code>Title (Year)/Title (Year).mkv</code></p>
+    <p>A series:</p>
+    <p><code>Show/Season 01/Show S01E01.mkv</code></p>
+    <p>The full rules are in <a href="file-names.html">How Kinema reads file names</a>.</p>
+
+    <h2>What Kinema shows and does</h2>
+    <ul>
+      <li>The film's page has badges for what the file holds: resolution, Dolby Vision profile (with FEL or MEL), HDR format, the exact sound format such as TrueHD Atmos or DTS:X, frame rate and bit depth. They are read from the file, not from its name. This uses ffprobe, which comes with ffmpeg, an optional extra that is installed separately (on Windows Kinema can do it with one press).</li>
+      <li>Atmos, DTS:X and TrueHD go to a receiver untouched, when the receiver takes them. Kinema asks about this on the first run.</li>
+      <li>Forced subtitles show even with subtitles off, in the language being spoken.</li>
+      <li>The playback details (the <code>i</code> key) say what the picture and sound are doing.</li>
+    </ul>
+
+    <h2>Questions</h2>
+    <div class="faq">
+      <details><summary>Can Kinema play the disc or the BDMV folder directly?</summary><div class="a">A folder holding a disc's BDMV, and an .iso of a Blu-ray, play as one film: the main film, with chapters and the languages of the sound and subtitle tracks, but no disc menus. A .m2ts file also plays. A disc that is still encrypted is not played; Kinema says so. Folders and .iso images play on Windows and Linux, not yet on Android TV. An MKV from MakeMKV plays everywhere Kinema does, so it is the simplest choice.</div></details>
+      <details><summary>Do I lose quality?</summary><div class="a">Not with MakeMKV's default output. The video and audio are copied as they are.</div></details>
+      <details><summary>Should I compress it?</summary><div class="a">That is your choice. Kinema plays both. A remux keeps everything on the disc and takes the most space.</div></details>
+      <details><summary>Why is my rip in Needs attention?</summary><div class="a">Kinema was not sure enough which title the file is, and would rather ask than guess. The file name is almost always the reason; see <a href="file-names.html">How Kinema reads file names</a>.</div></details>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <div>
+      <a class="brand" href="./"><svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="112" fill="#0a0a0c" stroke="#26262c" stroke-width="10"/><rect x="102" y="104" width="104" height="304" rx="12" fill="#fff"/><path d="M222 256 L342 104 L410 104 L290 256 L410 408 L342 408 Z" fill="#e50914"/></svg><span>Kinema</span></a>
+      <p>A free local media library and video player. MIT licence. This page loads nothing from other sites and has no analytics.</p>
+    </div>
+    <div>
+      <h4>Project</h4>
+      <ul>
+        <li><a href="https://github.com/basswaves/kinema">Source on GitHub</a></li>
+        <li><a href="https://github.com/basswaves/kinema/releases/latest">Latest release</a></li>
+        <li><a href="https://github.com/basswaves/kinema/blob/master/CHANGELOG.md">Changelog</a></li>
+        <li><a href="https://github.com/basswaves/kinema/blob/master/docs/ROADMAP.md">Roadmap</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Guides</h4>
+      <ul>
+        <li><a href="file-names.html">How Kinema reads file names</a></li>
+        <li><a href="blu-ray.html">Getting your Blu-rays into Kinema</a></li>
+        <li><a href="privacy.html">What leaves your computer</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Help &amp; feedback</h4>
+      <ul>
+        <li><a href="https://github.com/basswaves/kinema/discussions">Discussions</a></li>
+        <li><a href="https://github.com/basswaves/kinema/issues/new/choose">Report a bug or a device</a></li>
+        <li><a href="https://github.com/basswaves/kinema/blob/master/SECURITY.md">Security &amp; privacy</a></li>
+        <li><a href="https://github.com/basswaves/kinema/blob/master/CONTRIBUTING.md">Contributing</a></li>
+      </ul>
+    </div>
+    <p class="legal">This product uses the TMDB API but is not endorsed or certified by TMDB. Kodi, Plex, Jellyfin, VLC, MPC-HC, Dolby, Dolby Vision, Dolby Atmos, DTS and other names are trademarks of their respective owners; Kinema is not affiliated with or endorsed by any of them, and names them only to say what it works with or is compared to. Film posters and artwork in the screenshots belong to their owners.</p>
+  </div>
+</footer>
+</body>
+</html>

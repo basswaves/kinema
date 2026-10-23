@@ -30,6 +30,22 @@ makes no stability promises.
 - **A "+" on each episode row** adds just that episode to a playlist. The
   show page's button adds the whole season and now says so: "+ Playlist
   (season 1)".
+- **Fixed names for release files**, without the version (for example
+  `kinema-windows-x64-setup.exe`, `kinema-linux-amd64.deb`,
+  `kinema-android.apk`), so a link to the latest release's file always works.
+  The checksums and the install text follow.
+- **Download buttons on the website**: a big one per system. On Windows it is
+  the installer, with the portable ZIP beside it and a line on which to pick.
+  The Download button at the top starts the download straight away on Windows
+  and Android TV.
+- **New guides on the website**: "How Kinema reads file names" (also a short
+  section in the README), "Getting your Blu-rays into Kinema" (MakeMKV, names,
+  4K discs; Kinema rips nothing itself) and "What leaves your computer" (the
+  same text as Settings → Privacy).
+- **Needs attention** (Settings → Library) has a button that opens the
+  file-names guide.
+- For contributors: the website is published only when the latest release has
+  every file it links to; otherwise the old site stays up.
 
 ### Changed
 

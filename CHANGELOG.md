@@ -62,7 +62,9 @@ now have fixed names without the version.
   ratings replace Accounts, and each service sits on the card that uses it
   (OpenSubtitles under subtitles, SIMKL and Trakt under keeping track, the
   OMDb key under ratings). The setup pages follow: Skipping intros, Keep
-  track of what you watch, Subtitles online, Details and ratings.
+  track of what you watch, Subtitles online, Details and ratings. Messages
+  that send you to a setting (the details panel's fixes, errors, the log)
+  now name its section, as do the README and the website.
 - **Right-click no longer shows the browser's menu** (Back, Reload, Save as,
   Print — Reload restarted the interface, even mid-film). Text fields keep
   Cut, Copy and Paste; elsewhere right-click does nothing.

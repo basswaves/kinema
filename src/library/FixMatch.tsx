@@ -248,7 +248,7 @@ export default function FixMatch({ onChanged }: Props) {
                   onSelect={() =>
                     void run(async () => {
                       await returnFilesToReview(group.files);
-                      return `Restored ${count(group.files.length, 'file')} to the review queue.`;
+                      return `Restored ${count(group.files.length, 'file')} to Needs attention.`;
                     })
                   }
                 >

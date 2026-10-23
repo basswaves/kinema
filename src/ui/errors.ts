@@ -57,7 +57,7 @@ const RULES: [RegExp, string | (() => string)][] = [
   [/database is locked|database table is locked/i, 'Kinema was busy. Try again in a moment.'],
   [
     /HTTP 401\b|invalid api key/i,
-    'The TMDB key was not accepted. Check it in Settings.',
+    'The TMDB key was not accepted. Check it in Settings → Posters & ratings.',
   ],
   // wikidata.ts, after waiting it out: before the HTTP rules, which the
   // message can also contain.

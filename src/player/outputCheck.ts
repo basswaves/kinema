@@ -114,7 +114,7 @@ export function checkPicture(f: OutputFacts): Check | null {
       why: 'Classical resampling (spline36): no detail invented, none sharpened in.',
       fix:
         f.switches.resolution !== 'match'
-          ? 'If your TV or video processor upscales better, Settings → Screen → Resolution → Match content hands it the video at its own size.'
+          ? 'If your TV or video processor upscales better, Settings → Picture & sound → Screen → Resolution → Match the video hands it the video at its own size.'
           : undefined,
     };
   }
@@ -131,7 +131,7 @@ export function checkPicture(f: OutputFacts): Check | null {
       : `This screen cannot show ${film}.`,
     fix: canShow
       ? f.switches.resolution === 'off'
-        ? 'Settings → Screen → Resolution → Auto switches up for videos like this.'
+        ? 'Settings → Picture & sound → Screen → Resolution → Auto switches up for videos like this.'
         : `Set the desktop to the screen’s full resolution${
             screenOwner(f.system) === 'Windows' ? ' in Windows' : ''
           }.`
@@ -175,8 +175,8 @@ export function checkHdr(f: OutputFacts): Check {
           value: 'HDR video shown in SDR',
           why: `The screen can show HDR, but ${owner} has it switched off.`,
           fix: f.switches.hdr
-            ? 'Go fullscreen: HDR is switched on then (Settings → Screen).'
-            : `Settings → Screen → Turn HDR on for HDR videos, or switch HDR on in ${
+            ? 'Go fullscreen: HDR is switched on then (Settings → Picture & sound → Screen).'
+            : `Settings → Picture & sound → Screen → Turn HDR on for HDR videos, or switch HDR on in ${
                 owner === 'Windows' ? 'Windows' : "the desktop's display settings"
               }.`,
         };
@@ -269,7 +269,7 @@ export function checkMotion(f: OutputFacts): Check | null {
       value: `judders, ${pair}`,
       why,
       fix: !f.switches.refresh
-        ? 'Settings → Screen → Match the refresh rate: this screen has an even mode at its current resolution.'
+        ? 'Settings → Picture & sound → Screen → Match the refresh rate: this screen has an even mode at its current resolution.'
         : !f.fullscreen
           ? 'Go fullscreen: the refresh rate is only matched there.'
           : undefined,
@@ -316,7 +316,7 @@ export function checkColourDepth(f: OutputFacts): Check | null {
         '(more than HDMI 2.0 has), so the driver sends 8 bits with dithering.',
       fix: f.switches.refresh
         ? 'In the graphics driver’s settings, choose YCbCr 4:2:2 at 10 or 12 bits for this refresh rate.'
-        : 'Settings → Screen → Match the refresh rate: at 23.976 Hz the cable has room for 10-bit ' +
+        : 'Settings → Picture & sound → Screen → Match the refresh rate: at 23.976 Hz the cable has room for 10-bit ' +
           '(then set 10 or 12 bpc in the graphics driver’s settings). Or choose YCbCr 4:2:2 at 10/12-bit.',
     };
   }
@@ -382,7 +382,7 @@ export function checkSound(f: OutputFacts): Check | null {
       verdict: 'limited',
       value: `decoded by Kinema${folded ? `, folded from ${a.inChannels} to ${a.outChannels} channels` : ''}`,
       why: `${a.device?.name ?? 'The device'} takes ${CODEC_NAME[stream!] ?? stream} untouched, but the sound goes through ${system}, so any Atmos or DTS:X height sound is lost.`,
-      fix: 'Settings → Sound → Send sound straight to the receiver.',
+      fix: 'Settings → Picture & sound → Sound → Send sound straight to the receiver.',
     };
   }
   if (folded) {
@@ -395,7 +395,7 @@ export function checkSound(f: OutputFacts): Check | null {
         : `${system}’s speaker setup for this device has fewer channels than the soundtrack.`,
       fix: a.direct
         ? undefined
-        : `Settings → Sound → Send sound straight to the receiver, or set the speaker setup in ${system}.`,
+        : `Settings → Picture & sound → Sound → Send sound straight to the receiver, or set the speaker setup in ${system}.`,
     };
   }
   return {

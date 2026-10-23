@@ -1,5 +1,5 @@
 /**
- * Settings → Sound: how the film's sound leaves the PC.
+ * Settings → Picture & sound → Sound: how the film's sound leaves the PC.
  *
  * Every control here describes the equipment, not a taste (CONTRIBUTING.md → "Settings
  * describe the hardware, never taste"): whether the receiver should get the

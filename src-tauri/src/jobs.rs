@@ -23,7 +23,7 @@ pub async fn off_main<T: Send + 'static>(
         // A panic is already in app.log with its backtrace (applog.rs);
         // "task 113 panicked with message …" means nothing to a person.
         crate::log!("work off the main thread failed: {e}");
-        "Something went wrong inside Kinema. What happened is in its log (Settings → Advanced)."
+        "Something went wrong inside Kinema. What happened is in its log (Settings → Advanced → Developer tools → Open log folder)."
             .to_string()
     })?
 }
@@ -195,7 +195,7 @@ pub async fn off_main_background<T: Send + 'static>(
     });
     let failed = |what: String| {
         crate::log!("background work failed: {what}");
-        "Something went wrong inside Kinema. What happened is in its log (Settings → Advanced)."
+        "Something went wrong inside Kinema. What happened is in its log (Settings → Advanced → Developer tools → Open log folder)."
             .to_string()
     };
     if let Err(e) = started {

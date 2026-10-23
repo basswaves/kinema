@@ -95,7 +95,7 @@ describe('outputCheck', () => {
     expect(byLabel(checks).Sound?.value).toBe('untouched Dolby TrueHD → receiver');
   });
 
-  it('calls a 1080p film on a 4K screen upscaled, and offers Match content', () => {
+  it('calls a 1080p film on a 4K screen upscaled, and offers Match the video', () => {
     const c = byLabel(
       outputCheck({
         ...base,
@@ -105,7 +105,7 @@ describe('outputCheck', () => {
     );
     expect(c['Picture size']).toMatchObject({ verdict: 'info' });
     expect(c['Picture size']?.value).toMatch(/1080p video scaled up ×2\.00/);
-    expect(c['Picture size']?.fix).toMatch(/Match content/);
+    expect(c['Picture size']?.fix).toMatch(/Match the video/);
   });
 
   it('calls a 4K film on a 1080p desktop shrunk, and points at Auto', () => {

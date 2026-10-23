@@ -340,7 +340,7 @@ fn run_analysis(
 
     if !crate::ffmpeg::is_available(&ffmpeg_path) {
         say(format!(
-            "ffmpeg not found at '{}'. Set its location in Settings, or leave it blank to use PATH",
+            "ffmpeg not found at '{}'. Set its location in Settings → Skipping intros, or leave it blank to use PATH",
             ffmpeg_path.display()
         ));
         return step("analyse", None, tail);
@@ -774,7 +774,7 @@ pub async fn auto_detect(app: tauri::AppHandle) -> Result<AutoDetectReport, Stri
                 say(
                     "analyse",
                     false,
-                    format!("{} not analysed, because automatic detection is off in Settings", crate::util::count(pending, "episode")),
+                    format!("{} not analysed, because automatic detection is off in Settings → Skipping intros", crate::util::count(pending, "episode")),
                 );
                 continue;
             }

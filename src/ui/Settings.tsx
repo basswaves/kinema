@@ -1024,7 +1024,7 @@ export default function Settings({
                   note="Two ways of deciding when each frame is shown. Which is smoother depends on the screen: keep Match the sound unless playback stutters slightly every few seconds, then try Match the screen."
                   hint={
                     <>
-                      Neither fixes the steady judder of a 24 frames a second movie on a 60 Hz
+                      Neither fixes the steady judder of a 24-frames-a-second film on a 60 Hz
                       screen; Match the refresh rate in Picture &amp; sound does. Press{' '}
                       <kbd>I</kbd> while something plays to see what you are getting.
                     </>

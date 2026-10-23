@@ -1,5 +1,5 @@
 /**
- * Settings → Screen: whether Kinema may change the screen's mode to suit a
+ * Settings → Picture & sound → Screen: whether Kinema may change the screen's mode to suit a
  * video. Each switch describes the equipment (can this TV show 24 Hz, does it
  * or a video processor upscale better than Kinema, does it want HDR switched),
  * not a taste. The rules are `player/displayMode.ts`; the timing, including

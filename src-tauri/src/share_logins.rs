@@ -178,7 +178,7 @@ pub async fn save_share_login(
         .map_err(|e| {
             if e.starts_with("Something went wrong inside Kinema") {
                 format!(
-                    "Connecting to {named} failed because of a fault in Kinema, not your user name or password. What happened is in its log (Settings → Advanced)."
+                    "Connecting to {named} failed because of a fault in Kinema, not your user name or password. What happened is in its log (Settings → Advanced → Developer tools → Open log folder)."
                 )
             } else {
                 e

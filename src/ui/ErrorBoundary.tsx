@@ -101,7 +101,7 @@ function CrashScreen({ onRetry }: { onRetry: () => void }) {
           className="btn-secondary"
           onClick={() => void openLogFolder().catch(() => undefined)}
         >
-          Open the log folder
+          Open log folder
         </button>
         <button
           type="button"

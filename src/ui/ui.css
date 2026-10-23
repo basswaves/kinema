@@ -1945,7 +1945,7 @@ html {
   color: rgba(245, 245, 247, 0.6);
 }
 
-/* Settings → Accounts: each service under its own mark (AccountSection.tsx),
+/* Settings → Keep track of what I watch: each service under its own mark (AccountSection.tsx),
    the files unmodified in public/ as Trakt and SIMKL ask. */
 .account-heading {
   display: flex;

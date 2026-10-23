@@ -43,7 +43,7 @@ function apply(on: boolean): void {
  * TV mode also means the whole screen, the way a TV app has it.
  *
  * On a TV nobody wants a title bar and a taskbar round the library, and the
- * display switching in Settings → Screen only acts while the window is
+ * display switching in Settings → Picture & sound → Screen only acts while the window is
  * fullscreen — so a TV-mode library in a window meant every one of those
  * switches did nothing until someone found the Fullscreen button. The player
  * leaves the window fullscreen on the way out while this is on.

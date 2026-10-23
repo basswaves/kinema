@@ -292,7 +292,7 @@ export function noSoundNotice(system: string): string {
   return system === 'Windows'
     ? 'No sound: Windows would not open the audio device. If Windows spatial sound ' +
         '(Atmos or DTS:X for home theater) is on, switch it off, or turn on ' +
-        '"Send sound straight to the receiver" in Settings.'
+        '"Send sound straight to the receiver" in Settings → Picture & sound.'
     : `No sound: ${system} would not open the audio device.`;
 }
 

@@ -90,7 +90,7 @@
       "hosts": ["api.trakt.tv"],
       "sends": "The films and episodes you finish, at connect what the account lacks, and where you stopped something part-way. Where you stopped elsewhere is read back to resume here.",
       "when": "Only while Trakt is connected; resume points when a title's page or Home's Continue row is shown.",
-      "stop": "Disconnect, in Settings, Keep track of what I watch. Resume across devices has its own switch there.",
+      "stop": "Disconnect, in Settings, Keep track of what I watch. The switch “Continue where you stopped on another device” is there too.",
       "section": "tracking",
       "state": "trakt"
     },

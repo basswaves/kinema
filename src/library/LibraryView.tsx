@@ -8,7 +8,7 @@
  * TMDB query in Phase 2, while an unparsed file is merely work to do.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { formatBytes } from '../ui/format';
+import { count, formatBytes } from '../ui/format';
 import { chooseFolder } from './folders';
 import {
   addLibraryRoot,
@@ -140,7 +140,7 @@ export default function LibraryView() {
 
       await refresh();
       setDiagnosis(
-        `Matched ${outcome.matched} file(s), ${outcome.unmatched} left for review. ` +
+        `Matched ${count(outcome.matched, 'file')}, ${outcome.unmatched} left in Needs attention. ` +
           `Cached ${art.stored} image(s)${art.failed ? `, ${art.failed} failed` : ''}. ` +
           `${details.found} title(s) enriched.` +
           (outcome.errors.length ? ` Errors: ${outcome.errors.slice(0, 3).join('; ')}` : '')
@@ -377,7 +377,7 @@ export default function LibraryView() {
       {progress && progress.currentTitle && (
         <div className="library-diagnosis">
           Matching “{progress.currentTitle}”: {progress.groupsDone}/{progress.groupsTotal} groups,{' '}
-          {progress.matched} matched, {progress.unmatched} for review
+          {progress.matched} matched, {progress.unmatched} in Needs attention
         </div>
       )}
 

@@ -7,6 +7,32 @@ makes no stability promises.
 
 ## [Unreleased]
 
+### Added
+
+- **Copy text with the mouse.** Titles, plots and cast on a title's page,
+  Settings, the details panel and Needs attention's file names can be marked
+  and copied (Ctrl+C, or right-click → Copy). Cards, buttons and the player
+  stay unmarkable.
+- **Language codes in the audio and subtitle menu** (`EN`, `NO`, `PT-BR` where
+  the file names a region) at the start of each track's row.
+- **A "+" on each episode row** adds just that episode to a playlist. The
+  show page's button adds the whole season and now says so: "+ Playlist
+  (season 1)".
+
+### Changed
+
+- **Right-click no longer shows the browser's menu** (Back, Reload, Save as,
+  Print — Reload restarted the interface, even mid-film). Text fields keep
+  Cut, Copy and Paste; elsewhere right-click does nothing.
+- **At a desk, Library's Folders tile is "Add a folder"**: the system's
+  folder window opens at once, then Kinema asks Movies, TV shows or Videos.
+  The TV layout keeps the full Folders page, since a sofa has no Explorer.
+
+### Fixed
+
+- A playlist's name on Home's Playlists rail, and a video's name on its
+  tile, now grow with the window and the TV layout as card titles do.
+
 ## [0.12.0] — 2026-10-18
 
 For Windows and Linux: Videos folders and a Library tab, Folders (browse

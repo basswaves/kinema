@@ -177,7 +177,7 @@ export function LibraryPage({
             </FocusButton>
           )}
         </div>
-        {picked && <AddFolder path={picked} onAdded={added} onCancel={cancel} />}
+        {picked && <AddFolder key={picked} path={picked} onAdded={added} onCancel={cancel} />}
         {note && <p className="settings-note">{note}</p>}
         {error && <p className="leave-error">{error}</p>}
         {folders.length === 0 && (

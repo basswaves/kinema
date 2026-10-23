@@ -349,7 +349,7 @@ export default function TitleDetailView({ title, onPlayFile, onBack, onFindMatch
   }, [title.kind, visibleEpisodes, detail]);
   /** The playlist dialog, open for these items: the page's, or one episode's. */
   const [playlistFor, setPlaylistFor] = useState<{ items: NewItem[]; what: string } | null>(null);
-  const seasonWords = season === 0 ? 'the specials' : `season ${season ?? ''}`;
+  const seasonWords = season === 0 ? 'specials' : `season ${season ?? ''}`;
   const [playlistNote, setPlaylistNote] = useState<string | null>(null);
 
   /**
@@ -714,13 +714,18 @@ export default function TitleDetailView({ title, onPlayFile, onBack, onFindMatch
                     onSelect={() =>
                       setPlaylistFor({
                         items: playlistItems,
-                        what: title.kind !== 'series' ? 'the film' : seasonWords,
+                        what:
+                          title.kind !== 'series'
+                            ? 'the film'
+                            : season === 0
+                              ? 'the specials'
+                              : seasonWords,
                       })
                     }
                   >
                     {title.kind !== 'series'
                       ? '+ Playlist'
-                      : `+ Playlist (${season === 0 ? 'specials' : `season ${season ?? ''}`})`}
+                      : `+ Playlist (${seasonWords})`}
                   </FocusButton>
                 )}
                   </>

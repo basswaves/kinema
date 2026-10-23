@@ -54,7 +54,6 @@ function close(): void {
   menu?.remove();
   menu = null;
   document.removeEventListener('pointerdown', onPointerDown, true);
-  document.removeEventListener('keydown', onKeyDown, true);
   window.removeEventListener('blur', close);
   window.removeEventListener('resize', close);
   document.removeEventListener('scroll', close, true);
@@ -65,11 +64,18 @@ function onPointerDown(event: PointerEvent): void {
   close();
 }
 
-/** Escape closes the menu and nothing else — it is Back everywhere else in the app. */
+/**
+ * Any key closes an open menu. Escape closes it and does nothing else — it
+ * is Back everywhere else in the app — so this listens on `window` in the
+ * capture phase from before the first screen draws: the pages' own Back
+ * handlers listen there too, and the first registered runs first.
+ */
 function onKeyDown(event: KeyboardEvent): void {
-  if (event.key !== 'Escape') return;
-  event.preventDefault();
-  event.stopImmediatePropagation();
+  if (!menu) return;
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }
   close();
 }
 
@@ -106,7 +112,6 @@ function open(x: number, y: number): void {
   el.style.top = `${Math.max(0, Math.min(y, window.innerHeight - height - 4))}px`;
   menu = el;
   document.addEventListener('pointerdown', onPointerDown, true);
-  document.addEventListener('keydown', onKeyDown, true);
   window.addEventListener('blur', close);
   window.addEventListener('resize', close);
   document.addEventListener('scroll', close, true);
@@ -132,4 +137,5 @@ function onContextMenu(event: MouseEvent): void {
 
 export function installContextMenu(): void {
   document.addEventListener('contextmenu', onContextMenu);
+  window.addEventListener('keydown', onKeyDown, true);
 }

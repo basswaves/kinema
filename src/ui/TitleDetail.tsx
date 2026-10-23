@@ -864,7 +864,10 @@ export default function TitleDetailView({ title, onPlayFile, onBack, onFindMatch
                       episode.file_path &&
                       setPlaylistFor({
                         items: [{ path: episode.file_path, file_id: episode.file_id }],
-                        what: `episode ${episode.episode}`,
+                        what:
+                          season === 0
+                            ? `special ${episode.episode}`
+                            : `season ${season ?? ''}, episode ${episode.episode}`,
                       })
                     }
                     onPlay={() =>

@@ -136,7 +136,7 @@ test("one episode by the + on its row; the top button is the season's", async ({
   await press(page, 'ArrowRight');
   await expect(page.locator('.episode-add.focused')).toHaveAttribute('aria-label', 'Add to a playlist');
   await press(page, 'Enter');
-  await expect(page.locator('.playlist-dialog h2')).toHaveText('Add episode 1 to a playlist');
+  await expect(page.locator('.playlist-dialog h2')).toHaveText('Add season 1, episode 1 to a playlist');
   await expect.poll(() => focused(page)).toBe('+ New playlist');
   await press(page, 'Enter');
   await page.keyboard.type('Pilots');

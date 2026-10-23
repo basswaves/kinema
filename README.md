@@ -391,6 +391,8 @@ want rather than by service, with a search box at the top of the list — and
 Settings → Library → **Run setup again** brings the pages back. After the first scan, Kinema scans once at
 every start and only looks at what changed.
 
+<img src="docs/images/settings.png" width="240" alt="The Settings list: a search box above nine sections named by what you want, from Library and Playback to Privacy and Advanced">
+
 Posters, descriptions and artwork come from [TMDB](https://www.themoviedb.org),
 through a key Kinema carries — there is nothing to sign up for. If you would
 rather use a free TMDB key of your own, paste it in Settings → Posters & ratings. Should

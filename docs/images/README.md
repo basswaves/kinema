@@ -8,6 +8,7 @@ Referenced from the top-level [README](../../README.md).
 | `detail.jpg` | A movie's detail page, with the cast row |
 | `player.jpg` | The player controls over a paused file |
 | `stats.png` | The playback statistics panel (`i` while watching) |
+| `settings.png` | The Settings section list and search box, cut from a fullscreen shot |
 
 Take them in fullscreen, with no viewing history, playlists or device names on
 screen. Settings is left out on purpose: it shows the library's folder paths.

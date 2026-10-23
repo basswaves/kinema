@@ -128,6 +128,15 @@ function countInputs(): void {
   }
 }
 
+/** The focus key a drawn control was registered under, for landing on it by what it shows. */
+export function focusKeyOf(node: Element): string | null {
+  const components = (
+    SpatialNavigation as unknown as { focusableComponents?: Record<string, { node?: HTMLElement }> }
+  ).focusableComponents;
+  for (const [key, c] of Object.entries(components ?? {})) if (c.node === node) return key;
+  return null;
+}
+
 /** Whether the ring is on `focusKey` or something inside it. */
 function focusWithin(focusKey: string): boolean {
   const components = (

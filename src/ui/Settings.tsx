@@ -106,6 +106,9 @@ import { detectLines } from '../library/detectReport';
 import FixMatch from '../library/FixMatch';
 import SystemOutputSection from './SystemOutputSection';
 import { SECTIONS, SECTION_NAMES, type SectionId } from './settingsSections';
+import type { SettingEntry } from './settingsIndex';
+import { SearchBox, SearchResults } from './SettingsSearch';
+import { useLandOn } from './settingsLanding';
 
 // The developer tools are mouse-only and opened by choice; their code is
 // fetched when they are.
@@ -218,10 +221,27 @@ export default function Settings({
             ? 'library'
             : lastSection
   );
+  /** What is typed in the search box; while there is, its matches show instead of a section. */
+  const [query, setQuery] = useState('');
+  /** OK on the empty box in the TV layout: the letters, before anything is typed. */
+  const [searchOpen, setSearchOpen] = useState(false);
   const chooseSection = useCallback((id: SectionId) => {
     lastSection = id;
     setSection(id);
+    setQuery('');
+    setSearchOpen(false);
   }, []);
+  /** A match chosen: its section, then the ring on it once it is drawn. */
+  const [landing, setLanding] = useState<{ entry: SettingEntry } | null>(null);
+  const landed = useCallback(() => setLanding(null), []);
+  useLandOn(landing, landed);
+  const pick = useCallback(
+    (entry: SettingEntry) => {
+      chooseSection(entry.section);
+      setLanding({ entry });
+    },
+    [chooseSection]
+  );
   /** From the Privacy page to the setting that stops a service: into its section. */
   // A new object each time, so going to the same section twice moves focus twice.
   const [goneTo, setGoneTo] = useState<{ id: SectionId } | null>(null);
@@ -252,7 +272,9 @@ export default function Settings({
           : openSection === 'videos'
             ? ADD_VIDEOS_KEY
             : `settings-nav:${section}`,
-    true
+    // Not while a search match is being landed on: the list would take the
+    // ring first, and a press in between would act on the list.
+    landing === null
   );
 
   const [roots, setRoots] = useState<LibraryRoot[]>([]);
@@ -343,6 +365,15 @@ export default function Settings({
   const [autoAnalyse, setAutoAnalyse] = useState(true);
 
   const tvMode = useTvMode();
+  // The letters are the TV layout's: leaving it with the box empty leaves the search.
+  const shown: SectionId | 'search' =
+    query.trim() || (searchOpen && tvMode) ? 'search' : section;
+  const openSearch = useCallback(() => {
+    if (!tvMode) return;
+    setSearchOpen(true);
+    // Onto the letters, once they are drawn.
+    window.setTimeout(() => void setFocus('osk:a'), 50);
+  }, [tvMode]);
   const look = useLook();
   const can = useCapabilities();
   /** Windows, ffmpeg missing, or an install under way: the one-press install. */
@@ -724,10 +755,15 @@ export default function Settings({
             reviewCount={needsReview}
             hasUpdate={update !== null}
             onChoose={chooseSection}
+            searching={shown === 'search'}
+            search={<SearchBox query={query} onChange={setQuery} onOpen={openSearch} />}
           />
 
           <SectionContent>
-            {section === 'library' && (
+            {shown === 'search' && (
+              <SearchResults query={query} onChange={setQuery} letters={tvMode} onPick={pick} />
+            )}
+            {shown === 'library' && (
               <>
                 <section className="settings-section">
                   <h2>Folders</h2>
@@ -927,7 +963,7 @@ export default function Settings({
               </>
             )}
 
-            {section === 'playback' && (
+            {shown === 'playback' && (
               <>
               <section className="settings-section">
                 <h2>Playback</h2>
@@ -999,7 +1035,7 @@ export default function Settings({
               </>
             )}
 
-            {section === 'picture' && (
+            {shown === 'picture' && (
               <>
                 {/* Each part only where Kinema can do it (capabilities.ts):
                     a control that does nothing is worse than none. */}
@@ -1024,7 +1060,7 @@ export default function Settings({
               </>
             )}
 
-            {section === 'intros' && (
+            {shown === 'intros' && (
               <>
                 <section className="settings-section">
                   <h2>Skipping intros</h2>
@@ -1364,7 +1400,7 @@ export default function Settings({
               </>
             )}
 
-            {section === 'subtitles' && (
+            {shown === 'subtitles' && (
               <>
                 <section className="settings-section">
                   <h2>Language and subtitles</h2>
@@ -1375,7 +1411,7 @@ export default function Settings({
               </>
             )}
 
-            {section === 'tracking' && (
+            {shown === 'tracking' && (
               <>
                 <section className="settings-section">
                   <h2>Keep track of what I watch</h2>
@@ -1389,7 +1425,7 @@ export default function Settings({
               </>
             )}
 
-            {section === 'ratings' && (
+            {shown === 'ratings' && (
               <>
                 <section className="settings-section">
                   <h2>Posters and ratings</h2>
@@ -1493,14 +1529,14 @@ export default function Settings({
               </>
             )}
 
-            {section === 'privacy' && (
+            {shown === 'privacy' && (
               <WhatLeavesSection
                 sectionNames={SECTION_NAMES}
                 onGo={(id) => goToSection(id as SectionId)}
               />
             )}
 
-            {section === 'advanced' && (
+            {shown === 'advanced' && (
               <>
                 <section className="settings-section">
                   <h2>Updates</h2>
@@ -1712,11 +1748,17 @@ function SectionList({
   reviewCount,
   hasUpdate,
   onChoose,
+  searching,
+  search,
 }: {
   section: SectionId;
   reviewCount: number;
   hasUpdate: boolean;
   onChoose: (id: SectionId) => void;
+  /** Matches are shown, not a section: none is marked open. */
+  searching: boolean;
+  /** The search box, at the top of the list: Up from the first section. */
+  search: ReactNode;
 }) {
   const { ref, focusKey } = useFocusable({
     focusKey: 'settings-nav',
@@ -1728,11 +1770,12 @@ function SectionList({
   return (
     <FocusContext.Provider value={focusKey}>
       <nav className="settings-nav" aria-label="Settings sections" ref={ref}>
+        {search}
         {SECTIONS.map(([id, label]) => (
           <FocusButton
             key={id}
             focusKey={`settings-nav:${id}`}
-            className={section === id ? 'active' : ''}
+            className={section === id && !searching ? 'active' : ''}
             keepInView="page-top"
             onSelect={() => onChoose(id)}
           >

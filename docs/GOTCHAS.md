@@ -638,6 +638,13 @@ set to unset under a mounted control — and the second press armed again
 instead of confirming. **Do:** keep a control's `focusKey` the same for its
 whole life, or give it a React `key` so a different key means a new control.
 
+A list whose items move does it too. Settings' search keyed each match by its
+setting and its focus key by its place (`settings-search:0` for the first);
+typing "r" put the OMDb key 37th, typing on to "rotten" made it first, and
+React kept the button — still registered as the 37th. `setFocus` on the first
+match then found nothing and the ring vanished. **Do:** when the focus key
+follows the place, put the place in the React `key` as well.
+
 ### Focus cannot travel up into an overlay nav
 
 Going up, the library requires a candidate whose **bottom** edge is above the

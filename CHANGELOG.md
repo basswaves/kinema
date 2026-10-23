@@ -9,6 +9,10 @@ makes no stability promises.
 
 ### Added
 
+- **Search in Settings**: a box at the top of the section list finds a
+  setting by its name, what it does or one of its choices; OK on a match opens
+  its section with the ring on that setting. The TV layout brings up
+  Kinema's own letters on OK, as Search does.
 - **What leaves your computer** (Settings → Privacy): every service Kinema
   can talk to, what it sends, when, and what stops it, with whether each
   switchable one is on now and a button to its setting. A test keeps the

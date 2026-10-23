@@ -3655,7 +3655,7 @@ and a Jellyfin source further out. Decisions made along the way:
 - Not chosen: a dialog with a tick per episode; only through a later menu on
   cards.
 
-## Settings by what you want (2026-10-23)
+## Settings by what you want, and a search box (2026-10-23)
 
 - **One section per goal, services one level down** (owner, option A of 3).
   Accounts listed services by name, which says nothing to someone who has
@@ -3669,6 +3669,14 @@ and a Jellyfin source further out. Decisions made along the way:
   (least change, but subtitles stayed in two places); C, a switch per goal
   with the services under a "How it works" fold (shortest pages, but a fold is
   one more press and easy to miss with a remote).
+- **The search box sits at the top of the section list** (owner's choice over
+  the title bar): Up from the first section, matches where the section would
+  be, OK opens the section with the ring on the setting itself — a row's
+  chosen choice, a field, or a part's first control. It searches names, the
+  words for what each does, and choices, from a written index
+  (`settingsIndex.ts`), because only the open section is drawn; a unit test
+  checks each entry's text is still in the code and an e2e sweep lands on
+  every one. The TV layout gets Kinema's own letters on OK, as Search does.
 
 ## Open items
 

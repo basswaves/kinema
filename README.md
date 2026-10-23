@@ -369,7 +369,7 @@ one skippable, with **Finish later** to go straight to the library:
   scores.
 
 Everything on them is in Settings too — grouped the same way, by what you
-want rather than by service — and
+want rather than by service, with a search box at the top of the list — and
 Settings → Library → **Run setup again** brings the pages back. After the first scan, Kinema scans once at
 every start and only looks at what changed.
 

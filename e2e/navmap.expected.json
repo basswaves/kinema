@@ -141,53 +141,38 @@
       "Search": { "U": "·", "D": "Library #2", "L": "Library #1", "R": "Settings" },
       "Settings": { "U": "·", "D": "Library #2", "L": "Search", "R": "?" },
       "?": { "U": "·", "D": "Library #2", "L": "Settings", "R": "·" },
-      "Library #2": { "U": "Settings", "D": "Playback", "L": "·", "R": "Add movies folder" },
+      "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "Add movies folder" },
+      "Library #2": { "U": "Search settings", "D": "Playback", "L": "·", "R": "Add movies folder" },
       "Playback": { "U": "Library #2", "D": "Picture & sound", "L": "·", "R": "Add movies folder" },
-      "Picture & sound": { "U": "Playback", "D": "Intro & credits", "L": "·", "R": "Add movies folder" },
       "Remove #1": { "U": "Settings", "D": "Remove #2", "L": "Library #2", "R": "·" },
-      "Intro & credits": { "U": "Picture & sound", "D": "Accounts", "L": "·", "R": "Add movies folder" },
+      "Picture & sound": { "U": "Playback", "D": "Language & subtitles", "L": "·", "R": "Add movies folder" },
       "Remove #2": { "U": "Remove #1", "D": "Scan now", "L": "Library #2", "R": "·" },
-      "Accounts": { "U": "Intro & credits", "D": "Privacy", "L": "·", "R": "Add movies folder" },
+      "Language & subtitles": { "U": "Picture & sound", "D": "Skipping intros", "L": "·", "R": "Add movies folder" },
       "Add movies folder": { "U": "Remove #2", "D": "Nothing to review", "L": "Library #2", "R": "Add TV folder" },
       "Add TV folder": { "U": "Remove #2", "D": "Nothing to review", "L": "Add movies folder", "R": "Add Videos folder" },
       "Add Videos folder": { "U": "Remove #2", "D": "Nothing to review", "L": "Add TV folder", "R": "Scan now" },
       "Scan now": { "U": "Remove #2", "D": "Nothing to review", "L": "Add Videos folder", "R": "·" },
-      "Privacy": { "U": "Accounts", "D": "Advanced", "L": "·", "R": "Add movies folder" },
+      "Skipping intros": { "U": "Language & subtitles", "D": "Keep track of what I watch", "L": "·", "R": "Add movies folder" },
+      "Keep track of what I watch": { "U": "Skipping intros", "D": "Posters & ratings", "L": "·", "R": "Add movies folder" },
+      "Posters & ratings": { "U": "Keep track of what I watch", "D": "Privacy", "L": "·", "R": "Add movies folder" },
+      "Privacy": { "U": "Posters & ratings", "D": "Advanced", "L": "·", "R": "Add movies folder" },
       "Advanced": { "U": "Privacy", "D": "·", "L": "·", "R": "Add movies folder" },
-      "Nothing to review": { "U": "Add movies folder", "D": "Get a free TMDB key ↗", "L": "Library #2", "R": "·" },
-      "Get a free TMDB key ↗": { "U": "Nothing to review", "D": "Paste your TMDB key", "L": "Library #2", "R": "·" },
-      "Paste your TMDB key": { "U": "Get a free TMDB key ↗", "D": "Paste your OMDb key", "L": "Library #2", "R": "·" },
-      "Paste your OMDb key": { "U": "Paste your TMDB key", "D": "Run setup again", "L": "Library #2", "R": "·" },
-      "Run setup again": { "U": "Paste your OMDb key", "D": "·", "L": "Library #2", "R": "·" }
+      "Nothing to review": { "U": "Add movies folder", "D": "Run setup again", "L": "Library #2", "R": "·" },
+      "Run setup again": { "U": "Nothing to review", "D": "·", "L": "Library #2", "R": "·" }
     },
     "settings-playback": {
+      "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "At a desk" },
       "At a desk": { "U": "Settings", "D": "✓Auto", "L": "Playback", "R": "✓On a TV" },
       "✓On a TV": { "U": "Settings", "D": "Full", "L": "At a desk", "R": "·" },
-      "✓Auto": { "U": "At a desk", "D": "✓As the file sets it", "L": "Playback", "R": "Full" },
-      "Full": { "U": "✓On a TV", "D": "✓As the file sets it", "L": "✓Auto", "R": "Light" },
-      "Light": { "U": "✓On a TV", "D": "English", "L": "Full", "R": "·" },
-      "✓As the file sets it": { "U": "✓Auto", "D": "Off #1", "L": "Playback", "R": "English" },
-      "English": { "U": "Light", "D": "✓English when needed", "L": "✓As the file sets it", "R": "·" },
-      "Off #1": { "U": "✓As the file sets it", "D": "✓Show them", "L": "Playback", "R": "✓English when needed" },
-      "✓English when needed": { "U": "✓As the file sets it", "D": "✓Show them", "L": "Off #1", "R": "English always" },
-      "English always": { "U": "English", "D": "Off #2", "L": "✓English when needed", "R": "·" },
-      "✓Show them": { "U": "Off #1", "D": "✓Off", "L": "Playback", "R": "Off #2" },
-      "Off #2": { "U": "✓English when needed", "D": "On", "L": "✓Show them", "R": "·" },
-      "✓Off": { "U": "✓Show them", "D": "✓Show a Skip button", "L": "Playback", "R": "On" },
-      "On": { "U": "✓Show them", "D": "✓Show a Skip button", "L": "✓Off", "R": "·" },
-      "✓Show a Skip button": { "U": "✓Off", "D": "At the end", "L": "Playback", "R": "Skip them" },
-      "Skip them": { "U": "On", "D": "45s before", "L": "✓Show a Skip button", "R": "·" },
-      "At the end": { "U": "✓Show a Skip button", "D": "✓Match the sound", "L": "Playback", "R": "30s before" },
-      "30s before": { "U": "✓Show a Skip button", "D": "✓Match the sound", "L": "At the end", "R": "45s before" },
-      "45s before": { "U": "Skip them", "D": "Match the screen", "L": "30s before", "R": "✓60s before" },
-      "✓60s before": { "U": "Skip them", "D": "Match the screen", "L": "45s before", "R": "90s before" },
-      "90s before": { "U": "Skip them", "D": "Match the screen", "L": "✓60s before", "R": "120s before" },
-      "120s before": { "U": "Skip them", "D": "Match the screen", "L": "90s before", "R": "·" },
-      "✓Match the sound": { "U": "At the end", "D": "Offer Kinema as a video player", "L": "Playback", "R": "Match the screen" },
-      "Match the screen": { "U": "45s before", "D": "Offer Kinema as a video player", "L": "✓Match the sound", "R": "·" },
+      "✓Auto": { "U": "At a desk", "D": "✓Match the sound", "L": "Playback", "R": "Full" },
+      "Full": { "U": "✓On a TV", "D": "✓Match the sound", "L": "✓Auto", "R": "Light" },
+      "Light": { "U": "✓On a TV", "D": "Match the screen", "L": "Full", "R": "·" },
+      "✓Match the sound": { "U": "✓Auto", "D": "Offer Kinema as a video player", "L": "Playback", "R": "Match the screen" },
+      "Match the screen": { "U": "Light", "D": "Offer Kinema as a video player", "L": "✓Match the sound", "R": "·" },
       "Offer Kinema as a video player": { "U": "✓Match the sound", "D": "·", "L": "Playback", "R": "·" }
     },
     "settings-picture": {
+      "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "✓Off #1" },
       "✓Off #1": { "U": "Settings", "D": "Never change it", "L": "Picture & sound", "R": "Every screen #1" },
       "Every screen #1": { "U": "Settings", "D": "Never change it", "L": "✓Off #1", "R": "Only these #1" },
       "Only these #1": { "U": "Settings", "D": "Match the video", "L": "Every screen #1", "R": "·" },
@@ -206,17 +191,26 @@
       "Check again": { "U": "✓Windows default", "D": "·", "L": "Picture & sound", "R": "·" }
     },
     "settings-intros": {
-      "✓After each scan": { "U": "Settings", "D": "ffmpeg", "L": "Intro & credits", "R": "Only when I press Detect" },
-      "Only when I press Detect": { "U": "Settings", "D": "ffmpeg", "L": "✓After each scan", "R": "·" },
-      "ffmpeg": { "U": "✓After each scan", "D": "Install ffmpeg", "L": "Intro & credits", "R": "·" },
-      "Install ffmpeg": { "U": "ffmpeg", "D": "✓On #1", "L": "Intro & credits", "R": "·" },
-      "✓On #1": { "U": "Install ffmpeg", "D": "✓On #2", "L": "Intro & credits", "R": "Off #1" },
+      "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "✓Show a Skip button" },
+      "✓Show a Skip button": { "U": "Settings", "D": "At the end", "L": "Skipping intros", "R": "Skip them" },
+      "Skip them": { "U": "Settings", "D": "45s before", "L": "✓Show a Skip button", "R": "·" },
+      "At the end": { "U": "✓Show a Skip button", "D": "✓After each scan", "L": "Skipping intros", "R": "30s before" },
+      "30s before": { "U": "✓Show a Skip button", "D": "✓After each scan", "L": "At the end", "R": "45s before" },
+      "45s before": { "U": "Skip them", "D": "Only when I press Detect", "L": "30s before", "R": "✓60s before" },
+      "✓60s before": { "U": "Skip them", "D": "Only when I press Detect", "L": "45s before", "R": "90s before" },
+      "90s before": { "U": "Skip them", "D": "Only when I press Detect", "L": "✓60s before", "R": "120s before" },
+      "120s before": { "U": "Skip them", "D": "Only when I press Detect", "L": "90s before", "R": "·" },
+      "✓After each scan": { "U": "At the end", "D": "ffmpeg", "L": "Skipping intros", "R": "Only when I press Detect" },
+      "Only when I press Detect": { "U": "45s before", "D": "ffmpeg", "L": "✓After each scan", "R": "·" },
+      "ffmpeg": { "U": "✓After each scan", "D": "Install ffmpeg", "L": "Skipping intros", "R": "·" },
+      "Install ffmpeg": { "U": "ffmpeg", "D": "✓On #1", "L": "Skipping intros", "R": "·" },
+      "✓On #1": { "U": "Install ffmpeg", "D": "✓On #2", "L": "Skipping intros", "R": "Off #1" },
       "Off #1": { "U": "Install ffmpeg", "D": "Off #2", "L": "✓On #1", "R": "·" },
-      "✓On #2": { "U": "✓On #1", "D": "Open the Skiptro page ↗", "L": "Intro & credits", "R": "Off #2" },
+      "✓On #2": { "U": "✓On #1", "D": "Open the Skiptro page ↗", "L": "Skipping intros", "R": "Off #2" },
       "Off #2": { "U": "Off #1", "D": "Open the Skiptro page ↗", "L": "✓On #2", "R": "·" },
-      "Open the Skiptro page ↗": { "U": "✓On #2", "D": "Detect now", "L": "Intro & credits", "R": "Choose Skiptro" },
+      "Open the Skiptro page ↗": { "U": "✓On #2", "D": "Detect now", "L": "Skipping intros", "R": "Choose Skiptro" },
       "Choose Skiptro": { "U": "Off #2", "D": "Detect now", "L": "Open the Skiptro page ↗", "R": "·" },
-      "Detect now": { "U": "Open the Skiptro page ↗", "D": "·", "L": "Intro & credits", "R": "·" }
+      "Detect now": { "U": "Open the Skiptro page ↗", "D": "·", "L": "Skipping intros", "R": "·" }
     },
     "settings-accounts": {
       "Connect SIMKL": { "U": "Settings", "D": "Connect Trakt", "L": "Accounts", "R": "·" },
@@ -225,6 +219,7 @@
       "Your OpenSubtitles password": { "U": "The username, not the email address", "D": "·", "L": "Accounts", "R": "·" }
     },
     "settings-advanced": {
+      "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "✓On" },
       "✓On": { "U": "Settings", "D": "Clear artwork cache", "L": "Advanced", "R": "Off" },
       "Off": { "U": "Settings", "D": "Clear artwork cache", "L": "✓On", "R": "·" },
       "Clear artwork cache": { "U": "✓On", "D": "Write the missing ones", "L": "Advanced", "R": "·" },
@@ -242,7 +237,7 @@
     },
     "settings-review": {
       "Fixture Movie (1999) · 1 file · movieKinema could ": { "U": "Review 3 items", "D": "Sample Series · 2 files · seriesKinema could not i", "L": "Library #2", "R": "·" },
-      "Sample Series · 2 files · seriesKinema could not i": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Get a free TMDB key ↗", "L": "Library #2", "R": "·" }
+      "Sample Series · 2 files · seriesKinema could not i": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Run setup again", "L": "Library #2", "R": "·" }
     },
     "settings-review-item": {
       "Search for the right title…": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Name", "L": "Library #2", "R": "Movie" },
@@ -391,13 +386,39 @@
       "Remove #4": { "U": "Garden", "D": "·", "L": "↓ #4", "R": "·" }
     },
     "settings-privacy": {
-      "Go to Library, for OMDb (Rotten Tomatoes scores)": { "U": "Settings", "D": "Go to Intro & credits, for TheIntroDB", "L": "Privacy", "R": "·" },
-      "Go to Intro & credits, for TheIntroDB": { "U": "Go to Library, for OMDb (Rotten Tomatoes scores)", "D": "Go to Intro & credits, for IntroDB", "L": "Privacy", "R": "·" },
-      "Go to Intro & credits, for IntroDB": { "U": "Go to Intro & credits, for TheIntroDB", "D": "Go to Accounts, for OpenSubtitles", "L": "Privacy", "R": "·" },
-      "Go to Accounts, for OpenSubtitles": { "U": "Go to Intro & credits, for IntroDB", "D": "Go to Accounts, for SIMKL", "L": "Privacy", "R": "·" },
-      "Go to Accounts, for SIMKL": { "U": "Go to Accounts, for OpenSubtitles", "D": "Go to Accounts, for Trakt", "L": "Privacy", "R": "·" },
-      "Go to Accounts, for Trakt": { "U": "Go to Accounts, for SIMKL", "D": "Go to Advanced, for GitHub (new versions)", "L": "Privacy", "R": "·" },
-      "Go to Advanced, for GitHub (new versions)": { "U": "Go to Accounts, for Trakt", "D": "·", "L": "Privacy", "R": "·" }
+      "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "Go to Posters & ratings, for OMDb (Rotten Tomatoes scores)" },
+      "Go to Posters & ratings, for OMDb (Rotten Tomatoes scores)": { "U": "Settings", "D": "Go to Skipping intros, for TheIntroDB", "L": "Privacy", "R": "·" },
+      "Go to Skipping intros, for TheIntroDB": { "U": "Go to Posters & ratings, for OMDb (Rotten Tomatoes scores)", "D": "Go to Skipping intros, for IntroDB", "L": "Privacy", "R": "·" },
+      "Go to Skipping intros, for IntroDB": { "U": "Go to Skipping intros, for TheIntroDB", "D": "Go to Language & subtitles, for OpenSubtitles", "L": "Privacy", "R": "·" },
+      "Go to Language & subtitles, for OpenSubtitles": { "U": "Go to Skipping intros, for IntroDB", "D": "Go to Keep track of what I watch, for SIMKL", "L": "Privacy", "R": "·" },
+      "Go to Keep track of what I watch, for SIMKL": { "U": "Go to Language & subtitles, for OpenSubtitles", "D": "Go to Keep track of what I watch, for Trakt", "L": "Privacy", "R": "·" },
+      "Go to Keep track of what I watch, for Trakt": { "U": "Go to Keep track of what I watch, for SIMKL", "D": "Go to Advanced, for GitHub (new versions)", "L": "Privacy", "R": "·" },
+      "Go to Advanced, for GitHub (new versions)": { "U": "Go to Keep track of what I watch, for Trakt", "D": "·", "L": "Privacy", "R": "·" }
+    },
+    "settings-subtitles": {
+      "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "✓As the file sets it" },
+      "✓As the file sets it": { "U": "Settings", "D": "Off #1", "L": "Language & subtitles", "R": "English" },
+      "English": { "U": "Settings", "D": "✓English when needed", "L": "✓As the file sets it", "R": "·" },
+      "Off #1": { "U": "✓As the file sets it", "D": "✓Show them", "L": "Language & subtitles", "R": "✓English when needed" },
+      "✓English when needed": { "U": "✓As the file sets it", "D": "✓Show them", "L": "Off #1", "R": "English always" },
+      "English always": { "U": "English", "D": "Off #2", "L": "✓English when needed", "R": "·" },
+      "✓Show them": { "U": "Off #1", "D": "✓Off", "L": "Language & subtitles", "R": "Off #2" },
+      "Off #2": { "U": "✓English when needed", "D": "On", "L": "✓Show them", "R": "·" },
+      "✓Off": { "U": "✓Show them", "D": "The username, not the email address", "L": "Language & subtitles", "R": "On" },
+      "On": { "U": "✓Show them", "D": "The username, not the email address", "L": "✓Off", "R": "·" },
+      "The username, not the email address": { "U": "✓Off", "D": "Your OpenSubtitles password", "L": "Language & subtitles", "R": "·" },
+      "Your OpenSubtitles password": { "U": "The username, not the email address", "D": "·", "L": "Language & subtitles", "R": "·" }
+    },
+    "settings-tracking": {
+      "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "Connect SIMKL" },
+      "Connect SIMKL": { "U": "Settings", "D": "Connect Trakt", "L": "Keep track of what I watch", "R": "·" },
+      "Connect Trakt": { "U": "Connect SIMKL", "D": "·", "L": "Keep track of what I watch", "R": "·" }
+    },
+    "settings-ratings": {
+      "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "Get a free TMDB key ↗" },
+      "Get a free TMDB key ↗": { "U": "Settings", "D": "Paste your TMDB key", "L": "Posters & ratings", "R": "·" },
+      "Paste your TMDB key": { "U": "Get a free TMDB key ↗", "D": "Paste your OMDb key", "L": "Posters & ratings", "R": "·" },
+      "Paste your OMDb key": { "U": "Paste your TMDB key", "D": "·", "L": "Posters & ratings", "R": "·" }
     }
   },
   "linux": {
@@ -542,53 +563,38 @@
       "Search": { "U": "·", "D": "Library #2", "L": "Library #1", "R": "Settings" },
       "Settings": { "U": "·", "D": "Library #2", "L": "Search", "R": "?" },
       "?": { "U": "·", "D": "Library #2", "L": "Settings", "R": "·" },
-      "Library #2": { "U": "Settings", "D": "Playback", "L": "·", "R": "Add movies folder" },
+      "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "Add movies folder" },
+      "Library #2": { "U": "Search settings", "D": "Playback", "L": "·", "R": "Add movies folder" },
       "Playback": { "U": "Library #2", "D": "Picture & sound", "L": "·", "R": "Add movies folder" },
-      "Picture & sound": { "U": "Playback", "D": "Intro & credits", "L": "·", "R": "Add movies folder" },
       "Remove #1": { "U": "Settings", "D": "Remove #2", "L": "Library #2", "R": "·" },
-      "Intro & credits": { "U": "Picture & sound", "D": "Accounts", "L": "·", "R": "Add movies folder" },
+      "Picture & sound": { "U": "Playback", "D": "Language & subtitles", "L": "·", "R": "Add movies folder" },
       "Remove #2": { "U": "Remove #1", "D": "Scan now", "L": "Library #2", "R": "·" },
-      "Accounts": { "U": "Intro & credits", "D": "Privacy", "L": "·", "R": "Add movies folder" },
+      "Language & subtitles": { "U": "Picture & sound", "D": "Skipping intros", "L": "·", "R": "Add movies folder" },
       "Add movies folder": { "U": "Remove #2", "D": "Nothing to review", "L": "Library #2", "R": "Add TV folder" },
       "Add TV folder": { "U": "Remove #2", "D": "Nothing to review", "L": "Add movies folder", "R": "Add Videos folder" },
       "Add Videos folder": { "U": "Remove #2", "D": "Nothing to review", "L": "Add TV folder", "R": "Scan now" },
       "Scan now": { "U": "Remove #2", "D": "Nothing to review", "L": "Add Videos folder", "R": "·" },
-      "Privacy": { "U": "Accounts", "D": "Advanced", "L": "·", "R": "Add movies folder" },
+      "Skipping intros": { "U": "Language & subtitles", "D": "Keep track of what I watch", "L": "·", "R": "Add movies folder" },
+      "Keep track of what I watch": { "U": "Skipping intros", "D": "Posters & ratings", "L": "·", "R": "Add movies folder" },
+      "Posters & ratings": { "U": "Keep track of what I watch", "D": "Privacy", "L": "·", "R": "Add movies folder" },
+      "Privacy": { "U": "Posters & ratings", "D": "Advanced", "L": "·", "R": "Add movies folder" },
       "Advanced": { "U": "Privacy", "D": "·", "L": "·", "R": "Add movies folder" },
-      "Nothing to review": { "U": "Add movies folder", "D": "Get a free TMDB key ↗", "L": "Library #2", "R": "·" },
-      "Get a free TMDB key ↗": { "U": "Nothing to review", "D": "Paste your TMDB key", "L": "Library #2", "R": "·" },
-      "Paste your TMDB key": { "U": "Get a free TMDB key ↗", "D": "Paste your OMDb key", "L": "Library #2", "R": "·" },
-      "Paste your OMDb key": { "U": "Paste your TMDB key", "D": "Run setup again", "L": "Library #2", "R": "·" },
-      "Run setup again": { "U": "Paste your OMDb key", "D": "·", "L": "Library #2", "R": "·" }
+      "Nothing to review": { "U": "Add movies folder", "D": "Run setup again", "L": "Library #2", "R": "·" },
+      "Run setup again": { "U": "Nothing to review", "D": "·", "L": "Library #2", "R": "·" }
     },
     "settings-playback": {
+      "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "At a desk" },
       "At a desk": { "U": "Settings", "D": "✓Auto", "L": "Playback", "R": "✓On a TV" },
       "✓On a TV": { "U": "Settings", "D": "Full", "L": "At a desk", "R": "·" },
-      "✓Auto": { "U": "At a desk", "D": "✓As the file sets it", "L": "Playback", "R": "Full" },
-      "Full": { "U": "✓On a TV", "D": "✓As the file sets it", "L": "✓Auto", "R": "Light" },
-      "Light": { "U": "✓On a TV", "D": "English", "L": "Full", "R": "·" },
-      "✓As the file sets it": { "U": "✓Auto", "D": "Off #1", "L": "Playback", "R": "English" },
-      "English": { "U": "Light", "D": "✓English when needed", "L": "✓As the file sets it", "R": "·" },
-      "Off #1": { "U": "✓As the file sets it", "D": "✓Show them", "L": "Playback", "R": "✓English when needed" },
-      "✓English when needed": { "U": "✓As the file sets it", "D": "✓Show them", "L": "Off #1", "R": "English always" },
-      "English always": { "U": "English", "D": "Off #2", "L": "✓English when needed", "R": "·" },
-      "✓Show them": { "U": "Off #1", "D": "✓Off", "L": "Playback", "R": "Off #2" },
-      "Off #2": { "U": "✓English when needed", "D": "On", "L": "✓Show them", "R": "·" },
-      "✓Off": { "U": "✓Show them", "D": "✓Show a Skip button", "L": "Playback", "R": "On" },
-      "On": { "U": "✓Show them", "D": "✓Show a Skip button", "L": "✓Off", "R": "·" },
-      "✓Show a Skip button": { "U": "✓Off", "D": "At the end", "L": "Playback", "R": "Skip them" },
-      "Skip them": { "U": "On", "D": "45s before", "L": "✓Show a Skip button", "R": "·" },
-      "At the end": { "U": "✓Show a Skip button", "D": "✓Match the sound", "L": "Playback", "R": "30s before" },
-      "30s before": { "U": "✓Show a Skip button", "D": "✓Match the sound", "L": "At the end", "R": "45s before" },
-      "45s before": { "U": "Skip them", "D": "Match the screen", "L": "30s before", "R": "✓60s before" },
-      "✓60s before": { "U": "Skip them", "D": "Match the screen", "L": "45s before", "R": "90s before" },
-      "90s before": { "U": "Skip them", "D": "Match the screen", "L": "✓60s before", "R": "120s before" },
-      "120s before": { "U": "Skip them", "D": "Match the screen", "L": "90s before", "R": "·" },
-      "✓Match the sound": { "U": "At the end", "D": "Add Kinema to the app menu", "L": "Playback", "R": "Match the screen" },
-      "Match the screen": { "U": "45s before", "D": "Add Kinema to the app menu", "L": "✓Match the sound", "R": "·" },
+      "✓Auto": { "U": "At a desk", "D": "✓Match the sound", "L": "Playback", "R": "Full" },
+      "Full": { "U": "✓On a TV", "D": "✓Match the sound", "L": "✓Auto", "R": "Light" },
+      "Light": { "U": "✓On a TV", "D": "Match the screen", "L": "Full", "R": "·" },
+      "✓Match the sound": { "U": "✓Auto", "D": "Add Kinema to the app menu", "L": "Playback", "R": "Match the screen" },
+      "Match the screen": { "U": "Light", "D": "Add Kinema to the app menu", "L": "✓Match the sound", "R": "·" },
       "Add Kinema to the app menu": { "U": "✓Match the sound", "D": "·", "L": "Playback", "R": "·" }
     },
     "settings-picture": {
+      "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "✓Off" },
       "✓Off": { "U": "Settings", "D": "✓Linux default", "L": "Picture & sound", "R": "Every device that can" },
       "Every device that can": { "U": "Settings", "D": "✓Linux default", "L": "✓Off", "R": "Only these" },
       "Only these": { "U": "Settings", "D": "Mock AV receiver (HDMI)", "L": "Every device that can", "R": "·" },
@@ -598,17 +604,26 @@
       "Check again": { "U": "✓Linux default", "D": "·", "L": "Picture & sound", "R": "·" }
     },
     "settings-intros": {
-      "✓After each scan": { "U": "Settings", "D": "ffmpeg", "L": "Intro & credits", "R": "Only when I press Detect" },
-      "Only when I press Detect": { "U": "Settings", "D": "ffmpeg", "L": "✓After each scan", "R": "·" },
-      "ffmpeg": { "U": "✓After each scan", "D": "Open the ffmpeg download page ↗", "L": "Intro & credits", "R": "·" },
-      "Open the ffmpeg download page ↗": { "U": "ffmpeg", "D": "✓On #1", "L": "Intro & credits", "R": "·" },
-      "✓On #1": { "U": "Open the ffmpeg download page ↗", "D": "✓On #2", "L": "Intro & credits", "R": "Off #1" },
+      "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "✓Show a Skip button" },
+      "✓Show a Skip button": { "U": "Settings", "D": "At the end", "L": "Skipping intros", "R": "Skip them" },
+      "Skip them": { "U": "Settings", "D": "45s before", "L": "✓Show a Skip button", "R": "·" },
+      "At the end": { "U": "✓Show a Skip button", "D": "✓After each scan", "L": "Skipping intros", "R": "30s before" },
+      "30s before": { "U": "✓Show a Skip button", "D": "✓After each scan", "L": "At the end", "R": "45s before" },
+      "45s before": { "U": "Skip them", "D": "Only when I press Detect", "L": "30s before", "R": "✓60s before" },
+      "✓60s before": { "U": "Skip them", "D": "Only when I press Detect", "L": "45s before", "R": "90s before" },
+      "90s before": { "U": "Skip them", "D": "Only when I press Detect", "L": "✓60s before", "R": "120s before" },
+      "120s before": { "U": "Skip them", "D": "Only when I press Detect", "L": "90s before", "R": "·" },
+      "✓After each scan": { "U": "At the end", "D": "ffmpeg", "L": "Skipping intros", "R": "Only when I press Detect" },
+      "Only when I press Detect": { "U": "45s before", "D": "ffmpeg", "L": "✓After each scan", "R": "·" },
+      "ffmpeg": { "U": "✓After each scan", "D": "Open the ffmpeg download page ↗", "L": "Skipping intros", "R": "·" },
+      "Open the ffmpeg download page ↗": { "U": "ffmpeg", "D": "✓On #1", "L": "Skipping intros", "R": "·" },
+      "✓On #1": { "U": "Open the ffmpeg download page ↗", "D": "✓On #2", "L": "Skipping intros", "R": "Off #1" },
       "Off #1": { "U": "Open the ffmpeg download page ↗", "D": "Off #2", "L": "✓On #1", "R": "·" },
-      "✓On #2": { "U": "✓On #1", "D": "Open the Skiptro page ↗", "L": "Intro & credits", "R": "Off #2" },
+      "✓On #2": { "U": "✓On #1", "D": "Open the Skiptro page ↗", "L": "Skipping intros", "R": "Off #2" },
       "Off #2": { "U": "Off #1", "D": "Open the Skiptro page ↗", "L": "✓On #2", "R": "·" },
-      "Open the Skiptro page ↗": { "U": "✓On #2", "D": "Detect now", "L": "Intro & credits", "R": "Choose Skiptro" },
+      "Open the Skiptro page ↗": { "U": "✓On #2", "D": "Detect now", "L": "Skipping intros", "R": "Choose Skiptro" },
       "Choose Skiptro": { "U": "Off #2", "D": "Detect now", "L": "Open the Skiptro page ↗", "R": "·" },
-      "Detect now": { "U": "Open the Skiptro page ↗", "D": "·", "L": "Intro & credits", "R": "·" }
+      "Detect now": { "U": "Open the Skiptro page ↗", "D": "·", "L": "Skipping intros", "R": "·" }
     },
     "settings-accounts": {
       "Connect SIMKL": { "U": "Settings", "D": "Connect Trakt", "L": "Accounts", "R": "·" },
@@ -617,6 +632,7 @@
       "Your OpenSubtitles password": { "U": "The username, not the email address", "D": "·", "L": "Accounts", "R": "·" }
     },
     "settings-advanced": {
+      "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "✓On" },
       "✓On": { "U": "Settings", "D": "Clear artwork cache", "L": "Advanced", "R": "Off" },
       "Off": { "U": "Settings", "D": "Clear artwork cache", "L": "✓On", "R": "·" },
       "Clear artwork cache": { "U": "✓On", "D": "Write the missing ones", "L": "Advanced", "R": "·" },
@@ -634,7 +650,7 @@
     },
     "settings-review": {
       "Fixture Movie (1999) · 1 file · movieKinema could ": { "U": "Review 3 items", "D": "Sample Series · 2 files · seriesKinema could not i", "L": "Library #2", "R": "·" },
-      "Sample Series · 2 files · seriesKinema could not i": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Get a free TMDB key ↗", "L": "Library #2", "R": "·" }
+      "Sample Series · 2 files · seriesKinema could not i": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Run setup again", "L": "Library #2", "R": "·" }
     },
     "settings-review-item": {
       "Search for the right title…": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Name", "L": "Library #2", "R": "Movie" },
@@ -777,13 +793,39 @@
       "Remove #4": { "U": "Garden", "D": "·", "L": "↓ #4", "R": "·" }
     },
     "settings-privacy": {
-      "Go to Library, for OMDb (Rotten Tomatoes scores)": { "U": "Settings", "D": "Go to Intro & credits, for TheIntroDB", "L": "Privacy", "R": "·" },
-      "Go to Intro & credits, for TheIntroDB": { "U": "Go to Library, for OMDb (Rotten Tomatoes scores)", "D": "Go to Intro & credits, for IntroDB", "L": "Privacy", "R": "·" },
-      "Go to Intro & credits, for IntroDB": { "U": "Go to Intro & credits, for TheIntroDB", "D": "Go to Accounts, for OpenSubtitles", "L": "Privacy", "R": "·" },
-      "Go to Accounts, for OpenSubtitles": { "U": "Go to Intro & credits, for IntroDB", "D": "Go to Accounts, for SIMKL", "L": "Privacy", "R": "·" },
-      "Go to Accounts, for SIMKL": { "U": "Go to Accounts, for OpenSubtitles", "D": "Go to Accounts, for Trakt", "L": "Privacy", "R": "·" },
-      "Go to Accounts, for Trakt": { "U": "Go to Accounts, for SIMKL", "D": "Go to Advanced, for GitHub (new versions)", "L": "Privacy", "R": "·" },
-      "Go to Advanced, for GitHub (new versions)": { "U": "Go to Accounts, for Trakt", "D": "·", "L": "Privacy", "R": "·" }
+      "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "Go to Posters & ratings, for OMDb (Rotten Tomatoes scores)" },
+      "Go to Posters & ratings, for OMDb (Rotten Tomatoes scores)": { "U": "Settings", "D": "Go to Skipping intros, for TheIntroDB", "L": "Privacy", "R": "·" },
+      "Go to Skipping intros, for TheIntroDB": { "U": "Go to Posters & ratings, for OMDb (Rotten Tomatoes scores)", "D": "Go to Skipping intros, for IntroDB", "L": "Privacy", "R": "·" },
+      "Go to Skipping intros, for IntroDB": { "U": "Go to Skipping intros, for TheIntroDB", "D": "Go to Language & subtitles, for OpenSubtitles", "L": "Privacy", "R": "·" },
+      "Go to Language & subtitles, for OpenSubtitles": { "U": "Go to Skipping intros, for IntroDB", "D": "Go to Keep track of what I watch, for SIMKL", "L": "Privacy", "R": "·" },
+      "Go to Keep track of what I watch, for SIMKL": { "U": "Go to Language & subtitles, for OpenSubtitles", "D": "Go to Keep track of what I watch, for Trakt", "L": "Privacy", "R": "·" },
+      "Go to Keep track of what I watch, for Trakt": { "U": "Go to Keep track of what I watch, for SIMKL", "D": "Go to Advanced, for GitHub (new versions)", "L": "Privacy", "R": "·" },
+      "Go to Advanced, for GitHub (new versions)": { "U": "Go to Keep track of what I watch, for Trakt", "D": "·", "L": "Privacy", "R": "·" }
+    },
+    "settings-subtitles": {
+      "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "✓As the file sets it" },
+      "✓As the file sets it": { "U": "Settings", "D": "Off #1", "L": "Language & subtitles", "R": "English" },
+      "English": { "U": "Settings", "D": "✓English when needed", "L": "✓As the file sets it", "R": "·" },
+      "Off #1": { "U": "✓As the file sets it", "D": "✓Show them", "L": "Language & subtitles", "R": "✓English when needed" },
+      "✓English when needed": { "U": "✓As the file sets it", "D": "✓Show them", "L": "Off #1", "R": "English always" },
+      "English always": { "U": "English", "D": "Off #2", "L": "✓English when needed", "R": "·" },
+      "✓Show them": { "U": "Off #1", "D": "✓Off", "L": "Language & subtitles", "R": "Off #2" },
+      "Off #2": { "U": "✓English when needed", "D": "On", "L": "✓Show them", "R": "·" },
+      "✓Off": { "U": "✓Show them", "D": "The username, not the email address", "L": "Language & subtitles", "R": "On" },
+      "On": { "U": "✓Show them", "D": "The username, not the email address", "L": "✓Off", "R": "·" },
+      "The username, not the email address": { "U": "✓Off", "D": "Your OpenSubtitles password", "L": "Language & subtitles", "R": "·" },
+      "Your OpenSubtitles password": { "U": "The username, not the email address", "D": "·", "L": "Language & subtitles", "R": "·" }
+    },
+    "settings-tracking": {
+      "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "Connect SIMKL" },
+      "Connect SIMKL": { "U": "Settings", "D": "Connect Trakt", "L": "Keep track of what I watch", "R": "·" },
+      "Connect Trakt": { "U": "Connect SIMKL", "D": "·", "L": "Keep track of what I watch", "R": "·" }
+    },
+    "settings-ratings": {
+      "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "Get a free TMDB key ↗" },
+      "Get a free TMDB key ↗": { "U": "Settings", "D": "Paste your TMDB key", "L": "Posters & ratings", "R": "·" },
+      "Paste your TMDB key": { "U": "Get a free TMDB key ↗", "D": "Paste your OMDb key", "L": "Posters & ratings", "R": "·" },
+      "Paste your OMDb key": { "U": "Paste your TMDB key", "D": "·", "L": "Posters & ratings", "R": "·" }
     }
   },
   "android": {
@@ -924,56 +966,51 @@
       "Search": { "U": "·", "D": "Library #2", "L": "Library #1", "R": "Settings" },
       "Settings": { "U": "·", "D": "Library #2", "L": "Search", "R": "?" },
       "?": { "U": "·", "D": "Library #2", "L": "Settings", "R": "·" },
-      "Library #2": { "U": "Settings", "D": "Playback", "L": "·", "R": "Add movies folder" },
+      "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "Add movies folder" },
+      "Library #2": { "U": "Search settings", "D": "Playback", "L": "·", "R": "Add movies folder" },
       "Playback": { "U": "Library #2", "D": "Picture & sound", "L": "·", "R": "Add movies folder" },
-      "Picture & sound": { "U": "Playback", "D": "Intro & credits", "L": "·", "R": "Add movies folder" },
       "Remove #1": { "U": "Settings", "D": "Remove #2", "L": "Library #2", "R": "·" },
-      "Intro & credits": { "U": "Picture & sound", "D": "Accounts", "L": "·", "R": "Add movies folder" },
+      "Picture & sound": { "U": "Playback", "D": "Language & subtitles", "L": "·", "R": "Add movies folder" },
       "Remove #2": { "U": "Remove #1", "D": "Scan now", "L": "Library #2", "R": "·" },
-      "Accounts": { "U": "Intro & credits", "D": "Advanced", "L": "·", "R": "Add movies folder" },
+      "Language & subtitles": { "U": "Picture & sound", "D": "Skipping intros", "L": "·", "R": "Add movies folder" },
       "Add movies folder": { "U": "Remove #2", "D": "Nothing to review", "L": "Library #2", "R": "Add TV folder" },
       "Add TV folder": { "U": "Remove #2", "D": "Nothing to review", "L": "Add movies folder", "R": "Add Videos folder" },
       "Add Videos folder": { "U": "Remove #2", "D": "Nothing to review", "L": "Add TV folder", "R": "Scan now" },
       "Scan now": { "U": "Remove #2", "D": "Nothing to review", "L": "Add Videos folder", "R": "·" },
-      "Advanced": { "U": "Accounts", "D": "·", "L": "·", "R": "Add movies folder" },
-      "Nothing to review": { "U": "Add movies folder", "D": "Get a free TMDB key ↗", "L": "Library #2", "R": "·" },
-      "Get a free TMDB key ↗": { "U": "Nothing to review", "D": "Paste your TMDB key", "L": "Library #2", "R": "·" },
-      "Paste your TMDB key": { "U": "Get a free TMDB key ↗", "D": "Paste your OMDb key", "L": "Library #2", "R": "·" },
-      "Paste your OMDb key": { "U": "Paste your TMDB key", "D": "Run setup again", "L": "Library #2", "R": "·" },
-      "Run setup again": { "U": "Paste your OMDb key", "D": "·", "L": "Library #2", "R": "·" }
+      "Skipping intros": { "U": "Language & subtitles", "D": "Keep track of what I watch", "L": "·", "R": "Add movies folder" },
+      "Keep track of what I watch": { "U": "Skipping intros", "D": "Posters & ratings", "L": "·", "R": "Add movies folder" },
+      "Posters & ratings": { "U": "Keep track of what I watch", "D": "Privacy", "L": "·", "R": "Add movies folder" },
+      "Privacy": { "U": "Posters & ratings", "D": "Advanced", "L": "·", "R": "Add movies folder" },
+      "Advanced": { "U": "Privacy", "D": "·", "L": "·", "R": "Add movies folder" },
+      "Nothing to review": { "U": "Add movies folder", "D": "Run setup again", "L": "Library #2", "R": "·" },
+      "Run setup again": { "U": "Nothing to review", "D": "·", "L": "Library #2", "R": "·" }
     },
     "settings-playback": {
-      "✓Auto": { "U": "Settings", "D": "✓As the file sets it", "L": "Playback", "R": "Full" },
-      "Full": { "U": "Settings", "D": "✓As the file sets it", "L": "✓Auto", "R": "Light" },
-      "Light": { "U": "Settings", "D": "English", "L": "Full", "R": "·" },
-      "✓As the file sets it": { "U": "✓Auto", "D": "Off #1", "L": "Playback", "R": "English" },
-      "English": { "U": "Light", "D": "✓English when needed", "L": "✓As the file sets it", "R": "·" },
-      "Off #1": { "U": "✓As the file sets it", "D": "✓Show them", "L": "Playback", "R": "✓English when needed" },
-      "✓English when needed": { "U": "✓As the file sets it", "D": "✓Show them", "L": "Off #1", "R": "English always" },
-      "English always": { "U": "English", "D": "Off #2", "L": "✓English when needed", "R": "·" },
-      "✓Show them": { "U": "Off #1", "D": "✓Off", "L": "Playback", "R": "Off #2" },
-      "Off #2": { "U": "✓English when needed", "D": "On", "L": "✓Show them", "R": "·" },
-      "✓Off": { "U": "✓Show them", "D": "✓Show a Skip button", "L": "Playback", "R": "On" },
-      "On": { "U": "✓Show them", "D": "✓Show a Skip button", "L": "✓Off", "R": "·" },
-      "✓Show a Skip button": { "U": "✓Off", "D": "At the end", "L": "Playback", "R": "Skip them" },
-      "Skip them": { "U": "On", "D": "45s before", "L": "✓Show a Skip button", "R": "·" },
-      "At the end": { "U": "✓Show a Skip button", "D": "✓Match the sound", "L": "Playback", "R": "30s before" },
-      "30s before": { "U": "✓Show a Skip button", "D": "✓Match the sound", "L": "At the end", "R": "45s before" },
-      "45s before": { "U": "Skip them", "D": "Match the screen", "L": "30s before", "R": "✓60s before" },
-      "✓60s before": { "U": "Skip them", "D": "Match the screen", "L": "45s before", "R": "90s before" },
-      "90s before": { "U": "Skip them", "D": "Match the screen", "L": "✓60s before", "R": "120s before" },
-      "120s before": { "U": "Skip them", "D": "Match the screen", "L": "90s before", "R": "·" },
-      "✓Match the sound": { "U": "At the end", "D": "·", "L": "Playback", "R": "Match the screen" },
-      "Match the screen": { "U": "45s before", "D": "·", "L": "✓Match the sound", "R": "·" }
+      "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "✓Auto" },
+      "✓Auto": { "U": "Settings", "D": "✓Match the sound", "L": "Playback", "R": "Full" },
+      "Full": { "U": "Settings", "D": "✓Match the sound", "L": "✓Auto", "R": "Light" },
+      "Light": { "U": "Settings", "D": "Match the screen", "L": "Full", "R": "·" },
+      "✓Match the sound": { "U": "✓Auto", "D": "·", "L": "Playback", "R": "Match the screen" },
+      "Match the screen": { "U": "Light", "D": "·", "L": "✓Match the sound", "R": "·" }
     },
     "settings-picture": {
+      "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "✓On" },
       "✓On": { "U": "Settings", "D": "·", "L": "Picture & sound", "R": "Off" },
       "Off": { "U": "Settings", "D": "·", "L": "✓On", "R": "·" }
     },
     "settings-intros": {
-      "✓On #1": { "U": "Settings", "D": "✓On #2", "L": "Intro & credits", "R": "Off #1" },
-      "Off #1": { "U": "Settings", "D": "Off #2", "L": "✓On #1", "R": "·" },
-      "✓On #2": { "U": "✓On #1", "D": "·", "L": "Intro & credits", "R": "Off #2" },
+      "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "✓Show a Skip button" },
+      "✓Show a Skip button": { "U": "Settings", "D": "At the end", "L": "Skipping intros", "R": "Skip them" },
+      "Skip them": { "U": "Settings", "D": "45s before", "L": "✓Show a Skip button", "R": "·" },
+      "At the end": { "U": "✓Show a Skip button", "D": "✓On #1", "L": "Skipping intros", "R": "30s before" },
+      "30s before": { "U": "✓Show a Skip button", "D": "Off #1", "L": "At the end", "R": "45s before" },
+      "45s before": { "U": "Skip them", "D": "Off #1", "L": "30s before", "R": "✓60s before" },
+      "✓60s before": { "U": "Skip them", "D": "Off #1", "L": "45s before", "R": "90s before" },
+      "90s before": { "U": "Skip them", "D": "Off #1", "L": "✓60s before", "R": "120s before" },
+      "120s before": { "U": "Skip them", "D": "Off #1", "L": "90s before", "R": "·" },
+      "✓On #1": { "U": "At the end", "D": "✓On #2", "L": "Skipping intros", "R": "Off #1" },
+      "Off #1": { "U": "At the end", "D": "Off #2", "L": "✓On #1", "R": "·" },
+      "✓On #2": { "U": "✓On #1", "D": "·", "L": "Skipping intros", "R": "Off #2" },
       "Off #2": { "U": "Off #1", "D": "·", "L": "✓On #2", "R": "·" }
     },
     "settings-accounts": {
@@ -983,6 +1020,7 @@
       "Your OpenSubtitles password": { "U": "The username, not the email address", "D": "·", "L": "Accounts", "R": "·" }
     },
     "settings-advanced": {
+      "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "✓On" },
       "✓On": { "U": "Settings", "D": "Clear artwork cache", "L": "Advanced", "R": "Off" },
       "Off": { "U": "Settings", "D": "Clear artwork cache", "L": "✓On", "R": "·" },
       "Clear artwork cache": { "U": "✓On", "D": "Write the missing ones", "L": "Advanced", "R": "·" },
@@ -998,7 +1036,7 @@
     },
     "settings-review": {
       "Fixture Movie (1999) · 1 file · movieKinema could ": { "U": "Review 3 items", "D": "Sample Series · 2 files · seriesKinema could not i", "L": "Library #2", "R": "·" },
-      "Sample Series · 2 files · seriesKinema could not i": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Get a free TMDB key ↗", "L": "Library #2", "R": "·" }
+      "Sample Series · 2 files · seriesKinema could not i": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Run setup again", "L": "Library #2", "R": "·" }
     },
     "settings-review-item": {
       "Search for the right title…": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Name", "L": "Library #2", "R": "Movie" },
@@ -1113,6 +1151,41 @@
       "↑ #4": { "U": "Garden", "D": "·", "L": "Example Show · S01E01", "R": "↓ #4" },
       "↓ #4": { "U": "Garden", "D": "·", "L": "↑ #4", "R": "Remove #4" },
       "Remove #4": { "U": "Garden", "D": "·", "L": "↓ #4", "R": "·" }
+    },
+    "settings-subtitles": {
+      "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "✓As the file sets it" },
+      "✓As the file sets it": { "U": "Settings", "D": "Off #1", "L": "Language & subtitles", "R": "English" },
+      "English": { "U": "Settings", "D": "✓English when needed", "L": "✓As the file sets it", "R": "·" },
+      "Off #1": { "U": "✓As the file sets it", "D": "✓Show them", "L": "Language & subtitles", "R": "✓English when needed" },
+      "✓English when needed": { "U": "✓As the file sets it", "D": "✓Show them", "L": "Off #1", "R": "English always" },
+      "English always": { "U": "English", "D": "Off #2", "L": "✓English when needed", "R": "·" },
+      "✓Show them": { "U": "Off #1", "D": "✓Off", "L": "Language & subtitles", "R": "Off #2" },
+      "Off #2": { "U": "✓English when needed", "D": "On", "L": "✓Show them", "R": "·" },
+      "✓Off": { "U": "✓Show them", "D": "The username, not the email address", "L": "Language & subtitles", "R": "On" },
+      "On": { "U": "✓Show them", "D": "The username, not the email address", "L": "✓Off", "R": "·" },
+      "The username, not the email address": { "U": "✓Off", "D": "Your OpenSubtitles password", "L": "Language & subtitles", "R": "·" },
+      "Your OpenSubtitles password": { "U": "The username, not the email address", "D": "·", "L": "Language & subtitles", "R": "·" }
+    },
+    "settings-tracking": {
+      "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "Connect SIMKL" },
+      "Connect SIMKL": { "U": "Settings", "D": "Connect Trakt", "L": "Keep track of what I watch", "R": "·" },
+      "Connect Trakt": { "U": "Connect SIMKL", "D": "·", "L": "Keep track of what I watch", "R": "·" }
+    },
+    "settings-ratings": {
+      "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "Get a free TMDB key ↗" },
+      "Get a free TMDB key ↗": { "U": "Settings", "D": "Paste your TMDB key", "L": "Posters & ratings", "R": "·" },
+      "Paste your TMDB key": { "U": "Get a free TMDB key ↗", "D": "Paste your OMDb key", "L": "Posters & ratings", "R": "·" },
+      "Paste your OMDb key": { "U": "Paste your TMDB key", "D": "·", "L": "Posters & ratings", "R": "·" }
+    },
+    "settings-privacy": {
+      "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "Go to Posters & ratings, for OMDb (Rotten Tomatoes scores)" },
+      "Go to Posters & ratings, for OMDb (Rotten Tomatoes scores)": { "U": "Settings", "D": "Go to Skipping intros, for TheIntroDB", "L": "Privacy", "R": "·" },
+      "Go to Skipping intros, for TheIntroDB": { "U": "Go to Posters & ratings, for OMDb (Rotten Tomatoes scores)", "D": "Go to Skipping intros, for IntroDB", "L": "Privacy", "R": "·" },
+      "Go to Skipping intros, for IntroDB": { "U": "Go to Skipping intros, for TheIntroDB", "D": "Go to Language & subtitles, for OpenSubtitles", "L": "Privacy", "R": "·" },
+      "Go to Language & subtitles, for OpenSubtitles": { "U": "Go to Skipping intros, for IntroDB", "D": "Go to Keep track of what I watch, for SIMKL", "L": "Privacy", "R": "·" },
+      "Go to Keep track of what I watch, for SIMKL": { "U": "Go to Language & subtitles, for OpenSubtitles", "D": "Go to Keep track of what I watch, for Trakt", "L": "Privacy", "R": "·" },
+      "Go to Keep track of what I watch, for Trakt": { "U": "Go to Keep track of what I watch, for SIMKL", "D": "Go to Advanced, for GitHub (new versions)", "L": "Privacy", "R": "·" },
+      "Go to Advanced, for GitHub (new versions)": { "U": "Go to Keep track of what I watch, for Trakt", "D": "·", "L": "Privacy", "R": "·" }
     }
   }
 }

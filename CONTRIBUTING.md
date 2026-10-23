@@ -102,7 +102,7 @@ so export it on Windows.
 ### The Windows installer
 
 Each release carries a ZIP and a per-user installer
-(`kinema-<version>-windows-x64-setup.exe`). The installer is Tauri's NSIS
+(`kinema-windows-x64-setup.exe`). The installer is Tauri's NSIS
 bundler, configured by `src-tauri/tauri.installer.conf.json` and the hooks in
 `src-tauri/windows/hooks.nsh`; `scripts\build-app.ps1 -Installer` builds it,
 and `release.yml` does the same, writes its `.sha256` and adds it to the release

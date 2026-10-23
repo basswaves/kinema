@@ -32,10 +32,10 @@ esac
 kit="$out/kit"
 mkdir -p "$kit/tools" "$out"
 
-deb=$(ls "$root"/dist-linux/kinema_*_amd64.deb 2> /dev/null | head -1)
+deb=$(ls "$root"/dist-linux/kinema*amd64.deb 2> /dev/null | head -1)
 [ -n "$deb" ] || { echo "no .deb in dist-linux/: run scripts/package-linux.sh first" >&2; exit 1; }
 
-rm -f "$kit"/kinema_*_amd64.deb
+rm -f "$kit"/kinema*amd64.deb
 cp "$here/run.sh" "$kit/run.sh"
 cp "$here/display.py" "$kit/tools/display.py"
 cp "$root/scripts/selftest.sh" "$kit/tools/selftest.sh"

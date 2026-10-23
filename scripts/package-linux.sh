@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Build Kinema for Linux and package it three ways, into dist-linux/:
-#   kinema_<version>_<arch>.deb       Debian, Ubuntu and their relatives
-#   kinema-<version>-1.<arch>.rpm     Fedora and its relatives
-#   kinema-<version>-linux-<arch>.tar.gz
+#   kinema-linux-<arch>.deb       Debian, Ubuntu and their relatives
+#   kinema-linux-<arch>.rpm       Fedora and its relatives
+#   kinema-linux-<arch>.tar.gz
+# No version in the names, so the website can link to the latest release
+# directly (release.yml); the packages themselves still carry it.
 #                                     a folder to unpack and run, like the
 #                                     Windows ZIP, for every other distribution
 # with a .sha256 beside each.
@@ -20,7 +22,6 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root"
 
-version=$(node -p "require('./src-tauri/tauri.conf.json').version")
 case "$(uname -m)" in
   x86_64) deb_arch=amd64; rpm_arch=x86_64 ;;
   aarch64) deb_arch=arm64; rpm_arch=aarch64 ;;
@@ -33,12 +34,12 @@ npm run tauri build -- --bundles deb,rpm
 out="$root/dist-linux"
 rm -rf "$out"; mkdir -p "$out"
 bundle="$root/src-tauri/target/release/bundle"
-cp "$bundle"/deb/*.deb "$out/kinema_${version}_${deb_arch}.deb"
-cp "$bundle"/rpm/*.rpm "$out/kinema-${version}-1.${rpm_arch}.rpm"
+cp "$bundle"/deb/*.deb "$out/kinema-linux-${deb_arch}.deb"
+cp "$bundle"/rpm/*.rpm "$out/kinema-linux-${rpm_arch}.rpm"
 
 # The folder: the program, the wrapper in lib/ beside it (where the plugin
 # looks first), and what a person needs to read.
-folder="kinema-${version}-linux-${rpm_arch}"
+folder="kinema-linux-${rpm_arch}"
 stage="$(mktemp -d)/$folder"
 mkdir -p "$stage/lib"
 cp src-tauri/target/release/kinema "$stage/kinema"

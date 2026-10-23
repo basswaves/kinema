@@ -234,7 +234,7 @@ for Android TV ([below](#android-early-version)).
 
 On Windows you can use either file:
 
-- **The installer** (`kinema-<version>-windows-x64-setup.exe`) installs Kinema
+- **The installer** (`kinema-windows-x64-setup.exe`) installs Kinema
   for your own Windows account only, so it does not ask for an administrator.
   It adds a Start menu entry and a desktop shortcut, and lists Kinema in
   Settings → Apps. If Windows lacks Microsoft's WebView2 (most have it), the
@@ -280,11 +280,11 @@ system's mpv and WebKitGTK; the packages have the package manager install
 them:
 
 ```bash
-sudo apt install ./kinema_<version>_amd64.deb          # Ubuntu 24.04 or later, Debian 13
+sudo apt install ./kinema-linux-amd64.deb    # Ubuntu 24.04 or later, Debian 13
 ```
 
 ```bash
-sudo dnf install ./kinema-<version>-1.x86_64.rpm       # Fedora
+sudo dnf install ./kinema-linux-x86_64.rpm   # Fedora
 ```
 
 Anything else: unpack the folder and run `./kinema`; its README.txt names the
@@ -315,7 +315,7 @@ it HDR goes out at 8 bits per colour, and smooth gradients show bands.
 ### Android
 
 Since 0.10.0, as an early version (beta), for Android TV boxes: download
-`kinema-<version>-android.apk` from the Releases page, copy it to the device (a
+`kinema-android.apk` from the Releases page, copy it to the device (a
 USB stick works) and open it from a file manager. Android asks once to allow
 installs from that source, because Kinema is not from an app store. What has
 been tried and what is missing is under

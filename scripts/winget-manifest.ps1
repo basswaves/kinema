@@ -25,6 +25,9 @@ param(
     # SHA-256 of the installer, as Get-FileHash gives it.
     [Parameter(Mandatory)] [string]$Sha256,
     [Parameter(Mandatory)] [string]$OutDir,
+    # The installer's name on the release. Up to 0.12.0 it carried the
+    # version; later releases do not.
+    [string]$FileName = 'kinema-windows-x64-setup.exe',
     # The day the release is published; today by default.
     [string]$ReleaseDate = (Get-Date -Format 'yyyy-MM-dd')
 )
@@ -34,7 +37,7 @@ $ErrorActionPreference = 'Stop'
 $id = 'Basswaves.Kinema'
 $manifestVersion = '1.10.0'
 $repo = 'https://github.com/basswaves/kinema'
-$url = "$repo/releases/download/v$Version/kinema-$Version-windows-x64-setup.exe"
+$url = "$repo/releases/download/v$Version/$FileName"
 
 $files = @{
     "$id.yaml" = @"

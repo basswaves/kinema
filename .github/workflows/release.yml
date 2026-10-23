@@ -7,6 +7,10 @@
 # everything and publishes nothing — the files are left as the run's
 # artifacts, to check a change to this workflow without a release.
 #
+# File names carry no version (kinema-windows-x64-setup.exe, not
+# kinema-0.13.0-windows-x64-setup.exe), so the website can link straight to
+# releases/latest/download/<name>; the version is in the release's tag.
+#
 # Windows: the portable ZIP and a per-user installer, built from the same exe.
 # Both have the two native DLLs *beside* the exe, because `libmpv-2.dll` is
 # resolved by Windows' own search order, which begins at the executable's
@@ -97,14 +101,14 @@ jobs:
         shell: pwsh
         run: |
           $version = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
-          $zip = "kinema-$version-windows-x64.zip"
+          $zip = "kinema-windows-x64.zip"
           New-Item -ItemType Directory -Force out | Out-Null
           Compress-Archive -Path dist-app\* -DestinationPath "out\$zip"
           $hash = (Get-FileHash "out\$zip" -Algorithm SHA256).Hash.ToLower()
           # LF, as sha256sum writes it: a CRLF line makes `sha256sum -c` on
           # Linux look for a file whose name ends in a carriage return.
           [IO.File]::WriteAllText("$PWD\out\$zip.sha256", "$hash  $zip`n")
-          $setup = "kinema-$version-windows-x64-setup.exe"
+          $setup = "kinema-windows-x64-setup.exe"
           $built = @(Get-ChildItem src-tauri\target\release\bundle\nsis\*-setup.exe)
           if ($built.Count -ne 1) { throw "Expected one installer, found: $($built.Name -join ', ')" }
           Copy-Item $built[0].FullName "out\$setup"
@@ -323,10 +327,9 @@ jobs:
 
       - name: Package
         run: |
-          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
           mkdir -p out
-          cp src-tauri/gen/android/app/build/outputs/apk/universal/release/*.apk "out/kinema-$version-android.apk"
-          cd out && sha256sum "kinema-$version-android.apk" > "kinema-$version-android.apk.sha256"
+          cp src-tauri/gen/android/app/build/outputs/apk/universal/release/*.apk "out/kinema-android.apk"
+          cd out && sha256sum kinema-android.apk > kinema-android.apk.sha256
 
       - uses: actions/upload-artifact@v7
         with:
@@ -355,8 +358,8 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           {
             echo "VERSION=$version"
-            echo "WIN_SHA=$(cut -d' ' -f1 kinema-$version-windows-x64.zip.sha256)"
-            echo "SETUP_SHA=$(cut -d' ' -f1 kinema-$version-windows-x64-setup.exe.sha256)"
+            echo "WIN_SHA=$(cut -d' ' -f1 kinema-windows-x64.zip.sha256)"
+            echo "SETUP_SHA=$(cut -d' ' -f1 kinema-windows-x64-setup.exe.sha256)"
           } >> "$GITHUB_ENV"
 
       - name: Publish release
@@ -367,14 +370,14 @@ jobs:
           body: |
             ## Windows
 
-            **Installer:** download `kinema-${{ env.VERSION }}-windows-x64-setup.exe`
+            **Installer:** download `kinema-windows-x64-setup.exe`
             and run it. It installs for your Windows account only (no
             administrator) and adds Kinema to the Start menu. Uninstall it
             from Settings → Apps: it removes the program, its shortcuts and its
             "Open with" entries, and asks before deleting your library and
             settings.
 
-            **Portable:** or download `kinema-${{ env.VERSION }}-windows-x64.zip`,
+            **Portable:** or download `kinema-windows-x64.zip`,
             extract it anywhere, and run `kinema.exe`. Nothing is written
             outside the folder and your app data.
 
@@ -390,8 +393,8 @@ jobs:
             workflow built, run this in PowerShell where you downloaded it:
 
             ```powershell
-            Get-FileHash .\kinema-${{ env.VERSION }}-windows-x64-setup.exe -Algorithm SHA256
-            Get-FileHash .\kinema-${{ env.VERSION }}-windows-x64.zip -Algorithm SHA256
+            Get-FileHash .\kinema-windows-x64-setup.exe -Algorithm SHA256
+            Get-FileHash .\kinema-windows-x64.zip -Algorithm SHA256
             ```
 
             Expected: `${{ env.SETUP_SHA }}` for the installer,
@@ -406,16 +409,16 @@ jobs:
             **Ubuntu 24.04 or later, Debian 13:**
 
             ```bash
-            sudo apt install ./kinema_${{ env.VERSION }}_amd64.deb
+            sudo apt install ./kinema-linux-amd64.deb
             ```
 
             **Fedora:**
 
             ```bash
-            sudo dnf install ./kinema-${{ env.VERSION }}-1.x86_64.rpm
+            sudo dnf install ./kinema-linux-x86_64.rpm
             ```
 
-            **Anything else:** unpack `kinema-${{ env.VERSION }}-linux-x86_64.tar.gz`
+            **Anything else:** unpack `kinema-linux-x86_64.tar.gz`
             and run `./kinema`; its README.txt names the two libraries to
             install. HDR on Wayland needs mpv 0.40 or later — Ubuntu 26.04,
             Debian 13, Fedora 43 and Arch have it. Each file has a `.sha256`
@@ -424,12 +427,12 @@ jobs:
             ## Android (early version)
 
             For Android TV boxes, installed by hand (sideloaded): download
-            `kinema-${{ env.VERSION }}-android.apk`, copy it to the device and
+            `kinema-android.apk`, copy it to the device and
             open it (Android asks once to allow installs from that source).
             It is an early version, tried on one TV box and the emulator; a
             phone has not been tried. See the README for what has been tested
             and what is still missing. Check the download with
-            `sha256sum -c kinema-${{ env.VERSION }}-android.apk.sha256`; the
+            `sha256sum -c kinema-android.apk.sha256`; the
             certificate it is signed with is named in the README.
 
             ## First run

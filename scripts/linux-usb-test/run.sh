@@ -156,7 +156,7 @@ if [ "$stage" = setup ]; then
   say "The hardware with nouveau"
   system "$R/nouveau"
   say "Kinema"
-  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q "$home_kit"/kinema_*_amd64.deb
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q "$home_kit"/kinema*amd64.deb
   say "NVIDIA's driver, from the ISO, for the kernel this stick runs"
   # Not `ubuntu-drivers install`: it takes the newest module from the
   # archive, which is built for a newer kernel, and pulls that kernel in —
@@ -333,7 +333,7 @@ if [ "$stage" = check ]; then
   system "$R/system"
 
   say "Kinema, the build in the kit"
-  sudo dpkg -i "$home_kit"/kinema_*_amd64.deb 2>&1 | tee "$R/install.txt" > /dev/null
+  sudo dpkg -i "$home_kit"/kinema*amd64.deb 2>&1 | tee "$R/install.txt" > /dev/null
   dpkg -l kinema | tail -n 1 | tee -a "$R/install.txt"
   read -r w0 h0 r0 < <(display current)
   echo "screen at the start: ${w0}x${h0}@${r0}" | tee "$R/display.txt"
@@ -440,7 +440,7 @@ if [ "$stage" = wlroots ]; then
   graphics_ready || exit 1
   say "Sway and Hyprland from Ubuntu's archive, and the Kinema build in the kit"
   sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q sway hyprland > "$R/install.txt" 2>&1
-  sudo dpkg -i "$home_kit"/kinema_*_amd64.deb >> "$R/install.txt" 2>&1
+  sudo dpkg -i "$home_kit"/kinema*amd64.deb >> "$R/install.txt" 2>&1
   { sway --version; Hyprland --version; dpkg -l kinema | tail -n 1; } 2>&1 | tee "$R/versions.txt"
   nvidia=""
   lspci -n | grep -qE ' 03[0-9]{2}: 10de:' && nvidia="--unsupported-gpu"
@@ -515,7 +515,7 @@ if [ "$stage" = hyprland ]; then
   fi
   graphics_ready || exit 1
   command -v Hyprland > /dev/null || sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q hyprland > "$R/install.txt" 2>&1
-  sudo dpkg -i "$home_kit"/kinema_*_amd64.deb >> "$R/install.txt" 2>&1
+  sudo dpkg -i "$home_kit"/kinema*amd64.deb >> "$R/install.txt" 2>&1
   { Hyprland --version | head -n 1; dpkg -l kinema | tail -n 1; } 2>&1 | tee "$R/versions.txt"
   for v in A B C; do
     d="$R/$v"; mkdir -p "$d"

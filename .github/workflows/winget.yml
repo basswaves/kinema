@@ -39,12 +39,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ inputs.version }}
         run: |
-          gh release download "v$env:VERSION" --pattern "kinema-$env:VERSION-windows-x64-setup.exe*" --dir release
-          $setup = "release\kinema-$env:VERSION-windows-x64-setup.exe"
+          # kinema-windows-x64-setup.exe; up to 0.12.0 the name carried the version.
+          gh release download "v$env:VERSION" --pattern "kinema-*windows-x64-setup.exe*" --dir release
+          $setup = @(Get-ChildItem release\*-setup.exe)[0].FullName
           $hash = (Get-FileHash $setup -Algorithm SHA256).Hash.ToLower()
           $published = (Get-Content "$setup.sha256" -Raw).Split(' ')[0].Trim()
           if ($hash -ne $published) { throw "The installer's hash $hash is not the release's $published." }
           "SETUP_SHA=$hash" >> $env:GITHUB_ENV
+          "SETUP_NAME=$(Split-Path $setup -Leaf)" >> $env:GITHUB_ENV
 
       - name: Write and validate the manifest
         shell: pwsh
@@ -53,7 +55,7 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: |
           $date = (gh release view "v$env:VERSION" --json publishedAt --jq .publishedAt).Substring(0, 10)
-          ./scripts/winget-manifest.ps1 -Version $env:VERSION -Sha256 $env:SETUP_SHA -OutDir winget -ReleaseDate $date
+          ./scripts/winget-manifest.ps1 -Version $env:VERSION -Sha256 $env:SETUP_SHA -OutDir winget -ReleaseDate $date -FileName $env:SETUP_NAME
           winget validate --manifest winget
           if ($LASTEXITCODE -ne 0) { throw "winget validate failed ($LASTEXITCODE)." }
           Get-Content winget\*.yaml

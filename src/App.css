@@ -37,3 +37,52 @@ body {
   overflow: hidden;
   user-select: none;
 }
+
+/*
+ * Text worth copying can be marked with the mouse (owner, 2026-10-18): the
+ * title page, Settings, the details panel and Needs attention's file names.
+ * Controls, pictures and rows that play stay unmarkable even there, so a
+ * double-click or a drag leaves no stray highlight. Right-click on marked
+ * text offers Copy (ui/contextMenu.ts).
+ */
+.detail,
+.settings-content,
+.stats-panel,
+.fixmatch-files {
+  user-select: text;
+}
+
+:is(.detail, .settings-content, .stats-panel)
+  :is(button, [role='button'], [role='radiogroup'], img, .episode-row, .fixmatch-summary) {
+  user-select: none;
+}
+
+.text-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 7rem;
+  padding: 0.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 0.375rem;
+  background: #202027;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
+  user-select: none;
+}
+
+.text-menu button {
+  display: block;
+  width: 100%;
+  padding: 0.375rem 0.75rem;
+  border: none;
+  border-radius: 0.25rem;
+  background: none;
+  color: #f2f2f2;
+  font: inherit;
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.text-menu button:hover {
+  background: rgba(255, 255, 255, 0.12);
+}

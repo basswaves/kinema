@@ -218,3 +218,60 @@ test('add without a match by mouse, rename it, and send it back', async ({ page 
   await page.getByRole('button', { name: 'Find a match' }).click();
   await expect(page.locator('.fixmatch-title', { hasText: 'Fixture Movie' })).toHaveCount(1);
 });
+
+test('right-click: Copy on marked text, a text field keeps its own menu, nothing elsewhere', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.removeItem('kinemaMockSystem');
+    const w = window as unknown as { __menus: boolean[]; __copied: string[]; __ctrlC: boolean[] };
+    w.__menus = [];
+    w.__copied = [];
+    w.__ctrlC = [];
+    // Last in line, so it sees what Kinema's own listener decided.
+    window.addEventListener('contextmenu', (e) => w.__menus.push(e.defaultPrevented));
+    window.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.key === 'c') w.__ctrlC.push(e.defaultPrevented);
+    });
+    const exec = document.execCommand.bind(document);
+    document.execCommand = (command: string, ...rest: [boolean?, string?]) => {
+      if (command !== 'copy') return exec(command, ...rest);
+      w.__copied.push(String(window.getSelection()));
+      return true;
+    };
+  });
+  const seen = (key: '__menus' | '__copied' | '__ctrlC') =>
+    page.evaluate((k) => (window as unknown as Record<string, unknown[]>)[k], key);
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Movies', exact: true }).click();
+  await page.locator('.card').first().click();
+  const title = page.locator('.detail h1');
+  await expect(title).toBeVisible();
+
+  // Right-click on a button: no browser menu, and no Kinema one either.
+  await page.locator('.detail-actions button').first().click({ button: 'right' });
+  await expect(page.locator('.text-menu')).toHaveCount(0);
+  expect(await seen('__menus')).toEqual([true]);
+
+  // Marked text: Kinema's menu, whose Copy copies it; Escape closes it and is not Back.
+  await title.dblclick({ position: { x: 5, y: 10 } });
+  const marked = await page.evaluate(() => String(window.getSelection()).trim());
+  expect(marked.length).toBeGreaterThan(0);
+  await page.keyboard.press('Control+c');
+  expect(await seen('__ctrlC')).toEqual([false]);
+  await title.click({ button: 'right', position: { x: 5, y: 10 } });
+  await expect(page.locator('.text-menu')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.text-menu')).toHaveCount(0);
+  await expect(title).toBeVisible();
+  await title.dblclick({ position: { x: 5, y: 10 } });
+  await title.click({ button: 'right', position: { x: 5, y: 10 } });
+  await page.locator('.text-menu').getByRole('menuitem', { name: 'Copy' }).click();
+  await expect(page.locator('.text-menu')).toHaveCount(0);
+  expect((await seen('__copied')).join('')).toContain(marked);
+
+  // A text field: the webview's own Cut, Copy and Paste.
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  const field = page.locator('input').first();
+  await field.click({ button: 'right' });
+  expect((await seen('__menus')).at(-1)).toBe(false);
+});

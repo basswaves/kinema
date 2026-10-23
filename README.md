@@ -281,8 +281,8 @@ the one that was published, run this in PowerShell in your Downloads folder and
 compare the result with the one on the release page:
 
 ```powershell
-Get-FileHash .\kinema-*-windows-x64-setup.exe -Algorithm SHA256
-Get-FileHash .\kinema-*-windows-x64.zip -Algorithm SHA256
+Get-FileHash .\kinema-windows-x64-setup.exe -Algorithm SHA256
+Get-FileHash .\kinema-windows-x64.zip -Algorithm SHA256
 ```
 
 Kinema asks GitHub for the latest version number when it starts, and says in

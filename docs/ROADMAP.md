@@ -17,9 +17,10 @@ equipment allows is what Kinema is, so that work follows close behind.
 
 **Ready for newcomers.** A code-signed Windows download, so Windows no longer
 asks whether to run it — waiting on a free signing service for open-source
-projects. The rest of this step (direct downloads from the
-[website](https://basswaves.github.io/kinema/), Send a report, the guides and
-the "what leaves your computer" page) is in the next release.
+projects. The rest of this step is done in 0.13.0: direct downloads from the
+[website](https://basswaves.github.io/kinema/), Send a report, the guides, the
+"what leaves your computer" page, Settings grouped by what you want and a
+search box in Settings.
 
 **Everyday films and TV.** Subtitle size and background; two subtitle
 languages at once, for language learners and mixed households; a delay

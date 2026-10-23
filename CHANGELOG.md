@@ -7,6 +7,14 @@ makes no stability promises.
 
 ## [Unreleased]
 
+## [0.13.0] — 2026-10-23
+
+Easier to start with and to trust: Settings is grouped by what you want and has
+a search box, Settings → Privacy lists everything that leaves your computer,
+Send a report packs the logs for a bug report, the website has direct
+downloads and two guides, and text can be copied with the mouse. Release files
+now have fixed names without the version.
+
 ### Added
 
 - **Search in Settings**: a box at the top of the section list finds a

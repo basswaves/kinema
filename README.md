@@ -180,8 +180,9 @@ audio and subtitles, volume. Back steps back to wherever you came from.
   release name; nothing else is.
 - **Keeps home videos and clips apart.** A Videos folder holds what is neither
   a film nor a show, never matched, each with a picture taken from the file,
-  under the Library tab. Library → Folders browses your drives and shares
-  inside Kinema and plays any video in them.
+  under the Library tab. In the TV layout, Library → Folders browses your
+  drives and shares inside Kinema and plays any video in them; at a desk the
+  same tile is **Add a folder**, which opens the system's folder window.
 - **Playlists.** Put films, episodes and videos in an order you choose and play
   them through; import and export `.m3u` lists on Windows and Linux.
 - **Remembers where you were**, per file, and offers the next episode.

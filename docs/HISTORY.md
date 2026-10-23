@@ -3619,6 +3619,21 @@ and a Jellyfin source further out. Decisions made along the way:
   needs a check of its terms and stability first. The earlier viability review
   had said "later, not now"; it is now on the plan for later.
 
+## Library → Folders split by layout (2026-10-23)
+
+- **At a desk the Folders tile is "Add a folder"** (owner, option 1 of 3).
+  The owner found Kinema's own browser odd with a mouse: they expected the
+  tile to add a folder, and Explorer is the natural way to look through one.
+  So in the desk layout it opens the system's folder window at once, then
+  asks the same questions as Folders does (Movies, TV shows or Videos, a
+  name, the merge offer; `AddFolder.tsx`, shared), and scans.
+- **The TV layout keeps the full Folders page** — on desktops and Android —
+  because a sofa has no Explorer: browsing, playing and adding from the
+  remote is why it exists (local-media phase 4). Switching layout switches
+  the tile.
+- Not chosen: also an "Open file…" / Ctrl+O at a desk; no playing on the
+  Folders page anywhere.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

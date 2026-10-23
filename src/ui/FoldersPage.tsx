@@ -30,19 +30,13 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import FocusButton from './FocusButton';
 import FocusInput from './FocusInput';
-import MergeOffer from './MergeOffer';
+import AddFolder from './AddFolder';
 import NetworkPlaces, { type NetStep } from './NetworkPlaces';
 import { hasPendingReturn, useClaimFocus } from './focus';
 import { userError } from './errors';
-import { count } from './format';
+import { count, KIND_WORDS } from './format';
 import { useCapabilities } from '../capabilities';
-import {
-  addLibraryRoot,
-  mergeLibraryRoots,
-  rootsToMerge,
-  type LibraryKind,
-  type LibraryRoot,
-} from '../library/api';
+import type { LibraryRoot } from '../library/api';
 import {
   folderPlaces,
   joinPath,
@@ -63,7 +57,6 @@ const PAGE_KEY = 'folders-page';
 const ADDRESS_KEY = 'folders-address';
 const ADD_KEY = 'folders-add';
 const UP_KEY = 'folders-up';
-const NAME_KEY = 'folders-name';
 const RETRY_KEY = 'folders-retry';
 /** Network addresses opened before, newest first (desktops). */
 const ADDRESSES_SETTING = 'folders_addresses';
@@ -88,12 +81,6 @@ interface Start {
   place: Place;
   note: string;
 }
-
-const KIND_WORDS: Record<LibraryKind, string> = {
-  movies: 'Movies',
-  tv: 'TV shows',
-  videos: 'Videos',
-};
 
 const DESKTOP_NOTES: Record<string, string> = {
   drive: 'Drive',
@@ -142,11 +129,8 @@ export default function FoldersPage({
   const [net, setNet] = useState<NetStep | null>(null);
   const [address, setAddress] = useState('');
   const [addresses, setAddresses] = useState<string[]>([]);
-  /** Adding the folder shown: choosing a kind, then a name for Videos. */
-  const [adding, setAdding] = useState<null | 'kind' | { name: string }>(null);
-  const [mergeInside, setMergeInside] = useState<{ kind: LibraryKind; inside: LibraryRoot[] } | null>(
-    null
-  );
+  /** Adding the folder shown (AddFolder.tsx). */
+  const [adding, setAdding] = useState(false);
   /** What the browser came back out of: the ring goes there, not to the top. */
   const [cameFrom, setCameFrom] = useState<string | null>(null);
   /**
@@ -241,8 +225,7 @@ export default function FoldersPage({
       setListing(null);
       setError(null);
       setNote(null);
-      setAdding(null);
-      setMergeInside(null);
+      setAdding(false);
       onMove(next);
     },
     [onMove]
@@ -316,9 +299,8 @@ export default function FoldersPage({
   const level = inFolder ? `folder:${path}` : net ? `net:${net.step}` : 'places';
 
   const up = useCallback(() => {
-    if (adding || mergeInside) {
-      setAdding(null);
-      setMergeInside(null);
+    if (adding) {
+      setAdding(false);
       void setFocus(doesFocusableExist(ADD_KEY) ? ADD_KEY : UP_KEY);
       return;
     }
@@ -344,7 +326,7 @@ export default function FoldersPage({
     } else {
       go(null, spot.section ? placeKey(spot.section, spot.place.path) : null);
     }
-  }, [adding, mergeInside, spot, net, go, onBack]);
+  }, [adding, spot, net, go, onBack]);
 
   // Back goes up a level. Capture phase, like the folder browser: Browse
   // must not also take the press back to the Library page. In a text box
@@ -378,38 +360,9 @@ export default function FoldersPage({
 
   const inLibrary = path ? rootHolding(roots, path) : null;
 
-  const add = async (kind: LibraryKind, name?: string) => {
-    if (!path) return;
-    setError(null);
-    try {
-      const inside = await rootsToMerge(path, kind);
-      if (inside.length > 0) {
-        setAdding(null);
-        setMergeInside({ kind, inside });
-        return;
-      }
-      await addLibraryRoot(path, kind, name);
-      finishAdding(name ?? lastPart(path));
-    } catch (e) {
-      setError(userError(e));
-    }
-  };
-
-  const merge = async () => {
-    if (!path || !mergeInside) return;
-    setError(null);
-    try {
-      await mergeLibraryRoots(path, mergeInside.kind);
-      finishAdding(lastPart(path));
-    } catch (e) {
-      setError(userError(e));
-    }
-  };
-
   const finishAdding = (name: string) => {
     const added = path;
-    setAdding(null);
-    setMergeInside(null);
+    setAdding(false);
     setNote(`Added ${name} to the library. Scanning it now.`);
     onLibraryChanged();
     void runScanPipeline()
@@ -424,11 +377,6 @@ export default function FoldersPage({
       .catch((e: unknown) => shownPath.current === added && setError(userError(e)))
       .finally(onLibraryChanged);
   };
-
-  // The ring onto what adding asks next.
-  useEffect(() => {
-    if (adding === 'kind') void setFocus('folders-kind:movies');
-  }, [adding]);
 
   const where = spot
     ? [spot.place.name, ...spot.trail].join(' › ')
@@ -480,7 +428,7 @@ export default function FoldersPage({
               <FocusButton
                 focusKey={ADD_KEY}
                 className="btn-secondary"
-                onSelect={() => setAdding('kind')}
+                onSelect={() => setAdding(true)}
               >
                 Add this folder to the library
               </FocusButton>
@@ -494,70 +442,11 @@ export default function FoldersPage({
           </div>
         )}
 
-        {adding === 'kind' && (
-          <div className="folders-add" role="group" aria-label="Add as">
-            <p>Add {path} to the library as:</p>
-            <div className="settings-row">
-              {(['movies', 'tv'] as const).map((kind) => (
-                <FocusButton
-                  key={kind}
-                  focusKey={`folders-kind:${kind}`}
-                  className="btn-secondary"
-                  onSelect={() => void add(kind)}
-                >
-                  {KIND_WORDS[kind]}
-                </FocusButton>
-              ))}
-              <FocusButton
-                focusKey="folders-kind:videos"
-                className="btn-secondary"
-                onSelect={() => {
-                  setAdding({ name: spot ? lastPart(path ?? '') || spot.place.name : '' });
-                  window.setTimeout(() => void setFocus(NAME_KEY), 0);
-                }}
-              >
-                Videos
-              </FocusButton>
-              <FocusButton className="btn-secondary" onSelect={up}>
-                Cancel
-              </FocusButton>
-            </div>
-            <p className="muted">
-              Movies and TV shows are matched by their names; Videos are kept as they are, for home
-              videos, concerts and the rest.
-            </p>
-          </div>
-        )}
-
-        {adding && adding !== 'kind' && (
-          <div className="folders-add">
-            <p>A name for it on the Library page:</p>
-            <div className="settings-row">
-              <FocusInput
-                focusKey={NAME_KEY}
-                className="settings-input"
-                value={adding.name}
-                onChange={(name) => setAdding({ name })}
-                onEnter={() => void add('videos', adding.name.trim() || undefined)}
-                placeholder="Home videos"
-              />
-              <FocusButton
-                className="btn-primary"
-                onSelect={() => void add('videos', adding.name.trim() || undefined)}
-              >
-                Add
-              </FocusButton>
-              <FocusButton className="btn-secondary" onSelect={up}>
-                Cancel
-              </FocusButton>
-            </div>
-          </div>
-        )}
-
-        {mergeInside && path && (
-          <MergeOffer
-            offer={{ path, kind: mergeInside.kind, inside: mergeInside.inside }}
-            onMerge={() => void merge()}
+        {adding && path && spot && (
+          <AddFolder
+            path={path}
+            name={lastPart(path) || spot.place.name}
+            onAdded={finishAdding}
             onCancel={up}
           />
         )}

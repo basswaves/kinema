@@ -1900,8 +1900,12 @@ const handlers: Record<string, Handler> = {
   },
   link_qr: () => MOCK_QR,
   'plugin:storage|share': () => null,
-  // The folder picker answers at once, with the fixture's folder.
-  'plugin:dialog|open': () => 'C:\\fixture',
+  // The folder picker answers at once, with the fixture's folder, or the one
+  // a test names (`kinemaMockPick`; empty is the window closed).
+  'plugin:dialog|open': () => {
+    const pick = localStorage.getItem('kinemaMockPick');
+    return pick === null ? 'C:\\fixture' : pick || null;
+  },
   // What an Android TV box says its TV and receiver take (Media3Plugin.kt
   // `output`): HDR10 and HLG, two surround formats, and a last film whose
   // sound the box decoded after all, as an operator box was found doing.

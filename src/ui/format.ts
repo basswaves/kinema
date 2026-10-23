@@ -1,5 +1,7 @@
 /** Display formatting shared between screens. */
 
+import type { LibraryKind } from '../library/api';
+
 /** A byte count as a person reads it: `0 B`, `812 KB`, `1.4 GB`. */
 export function formatBytes(bytes: number): string {
   if (!bytes) return '0 B';
@@ -38,3 +40,10 @@ export function formatTime(seconds: number | null): string {
   const mm = h > 0 ? String(m).padStart(2, '0') : String(m);
   return `${h > 0 ? `${h}:` : ''}${mm}:${String(sec).padStart(2, '0')}`;
 }
+
+/** A library folder's kind, as the pages that add one name it. */
+export const KIND_WORDS: Record<LibraryKind, string> = {
+  movies: 'Movies',
+  tv: 'TV shows',
+  videos: 'Videos',
+};

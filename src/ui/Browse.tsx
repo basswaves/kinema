@@ -860,6 +860,7 @@ export default function Browse() {
             onFolders={() => openView({ name: 'folders', at: null })}
             onPlaylists={() => openView({ name: 'playlists' })}
             onSettings={() => openView({ name: 'settings', section: 'videos' })}
+            onLibraryChanged={() => void load()}
           />
         )}
 

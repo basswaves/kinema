@@ -2,8 +2,10 @@
  * Library → Folders by keyboard alone (FoldersPage.tsx): a drive, a folder,
  * a video played as a video of its own and Back to it; a library episode
  * played as that episode; "Add this folder to the library" as Videos; a typed
- * network address kept for next time. The mock's drives are in
- * mockBackend.ts `mockDrives` and `folder_places`.
+ * network address kept for next time — all in the TV layout. At a desk the
+ * tile is "Add a folder": the system's folder window, then the same
+ * questions. The mock's drives are in mockBackend.ts `mockDrives` and
+ * `folder_places`.
  */
 import { expect, test, type Page } from '@playwright/test';
 
@@ -24,14 +26,33 @@ async function moveTo(page: Page, key: 'ArrowDown' | 'ArrowUp' | 'ArrowRight', t
   expect(await focused(page)).toMatch(new RegExp(`^${text.replace(/[()\\]/g, '\\$&')}`));
 }
 
-/** Home → Library → Folders: the ring on the first place. */
-async function openFolders(page: Page): Promise<void> {
-  await page.goto('/');
+/** Switch the TV layout on through the app's own module, as Settings would. */
+async function tvMode(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const path = '/src/ui/tv.ts';
+    const tv = await import(/* @vite-ignore */ path);
+    await tv.setTvMode(true);
+  });
+}
+
+/** Home → Library: the ring on the Library page. */
+async function openLibrary(page: Page): Promise<void> {
   await expect.poll(() => focused(page)).toContain('Play');
   await press(page, 'ArrowUp', 2);
   await moveTo(page, 'ArrowRight', 'Library');
   await press(page, 'Enter');
   await expect(page.locator('.library-page')).toBeVisible();
+}
+
+/**
+ * Home → Library → Folders: the ring on the first place. Kinema's own
+ * browser is the TV layout's; at a desk the tile is "Add a folder".
+ */
+async function openFolders(page: Page): Promise<void> {
+  await page.goto('/');
+  await expect.poll(() => focused(page)).toContain('Play');
+  await tvMode(page);
+  await openLibrary(page);
   await moveTo(page, 'ArrowRight', 'Folders');
   await press(page, 'Enter');
   await expect(page.locator('.folders-page')).toBeVisible();
@@ -129,4 +150,37 @@ test('a typed network address opens, and is offered again', async ({ page }) => 
   await press(page, 'Escape');
   await expect(page.getByText('Opened before')).toBeVisible();
   await expect.poll(() => focused(page)).toMatch(/^\\\\nas\\films/);
+});
+
+test('at a desk, Add a folder opens the system window and asks the same questions', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('kinemaMockPick', 'D:\\Concerts'));
+  await page.goto('/');
+  await openLibrary(page);
+  await expect(page.locator('.library-tile', { hasText: /^Folders/ })).toHaveCount(0);
+  await moveTo(page, 'ArrowRight', 'Add a folder');
+  await press(page, 'Enter');
+  await expect(page.getByText('Add D:\\Concerts to the library as:')).toBeVisible();
+  await expect.poll(() => focused(page)).toBe('Movies');
+
+  // Back puts the questions away and stays on the page.
+  await press(page, 'Escape');
+  await expect(page.locator('.folders-add')).toHaveCount(0);
+  await expect(page.locator('.library-page')).toBeVisible();
+  await expect.poll(() => focused(page)).toMatch(/^Add a folder/);
+
+  await press(page, 'Enter');
+  await moveTo(page, 'ArrowRight', 'Videos');
+  await press(page, 'Enter');
+  const name = page.locator('.folders-add input');
+  await expect(name).toBeFocused();
+  await expect(name).toHaveValue('Concerts');
+  await name.fill('Live shows');
+  await press(page, 'Enter');
+  await expect(page.getByText('Added Live shows to the library and scanned it.')).toBeVisible();
+  await expect(page.locator('.library-tile', { hasText: 'Live shows' })).toBeVisible();
+
+  // The TV layout has Kinema's own browser there instead.
+  await tvMode(page);
+  await expect(page.locator('.library-tile', { hasText: /^Folders/ })).toBeVisible();
+  await expect(page.locator('.library-tile', { hasText: 'Add a folder' })).toHaveCount(0);
 });

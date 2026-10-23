@@ -20,6 +20,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import FocusButton from '../ui/FocusButton';
 import FocusInput from '../ui/FocusInput';
 import { keepOnScreen } from '../ui/focus';
+import { openLink } from '../ui/links';
 import { addWithoutMatch, listNeedsReview } from '../metadata/api';
 import { readLocalName, shelfOf } from './localTitle';
 import type { MediaFile } from './api';
@@ -56,6 +57,24 @@ interface Props {
  * anything is hidden.
  */
 const QUEUE_LIMIT = 2000;
+
+/**
+ * The website's guide to the names Kinema understands. Most refusals are a
+ * name the parser could not read, and renaming is often quicker than a search.
+ */
+const FILE_NAMES_GUIDE = 'https://basswaves.github.io/kinema/file-names.html';
+
+function GuideLink() {
+  return (
+    <FocusButton
+      className="fixmatch-guide"
+      keepInView="nearest"
+      onSelect={() => void openLink(FILE_NAMES_GUIDE)}
+    >
+      How Kinema reads file names ↗
+    </FocusButton>
+  );
+}
 
 /** A group's row, so the ring can be put on it. */
 const rowKey = (group: FileGroup) => `fixmatch-row:${group.key}`;
@@ -142,6 +161,7 @@ export default function FixMatch({ onChanged }: Props) {
           Nothing needs attention: every parsed file is matched. Files the matcher refuses to
           guess at appear here, with the reason it gave.
         </p>
+        <GuideLink />
       </section>
     );
   }
@@ -238,6 +258,9 @@ export default function FixMatch({ onChanged }: Props) {
             ))}
         </div>
       )}
+
+      {/* Last, so Down from the Review button still lands on the first group. */}
+      <GuideLink />
     </section>
   );
 }

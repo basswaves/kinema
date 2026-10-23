@@ -212,12 +212,6 @@
       "Choose Skiptro": { "U": "Off #2", "D": "Detect now", "L": "Open the Skiptro page ↗", "R": "·" },
       "Detect now": { "U": "Open the Skiptro page ↗", "D": "·", "L": "Skipping intros", "R": "·" }
     },
-    "settings-accounts": {
-      "Connect SIMKL": { "U": "Settings", "D": "Connect Trakt", "L": "Accounts", "R": "·" },
-      "Connect Trakt": { "U": "Connect SIMKL", "D": "The username, not the email address", "L": "Accounts", "R": "·" },
-      "The username, not the email address": { "U": "Connect Trakt", "D": "Your OpenSubtitles password", "L": "Accounts", "R": "·" },
-      "Your OpenSubtitles password": { "U": "The username, not the email address", "D": "·", "L": "Accounts", "R": "·" }
-    },
     "settings-advanced": {
       "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "✓On" },
       "✓On": { "U": "Settings", "D": "Clear artwork cache", "L": "Advanced", "R": "Off" },
@@ -237,7 +231,8 @@
     },
     "settings-review": {
       "Fixture Movie (1999) · 1 file · movieKinema could ": { "U": "Review 3 items", "D": "Sample Series · 2 files · seriesKinema could not i", "L": "Library #2", "R": "·" },
-      "Sample Series · 2 files · seriesKinema could not i": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Run setup again", "L": "Library #2", "R": "·" }
+      "Sample Series · 2 files · seriesKinema could not i": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "How Kinema reads file names ↗", "L": "Library #2", "R": "·" },
+      "How Kinema reads file names ↗": { "U": "Sample Series · 2 files · seriesKinema could not i", "D": "Run setup again", "L": "Library #2", "R": "·" }
     },
     "settings-review-item": {
       "Search for the right title…": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Name", "L": "Library #2", "R": "Movie" },
@@ -625,12 +620,6 @@
       "Choose Skiptro": { "U": "Off #2", "D": "Detect now", "L": "Open the Skiptro page ↗", "R": "·" },
       "Detect now": { "U": "Open the Skiptro page ↗", "D": "·", "L": "Skipping intros", "R": "·" }
     },
-    "settings-accounts": {
-      "Connect SIMKL": { "U": "Settings", "D": "Connect Trakt", "L": "Accounts", "R": "·" },
-      "Connect Trakt": { "U": "Connect SIMKL", "D": "The username, not the email address", "L": "Accounts", "R": "·" },
-      "The username, not the email address": { "U": "Connect Trakt", "D": "Your OpenSubtitles password", "L": "Accounts", "R": "·" },
-      "Your OpenSubtitles password": { "U": "The username, not the email address", "D": "·", "L": "Accounts", "R": "·" }
-    },
     "settings-advanced": {
       "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "✓On" },
       "✓On": { "U": "Settings", "D": "Clear artwork cache", "L": "Advanced", "R": "Off" },
@@ -650,7 +639,8 @@
     },
     "settings-review": {
       "Fixture Movie (1999) · 1 file · movieKinema could ": { "U": "Review 3 items", "D": "Sample Series · 2 files · seriesKinema could not i", "L": "Library #2", "R": "·" },
-      "Sample Series · 2 files · seriesKinema could not i": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Run setup again", "L": "Library #2", "R": "·" }
+      "Sample Series · 2 files · seriesKinema could not i": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "How Kinema reads file names ↗", "L": "Library #2", "R": "·" },
+      "How Kinema reads file names ↗": { "U": "Sample Series · 2 files · seriesKinema could not i", "D": "Run setup again", "L": "Library #2", "R": "·" }
     },
     "settings-review-item": {
       "Search for the right title…": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Name", "L": "Library #2", "R": "Movie" },
@@ -1013,12 +1003,6 @@
       "✓On #2": { "U": "✓On #1", "D": "·", "L": "Skipping intros", "R": "Off #2" },
       "Off #2": { "U": "Off #1", "D": "·", "L": "✓On #2", "R": "·" }
     },
-    "settings-accounts": {
-      "Connect SIMKL": { "U": "Settings", "D": "Connect Trakt", "L": "Accounts", "R": "·" },
-      "Connect Trakt": { "U": "Connect SIMKL", "D": "The username, not the email address", "L": "Accounts", "R": "·" },
-      "The username, not the email address": { "U": "Connect Trakt", "D": "Your OpenSubtitles password", "L": "Accounts", "R": "·" },
-      "Your OpenSubtitles password": { "U": "The username, not the email address", "D": "·", "L": "Accounts", "R": "·" }
-    },
     "settings-advanced": {
       "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "✓On" },
       "✓On": { "U": "Settings", "D": "Clear artwork cache", "L": "Advanced", "R": "Off" },
@@ -1036,7 +1020,8 @@
     },
     "settings-review": {
       "Fixture Movie (1999) · 1 file · movieKinema could ": { "U": "Review 3 items", "D": "Sample Series · 2 files · seriesKinema could not i", "L": "Library #2", "R": "·" },
-      "Sample Series · 2 files · seriesKinema could not i": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Run setup again", "L": "Library #2", "R": "·" }
+      "Sample Series · 2 files · seriesKinema could not i": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "How Kinema reads file names ↗", "L": "Library #2", "R": "·" },
+      "How Kinema reads file names ↗": { "U": "Sample Series · 2 files · seriesKinema could not i", "D": "Run setup again", "L": "Library #2", "R": "·" }
     },
     "settings-review-item": {
       "Search for the right title…": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Name", "L": "Library #2", "R": "Movie" },

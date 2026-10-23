@@ -61,6 +61,11 @@
   cursor: default;
 }
 
+/* The guide link, under the queue: a link, not a step of the work. */
+.fixmatch > .fixmatch-guide {
+  align-self: flex-start;
+}
+
 .fixmatch button.primary {
   background: #e50914;
   border-color: #e50914;

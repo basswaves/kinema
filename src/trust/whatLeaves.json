@@ -124,6 +124,7 @@
       { "host": "auth.trakt.tv", "for": "Trakt's sign-in page" },
       { "host": "app.trakt.tv", "for": "Trakt's developer page" },
       { "host": "github.com", "for": "Kinema's release page, Skiptro's page, and reporting a bug" },
+      { "host": "basswaves.github.io", "for": "Kinema's website and its guides, such as how file names are read" },
       { "host": "ffmpeg.org", "for": "downloading ffmpeg by hand" },
       { "host": "www.youtube.com", "for": "trailers" }
     ]

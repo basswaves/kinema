@@ -48,6 +48,10 @@ param(
   # How much to shrink each screenshot: 4 (a quarter) for checking timing, 1 or 2
   # for pictures worth looking at, such as the README's.
   [int]$ShotDivisor = 4,
+  # Which screen the screenshots are of. 'other' is the first screen that is
+  # not the primary one - for a plan that moves the window there first
+  # (call moveToScreen -1), so a run never covers the main screen.
+  [ValidateSet('primary', 'other')][string]$Screen = 'primary',
   [int]$TimeoutSeconds = 180
 )
 
@@ -78,6 +82,11 @@ $process = Start-Process -FilePath $Exe -WorkingDirectory $exeDir -PassThru
 Remove-Item Env:\KINEMA_SELFTEST
 
 $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+if ($Screen -eq 'other') {
+  $second = [System.Windows.Forms.Screen]::AllScreens | Where-Object { -not $_.Primary } | Select-Object -First 1
+  if (-not $second) { throw 'There is no second screen to take the screenshots of.' }
+  $bounds = $second.Bounds
+}
 $shots = $ShotsAt -split '[,; ]+' | Where-Object { $_ } | ForEach-Object { [int]$_ } | Sort-Object
 foreach ($ms in $shots) {
   while (((Get-Date) - $start).TotalMilliseconds -lt $ms) { Start-Sleep -Milliseconds 10 }

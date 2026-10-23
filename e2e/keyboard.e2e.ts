@@ -1443,6 +1443,41 @@ test('Android: the system keyboard opens on OK, never on arriving at a field', a
   await expect(box).toHaveAttribute('inputmode', 'none');
 });
 
+test('Settings → Privacy lists what leaves the computer, and goes to the switch that stops it', async ({
+  page,
+}) => {
+  await open(page, 'windows');
+  await press(page, 'ArrowUp', 2);
+  await press(page, 'ArrowRight', 5);
+  await expect.poll(() => focused(page)).toBe('Settings');
+  await press(page, 'Enter');
+  await press(page, 'ArrowDown');
+  for (let i = 0; i < 12 && (await focused(page)) !== 'Privacy'; i++) {
+    await press(page, 'ArrowDown');
+  }
+  await expect.poll(() => focused(page)).toBe('Privacy');
+  await press(page, 'Enter');
+  const section = page.locator('.what-leaves');
+  await expect(section.locator('h2')).toHaveText('What leaves your computer');
+  await expect(section).toContainText('api.themoviedb.org');
+  await expect(section).toContainText('www.youtube.com (trailers)');
+  // The mock has the intro lookups on (unset means on).
+  await expect(section.locator('li', { hasText: 'TheIntroDB' })).toContainText('On');
+  if (await page.evaluate(() => Boolean(document.querySelector('.settings-nav .focused')))) {
+    await press(page, 'ArrowRight');
+  }
+  for (let i = 0; i < 12 && (await focused(page)) !== 'Go to Intro & credits'; i++) {
+    await press(page, 'ArrowDown');
+  }
+  await expect.poll(() => focused(page)).toBe('Go to Intro & credits');
+  await press(page, 'Enter');
+  await expect(page.locator('.settings-section h2').first()).toHaveText('Intro and credits');
+  // In the section, not back on the list beside it.
+  await expect
+    .poll(() => page.evaluate(() => Boolean(document.querySelector('.settings-content .focused'))))
+    .toBe(true);
+});
+
 async function androidSettings(page: Page, section: string): Promise<void> {
   await page.setViewportSize({ width: 960, height: 540 });
   await page.addInitScript(() => localStorage.setItem('kinemaMockSystem', 'android'));

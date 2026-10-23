@@ -147,12 +147,13 @@
       "Remove #1": { "U": "Settings", "D": "Remove #2", "L": "Library #2", "R": "·" },
       "Intro & credits": { "U": "Picture & sound", "D": "Accounts", "L": "·", "R": "Add movies folder" },
       "Remove #2": { "U": "Remove #1", "D": "Scan now", "L": "Library #2", "R": "·" },
-      "Accounts": { "U": "Intro & credits", "D": "Advanced", "L": "·", "R": "Add movies folder" },
+      "Accounts": { "U": "Intro & credits", "D": "Privacy", "L": "·", "R": "Add movies folder" },
       "Add movies folder": { "U": "Remove #2", "D": "Nothing to review", "L": "Library #2", "R": "Add TV folder" },
       "Add TV folder": { "U": "Remove #2", "D": "Nothing to review", "L": "Add movies folder", "R": "Add Videos folder" },
       "Add Videos folder": { "U": "Remove #2", "D": "Nothing to review", "L": "Add TV folder", "R": "Scan now" },
       "Scan now": { "U": "Remove #2", "D": "Nothing to review", "L": "Add Videos folder", "R": "·" },
-      "Advanced": { "U": "Accounts", "D": "·", "L": "·", "R": "Add movies folder" },
+      "Privacy": { "U": "Accounts", "D": "Advanced", "L": "·", "R": "Add movies folder" },
+      "Advanced": { "U": "Privacy", "D": "·", "L": "·", "R": "Add movies folder" },
       "Nothing to review": { "U": "Add movies folder", "D": "Get a free TMDB key ↗", "L": "Library #2", "R": "·" },
       "Get a free TMDB key ↗": { "U": "Nothing to review", "D": "Paste your TMDB key", "L": "Library #2", "R": "·" },
       "Paste your TMDB key": { "U": "Get a free TMDB key ↗", "D": "Paste your OMDb key", "L": "Library #2", "R": "·" },
@@ -387,6 +388,15 @@
       "↑ #4": { "U": "Garden", "D": "·", "L": "Example Show · S01E01", "R": "↓ #4" },
       "↓ #4": { "U": "Garden", "D": "·", "L": "↑ #4", "R": "Remove #4" },
       "Remove #4": { "U": "Garden", "D": "·", "L": "↓ #4", "R": "·" }
+    },
+    "settings-privacy": {
+      "Go to Library, for OMDb (Rotten Tomatoes scores)": { "U": "Settings", "D": "Go to Intro & credits, for TheIntroDB", "L": "Privacy", "R": "·" },
+      "Go to Intro & credits, for TheIntroDB": { "U": "Go to Library, for OMDb (Rotten Tomatoes scores)", "D": "Go to Intro & credits, for IntroDB", "L": "Privacy", "R": "·" },
+      "Go to Intro & credits, for IntroDB": { "U": "Go to Intro & credits, for TheIntroDB", "D": "Go to Accounts, for OpenSubtitles", "L": "Privacy", "R": "·" },
+      "Go to Accounts, for OpenSubtitles": { "U": "Go to Intro & credits, for IntroDB", "D": "Go to Accounts, for SIMKL", "L": "Privacy", "R": "·" },
+      "Go to Accounts, for SIMKL": { "U": "Go to Accounts, for OpenSubtitles", "D": "Go to Accounts, for Trakt", "L": "Privacy", "R": "·" },
+      "Go to Accounts, for Trakt": { "U": "Go to Accounts, for SIMKL", "D": "Go to Advanced, for GitHub (new versions)", "L": "Privacy", "R": "·" },
+      "Go to Advanced, for GitHub (new versions)": { "U": "Go to Accounts, for Trakt", "D": "·", "L": "Privacy", "R": "·" }
     }
   },
   "linux": {
@@ -537,12 +547,13 @@
       "Remove #1": { "U": "Settings", "D": "Remove #2", "L": "Library #2", "R": "·" },
       "Intro & credits": { "U": "Picture & sound", "D": "Accounts", "L": "·", "R": "Add movies folder" },
       "Remove #2": { "U": "Remove #1", "D": "Scan now", "L": "Library #2", "R": "·" },
-      "Accounts": { "U": "Intro & credits", "D": "Advanced", "L": "·", "R": "Add movies folder" },
+      "Accounts": { "U": "Intro & credits", "D": "Privacy", "L": "·", "R": "Add movies folder" },
       "Add movies folder": { "U": "Remove #2", "D": "Nothing to review", "L": "Library #2", "R": "Add TV folder" },
       "Add TV folder": { "U": "Remove #2", "D": "Nothing to review", "L": "Add movies folder", "R": "Add Videos folder" },
       "Add Videos folder": { "U": "Remove #2", "D": "Nothing to review", "L": "Add TV folder", "R": "Scan now" },
       "Scan now": { "U": "Remove #2", "D": "Nothing to review", "L": "Add Videos folder", "R": "·" },
-      "Advanced": { "U": "Accounts", "D": "·", "L": "·", "R": "Add movies folder" },
+      "Privacy": { "U": "Accounts", "D": "Advanced", "L": "·", "R": "Add movies folder" },
+      "Advanced": { "U": "Privacy", "D": "·", "L": "·", "R": "Add movies folder" },
       "Nothing to review": { "U": "Add movies folder", "D": "Get a free TMDB key ↗", "L": "Library #2", "R": "·" },
       "Get a free TMDB key ↗": { "U": "Nothing to review", "D": "Paste your TMDB key", "L": "Library #2", "R": "·" },
       "Paste your TMDB key": { "U": "Get a free TMDB key ↗", "D": "Paste your OMDb key", "L": "Library #2", "R": "·" },
@@ -762,6 +773,15 @@
       "↑ #4": { "U": "Garden", "D": "·", "L": "Example Show · S01E01", "R": "↓ #4" },
       "↓ #4": { "U": "Garden", "D": "·", "L": "↑ #4", "R": "Remove #4" },
       "Remove #4": { "U": "Garden", "D": "·", "L": "↓ #4", "R": "·" }
+    },
+    "settings-privacy": {
+      "Go to Library, for OMDb (Rotten Tomatoes scores)": { "U": "Settings", "D": "Go to Intro & credits, for TheIntroDB", "L": "Privacy", "R": "·" },
+      "Go to Intro & credits, for TheIntroDB": { "U": "Go to Library, for OMDb (Rotten Tomatoes scores)", "D": "Go to Intro & credits, for IntroDB", "L": "Privacy", "R": "·" },
+      "Go to Intro & credits, for IntroDB": { "U": "Go to Intro & credits, for TheIntroDB", "D": "Go to Accounts, for OpenSubtitles", "L": "Privacy", "R": "·" },
+      "Go to Accounts, for OpenSubtitles": { "U": "Go to Intro & credits, for IntroDB", "D": "Go to Accounts, for SIMKL", "L": "Privacy", "R": "·" },
+      "Go to Accounts, for SIMKL": { "U": "Go to Accounts, for OpenSubtitles", "D": "Go to Accounts, for Trakt", "L": "Privacy", "R": "·" },
+      "Go to Accounts, for Trakt": { "U": "Go to Accounts, for SIMKL", "D": "Go to Advanced, for GitHub (new versions)", "L": "Privacy", "R": "·" },
+      "Go to Advanced, for GitHub (new versions)": { "U": "Go to Accounts, for Trakt", "D": "·", "L": "Privacy", "R": "·" }
     }
   },
   "android": {

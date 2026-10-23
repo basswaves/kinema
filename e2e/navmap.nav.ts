@@ -510,6 +510,7 @@ const SECTIONS: [string, string][] = [
   ['picture', 'Picture & sound'],
   ['intros', 'Intro & credits'],
   ['accounts', 'Accounts'],
+  ['privacy', 'Privacy'],
   ['advanced', 'Advanced'],
 ];
 

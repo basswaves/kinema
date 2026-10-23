@@ -1,0 +1,132 @@
+{
+  "title": "What leaves your computer",
+  "intro": "Kinema keeps your library, your settings and what you have watched on this device. It has no account and no server of its own, and it sends no usage statistics. These are every service it can talk to, what it sends, when, and what stops it.",
+  "services": [
+    {
+      "id": "tmdb",
+      "name": "TMDB (The Movie Database)",
+      "hosts": ["api.themoviedb.org", "image.tmdb.org"],
+      "sends": "The title and year read from a file or folder name, then the TMDB number of each match, with Kinema's key or yours. Pictures are asked for by their address.",
+      "when": "When a scan finds a film or show that has not been matched yet, when a title's details are over six months old (TMDB's terms), and when a poster or backdrop is first shown.",
+      "stop": "No switch: TMDB is how Kinema knows what your films and shows are. A folder you remove is no longer looked up."
+    },
+    {
+      "id": "tvmaze",
+      "name": "TVmaze",
+      "hosts": ["api.tvmaze.com", "static.tvmaze.com"],
+      "sends": "A show's name read from its folder, or its IMDb or TheTVDB number, then that show's number to get its episodes and pictures.",
+      "when": "When a scan finds a TV show that has not been matched yet, or new episodes of one.",
+      "stop": "No switch: it is used for TV shows only, and a TV folder you remove is no longer looked up."
+    },
+    {
+      "id": "wikidata",
+      "name": "Wikidata and Wikipedia",
+      "hosts": ["www.wikidata.org", "en.wikipedia.org"],
+      "sends": "A film's title and year read from its file name.",
+      "when": "Only for films, and only when no TMDB key works, as a fallback. Never pictures.",
+      "stop": "Stops by itself as soon as a TMDB key works."
+    },
+    {
+      "id": "omdb",
+      "name": "OMDb (Rotten Tomatoes scores)",
+      "hosts": ["www.omdbapi.com"],
+      "sends": "A film's IMDb number and your own OMDb key.",
+      "when": "Only if you typed in an OMDb key, at most 500 lookups a day.",
+      "stop": "Empty the OMDb key in Settings, Library.",
+      "section": "library",
+      "state": "omdb"
+    },
+    {
+      "id": "imdb",
+      "name": "IMDb ratings file",
+      "hosts": ["datasets.imdbws.com"],
+      "sends": "Nothing about your library: Kinema downloads the ratings file IMDb publishes for everyone and keeps only the rows for your titles.",
+      "when": "The first time, then when the file is over 30 days old, or a week after a new title joined the library.",
+      "stop": "No switch: nothing of yours is sent."
+    },
+    {
+      "id": "theintrodb",
+      "name": "TheIntroDB",
+      "hosts": ["api.theintrodb.org"],
+      "sends": "The TMDB number of what you are playing, with the season and episode for a show.",
+      "when": "When you play an episode or film whose intro or credits are not known, at most once a month for each.",
+      "stop": "Look up TheIntroDB, in Settings, Intro & credits.",
+      "section": "intros",
+      "state": "theintrodb"
+    },
+    {
+      "id": "introdb_app",
+      "name": "IntroDB",
+      "hosts": ["api.introdb.app"],
+      "sends": "The IMDb number of what you are playing, with the season and episode for a show.",
+      "when": "When you play something whose intro or credits are still not known, at most once a month for each.",
+      "stop": "Look up IntroDB, in Settings, Intro & credits.",
+      "section": "intros",
+      "state": "introdb_app"
+    },
+    {
+      "id": "opensubtitles",
+      "name": "OpenSubtitles",
+      "hosts": ["api.opensubtitles.com"],
+      "sends": "The title's numbers, season and episode, a fingerprint of the video file (not the file itself), the languages you want, and your sign-in if you added one. The subtitle is then downloaded from the address OpenSubtitles gives.",
+      "when": "Only when you ask for subtitles, and for forced subtitles by themselves if you switched that on.",
+      "stop": "Do not ask; forced subtitles are switched off in Settings, Accounts.",
+      "section": "accounts",
+      "state": "opensubtitles"
+    },
+    {
+      "id": "simkl",
+      "name": "SIMKL",
+      "hosts": ["api.simkl.com"],
+      "sends": "The films and episodes you finish (their numbers and when), and at connect what you had already watched. Nothing is read back.",
+      "when": "Only while SIMKL is connected.",
+      "stop": "Disconnect, in Settings, Accounts.",
+      "section": "accounts",
+      "state": "simkl"
+    },
+    {
+      "id": "trakt",
+      "name": "Trakt",
+      "hosts": ["api.trakt.tv"],
+      "sends": "The films and episodes you finish, at connect what the account lacks, and where you stopped something part-way. Where you stopped elsewhere is read back to resume here.",
+      "when": "Only while Trakt is connected; resume points when a title's page or Home's Continue row is shown.",
+      "stop": "Disconnect, in Settings, Accounts. Resume across devices has its own switch there.",
+      "section": "accounts",
+      "state": "trakt"
+    },
+    {
+      "id": "winget",
+      "name": "winget (installing ffmpeg)",
+      "hosts": [],
+      "sends": "Kinema sends nothing itself: it asks winget, Windows' own installer, to fetch ffmpeg from its usual sources.",
+      "when": "Only when you press Install ffmpeg.",
+      "stop": "Do not press it.",
+      "only": "installs_ffmpeg"
+    },
+    {
+      "id": "github",
+      "name": "GitHub (new versions)",
+      "hosts": ["api.github.com"],
+      "sends": "An ordinary request for the number of Kinema's latest release. Nothing about you or your library.",
+      "when": "Once each time Kinema starts.",
+      "stop": "Look for new versions, in Settings, Advanced.",
+      "section": "advanced",
+      "state": "updates"
+    }
+  ],
+  "links": {
+    "intro": "Some buttons open a web page in your browser. Kinema itself sends nothing to these; your browser does, as with any link.",
+    "hosts": [
+      { "host": "www.themoviedb.org", "for": "getting a free TMDB key" },
+      { "host": "www.omdbapi.com", "for": "getting a free OMDb key" },
+      { "host": "simkl.com", "for": "SIMKL's sign-in and developer pages" },
+      { "host": "trakt.tv", "for": "Trakt's sign-in page" },
+      { "host": "auth.trakt.tv", "for": "Trakt's sign-in page" },
+      { "host": "app.trakt.tv", "for": "Trakt's developer page" },
+      { "host": "github.com", "for": "Kinema's release page, Skiptro's page, and reporting a bug" },
+      { "host": "ffmpeg.org", "for": "downloading ffmpeg by hand" },
+      { "host": "www.youtube.com", "for": "trailers" }
+    ]
+  },
+  "local": "Folders on your own network are read where they are, and the player streams from Kinema on this device only. Neither leaves your home network."
+}

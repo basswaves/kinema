@@ -578,12 +578,14 @@ reasoning is in [docs/DESIGN.md](docs/DESIGN.md) and [docs/HISTORY.md](docs/HIST
   `gradle/wrapper/gradle-wrapper.jar` (Gradle's own 59 KB starter, which
   every Android project keeps). It runs on the build machine and is never
   in the app.
-- **Say what leaves the computer.** Kinema is to have one page listing every
-  service it can contact, what it sends, when, and the switch that stops it
-  (planned, 2026-10-21). A change that makes Kinema contact a new service, or
-  send something new to one, updates that page in the same pull request; a
-  check is planned that fails when the code contacts a host the page does not
-  list.
+- **Say what leaves the computer.** Settings → Privacy lists every service
+  Kinema can contact, what it sends, when, and what stops it. Its words are in
+  `src/trust/whatLeaves.json`, shared with the website. A change that makes
+  Kinema contact a new service, or send something new to one, updates that
+  file in the same pull request. `src/trust/whatLeaves.test.ts` fails when
+  the code (Rust, TypeScript, Kotlin or the Tauri config) names a host the
+  file does not list; a host that is only text, never contacted, goes in the
+  test's own list with the reason.
 - **Sidecars are read, never written** by default. The reader stays so other
   producers of the format keep working.
 - **Android is for TV devices.** Boxes, sticks and TVs running Android TV or

@@ -9,6 +9,10 @@ makes no stability promises.
 
 ### Added
 
+- **What leaves your computer** (Settings → Privacy): every service Kinema
+  can talk to, what it sends, when, and what stops it, with whether each
+  switchable one is on now and a button to its setting. A test keeps the
+  list in step with the code.
 - **Copy text with the mouse.** Titles, plots and cast on a title's page,
   Settings, the details panel and Needs attention's file names can be marked
   and copied (Ctrl+C, or right-click → Copy). Cards, buttons and the player

@@ -19,7 +19,7 @@ import LanguageSection from './LanguageSection';
 import ChoiceRow from './ChoiceRow';
 import { getVersion } from '@tauri-apps/api/app';
 import { availableUpdate, UPDATE_CHECK_KEY, type Release } from './updates';
-import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
+import { useFocusable, FocusContext, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -42,6 +42,7 @@ import { ForcedSubtitleRows, OpenSubtitlesSection } from './SubtitlesSettings';
 import ConfirmButton from './ConfirmButton';
 import MergeOffer, { type MergeOfferState } from './MergeOffer';
 import EquipmentSection from './EquipmentSection';
+import WhatLeavesSection from './WhatLeavesSection';
 import SoundSection from './SoundSection';
 import ScreenSection from './ScreenSection';
 import { capabilitiesNow, useCapabilities, type Capabilities } from '../capabilities';
@@ -187,7 +188,14 @@ const ADD_VIDEOS_KEY = 'settings:add-videos';
 /** The name row that follows picking a Videos folder. */
 const VIDEOS_NAME_KEY = 'settings:videos-name';
 
-type SectionId = 'library' | 'playback' | 'picture' | 'intros' | 'accounts' | 'advanced';
+type SectionId =
+  | 'library'
+  | 'playback'
+  | 'picture'
+  | 'intros'
+  | 'accounts'
+  | 'privacy'
+  | 'advanced';
 
 /** The list down the side, in the order someone setting up would need them. */
 const SECTIONS: [SectionId, string][] = [
@@ -198,6 +206,8 @@ const SECTIONS: [SectionId, string][] = [
   // Services signed into with the user's own account. Keys that identify
   // films stay in Library; the keyless skip databases in Intro & credits.
   ['accounts', 'Accounts'],
+  // What leaves your computer: every service, what it sends, what stops it.
+  ['privacy', 'Privacy'],
   ['advanced', 'Advanced'],
 ];
 
@@ -231,6 +241,23 @@ export default function Settings({
     lastSection = id;
     setSection(id);
   }, []);
+  /** From the Privacy page to the setting that stops a service: into its section. */
+  // A new object each time, so going to the same section twice moves focus twice.
+  const [goneTo, setGoneTo] = useState<{ id: SectionId } | null>(null);
+  const goToSection = useCallback(
+    (id: SectionId) => {
+      chooseSection(id);
+      setGoneTo({ id });
+    },
+    [chooseSection]
+  );
+  useEffect(() => {
+    if (!goneTo) return;
+    // A section whose controls are still loading (Accounts asks each service
+    // first) has nothing to land on yet: its entry in the list, then.
+    const ready = document.querySelector('.settings-content button, .settings-content input');
+    setFocus(ready ? 'settings-content' : `settings-nav:${goneTo.id}`);
+  }, [goneTo]);
 
   // Land on the open section in the list — or, from Home's notice, straight
   // on the review queue.
@@ -1443,6 +1470,13 @@ export default function Settings({
                 <AccountSection service="trakt" />
                 <OpenSubtitlesSection />
               </>
+            )}
+
+            {section === 'privacy' && (
+              <WhatLeavesSection
+                sectionNames={Object.fromEntries(SECTIONS)}
+                onGo={(id) => goToSection(id as SectionId)}
+              />
             )}
 
             {section === 'advanced' && (

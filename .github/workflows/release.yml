@@ -207,11 +207,11 @@ jobs:
       # Fedora's container image turns weak dependencies off to stay small;
       # an installed Fedora has them on, which is what this is checking.
       - name: Install the .rpm with dnf
-        run: dnf install -y --setopt=install_weak_deps=True ./kinema-*.x86_64.rpm
+        run: dnf install -y --setopt=install_weak_deps=True ./kinema-linux-x86_64.rpm
 
       - name: Check mpv and ffmpeg came with it
         run: |
-          rpm -q "$(rpm -qp --qf '%{NAME}' ./kinema-*.x86_64.rpm)"
+          rpm -q "$(rpm -qp --qf '%{NAME}' ./kinema-linux-x86_64.rpm)"
           rpm -q mpv-libs
           rpm -q ffmpeg-free || rpm -q ffmpeg
           ffprobe -version | head -n 1

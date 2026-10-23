@@ -138,7 +138,7 @@ function summaryLine(s: ScanSummary): string {
   const parts = [
     `${count(s.filesAdded, 'new file')}`,
     `${s.matched} matched`,
-    `${s.unmatched} left for review`,
+    `${s.unmatched} in Needs attention`,
   ];
   if (s.artworkStored) parts.push(`${count(s.artworkStored, 'image')} cached`);
   if (s.detailsFilled) parts.push(`${count(s.detailsFilled, 'title')} enriched`);

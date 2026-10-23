@@ -34,11 +34,24 @@ jobs:
       # What Tauri needs to compile on Linux: WebKitGTK and its friends. The
       # same list CONTRIBUTING gives, minus libmpv (loaded at runtime, as on
       # Windows).
+      # The packages are kept between runs: Ubuntu's mirror for the runners
+      # has stalled for minutes per file on some days (a 36 s step took 29
+      # min), and a stalled download gives up after 15 s and retries.
+      - uses: actions/cache@v4
+        if: runner.os == 'Linux'
+        with:
+          path: ~/apt-cache
+          key: apt-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.github/workflows/ci.yml') }}
+          restore-keys: apt-${{ runner.os }}-${{ runner.arch }}-
+
       - name: Install Linux build libraries
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev
+          mkdir -p ~/apt-cache/partial
+          APT="-o Acquire::http::Timeout=15 -o Acquire::Retries=5 -o Dir::Cache::Archives=$HOME/apt-cache"
+          sudo apt-get $APT update
+          sudo apt-get $APT install -y libwebkit2gtk-4.1-dev libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libasound2-dev
+          sudo chown -R "$USER" ~/apt-cache
 
       - uses: actions/setup-node@v5
         with:

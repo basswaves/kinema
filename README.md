@@ -553,6 +553,10 @@ to an app of your choice, such as mail or a cloud drive.
   for.
 
 Attach both to a [bug report](https://github.com/Basswaves/kinema/issues/new?template=bug_report.yml).
+On Windows and Linux, **Settings → Advanced → Developer tools → Send a report**
+does it for you: both logs and the equipment check in one zip in your
+Downloads folder, with your home folder's name replaced by `~`, and the form
+opened in your browser. Kinema sends nothing itself; you attach the file.
 They are the most useful thing you can send, and most problems here produce no
 visible error at all — only a log line. Say which system, which device or
 graphics card, and where the media is (a local disk, a USB drive or a NAS).

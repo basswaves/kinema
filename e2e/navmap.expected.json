@@ -233,8 +233,9 @@
       "Restore #1": { "U": "Replace every one", "D": "Restore #2", "L": "Advanced", "R": "·" },
       "Restore #2": { "U": "Restore #1", "D": "Open the folder of copies", "L": "Advanced", "R": "·" },
       "Open the folder of copies": { "U": "Restore #2", "D": "Show developer tools", "L": "Advanced", "R": "·" },
-      "Show developer tools": { "U": "Open the folder of copies", "D": "From simkl.com/settings/developer", "L": "Advanced", "R": "Open log folder" },
-      "Open log folder": { "U": "Open the folder of copies", "D": "From simkl.com/settings/developer", "L": "Show developer tools", "R": "·" },
+      "Show developer tools": { "U": "Open the folder of copies", "D": "From simkl.com/settings/developer", "L": "Advanced", "R": "Send a report" },
+      "Send a report": { "U": "Open the folder of copies", "D": "From simkl.com/settings/developer", "L": "Show developer tools", "R": "Open log folder" },
+      "Open log folder": { "U": "Open the folder of copies", "D": "From simkl.com/settings/developer", "L": "Send a report", "R": "·" },
       "From simkl.com/settings/developer": { "U": "Show developer tools", "D": "From app.trakt.tv/settings/apps", "L": "Advanced", "R": "·" },
       "From app.trakt.tv/settings/apps": { "U": "From simkl.com/settings/developer", "D": "Used with the client ID above", "L": "Advanced", "R": "·" },
       "Used with the client ID above": { "U": "From app.trakt.tv/settings/apps", "D": "·", "L": "Advanced", "R": "·" }
@@ -624,8 +625,9 @@
       "Restore #1": { "U": "Replace every one", "D": "Restore #2", "L": "Advanced", "R": "·" },
       "Restore #2": { "U": "Restore #1", "D": "Open the folder of copies", "L": "Advanced", "R": "·" },
       "Open the folder of copies": { "U": "Restore #2", "D": "Show developer tools", "L": "Advanced", "R": "·" },
-      "Show developer tools": { "U": "Open the folder of copies", "D": "From simkl.com/settings/developer", "L": "Advanced", "R": "Open log folder" },
-      "Open log folder": { "U": "Open the folder of copies", "D": "From simkl.com/settings/developer", "L": "Show developer tools", "R": "·" },
+      "Show developer tools": { "U": "Open the folder of copies", "D": "From simkl.com/settings/developer", "L": "Advanced", "R": "Send a report" },
+      "Send a report": { "U": "Open the folder of copies", "D": "From simkl.com/settings/developer", "L": "Show developer tools", "R": "Open log folder" },
+      "Open log folder": { "U": "Open the folder of copies", "D": "From simkl.com/settings/developer", "L": "Send a report", "R": "·" },
       "From simkl.com/settings/developer": { "U": "Show developer tools", "D": "From app.trakt.tv/settings/apps", "L": "Advanced", "R": "·" },
       "From app.trakt.tv/settings/apps": { "U": "From simkl.com/settings/developer", "D": "Used with the client ID above", "L": "Advanced", "R": "·" },
       "Used with the client ID above": { "U": "From app.trakt.tv/settings/apps", "D": "·", "L": "Advanced", "R": "·" }

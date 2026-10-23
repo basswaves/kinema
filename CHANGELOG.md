@@ -13,6 +13,10 @@ makes no stability promises.
   can talk to, what it sends, when, and what stops it, with whether each
   switchable one is on now and a button to its setting. A test keeps the
   list in step with the code.
+- **Send a report** (Settings → Advanced → Developer tools, and the crash
+  screen; Windows and Linux): both logs and the equipment check in one zip
+  in Downloads, shown in its folder, and the bug-report form opened. Your
+  home folder's name is replaced by `~`. Kinema sends nothing itself.
 - **Copy text with the mouse.** Titles, plots and cast on a title's page,
   Settings, the details panel and Needs attention's file names can be marked
   and copied (Ctrl+C, or right-click → Copy). Cards, buttons and the player

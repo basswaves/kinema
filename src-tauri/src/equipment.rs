@@ -757,17 +757,19 @@ pub fn check_at_startup(app: tauri::AppHandle) {
 /// the hardware again.
 #[tauri::command]
 pub async fn get_equipment(app: tauri::AppHandle) -> Result<EquipmentView, String> {
-    crate::jobs::off_main(move || {
-        use tauri::Manager;
-        let state = app.state::<EquipmentState>();
-        let _turn = state.checking.lock().unwrap_or_else(|e| e.into_inner());
-        let latest = state.latest.lock().unwrap_or_else(|e| e.into_inner()).clone();
-        match latest {
-            Some(view) => Ok(view),
-            None => check(&app),
-        }
-    })
-    .await
+    crate::jobs::off_main(move || latest_or_check(&app)).await
+}
+
+/// This launch's check, or a check now if there has not been one; blocking.
+pub fn latest_or_check(app: &tauri::AppHandle) -> Result<EquipmentView, String> {
+    use tauri::Manager;
+    let state = app.state::<EquipmentState>();
+    let _turn = state.checking.lock().unwrap_or_else(|e| e.into_inner());
+    let latest = state.latest.lock().unwrap_or_else(|e| e.into_inner()).clone();
+    match latest {
+        Some(view) => Ok(view),
+        None => check(app),
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]

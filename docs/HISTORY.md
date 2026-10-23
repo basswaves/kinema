@@ -3603,7 +3603,14 @@ and a Jellyfin source further out. Decisions made along the way:
 - **A page of what leaves the computer, kept honest by a test.** Every service
   Kinema can contact, what it sends and the switch that stops it. Such a page
   goes stale silently, so the plan is a check that fails when the code
-  contacts a host the page does not list.
+  contacts a host the page does not list. *Built 2026-10-23* as Settings →
+  Privacy: the words in one file the website shares, and a test reading the
+  Rust, TypeScript, Kotlin and Tauri config for hosts. The page never repeats
+  a switch; it says whether each is on and goes to it, so there is one place
+  to change each thing. **Send a report**, built the same day, writes its zip
+  itself (the format is frozen and deflate is already in the build, so no
+  new crate to keep up), into Downloads, and replaces the home folder's path
+  with `~` but keeps film and folder names, which are often the bug.
 - **Moving a library to another computer must not disturb SIMKL, Trakt or a
   later sync**: what was already sent stays sent, nothing is sent again, and
   no sign-in travels in the file.

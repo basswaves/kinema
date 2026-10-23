@@ -10,7 +10,13 @@ body:
         otherwise invisible from outside the app — most bugs here produce no
         visible error at all, only a log line.
 
-        Open them from **Settings → Advanced → Developer tools → Open log folder**, or go
+        On Windows and Linux the easy way is **Settings → Advanced → Developer
+        tools → Send a report**: it packs both logs and the equipment check into
+        one zip in your Downloads folder and opens this form. Drag the zip into
+        **What happened** below. Your home folder's name is replaced by `~`;
+        film and folder names stay. Kinema sends nothing itself.
+
+        Or open them from **Settings → Advanced → Developer tools → Open log folder**, or go
         to `%APPDATA%\com.kinema.app\logs\` (Windows) or
         `~/.local/share/com.kinema.app/logs/` (Linux). On Android there is no
         folder to open: use **Share the log** in the same place, and send it to
@@ -56,7 +62,8 @@ body:
       label: Logs
       description: >
         Paste the relevant part of `app.log`, and `mpv.log` too if this is about
-        playback. If you are not sure what is relevant, attach both files.
+        playback. If you are not sure what is relevant, attach both files (or
+        the report zip) in What happened instead: this box takes text only.
       render: text
 
   - type: input

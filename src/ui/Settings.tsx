@@ -43,6 +43,7 @@ import ConfirmButton from './ConfirmButton';
 import MergeOffer, { type MergeOfferState } from './MergeOffer';
 import EquipmentSection from './EquipmentSection';
 import WhatLeavesSection from './WhatLeavesSection';
+import { REPORT_WORDS, sendReport } from './report';
 import SoundSection from './SoundSection';
 import ScreenSection from './ScreenSection';
 import { capabilitiesNow, useCapabilities, type Capabilities } from '../capabilities';
@@ -292,6 +293,24 @@ export default function Settings({
     openSection === 'review' ? 'review' : 'none'
   );
   const [writingNfo, setWritingNfo] = useState(false);
+  /** How the last Send a report went, said under its button. */
+  const [report, setReport] = useState<{ text: string; failed: boolean } | null>(null);
+  const makeReport = useCallback(async () => {
+    try {
+      const made = await sendReport();
+      setReport({
+        text:
+          `Saved ${made.path} (${made.files.join(', ')}), shown in its folder. ` +
+          'Attach it to the form that opened in your browser.',
+        failed: false,
+      });
+    } catch (e) {
+      setReport({
+        text: `The report could not be made: ${userError(e)} The form opened anyway; Open log folder has the logs.`,
+        failed: true,
+      });
+    }
+  }, []);
 
   // Intro detection. `detecting` holds the root currently being worked on, so
   // one root's button can show progress while the others simply disable.
@@ -1579,8 +1598,8 @@ export default function Settings({
                   <p className="settings-intro">
                     {can?.opens_folders ? (
                       <>
-                        For working on Kinema itself, and made for a mouse. The log folder holds
-                        what a bug report needs: <code>app.log</code> and <code>mpv.log</code>.
+                        For working on Kinema itself, and made for a mouse. For a bug report,
+                        Send a report puts what it needs in one file.
                       </>
                     ) : (
                       <>
@@ -1602,6 +1621,15 @@ export default function Settings({
                       <FocusButton
                         keepInView="nearest"
                         className="btn-secondary"
+                        onSelect={() => void makeReport()}
+                      >
+                        Send a report
+                      </FocusButton>
+                    )}
+                    {can?.opens_folders && (
+                      <FocusButton
+                        keepInView="nearest"
+                        className="btn-secondary"
                         onSelect={() => void openLogFolder().catch((e) => setError(userError(e)))}
                       >
                         Open log folder
@@ -1619,6 +1647,11 @@ export default function Settings({
                       </FocusButton>
                     )}
                   </div>
+                  {can?.opens_folders && (
+                    <p className={report?.failed ? 'settings-warn' : report ? 'settings-ok' : 'settings-hint'}>
+                      {report?.text ?? REPORT_WORDS}
+                    </p>
+                  )}
                   <AccountAppFields />
                 </section>
 

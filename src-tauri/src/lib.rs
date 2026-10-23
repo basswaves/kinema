@@ -49,6 +49,7 @@ mod probe;
 mod procstats;
 mod scanner;
 mod selftest;
+mod report;
 mod settings;
 mod share_logins;
 mod simkl;
@@ -372,6 +373,7 @@ pub fn run() {
             settings::append_log,
             settings::log_paths,
             settings::open_log_folder,
+            report::make_report,
             tracking::link_qr,
             settings::open_backup_folder,
             simkl::simkl_status,

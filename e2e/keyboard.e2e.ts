@@ -1478,6 +1478,29 @@ test('Settings → Privacy lists what leaves the computer, and goes to the switc
     .toBe(true);
 });
 
+test('Developer tools: Send a report says what it packs, saves it and opens the form', async ({
+  page,
+}) => {
+  // Developer tools are made for a mouse on a desktop (notes/CLAUDE.md).
+  await open(page, 'windows');
+  await page.locator('.top-bar button, nav button', { hasText: 'Settings' }).first().click();
+  await page.locator('.settings-nav button', { hasText: 'Advanced' }).click();
+  const tools = page.locator('.settings-section', { hasText: 'Developer tools' });
+  await expect(tools).toContainText('Kinema sends nothing');
+  await expect(tools).toContainText('replaced by ~');
+  await tools.locator('button', { hasText: 'Send a report' }).click();
+  await expect(tools.locator('.settings-ok')).toContainText(
+    'Downloads\\kinema-report-2026-10-23-1405.zip (app.log, app.previous.log, mpv.log, equipment.txt)'
+  );
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as unknown as { __kinemaMock: { openedLinks: string[] } }).__kinemaMock.openedLinks
+      )
+    )
+    .toContain('https://github.com/Basswaves/kinema/issues/new?template=bug_report.yml');
+});
+
 async function androidSettings(page: Page, section: string): Promise<void> {
   await page.setViewportSize({ width: 960, height: 540 });
   await page.addInitScript(() => localStorage.setItem('kinemaMockSystem', 'android'));

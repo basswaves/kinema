@@ -16,6 +16,8 @@
 import { Component, Fragment, useEffect, useRef, type ErrorInfo, type ReactNode } from 'react';
 import { openLogFolder } from '../metadata/api';
 import { powerAction } from './api';
+import { capabilitiesNow } from '../capabilities';
+import { sendReport } from './report';
 
 interface Props {
   children: ReactNode;
@@ -84,6 +86,16 @@ function CrashScreen({ onRetry }: { onRetry: () => void }) {
         <button type="button" className="btn-primary" autoFocus onClick={onRetry}>
           Try again
         </button>
+        {/* Desktop only: Android has no folder to save into (Share the log, in Settings). */}
+        {capabilitiesNow()?.opens_folders && (
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => void sendReport().catch(() => undefined)}
+          >
+            Send a report
+          </button>
+        )}
         <button
           type="button"
           className="btn-secondary"

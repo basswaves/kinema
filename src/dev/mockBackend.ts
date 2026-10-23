@@ -990,6 +990,8 @@ const mpvOnly =
   };
 /** Who listened for the system's Back button (`plugin:app|register_listener`). */
 const backListeners: string[] = [];
+/** Addresses handed to the system's browser, in order. */
+const openedLinks: string[] = [];
 /**
  * `kinemaMockReview` pretends that many videos wait in the review queue.
  * Read at each count, so a test can match them "by hand" part-way through.
@@ -1721,6 +1723,10 @@ const handlers: Record<string, Handler> = {
     shader_cache: 'C:\\fixture\\shadercache',
   }),
   open_log_folder: () => null,
+  make_report: () => ({
+    path: 'C:\\Users\\you\\Downloads\\kinema-report-2026-10-23-1405.zip',
+    files: ['app.log', 'app.previous.log', 'mpv.log', 'equipment.txt'],
+  }),
   open_backup_folder: () => null,
   list_backups: () => [
     { name: 'library-auto-v18-1790600000.db', kind: 'weekly', made_at: 1790600000, bytes: 4200000 },
@@ -1894,8 +1900,9 @@ const handlers: Record<string, Handler> = {
   'plugin:window|show': () => null,
   // An Android box with nothing that opens web pages: the opener refuses,
   // as Android's does (links.ts shows the address instead).
-  'plugin:opener|open_url': () => {
+  'plugin:opener|open_url': (a) => {
     if (ON_ANDROID) throw new Error('No Activity found to handle Intent');
+    openedLinks.push(String(a.url));
     return null;
   },
   link_qr: () => MOCK_QR,
@@ -2008,6 +2015,7 @@ export function installMockBackend(): void {
   fakeMedia3.exposeFakeMedia3();
   (window as unknown as { __kinemaMock: unknown }).__kinemaMock = {
     backListeners,
+    openedLinks,
     playback,
     settings,
     files,

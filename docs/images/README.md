@@ -11,7 +11,8 @@ Referenced from the top-level [README](../../README.md).
 | `settings.png` | The Settings section list and search box, cut from a fullscreen shot |
 
 Take them in fullscreen, with no viewing history, playlists or device names on
-screen. Settings is left out on purpose: it shows the library's folder paths.
+screen. Of Settings only the section list is shown: its Library section lists
+the library's folder paths.
 Check the audio list in `player` too: each track's title is often the file's
 release name, so the current picture has those names painted out. `stats` is
 the panel cut out of a player shot. The website uses the same pictures, smaller,

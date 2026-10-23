@@ -3594,6 +3594,9 @@ kbd {
   border: none;
   background: none;
   color: inherit;
+  /* A button keeps the browser's own fixed text size unless told otherwise,
+     which left these names out of the app's scaling. */
+  font: inherit;
   text-align: left;
   cursor: pointer;
 }

@@ -1,7 +1,8 @@
 /**
  * Playlists by keyboard alone (LOCAL-MEDIA.md phase 5): Library → Playlists →
  * a playlist plays in its own order through Up next and carries on where it
- * was left; + Playlist on a film's page makes a playlist by name; the player's
+ * was left; + Playlist on a film's page makes a playlist by name, and an
+ * episode's own "+" adds just that episode; the player's
  * Audio & subtitles adds what is playing; Up and Remove on the playlist page.
  * `kinemaMockPlaylists=1` starts the mock with "Evening": S01E02, the film, a
  * video, S01E01 (mockBackend.ts).
@@ -118,6 +119,32 @@ test("+ Playlist on a film's page makes a playlist by name", async ({ page }) =>
   await expect(page.locator('.detail-note')).toHaveText('Added 1 item to Road');
   // The ring is back on the button that opened the dialog.
   await expect.poll(() => focused(page)).toBe('+ Playlist');
+});
+
+test("one episode by the + on its row; the top button is the season's", async ({ page }) => {
+  await home(page, 'series', false);
+  await press(page, 'ArrowRight');
+  await press(page, 'Enter');
+  await expect(page.locator('.detail-actions')).toBeVisible();
+  // The page's own button names what it adds.
+  await moveTo(page, 'ArrowRight', '+ Playlist (season 1)');
+
+  // Episode 1 → its tick → its "+".
+  await moveTo(page, 'ArrowDown', '1Episode 1');
+  await press(page, 'ArrowRight');
+  await expect.poll(() => focused(page)).toMatch(/^✓/);
+  await press(page, 'ArrowRight');
+  await expect(page.locator('.episode-add.focused')).toHaveAttribute('aria-label', 'Add to a playlist');
+  await press(page, 'Enter');
+  await expect(page.locator('.playlist-dialog h2')).toHaveText('Add episode 1 to a playlist');
+  await expect.poll(() => focused(page)).toBe('+ New playlist');
+  await press(page, 'Enter');
+  await page.keyboard.type('Pilots');
+  await press(page, 'Enter');
+  await expect(page.locator('.playlist-dialog')).toHaveCount(0);
+  await expect(page.locator('.detail-note')).toHaveText('Added 1 item to Pilots');
+  // The ring is back on the "+" it came from.
+  await expect(page.locator('.episode-add.focused')).toHaveCount(1);
 });
 
 test("the player's Audio & subtitles adds what is playing", async ({ page }) => {

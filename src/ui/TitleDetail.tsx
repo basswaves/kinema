@@ -337,7 +337,7 @@ export default function TitleDetailView({ title, onPlayFile, onBack, onFindMatch
   /**
    * What + Playlist adds (LOCAL-MEDIA.md phase 5): the film, or the episodes
    * of the season shown that are here, in order. A single episode is added
-   * from the player.
+   * by the "+" on its row, or from the player.
    */
   const playlistItems = useMemo((): NewItem[] => {
     if (title.kind === 'series') {
@@ -347,7 +347,9 @@ export default function TitleDetailView({ title, onPlayFile, onBack, onFindMatch
     }
     return detail?.movie_path ? [{ path: detail.movie_path, file_id: detail.movie_file_id }] : [];
   }, [title.kind, visibleEpisodes, detail]);
-  const [playlistOpen, setPlaylistOpen] = useState(false);
+  /** The playlist dialog, open for these items: the page's, or one episode's. */
+  const [playlistFor, setPlaylistFor] = useState<{ items: NewItem[]; what: string } | null>(null);
+  const seasonWords = season === 0 ? 'the specials' : `season ${season ?? ''}`;
   const [playlistNote, setPlaylistNote] = useState<string | null>(null);
 
   /**
@@ -709,9 +711,16 @@ export default function TitleDetailView({ title, onPlayFile, onBack, onFindMatch
                   <FocusButton
                     className="btn-secondary"
                     keepInView="page-top"
-                    onSelect={() => setPlaylistOpen(true)}
+                    onSelect={() =>
+                      setPlaylistFor({
+                        items: playlistItems,
+                        what: title.kind !== 'series' ? 'the film' : seasonWords,
+                      })
+                    }
                   >
-                    + Playlist
+                    {title.kind !== 'series'
+                      ? '+ Playlist'
+                      : `+ Playlist (${season === 0 ? 'specials' : `season ${season ?? ''}`})`}
                   </FocusButton>
                 )}
                   </>
@@ -719,18 +728,12 @@ export default function TitleDetailView({ title, onPlayFile, onBack, onFindMatch
               </FocusGroup>
               {renameError && <div className="detail-error">{renameError}</div>}
               {playlistNote && <div className="detail-note">{playlistNote}</div>}
-              {playlistOpen && (
+              {playlistFor && (
                 <PlaylistDialog
-                  items={playlistItems}
-                  what={
-                    title.kind !== 'series'
-                      ? 'the film'
-                      : season === 0
-                        ? 'the specials'
-                        : `season ${season ?? ''}`
-                  }
+                  items={playlistFor.items}
+                  what={playlistFor.what}
                   onClose={(message) => {
-                    setPlaylistOpen(false);
+                    setPlaylistFor(null);
                     setPlaylistNote(message);
                   }}
                 />
@@ -852,6 +855,13 @@ export default function TitleDetailView({ title, onPlayFile, onBack, onFindMatch
                     onToggleWatched={() =>
                       void toggleWatched(episode.file_id as number, !episode.watched)
                     }
+                    onAddToPlaylist={() =>
+                      episode.file_path &&
+                      setPlaylistFor({
+                        items: [{ path: episode.file_path, file_id: episode.file_id }],
+                        what: `episode ${episode.episode}`,
+                      })
+                    }
                     onPlay={() =>
                       episode.file_path &&
                       onPlayFile({
@@ -878,6 +888,7 @@ interface EpisodeRowProps {
   differences?: string[];
   onPlay: () => void;
   onToggleWatched: () => void;
+  onAddToPlaylist: () => void;
   focusKey?: string;
 }
 
@@ -913,6 +924,7 @@ function PlayableEpisodeRow({
   differences,
   onPlay,
   onToggleWatched,
+  onAddToPlaylist,
   focusKey,
 }: EpisodeRowProps) {
   const { ref, focusKey: rowKey, hasFocusedChild } = useFocusable({
@@ -944,6 +956,17 @@ function PlayableEpisodeRow({
             ✓
           </span>
           <span className="watched-text">{episode.watched ? 'Watched' : 'Mark watched'}</span>
+        </FocusButton>
+        {/* Just this episode into a playlist (owner, 2026-10-18): a "+" only,
+            as words on every row would look busy, and as quiet as the tick. */}
+        <FocusButton
+          className="episode-add"
+          keepInView="nearest"
+          label="Add to a playlist"
+          title="Add to a playlist"
+          onSelect={onAddToPlaylist}
+        >
+          +
         </FocusButton>
       </div>
     </FocusContext.Provider>

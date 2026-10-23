@@ -3634,6 +3634,20 @@ and a Jellyfin source further out. Decisions made along the way:
 - Not chosen: also an "Open file…" / Ctrl+O at a desk; no playing on the
   Folders page anywhere.
 
+## One episode into a playlist (2026-10-23)
+
+- **A "+" on each episode row, beside the watched tick** (owner, option 1 of
+  3), revising "not a + on every row" from the playlists entry above. Adding
+  one episode used to need the player; a season list is where a person picks
+  one. The cost that rule guarded against is small here: the "+" is the last
+  stop on its own row, reached by Right past the tick, so Up and Down still
+  walk the episodes. A "+" only, as words on every row would look busy; as
+  quiet as the tick until its row has the ring or the pointer; named "Add to
+  a playlist" for screen readers and as a tooltip. The page's button stays
+  for the whole season and now says so: "+ Playlist (season N)".
+- Not chosen: a dialog with a tick per episode; only through a later menu on
+  cards.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

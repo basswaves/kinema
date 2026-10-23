@@ -260,14 +260,14 @@
       "Volume 100%": { "U": "·", "D": "·", "L": "Audio & subtitles", "R": "·" }
     },
     "player-tracks": {
-      "close": { "U": "Add to a playlist ›", "D": "English · 7.1 · Dolby TrueHD Atmos", "L": "·", "R": "·" },
-      "English · 7.1 · Dolby TrueHD Atmos": { "U": "close", "D": "English · Stereo · Dolby Digital · Commentary with", "L": "·", "R": "·" },
-      "English · Stereo · Dolby Digital · Commentary with": { "U": "English · 7.1 · Dolby TrueHD Atmos", "D": "Off", "L": "·", "R": "·" },
-      "Off": { "U": "English · Stereo · Dolby Digital · Commentary with", "D": "English · SDH", "L": "·", "R": "·" },
-      "English · SDH": { "U": "Off", "D": "Norwegian", "L": "·", "R": "·" },
-      "Norwegian": { "U": "English · SDH", "D": "Norwegian · Forced", "L": "·", "R": "·" },
-      "Norwegian · Forced": { "U": "Norwegian", "D": "Find English subtitles online", "L": "·", "R": "·" },
-      "Find English subtitles online": { "U": "Norwegian · Forced", "D": "Playback details ›", "L": "·", "R": "·" },
+      "close": { "U": "Add to a playlist ›", "D": "ENEnglish · 7.1 · Dolby TrueHD Atmos", "L": "·", "R": "·" },
+      "ENEnglish · 7.1 · Dolby TrueHD Atmos": { "U": "close", "D": "ENEnglish · Stereo · Dolby Digital · Commentary wi", "L": "·", "R": "·" },
+      "ENEnglish · Stereo · Dolby Digital · Commentary wi": { "U": "ENEnglish · 7.1 · Dolby TrueHD Atmos", "D": "Off", "L": "·", "R": "·" },
+      "Off": { "U": "ENEnglish · Stereo · Dolby Digital · Commentary wi", "D": "ENEnglish · SDH", "L": "·", "R": "·" },
+      "ENEnglish · SDH": { "U": "Off", "D": "NONorwegian", "L": "·", "R": "·" },
+      "NONorwegian": { "U": "ENEnglish · SDH", "D": "NONorwegian · Forced", "L": "·", "R": "·" },
+      "NONorwegian · Forced": { "U": "NONorwegian", "D": "Find English subtitles online", "L": "·", "R": "·" },
+      "Find English subtitles online": { "U": "NONorwegian · Forced", "D": "Playback details ›", "L": "·", "R": "·" },
       "Playback details ›": { "U": "Find English subtitles online", "D": "Add to a playlist ›", "L": "·", "R": "·" },
       "Add to a playlist ›": { "U": "Playback details ›", "D": "close", "L": "·", "R": "·" }
     },
@@ -306,16 +306,13 @@
       "Next": { "U": "·", "D": "Connect SIMKL", "L": "·", "R": "Finish later" },
       "Finish later": { "U": "·", "D": "Connect SIMKL", "L": "Next", "R": "·" },
       "Connect SIMKL": { "U": "Next", "D": "Connect Trakt", "L": "·", "R": "·" },
-      "Connect Trakt": { "U": "Connect SIMKL", "D": "The username, not the email address", "L": "·", "R": "·" },
-      "The username, not the email address": { "U": "Connect Trakt", "D": "Your OpenSubtitles password", "L": "·", "R": "·" },
-      "Your OpenSubtitles password": { "U": "The username, not the email address", "D": "·", "L": "·", "R": "·" }
+      "Connect Trakt": { "U": "Connect SIMKL", "D": "·", "L": "·", "R": "·" }
     },
     "setup-4": {
-      "Finish": { "U": "·", "D": "Install ffmpeg", "L": "·", "R": "·" },
-      "Install ffmpeg": { "U": "Finish", "D": "ffmpeg", "L": "·", "R": "·" },
-      "ffmpeg": { "U": "Install ffmpeg", "D": "Get a free key ↗", "L": "·", "R": "·" },
-      "Get a free key ↗": { "U": "ffmpeg", "D": "OMDb API key", "L": "·", "R": "·" },
-      "OMDb API key": { "U": "Get a free key ↗", "D": "·", "L": "·", "R": "·" }
+      "Next": { "U": "·", "D": "The username, not the email address", "L": "·", "R": "Finish later" },
+      "Finish later": { "U": "·", "D": "The username, not the email address", "L": "Next", "R": "·" },
+      "The username, not the email address": { "U": "Next", "D": "Your OpenSubtitles password", "L": "·", "R": "·" },
+      "Your OpenSubtitles password": { "U": "The username, not the email address", "D": "·", "L": "·", "R": "·" }
     },
     "library": {
       "Home videos": { "U": "Library", "D": "Library folders", "L": "·", "R": "Playlists" },
@@ -414,6 +411,13 @@
       "Get a free TMDB key ↗": { "U": "Settings", "D": "Paste your TMDB key", "L": "Posters & ratings", "R": "·" },
       "Paste your TMDB key": { "U": "Get a free TMDB key ↗", "D": "Paste your OMDb key", "L": "Posters & ratings", "R": "·" },
       "Paste your OMDb key": { "U": "Paste your TMDB key", "D": "·", "L": "Posters & ratings", "R": "·" }
+    },
+    "setup-5": {
+      "Finish": { "U": "·", "D": "Install ffmpeg", "L": "·", "R": "·" },
+      "Install ffmpeg": { "U": "Finish", "D": "ffmpeg", "L": "·", "R": "·" },
+      "ffmpeg": { "U": "Install ffmpeg", "D": "Get a free key ↗", "L": "·", "R": "·" },
+      "Get a free key ↗": { "U": "ffmpeg", "D": "OMDb API key", "L": "·", "R": "·" },
+      "OMDb API key": { "U": "Get a free key ↗", "D": "·", "L": "·", "R": "·" }
     }
   },
   "linux": {
@@ -668,14 +672,14 @@
       "Volume 100%": { "U": "·", "D": "·", "L": "Audio & subtitles", "R": "·" }
     },
     "player-tracks": {
-      "close": { "U": "Add to a playlist ›", "D": "English · 7.1 · Dolby TrueHD Atmos", "L": "·", "R": "·" },
-      "English · 7.1 · Dolby TrueHD Atmos": { "U": "close", "D": "English · Stereo · Dolby Digital · Commentary with", "L": "·", "R": "·" },
-      "English · Stereo · Dolby Digital · Commentary with": { "U": "English · 7.1 · Dolby TrueHD Atmos", "D": "Off", "L": "·", "R": "·" },
-      "Off": { "U": "English · Stereo · Dolby Digital · Commentary with", "D": "English · SDH", "L": "·", "R": "·" },
-      "English · SDH": { "U": "Off", "D": "Norwegian", "L": "·", "R": "·" },
-      "Norwegian": { "U": "English · SDH", "D": "Norwegian · Forced", "L": "·", "R": "·" },
-      "Norwegian · Forced": { "U": "Norwegian", "D": "Find English subtitles online", "L": "·", "R": "·" },
-      "Find English subtitles online": { "U": "Norwegian · Forced", "D": "Playback details ›", "L": "·", "R": "·" },
+      "close": { "U": "Add to a playlist ›", "D": "ENEnglish · 7.1 · Dolby TrueHD Atmos", "L": "·", "R": "·" },
+      "ENEnglish · 7.1 · Dolby TrueHD Atmos": { "U": "close", "D": "ENEnglish · Stereo · Dolby Digital · Commentary wi", "L": "·", "R": "·" },
+      "ENEnglish · Stereo · Dolby Digital · Commentary wi": { "U": "ENEnglish · 7.1 · Dolby TrueHD Atmos", "D": "Off", "L": "·", "R": "·" },
+      "Off": { "U": "ENEnglish · Stereo · Dolby Digital · Commentary wi", "D": "ENEnglish · SDH", "L": "·", "R": "·" },
+      "ENEnglish · SDH": { "U": "Off", "D": "NONorwegian", "L": "·", "R": "·" },
+      "NONorwegian": { "U": "ENEnglish · SDH", "D": "NONorwegian · Forced", "L": "·", "R": "·" },
+      "NONorwegian · Forced": { "U": "NONorwegian", "D": "Find English subtitles online", "L": "·", "R": "·" },
+      "Find English subtitles online": { "U": "NONorwegian · Forced", "D": "Playback details ›", "L": "·", "R": "·" },
       "Playback details ›": { "U": "Find English subtitles online", "D": "Add to a playlist ›", "L": "·", "R": "·" },
       "Add to a playlist ›": { "U": "Playback details ›", "D": "close", "L": "·", "R": "·" }
     },
@@ -708,16 +712,13 @@
       "Next": { "U": "·", "D": "Connect SIMKL", "L": "·", "R": "Finish later" },
       "Finish later": { "U": "·", "D": "Connect SIMKL", "L": "Next", "R": "·" },
       "Connect SIMKL": { "U": "Next", "D": "Connect Trakt", "L": "·", "R": "·" },
-      "Connect Trakt": { "U": "Connect SIMKL", "D": "The username, not the email address", "L": "·", "R": "·" },
-      "The username, not the email address": { "U": "Connect Trakt", "D": "Your OpenSubtitles password", "L": "·", "R": "·" },
-      "Your OpenSubtitles password": { "U": "The username, not the email address", "D": "·", "L": "·", "R": "·" }
+      "Connect Trakt": { "U": "Connect SIMKL", "D": "·", "L": "·", "R": "·" }
     },
     "setup-4": {
-      "Finish": { "U": "·", "D": "Open the ffmpeg download page ↗", "L": "·", "R": "·" },
-      "Open the ffmpeg download page ↗": { "U": "Finish", "D": "ffmpeg", "L": "·", "R": "·" },
-      "ffmpeg": { "U": "Open the ffmpeg download page ↗", "D": "Get a free key ↗", "L": "·", "R": "·" },
-      "Get a free key ↗": { "U": "ffmpeg", "D": "OMDb API key", "L": "·", "R": "·" },
-      "OMDb API key": { "U": "Get a free key ↗", "D": "·", "L": "·", "R": "·" }
+      "Next": { "U": "·", "D": "The username, not the email address", "L": "·", "R": "Finish later" },
+      "Finish later": { "U": "·", "D": "The username, not the email address", "L": "Next", "R": "·" },
+      "The username, not the email address": { "U": "Next", "D": "Your OpenSubtitles password", "L": "·", "R": "·" },
+      "Your OpenSubtitles password": { "U": "The username, not the email address", "D": "·", "L": "·", "R": "·" }
     },
     "library": {
       "Home videos": { "U": "Library", "D": "Library folders", "L": "·", "R": "Playlists" },
@@ -816,6 +817,13 @@
       "Get a free TMDB key ↗": { "U": "Settings", "D": "Paste your TMDB key", "L": "Posters & ratings", "R": "·" },
       "Paste your TMDB key": { "U": "Get a free TMDB key ↗", "D": "Paste your OMDb key", "L": "Posters & ratings", "R": "·" },
       "Paste your OMDb key": { "U": "Paste your TMDB key", "D": "·", "L": "Posters & ratings", "R": "·" }
+    },
+    "setup-5": {
+      "Finish": { "U": "·", "D": "Open the ffmpeg download page ↗", "L": "·", "R": "·" },
+      "Open the ffmpeg download page ↗": { "U": "Finish", "D": "ffmpeg", "L": "·", "R": "·" },
+      "ffmpeg": { "U": "Open the ffmpeg download page ↗", "D": "Get a free key ↗", "L": "·", "R": "·" },
+      "Get a free key ↗": { "U": "ffmpeg", "D": "OMDb API key", "L": "·", "R": "·" },
+      "OMDb API key": { "U": "Get a free key ↗", "D": "·", "L": "·", "R": "·" }
     }
   },
   "android": {
@@ -1047,15 +1055,15 @@
       "Volume 100%": { "U": "·", "D": "·", "L": "Audio & subtitles", "R": "·" }
     },
     "player-tracks": {
-      "close": { "U": "Add to a playlist ›", "D": "English · 5.1 · Dolby Digital Plus Atmos", "L": "·", "R": "·" },
-      "English · 5.1 · Dolby Digital Plus Atmos": { "U": "close", "D": "English · Stereo · Dolby Digital · Commentary with", "L": "·", "R": "·" },
-      "English · Stereo · Dolby Digital · Commentary with": { "U": "English · 5.1 · Dolby Digital Plus Atmos", "D": "Off", "L": "·", "R": "·" },
-      "Off": { "U": "English · Stereo · Dolby Digital · Commentary with", "D": "English · SDH", "L": "·", "R": "·" },
-      "English · SDH": { "U": "Off", "D": "Norwegian", "L": "·", "R": "·" },
-      "Norwegian": { "U": "English · SDH", "D": "Norwegian · Forced", "L": "·", "R": "·" },
-      "Norwegian · Forced": { "U": "Norwegian", "D": "Dutch · separate file", "L": "·", "R": "·" },
-      "Dutch · separate file": { "U": "Norwegian · Forced", "D": "Find English subtitles online", "L": "·", "R": "·" },
-      "Find English subtitles online": { "U": "Dutch · separate file", "D": "Playback details ›", "L": "·", "R": "·" },
+      "close": { "U": "Add to a playlist ›", "D": "ENEnglish · 5.1 · Dolby Digital Plus Atmos", "L": "·", "R": "·" },
+      "ENEnglish · 5.1 · Dolby Digital Plus Atmos": { "U": "close", "D": "ENEnglish · Stereo · Dolby Digital · Commentary wi", "L": "·", "R": "·" },
+      "ENEnglish · Stereo · Dolby Digital · Commentary wi": { "U": "ENEnglish · 5.1 · Dolby Digital Plus Atmos", "D": "Off", "L": "·", "R": "·" },
+      "Off": { "U": "ENEnglish · Stereo · Dolby Digital · Commentary wi", "D": "ENEnglish · SDH", "L": "·", "R": "·" },
+      "ENEnglish · SDH": { "U": "Off", "D": "NONorwegian", "L": "·", "R": "·" },
+      "NONorwegian": { "U": "ENEnglish · SDH", "D": "NONorwegian · Forced", "L": "·", "R": "·" },
+      "NONorwegian · Forced": { "U": "NONorwegian", "D": "NLDutch · separate file", "L": "·", "R": "·" },
+      "NLDutch · separate file": { "U": "NONorwegian · Forced", "D": "Find English subtitles online", "L": "·", "R": "·" },
+      "Find English subtitles online": { "U": "NLDutch · separate file", "D": "Playback details ›", "L": "·", "R": "·" },
       "Playback details ›": { "U": "Find English subtitles online", "D": "Add to a playlist ›", "L": "·", "R": "·" },
       "Add to a playlist ›": { "U": "Playback details ›", "D": "close", "L": "·", "R": "·" }
     },

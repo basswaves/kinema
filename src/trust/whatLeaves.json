@@ -32,8 +32,8 @@
       "hosts": ["www.omdbapi.com"],
       "sends": "A film's IMDb number and your own OMDb key.",
       "when": "Only if you typed in an OMDb key, at most 500 lookups a day.",
-      "stop": "Empty the OMDb key in Settings, Library.",
-      "section": "library",
+      "stop": "Empty the OMDb key in Settings, Posters & ratings.",
+      "section": "ratings",
       "state": "omdb"
     },
     {
@@ -50,7 +50,7 @@
       "hosts": ["api.theintrodb.org"],
       "sends": "The TMDB number of what you are playing, with the season and episode for a show.",
       "when": "When you play an episode or film whose intro or credits are not known, at most once a month for each.",
-      "stop": "Look up TheIntroDB, in Settings, Intro & credits.",
+      "stop": "Look up TheIntroDB, in Settings, Skipping intros.",
       "section": "intros",
       "state": "theintrodb"
     },
@@ -60,7 +60,7 @@
       "hosts": ["api.introdb.app"],
       "sends": "The IMDb number of what you are playing, with the season and episode for a show.",
       "when": "When you play something whose intro or credits are still not known, at most once a month for each.",
-      "stop": "Look up IntroDB, in Settings, Intro & credits.",
+      "stop": "Look up IntroDB, in Settings, Skipping intros.",
       "section": "intros",
       "state": "introdb_app"
     },
@@ -70,8 +70,8 @@
       "hosts": ["api.opensubtitles.com"],
       "sends": "The title's numbers, season and episode, a fingerprint of the video file (not the file itself), the languages you want, and your sign-in if you added one. The subtitle is then downloaded from the address OpenSubtitles gives.",
       "when": "Only when you ask for subtitles, and for forced subtitles by themselves if you switched that on.",
-      "stop": "Do not ask; forced subtitles are switched off in Settings, Accounts.",
-      "section": "accounts",
+      "stop": "Do not ask; forced subtitles are switched off in Settings, Language & subtitles.",
+      "section": "subtitles",
       "state": "opensubtitles"
     },
     {
@@ -80,8 +80,8 @@
       "hosts": ["api.simkl.com"],
       "sends": "The films and episodes you finish (their numbers and when), and at connect what you had already watched. Nothing is read back.",
       "when": "Only while SIMKL is connected.",
-      "stop": "Disconnect, in Settings, Accounts.",
-      "section": "accounts",
+      "stop": "Disconnect, in Settings, Keep track of what I watch.",
+      "section": "tracking",
       "state": "simkl"
     },
     {
@@ -90,8 +90,8 @@
       "hosts": ["api.trakt.tv"],
       "sends": "The films and episodes you finish, at connect what the account lacks, and where you stopped something part-way. Where you stopped elsewhere is read back to resume here.",
       "when": "Only while Trakt is connected; resume points when a title's page or Home's Continue row is shown.",
-      "stop": "Disconnect, in Settings, Accounts. Resume across devices has its own switch there.",
-      "section": "accounts",
+      "stop": "Disconnect, in Settings, Keep track of what I watch. Resume across devices has its own switch there.",
+      "section": "tracking",
       "state": "trakt"
     },
     {

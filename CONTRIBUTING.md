@@ -533,7 +533,7 @@ reasoning is in [docs/DESIGN.md](docs/DESIGN.md) and [docs/HISTORY.md](docs/HIST
   come from the name, because nothing inside a file says them. The badges are
   in Kinema's own lettering: Dolby, DTS and IMDb logos are trademarks for
   licensed products, which this is not. The services a user connects are
-  different — Settings → Accounts shows SIMKL's and Trakt's own marks because
+  different — Settings → Keep track of what I watch shows SIMKL's and Trakt's own marks because
   both ask apps to, each as its guidelines say (NOTICE.md). A service that
   publishes no terms for its logo is shown by name.
 - **No shared key for scores.** IMDb's rating comes from the file IMDb
@@ -548,7 +548,7 @@ reasoning is in [docs/DESIGN.md](docs/DESIGN.md) and [docs/HISTORY.md](docs/HIST
   flow (a code and a phone). Trakt keeps duplicate plays, so what it already has
   is never sent to it again. Nothing is read back from SIMKL. From Trakt only
   resume points are read, so a film stopped on one device continues on another:
-  on while Trakt is connected, with one switch in Settings → Accounts to turn it
+  on while Trakt is connected, with one switch in Settings → Keep track of what I watch to turn it
   off. The newer position wins, never the older (a finish here after the pause
   stays finished). It is read when a title's page opens and when Continue
   Watching loads — one request for the account's list, kept two minutes, never

@@ -506,11 +506,11 @@ test('first run: where to watch, a folder, then the setup pages, all by remote',
   // The way on is one press up, and says Next once something is chosen.
   await press(page, 'ArrowUp');
   await expect.poll(() => focused(page)).toBe('Next');
-  await expect(page.locator('.setup-progress')).toContainText('1 of 4');
+  await expect(page.locator('.setup-progress')).toContainText('1 of 5');
   await press(page, 'Enter');
 
   // Intros and credits: the current answers shown, the ring on the first.
-  await expect(page.locator('.setup-pages h1')).toHaveText('Intros and credits');
+  await expect(page.locator('.setup-pages h1')).toHaveText('Skipping intros');
   await expect.poll(() => focused(page)).toBe('✓Show a Skip button');
   // Skiptro is not on this PC: one line, nothing to press.
   await expect(page.locator('.setup-page')).toContainText('Already use Skiptro');
@@ -529,22 +529,28 @@ test('first run: where to watch, a folder, then the setup pages, all by remote',
   await expect.poll(() => focused(page)).toBe('✓Every receiver');
   await press(page, 'ArrowUp');
   await press(page, 'Enter');
-  await expect(page.locator('.setup-pages h1')).toHaveText('Intros and credits');
+  await expect(page.locator('.setup-pages h1')).toHaveText('Skipping intros');
 
   await press(page, 'ArrowUp');
   await expect.poll(() => focused(page)).toBe('Next');
   await press(page, 'Enter');
 
-  // Accounts: Settings' own sections, the ring on the first Connect.
-  await expect(page.locator('.setup-pages h1')).toHaveText('Accounts');
-  await expect(page.locator('.setup-page h2')).toHaveCount(3);
+  // Watch history: Settings' own cards, the ring on the first Connect.
+  await expect(page.locator('.setup-pages h1')).toHaveText('Keep track of what you watch');
+  await expect(page.locator('.setup-page h2')).toHaveCount(2);
   await expect.poll(() => focused(page)).toBe('Connect SIMKL');
   await press(page, 'ArrowUp');
   await expect.poll(() => focused(page)).toBe('Next');
   await press(page, 'Enter');
 
-  // Extras: the mock has no ffmpeg, so the way to install it and where it is.
-  await expect(page.locator('.setup-pages h1')).toHaveText('Extras');
+  // Subtitles online: OpenSubtitles' card.
+  await expect(page.locator('.setup-pages h1')).toHaveText('Subtitles online');
+  await expect(page.locator('.setup-page h2')).toHaveText(['OpenSubtitles']);
+  for (let i = 0; i < 6 && (await focused(page)) !== 'Next'; i++) await press(page, 'ArrowUp');
+  await press(page, 'Enter');
+
+  // Details and ratings: the mock has no ffmpeg, so the way to install it and where it is.
+  await expect(page.locator('.setup-pages h1')).toHaveText('Details and ratings');
   await expect(page.locator('.setup-page')).toContainText('ffmpeg is not installed');
   await expect.poll(() => focused(page)).toBe('Install ffmpeg');
   await press(page, 'ArrowDown');
@@ -758,8 +764,8 @@ test('Android: always the TV layout, never asked', async ({ page }) => {
   await expect(page.locator('.first-run-roots li')).toHaveCount(1);
   for (let i = 0; i < 4 && (await focused(page)) !== 'Scan my library'; i++) await press(page, 'ArrowDown');
   await press(page, 'Enter');
-  await expect(page.locator('.setup-pages h1')).toHaveText('Intros and credits');
-  await expect(page.locator('.setup-progress')).toContainText('1 of 3');
+  await expect(page.locator('.setup-pages h1')).toHaveText('Skipping intros');
+  await expect(page.locator('.setup-progress')).toContainText('1 of 4');
   await press(page, 'ArrowUp');
   // Nothing chosen, and the way on still says Next: it accepts what is shown.
   await expect.poll(() => focused(page)).toBe('Next');
@@ -821,7 +827,7 @@ async function firstRunToSetupPage(
   await expect(page.locator('.first-run-roots li')).toHaveCount(1);
   for (let i = 0; i < 4 && (await focused(page)) !== 'Scan my library'; i++) await press(page, 'ArrowDown');
   await press(page, 'Enter');
-  for (let i = 0; i < 4 && (await page.locator('.setup-pages h1').textContent()) !== title; i++) {
+  for (let i = 0; i < 6 && (await page.locator('.setup-pages h1').textContent()) !== title; i++) {
     await expect.poll(() => focused(page)).not.toBeUndefined();
     for (let j = 0; j < 4 && (await focused(page)) !== 'Next'; j++) {
       await press(page, 'ArrowUp');
@@ -835,7 +841,8 @@ async function firstRunToSetupPage(
 for (const system of ['android', 'windows'] as const) {
   test(`${system}: a setup page with nothing to press keeps the ring on Next`, async ({ page }) => {
     // A build without SIMKL's or Trakt's app and without an OpenSubtitles key
-    // — every build but a release — has nothing to press on Accounts. The
+    // — every build but a release — has nothing to press on Keep track of
+    // what you watch, nor on Subtitles online. The
     // ring went nowhere a moment after arriving, for good (found on a box).
     await page.setViewportSize({ width: 960, height: 540 });
     await page.addInitScript((s) => {
@@ -843,7 +850,7 @@ for (const system of ['android', 'windows'] as const) {
       localStorage.setItem('kinemaMockEmpty', '1');
       localStorage.setItem('kinemaMockNoAccountApps', '1');
     }, system);
-    await firstRunToSetupPage(page, system, 'Accounts');
+    await firstRunToSetupPage(page, system, 'Keep track of what you watch');
     await expect(page.locator('.setup-page')).toContainText('built without a SIMKL app');
 
     // Long after the page's wait for a question has run out, the ring is on
@@ -875,20 +882,20 @@ for (const system of ['android', 'windows'] as const) {
     expect(await inView()).toBe(true);
     expect(await focused(page)).toBe('Next');
     await press(page, 'Enter');
-    await expect(page.locator('.setup-pages h1')).toHaveText('Extras');
+    await expect(page.locator('.setup-pages h1')).toHaveText('Subtitles online');
   });
 }
 
 test('a setup page whose question comes late still starts on it, unless the remote was used', async ({
   page,
 }) => {
-  // Extras asks whether ffmpeg is there before it shows anything; on a busy
+  // Details and ratings asks whether ffmpeg is there before it shows anything; on a busy
   // computer that took longer than the page waits (seen once under load).
   await page.addInitScript(() => {
     localStorage.setItem('kinemaMockEmpty', '1');
     localStorage.setItem('kinemaMockSlowFfmpeg', '1');
   });
-  await firstRunToSetupPage(page, 'windows', 'Extras');
+  await firstRunToSetupPage(page, 'windows', 'Details and ratings');
   // Meanwhile the ring is on the way on (the last page's: Finish), never
   // nowhere…
   await expect.poll(() => focused(page)).toBe('Finish');
@@ -899,11 +906,11 @@ test('a setup page whose question comes late still starts on it, unless the remo
   // Back, and on again: this time a key is pressed before the question comes,
   // and the ring stays where the person has it.
   await press(page, 'Escape');
-  await expect(page.locator('.setup-pages h1')).toHaveText('Accounts');
+  await expect(page.locator('.setup-pages h1')).toHaveText('Subtitles online');
   await press(page, 'ArrowUp');
-  for (let i = 0; i < 4 && (await focused(page)) !== 'Next'; i++) await press(page, 'ArrowUp');
+  for (let i = 0; i < 6 && (await focused(page)) !== 'Next'; i++) await press(page, 'ArrowUp');
   await press(page, 'Enter');
-  await expect(page.locator('.setup-pages h1')).toHaveText('Extras');
+  await expect(page.locator('.setup-pages h1')).toHaveText('Details and ratings');
   await expect.poll(() => focused(page), { timeout: 2500 }).toBe('Finish');
   await press(page, 'ArrowDown');
   await expect(page.locator('.setup-page')).toContainText('ffmpeg is not installed');
@@ -974,20 +981,20 @@ test('Windows: Settings installs ffmpeg, and its status turns green', async ({ p
   await press(page, 'Enter');
   await press(page, 'ArrowDown');
   await expect.poll(() => focused(page)).toBe('Library');
-  for (let i = 0; i < 12 && (await focused(page)) !== 'Intro & credits'; i++) {
+  for (let i = 0; i < 12 && (await focused(page)) !== 'Skipping intros'; i++) {
     await press(page, 'ArrowDown');
   }
-  await expect.poll(() => focused(page)).toBe('Intro & credits');
+  await expect.poll(() => focused(page)).toBe('Skipping intros');
   await press(page, 'Enter');
-  await expect(page.locator('.settings-section h2').first()).toHaveText('Intro and credits');
+  await expect(page.locator('.settings-section h2').first()).toHaveText('Skipping intros');
   if (await page.evaluate(() => Boolean(document.querySelector('.settings-nav .focused')))) {
     await press(page, 'ArrowRight');
   }
-  for (let i = 0; i < 8 && (await focused(page)) !== 'Install ffmpeg'; i++) {
+  for (let i = 0; i < 12 && (await focused(page)) !== 'Install ffmpeg'; i++) {
     await press(page, 'ArrowDown');
   }
   await expect.poll(() => focused(page)).toBe('Install ffmpeg');
-  const section = page.locator('.settings-section');
+  const section = page.locator('.settings-content');
   await expect(section).toContainText('Could not find ffmpeg');
   await expect(section).toContainText('about 110 MB');
 
@@ -1002,13 +1009,13 @@ test('Windows: Settings installs ffmpeg, and its status turns green', async ({ p
   await expect.poll(() => focused(page)).toBeTruthy();
 });
 
-test('first run, Extras: ffmpeg installs from the setup page by remote', async ({ page }) => {
+test('first run, Details and ratings: ffmpeg installs from the setup page by remote', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('kinemaMockEmpty', '1');
-    // Accounts with nothing to press, so its way on is under the ring.
+    // Watch history and subtitles with nothing to press, so their way on is under the ring.
     localStorage.setItem('kinemaMockNoAccountApps', '1');
   });
-  await firstRunToSetupPage(page, 'windows', 'Extras');
+  await firstRunToSetupPage(page, 'windows', 'Details and ratings');
   await expect.poll(() => focused(page)).toBe('Install ffmpeg');
   await expect(page.locator('.setup-page')).toContainText('about 110 MB');
   await press(page, 'Enter');
@@ -1038,11 +1045,11 @@ test("an ffmpeg without HEVC or E-AC-3 (Fedora's own) is found, and what it cost
   await expect.poll(() => focused(page)).toBe('Settings');
   await press(page, 'Enter');
   await press(page, 'ArrowDown');
-  for (let i = 0; i < 12 && (await focused(page)) !== 'Intro & credits'; i++) {
+  for (let i = 0; i < 12 && (await focused(page)) !== 'Skipping intros'; i++) {
     await press(page, 'ArrowDown');
   }
   await press(page, 'Enter');
-  const section = page.locator('.settings-section');
+  const section = page.locator('.settings-content');
   await expect(section).toContainText('Found ffmpeg at');
   await expect(section).toContainText('cannot decode HEVC video or E-AC-3 sound');
   await expect(section).toContainText('the picture shape is not measured');
@@ -1072,14 +1079,15 @@ test('Android: nothing offers ffmpeg or Skiptro, which an Android app cannot run
   await expect.poll(() => focused(page)).toBe('Settings');
   await press(page, 'Enter');
   await press(page, 'ArrowDown');
-  for (let i = 0; i < 6 && (await focused(page)) !== 'Intro & credits'; i++) {
+  for (let i = 0; i < 6 && (await focused(page)) !== 'Skipping intros'; i++) {
     await press(page, 'ArrowDown');
   }
   await press(page, 'Enter');
-  const section = page.locator('.settings-section');
-  await expect(section.locator('h2')).toHaveText(['Intro and credits']);
+  const section = page.locator('.settings-content');
+  await expect(section.locator('h2')).toHaveText(['Skipping intros', 'How Kinema finds them']);
   await expect(section).toContainText('cannot listen to the episodes itself');
-  await expect(section.locator('h3')).toHaveText(['TheIntroDB', 'IntroDB']);
+  await expect(section.locator('h3')).toHaveText(['Times shared by other viewers']);
+  await expect(section.locator('.choice-label')).toContainText(['Look up TheIntroDB', 'Look up IntroDB']);
   await expect(section).not.toContainText('ffmpeg');
   await expect(section).not.toContainText('Skiptro');
 });
@@ -1342,7 +1350,7 @@ test('Android: OK on a text box puts it in the upper screen, clear of the keyboa
   page,
 }) => {
   // TV-FEEL.md, N10: the system's keyboard covered the box being typed in.
-  await androidSettings(page, 'Accounts');
+  await androidSettings(page, 'Language & subtitles');
   await downToTextBox(page);
   await press(page, 'Shift+Enter');
   await page.waitForTimeout(200);
@@ -1361,7 +1369,7 @@ test('the visible area shrinking while typing moves the box up out of the way', 
   for (let i = 0; i < 6 && (await focused(page)) !== 'Settings'; i++) await press(page, 'ArrowRight');
   await press(page, 'Enter');
   await press(page, 'ArrowDown');
-  for (let i = 0; i < 8 && (await focused(page)) !== 'Intro & credits'; i++) await press(page, 'ArrowDown');
+  for (let i = 0; i < 8 && (await focused(page)) !== 'Skipping intros'; i++) await press(page, 'ArrowDown');
   await press(page, 'Enter');
   await press(page, 'ArrowRight');
   await downToTextBox(page);
@@ -1466,12 +1474,12 @@ test('Settings → Privacy lists what leaves the computer, and goes to the switc
   if (await page.evaluate(() => Boolean(document.querySelector('.settings-nav .focused')))) {
     await press(page, 'ArrowRight');
   }
-  for (let i = 0; i < 12 && (await focused(page)) !== 'Go to Intro & credits'; i++) {
+  for (let i = 0; i < 12 && (await focused(page)) !== 'Go to Skipping intros'; i++) {
     await press(page, 'ArrowDown');
   }
-  await expect.poll(() => focused(page)).toBe('Go to Intro & credits');
+  await expect.poll(() => focused(page)).toBe('Go to Skipping intros');
   await press(page, 'Enter');
-  await expect(page.locator('.settings-section h2').first()).toHaveText('Intro and credits');
+  await expect(page.locator('.settings-section h2').first()).toHaveText('Skipping intros');
   // In the section, not back on the list beside it.
   await expect
     .poll(() => page.evaluate(() => Boolean(document.querySelector('.settings-content .focused'))))
@@ -1540,7 +1548,7 @@ for (const system of ['windows', 'android'] as const) {
 test('Android: a web page nothing can open is shown as its address and a QR code', async ({
   page,
 }) => {
-  await androidSettings(page, 'Library');
+  await androidSettings(page, 'Posters & ratings');
   for (let i = 0; i < 12 && (await focused(page)) !== 'Get a free TMDB key ↗'; i++) {
     await press(page, 'ArrowDown');
   }

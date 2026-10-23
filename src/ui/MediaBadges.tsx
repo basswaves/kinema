@@ -110,7 +110,7 @@ export function BadgeRows({ rows, heading }: { rows: BadgeRow[]; heading?: strin
       {sayNoFfmpeg && (
         <p className="media-badges-note">
           The picture and sound details appear here once Kinema can find ffmpeg. Settings, under
-          Intro &amp; credits, says how.
+          Skipping intros, says how.
         </p>
       )}
     </div>

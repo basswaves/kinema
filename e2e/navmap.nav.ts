@@ -508,8 +508,10 @@ const SECTIONS: [string, string][] = [
   ['library', 'Library'],
   ['playback', 'Playback'],
   ['picture', 'Picture & sound'],
-  ['intros', 'Intro & credits'],
-  ['accounts', 'Accounts'],
+  ['subtitles', 'Language & subtitles'],
+  ['intros', 'Skipping intros'],
+  ['tracking', 'Keep track of what I watch'],
+  ['ratings', 'Posters & ratings'],
   ['privacy', 'Privacy'],
   ['advanced', 'Advanced'],
 ];

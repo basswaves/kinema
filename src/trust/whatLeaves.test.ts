@@ -9,6 +9,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import page from './whatLeaves.json';
+import { SECTION_NAMES, type SectionId } from '../ui/settingsSections';
 
 /** Named in the code but never contacted by Kinema or opened for the user. */
 const NOT_CONTACTED: Record<string, string> = {
@@ -105,6 +106,16 @@ describe('What leaves your computer', () => {
       expect(s.sends && s.when && s.stop, s.id).toBeTruthy();
     }
     expect(new Set(page.services.map((s) => s.id)).size).toBe(page.services.length);
+  });
+
+  it('sends each Go to button to a section Settings has, named as it is there', () => {
+    // Settings was regrouped once (2026-10-23) and the buttons have to follow.
+    for (const s of page.services as { id: string; stop: string; section?: string }[]) {
+      if (!s.section) continue;
+      const name = SECTION_NAMES[s.section as SectionId];
+      expect(name, s.id).toBeTruthy();
+      expect(s.stop, s.id).toContain(`Settings, ${name}`);
+    }
   });
 
   it('finds a host in a URL and a bare one, and skips comments and Rust tests', () => {

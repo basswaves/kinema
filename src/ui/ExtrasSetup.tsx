@@ -118,7 +118,7 @@ export default function ExtrasSetup() {
 
       {programs && (
       <div className="choice-row">
-        <div className="choice-label">ffmpeg</div>
+        <div className="choice-label">Intros, credits and picture details (ffmpeg)</div>
         <p className="choice-note">
           A free program for reading video and audio. Kinema uses it to find intros and end credits
           by listening to the episodes, and to read each file&rsquo;s picture and sound for a

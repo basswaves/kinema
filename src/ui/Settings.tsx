@@ -105,6 +105,7 @@ import { buildNfoExports, writeNfo } from '../metadata/nfo';
 import { detectLines } from '../library/detectReport';
 import FixMatch from '../library/FixMatch';
 import SystemOutputSection from './SystemOutputSection';
+import { SECTIONS, SECTION_NAMES, type SectionId } from './settingsSections';
 
 // The developer tools are mouse-only and opened by choice; their code is
 // fetched when they are.
@@ -189,29 +190,6 @@ const ADD_VIDEOS_KEY = 'settings:add-videos';
 /** The name row that follows picking a Videos folder. */
 const VIDEOS_NAME_KEY = 'settings:videos-name';
 
-type SectionId =
-  | 'library'
-  | 'playback'
-  | 'picture'
-  | 'intros'
-  | 'accounts'
-  | 'privacy'
-  | 'advanced';
-
-/** The list down the side, in the order someone setting up would need them. */
-const SECTIONS: [SectionId, string][] = [
-  ['library', 'Library'],
-  ['playback', 'Playback'],
-  ['picture', 'Picture & sound'],
-  ['intros', 'Intro & credits'],
-  // Services signed into with the user's own account. Keys that identify
-  // films stay in Library; the keyless skip databases in Intro & credits.
-  ['accounts', 'Accounts'],
-  // What leaves your computer: every service, what it sends, what stops it.
-  ['privacy', 'Privacy'],
-  ['advanced', 'Advanced'],
-];
-
 /** Coming back to Settings opens the section you were last in. */
 let lastSection: SectionId = 'library';
 
@@ -234,9 +212,11 @@ export default function Settings({
       ? 'intros'
       : openSection === 'picture'
         ? 'picture'
-        : openSection
-          ? 'library'
-          : lastSection
+        : openSection === 'tmdb-key'
+          ? 'ratings'
+          : openSection
+            ? 'library'
+            : lastSection
   );
   const chooseSection = useCallback((id: SectionId) => {
     lastSection = id;
@@ -854,7 +834,7 @@ export default function Settings({
 
                   {!scan && last && <p className="muted">Last scan: {summaryLine(last)}</p>}
                   {/* The report from the intro/credits pass at the end of the
-                      scan, here rather than under Intro & credits because this
+                      scan, here rather than under Skipping intros because this
                       is where people look after a scan. Problems are always
                       shown: a Skiptro that is no longer where it was set up is
                       exactly the failure this exists to stop being silent. */}
@@ -934,105 +914,6 @@ export default function Settings({
                 </section>
 
                 <section className="settings-section">
-                  <h2>Posters and descriptions</h2>
-                  <p className="settings-intro">
-                    {!BUILTIN_TMDB_KEY
-                      ? 'Without a TMDB key, movies are identified through Wikidata: details and ' +
-                        'a description, but no posters. A free TMDB key adds posters, ' +
-                        'backdrops and cast.'
-                      : builtinRejected
-                        ? 'TMDB no longer accepts the key Kinema came with. Until an update ' +
-                          'brings a new one, new movies are identified through Wikidata, ' +
-                          'without posters. A free key of your own brings them back.'
-                        : 'Kinema looks up movies and TV shows on TMDB with a key of its own, ' +
-                          'so there is nothing to set up. You can use your own free key instead.'}
-                  </p>
-                  <div className="settings-row">
-                    <FocusButton
-                      keepInView="nearest"
-                      className="btn-secondary"
-                      onSelect={() => void openLink(TMDB_KEY_URL)}
-                    >
-                      Get a free TMDB key ↗
-                    </FocusButton>
-                    {keysSaved && <span className="muted">Saved.</span>}
-                  </div>
-                  <label className="settings-field">
-                    <span>
-                      {BUILTIN_TMDB_KEY ? 'Your own TMDB key ' : 'TMDB key '}
-                      <span className="muted">
-                        {BUILTIN_TMDB_KEY && !builtinRejected
-                          ? '(optional, used instead of Kinema’s)'
-                          : '(posters, backdrops, cast and episode pictures)'}
-                      </span>
-                    </span>
-                    {/* Masked. This screen is routinely on a television, and a
-                        key on a 60-inch panel in a living room is not private. */}
-                    <FocusInput
-                      focusKey={TMDB_KEY_INPUT_KEY}
-                      className="settings-input"
-                      value={tmdbKey}
-                      onChange={(v) => {
-                        setTmdbKey(v);
-                        setKeysSaved(false);
-                      }}
-                      type="password"
-                      placeholder={
-                        BUILTIN_TMDB_KEY && !builtinRejected ? 'Not needed' : 'Paste your TMDB key'
-                      }
-                    />
-                  </label>
-                  <label className="settings-field">
-                    <span>
-                      OMDb key <span className="muted">(optional)</span>
-                    </span>
-                    <FocusInput
-                      className="settings-input"
-                      value={omdbKey}
-                      onChange={(v) => {
-                        setOmdbKey(v);
-                        setKeysSaved(false);
-                      }}
-                      type="password"
-                      placeholder="Paste your OMDb key"
-                    />
-                  </label>
-                  <p className="choice-note">
-                    An OMDb key adds Rotten Tomatoes scores to a title&rsquo;s page, and helps
-                    identify movies. A free key allows 1,000 lookups a day and Kinema uses at most
-                    500, so a large library fills in over a few days.
-                  </p>
-                  <p className="settings-hint">
-                    Keys save as you type. A new key is used for titles identified from now on;
-                    titles already in the library keep what they have until they are looked up
-                    again.
-                  </p>
-                  {/* Attribution TMDB require wherever their data is shown, and
-                      TVmaze's licence asks for. The logo is TMDB's own unmodified
-                      SVG, served from the app rather than hotlinked. */}
-                  <div className="settings-attribution">
-                    <img src="/tmdb.svg" alt="TMDB" className="tmdb-logo" />
-                    <p className="muted">
-                      Movie and TV data from TMDB. This product uses the TMDB API but is not
-                      endorsed or certified by TMDB. TV data also from <strong>TVmaze</strong>.
-                      Movies found without a TMDB key: data from <strong>Wikidata</strong>, and
-                      descriptions from <strong>Wikipedia</strong> under CC BY-SA 4.0.
-                    </p>
-                    {/* The exact statement IMDb's terms for its ratings file
-                        require. */}
-                    <p className="muted">
-                      IMDb ratings: Information courtesy of IMDb (https://www.imdb.com). Used with
-                      permission.
-                    </p>
-                    {/* OMDb's data is CC BY-NC 4.0, which asks for a credit. */}
-                    <p className="muted">
-                      Rotten Tomatoes scores from <strong>OMDb</strong>, with your own key, under
-                      CC BY-NC 4.0.
-                    </p>
-                  </div>
-                </section>
-
-                <section className="settings-section">
                   <h2>Setup</h2>
                   <p className="settings-intro">
                     The short pages from the first scan, one subject each: what your TV and
@@ -1090,37 +971,6 @@ export default function Settings({
                         : `Auto chose ${look.reason}.`
                   }
                 />
-                <LanguageSection onError={setError} />
-                <ForcedSubtitleRows onError={setError} />
-                <ChoiceRow
-                  label="Intros and credits"
-                  choices={[
-                    { value: 'button', label: 'Show a Skip button' },
-                    { value: 'auto', label: 'Skip them' },
-                  ]}
-                  value={autoSkip ? 'auto' : 'button'}
-                  onChange={(v) => {
-                    setAutoSkip(v === 'auto');
-                    void setSetting('skip_mode', v).catch((e) => setError(userError(e)));
-                  }}
-                  note="Show a Skip button lets you choose each time. Skip them jumps straight past intros and end credits."
-                  hint="Works for episodes where Kinema knows where they are. Intro & credits says how it finds out."
-                />
-                <ChoiceRow
-                  label="When the end credits are not known, offer the next episode"
-                  choices={CREDITS_TAIL_CHOICES.map((n) => ({
-                    value: String(n),
-                    label: n === 0 ? 'At the end' : `${n}s before`,
-                  }))}
-                  value={String(creditsTail)}
-                  onChange={(v) => {
-                    const next = Number(v);
-                    setCreditsTail(next);
-                    void setSetting(CREDITS_TAIL_KEY, v).catch((e) => setError(userError(e)));
-                  }}
-                  note="For an episode where nothing has found the end credits, Kinema guesses they are the last stretch and offers the next episode this long before the end."
-                  hint="Where the credits are known, from detection or a chapter named for them, that is used instead. Never for movies, or for the last episode you have."
-                />
                 {/* The one rendering switch in the app, and it exists only
                     because the right answer depends on hardware this code
                     cannot see. Everything else the app decides for itself. */}
@@ -1176,6 +1026,38 @@ export default function Settings({
 
             {section === 'intros' && (
               <>
+                <section className="settings-section">
+                  <h2>Skipping intros</h2>
+                  <ChoiceRow
+                    label="Intros and credits"
+                    choices={[
+                      { value: 'button', label: 'Show a Skip button' },
+                      { value: 'auto', label: 'Skip them' },
+                    ]}
+                    value={autoSkip ? 'auto' : 'button'}
+                    onChange={(v) => {
+                      setAutoSkip(v === 'auto');
+                      void setSetting('skip_mode', v).catch((e) => setError(userError(e)));
+                    }}
+                    note="Show a Skip button lets you choose each time. Skip them jumps straight past intros and end credits."
+                    hint="Works for episodes where Kinema knows where they are. How it finds out is below."
+                  />
+                  <ChoiceRow
+                    label="When the end credits are not known, offer the next episode"
+                    choices={CREDITS_TAIL_CHOICES.map((n) => ({
+                      value: String(n),
+                      label: n === 0 ? 'At the end' : `${n}s before`,
+                    }))}
+                    value={String(creditsTail)}
+                    onChange={(v) => {
+                      const next = Number(v);
+                      setCreditsTail(next);
+                      void setSetting(CREDITS_TAIL_KEY, v).catch((e) => setError(userError(e)));
+                    }}
+                    note="For an episode where nothing has found the end credits, Kinema guesses they are the last stretch and offers the next episode this long before the end."
+                    hint="Where the credits are known, from detection or a chapter named for them, that is used instead. Never for movies, or for the last episode you have."
+                  />
+                </section>
                 {/* Four sources, in the order they are trusted: Skiptro and
                     this app's own analysis both measure the exact file on this
                     disk, but only the analysis finds credits; TheIntroDB and
@@ -1184,10 +1066,10 @@ export default function Settings({
                     the only ones that know recaps and a film's scene after
                     the credits. */}
                 <section className="settings-section">
-                  <h2>Intro and credits</h2>
+                  <h2>How Kinema finds them</h2>
                   <p className="settings-intro">
-                    How Kinema finds where intros, recaps and end credits are, for the Skip button
-                    and for offering the next episode.{' '}
+                    Where intros, recaps and end credits are, for the Skip button and for offering
+                    the next episode.{' '}
                     {can?.runs_programs
                       ? 'It works by itself: new episodes are checked after every scan. When more than one source knows an episode, the most reliable one is used.'
                       : `On ${can?.system ?? 'this system'} Kinema cannot listen to the episodes itself, so it asks the two services below the first time an episode or film plays.`}
@@ -1196,7 +1078,7 @@ export default function Settings({
                   {/* ffmpeg's listening: only where Kinema can run a program it did not bring (not Android). */}
                   {can?.runs_programs && (
                     <>
-                    <h3>Built into Kinema</h3>
+                    <h3>Kinema listens for them</h3>
                     <ChoiceRow
                       label="Detect intros and credits"
                       choices={[
@@ -1263,7 +1145,7 @@ export default function Settings({
                     </>
                   )}
 
-                  <h3>TheIntroDB</h3>
+                  <h3>Times shared by other viewers</h3>
                   <ChoiceRow
                     label="Look up TheIntroDB"
                     choices={[
@@ -1283,7 +1165,6 @@ export default function Settings({
                     Segment data from <strong>TheIntroDB</strong>, <code>https://theintrodb.org</code>.
                   </p>
 
-                  <h3>IntroDB</h3>
                   <ChoiceRow
                     label="Look up IntroDB"
                     choices={[
@@ -1308,9 +1189,9 @@ export default function Settings({
                   {/* Skiptro is a program, and detecting now runs ffmpeg and Skiptro: neither where programs cannot run. */}
                   {can?.runs_programs && (
                     <>
-                    <h3>Skiptro</h3>
+                    <h3>An optional program</h3>
                     <p className="choice-note">
-                      Optional: a separate free program that is very good at finding intros (not
+                      Skiptro is a separate free program that is very good at finding intros (not
                       credits). Where it and the built-in detection disagree about an intro, Skiptro
                       wins. If you have not heard of it, you can leave this alone.
                     </p>
@@ -1483,17 +1364,138 @@ export default function Settings({
               </>
             )}
 
-            {section === 'accounts' && (
+            {section === 'subtitles' && (
               <>
+                <section className="settings-section">
+                  <h2>Language and subtitles</h2>
+                  <LanguageSection onError={setError} />
+                  <ForcedSubtitleRows onError={setError} />
+                </section>
+                <OpenSubtitlesSection />
+              </>
+            )}
+
+            {section === 'tracking' && (
+              <>
+                <section className="settings-section">
+                  <h2>Keep track of what I watch</h2>
+                  <p className="settings-intro">
+                    Kinema can add what you finish to a watch history online, on SIMKL or Trakt.
+                    Both are optional, free, and work without each other.
+                  </p>
+                </section>
                 <AccountSection service="simkl" />
                 <AccountSection service="trakt" />
-                <OpenSubtitlesSection />
+              </>
+            )}
+
+            {section === 'ratings' && (
+              <>
+                <section className="settings-section">
+                  <h2>Posters and ratings</h2>
+                  <p className="settings-intro">
+                    {!BUILTIN_TMDB_KEY
+                      ? 'Without a TMDB key, movies are identified through Wikidata: details and ' +
+                        'a description, but no posters. A free TMDB key adds posters, ' +
+                        'backdrops and cast.'
+                      : builtinRejected
+                        ? 'TMDB no longer accepts the key Kinema came with. Until an update ' +
+                          'brings a new one, new movies are identified through Wikidata, ' +
+                          'without posters. A free key of your own brings them back.'
+                        : 'Kinema looks up movies and TV shows on TMDB with a key of its own, ' +
+                          'so there is nothing to set up. You can use your own free key instead.'}
+                  </p>
+                  <div className="settings-row">
+                    <FocusButton
+                      keepInView="nearest"
+                      className="btn-secondary"
+                      onSelect={() => void openLink(TMDB_KEY_URL)}
+                    >
+                      Get a free TMDB key ↗
+                    </FocusButton>
+                    {keysSaved && <span className="muted">Saved.</span>}
+                  </div>
+                  <label className="settings-field">
+                    <span>
+                      {BUILTIN_TMDB_KEY ? 'Your own TMDB key ' : 'TMDB key '}
+                      <span className="muted">
+                        {BUILTIN_TMDB_KEY && !builtinRejected
+                          ? '(optional, used instead of Kinema’s)'
+                          : '(posters, backdrops, cast and episode pictures)'}
+                      </span>
+                    </span>
+                    {/* Masked. This screen is routinely on a television, and a
+                        key on a 60-inch panel in a living room is not private. */}
+                    <FocusInput
+                      focusKey={TMDB_KEY_INPUT_KEY}
+                      className="settings-input"
+                      value={tmdbKey}
+                      onChange={(v) => {
+                        setTmdbKey(v);
+                        setKeysSaved(false);
+                      }}
+                      type="password"
+                      placeholder={
+                        BUILTIN_TMDB_KEY && !builtinRejected ? 'Not needed' : 'Paste your TMDB key'
+                      }
+                    />
+                  </label>
+                  <label className="settings-field">
+                    <span>
+                      OMDb key <span className="muted">(optional)</span>
+                    </span>
+                    <FocusInput
+                      className="settings-input"
+                      value={omdbKey}
+                      onChange={(v) => {
+                        setOmdbKey(v);
+                        setKeysSaved(false);
+                      }}
+                      type="password"
+                      placeholder="Paste your OMDb key"
+                    />
+                  </label>
+                  <p className="choice-note">
+                    An OMDb key adds Rotten Tomatoes scores to a title&rsquo;s page, and helps
+                    identify movies. A free key allows 1,000 lookups a day and Kinema uses at most
+                    500, so a large library fills in over a few days.
+                  </p>
+                  <p className="settings-hint">
+                    Keys save as you type. A new key is used for titles identified from now on;
+                    titles already in the library keep what they have until they are looked up
+                    again.
+                  </p>
+                  {/* Attribution TMDB require wherever their data is shown, and
+                      TVmaze's licence asks for. The logo is TMDB's own unmodified
+                      SVG, served from the app rather than hotlinked. */}
+                  <div className="settings-attribution">
+                    <img src="/tmdb.svg" alt="TMDB" className="tmdb-logo" />
+                    <p className="muted">
+                      Movie and TV data from TMDB. This product uses the TMDB API but is not
+                      endorsed or certified by TMDB. TV data also from <strong>TVmaze</strong>.
+                      Movies found without a TMDB key: data from <strong>Wikidata</strong>, and
+                      descriptions from <strong>Wikipedia</strong> under CC BY-SA 4.0.
+                    </p>
+                    {/* The exact statement IMDb's terms for its ratings file
+                        require. */}
+                    <p className="muted">
+                      IMDb ratings: Information courtesy of IMDb (https://www.imdb.com). Used with
+                      permission.
+                    </p>
+                    {/* OMDb's data is CC BY-NC 4.0, which asks for a credit. */}
+                    <p className="muted">
+                      Rotten Tomatoes scores from <strong>OMDb</strong>, with your own key, under
+                      CC BY-NC 4.0.
+                    </p>
+                  </div>
+                </section>
+
               </>
             )}
 
             {section === 'privacy' && (
               <WhatLeavesSection
-                sectionNames={Object.fromEntries(SECTIONS)}
+                sectionNames={SECTION_NAMES}
                 onGo={(id) => goToSection(id as SectionId)}
               />
             )}

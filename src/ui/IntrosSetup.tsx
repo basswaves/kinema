@@ -6,7 +6,7 @@
  * from other viewers may be asked. That second one is here because a person
  * should hear on day one that playing an episode tells TheIntroDB and IntroDB
  * which episode it is — they are on unless switched off. One answer covers
- * both; Settings → Intro & credits has them apart.
+ * both; Settings → Skipping intros has them apart.
  *
  * Skiptro, a separate program, is brought up only when its database is on
  * this PC: to anyone else it is a name they have never heard, and Settings
@@ -162,7 +162,7 @@ export default function IntrosSetup() {
       )}
       {programs && skiptro === false && (
         <p className="muted">
-          Already use Skiptro, a separate program that finds intros? Settings → Intro &amp; credits
+          Already use Skiptro, a separate program that finds intros? Settings → Skipping intros
           is where it goes.
         </p>
       )}

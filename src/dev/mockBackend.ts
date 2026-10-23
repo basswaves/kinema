@@ -901,7 +901,7 @@ const SKIPTRO = flag('kinemaMockSkiptro') === '1';
 /**
  * `kinemaMockNoAccountApps=1`: built without SIMKL's and Trakt's apps and
  * without an OpenSubtitles key, as every build but a release is — so the
- * Accounts page has nothing to press.
+ * setup pages for watch history and subtitles have nothing to press.
  */
 const NO_ACCOUNT_APPS = flag('kinemaMockNoAccountApps') === '1';
 /**

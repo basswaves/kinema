@@ -358,22 +358,24 @@ one skippable, with **Finish later** to go straight to the library:
   the film, HDR switched on for HDR films — each with what it gives and what
   it costs, for every device that can, only the ones connected now, or off.
   Skipped, everything stays off.
-- **Intros and credits:** skip them, or show a Skip button; and whether to
+- **Skipping intros:** skip them, or show a Skip button; and whether to
   ask TheIntroDB and IntroDB, which know them from other viewers.
-- **Accounts:** SIMKL or Trakt, to keep a record of what you finish, and
-  OpenSubtitles.
-- **Extras:** [ffmpeg](https://ffmpeg.org), which Kinema uses for intros,
+- **Keep track of what you watch:** SIMKL or Trakt, to keep a record of what
+  you finish.
+- **Subtitles online:** an OpenSubtitles account, for more a day.
+- **Details and ratings:** [ffmpeg](https://ffmpeg.org), which Kinema uses for intros,
   credits and a title's picture and sound details but does not include — on
   Windows one press installs it for you — and an OMDb key for Rotten Tomatoes
   scores.
 
-Everything on them is in Settings too, and Settings → Library → **Run setup
-again** brings the pages back. After the first scan, Kinema scans once at
+Everything on them is in Settings too — grouped the same way, by what you
+want rather than by service — and
+Settings → Library → **Run setup again** brings the pages back. After the first scan, Kinema scans once at
 every start and only looks at what changed.
 
 Posters, descriptions and artwork come from [TMDB](https://www.themoviedb.org),
 through a key Kinema carries — there is nothing to sign up for. If you would
-rather use a free TMDB key of your own, paste it in Settings → Library. Should
+rather use a free TMDB key of your own, paste it in Settings → Posters & ratings. Should
 TMDB ever be out of reach, movies are still identified through Wikidata, just
 without pictures.
 
@@ -390,13 +392,13 @@ ffmpeg is the one Kinema can install for you, with a button — see below.)
 |---|---|---|
 | **[ffmpeg](https://ffmpeg.org/download.html)** | Kinema's own intro and credits detection, by fingerprinting a season's audio; and the picture and sound badges on a title's page — resolution, Dolby Vision, HDR, Atmos, the measured aspect ratio | Intros and credits come from TheIntroDB and chapter markers only; a title's page keeps its source, studio, age rating and scores, without the picture and sound badges |
 | **[Skiptro](https://github.com/MikeSiLVO/skiptro-releases)** | A second, well-tuned intro detector that Kinema can run and read | The built-in detector handles it |
-| **An [OMDb key](https://www.omdbapi.com/apikey.aspx)** (free) | Rotten Tomatoes scores on a title's page, in Settings → Library. Kinema spends at most half of a free key's daily lookups | IMDb's and TMDB's scores only |
+| **An [OMDb key](https://www.omdbapi.com/apikey.aspx)** (free) | Rotten Tomatoes scores on a title's page, in Settings → Posters & ratings. Kinema spends at most half of a free key's daily lookups | IMDb's and TMDB's scores only |
 
 These two are for Windows and Linux; Android has no way to run them, and its
 intro skips come from the two community databases below.
 
-**ffmpeg on Windows:** press **Install ffmpeg** — on the first run's Extras
-page, Home's ffmpeg notice, or Settings → Intro & credits. Kinema asks Windows'
+**ffmpeg on Windows:** press **Install ffmpeg** — on the first run's Details and
+ratings page, Home's ffmpeg notice, or Settings → Skipping intros. Kinema asks Windows'
 own app installer, winget, to install the Windows build from
 [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) that ffmpeg's site points to
 (about 110 MB), for your user only, with no administrator prompt. Kinema finds
@@ -422,7 +424,7 @@ you straight to it. Only which film or episode it is gets sent — no account, n
 key, nothing about you. Turn either off in Settings if you would rather it did
 not.
 
-**SIMKL** is off until you connect it, in Settings → Accounts. Kinema then adds
+**SIMKL** is off until you connect it, in Settings → Keep track of what I watch. Kinema then adds
 each film and episode you finish to your SIMKL account — and, once, everything
 you had already watched in Kinema. It only ever adds: nothing comes back, and
 marking something unwatched in Kinema leaves SIMKL alone. You approve Kinema on
@@ -430,16 +432,16 @@ SIMKL's own page, so Kinema never sees your password.
 
 **OpenSubtitles** needs nothing to start: "Find subtitles online" in the
 player's Audio & subtitles panel allows 5 downloads a day, or 20 with a free
-OpenSubtitles account, signed in under Settings → Accounts. What is found is
-kept in Kinema's own folder, never beside your videos. Settings → Playback can
+OpenSubtitles account, signed in under Settings → Language & subtitles. What is found is
+kept in Kinema's own folder, never beside your videos. The same section can
 also have Kinema fetch forced subtitles by itself for files without them.
 
-**Trakt** works the same way, beside SIMKL in Settings → Accounts, with one
+**Trakt** works the same way, beside SIMKL in Settings → Keep track of what I watch, with one
 difference: Trakt keeps every play it is sent, so when you connect Kinema first
 asks what your Trakt account already has and sends only the rest. A free Trakt
 account can be connected to only one app besides Trakt's own. Trakt also gives
 back where you stopped a film or episode, so it continues on your other
-devices; the newer position wins. Settings → Accounts → Trakt, "Continue where
+devices; the newer position wins. Trakt's card there, "Continue where
 you stopped on another device", turns that off. SIMKL is only ever sent to.
 
 ## Platform support

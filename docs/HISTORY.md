@@ -3655,6 +3655,21 @@ and a Jellyfin source further out. Decisions made along the way:
 - Not chosen: a dialog with a tick per episode; only through a later menu on
   cards.
 
+## Settings by what you want (2026-10-23)
+
+- **One section per goal, services one level down** (owner, option A of 3).
+  Accounts listed services by name, which says nothing to someone who has
+  never heard of SIMKL, and OpenSubtitles sat apart from the subtitle
+  languages it serves. Now: Library, Playback, Picture & sound, Language &
+  subtitles, Skipping intros, Keep track of what I watch, Posters & ratings,
+  Privacy, Advanced (`settingsSections.ts`). A service's name is on the card
+  or row that uses it. Nothing is folded away or nested: a section shows its
+  settings at once. The setup pages follow the same goals.
+- Not chosen: B, the seven sections kept with only their headings renamed
+  (least change, but subtitles stayed in two places); C, a switch per goal
+  with the services under a "How it works" fold (shortest pages, but a fold is
+  one more press and easy to miss with a remote).
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

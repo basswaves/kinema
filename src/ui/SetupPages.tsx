@@ -4,7 +4,7 @@
  * The welcome page asks only what a library needs to exist: where it will be
  * watched, where the films are, and in a build from source a TMDB key. The
  * rest of what is worth knowing on day one — what the equipment can do, and
- * later intros, accounts and the extras — waits for the scan, which takes
+ * later intros, watch history, subtitles and the extras — waits for the scan, which takes
  * minutes the first time anyway. Each page is one subject, a few answers
  * long, and can be skipped; nothing on one is chosen for the person.
  *
@@ -87,29 +87,41 @@ export default function SetupPages({ onClose }: Props) {
       },
       {
         id: 'intros',
-        title: 'Intros and credits',
+        title: 'Skipping intros',
         body: <IntrosSetup />,
       },
-      // Settings → Accounts as it is: connecting is the same job here.
+      // By what someone wants, as Settings is (settingsSections.ts): the
+      // service's own card one level down, the same job as there.
       {
-        id: 'accounts',
-        title: 'Accounts',
+        id: 'tracking',
+        title: 'Keep track of what you watch',
         body: (
           <>
             <p className="muted">
-              All optional, and each works without the others: SIMKL or Trakt keep a record of
-              what you finish in Kinema, and OpenSubtitles is where Kinema looks for subtitles a
-              film does not come with.
+              Optional: Kinema can add what you finish to a watch history online, on SIMKL or
+              Trakt. Each works without the other.
             </p>
             <AccountSection service="simkl" />
             <AccountSection service="trakt" />
+          </>
+        ),
+      },
+      {
+        id: 'subtitles',
+        title: 'Subtitles online',
+        body: (
+          <>
+            <p className="muted">
+              For a film that does not come with the subtitles you want, Kinema can look online.
+              It works without an account; one adds more a day.
+            </p>
             <OpenSubtitlesSection />
           </>
         ),
       },
       {
         id: 'extras',
-        title: 'Extras',
+        title: 'Details and ratings',
         body: <ExtrasSetup />,
       },
     ];
@@ -308,8 +320,8 @@ export default function SetupPages({ onClose }: Props) {
  * page lands on its first question rather than on the buttons above it.
  *
  * Only while it has a question to land on. A page can have nothing to press:
- * Accounts in a build without SIMKL's or Trakt's app and without an
- * OpenSubtitles key, which is every build but a release. Focus given to an
+ * Keep track of what you watch in a build without SIMKL's or Trakt's app,
+ * and Subtitles online without an OpenSubtitles key: every build but a release. Focus given to an
  * empty container stays on the container, which draws no ring, so the remote
  * was left with nothing to act from — and every recovery chose this
  * container again. Out of the way, the page's own landing goes to Next.

@@ -1,5 +1,5 @@
 /**
- * Settings → Accounts: connecting SIMKL or Trakt, so what is finished in
+ * Settings → Keep track of what I watch: connecting SIMKL or Trakt, so what is finished in
  * Kinema is added to the account.
  *
  * Both sign in the same way — a code and a QR code here, approval on a phone —

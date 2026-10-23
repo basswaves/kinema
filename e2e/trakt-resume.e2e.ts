@@ -1,6 +1,6 @@
 /**
  * Trakt's resume point, by keyboard alone: connect Trakt in Settings →
- * Accounts, see the "Continue where you stopped on another device" row, and
+ * Keep track of what I watch, see the "Continue where you stopped on another device" row, and
  * find the film's page offering to resume (trakt_resume.rs). The mock hands
  * Example Film a 40 % point once Trakt is connected.
  */
@@ -19,7 +19,7 @@ function focused(page: Page): Promise<string | undefined> {
 
 const ROW = 'Continue where you stopped on another device';
 
-/** Home → Settings → Accounts → Connect Trakt → Connected; the ring on the row. */
+/** Home → Settings → Keep track of what I watch → Connect Trakt → Connected; the ring on the row. */
 async function connectTrakt(page: Page): Promise<void> {
   await page.goto('/');
   await expect.poll(() => focused(page)).toContain('Play');
@@ -28,9 +28,9 @@ async function connectTrakt(page: Page): Promise<void> {
   await expect.poll(() => focused(page)).toBe('Settings');
   await press(page, 'Enter');
   await press(page, 'ArrowDown');
-  for (let i = 0; i < 8 && (await focused(page)) !== 'Accounts'; i++) await press(page, 'ArrowDown');
+  for (let i = 0; i < 8 && (await focused(page)) !== 'Keep track of what I watch'; i++) await press(page, 'ArrowDown');
   await press(page, 'Enter');
-  await expect(page.locator('.settings-section h2').first()).toHaveText('SIMKL');
+  await expect(page.locator('.settings-section h2').first()).toHaveText('Keep track of what I watch');
   await press(page, 'ArrowRight');
   for (let i = 0; i < 20 && (await focused(page)) !== 'Connect Trakt'; i++) await press(page, 'ArrowDown');
   await expect.poll(() => focused(page)).toBe('Connect Trakt');
@@ -58,7 +58,10 @@ async function toRow(page: Page): Promise<void> {
 /** Leave Settings and open Example Film's page from Home. */
 async function openFilm(page: Page): Promise<void> {
   await press(page, 'ArrowLeft', 2);
-  await press(page, 'ArrowUp', 6);
+  // Up the list and past the search box to the top bar.
+  for (let i = 0; i < 12 && !(await page.evaluate(() => !!document.querySelector('.top-nav .focused'))); i++) {
+    await press(page, 'ArrowUp');
+  }
   for (let i = 0; i < 8 && (await focused(page)) !== 'Home'; i++) await press(page, 'ArrowLeft');
   await press(page, 'Enter');
   await expect.poll(() => focused(page)).toContain('Play');

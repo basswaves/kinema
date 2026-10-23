@@ -1,10 +1,10 @@
 /**
  * Settings for subtitles found online, and for forced subtitles.
  *
- * - `ForcedSubtitleRows`, in Playback: whether forced subtitles show with
+ * - `ForcedSubtitleRows`, in Language & subtitles: whether forced subtitles show with
  *   subtitles off (on by default), and whether Kinema fetches them from
  *   OpenSubtitles for a file with none (off by default) — decided 2026-09-30.
- * - `OpenSubtitlesSection`, in Accounts: an optional OpenSubtitles account,
+ * - `OpenSubtitlesSection`, under them: an optional OpenSubtitles account,
  *   for 20 downloads a day instead of 5. OpenSubtitles has no phone approval,
  *   so this is the one place Kinema asks for a password; it is kept encrypted
  *   to the Windows user (opensubtitles.rs), so Kinema can sign in again when
@@ -71,7 +71,7 @@ export function ForcedSubtitleRows({ onError }: { onError: (message: string) => 
             void setSetting(AUTO_FORCED_KEY, v).catch((e) => onError(userError(e)));
           }}
           note="Kinema asks OpenSubtitles for forced subtitles as a film or episode starts, if the file has none, and shows them. A file is asked about once; what is found is kept."
-          hint="Each one found uses one of the day's OpenSubtitles downloads (5 without an account, 20 with one — see Accounts). Most films have no forced parts, and those cost nothing."
+          hint="Each one found uses one of the day's OpenSubtitles downloads (5 without an account, 20 with one — see below). Most films have no forced parts, and those cost nothing."
         />
       )}
     </>

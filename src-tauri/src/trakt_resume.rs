@@ -1,7 +1,7 @@
 //! Trakt — continuing on one device where a film was stopped on another.
 //!
 //! **What the owner decided (2026-10-17):** on whenever Trakt is connected,
-//! one switch in Settings → Accounts → Trakt turns it off ([`SWITCH_KEY`]).
+//! one switch in Settings → Keep track of what I watch → Trakt turns it off ([`SWITCH_KEY`]).
 //! The newer position wins, never the older. Trakt is read when a title's
 //! page opens and when Home's Continue Watching rail loads — one request for
 //! the account's whole resume list, kept for [`KEEP_FOR`], never fetched in

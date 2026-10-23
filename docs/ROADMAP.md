@@ -19,8 +19,7 @@ equipment allows is what Kinema is, so that work follows close behind.
 [website](https://basswaves.github.io/kinema/) without a detour through
 GitHub; a **Send a report** button that packs the logs into one file; a guide
 to how Kinema reads file and folder names, and one to getting your own
-Blu-rays into a library; Settings arranged by what you want to do rather than
-by the names of the services behind it, with a search box; and a page saying
+Blu-rays into a library; and a page saying
 plainly **what leaves your computer** — every service Kinema can talk to, what
 it sends, and the switch that stops it. Plus small fixes: copying text, a
 right-click menu of Kinema's own, language codes in the track menus, adding a

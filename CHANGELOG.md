@@ -29,6 +29,12 @@ makes no stability promises.
 
 ### Changed
 
+- **Settings is grouped by what you want, not by service**: Language &
+  subtitles, Skipping intros, Keep track of what I watch and Posters &
+  ratings replace Accounts, and each service sits on the card that uses it
+  (OpenSubtitles under subtitles, SIMKL and Trakt under keeping track, the
+  OMDb key under ratings). The setup pages follow: Skipping intros, Keep
+  track of what you watch, Subtitles online, Details and ratings.
 - **Right-click no longer shows the browser's menu** (Back, Reload, Save as,
   Print — Reload restarted the interface, even mid-film). Text fields keep
   Cut, Copy and Paste; elsewhere right-click does nothing.

@@ -701,9 +701,9 @@ async fn download(
         200 => {}
         406 => {
             note_allowance(&answer)?;
-            return Err("Today's OpenSubtitles downloads are used up. More are allowed tomorrow — or sign in, in Settings → Accounts, for 20 a day.".into());
+            return Err("Today's OpenSubtitles downloads are used up. More are allowed tomorrow — or sign in, in Settings → Language & subtitles, for 20 a day.".into());
         }
-        401 => return Err("OpenSubtitles did not accept the sign-in. Sign in again in Settings → Accounts.".into()),
+        401 => return Err("OpenSubtitles did not accept the sign-in. Sign in again in Settings → Language & subtitles.".into()),
         429 => return Err("OpenSubtitles is busy; try again in a moment.".into()),
         other => {
             crate::log!("opensubtitles: download answered {other}: {answer}");

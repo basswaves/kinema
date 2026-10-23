@@ -9,7 +9,7 @@ import { useFocusGroup } from '../ui/focusGroups';
 import FocusButton from '../ui/FocusButton';
 import type { Track } from './engine';
 import { describeTrack } from './tracks';
-import { languageName } from './language';
+import { languageBadge, languageName } from './language';
 import { describeOffer, type Offer } from './onlineSubtitles';
 
 /**
@@ -30,6 +30,21 @@ export interface OnlineSubtitles {
   /** The rest of what was found, for "Choose another". */
   offers: Offer[];
   onOffer: (offer: Offer) => void;
+}
+
+/** A track's row: its language's short code, then the line describing it. */
+function TrackText({ track }: { track: Track }) {
+  const badge = languageBadge(track.lang);
+  return (
+    <>
+      {badge && (
+        <span className="track-lang" aria-hidden="true">
+          {badge}
+        </span>
+      )}
+      {describeTrack(track)}
+    </>
+  );
 }
 
 /** How many of the others to list; a remote scrolls a short list. */
@@ -107,7 +122,7 @@ export default function TrackPanel({
             keepInView="nearest"
             onSelect={() => onChoose('audio', track)}
           >
-            {describeTrack(track)}
+            <TrackText track={track} />
           </FocusButton>
         ))}
 
@@ -128,7 +143,7 @@ export default function TrackPanel({
             keepInView="nearest"
             onSelect={() => onChoose('sub', track)}
           >
-            {describeTrack(track)}
+            <TrackText track={track} />
           </FocusButton>
         ))}
         {online && (

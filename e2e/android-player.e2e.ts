@@ -198,6 +198,10 @@ test('Android: the track panel lists Media3’s tracks, chooses by remote, and t
   // Media3's tracks, read the same way as mpv's.
   await expect(panel.locator('.track-option', { hasText: 'English · 5.1 · Dolby Digital Plus Atmos' })).toBeVisible();
   await expect(panel.locator('.track-option', { hasText: 'Commentary with the director' })).toBeVisible();
+  // Each language's short code leads its row, as on the desktop.
+  await expect(
+    panel.locator('.track-option', { hasText: 'English · 5.1' }).first().locator('.track-lang')
+  ).toHaveText('EN');
 
   const target = panel.locator('.track-option', { hasText: 'Norwegian' }).first();
   for (let i = 0; i < 10 && !(await target.evaluate((el) => el.classList.contains('focused'))); i++) {

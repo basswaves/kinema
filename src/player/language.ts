@@ -49,6 +49,25 @@ export function languageName(code: string | null | undefined): string | null {
   }
 }
 
+/**
+ * The short code on a track's row (owner, 2026-10-18): `EN`, `NO`, and the
+ * region only where the file states one (`PT-BR`). A region that only repeats
+ * the language (`de-DE`) adds nothing and is left off. No flags: a flag is a
+ * country, not a language.
+ */
+export function languageBadge(code: string | null | undefined): string | null {
+  const lang = canonicalLang(code);
+  if (!lang) return null;
+  let region: string | undefined;
+  try {
+    region = new Intl.Locale(String(code).trim()).region;
+  } catch {
+    region = undefined;
+  }
+  const badge = lang.toUpperCase();
+  return region && region.toLowerCase() !== lang ? `${badge}-${region.toUpperCase()}` : badge;
+}
+
 export function sameLanguage(a: string | null | undefined, b: string | null | undefined): boolean {
   const x = canonicalLang(a);
   return x !== null && x === canonicalLang(b);

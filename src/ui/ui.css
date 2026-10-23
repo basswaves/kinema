@@ -2895,6 +2895,21 @@ html {
   white-space: nowrap;
 }
 
+/* The language's short code (`EN`, `PT-BR`), part of the row, not a control. */
+.track-lang {
+  display: inline-block;
+  min-width: 1.75rem;
+  margin-right: 0.5rem;
+  padding: 0.0625rem 0.3125rem;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 0.25rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: center;
+  vertical-align: 0.0625rem;
+}
+
 .track-option:hover {
   background: rgba(255, 255, 255, 0.14);
 }

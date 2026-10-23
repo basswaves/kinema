@@ -517,6 +517,8 @@ test('the track panel by remote: choose, find online, and Back to its button', a
   // A Norwegian subtitle track, chosen by remote, is put on and remembered.
   const target = panel.locator('.track-option', { hasText: 'Norwegian' }).first();
   await expect(target).toBeVisible();
+  // Its language's short code leads the row.
+  await expect(target.locator('.track-lang')).toHaveText('NO');
   for (let i = 0; i < 10 && !(await target.evaluate((el) => el.classList.contains('focused'))); i++) {
     await press(page, 'ArrowDown');
   }

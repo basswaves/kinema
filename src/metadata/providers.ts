@@ -15,6 +15,7 @@
  *             No backdrop, no logo, no usable cast.
  */
 import { fetch } from '@tauri-apps/plugin-http';
+import { getSetting, setSetting } from './api';
 import { noteTmdbRejection } from './builtinKey';
 import type { Candidate } from './score';
 
@@ -344,10 +345,11 @@ const RATE_LIMIT_RETRIES = 2;
 export async function fetchPolitely(
   url: string,
   label: string,
-  headers?: Record<string, string>
+  headers?: Record<string, string>,
+  connectTimeout?: number
 ): Promise<Response> {
   for (let attempt = 0; ; attempt++) {
-    const response = await fetch(url, { method: 'GET', headers });
+    const response = await fetch(url, { method: 'GET', headers, connectTimeout });
     if (response.status !== 429 || attempt >= RATE_LIMIT_RETRIES) return response;
 
     const header = Number(response.headers.get('retry-after'));
@@ -467,18 +469,98 @@ export async function tvmazeGetEpisodes(id: string): Promise<EpisodeMetadata[]> 
 
 const TMDB_IMAGE = 'https://image.tmdb.org/t/p/original';
 
-function tmdbUrl(key: string, path: string, params: Record<string, string> = {}): string {
+/**
+ * TMDB's API answers at two addresses, the same service on the same terms.
+ * Some networks do not let the first through (a tester's internet worked while
+ * every TMDB request failed), so a request that gets no answer at all is sent
+ * once more to the other, and the one that answered is used from then on.
+ */
+export const TMDB_HOSTS = ['api.themoviedb.org', 'api.tmdb.org'] as const;
+const TMDB_HOST_KEY = 'tmdb_api_host';
+
+/** A connection that has not opened by then is not going to. */
+const TMDB_CONNECT_TIMEOUT_MS = 15_000;
+
+/**
+ * After both addresses failed, how long further requests fail at once instead
+ * of each waiting out two timeouts — a library of films behind a blocking
+ * network would otherwise take most of an hour to be told no.
+ */
+const TMDB_DOWN_MS = 60_000;
+
+let tmdbHost: Promise<number> | null = null;
+let tmdbDownSince = 0;
+
+function preferredTmdbHost(): Promise<number> {
+  tmdbHost ??= getSetting(TMDB_HOST_KEY)
+    .then((h) => Math.max(0, TMDB_HOSTS.indexOf(h as (typeof TMDB_HOSTS)[number])))
+    .catch(() => 0);
+  return tmdbHost;
+}
+
+function tmdbUrl(
+  key: string,
+  path: string,
+  params: Record<string, string> = {},
+  host: string = TMDB_HOSTS[0]
+): string {
   const query = new URLSearchParams({ api_key: key, ...params });
-  return `https://api.themoviedb.org/3${path}?${query.toString()}`;
+  return `https://${host}/3${path}?${query.toString()}`;
 }
 
 /** TMDB answered 401: the key is not (or no longer) accepted. */
 export class TmdbKeyRejected extends Error {}
 
+/**
+ * No answer at all from any of a service's addresses — not a refusal, nothing
+ * was said. `reach.ts` finds out why before anything is shown.
+ */
+export class Unreachable extends Error {
+  constructor(
+    readonly service: string,
+    readonly hosts: readonly string[]
+  ) {
+    super(`${service} could not be reached at ${hosts.join(' or ')}`);
+  }
+}
+
+/** One TMDB request, at whichever address answers. */
+async function tmdbFetch(
+  key: string,
+  path: string,
+  params?: Record<string, string>
+): Promise<Response> {
+  if (Date.now() - tmdbDownSince < TMDB_DOWN_MS) throw new Unreachable('TMDB', TMDB_HOSTS);
+  const first = await preferredTmdbHost();
+  for (let i = 0; i < TMDB_HOSTS.length; i++) {
+    const index = (first + i) % TMDB_HOSTS.length;
+    const host = TMDB_HOSTS[index];
+    try {
+      const response = await fetchPolitely(
+        tmdbUrl(key, path, params, host),
+        `TMDB ${path}`,
+        undefined,
+        TMDB_CONNECT_TIMEOUT_MS
+      );
+      tmdbDownSince = 0;
+      if (index !== first) {
+        console.warn(`TMDB: ${TMDB_HOSTS[first]} gave no answer, ${host} did; using ${host}`);
+        tmdbHost = Promise.resolve(index);
+        await setSetting(TMDB_HOST_KEY, host).catch(() => undefined);
+      }
+      return response;
+    } catch (e) {
+      console.warn(`TMDB ${path}: no answer from ${host}:`, e instanceof Error ? e.message : String(e));
+    }
+  }
+  tmdbDownSince = Date.now();
+  throw new Unreachable('TMDB', TMDB_HOSTS);
+}
+
 /** Every TMDB request goes through here, which is what makes one queue enough. */
 async function tmdbGet<T>(key: string, path: string, params?: Record<string, string>): Promise<T> {
   return tmdbQueued(async () => {
-    const response = await fetchPolitely(tmdbUrl(key, path, params), `TMDB ${path}`);
+    const response = await tmdbFetch(key, path, params);
     if (response.status === 401) {
       await noteTmdbRejection(key);
       throw new TmdbKeyRejected(`TMDB ${path} failed: HTTP 401, the key was not accepted`);

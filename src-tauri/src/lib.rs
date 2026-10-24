@@ -49,6 +49,7 @@ mod probe;
 mod procstats;
 mod scanner;
 mod selftest;
+mod reach;
 mod report;
 mod settings;
 mod share_logins;
@@ -373,6 +374,7 @@ pub fn run() {
             settings::append_log,
             settings::log_paths,
             settings::open_log_folder,
+            reach::check_reach,
             report::make_report,
             tracking::link_qr,
             settings::open_backup_folder,

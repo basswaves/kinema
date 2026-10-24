@@ -31,6 +31,7 @@ import {
   tmdbGetTitle,
   tmdbSearch,
   TmdbKeyRejected,
+  Unreachable,
   tvmazeGetEpisodes,
   tvmazeGetShow,
   tvmazeSearch,
@@ -43,6 +44,7 @@ import {
   type TmdbKeySource,
 } from './builtinKey';
 import { pickBest, type Candidate, type ScoreContext } from './score';
+import { explainUnreachable } from './reach';
 import { wikidataGetMovie, wikidataSearch } from './wikidata';
 import { nfoForGroup, resolveNfoIds, sourceName } from './nfo';
 import { yieldToPlayback } from '../library/playback';
@@ -515,6 +517,8 @@ export async function matchFiles(
   // Two groups of one title (a film and a series called the same, or two years
   // of a remake) are never in flight together: each waits for the one before.
   const titleChains = new Map<string, Promise<void>>();
+  // Asked once per run: the same network says the same thing for every title.
+  let unreachable: Promise<string> | null = null;
 
   const matchGroup = async (group: FileGroup, index: number): Promise<void> => {
     await yieldToPlayback();
@@ -549,7 +553,16 @@ export async function matchFiles(
         outcome.unmatched += group.files.length;
       }
     } catch (e) {
-      const message = `${group.title}: ${e instanceof Error ? e.message : String(e)}`;
+      const why =
+        e instanceof Unreachable
+          ? await (unreachable ??= explainUnreachable(e).then((sentence) => {
+              console.warn(`matching: ${sentence}`);
+              return sentence;
+            }))
+          : e instanceof Error
+            ? e.message
+            : String(e);
+      const message = `${group.title}: ${why}`;
       errorsByGroup[index] = message;
 
       // TMDB refused the built-in key: it has been set aside (builtinKey.ts),

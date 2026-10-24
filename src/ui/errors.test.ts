@@ -49,10 +49,11 @@ describe('describeError', () => {
     expect(describeError(new Error('TVmaze search failed: HTTP 503'))).toMatch(/its end/);
   });
 
-  it('recognises a connection failure', () => {
-    expect(describeError('error sending request for url (https://api.tvmaze.com/)')).toMatch(
-      /internet/
+  it('names the host a connection failure was to, never "the internet"', () => {
+    expect(describeError('error sending request for url (https://api.tvmaze.com/x?q=a)')).toBe(
+      'Couldn’t reach api.tvmaze.com. Check the connection and try again.'
     );
+    expect(describeError('dns error')).not.toMatch(/internet/);
   });
 
   it('shows anything it does not recognise as it is, minus the prefix', () => {

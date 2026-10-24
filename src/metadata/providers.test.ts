@@ -8,10 +8,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const calls: { url: string; at: number }[] = [];
 let responses: Array<{ status: number; body: unknown; retryAfter?: string }> = [];
+/** Hosts that give no answer at all, as a network that blocks them would. */
+const deadHosts = new Set<string>();
 
 vi.mock('@tauri-apps/plugin-http', () => ({
   fetch: vi.fn(async (url: string) => {
     calls.push({ url, at: Date.now() });
+    if (deadHosts.has(new URL(url).host)) throw `error sending request for url (${url})`;
     const next = responses.shift() ?? { status: 200, body: [] };
     return {
       ok: next.status >= 200 && next.status < 300,
@@ -28,7 +31,9 @@ const {
   pickStudios,
   tmdbGetEpisodes,
   tmdbGetTitle,
+  tmdbSearch,
   tvmazeSearch,
+  Unreachable,
   usCertification,
 } = await import(
   './providers'
@@ -246,5 +251,38 @@ describe('OMDb Rotten Tomatoes score', () => {
     const spent = await ask(401, { Response: 'False', Error: 'Request limit reached!' });
     expect(spent).toBeInstanceOf(OmdbStop);
     expect((spent as Error).message).toContain('limit');
+  });
+});
+
+// Last in the file: which address answered is remembered for the session.
+describe('TMDB with no answer from its first address', () => {
+  const settle = async <T,>(p: Promise<T>): Promise<T> => {
+    const caught = p.catch((e: unknown) => e);
+    await vi.runAllTimersAsync();
+    return (await caught) as T;
+  };
+  const hostOf = (i: number) => new URL(calls[i].url).host;
+
+  it('asks the second address, then keeps to the one that answered', async () => {
+    deadHosts.add('api.themoviedb.org');
+    responses = [{ status: 200, body: { results: [] } }, { status: 200, body: { results: [] } }];
+    await settle(tmdbSearch('key', 'A film', null, 'movie'));
+    expect(calls.map((_, i) => hostOf(i))).toEqual(['api.themoviedb.org', 'api.tmdb.org']);
+
+    calls.length = 0;
+    await settle(tmdbSearch('key', 'Another', null, 'movie'));
+    expect(calls.map((_, i) => hostOf(i))).toEqual(['api.tmdb.org']);
+  });
+
+  it('says it could not be reached when neither answers, and stops asking for a while', async () => {
+    deadHosts.add('api.tmdb.org');
+    const e = await settle(tmdbSearch('key', 'A film', null, 'movie'));
+    expect(e).toBeInstanceOf(Unreachable);
+    expect(String(e)).toMatch(/api\.themoviedb\.org or api\.tmdb\.org/);
+    expect(calls).toHaveLength(2);
+
+    calls.length = 0;
+    expect(await settle(tmdbSearch('key', 'Next', null, 'movie'))).toBeInstanceOf(Unreachable);
+    expect(calls).toHaveLength(0);
   });
 });

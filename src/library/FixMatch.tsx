@@ -14,6 +14,7 @@
  * at the moment of each search and each link. See `loadProviderKeys`.
  */
 import { count } from '../ui/format';
+import { describeFailure } from '../metadata/reach';
 import { userError } from '../ui/errors';
 import { setFocus, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -146,7 +147,7 @@ export default function FixMatch({ onChanged }: Props) {
       } catch (e) {
         // Nothing left the queue, or it is unknown what did: the ring stays.
         refocus.current = false;
-        setError(userError(e));
+        setError(await describeFailure(e));
       } finally {
         setBusy(false);
       }
@@ -286,6 +287,9 @@ function adviceFor(reason: string): string {
   if (/no provider available/.test(reason)) {
     return 'Kinema had no way to look this up when it was scanned. Search for it below.';
   }
+  if (/could not be reached|did not answer, but answers now/.test(reason)) {
+    return 'Kinema could not reach the service it looks titles up with when this was scanned. The next scan asks again, or search below.';
+  }
   if (/no candidates (returned|scored)/.test(reason)) {
     return 'Nothing came back for this name. Search for it below using the real title.';
   }
@@ -384,7 +388,7 @@ function GroupRow({
       setResults(found);
       setUsed({ provider, isSeries });
     } catch (e) {
-      setSearchError(userError(e));
+      setSearchError(await describeFailure(e));
     } finally {
       setSearching(false);
     }

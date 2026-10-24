@@ -37,7 +37,19 @@ function refusedAccess(): string {
   }
 }
 
-const RULES: [RegExp, string | (() => string)][] = [
+/**
+ * A request that got no answer, said with the host it was sent to. It used to
+ * say "the internet" for every one of them, which is false whenever the
+ * internet works and one service does not get through.
+ */
+function noAnswer(raw: string): string {
+  const host = /for url \(https?:\/\/([^/:)\s]+)/i.exec(raw)?.[1];
+  return host
+    ? `Couldn’t reach ${host}. Check the connection and try again.`
+    : 'Couldn’t reach the service. Check the connection and try again.';
+}
+
+const RULES: [RegExp, string | ((raw: string) => string)][] = [
   [
     /input\/output error|stale file handle/i,
     'The disk or network drive did not answer. Check that it is connected, then try again.',
@@ -69,7 +81,7 @@ const RULES: [RegExp, string | (() => string)][] = [
   [/HTTP 5\d\d\b/, 'The online service had a problem at its end. Try again later.'],
   [
     /error sending request|dns error|timed out|connection (refused|reset|closed)|failed to fetch/i,
-    'Couldn’t reach the internet. Check the connection and try again.',
+    noAnswer,
   ],
 ];
 
@@ -83,7 +95,7 @@ export function rawError(e: unknown): string {
 export function describeError(e: unknown): string {
   const raw = rawError(e).trim();
   for (const [pattern, message] of RULES) {
-    if (pattern.test(raw)) return typeof message === 'string' ? message : message();
+    if (pattern.test(raw)) return typeof message === 'string' ? message : message(raw);
   }
   return raw.replace(/^error:\s*/i, '') || 'Something went wrong.';
 }

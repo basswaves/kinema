@@ -531,6 +531,10 @@ function mockFileFacts(fileId: number) {
 /** Episodes the provider lists that the library does not hold. */
 const MISSING = [{ titleId: SAGA_ID, season: 0, episode: 1, name: 'Behind the scenes' }];
 
+/** My list: title id → when it was added (a counter, so the order is exact). */
+const myList = new Map<number, number>();
+let myListClock = 0;
+
 const playback = new Map<
   number,
   { position: number; duration: number | null; completed: boolean; updated: number; fraction?: number }
@@ -1351,6 +1355,15 @@ const handlers: Record<string, Handler> = {
     const list = playlistOf(num(a, 'playlistId'));
     const mode = a.mode as { shuffle: boolean; repeat: boolean };
     if (list) Object.assign(list, mode);
+    return null;
+  },
+  // My list (my_list.rs), newest first; kept for the mock's life.
+  my_list: () => [...myList.entries()].sort((a, b) => b[1] - a[1]).map(([title_id, added_at]) => ({ title_id, added_at })),
+  set_in_my_list: (a) => {
+    const id = num(a, 'titleId');
+    if (a.on) {
+      if (!myList.has(id)) myList.set(id, ++myListClock);
+    } else myList.delete(id);
     return null;
   },
   export_playlist: (a) => playlistOf(num(a, 'playlistId'))?.items.length ?? 0,

@@ -26,6 +26,7 @@ mod library;
 mod lifecycle;
 mod local_title;
 mod metadata;
+mod my_list;
 #[cfg(target_os = "linux")]
 mod desktop;
 #[cfg(target_os = "linux")]
@@ -462,6 +463,8 @@ pub fn run() {
             playlists::set_playlist_current,
             playlists::playlist_step,
             playlists::set_playlist_mode,
+            my_list::my_list,
+            my_list::set_in_my_list,
             playlists::export_playlist,
             playlists::import_playlist,
             videos::list_videos,

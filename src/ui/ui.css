@@ -1433,7 +1433,8 @@ html {
 
 /* The movie equivalent, which is an ordinary action button rather than a pill:
    it sits beside Play and Trailer, so it has to match them. */
-.btn-secondary.watched-on {
+.btn-secondary.watched-on,
+.btn-secondary.on-list {
   background: rgba(255, 255, 255, 0.9);
   color: #0a0a0c;
 }
@@ -3707,8 +3708,25 @@ kbd {
 :root[data-look='light'] .continue-art,
 :root[data-look='light'] .detail-poster,
 :root[data-look='light'] .skip-button,
+/* On My list: a ribbon at the card's top left, clear of the watched tick on
+   the right and the badge. Drawn, not a glyph: no font decides its shape. */
+.card-listed {
+  position: absolute;
+  top: 0;
+  left: 0.5rem;
+  width: 1rem;
+  height: 1.5rem;
+  background: #e50914;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 72%, 0 100%);
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.6));
+}
+
 :root[data-look='light'] .card-watched {
   box-shadow: none;
+}
+
+:root[data-look='light'] .card-listed {
+  filter: none;
 }
 
 :root[data-look='light'] .up-next,

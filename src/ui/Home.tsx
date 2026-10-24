@@ -24,6 +24,7 @@ import { parseGenres, type Title } from './api';
 import { pickHero } from './hero';
 import { useScanStatus } from '../library/pipeline';
 import { scanWords } from '../library/scanWords';
+import { useMyList } from '../library/myList';
 
 interface Props {
   titles: Title[];
@@ -160,6 +161,14 @@ function HomeRows({
     [titles]
   );
 
+  // In the order they were put there, newest first; a title not in the
+  // library just now (its folder offline) is simply not shown.
+  const listIds = useMyList();
+  const myList = useMemo(() => {
+    const byId = new Map(titles.map((t) => [t.id, t]));
+    return listIds.flatMap((id) => byId.get(id) ?? []);
+  }, [titles, listIds]);
+
   const series = useMemo(() => titles.filter((t) => t.kind === 'series'), [titles]);
   const movies = useMemo(() => titles.filter((t) => t.kind === 'movie'), [titles]);
 
@@ -208,6 +217,8 @@ function HomeRows({
         {/* First rail, as on any streaming service: the thing you were most
             recently in the middle of is what you probably want. */}
         <ContinueRail items={resumable} onResume={onResume} onRemove={onRemoveResumable} />
+        {/* Hidden while empty, as every rail is (Rail.tsx). */}
+        <Rail heading="My list" titles={myList} onSelect={onSelect} onSeeAll={onSeeAll} listRail />
         <PlaylistsRail onOpen={onOpenPlaylist} />
 
         <Rail

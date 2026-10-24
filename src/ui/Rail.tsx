@@ -24,9 +24,11 @@ interface Props {
   onSelect: (title: Title) => void;
   /** Omitted for rails that cannot meaningfully be expanded. */
   onSeeAll?: (heading: string, titles: Title[]) => void;
+  /** My list's rail: a card taken off the list leaves it (Card.tsx). */
+  listRail?: boolean;
 }
 
-export default memo(function Rail({ heading, titles, onSelect, onSeeAll }: Props) {
+export default memo(function Rail({ heading, titles, onSelect, onSeeAll, listRail }: Props) {
   // Not a place to move to while empty — see ContinueRail.tsx.
   const { ref, focusKey } = useFocusable({
     trackChildren: true,
@@ -62,6 +64,7 @@ export default memo(function Rail({ heading, titles, onSelect, onSeeAll }: Props
               title={title}
               onSelect={onSelect}
               focusKey={`rail:${heading}:${title.id}`}
+              goesWhenUnlisted={listRail}
             />
           ))}
           {/* At the end of the row rather than beside the heading: that is

@@ -37,6 +37,7 @@ import {
 } from '../player/api';
 import { resumePoint, resumeShare } from '../player/resume';
 import { formatTime } from './format';
+import { isMyListKey, toggleMyList, useOnMyList } from '../library/myList';
 import {
   findLocalTrailer,
   getTitleDetail,
@@ -84,6 +85,7 @@ interface Props {
  */
 const DETAIL_FOCUS_KEY = 'detail-root';
 const DETAIL_PLAY_KEY = 'detail-play';
+const DETAIL_LIST_KEY = 'detail-my-list';
 const DETAIL_FIRST_EPISODE_KEY = 'detail-first-episode';
 
 /**
@@ -480,14 +482,18 @@ export default function TitleDetailView({ title, onPlayFile, onBack, onFindMatch
     }
   }, [title.id, onFindMatch]);
 
-  // Whether the row under the title has anything to land on: a series with
-  // nothing to continue and no trailer has no buttons there at all.
-  const hasActions =
-    primary !== null ||
-    (title.kind !== 'series' && detail?.movie_file_id != null) ||
-    trailerPath !== null ||
-    Boolean(shown.trailer_key) ||
-    isLocal;
+  // The row under the title always has My list, so it always has somewhere
+  // to land; Play is the current item once it exists.
+  const listed = useOnMyList(title.id);
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!isMyListKey(e)) return;
+      e.preventDefault();
+      void toggleMyList(title.id);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [title.id]);
 
   return (
     <FocusContext.Provider value={focusKey}>
@@ -567,8 +573,7 @@ export default function TitleDetailView({ title, onPlayFile, onBack, onFindMatch
               <FocusGroup
                 kind="row"
                 focusKey={DETAIL_ACTIONS_KEY}
-                current={primary ? DETAIL_PLAY_KEY : undefined}
-                focusable={hasActions}
+                current={primary ? DETAIL_PLAY_KEY : DETAIL_LIST_KEY}
                 className="detail-actions"
               >
                 {renaming ? (
@@ -630,6 +635,18 @@ export default function TitleDetailView({ title, onPlayFile, onBack, onFindMatch
                     Play from start
                   </FocusButton>
                 )}
+
+                {/* Beside Play: keeping it for later is decided on the same
+                    look as playing it now. L does the same from anywhere on
+                    the page. */}
+                <FocusButton
+                  focusKey={DETAIL_LIST_KEY}
+                  className={`btn-secondary ${listed ? 'on-list' : ''}`}
+                  keepInView="page-top"
+                  onSelect={() => void toggleMyList(title.id)}
+                >
+                  {listed ? '✓ On My list' : '+ My list'}
+                </FocusButton>
 
                 {/* Series get their watched toggle per episode, on the rows.
                     A film is a single file, so this is the only place it can

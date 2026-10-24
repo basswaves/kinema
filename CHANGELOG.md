@@ -49,6 +49,21 @@ makes no stability promises.
   came; repeat starts again from the top (or with a new shuffled round).
 - Library upgrade to schema 30 (`shuffle`, `repeat_all`, `shuffle_order` on
   playlists).
+- **My list.** One list for anything to keep handy, to watch later or loved.
+  "+ My list" sits beside Play on a film's or a show's page; L on a
+  highlighted card or page puts it on or takes it off (a small red ribbon on
+  the card). Home has a "My list" rail, newest first, hidden while empty. Kept
+  on this computer only and never sent to SIMKL or Trakt. It survives
+  matching again (a key added, a folder moved).
+- **Play something.** A button in Home's top row (and S) picks something to
+  watch: a film you have not seen, or the next episode of a show you are in
+  the middle of. On a genre, a collection or the Movies / TV shows shelf it
+  picks from what that page shows. It shows the pick (poster, name, one line
+  why) with Play, Another and Not now before anything plays. Never something
+  in Needs attention or a Videos clip, and not the last few picks again. Only
+  when nothing fits does it take anything not yet watched (a show not started
+  begins at episode 1).
+- Library upgrade to schema 31 (`my_list`).
 
 ### Changed
 

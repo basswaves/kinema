@@ -3788,6 +3788,31 @@ settings describe a person's needs or the equipment, never taste.
 - **The second-subtitle list closes after a choice**, like Add to a playlist,
   so a stray OK cannot pick again.
 
+## My list and Play something (2026-10-25)
+
+- **One list, not favourites plus a watchlist** (owner's choice, 2026-10-24).
+  Both mean "keep this handy". Two lists double the buttons and add the
+  question of which one to use.
+- **Stored by the provider's ids, not by `titles.id`**: kind, provider,
+  provider id, plus the IMDb and TMDB ids. Same reason as `watch_history`:
+  matching again (after adding a key, or a moved folder) makes new title rows
+  and the list must survive it. An entry for a title not in the library just
+  now stays and comes back with it. Schema 31, `my_list`. The weekly safety
+  copy is `VACUUM INTO`, so the list is kept without extra code.
+- **Local only, never sent to SIMKL or Trakt.** Those are one way and receive
+  only history (settled). A list is not history.
+- **L on a card is for keyboards.** A remote uses the page button. The full
+  menu on cards is round 6.
+- **Play something shows the pick before playing.** A film nobody chose
+  starting by itself would be a surprise. "Another" leaves out the last five
+  picks, kept for the app's run and not stored. Candidates are unwatched films
+  and shows in the middle (episodes watched above zero, or a resume point);
+  only if none, anything unwatched. Needs attention and Videos are excluded by
+  construction, since they are never titles. The button sits in Home's top row
+  (where Home lands) and in a grid's head; S on Home or a grid.
+- **Navigation:** on the Movies and TV shows grids, Up from the order row now
+  reaches Play something before the top bar (approved nav map).
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

@@ -540,6 +540,12 @@ where the system has a file picker. The pages are `PlaylistsPages.tsx` (the
 tiles and a playlist's own page) and `PlaylistPicker.tsx` (choosing where to
 add, from a page or from the player's panel).
 
+**My list is one local list, keyed by the provider's ids.** `my_list.rs` holds
+it in `my_list` (schema 31): kind, provider, provider id and the IMDb and TMDB
+ids, not `titles.id`, so matching again does not lose it. `myList.ts` is the one
+store in the interface; it writes behind the press and reads back if the write
+fails. Never sent to SIMKL or Trakt.
+
 **Forced subtitles are not "subtitles on."** Subtitles off means no full
 subtitles; it has never meant missing what is said in another language. So a
 forced track in the language being spoken shows whenever full subtitles do

@@ -65,17 +65,18 @@ test('My list by keyboard: add on the page, see the rail, L takes it off, L adds
   const rail = page.locator('section, div').filter({ has: page.getByRole('heading', { name: 'My list' }) }).last();
   await expect(rail.locator('.card').first()).toBeVisible();
 
-  // Up to My list's card (the rail sits above the one the ring came back to) and L.
-  for (let i = 0; i < 6; i++) {
-    const inList = await page.evaluate(() => {
-      const f = document.querySelector('.focused');
+  // To My list's card and L. Where Back puts the ring differs by engine, so
+  // up first, then down, and only press L once the ring is in the rail.
+  const inList = () =>
+    page.evaluate(() => {
+      const f = document.querySelector('.card.focused');
       const h = Array.from(document.querySelectorAll('h2, h3')).find((x) => x.textContent?.trim() === 'My list');
-      const sec = h?.closest('section') ?? h?.parentElement?.parentElement;
+      const sec = h?.closest('section');
       return !!(f && sec && sec.contains(f));
     });
-    if (inList) break;
-    await press(page, 'ArrowUp');
-  }
+  for (let i = 0; i < 6 && !(await inList()); i++) await press(page, 'ArrowUp');
+  for (let i = 0; i < 8 && !(await inList()); i++) await press(page, 'ArrowDown');
+  expect(await inList()).toBe(true);
   await press(page, 'l');
   await expect(page.getByRole('heading', { name: 'My list' })).toHaveCount(0);
   await expect.poll(() => visibleFocus(page)).toBe(true);

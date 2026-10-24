@@ -274,9 +274,10 @@
     "first-run": {
       "✓A TV, from the sofa": { "U": "·", "D": "Add movies folder", "L": "·", "R": "A desk" },
       "A desk": { "U": "·", "D": "Add TV folder", "L": "✓A TV, from the sofa", "R": "·" },
-      "Add movies folder": { "U": "✓A TV, from the sofa", "D": "Get a free key ↗", "L": "·", "R": "Add TV folder" },
-      "Add TV folder": { "U": "A desk", "D": "Get a free key ↗", "L": "Add movies folder", "R": "·" },
-      "Get a free key ↗": { "U": "Add movies folder", "D": "TMDB API key", "L": "·", "R": "·" },
+      "Add movies folder": { "U": "✓A TV, from the sofa", "D": "Remove C:\\fixture", "L": "·", "R": "Add TV folder" },
+      "Add TV folder": { "U": "A desk", "D": "Remove C:\\fixture", "L": "Add movies folder", "R": "·" },
+      "Remove C:\\fixture": { "U": "Add TV folder", "D": "Get a free key ↗", "L": "·", "R": "·" },
+      "Get a free key ↗": { "U": "Remove C:\\fixture", "D": "TMDB API key", "L": "·", "R": "·" },
       "TMDB API key": { "U": "Get a free key ↗", "D": "Save key", "L": "·", "R": "·" },
       "Save key": { "U": "TMDB API key", "D": "Scan my library", "L": "·", "R": "·" },
       "Scan my library": { "U": "Save key", "D": "·", "L": "·", "R": "·" }

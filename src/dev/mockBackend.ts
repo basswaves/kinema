@@ -1393,7 +1393,14 @@ const handlers: Record<string, Handler> = {
     emptyLibrary.path = String(a.path ?? emptyLibrary.path);
     return 13;
   },
-  remove_library_root: () => null,
+  // In an empty library's first run, removing its one folder empties it again
+  // (the Welcome page's Remove); elsewhere an added folder goes.
+  remove_library_root: (a) => {
+    const at = addedRoots.findIndex((r) => r.id === Number(a.id));
+    if (at >= 0) addedRoots.splice(at, 1);
+    else if (EMPTY && Number(a.id) === 1) emptyLibrary.hasRoot = false;
+    return null;
+  },
   list_media_files: () => [],
 
   // metadata

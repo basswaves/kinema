@@ -46,6 +46,7 @@ import {
   addLibraryRoot,
   listLibraryRoots,
   mergeLibraryRoots,
+  removeLibraryRoot,
   rootsToMerge,
   type LibraryKind,
   type LibraryRoot,
@@ -136,6 +137,17 @@ export default function FirstRun({ onScan }: Props) {
     setError(null);
     try {
       await mergeLibraryRoots(offer.path, offer.kind);
+      setRoots(await listLibraryRoots());
+    } catch (e) {
+      setError(userError(e));
+    }
+  }, []);
+
+  /** A folder added by mistake goes here, not only in Settings → Library. */
+  const removeRoot = useCallback(async (id: number) => {
+    setError(null);
+    try {
+      await removeLibraryRoot(id);
       setRoots(await listLibraryRoots());
     } catch (e) {
       setError(userError(e));
@@ -249,6 +261,13 @@ export default function FirstRun({ onScan }: Props) {
                     {root.kind === 'tv' ? 'TV' : root.kind === 'videos' ? 'Videos' : 'Movies'}
                   </span>
                   <span className="root-path">{root.path}</span>
+                  <FocusButton
+                    className="settings-remove"
+                    label={`Remove ${root.path}`}
+                    onSelect={() => void removeRoot(root.id)}
+                  >
+                    Remove
+                  </FocusButton>
                 </li>
               ))}
             </ul>

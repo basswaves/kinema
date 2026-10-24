@@ -1779,6 +1779,10 @@ html {
   font-size: 0.8125rem;
 }
 
+.first-run-roots .settings-remove {
+  margin-left: auto;
+}
+
 .first-run-roots li {
   display: flex;
   align-items: center;

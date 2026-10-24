@@ -484,7 +484,7 @@ test('first run: where to watch, a folder, then the setup pages, all by remote',
   await press(page, 'ArrowRight');
   await press(page, 'Enter');
   await expect(page.locator('.first-run-roots li')).toHaveCount(1);
-  for (let i = 0; i < 4 && (await focused(page)) !== 'Scan my library'; i++) await press(page, 'ArrowDown');
+  for (let i = 0; i < 5 && (await focused(page)) !== 'Scan my library'; i++) await press(page, 'ArrowDown');
   await expect.poll(() => focused(page)).toBe('Scan my library');
   await press(page, 'Enter');
 
@@ -762,7 +762,7 @@ test('Android: always the TV layout, never asked', async ({ page }) => {
   await expect.poll(() => focused(page)).toBe('Use this folder');
   await press(page, 'Enter');
   await expect(page.locator('.first-run-roots li')).toHaveCount(1);
-  for (let i = 0; i < 4 && (await focused(page)) !== 'Scan my library'; i++) await press(page, 'ArrowDown');
+  for (let i = 0; i < 5 && (await focused(page)) !== 'Scan my library'; i++) await press(page, 'ArrowDown');
   await press(page, 'Enter');
   await expect(page.locator('.setup-pages h1')).toHaveText('Skipping intros');
   await expect(page.locator('.setup-progress')).toContainText('1 of 4');
@@ -825,7 +825,7 @@ async function firstRunToSetupPage(
     await press(page, 'Enter');
   }
   await expect(page.locator('.first-run-roots li')).toHaveCount(1);
-  for (let i = 0; i < 4 && (await focused(page)) !== 'Scan my library'; i++) await press(page, 'ArrowDown');
+  for (let i = 0; i < 5 && (await focused(page)) !== 'Scan my library'; i++) await press(page, 'ArrowDown');
   await press(page, 'Enter');
   for (let i = 0; i < 6 && (await page.locator('.setup-pages h1').textContent()) !== title; i++) {
     await expect.poll(() => focused(page)).not.toBeUndefined();

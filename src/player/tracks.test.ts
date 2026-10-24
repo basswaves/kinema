@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { canonicalLang, languageName, sameLanguage } from './language';
 import type { Track } from './engine';
-import { describeTrack, findTrackByLang } from './tracks';
+import { describeTrack, describeTracks, findTrackByLang } from './tracks';
 
 const track = (fields: Partial<Track>): Track => ({
   id: 1,
@@ -85,5 +85,22 @@ describe('findTrackByLang', () => {
     const tracks = [track({ id: 1, type: 'sub', lang: 'eng' }), track({ id: 2, type: 'sub', lang: 'nor' })];
     expect(findTrackByLang(tracks, 'sub', 'nb-NO')?.id).toBe(2);
     expect(findTrackByLang(tracks, 'sub', 'nob')?.id).toBe(2);
+  });
+});
+
+describe('describeTracks', () => {
+  it('tells alike tracks apart by what the file holds', () => {
+    const lines = describeTracks([
+      track({ id: 1, type: 'sub', lang: 'ger', codec: 'hdmv_pgs_subtitle' }),
+      track({ id: 2, type: 'sub', lang: 'ger', codec: 'subrip' }),
+      track({ id: 3, type: 'sub', lang: 'ita', codec: 'hdmv_pgs_subtitle' }),
+      track({ id: 4, type: 'sub', lang: 'ita', codec: 'hdmv_pgs_subtitle' }),
+      track({ id: 5, type: 'sub', lang: 'eng', codec: 'subrip' }),
+    ]);
+    expect(lines.get(1)).toBe('German · picture subtitles');
+    expect(lines.get(2)).toBe('German · text subtitles');
+    expect(lines.get(3)).toBe('Italian · picture subtitles · track 3');
+    expect(lines.get(4)).toBe('Italian · picture subtitles · track 4');
+    expect(lines.get(5)).toBe('English');
   });
 });

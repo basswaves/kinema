@@ -8,7 +8,7 @@ import type { NewItem } from '../library/playlists';
 import { useFocusGroup } from '../ui/focusGroups';
 import FocusButton from '../ui/FocusButton';
 import type { Track } from './engine';
-import { describeTrack } from './tracks';
+import { describeTracks } from './tracks';
 import { languageBadge, languageName } from './language';
 import { describeOffer, type Offer } from './onlineSubtitles';
 
@@ -33,7 +33,7 @@ export interface OnlineSubtitles {
 }
 
 /** A track's row: its language's short code, then the line describing it. */
-function TrackText({ track }: { track: Track }) {
+function TrackText({ track, line }: { track: Track; line: string | undefined }) {
   const badge = languageBadge(track.lang);
   return (
     <>
@@ -42,7 +42,7 @@ function TrackText({ track }: { track: Track }) {
           {badge}
         </span>
       )}
-      {describeTrack(track)}
+      {line}
     </>
   );
 }
@@ -106,6 +106,8 @@ export default function TrackPanel({
   // the controls behind it; Up on the top goes round to the bottom and back;
   // Back closes it (Player.tsx).
   const { ref, focusKey } = useFocusGroup<HTMLElement>('menu', { focusKey: TRACK_PANEL_KEY });
+  const audioLines = describeTracks(audioTracks);
+  const subLines = describeTracks(subTracks);
 
   return (
     <FocusContext.Provider value={focusKey}>
@@ -122,7 +124,7 @@ export default function TrackPanel({
             keepInView="nearest"
             onSelect={() => onChoose('audio', track)}
           >
-            <TrackText track={track} />
+            <TrackText track={track} line={audioLines.get(track.id)} />
           </FocusButton>
         ))}
 
@@ -143,7 +145,7 @@ export default function TrackPanel({
             keepInView="nearest"
             onSelect={() => onChoose('sub', track)}
           >
-            <TrackText track={track} />
+            <TrackText track={track} line={subLines.get(track.id)} />
           </FocusButton>
         ))}
         {online && (

@@ -100,6 +100,44 @@ export function describeTrack(track: Track): string {
   return line.length > 0 ? line.join(' · ') : `Track ${track.id}`;
 }
 
+/** What kind of subtitle a codec is, said plainly: drawn pictures or text. */
+function subtitleKind(codec: string | undefined): string | null {
+  const c = codec?.toLowerCase();
+  if (!c) return null;
+  if (/pgs|dvd_sub|dvb_sub|vobsub|xsub/.test(c)) return 'picture subtitles';
+  if (/subrip|srt|ass|ssa|webvtt|mov_text|text|ttml/.test(c)) return 'text subtitles';
+  return null;
+}
+
+/**
+ * Every track's line, where two that would read the same are told apart.
+ *
+ * Files often name several tracks alike — two "German", two "Italian" — and
+ * a list of identical rows gives nothing to choose by. Those get what the file
+ * itself says about them: for subtitles, whether they are pictures or text,
+ * and, when that is the same too, the track's number in the file. Rows that
+ * are already different are left as they are.
+ */
+export function describeTracks(tracks: Track[]): Map<number, string> {
+  const lines = new Map(tracks.map((t) => [t.id, describeTrack(t)] as const));
+  const alike = (id: number) =>
+    tracks.filter((t) => lines.get(t.id) === lines.get(id)).length > 1;
+
+  const withKind = new Map(lines);
+  for (const t of tracks) {
+    const kind = t.type === 'sub' ? subtitleKind(t.codec) : null;
+    if (alike(t.id) && kind) withKind.set(t.id, `${lines.get(t.id)} · ${kind}`);
+  }
+  const result = new Map(withKind);
+  for (const t of tracks) {
+    const line = withKind.get(t.id);
+    if (tracks.filter((o) => withKind.get(o.id) === line).length > 1) {
+      result.set(t.id, `${line} · track ${t.id}`);
+    }
+  }
+  return result;
+}
+
 /**
  * Pick the track matching a remembered language.
  *

@@ -9,7 +9,10 @@ describe('resumePoint', () => {
   it('starts again when it had barely started, was finished, or was watched', () => {
     expect(resumePoint({ position_secs: 12, duration_secs: 6000, completed: false })).toBeNull();
     expect(resumePoint({ position_secs: 5900, duration_secs: 6000, completed: false })).toBeNull();
-    expect(resumePoint({ position_secs: 3000, duration_secs: 6000, completed: true })).toBeNull();
+    // Watched: finished at the credits, nothing to resume; a re-watch stopped half-way is.
+    expect(resumePoint({ position_secs: 5500, duration_secs: 6000, completed: true })).toBeNull();
+    expect(resumePoint({ position_secs: 3000, duration_secs: 6000, completed: true })).toBe(3000);
+    expect(resumePoint({ position_secs: 3000, duration_secs: null, completed: true })).toBeNull();
     expect(resumePoint(null)).toBeNull();
   });
 

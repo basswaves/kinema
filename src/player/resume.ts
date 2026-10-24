@@ -11,9 +11,22 @@ import type { Progress } from './api';
 export const MIN_RESUME_SECS = 30;
 /** Or one that is effectively finished. */
 export const RESUME_MAX_FRACTION = 0.94;
+/**
+ * A watched file stays watched while it is watched again (playback.rs), so a
+ * position on one is either where it finished — at the credits, which start
+ * well past this share — or where a re-watch stopped, which is offered.
+ * Trakt counts a play from 80 % for the same reason.
+ */
+export const REWATCH_MAX_FRACTION = 0.8;
 
 export function resumePoint(progress: Progress | null): number | null {
-  if (!progress || progress.completed) return null;
+  if (!progress) return null;
+  if (
+    progress.completed &&
+    !(progress.duration_secs && progress.position_secs / progress.duration_secs < REWATCH_MAX_FRACTION)
+  ) {
+    return null;
+  }
   if (progress.position_secs < MIN_RESUME_SECS) return null;
   if (
     progress.duration_secs &&

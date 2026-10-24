@@ -153,24 +153,8 @@ pub fn save_progress(
             completed = false;
         }
     }
-    conn.execute(
-        "INSERT INTO playback_state (file_id, position_secs, duration_secs, completed, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5)
-         ON CONFLICT(file_id) DO UPDATE SET
-            position_secs = excluded.position_secs,
-            duration_secs = excluded.duration_secs,
-            completed     = excluded.completed,
-            updated_at    = excluded.updated_at,
-            fraction      = NULL",
-        params![
-            file_id,
-            position_secs,
-            duration_secs,
-            completed as i64,
-            now_secs()
-        ],
-    )
-    .map_err(to_string_err)?;
+    store_progress(&conn, file_id, position_secs, duration_secs, completed, now_secs())
+        .map_err(to_string_err)?;
     // The episode's, and every other copy's — see `history`.
     if crate::history::remember(&conn, file_id).map_err(to_string_err)? > 0 {
         crate::tracking::send_soon(&app);
@@ -181,6 +165,31 @@ pub fn save_progress(
         crate::trakt_resume::left(&app, file_id);
     }
     Ok(())
+}
+
+/// Write a resume point. Watched stays watched: a re-watch moves the position
+/// (so it can be resumed, `resume.ts`) but never takes the ✓ away — only
+/// un-watching by hand does (owner, 2026-10-24; it used to go after seconds of
+/// a re-watch).
+fn store_progress(
+    conn: &rusqlite::Connection,
+    file_id: i64,
+    position_secs: f64,
+    duration_secs: Option<f64>,
+    completed: bool,
+    now: i64,
+) -> rusqlite::Result<usize> {
+    conn.execute(
+        "INSERT INTO playback_state (file_id, position_secs, duration_secs, completed, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5)
+         ON CONFLICT(file_id) DO UPDATE SET
+            position_secs = excluded.position_secs,
+            duration_secs = excluded.duration_secs,
+            completed     = MAX(playback_state.completed, excluded.completed),
+            updated_at    = excluded.updated_at,
+            fraction      = NULL",
+        params![file_id, position_secs, duration_secs, completed as i64, now],
+    )
 }
 
 /// Mark a file watched, or clear it, by hand.
@@ -210,6 +219,8 @@ pub fn set_watched(
              VALUES (?1, 0, NULL, 1, ?2)
              ON CONFLICT(file_id) DO UPDATE SET
                 completed  = 1,
+                -- Where it was stopped is not a re-watch to resume.
+                position_secs = 0,
                 updated_at = excluded.updated_at,
                 fraction   = NULL",
             params![file_id, now_secs()],
@@ -812,7 +823,28 @@ pub fn set_title_prefs(
 #[cfg(test)]
 mod tests {
     use super::{decode_episode_key, dismiss, encode_episode_key, hide_dismissed, is_complete};
-    use super::{loose_progress, store_loose, LOOSE_KEEP};
+    use super::{loose_progress, store_loose, store_progress, LOOSE_KEEP};
+
+    /// A re-watch moves the position but keeps the ✓.
+    #[test]
+    fn a_rewatch_keeps_watched() {
+        let conn = loose_library();
+        conn.execute_batch(
+            "INSERT INTO library_roots (id, path, kind, added_at) VALUES (1, 'D:/TV', 'tv', 0);
+             INSERT INTO media_files (id, root_id, path, parent_dir, file_name, extension,
+                                      size_bytes, modified_at, first_seen_at, last_seen_at)
+             VALUES (1, 1, 'D:/TV/a.mkv', 'D:/TV', 'a.mkv', 'mkv', 1, 0, 0, 0);",
+        )
+        .unwrap();
+        store_progress(&conn, 1, 1400.0, Some(1500.0), true, 1).unwrap();
+        store_progress(&conn, 1, 16.0, Some(1500.0), false, 2).unwrap();
+        let (position, completed): (f64, i64) = conn
+            .query_row("SELECT position_secs, completed FROM playback_state WHERE file_id = 1", [], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })
+            .unwrap();
+        assert_eq!((position, completed), (16.0, 1));
+    }
 
     fn loose_library() -> rusqlite::Connection {
         let conn = rusqlite::Connection::open_in_memory().unwrap();

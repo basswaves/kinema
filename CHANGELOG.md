@@ -38,6 +38,11 @@ makes no stability promises.
 
 ### Changed
 
+- **The website's disc guide is rewritten** as "How to rip your DVDs, Blu-rays
+  and 4K discs": DVD, Blu-ray and 4K in one page, step by step with drawings,
+  picking the right title (including discs with many fake titles), which
+  tracks to keep, series discs, naming, troubleshooting and questions. Same
+  address as before.
 - **Up next names the episode.** Up next and the playlist's Up next card say
   "S05E02 · its name". The episode's name also stays in the player's top line
   after Up next has moved on.

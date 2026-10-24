@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Getting your Blu-rays into Kinema — Kinema</title>
-<meta name="description" content="A plain guide for newcomers: rip your own Blu-ray and 4K UHD discs to MKV with MakeMKV, name the files, and see what Kinema does with them.">
+<title>How to Rip DVDs, Blu-rays and 4K Discs with MakeMKV: A Beginner's Guide</title>
+<meta name="description" content="A plain-English guide to ripping DVDs, Blu-rays and 4K UHD discs you own with MakeMKV: what you need, picking the right title, which tracks to keep, TV series, naming, and fixing common problems.">
 <link rel="canonical" href="https://basswaves.github.io/kinema/blu-ray.html">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <meta name="theme-color" content="#0a0a0c">
@@ -16,21 +16,173 @@
 
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="Kinema">
-<meta property="og:title" content="Getting your Blu-rays into Kinema">
-<meta property="og:description" content="Rip your own discs to MKV with MakeMKV, name the files, and play them in Kinema.">
+<meta property="og:title" content="How to rip your DVDs, Blu-rays and 4K discs: a plain-English guide">
+<meta property="og:description" content="Rip the discs you own with MakeMKV, keep the picture and sound as they are, and end up with a tidy film library.">
 <meta property="og:url" content="https://basswaves.github.io/kinema/blu-ray.html">
 <meta property="og:image" content="https://basswaves.github.io/kinema/img/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Getting your Blu-rays into Kinema">
-<meta name="twitter:description" content="Rip your own discs to MKV with MakeMKV, name the files, and play them in Kinema.">
+<meta name="twitter:title" content="How to rip your DVDs, Blu-rays and 4K discs: a plain-English guide">
+<meta name="twitter:description" content="Rip the discs you own with MakeMKV, keep the picture and sound as they are, and end up with a tidy film library.">
 <meta name="twitter:image" content="https://basswaves.github.io/kinema/img/og.jpg">
 
 <script>document.documentElement.className+=" js"</script>
 <link rel="stylesheet" href="style.css">
-<style>.page ol,.page ul{color:var(--muted);max-width:46rem;padding-left:1.3em;margin:0 0 12px}.page li{margin:0 0 6px}.page .faq{margin-top:20px}</style>
+<style>
+.page h1{font-size:clamp(2rem,5.4vw,3.2rem);max-width:22ch}
+.page h2{font-size:clamp(1.45rem,3.2vw,1.9rem);margin:56px 0 12px;max-width:none}
+.page h3{font-size:1.12rem;margin:26px 0 8px;letter-spacing:-.01em}
+.page ol,.page ul{color:var(--muted);max-width:46rem;padding-left:1.3em;margin:0 0 12px}
+.page li{margin:0 0 6px}
+.page b{color:var(--text)}
+.page a{color:#fff}
+.page code{font-family:var(--mono);color:#fff;overflow-wrap:anywhere}
+.nw{white-space:nowrap}
+.lead{font-size:1.12rem;color:#cfcfd8!important}
+.answer{max-width:46rem;margin:26px 0 8px;padding:20px 22px 18px;background:linear-gradient(180deg,rgba(229,9,20,.13),rgba(229,9,20,.03) 70%),var(--card);border:1px solid rgba(229,9,20,.45);border-radius:var(--r)}
+.answer h2{margin:0 0 10px;font-size:1rem;font:600 .78rem var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--red-text)}
+.answer ol{margin:0;color:#e4e4ea}
+.answer li{margin:0 0 4px}
+.toc{max-width:46rem;margin:22px 0 0;padding:14px 18px;border:1px solid var(--line);border-radius:12px;background:var(--bg-2)}
+.toc p{margin:0 0 6px!important;font:600 .74rem var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--dim)!important}
+.toc ol{columns:2 15rem;column-gap:28px;margin:0;font-size:.95rem}
+.toc a{color:#c9c9d2;text-decoration:none}
+.toc a:hover{color:#fff;text-decoration:underline}
+.tbl{max-width:52rem;margin:16px 0 14px;overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--card)}
+.tbl table{width:100%;border-collapse:collapse;font-size:.95rem}
+.tbl th,.tbl td{padding:11px 14px;text-align:left;vertical-align:top;border-top:1px solid var(--line)}
+.tbl thead th{border-top:0;color:var(--muted);font-weight:700;font-size:.9rem}
+.tbl tbody th{color:var(--text);font-weight:600}
+.tbl td{color:var(--muted)}
+.tbl .k{color:#dff6ea;font-weight:700;white-space:nowrap}
+.tbl .k::before{content:"✓ ";color:var(--green)}
+.tbl .s{color:#cbbfc0;font-weight:700;white-space:nowrap}
+.tbl .s::before{content:"✕ ";color:#e0656b}
+.tbl .c{color:#f6e6c4;font-weight:700;white-space:nowrap}
+.tbl .c::before{content:"◐ ";color:var(--amber)}
+@media (max-width:620px){.tbl table{font-size:.86rem}.tbl th,.tbl td{padding:9px 8px}.tbl .k,.tbl .s,.tbl .c{white-space:normal}}
+.fig{margin:22px 0 18px;max-width:40rem}
+.fig.wide{max-width:56rem}
+.fig.sm{max-width:28rem}
+.fig figcaption{margin-top:10px;font-size:.88rem;color:var(--dim);max-width:46rem}
+.ill{display:block;width:100%;height:auto}
+.ill text{font-family:var(--sans)}
+.ill .bx{fill:var(--card-2);stroke:var(--line-2);stroke-width:2}
+.ill .win{fill:var(--bg-2);stroke:var(--line-2);stroke-width:2}
+.ill .hi{fill:rgba(229,9,20,.14);stroke:var(--red);stroke-width:2}
+.ill .ok{fill:rgba(82,201,150,.14);stroke:var(--green);stroke-width:2}
+.ill .ico{fill:none;stroke:var(--text);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}
+.ill .icf{fill:none;stroke:var(--dim);stroke-width:1.5}
+.ill .red{fill:var(--red)}
+.ill .redl{fill:none;stroke:var(--red-text);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.ill .ln{fill:none;stroke:var(--line-2);stroke-width:2}
+.ill .ar{fill:none;stroke:var(--muted);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.ill .t{fill:var(--text);font-size:19px;font-weight:700}
+.ill .tm{fill:var(--text);font-size:17px}
+.ill .m{fill:var(--muted);font-size:16px}
+.ill .d{fill:var(--dim);font-size:14px}
+.ill .r{fill:var(--red-text);font-size:16px;font-weight:700}
+.ill .g{fill:var(--green);font-size:16px;font-weight:700}
+.ill .mo{font-family:var(--mono)}
+.ill .seg1{fill:#5a5a66}.ill .seg2{fill:#3f3f4a}.ill .seg3{fill:#71717e}.ill .seg4{fill:#2e2e37}
+.ill .segt{fill:#fff;font-size:15px;font-weight:700}
+.ill .bl{fill:#4a4a55}
+.ill .blm{fill:var(--red)}
+.ill .chk{fill:var(--card-2);stroke:var(--muted);stroke-width:1.6}
+.ill .chk.on{fill:var(--red);stroke:var(--red)}
+.ill .tick{fill:none;stroke:#fff;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.only-narrow{display:none}
+@media (max-width:620px){.only-wide{display:none}.only-narrow{display:block}.fig.narrow-max{max-width:24rem}}
+.steps{list-style:none;padding:0!important;margin:20px 0 0!important;max-width:none!important;display:grid;gap:26px;counter-reset:s}
+.steps>li{counter-increment:s;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,25rem);gap:20px 32px;align-items:start;padding:22px;background:var(--card);border:1px solid var(--line);border-radius:var(--r);margin:0!important}
+.steps>li>div>h3{margin:0 0 8px;font-size:1.2rem;display:flex;gap:12px;align-items:center}
+.steps>li>div>h3::before{content:counter(s);flex:0 0 32px;height:32px;border-radius:9px;background:rgba(229,9,20,.14);border:1px solid rgba(229,9,20,.5);display:grid;place-items:center;font:700 .85rem var(--mono);color:var(--red-text)}
+.steps p{margin:0 0 10px}
+.steps .fig{margin:0}
+@media (max-width:860px){.steps>li{grid-template-columns:1fr;padding:18px}.steps .fig{max-width:28rem}}
+.callout{max-width:46rem;margin:16px 0;padding:14px 18px;border-left:3px solid var(--amber);background:rgba(242,184,75,.06);border-radius:0 12px 12px 0;color:var(--muted)}
+.callout b{color:#f6e6c4}
+.trouble{max-width:52rem}
+.trouble dt{color:var(--text);font-weight:700;margin-top:18px}
+.trouble dd{margin:4px 0 0;color:var(--muted)}
+.deep{max-width:52rem;margin-top:16px;border:1px solid var(--line);border-radius:var(--r);background:var(--bg-2)}
+.deep>summary{cursor:pointer;list-style:none;padding:18px 48px 18px 22px;font-weight:700;font-size:1.08rem;position:relative}
+.deep>summary::-webkit-details-marker{display:none}
+.deep>summary::after{content:"+";position:absolute;right:20px;top:12px;font:300 1.9rem/1 var(--sans);color:var(--red-text);transition:transform .2s}
+.deep[open]>summary::after{transform:rotate(45deg)}
+.deep>div{padding:0 22px 20px}
+.deep h3:first-child{margin-top:4px}
+.page .faq{margin-top:20px}
+.page .faq summary{font-size:1.05rem}
+.src{font-size:.9rem}
+@media (prefers-reduced-motion:reduce){.deep>summary::after{transition:none}}
+</style>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "How to rip your DVDs, Blu-rays and 4K discs: a plain-English guide",
+  "description": "Rip DVDs, Blu-rays and 4K UHD discs you own with MakeMKV: what you need, picking the right title, which tracks to keep, TV series, naming, and fixing common problems.",
+  "url": "https://basswaves.github.io/kinema/blu-ray.html",
+  "image": "https://basswaves.github.io/kinema/img/og.jpg",
+  "datePublished": "2026-10-23",
+  "dateModified": "2026-10-24",
+  "inLanguage": "en",
+  "author": {"@type": "Organization", "name": "Kinema", "url": "https://basswaves.github.io/kinema/"},
+  "publisher": {"@type": "Organization", "name": "Kinema", "url": "https://basswaves.github.io/kinema/"}
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "HowTo",
+  "name": "How to rip a DVD, Blu-ray or 4K UHD disc with MakeMKV",
+  "description": "Copy a disc you own to an MKV file with the picture and sound untouched, then name it so a media library can find it.",
+  "totalTime": "PT1H",
+  "supply": [{"@type": "HowToSupply", "name": "A DVD, Blu-ray or 4K UHD disc you own"}, {"@type": "HowToSupply", "name": "Free disk space: about 8 GB for a DVD, 40 GB for a Blu-ray, 90 GB for a 4K disc"}],
+  "tool": [{"@type": "HowToTool", "name": "A DVD or Blu-ray drive (for 4K discs, one MakeMKV can read them with)"}, {"@type": "HowToTool", "name": "MakeMKV"}],
+  "step": [
+    {"@type": "HowToStep", "name": "Install MakeMKV", "text": "Download MakeMKV from makemkv.com and install it. DVDs work at once. For Blu-ray and 4K discs, enter the current beta key from MakeMKV's forum, or a key you bought."},
+    {"@type": "HowToStep", "name": "Open the disc", "text": "Put the disc in the drive, start MakeMKV and click the big drive picture. MakeMKV reads the disc and lists what is on it."},
+    {"@type": "HowToStep", "name": "Pick the main title", "text": "Tick only the main film. It is usually the longest title, with the most chapters. Untick the rest."},
+    {"@type": "HowToStep", "name": "Pick the tracks", "text": "Open the title and keep the best sound track in your language, the subtitles you read and the forced subtitles."},
+    {"@type": "HowToStep", "name": "Make the MKV", "text": "Choose an output folder with enough free space and click Make MKV. Wait until it says it is done."},
+    {"@type": "HowToStep", "name": "Name it and move it", "text": "Rename the file to Title (Year).mkv, put it in a folder with the same name, and add that folder to your media player."}
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {"@type": "Question", "name": "Is MakeMKV free?", "acceptedAnswer": {"@type": "Answer", "text": "Ripping DVDs is free and, according to MakeMKV's site, will stay free. Blu-ray and 4K UHD ripping are free while MakeMKV is in beta, with a beta key that MakeMKV posts on its forum and replaces from time to time. You can also buy a key. The beta version stops working after 60 days; installing the latest version resets that."}},
+    {"@type": "Question", "name": "How long does it take to rip a Blu-ray?", "acceptedAnswer": {"@type": "Answer", "text": "Roughly 30 to 90 minutes for a Blu-ray film, 15 to 30 minutes for a DVD, and 45 minutes to 2 hours for a 4K UHD disc. The drive's reading speed decides most of it: on a slow USB drive a Blu-ray can take as long as the film. A scratched disc is slower still."}},
+    {"@type": "Question", "name": "How big is a ripped Blu-ray or 4K file?", "acceptedAnswer": {"@type": "Answer", "text": "A film from a DVD is about 4 to 8 GB, from a Blu-ray about 20 to 40 GB, and from a 4K UHD disc about 50 to 90 GB. It depends on the film's length and how many sound tracks you keep."}},
+    {"@type": "Question", "name": "Do I lose quality when I rip with MakeMKV?", "acceptedAnswer": {"@type": "Answer", "text": "No. MakeMKV copies the video and sound as they are into an MKV file. Nothing is re-encoded. This kind of copy is called a remux."}},
+    {"@type": "Question", "name": "Can any Blu-ray drive rip 4K UHD discs?", "acceptedAnswer": {"@type": "Answer", "text": "No. MakeMKV needs a drive it can put in LibreDrive mode to read 4K UHD discs, and many drives cannot do that out of the box. MakeMKV's forum keeps the current lists of drives that work. Check there before buying a drive. MakeMKV also needs internet access to fetch each 4K disc's key."}},
+    {"@type": "Question", "name": "Why does my Blu-ray show dozens of titles of the same length?", "acceptedAnswer": {"@type": "Answer", "text": "Some discs hide the real film among many fake copies, called playlist obfuscation. The fakes play the same scenes in the wrong order. If Java is installed, MakeMKV can often spot the real one and mark it. Otherwise, the film's thread on MakeMKV's forum usually names the right playlist file (for example 00800.mpls), which MakeMKV shows in the info pane for each title."}},
+    {"@type": "Question", "name": "What are forced subtitles?", "acceptedAnswer": {"@type": "Answer", "text": "Forced subtitles are the few lines meant to show even when subtitles are off, such as when a character speaks another language or a sign needs translating. MakeMKV can put them in a track of their own, marked forced only. Keep that track."}},
+    {"@type": "Question", "name": "Should I compress my rips with HandBrake?", "acceptedAnswer": {"@type": "Answer", "text": "Only if you are short of space. Compressing takes hours per film, loses some detail, and can drop Dolby Vision and lossless sound unless set up carefully. Disk space is cheap compared with ripping a collection twice, so many people keep the remux."}},
+    {"@type": "Question", "name": "Is ripping my own discs legal?", "acceptedAnswer": {"@type": "Answer", "text": "It depends on where you live. Copying discs you own for your own use is allowed in some countries and not in others, often because breaking the copy protection is not allowed. Check the rules where you live."}},
+    {"@type": "Question", "name": "Can Kinema play the disc or the BDMV folder directly?", "acceptedAnswer": {"@type": "Answer", "text": "A folder holding a disc's BDMV, and an .iso of a Blu-ray, play as one film: the main film, with chapters and the languages of the sound and subtitle tracks, but no disc menus. A .m2ts file also plays. A disc that is still encrypted is not played; Kinema says so. Folders and .iso images play on Windows and Linux, not yet on Android TV. An MKV from MakeMKV plays everywhere Kinema does, so it is the simplest choice."}},
+    {"@type": "Question", "name": "Why is my rip in Needs attention in Kinema?", "acceptedAnswer": {"@type": "Answer", "text": "Kinema was not sure enough which title the file is, and would rather ask than guess. The file name is almost always the reason."}}
+  ]
+}
+</script>
 </head>
 <body id="top">
 <a class="skip" href="#main">Skip to content</a>
+
+<svg class="ill" width="0" height="0" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true" focusable="false">
+  <symbol id="ic-disc" viewBox="0 0 60 60"><circle style="fill:none;stroke:var(--text);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round" cx="30" cy="30" r="25"/><circle style="fill:none;stroke:var(--dim);stroke-width:1.5" cx="30" cy="30" r="16"/><circle style="fill:none;stroke:var(--text);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round" cx="30" cy="30" r="6"/></symbol>
+  <symbol id="ic-app" viewBox="0 0 60 60"><rect style="fill:none;stroke:var(--text);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round" x="5" y="9" width="50" height="42" rx="5"/><path style="fill:none;stroke:var(--text);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round" d="M5 19H55"/><rect style="fill:var(--red)" x="11" y="25" width="8" height="5" rx="1"/><path style="fill:none;stroke:var(--dim);stroke-width:1.5" d="M23 27.5H48M23 35.5H44M23 43.5H40"/><rect style="fill:var(--red)" x="11" y="33" width="8" height="5" rx="1" opacity=".45"/></symbol>
+  <symbol id="ic-file" viewBox="0 0 60 60"><path style="fill:none;stroke:var(--text);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round" d="M13 5H37L48 16V55H13Z"/><path style="fill:none;stroke:var(--text);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round" d="M37 5V16H48"/><path style="fill:none;stroke:var(--red-text);stroke-width:2.5;stroke-linecap:round" d="M20 30H41M20 38H41M20 46H33"/></symbol>
+  <symbol id="ic-folder" viewBox="0 0 60 60"><path style="fill:none;stroke:var(--text);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round" d="M5 15H23L28 20H55V49H5Z"/><path style="fill:none;stroke:var(--dim);stroke-width:1.5" d="M5 26H55"/></symbol>
+  <symbol id="ic-tv" viewBox="0 0 60 60"><rect style="fill:none;stroke:var(--text);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round" x="3" y="9" width="54" height="35" rx="4"/><path style="fill:none;stroke:var(--text);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round" d="M21 53H39M30 44V53"/><path style="fill:var(--red)" d="M25 18L39 26.5L25 35Z"/></symbol>
+</svg>
 
 <header class="top">
   <div class="wrap bar">
@@ -51,57 +203,424 @@
 
 <main id="main" class="page">
   <div class="wrap">
-    <p class="chap">Guide</p>
-    <h1>Getting your Blu-rays into Kinema</h1>
-    <p>Kinema plays video files. It does not copy discs. This guide is for someone who owns Blu-rays or 4K UHD discs and has never ripped one: use MakeMKV to turn the disc into an MKV file with the picture and sound untouched, put the file in a folder Kinema scans, and play it.</p>
+    <p class="chap">Guide · Discs</p>
+    <h1>How to rip your DVDs, <span class="nw">Blu-rays</span> and 4K discs: a <span class="nw">plain-English</span> guide</h1>
+    <p class="lead">Ripping means copying a film from a disc you own into a file on your computer. Done right, the file looks and sounds exactly like the disc. This guide is for someone who has never done it. It uses MakeMKV, the tool most people use for this, and works the same for DVDs, Blu-rays and 4K UHD discs.</p>
     <p class="note" style="margin-top:0">Copying discs you own is legal in some countries and not in others. Check the rules where you live.</p>
 
-    <h2>What you need</h2>
-    <ul>
-      <li><b>A drive.</b> Any Blu-ray drive for Blu-rays. 4K UHD discs need a drive MakeMKV can read them with; see the 4K section.</li>
-      <li><b>MakeMKV</b>, for Windows, macOS or Linux. Its home page says all features, Blu-ray included, are free during its beta, and that opening DVDs is free. For the current terms, see <a href="https://www.makemkv.com/">MakeMKV's own site</a>.</li>
-      <li><b>Space.</b> Very roughly 20 to 50 GB for a Blu-ray film and 50 to 100 GB for a 4K UHD film.</li>
-      <li><b>Kinema</b>, with the folder you rip into added as a library folder (it can be a local disk, a USB drive or a NAS).</li>
-    </ul>
+    <section class="answer" aria-labelledby="short">
+      <h2 id="short">The short answer</h2>
+      <ol>
+        <li>Get a drive that reads your discs, and install <a href="https://www.makemkv.com/">MakeMKV</a>.</li>
+        <li>Put the disc in, open it in MakeMKV, and tick only the main film (usually the longest title).</li>
+        <li>Keep your language's best sound track, your subtitles and the forced subtitles.</li>
+        <li>Click Make MKV. Expect 20 minutes to 2 hours and 5 to 90 GB, depending on the disc.</li>
+        <li>Rename the file to <code>Title (Year).mkv</code>, put it in a folder of the same name, and play it.</li>
+      </ol>
+    </section>
 
-    <h2>Ripping a film</h2>
-    <ol>
-      <li>Put the disc in, start MakeMKV and click the big drive icon. It reads the disc and lists the titles.</li>
-      <li>Pick the main film. It is usually the longest title. Discs with several cuts, or with the film split into many pieces, list more than one long title; look at each title's length and chapter count, choose the version you want, and compare if unsure.</li>
-      <li>Open that title and tick the tracks you want. Keep the lossless sound track (for example TrueHD or Atmos, or DTS-HD Master Audio), plus any ordinary track you want as a fallback. Keep the subtitle languages you use, and the forced subtitle track if there is one: it holds the lines in another language that are meant to show even with subtitles off.</li>
-      <li>Choose an output folder with enough space, then click Make MKV. It takes a while, because the drive is read at its own pace.</li>
-    </ol>
-    <p>This is a remux: the video and audio are copied as they are, not re-encoded, so nothing is lost. The file is only put in a different container.</p>
+    <figure class="fig wide">
+      <svg class="ill only-wide" viewBox="0 0 1000 170" role="img" aria-labelledby="flow-t">
+        <title id="flow-t">From disc to film library: the disc, MakeMKV copies it, an MKV file with nothing lost, a folder named Title (Year), and a player such as Kinema.</title>
+        <g transform="translate(0,6)"><rect class="bx" width="160" height="150" rx="14"/><use href="#ic-disc" x="50" y="18" width="60" height="60"/><text class="t" x="80" y="108" text-anchor="middle">Your disc</text><text class="d" x="80" y="132" text-anchor="middle">DVD, Blu-ray, 4K</text></g>
+        <g transform="translate(210,6)"><rect class="bx" width="160" height="150" rx="14"/><use href="#ic-app" x="50" y="18" width="60" height="60"/><text class="t" x="80" y="108" text-anchor="middle">MakeMKV</text><text class="d" x="80" y="132" text-anchor="middle">copies it</text></g>
+        <g transform="translate(420,6)"><rect class="hi" width="160" height="150" rx="14"/><use href="#ic-file" x="50" y="18" width="60" height="60"/><text class="t" x="80" y="108" text-anchor="middle">An MKV file</text><text class="d" x="80" y="132" text-anchor="middle">nothing lost</text></g>
+        <g transform="translate(630,6)"><rect class="bx" width="160" height="150" rx="14"/><use href="#ic-folder" x="50" y="18" width="60" height="60"/><text class="t" x="80" y="108" text-anchor="middle">A folder</text><text class="d" x="80" y="132" text-anchor="middle">Title (Year)</text></g>
+        <g transform="translate(840,6)"><rect class="bx" width="160" height="150" rx="14"/><use href="#ic-tv" x="50" y="18" width="60" height="60"/><text class="t" x="80" y="108" text-anchor="middle">Your player</text><text class="d" x="80" y="132" text-anchor="middle">Kinema, or another</text></g>
+        <path class="ar" d="M168 81H202M195 74L202 81L195 88M378 81H412M405 74L412 81L405 88M588 81H622M615 74L622 81L615 88M798 81H832M825 74L832 81L825 88"/>
+      </svg>
+      <svg class="ill only-narrow" viewBox="0 0 340 520" role="img" aria-labelledby="flow-n">
+        <title id="flow-n">From disc to film library: the disc, MakeMKV copies it, an MKV file with nothing lost, a folder named Title (Year), and a player such as Kinema.</title>
+        <g><rect class="bx" width="340" height="80" rx="14"/><use href="#ic-disc" x="16" y="12" width="56" height="56"/><text class="t" x="92" y="36">Your disc</text><text class="m" x="92" y="60">DVD, Blu-ray, 4K</text></g>
+        <g transform="translate(0,110)"><rect class="bx" width="340" height="80" rx="14"/><use href="#ic-app" x="16" y="12" width="56" height="56"/><text class="t" x="92" y="36">MakeMKV</text><text class="m" x="92" y="60">copies it</text></g>
+        <g transform="translate(0,220)"><rect class="hi" width="340" height="80" rx="14"/><use href="#ic-file" x="16" y="12" width="56" height="56"/><text class="t" x="92" y="36">An MKV file</text><text class="m" x="92" y="60">nothing lost</text></g>
+        <g transform="translate(0,330)"><rect class="bx" width="340" height="80" rx="14"/><use href="#ic-folder" x="16" y="12" width="56" height="56"/><text class="t" x="92" y="36">A folder</text><text class="m" x="92" y="60">Title (Year)</text></g>
+        <g transform="translate(0,440)"><rect class="bx" width="340" height="80" rx="14"/><use href="#ic-tv" x="16" y="12" width="56" height="56"/><text class="t" x="92" y="36">Your player</text><text class="m" x="92" y="60">Kinema, or another</text></g>
+        <path class="ar" d="M170 84V106M163 99L170 106L177 99M170 194V216M163 209L170 216L177 209M170 304V326M163 319L170 326L177 319M170 414V436M163 429L170 436L177 429"/>
+      </svg>
+    </figure>
 
-    <h2>4K UHD discs</h2>
-    <p>Not every drive can read 4K UHD discs for MakeMKV. Its forum keeps the current advice on which drives work, so check there before buying anything. No drive models are named here because that advice changes.</p>
-    <p>On such a disc the picture is HDR10 and often Dolby Vision as well. Many Dolby Vision discs are profile 7, which is an HDR10 picture plus extra layers. Where the device has no decoder for profile 7, Kinema plays the HDR10 base layer and says so in the playback details. It never claims a Dolby Vision picture it did not show. The details panel also names the HDR format of the file, HDR10+ included.</p>
+    <nav class="toc" aria-label="On this page">
+      <p>On this page</p>
+      <ol>
+        <li><a href="#need">What you need</a></li>
+        <li><a href="#steps">Step by step</a></li>
+        <li><a href="#title">Picking the right title</a></li>
+        <li><a href="#tracks">Which sound and subtitles to keep</a></li>
+        <li><a href="#series">TV series discs</a></li>
+        <li><a href="#names">Naming and folders</a></li>
+        <li><a href="#watch">Watching the result</a></li>
+        <li><a href="#trouble">When something goes wrong</a></li>
+        <li><a href="#deep">For enthusiasts</a></li>
+        <li><a href="#faq">Questions</a></li>
+      </ol>
+    </nav>
 
-    <h2>TV series discs</h2>
-    <p>Each episode shows up as its own title, usually of similar length. Tick the episodes and leave out the extras, then rename the files to <code>Show S01E01.mkv</code>, <code>Show S01E02.mkv</code> and so on. MakeMKV lists titles in disc order, which is normally episode order but worth checking against the booklet.</p>
-
-    <h2>Names and folders</h2>
-    <p>Kinema works out what a file is from its folder and file names. A film:</p>
-    <p><code>Title (Year)/Title (Year).mkv</code></p>
-    <p>A series:</p>
-    <p><code>Show/Season 01/Show S01E01.mkv</code></p>
-    <p>The full rules are in <a href="file-names.html">How Kinema reads file names</a>.</p>
-
-    <h2>What Kinema shows and does</h2>
-    <ul>
-      <li>The film's page has badges for what the file holds: resolution, Dolby Vision profile (for profile 7, also whether its extra layer is the full or the minimal kind: FEL or MEL), HDR format, the exact sound format such as TrueHD Atmos or DTS:X, frame rate and bit depth. They are read from the file, not from its name. This uses ffprobe, which comes with ffmpeg, an optional extra that is installed separately (on Windows Kinema can do it with one press).</li>
-      <li>Atmos, DTS:X and TrueHD go to a receiver untouched, when the receiver takes them. Kinema asks about this on the first run.</li>
-      <li>Forced subtitles show even with subtitles off, in the language being spoken.</li>
-      <li>The playback details (the <code>i</code> key) say what the picture and sound are doing.</li>
-    </ul>
-
-    <h2>Questions</h2>
-    <div class="faq">
-      <details><summary>Can Kinema play the disc or the BDMV folder directly?</summary><div class="a">A folder holding a disc's BDMV, and an .iso of a Blu-ray, play as one film: the main film, with chapters and the languages of the sound and subtitle tracks, but no disc menus. A .m2ts file also plays. A disc that is still encrypted is not played; Kinema says so. Folders and .iso images play on Windows and Linux, not yet on Android TV. An MKV from MakeMKV plays everywhere Kinema does, so it is the simplest choice.</div></details>
-      <details><summary>Do I lose quality?</summary><div class="a">Not with MakeMKV's default output. The video and audio are copied as they are.</div></details>
-      <details><summary>Should I compress it?</summary><div class="a">That is your choice. Kinema plays both. A remux keeps everything on the disc and takes the most space.</div></details>
-      <details><summary>Why is my rip in Needs attention?</summary><div class="a">Kinema was not sure enough which title the file is, and would rather ask than guess. The file name is almost always the reason; see <a href="file-names.html">How Kinema reads file names</a>.</div></details>
+    <h2 id="need">What you need</h2>
+    <p>A computer, a drive, MakeMKV and some disk space. The drive is the one part that differs by disc type.</p>
+    <div class="tbl">
+      <table>
+        <thead><tr><th scope="col"></th><th scope="col">DVD</th><th scope="col">Blu-ray</th><th scope="col">4K UHD Blu-ray</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Drive</th><td>Any DVD or Blu-ray drive</td><td>Any Blu-ray drive</td><td>Only some drives. See below.</td></tr>
+          <tr><th scope="row">MakeMKV</th><td>Free, and stays free</td><td>Free during the beta, with the beta key</td><td>Free during the beta, with the beta key</td></tr>
+          <tr><th scope="row">Space per film</th><td>About 4–8 GB</td><td>About 20–40 GB</td><td>About 50–90 GB</td></tr>
+          <tr><th scope="row">Time per film</th><td>About 15–30 min</td><td>About 30–90 min</td><td>About 45 min to 2 hours</td></tr>
+          <tr><th scope="row">Internet</th><td>Not needed</td><td>Helps with new discs</td><td>Needed, for the disc's key</td></tr>
+        </tbody>
+      </table>
     </div>
+    <p>Sizes and times are rough. A longer film is bigger, a scratched disc is slower, and an external USB drive is often slower than one inside the computer. On a slow drive a Blu-ray can take as long as the film itself.</p>
+
+    <h3>MakeMKV and its key</h3>
+    <p>MakeMKV runs on Windows, macOS and Linux. Its <a href="https://www.makemkv.com/">home page</a> says opening DVDs is free and will stay free, and that everything else, Blu-ray included, is free while the program is in beta. The beta has been running for many years. For Blu-ray and 4K discs you enter a beta key, which MakeMKV posts in a <a href="https://forum.makemkv.com/forum/viewtopic.php?t=1053">pinned forum post</a> and replaces from time to time. You can also <a href="https://www.makemkv.com/buy/">buy a key</a> that does not expire. The beta version itself stops working after 60 days; installing the newest version resets that.</p>
+
+    <h3>A drive for 4K UHD discs</h3>
+    <p>This is where beginners get caught. A 4K disc needs a drive that MakeMKV can switch into what it calls <a href="https://forum.makemkv.com/forum/viewtopic.php?t=18856">LibreDrive mode</a>. Many Blu-ray drives, even ones sold as "4K" or "UHD", cannot do that as they come from the factory. Which models work changes with each firmware version, so this guide names none.</p>
+    <p>Before you buy, check the <a href="https://forum.makemkv.com/forum/viewtopic.php?t=19634">UHD drive list on MakeMKV's forum</a>, kept by its members. As a beginner, pick one listed as working with no changes needed. Two things the list warns about: the same model number can come with different firmware, so ask on the forum if unsure, and some USB cases for drives stop LibreDrive from working. Once a drive is connected, MakeMKV shows its LibreDrive status in the information pane on its main screen.</p>
+    <p>4K discs also need MakeMKV to be online. It fetches the key for each disc from the internet, so leave <b>Enable Internet access</b> ticked (View → Preferences → General).</p>
+
+    <h3>Disk space</h3>
+    <p>Rip to a disk with room for the whole file plus some spare. If you use a USB drive or stick, it must not be formatted as FAT32: that format cannot hold files over 4 GB. exFAT or NTFS on Windows, and ext4 on Linux, are fine. Rip to a disk inside or plugged into the computer, not straight to a network drive: it is faster and less likely to fail halfway. Copy the finished file over afterwards.</p>
+
+    <h2 id="steps">Step by step</h2>
+    <p>The drawings below are simplified sketches. MakeMKV's real window looks different, but the parts are the same.</p>
+    <ol class="steps">
+      <li>
+        <div>
+          <h3>Install MakeMKV</h3>
+          <p>Download it from <a href="https://www.makemkv.com/download/">makemkv.com</a> and install it. On Windows the beta needs to run as administrator. For Blu-ray or 4K discs, open Help → Register and paste in the beta key.</p>
+          <p>One setting is worth changing first: View → Preferences → General → <b>Expert mode</b>. It shows more about each title and track, which helps with the next steps.</p>
+        </div>
+        <figure class="fig">
+          <svg class="ill" viewBox="0 0 400 200" role="img" aria-labelledby="s1-t">
+            <title id="s1-t">A registration box with a field for the key and an OK button.</title>
+            <rect class="win" x="10" y="10" width="380" height="180" rx="12"/>
+            <path class="ln" d="M10 46H390"/>
+            <text class="tm" x="28" y="34">Register</text>
+            <text class="m" x="28" y="82">Registration key</text>
+            <rect class="bx" x="28" y="94" width="344" height="40" rx="8"/>
+            <text class="m mo" x="42" y="120">T-xxxxxxxxxxxxxxxxxxxx</text>
+            <rect class="hi" x="282" y="146" width="90" height="32" rx="8"/>
+            <text class="tm" x="327" y="168" text-anchor="middle">OK</text>
+          </svg>
+        </figure>
+      </li>
+      <li>
+        <div>
+          <h3>Put the disc in and open it</h3>
+          <p>Start MakeMKV with the disc in the drive. Click the big drive picture. MakeMKV reads the disc and lists every title on it. This can take a minute or two, longer for a 4K disc. Wait for the list to appear.</p>
+        </div>
+        <figure class="fig">
+          <svg class="ill" viewBox="0 0 400 200" role="img" aria-labelledby="s2-t">
+            <title id="s2-t">MakeMKV's start screen: one big button showing a drive with a disc, labelled Open disc.</title>
+            <rect class="win" x="10" y="10" width="380" height="180" rx="12"/>
+            <rect class="hi" x="120" y="34" width="160" height="112" rx="14"/>
+            <rect class="ico" x="146" y="88" width="108" height="30" rx="4"/>
+            <path class="icf" d="M160 108H200"/>
+            <circle class="red" cx="238" cy="103" r="3.5"/>
+            <use href="#ic-disc" x="172" y="38" width="56" height="56"/>
+            <text class="tm" x="200" y="172" text-anchor="middle">Open disc</text>
+          </svg>
+        </figure>
+      </li>
+      <li>
+        <div>
+          <h3>Tick only the main film</h3>
+          <p>Each title is something the disc can play: the film, the extras, trailers, short menu clips. Click the box beside a title to untick it. A quick way: right-click the list and choose Unselect all, then tick one title: the main film, which is usually the longest, with the most chapters and the biggest size. If several look the same, read <a href="#title">Picking the right title</a>.</p>
+        </div>
+        <figure class="fig">
+          <svg class="ill" viewBox="0 0 400 240" role="img" aria-labelledby="s3-t">
+            <title id="s3-t">A list of four titles. Title 00 is 2 hours 14 minutes, 28 chapters, 38 GB, and is ticked. The others are short extras and are unticked.</title>
+            <rect class="win" x="10" y="10" width="380" height="220" rx="12"/>
+            <rect class="hi" x="20" y="22" width="360" height="46" rx="8"/>
+            <rect class="chk on" x="32" y="35" width="20" height="20" rx="4"/><path class="tick" d="M36.5 45.5L40.5 49.5L48 41"/>
+            <text class="tm" x="64" y="51">Title 00</text><text class="tm mo" x="160" y="51">2:14:08</text><text class="m" x="250" y="51">28 ch</text><text class="m" x="314" y="51">38 GB</text>
+            <rect class="chk" x="32" y="87" width="20" height="20" rx="4"/>
+            <text class="m" x="64" y="103">Title 01</text><text class="m mo" x="160" y="103">0:21:40</text><text class="d" x="250" y="103">4 ch</text><text class="d" x="314" y="103">4 GB</text>
+            <rect class="chk" x="32" y="135" width="20" height="20" rx="4"/>
+            <text class="m" x="64" y="151">Title 02</text><text class="m mo" x="160" y="151">0:12:05</text><text class="d" x="250" y="151">2 ch</text><text class="d" x="314" y="151">2 GB</text>
+            <rect class="chk" x="32" y="183" width="20" height="20" rx="4"/>
+            <text class="m" x="64" y="199">Title 03</text><text class="m mo" x="160" y="199">0:02:31</text><text class="d" x="250" y="199">1 ch</text><text class="d" x="314" y="199">0.4 GB</text>
+          </svg>
+        </figure>
+      </li>
+      <li>
+        <div>
+          <h3>Choose the sound and subtitles</h3>
+          <p>Click the small arrow beside the ticked title to open it. Inside are the video, the sound tracks and the subtitles. Keep the best sound in your language, the subtitles you read, and the forced subtitles. Untick the rest. The <a href="#tracks">keep or skip table</a> says which is which.</p>
+        </div>
+        <figure class="fig">
+          <svg class="ill" viewBox="0 0 400 286" role="img" aria-labelledby="s4-t">
+            <title id="s4-t">The main title opened. Ticked: the video, English TrueHD Atmos, English Dolby Digital 5.1, English subtitles and English forced-only subtitles. Unticked: French sound, commentary and Spanish subtitles.</title>
+            <rect class="win" x="10" y="10" width="380" height="266" rx="12"/>
+            <g class="rows">
+              <rect class="chk on" x="26" y="26" width="18" height="18" rx="4"/><path class="tick" d="M30 35.5L33.6 39L40 32"/><text class="tm" x="56" y="41">Video · 1080p</text>
+              <rect class="chk on" x="26" y="58" width="18" height="18" rx="4"/><path class="tick" d="M30 67.5L33.6 71L40 64"/><text class="tm" x="56" y="73">Sound · English · TrueHD Atmos</text>
+              <rect class="chk on" x="26" y="90" width="18" height="18" rx="4"/><path class="tick" d="M30 99.5L33.6 103L40 96"/><text class="tm" x="56" y="105">Sound · English · Dolby Digital 5.1</text>
+              <rect class="chk" x="26" y="122" width="18" height="18" rx="4"/><text class="m" x="56" y="137">Sound · French · Dolby Digital 5.1</text>
+              <rect class="chk" x="26" y="154" width="18" height="18" rx="4"/><text class="m" x="56" y="169">Sound · English · Commentary</text>
+              <rect class="chk on" x="26" y="186" width="18" height="18" rx="4"/><path class="tick" d="M30 195.5L33.6 199L40 192"/><text class="tm" x="56" y="201">Subtitles · English</text>
+              <rect class="chk on" x="26" y="218" width="18" height="18" rx="4"/><path class="tick" d="M30 227.5L33.6 231L40 224"/><text class="tm" x="56" y="233">Subtitles · English · forced only</text>
+              <rect class="chk" x="26" y="250" width="18" height="18" rx="4"/><text class="m" x="56" y="265">Subtitles · Spanish</text>
+            </g>
+          </svg>
+        </figure>
+      </li>
+      <li>
+        <div>
+          <h3>Choose a folder and click Make MKV</h3>
+          <p>Under Output folder, pick a disk with enough free space. Click Make MKV. The progress bar shows how far it has got. Leave the computer awake until it says the copy is done. You can use it for other things meanwhile.</p>
+        </div>
+        <figure class="fig">
+          <svg class="ill" viewBox="0 0 400 200" role="img" aria-labelledby="s5-t">
+            <title id="s5-t">An output folder field, a Make MKV button, and a progress bar about two-thirds full.</title>
+            <rect class="win" x="10" y="10" width="380" height="180" rx="12"/>
+            <text class="m" x="28" y="44">Output folder</text>
+            <rect class="bx" x="28" y="56" width="236" height="40" rx="8"/>
+            <text class="m mo" x="42" y="82">D:\Rips</text>
+            <rect class="hi" x="276" y="52" width="96" height="48" rx="10"/>
+            <text class="tm" x="324" y="74" text-anchor="middle" style="font-size:15px">Make</text><text class="tm" x="324" y="92" text-anchor="middle" style="font-size:15px">MKV</text>
+            <rect class="bx" x="28" y="128" width="344" height="16" rx="8"/>
+            <rect class="red" x="28" y="128" width="230" height="16" rx="8"/>
+            <text class="d" x="28" y="172">Saving title 00… 67 %</text>
+          </svg>
+        </figure>
+      </li>
+      <li>
+        <div>
+          <h3>Rename it and put it in place</h3>
+          <p>MakeMKV names the file after the disc, something like <code>DISC_NAME_t00.mkv</code>. Rename it to the film's title and year, and give it a folder of the same name. With Expert mode on, you can also type the name into the title's name field before ripping. Then add the folder that holds your films to your player. <a href="#names">Naming and folders</a> has the details.</p>
+        </div>
+        <figure class="fig">
+          <svg class="ill" viewBox="0 0 400 200" role="img" aria-labelledby="s6-t">
+            <title id="s6-t">A file called DISC_NAME_t00.mkv becomes Example Film (2019).mkv inside a folder called Example Film (2019).</title>
+            <rect class="win" x="10" y="10" width="380" height="180" rx="12"/>
+            <use href="#ic-file" x="26" y="26" width="40" height="40"/>
+            <text class="m mo" x="76" y="52">DISC_NAME_t00.mkv</text>
+            <path class="ar" d="M46 76V100M39 93L46 100L53 93"/>
+            <use href="#ic-folder" x="26" y="108" width="40" height="40"/>
+            <text class="tm" x="76" y="134">Example Film (2019)</text>
+            <use href="#ic-file" x="56" y="144" width="34" height="34"/>
+            <text class="tm" x="96" y="167">Example Film (2019).mkv</text>
+          </svg>
+        </figure>
+      </li>
+    </ol>
+    <p style="margin-top:20px">This kind of copy is called a <b>remux</b>. The video and sound are copied as they are, not re-encoded, so nothing is lost. Only the container changes, from the disc's own format to MKV, which keeps the chapters and the name of each track's language.</p>
+    <p>Before you put the disc away, play the file and skip through it: the length should match the film, the scenes should follow one another, and the sound should be in sync.</p>
+
+    <h2 id="title">Picking the right title</h2>
+    <p>A disc holds more than the film. MakeMKV hides very short clips by default (anything under two minutes; this is in Preferences → Video), but you will still see the film, the extras and sometimes other versions of the film.</p>
+    <figure class="fig sm">
+      <svg class="ill" viewBox="0 0 400 330" role="img" aria-labelledby="disc-t">
+        <title id="disc-t">What is on a typical disc, as bars by length: the main film at 2 hours 14 minutes, an extended cut at 2 hours 25 minutes, a making-of at 22 minutes, deleted scenes at 12 minutes, and a trailer at 2 minutes.</title>
+        <text class="t" x="0" y="22">What is on a typical disc</text>
+        <text class="m" x="0" y="60">Main film</text><rect class="blm" x="0" y="68" width="300" height="18" rx="4"/><text class="r mo" x="308" y="83">2:14</text>
+        <text class="m" x="0" y="112">Extended cut</text><rect class="bl" x="0" y="120" width="325" height="18" rx="4"/><text class="m mo" x="333" y="135">2:25</text>
+        <text class="m" x="0" y="164">Making-of</text><rect class="bl" x="0" y="172" width="50" height="18" rx="4"/><text class="m mo" x="58" y="187">0:22</text>
+        <text class="m" x="0" y="216">Deleted scenes</text><rect class="bl" x="0" y="224" width="27" height="18" rx="4"/><text class="m mo" x="35" y="239">0:12</text>
+        <text class="m" x="0" y="268">Trailer</text><rect class="bl" x="0" y="276" width="5" height="18" rx="4"/><text class="m mo" x="13" y="291">0:02</text>
+        <text class="d" x="0" y="322">Menu clips and logos are hidden by the minimum length.</text>
+      </svg>
+    </figure>
+    <h3>The usual case</h3>
+    <p>Pick the longest title. It almost always has the most chapters and the biggest size too. Click a title and the information pane shows its length, chapters and size.</p>
+    <h3>More than one long title</h3>
+    <p>Some discs carry two cuts of the film, such as the cinema version and an extended one, or a version with the credits in another language. Their lengths differ by a few minutes. The case often gives the running time, and <a href="https://www.dvdcompare.net/">dvdcompare.net</a> lists the cuts and lengths of most discs. You can rip both: each one becomes its own file.</p>
+    <p>Two long titles with the <em>same</em> length are often the same film with different credits or different language choices, for other countries. Either works if you do not need those languages. On discs from one big studio, playlist <code>00800.mpls</code> is usually the English version.</p>
+    <h3>Dozens of titles with the same length</h3>
+    <p>Some Blu-rays, from a few studios, hide the real film among many fakes. This is called <b>playlist obfuscation</b>. Every fake has the same length and size as the real film, but plays the scenes in the wrong order, so a rip of a fake jumps around or ends in the wrong place.</p>
+    <figure class="fig sm">
+      <svg class="ill" viewBox="0 0 400 330" role="img" aria-labelledby="obf-t">
+        <title id="obf-t">Four playlists of exactly the same length. Each is made of the same four pieces. Only one, 00800.mpls, plays them in the order 1 2 3 4. The others play them shuffled.</title>
+        <text class="t" x="0" y="22">Same length, different order</text>
+        <g transform="translate(0,44)"><text class="m mo" x="0" y="16">00800.mpls</text><text class="g" x="400" y="16" text-anchor="end">real</text><rect class="seg1" x="0" y="24" width="100" height="28"/><text class="segt" x="50" y="44" text-anchor="middle">1</text><rect class="seg2" x="100" y="24" width="100" height="28"/><text class="segt" x="150" y="44" text-anchor="middle">2</text><rect class="seg3" x="200" y="24" width="100" height="28"/><text class="segt" x="250" y="44" text-anchor="middle">3</text><rect class="seg4" x="300" y="24" width="100" height="28"/><text class="segt" x="350" y="44" text-anchor="middle">4</text><rect fill="none" stroke="var(--green)" stroke-width="3" x="1.5" y="22.5" width="397" height="31" rx="3"/></g>
+        <g transform="translate(0,110)"><text class="m mo" x="0" y="16">00801.mpls</text><text class="d" x="400" y="16" text-anchor="end">fake</text><rect class="seg3" x="0" y="24" width="100" height="28"/><text class="segt" x="50" y="44" text-anchor="middle">3</text><rect class="seg1" x="100" y="24" width="100" height="28"/><text class="segt" x="150" y="44" text-anchor="middle">1</text><rect class="seg4" x="200" y="24" width="100" height="28"/><text class="segt" x="250" y="44" text-anchor="middle">4</text><rect class="seg2" x="300" y="24" width="100" height="28"/><text class="segt" x="350" y="44" text-anchor="middle">2</text></g>
+        <g transform="translate(0,176)"><text class="m mo" x="0" y="16">00802.mpls</text><text class="d" x="400" y="16" text-anchor="end">fake</text><rect class="seg2" x="0" y="24" width="100" height="28"/><text class="segt" x="50" y="44" text-anchor="middle">2</text><rect class="seg4" x="100" y="24" width="100" height="28"/><text class="segt" x="150" y="44" text-anchor="middle">4</text><rect class="seg1" x="200" y="24" width="100" height="28"/><text class="segt" x="250" y="44" text-anchor="middle">1</text><rect class="seg3" x="300" y="24" width="100" height="28"/><text class="segt" x="350" y="44" text-anchor="middle">3</text></g>
+        <g transform="translate(0,242)"><text class="m mo" x="0" y="16">00803.mpls</text><text class="d" x="400" y="16" text-anchor="end">fake</text><rect class="seg1" x="0" y="24" width="100" height="28"/><text class="segt" x="50" y="44" text-anchor="middle">1</text><rect class="seg3" x="100" y="24" width="100" height="28"/><text class="segt" x="150" y="44" text-anchor="middle">3</text><rect class="seg2" x="200" y="24" width="100" height="28"/><text class="segt" x="250" y="44" text-anchor="middle">2</text><rect class="seg4" x="300" y="24" width="100" height="28"/><text class="segt" x="350" y="44" text-anchor="middle">4</text></g>
+        <text class="d" x="0" y="322">…and often dozens more like these</text>
+      </svg>
+    </figure>
+    <p>What helps, in order:</p>
+    <ol>
+      <li><b>Let MakeMKV find it.</b> If Java is installed on the computer, MakeMKV can often work out the real title from the disc's menus. It then puts it first in the list and marks it as the main feature.</li>
+      <li><b>Look it up.</b> Click each title and note the playlist file name the information pane shows, such as <code>00800.mpls</code>. Search MakeMKV's forum or the web for the film's name with "playlist". Someone has usually posted the right one. Go by the playlist file name, not the title number: the numbers can change with MakeMKV's settings.</li>
+      <li><b>Check after ripping.</b> Play the file and skip through it. The scenes should follow one another, and the film should end with its credits.</li>
+    </ol>
+
+    <h2 id="tracks">Which sound and subtitles to keep</h2>
+    <p>Discs carry many sound and subtitle tracks. Subtitles are tiny, so keeping a few costs nothing. Sound tracks are bigger; a lossless one can be several gigabytes.</p>
+    <div class="tbl">
+      <table>
+        <thead><tr><th scope="col">Track</th><th scope="col">Keep?</th><th scope="col">Why</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">The best sound in your language: TrueHD (often with Atmos), DTS-HD Master Audio (sometimes DTS:X) or LPCM</th><td class="k">Keep</td><td>This is the disc's full-quality sound. It is the reason to rip rather than stream.</td></tr>
+          <tr><th scope="row">A plain track in the same language: Dolby Digital (AC3) or DTS</th><td class="c">Your choice</td><td>A fallback for devices that cannot play the lossless one. MakeMKV often shows it tucked under the lossless track, because the lossless track carries it inside. Ticking both gives you two separate tracks.</td></tr>
+          <tr><th scope="row">On a DVD: the Dolby Digital track in your language</th><td class="k">Keep</td><td>DVDs have no lossless sound. This is the best there is.</td></tr>
+          <tr><th scope="row">Other languages</th><td class="c">Your choice</td><td>Keep the ones someone at home listens to.</td></tr>
+          <tr><th scope="row">Commentary</th><td class="c">Your choice</td><td>Small, and some people love them.</td></tr>
+          <tr><th scope="row">Audio description</th><td class="s">Skip</td><td>Unless someone at home uses it.</td></tr>
+          <tr><th scope="row">Subtitles in the languages you read</th><td class="k">Keep</td><td>Tiny, and the disc's own subtitles are timed exactly to it.</td></tr>
+          <tr><th scope="row">Forced subtitles ("forced only")</th><td class="k">Keep</td><td>See below. Without them, some lines go untranslated.</td></tr>
+          <tr><th scope="row">Subtitles in languages nobody reads</th><td class="s">Skip</td><td>Harmless, but they make the subtitle menu long.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>Forced subtitles, explained</h3>
+    <p>Some films have a few lines meant to be read even with subtitles off: a character speaking another language, or a sign or letter that needs translating. Those lines are called <b>forced subtitles</b>. On the disc they are often mixed in with the full subtitles and only marked as forced.</p>
+    <p>MakeMKV can split them into a track of their own, named something like "forced only". Keep that track. A good player shows it on its own when subtitles are off. Some discs put forced lines in a separate, unmarked track instead; then MakeMKV cannot tell, and a small subtitle track in your own language is the clue.</p>
+
+    <h2 id="series">TV series discs</h2>
+    <p>A series disc usually shows each episode as its own title, all of similar length. Tick the episodes and leave the extras out. Some things to watch for:</p>
+    <ul>
+      <li><b>A "play all" title.</b> Many series discs also have one long title holding every episode in a row. Skip it: you already have the episodes one by one.</li>
+      <li><b>Which titles.</b> Look for as many titles as the disc has episodes, with similar lengths, chapter counts and sizes.</li>
+      <li><b>The order.</b> MakeMKV lists titles in the order they sit on the disc. That is normally episode order, but not always. Check the lengths against the booklet or an episode guide.</li>
+      <li><b>Several discs per season.</b> Keep counting across discs. If disc 1 ends at episode 4, disc 2 starts at <code>S01E05</code>.</li>
+      <li><b>All episodes in one title.</b> A few discs, mostly DVDs, have the whole disc as one title with chapters. You can rip it and split it by chapter afterwards with <a href="https://mkvtoolnix.download/">MKVToolNix</a>, which is free.</li>
+    </ul>
+    <p>Rename each file to the show's name with the season and episode number, such as <code>Example Show S01E01.mkv</code>.</p>
+
+    <h2 id="names">Naming and folders</h2>
+    <p>Media players work out what a file is from its folder and file name. Name it badly, and the player shows the wrong poster or none. The layout below works in Kinema, Jellyfin, Plex and Kodi alike.</p>
+    <figure class="fig sm">
+      <svg class="ill" viewBox="0 0 370 380" role="img" aria-labelledby="tree-t">
+        <title id="tree-t">A folder tree. Films holds a folder per film, each named Title (Year) with one file of the same name inside. TV holds a folder per show, a folder per season, and files named Show S01E01.mkv.</title>
+        <path class="ln" d="M20 44V160M20 74H44M20 160H44M58 87V130H82M20 230V258H44M58 272V300H82M96 314V366M96 342H120M96 366H120"/>
+        <use href="#ic-folder" x="8" y="12" width="30" height="30"/><text class="t" x="46" y="34">Films</text>
+        <use href="#ic-folder" x="44" y="58" width="28" height="28"/><text class="tm" x="80" y="79">Example Film (2019)</text>
+        <use href="#ic-file" x="82" y="114" width="26" height="26"/><text class="m" x="114" y="133">Example Film (2019).mkv</text>
+        <use href="#ic-folder" x="44" y="144" width="28" height="28"/><text class="tm" x="80" y="165">Another Film (2021)</text>
+        <use href="#ic-folder" x="8" y="198" width="30" height="30"/><text class="t" x="46" y="220">TV</text>
+        <use href="#ic-folder" x="44" y="244" width="28" height="28"/><text class="tm" x="80" y="265">Example Show</text>
+        <use href="#ic-folder" x="82" y="286" width="28" height="28"/><text class="tm" x="118" y="307">Season 01</text>
+        <use href="#ic-file" x="120" y="326" width="26" height="26"/><text class="m" x="152" y="345">Example Show S01E01.mkv</text>
+        <text class="m" x="152" y="372">Example Show S01E02.mkv …</text>
+      </svg>
+    </figure>
+    <ul>
+      <li>A film: <code>Films/Example Film (2019)/Example Film (2019).mkv</code></li>
+      <li>An episode: <code>TV/Example Show/Season 01/Example Show S01E01.mkv</code></li>
+      <li>Two cuts of one film can sit in the same folder, for example <code>Example Film (2019) - Extended.mkv</code>.</li>
+      <li>Keep films and series in separate top folders. Players handle them differently.</li>
+    </ul>
+    <p>The year matters: it tells two films of the same name apart. The full rules, including what Kinema does with release-style names, are in <a href="file-names.html">How Kinema reads file names</a>.</p>
+
+    <h2 id="watch">Watching the result</h2>
+    <p>Any good player can play an MKV. Where they differ is how much of the disc's picture and sound reaches your screen and speakers. We make <a href="./">Kinema</a>, a free, open-source library and player for Windows, Linux and (early) Android TV, built for exactly these files:</p>
+    <ul>
+      <li><b>Point it at your folder and it does the rest.</b> Posters, descriptions and where you stopped. Files it is not sure about wait in a Needs attention list instead of getting a wrong poster.</li>
+      <li><b>The sound reaches your receiver untouched.</b> Atmos, DTS:X and TrueHD go to an AV receiver as they are, when the receiver takes them. Kinema asks about this on the first run.</li>
+      <li><b>Forced subtitles show with subtitles off</b>, in the language being spoken.</li>
+      <li><b>It says what it is doing.</b> The film's page shows what the file holds (resolution, HDR format, the exact sound format), read from the file itself. Press <code>i</code> while playing to see what the picture and sound are doing.</li>
+      <li><b>No server and no account.</b> One program on the computer connected to your TV.</li>
+    </ul>
+    <p>If you would rather stream to phones and other rooms from one server, Jellyfin and Plex do that. If you want a full media centre with add-ons, there is Kodi. All three play these files too.</p>
+    <p><a class="btn small primary" href="./#download">Download Kinema</a></p>
+
+    <h2 id="trouble">When something goes wrong</h2>
+    <dl class="trouble">
+      <dt>MakeMKV says it is too old, or has expired.</dt>
+      <dd>The beta stops after 60 days. Download and install the newest version from makemkv.com. If it then asks for a key, take the current one from the <a href="https://forum.makemkv.com/forum/viewtopic.php?t=1053">forum post</a>.</dd>
+      <dt>MakeMKV does not see the drive.</dt>
+      <dd>On Windows, start MakeMKV as administrator. For an external drive, try another USB port and the drive's own power supply if it has one. Then restart MakeMKV with the disc already in.</dd>
+      <dt>A 4K disc will not open, or opens with errors.</dt>
+      <dd>Look at the information pane with the drive selected. If LibreDrive is not shown as enabled, this drive cannot read 4K discs for MakeMKV. The <a href="https://forum.makemkv.com/forum/viewtopic.php?t=19634">UHD drive list</a> says which can. Blu-rays and DVDs still work in it.</dd>
+      <dt>The rip stops with read errors, or says 0 titles saved.</dt>
+      <dd>Look at the messages just above. Words like "medium error" or "uncorrectable read error" mean the drive could not read the disc: clean it with a soft cloth, wiping from the centre outwards, and try again. Some damaged discs read in one drive and not another, and some never rip at all. Messages about AACS mean a problem with the disc's protection instead; see the next item.</dd>
+      <dt>It says the disc's key is unknown, or it cannot decrypt a new disc.</dt>
+      <dd>Install the newest MakeMKV and check that Enable Internet access is ticked. For 4K discs, MakeMKV fetches each disc's key online. A brand-new disc may not have one yet; the disc's thread on MakeMKV's forum usually says when it works.</dd>
+      <dt>A 4K disc stops reading after it sat in the drive for a while.</dt>
+      <dd>Some drives go to sleep after about two minutes and then cannot read a 4K disc. Open and close the tray, and start again.</dd>
+      <dt>The film jumps around or ends in the wrong place.</dt>
+      <dd>You ripped a fake playlist. See <a href="#title">Dozens of titles with the same length</a>.</dd>
+      <dt>A foreign-language scene has no subtitles.</dt>
+      <dd>The forced subtitles were not kept, or the player does not show them on their own. Rip the title again with the "forced only" track ticked.</dd>
+      <dt>There is sound on the receiver but not on the TV or headphones, or the other way round.</dt>
+      <dd>Your device cannot play the lossless track. Switch to the fallback track in the player, if you kept one, or try a player that can decode it.</dd>
+      <dt>The copy fails near the end of a large file.</dt>
+      <dd>The output disk is full, or it is FAT32 and the file is over 4 GB. Use a disk with more room, formatted as exFAT, NTFS or ext4.</dd>
+      <dt>The player shows the wrong film, or none.</dt>
+      <dd>Check the file and folder names against <a href="#names">Naming and folders</a>. Add the year. In Kinema, the Needs attention list lets you pick the right film by hand.</dd>
+    </dl>
+
+    <h2 id="deep">For enthusiasts</h2>
+    <p>None of this is needed to rip a disc well. It is here for when you want to know more.</p>
+    <details class="deep">
+      <summary>Dolby Vision on 4K discs: profile 7, FEL and MEL</summary>
+      <div>
+        <p>A 4K disc's picture is HDR10, and often Dolby Vision as well. Most Dolby Vision discs use <b>profile 7</b>: an HDR10 picture, the base layer, plus a second layer with the Dolby Vision information, the enhancement layer. MakeMKV keeps both in the MKV.</p>
+        <p>The second layer comes in two kinds. A <b>MEL</b> (minimal enhancement layer) carries only the Dolby Vision instructions. A <b>FEL</b> (full enhancement layer) also carries picture data that adds to the base layer. Few devices outside disc players can use a FEL fully.</p>
+        <p>Where the device has no decoder for profile 7, Kinema plays the HDR10 base layer and says so in the playback details. It never claims a Dolby Vision picture it did not show. The film's page names the profile, and for profile 7 whether it is FEL or MEL. Those badges need ffmpeg, an optional extra installed separately (on Windows Kinema can do it with one press).</p>
+      </div>
+    </details>
+    <details class="deep">
+      <summary>HDR10+</summary>
+      <div>
+        <p>HDR10+ is a rival to Dolby Vision, used on some discs. Its scene-by-scene information sits inside the video itself, so a remux keeps it with no extra step. Whether you see it depends on the TV and the player. Kinema's playback details name the file's HDR format, HDR10+ included.</p>
+      </div>
+    </details>
+    <details class="deep">
+      <summary>Keep the remux, or compress it with HandBrake?</summary>
+      <div>
+        <figure class="fig sm">
+          <svg class="ill" viewBox="0 0 400 250" role="img" aria-labelledby="re-t">
+            <title id="re-t">Two paths. A remux copies the disc to an MKV of about 38 gigabytes with everything kept, in minutes. A re-encode takes that MKV through HandBrake, for hours, to a file of about 8 gigabytes with some detail lost.</title>
+            <text class="t" x="0" y="22">Remux</text>
+            <use href="#ic-disc" x="0" y="40" width="50" height="50"/>
+            <path class="ar" d="M60 65H100M93 58L100 65L93 72"/>
+            <use href="#ic-file" x="108" y="36" width="58" height="58"/>
+            <text class="tm" x="180" y="58">38 GB</text><text class="g" x="180" y="82">everything kept</text>
+            <text class="t" x="0" y="146">Re-encode</text>
+            <use href="#ic-disc" x="0" y="164" width="50" height="50"/>
+            <path class="ar" d="M60 189H100M93 182L100 189L93 196"/>
+            <use href="#ic-file" x="108" y="160" width="58" height="58"/>
+            <path class="ar" d="M174 189H226M219 182L226 189L219 196"/>
+            <text class="d" x="172" y="216">HandBrake</text>
+            <use href="#ic-file" x="232" y="172" width="36" height="36"/>
+            <text class="tm" x="278" y="184">8 GB</text><text class="r" x="278" y="206">detail lost</text><text class="d" x="278" y="228">hours</text>
+          </svg>
+        </figure>
+        <p>A remux keeps everything and takes the most space. <a href="https://handbrake.fr/">HandBrake</a> can shrink a file to a fraction of the size by re-encoding it, but that always throws some detail away, takes hours per film, and can drop Dolby Vision and lossless sound unless you set it up with care. HandBrake does not read protected discs itself, so you would still rip with MakeMKV first.</p>
+        <p>Compress if space is the problem, for example films for a laptop. For a home cinema, many people keep the remux: disks are cheaper than ripping a collection twice. Kinema plays both.</p>
+      </div>
+    </details>
+    <details class="deep">
+      <summary>Backups</summary>
+      <div>
+        <p>A collection of remuxes takes days of ripping to build. Keep a second copy on another disk, ideally in another place. Two disks inside one computer, or a RAID, protect against one disk failing, not against a mistake, a theft or a fire.</p>
+        <p>If you want the whole disc, menus and all, MakeMKV's Backup button copies it unchanged into a folder (tick "Decrypt video files"). Kinema plays such a folder, or an <code>.iso</code> of a Blu-ray, as one film on Windows and Linux, without the menus. An MKV is still the simplest: it plays everywhere.</p>
+      </div>
+    </details>
+
+    <h2 id="faq">Questions</h2>
+    <div class="faq">
+      <details><summary>Is MakeMKV free?</summary><div class="a">Ripping DVDs is free and, according to MakeMKV's site, will stay free. Blu-ray and 4K UHD ripping are free while MakeMKV is in beta, with a beta key that MakeMKV posts on its forum and replaces from time to time. You can also buy a key. The beta version stops working after 60 days; installing the latest version resets that.</div></details>
+      <details><summary>How long does it take to rip a Blu-ray?</summary><div class="a">Roughly 30 to 90 minutes for a Blu-ray film, 15 to 30 minutes for a DVD, and 45 minutes to 2 hours for a 4K UHD disc. The drive's reading speed decides most of it: on a slow USB drive a Blu-ray can take as long as the film. A scratched disc is slower still.</div></details>
+      <details><summary>How big is a ripped Blu-ray or 4K file?</summary><div class="a">A film from a DVD is about 4 to 8 GB, from a Blu-ray about 20 to 40 GB, and from a 4K UHD disc about 50 to 90 GB. It depends on the film's length and how many sound tracks you keep.</div></details>
+      <details><summary>Do I lose quality when I rip with MakeMKV?</summary><div class="a">No. MakeMKV copies the video and sound as they are into an MKV file. Nothing is re-encoded. This kind of copy is called a remux.</div></details>
+      <details><summary>Can any Blu-ray drive rip 4K UHD discs?</summary><div class="a">No. MakeMKV needs a drive it can put in LibreDrive mode to read 4K UHD discs, and many drives cannot do that out of the box. MakeMKV's forum keeps <a href="https://forum.makemkv.com/forum/viewtopic.php?t=19634">the current lists of drives that work</a>. Check there before buying a drive. MakeMKV also needs internet access to fetch each 4K disc's key.</div></details>
+      <details><summary>Why does my Blu-ray show dozens of titles of the same length?</summary><div class="a">Some discs hide the real film among many fake copies, called playlist obfuscation. The fakes play the same scenes in the wrong order. If Java is installed, MakeMKV can often spot the real one and mark it. Otherwise, the film's thread on MakeMKV's forum usually names the right playlist file (for example 00800.mpls), which MakeMKV shows in the info pane for each title.</div></details>
+      <details><summary>What are forced subtitles?</summary><div class="a">Forced subtitles are the few lines meant to show even when subtitles are off, such as when a character speaks another language or a sign needs translating. MakeMKV can put them in a track of their own, marked forced only. Keep that track.</div></details>
+      <details><summary>Should I compress my rips with HandBrake?</summary><div class="a">Only if you are short of space. Compressing takes hours per film, loses some detail, and can drop Dolby Vision and lossless sound unless set up carefully. Disk space is cheap compared with ripping a collection twice, so many people keep the remux.</div></details>
+      <details><summary>Is ripping my own discs legal?</summary><div class="a">It depends on where you live. Copying discs you own for your own use is allowed in some countries and not in others, often because breaking the copy protection is not allowed. Check the rules where you live.</div></details>
+      <details><summary>Can Kinema play the disc or the BDMV folder directly?</summary><div class="a">A folder holding a disc's BDMV, and an .iso of a Blu-ray, play as one film: the main film, with chapters and the languages of the sound and subtitle tracks, but no disc menus. A .m2ts file also plays. A disc that is still encrypted is not played; Kinema says so. Folders and .iso images play on Windows and Linux, not yet on Android TV. An MKV from MakeMKV plays everywhere Kinema does, so it is the simplest choice.</div></details>
+      <details><summary>Why is my rip in Needs attention in Kinema?</summary><div class="a">Kinema was not sure enough which title the file is, and would rather ask than guess. The file name is almost always the reason; see <a href="file-names.html">How Kinema reads file names</a>.</div></details>
+    </div>
+
+    <h2>Sources and further reading</h2>
+    <ul class="src">
+      <li><a href="https://www.makemkv.com/">MakeMKV</a> and its <a href="https://www.makemkv.com/download/">download page</a>: what is free, the 60-day beta, systems supported.</li>
+      <li><a href="https://forum.makemkv.com/forum/viewtopic.php?t=1053">MakeMKV forum: the current beta key</a>.</li>
+      <li><a href="https://forum.makemkv.com/forum/viewtopic.php?t=18856">MakeMKV forum: What is LibreDrive?</a></li>
+      <li><a href="https://forum.makemkv.com/forum/viewtopic.php?t=19634">MakeMKV forum: the UHD drive guide and list</a>, kept by forum members.</li>
+      <li><a href="https://forum.makemkv.com/forum/viewtopic.php?p=59694">MakeMKV forum FAQ</a>: playlists, series titles, the lossless track's core.</li>
+      <li><a href="https://forum.jellyfin.org/printthread.php?tid=68">Jellyfin forum: From disc to drive</a>, a thorough beginner's guide to ripping for a library.</li>
+      <li><a href="https://www.dvdcompare.net/">dvdcompare.net</a>, for the cuts and running times on a disc.</li>
+      <li><a href="https://mkvtoolnix.download/">MKVToolNix</a>, for splitting or editing MKV files afterwards, and <a href="https://handbrake.fr/">HandBrake</a>, for compressing them.</li>
+    </ul>
+    <p class="note">Last checked against MakeMKV 2.0.0, October 2026. If something here is wrong or out of date, please <a href="https://github.com/basswaves/kinema/discussions">tell us</a>.</p>
   </div>
 </main>
 
@@ -124,7 +643,7 @@
       <h4>Guides</h4>
       <ul>
         <li><a href="file-names.html">How Kinema reads file names</a></li>
-        <li><a href="blu-ray.html">Getting your Blu-rays into Kinema</a></li>
+        <li><a href="blu-ray.html">How to rip DVDs, Blu-rays and 4K discs</a></li>
         <li><a href="privacy.html">What leaves your computer</a></li>
       </ul>
     </div>
@@ -137,7 +656,7 @@
         <li><a href="https://github.com/basswaves/kinema/blob/master/CONTRIBUTING.md">Contributing</a></li>
       </ul>
     </div>
-    <p class="legal">This product uses the TMDB API but is not endorsed or certified by TMDB. Kodi, Plex, Jellyfin, VLC, MPC-HC, Dolby, Dolby Vision, Dolby Atmos, DTS and other names are trademarks of their respective owners; Kinema is not affiliated with or endorsed by any of them, and names them only to say what it works with or is compared to. Film posters and artwork in the screenshots belong to their owners.</p>
+    <p class="legal">This product uses the TMDB API but is not endorsed or certified by TMDB. Kodi, Plex, Jellyfin, VLC, MPC-HC, MakeMKV, HandBrake, Dolby, Dolby Vision, Dolby Atmos, DTS and other names are trademarks of their respective owners; Kinema is not affiliated with or endorsed by any of them, and names them only to say what it works with or is compared to. Film posters and artwork in the screenshots belong to their owners.</p>
   </div>
 </footer>
 </body>

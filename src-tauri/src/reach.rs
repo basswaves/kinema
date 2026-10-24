@@ -78,15 +78,95 @@ pub async fn check_reach(host: String) -> Result<Reach, String> {
                 source = s.source();
             }
             let cause = classify(&chain, e.is_timeout());
-            crate::log!("reach: {host} not reached ({cause}): {chain}");
+            crate::log!("reach: {host} not reached ({cause}): {chain}; {}", proxy_note());
             Ok(Reach { reached: false, status: None, cause: cause.to_string() })
         }
+    }
+}
+
+/// Whether a proxy is set where a browser would use one and this request may
+/// not: a browser that gets through while Kinema does not is often that, or
+/// the browser's own DNS-over-HTTPS. Only whether each is set — never the
+/// address, which is the user's own network.
+fn proxy_note() -> String {
+    let env: Vec<&str> = ["HTTPS_PROXY", "HTTP_PROXY", "ALL_PROXY"]
+        .into_iter()
+        .filter(|v| std::env::var_os(v).is_some_and(|x| !x.is_empty()))
+        .collect();
+    #[cfg_attr(not(windows), allow(unused_mut))]
+    let mut note = if env.is_empty() {
+        "no proxy in the environment".to_string()
+    } else {
+        format!("proxy in the environment: {}", env.join(", "))
+    };
+    #[cfg(windows)]
+    note.push_str(&windows_proxy::note());
+    note
+}
+
+#[cfg(windows)]
+mod windows_proxy {
+    use windows::core::HSTRING;
+    use windows::Win32::System::Registry::{
+        RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_DWORD, RRF_RT_REG_SZ,
+    };
+
+    const KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Internet Settings";
+
+    fn present(value: &str, flags: windows::Win32::System::Registry::REG_ROUTINE_FLAGS) -> Option<u32> {
+        let mut buffer = [0u8; 4];
+        let mut size = 0u32;
+        // SAFETY: with no buffer for a string only the size is asked for; a
+        // DWORD fits the four bytes given.
+        let got = unsafe {
+            if flags == RRF_RT_REG_DWORD {
+                size = 4;
+                RegGetValueW(
+                    HKEY_CURRENT_USER,
+                    &HSTRING::from(KEY),
+                    &HSTRING::from(value),
+                    flags,
+                    None,
+                    Some(buffer.as_mut_ptr().cast()),
+                    Some(&mut size),
+                )
+            } else {
+                RegGetValueW(
+                    HKEY_CURRENT_USER,
+                    &HSTRING::from(KEY),
+                    &HSTRING::from(value),
+                    flags,
+                    None,
+                    None,
+                    Some(&mut size),
+                )
+            }
+        };
+        got.is_ok().then(|| if flags == RRF_RT_REG_DWORD { u32::from_le_bytes(buffer) } else { size })
+    }
+
+    /// Windows' own proxy settings (the ones a browser follows).
+    pub fn note() -> String {
+        let enabled = present("ProxyEnable", RRF_RT_REG_DWORD).unwrap_or(0) != 0;
+        // A string of two bytes is the empty string's terminator.
+        let script = present("AutoConfigURL", RRF_RT_REG_SZ).is_some_and(|n| n > 2);
+        format!(
+            "; Windows proxy {}, proxy script {}",
+            if enabled { "on" } else { "off" },
+            if script { "set" } else { "not set" }
+        )
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_proxy_note_reads_without_failing() {
+        let note = proxy_note();
+        assert!(note.contains("proxy"), "{note}");
+    }
 
     #[test]
     fn causes_are_told_apart() {

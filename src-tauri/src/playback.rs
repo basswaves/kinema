@@ -179,6 +179,9 @@ fn store_progress(
     completed: bool,
     now: i64,
 ) -> rusqlite::Result<usize> {
+    // Where a play finished is not a re-watch to resume: a file can finish at
+    // its credits from half way (`is_complete`), below resume.ts's 80 %.
+    let position_secs = if completed { 0.0 } else { position_secs };
     conn.execute(
         "INSERT INTO playback_state (file_id, position_secs, duration_secs, completed, updated_at)
          VALUES (?1, ?2, ?3, ?4, ?5)

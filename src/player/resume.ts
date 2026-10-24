@@ -13,9 +13,9 @@ export const MIN_RESUME_SECS = 30;
 export const RESUME_MAX_FRACTION = 0.94;
 /**
  * A watched file stays watched while it is watched again (playback.rs), so a
- * position on one is either where it finished — at the credits, which start
- * well past this share — or where a re-watch stopped, which is offered.
- * Trakt counts a play from 80 % for the same reason.
+ * position on one is where a re-watch stopped, which is offered below this
+ * share (where it finished is stored as 0). Trakt counts a play from 80 % for
+ * the same reason.
  */
 export const REWATCH_MAX_FRACTION = 0.8;
 

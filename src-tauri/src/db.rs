@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use std::path::Path;
 
 /// The schema this build understands. Bump it with every new `SCHEMA_V*`.
-pub const SCHEMA_VERSION: i64 = 26;
+pub const SCHEMA_VERSION: i64 = 27;
 
 /// What can go wrong opening the library.
 ///
@@ -772,6 +772,15 @@ CREATE TABLE playlist_items (
 CREATE INDEX idx_playlist_items ON playlist_items(playlist_id, position);
 "#;
 
+/// A watched file's position is no longer where it finished or was marked
+/// watched (0.13.1): a re-watch keeps the ✓ and its position is offered as a
+/// resume (`resume.ts`). Rows written before then held the old meaning, so
+/// they start from the beginning.
+const SCHEMA_V27: &str = r#"
+UPDATE playback_state SET position_secs = 0 WHERE completed = 1;
+UPDATE watch_history SET position_secs = 0 WHERE completed = 1;
+"#;
+
 /// How long a statement waits for the write lock before giving up.
 ///
 /// Load-bearing from the moment there is more than one connection. SQLite
@@ -989,7 +998,7 @@ pub(crate) const MIGRATIONS: [&str; SCHEMA_VERSION as usize] = [
     SCHEMA_V9, SCHEMA_V10, SCHEMA_V11, SCHEMA_V12, SCHEMA_V13, SCHEMA_V14,
     SCHEMA_V15, SCHEMA_V16, SCHEMA_V17, SCHEMA_V18, SCHEMA_V19,
     SCHEMA_V20, SCHEMA_V21, SCHEMA_V22, SCHEMA_V23, SCHEMA_V24, SCHEMA_V25,
-    SCHEMA_V26,
+    SCHEMA_V26, SCHEMA_V27,
 ];
 
 /// Bring the database up to [`SCHEMA_VERSION`].
@@ -1357,6 +1366,32 @@ mod tests {
         }
     }
 
+    /// A watched file's old position (where it finished, or was marked) is not
+    /// offered as a re-watch to resume; an unfinished one stays.
+    #[test]
+    fn the_v27_upgrade_clears_watched_positions_only() {
+        let conn = at_version(26);
+        conn.execute_batch(
+            r#"INSERT INTO library_roots (id, path, kind, added_at) VALUES (1, 'C:/m', 'movies', 0);
+               INSERT INTO media_files (id, root_id, path, parent_dir, file_name, extension,
+                   size_bytes, modified_at, first_seen_at, last_seen_at)
+               VALUES (1, 1, 'a', 'C:/m', 'a', 'mkv', 1, 0, 0, 0),
+                      (2, 1, 'b', 'C:/m', 'b', 'mkv', 1, 0, 0, 0);
+               INSERT INTO playback_state (file_id, position_secs, duration_secs, completed, updated_at)
+               VALUES (1, 2900, 7200, 1, 10), (2, 600, 7200, 0, 10);"#,
+        )
+        .unwrap();
+        migrate(&conn).unwrap();
+        let positions: Vec<f64> = conn
+            .prepare("SELECT position_secs FROM playback_state ORDER BY file_id")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        assert_eq!(positions, vec![0.0, 600.0]);
+    }
+
     /// Resume points from before Trakt's percentages stay as they were.
     #[test]
     fn the_v25_upgrade_keeps_resume_points_with_no_share() {
@@ -1418,11 +1453,12 @@ mod tests {
                 .flatten()
                 .collect()
         };
+        // Watched positions are cleared later, by v27.
         assert_eq!(
             rows,
             vec![
-                (Some(1), Some(1), 2900.0, 1, "Example Show S01E01".into(), Some("9001".into())),
-                (Some(1), Some(2), 2900.0, 1, "Example Show S01E02".into(), Some("9001".into())),
+                (Some(1), Some(1), 0.0, 1, "Example Show S01E01".into(), Some("9001".into())),
+                (Some(1), Some(2), 0.0, 1, "Example Show S01E02".into(), Some("9001".into())),
                 (Some(1), Some(3), 300.0, 0, "Example Show S01E03".into(), Some("9001".into())),
                 (None, None, 3000.0, 0, "300".into(), None),
             ]

@@ -2342,3 +2342,12 @@ Tauri's Android project compiled with Kotlin 1.9, which cannot read it
 ("compiled with an incompatible version of Kotlin"), and every Kotlin file
 failed. **Do:** keep the Kotlin Gradle plugin (`gen/android/build.gradle.kts`)
 at the standard library's version or above.
+
+### tauri-plugin-http's fetch error hides the cause and shows the keys
+
+The error is reqwest's top-level text, "error sending request for url (...)".
+The URL includes query keys, and the real cause (DNS, TLS, refused) is only in
+the error's source chain, which the webview never sees. Every failure then
+looked the same, and the log held the keys. **Do:** use `reach.rs`
+(`check_reach`) to ask the host again from Rust, and never print the raw URL
+without `applog`'s key hiding.

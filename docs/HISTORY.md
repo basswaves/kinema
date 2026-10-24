@@ -3678,6 +3678,25 @@ and a Jellyfin source further out. Decisions made along the way:
   checks each entry's text is still in the code and an e2e sweep lands on
   every one. The TV layout gets Kinema's own letters on OK, as Search does.
 
+## Round 4: first outside tester (2026-10-24)
+
+- **"Couldn't reach the internet" was false.** A tester whose internet worked
+  was told it, because every request failure was called that. The webview's
+  fetch only says "error sending request", so `reach.rs` asks the host again
+  from Rust, where the cause (name lookup, refused, cut off, timed out, secure
+  connection) is readable, and checks the internet itself against Wikidata.
+- **TMDB's second address is retried; Wikidata is not a fallback for an
+  unreachable TMDB** (owner's choice). The rule stands: Wikidata only when no
+  TMDB key works. After both addresses fail, requests fail at once for 60 s,
+  so a blocked network is not an hour of timeouts.
+- **Re-watching keeps the tick** (owner, 2026-10-24). One completed flag
+  stays, and `save` keeps MAX(old, new). `resume.ts` offers a re-watch
+  position below 80 %, because finishing happens at the credits, past that
+  share.
+- **Send a report no longer opens the browser at once** (owner, 2026-10-24):
+  it saves the zip and says where; opening the form and showing the file are
+  their own presses.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

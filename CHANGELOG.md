@@ -7,6 +7,37 @@ makes no stability promises.
 
 ## [Unreleased]
 
+### Changed
+
+- **Matching says what really failed.** When TMDB gives no answer, Kinema
+  tries TMDB's second address (`api.tmdb.org`, the same service and terms) and
+  keeps the one that answers. When neither does, it names the cause: the name
+  could not be looked up, the connection was refused or cut off, it timed out,
+  or the secure connection failed. It also says whether the internet itself
+  works (checked against Wikidata), instead of "Couldn't reach the internet".
+  Other services' failures name their host. Settings -> Privacy lists
+  `api.tmdb.org`.
+- **Send a report** saves the zip and says its name and folder. "Open the
+  report form" and "Show the file" are separate presses, so the browser no
+  longer covers the note. The crash screen says the same, where a failed
+  report used to say nothing.
+- **Trakt's card** says that where you stopped is read back (Trakt resume); it
+  said nothing comes back.
+- ffmpeg found on the PATH is said so. The setup page says 5 subtitle
+  downloads a day without an account and 20 with one.
+
+### Fixed
+
+- Keys no longer show: a failed request's address, with TMDB's or OMDb's key
+  in it, is cut at its query on screen (Needs attention showed it) and in the
+  log, which goes into Send a report's zip. A lookup that got no answer no
+  longer says "could not identify this"; the next scan asks again.
+- Re-watching a watched film or episode keeps it watched; a re-watch stopped
+  before 80 % can be resumed.
+- A year written twice in a name ("Film 2017 (2017)") no longer stays in the
+  title and stops it matching.
+- Self-tests never run Skiptro, whose database is the real one.
+
 ## [0.13.0] — 2026-10-23
 
 Easier to start with and to trust: Settings is grouped by what you want and has

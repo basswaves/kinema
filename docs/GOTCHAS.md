@@ -1197,6 +1197,13 @@ can round the thumb and drop the arrow buttons. Adding `scrollbar-color` to
 `scrollbar-width: none` on purpose, to stay hidden. **Do:** style scrollbars
 with the pseudo-elements only (`ui.css`, after `.browse`).
 
+### A random pick per step disagrees with itself
+
+Up next and the Next button both ask `playlist_step`. With a fresh random
+pick on each call they named different items, and Previous could not retrace.
+**Do:** draw the shuffled round once and store it with the playlist
+(`playlists.rs`); every step reads from that order.
+
 ---
 
 ## Testing and tools

@@ -35,6 +35,20 @@ makes no stability promises.
   folder; None clears it. Desktop only (Media3 shows one text track).
 - Library upgrade to schema 29 (`sub2_lang` in `title_prefs` and
   `video_prefs`).
+- **A sound delay for each sound device.** In 10 ms steps, for receivers or
+  TVs that put the sound out of step with the lips. In the player's Audio &
+  subtitles panel (-10 / +10 / 0, works with a remote), with Ctrl + / Ctrl - /
+  Ctrl 0 on a keyboard, and in Settings → Picture & sound beside the sound
+  device. Kept per device, put on as each file starts, and shown in Playback
+  details. Computers only for now.
+- **A chapter list in the player.** A Chapters button appears when the file has
+  chapters; it opens on the chapter playing, and OK jumps to another. Remote,
+  keyboard and mouse.
+- **Shuffle and repeat on a playlist's page**, kept for each playlist. Shuffle
+  plays every item once before any plays again; Previous goes back the way it
+  came; repeat starts again from the top (or with a new shuffled round).
+- Library upgrade to schema 30 (`shuffle`, `repeat_all`, `shuffle_order` on
+  playlists).
 
 ### Changed
 
@@ -95,6 +109,8 @@ makes no stability promises.
   that show's page, not Home.
 - Finishing the setup pages while the first scan is still finding titles shows
   "Reading your library" with what it is doing, instead of the Welcome page
+  again.
+- Choosing second subtitles now closes their list, so a stray OK does not pick
   again.
 
 ### For contributors

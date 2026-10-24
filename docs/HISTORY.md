@@ -3764,6 +3764,30 @@ settings describe a person's needs or the equipment, never taste.
   shows one text track; changing either needs Kotlin in the parked Android
   plugin. Settings says so rather than showing a control that does nothing.
 
+## Sound delay, chapters, shuffle (2026-10-24, round 5 E)
+
+- **Audio delay is equipment, not taste.** A receiver or TV that puts the
+  sound out of step with the lips is a fact about the equipment, so it passes
+  the settings rule. Kept per sound device, under the endpoint id the
+  per-device policies use; `*` where the sound server picks the device (Linux
+  auto) or after a fallback. mpv's `audio-delay` is a runtime property, so it
+  is set at each file start. Playback details reads mpv's own value, saying
+  only what is known. Keys follow mpv's Ctrl +/-. Positive = sound later.
+  Desktop only: Media3 has no shared small hook for it; Settings says so on
+  Android.
+- **Chapter list.** A separate closed menu panel, the same pattern as Audio &
+  subtitles. Shown only with two or more chapters (one chapter is the whole
+  film). Chapters are read as indexed scalars, never `chapter-list` as a node.
+  No seek-preview pictures yet.
+- **Shuffle keeps its round with the playlist** (schema 30: `shuffle`,
+  `repeat_all`, `shuffle_order`) instead of picking at random on each step.
+  The player asks for the next item more than once (Up next and the Next
+  button) and both must name the same item, and Previous must retrace. A new
+  round puts the item just played first, so it never comes straight back. No
+  random crate: std `RandomState`, per the upkeep rule.
+- **The second-subtitle list closes after a choice**, like Add to a playlist,
+  so a stray OK cannot pick again.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

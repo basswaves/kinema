@@ -15,18 +15,22 @@ import {
   adoptProvider,
   listStaleTitles,
   listTitlesNeedingDetail,
-  listWikidataFilms,
+  listFallbackTitles,
+  markUpgradeChecked,
   recordMatch,
   recordProviderFailure,
   recordRefusal,
   returnToReview,
   saveEpisodes,
   saveTitle,
+  type FallbackTitle,
   type StoredTitle,
 } from './api';
 import {
   omdbGetMovie,
   omdbSearch,
+  tmdbFindByImdb,
+  tmdbFindByTvdb,
   tmdbGetEpisodes,
   tmdbGetTitle,
   tmdbSearch,
@@ -35,6 +39,7 @@ import {
   tvmazeGetEpisodes,
   tvmazeGetShow,
   tvmazeSearch,
+  tvmazeTvdbId,
 } from './providers';
 import {
   BUILTIN_REJECTED_KEY,
@@ -344,35 +349,85 @@ export async function refreshStaleTitles(): Promise<DetailBackfill> {
   return result;
 }
 
+/** What one scan's move of fallback matches to TMDB did. */
+export interface FallbackUpgrade {
+  /** Films and shows now on TMDB, with its pictures. */
+  films: number;
+  shows: number;
+  /** Asked about with no confident answer: left matched as they were. */
+  left: number;
+  errors: string[];
+}
+
 /**
- * Move films found through Wikidata to TMDB, once there is a key to ask with.
+ * The TMDB id of a title matched through a fallback, or null.
  *
- * Wikidata is the fallback for movies when no TMDB key works (wikidata.ts),
- * and it has no pictures. Its items carry the film's TMDB id, so when a key
- * is back — an update with a new one, or a key of the user's own — each such
- * film is fetched from TMDB by that id, no searching and no scoring, and its
- * row re-keyed in place: files, watch history and track choices stay with it.
- * A film TMDB already has a row for (the same film matched from another file)
- * is left as it is.
+ * Ids first, each a lookup rather than a guess: the TMDB id Wikidata holds,
+ * then TMDB's `/find` by the IMDb id (OMDb's own key, Wikidata's and
+ * TVmaze's), then by the TheTVDB id TVmaze holds. Only then a search, scored
+ * by the same rules as any match (0.75, a 0.05 margin, the year) — and never
+ * for a title matched by hand, which moves only by an id.
  */
-export async function upgradeWikidataFilms(): Promise<DetailBackfill> {
-  const result: DetailBackfill = { found: 0, none: 0, errors: [] };
+async function tmdbIdFor(key: string, target: FallbackTitle): Promise<string | null> {
+  const isSeries = target.kind === 'series';
+  if (target.tmdb_id) return target.tmdb_id;
+  if (target.imdb_id) {
+    const found = await tmdbFindByImdb(key, target.imdb_id, isSeries);
+    if (found) return found;
+  }
+  if (target.provider === 'tvmaze') {
+    const tvdb = await tvmazeTvdbId(target.provider_id);
+    const found = tvdb ? await tmdbFindByTvdb(key, tvdb, isSeries) : null;
+    if (found) return found;
+  }
+  if (target.by_hand) return null;
+  const candidates = await tmdbSearch(key, target.title, target.year, isSeries ? 'series' : 'movie');
+  const { best, matched } = pickBest(candidates, {
+    parsedTitle: target.title,
+    parsedYear: target.year,
+  });
+  return matched && best ? best.providerId : null;
+}
+
+/**
+ * Move titles matched through a fallback — Wikidata or OMDb for films,
+ * TVmaze for shows — to TMDB, once there is a key to ask with.
+ *
+ * The fallbacks are used only when no TMDB key works, and they have no
+ * pictures (Wikidata), only a poster (OMDb), or a smaller set (TVmaze). When a
+ * key is back, each is looked up on TMDB (`tmdbIdFor`), fetched before
+ * anything changes, so a failure leaves the row as it was, and re-keyed in
+ * place: files, resume points, playlists, track choices, watch history and My
+ * list stay with it (`adopt` in metadata.rs). A title with no confident answer
+ * stays matched as it is — never sent to Needs attention: a wrong match is
+ * worse than none, and it was already matched — and is asked about again a
+ * month later. A few per scan, like the six-month refresh, so a big library is
+ * not asked about at once.
+ */
+export async function upgradeFallbackTitles(): Promise<FallbackUpgrade> {
+  const result: FallbackUpgrade = { films: 0, shows: 0, left: 0, errors: [] };
   const keys = await loadProviderKeys();
   if (!keys.tmdb) return result;
 
-  for (const target of await listWikidataFilms(REFRESH_PER_SCAN)) {
+  for (const target of await listFallbackTitles(REFRESH_PER_SCAN)) {
     await yieldToPlayback();
+    const kind = target.kind === 'series' ? 'series' : 'movie';
     try {
-      // Fetched before re-keying, so a failure leaves the row as it was.
-      const metadata = await tmdbGetTitle(keys.tmdb, target.tmdb_id, 'movie');
-      if (await adoptProvider(target.id, 'tmdb', target.tmdb_id)) {
-        await saveTitle(metadata);
-        result.found++;
-      } else {
-        result.none++;
+      const tmdbId = await tmdbIdFor(keys.tmdb, target);
+      const metadata = tmdbId ? await tmdbGetTitle(keys.tmdb, tmdbId, kind) : null;
+      const episodes = tmdbId && kind === 'series' ? await tmdbGetEpisodes(keys.tmdb, tmdbId) : [];
+      if (!tmdbId || !metadata || !(await adoptProvider(target.id, 'tmdb', tmdbId))) {
+        await markUpgradeChecked(target.id);
+        result.left++;
+        continue;
       }
+      const titleId = await saveTitle(metadata);
+      if (episodes.length > 0) await saveEpisodes(titleId, episodes);
+      if (kind === 'series') result.shows++;
+      else result.films++;
     } catch (e) {
-      result.errors.push(`${target.tmdb_id}: ${e instanceof Error ? e.message : String(e)}`);
+      result.errors.push(`${target.title}: ${e instanceof Error ? e.message : String(e)}`);
+      // A refused key will be refused for every other title too.
       if (e instanceof TmdbKeyRejected) break;
     }
   }

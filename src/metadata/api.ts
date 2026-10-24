@@ -169,11 +169,29 @@ export const listTitlesNeedingDetail = () =>
 export const listStaleTitles = (limit: number) =>
   invoke<TrailerTarget[]>('list_stale_titles', { limit });
 
-/** Films found through Wikidata whose TMDB id Wikidata knows. */
-export const listWikidataFilms = (limit: number) =>
-  invoke<TrailerTarget[]>('list_wikidata_films', { limit });
+/** A title matched through Wikidata, OMDb or TVmaze, and what it can be found on TMDB by. */
+export interface FallbackTitle {
+  id: number;
+  kind: string;
+  provider: string;
+  provider_id: string;
+  tmdb_id: string | null;
+  imdb_id: string | null;
+  title: string;
+  year: number | null;
+  /** Matched by hand or by an NFO's id: moves only by an id, never by a search. */
+  by_hand: boolean;
+}
 
-/** Re-key a title to another provider's entry, in place; false if it has a row already. */
+/** Fallback-matched titles to ask TMDB about, never-asked first; none asked this month. */
+export const listFallbackTitles = (limit: number) =>
+  invoke<FallbackTitle[]>('list_fallback_titles', { limit });
+
+/** TMDB had no confident answer: the title waits a month before it is asked about again. */
+export const markUpgradeChecked = (titleId: number) =>
+  invoke<void>('mark_upgrade_checked', { titleId });
+
+/** Re-key a title to another provider's entry, in place, with its history and My list; false if that entry's row has files. */
 export const adoptProvider = (titleId: number, provider: string, providerId: string) =>
   invoke<boolean>('adopt_provider', { titleId, provider, providerId });
 

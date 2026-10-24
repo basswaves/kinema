@@ -82,7 +82,7 @@ import {
   loadProviderKeys,
   matchFiles,
   refreshStaleTitles,
-  upgradeWikidataFilms,
+  upgradeFallbackTitles,
 } from './metadata/match';
 
 /**
@@ -227,7 +227,7 @@ const CALLABLE: Record<string, (...args: never[]) => Promise<unknown>> = {
   // OpenSubtitles end to end on the copy: search, download, the file on disk.
   findSubtitles,
   cacheArtwork,
-  upgradeWikidataFilms,
+  upgradeFallbackTitles,
   // The scan's reading of files for the detail page's badges, on its own.
   probeLibrary,
   measurePictures,

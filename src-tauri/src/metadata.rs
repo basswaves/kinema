@@ -646,44 +646,132 @@ pub fn list_stale_titles(db: tauri::State<Db>, limit: i64) -> Result<Vec<Trailer
     stale_titles(&conn, crate::util::now_secs(), limit).map_err(to_string_err)
 }
 
-/// Films identified through Wikidata, which has no pictures, that Wikidata
-/// also knows the TMDB id of — so they can move to TMDB once a key works.
-#[tauri::command]
-pub fn list_wikidata_films(db: tauri::State<Db>, limit: i64) -> Result<Vec<TrailerTarget>, String> {
-    let conn = db.0.lock().map_err(to_string_err)?;
-    let mut stmt = conn
-        .prepare(
-            "SELECT id, tmdb_id, kind FROM titles
-              WHERE provider = 'wikidata' AND tmdb_id IS NOT NULL AND tmdb_id <> ''
-              ORDER BY id LIMIT ?1",
-        )
-        .map_err(to_string_err)?;
-    let rows = stmt
-        .query_map(params![limit], |r| {
-            Ok(TrailerTarget {
-                id: r.get(0)?,
-                tmdb_id: r.get(1)?,
-                kind: r.get(2)?,
-            })
-        })
-        .map_err(to_string_err)?;
-    rows.collect::<rusqlite::Result<Vec<_>>>()
-        .map_err(to_string_err)
+/// A title matched through a fallback provider, and what is known to find it
+/// on TMDB with.
+#[derive(Debug, Serialize)]
+pub struct FallbackTitle {
+    pub id: i64,
+    pub kind: String,
+    pub provider: String,
+    pub provider_id: String,
+    pub tmdb_id: Option<String>,
+    pub imdb_id: Option<String>,
+    pub title: String,
+    pub year: Option<i64>,
+    /// A file of it was matched by hand (Fix match) or by an NFO's id: such a
+    /// title moves only by an id, never by a search.
+    pub by_hand: bool,
 }
 
-/// Re-key a title to another provider's entry for the same film, in place.
-/// The row keeps its id, so files, watch history and track choices stay with
-/// it, and `save_title` then fills it from the new provider. Refused — false —
-/// when that entry already has a row of its own: two rows for one film is a
-/// merge, which is not this.
+/// How long a title TMDB gave no confident answer for waits before it is asked
+/// about again: a month, so a library of them is not searched every scan.
+const UPGRADE_RECHECK_SECS: i64 = 30 * 24 * 60 * 60;
+
+/// Titles matched through Wikidata, OMDb or TVmaze — no pictures, or only a
+/// poster — that some file still points at, never-asked first, then the
+/// longest-asked; one asked within the month is left out.
+fn fallback_titles(conn: &rusqlite::Connection, now: i64, limit: i64) -> rusqlite::Result<Vec<FallbackTitle>> {
+    let mut stmt = conn.prepare(
+        "SELECT t.id, t.kind, t.provider, t.provider_id, NULLIF(t.tmdb_id, ''),
+                NULLIF(t.imdb_id, ''), t.title, t.year,
+                EXISTS (SELECT 1 FROM media_files m WHERE m.title_id = t.id
+                         AND (m.match_reason LIKE 'manual:%' OR m.match_reason LIKE 'nfo:%'))
+           FROM titles t
+          WHERE t.provider IN ('wikidata', 'omdb', 'tvmaze')
+            AND EXISTS (SELECT 1 FROM media_files m WHERE m.title_id = t.id)
+            AND (t.upgrade_checked_at IS NULL OR t.upgrade_checked_at <= ?1)
+          ORDER BY t.upgrade_checked_at IS NOT NULL, t.upgrade_checked_at, t.id
+          LIMIT ?2",
+    )?;
+    let rows = stmt.query_map(params![now - UPGRADE_RECHECK_SECS, limit], |r| {
+        Ok(FallbackTitle {
+            id: r.get(0)?,
+            kind: r.get(1)?,
+            provider: r.get(2)?,
+            provider_id: r.get(3)?,
+            tmdb_id: r.get(4)?,
+            imdb_id: r.get(5)?,
+            title: r.get(6)?,
+            year: r.get(7)?,
+            by_hand: r.get(8)?,
+        })
+    })?;
+    rows.collect()
+}
+
+#[tauri::command]
+pub fn list_fallback_titles(db: tauri::State<Db>, limit: i64) -> Result<Vec<FallbackTitle>, String> {
+    let conn = db.0.lock().map_err(to_string_err)?;
+    fallback_titles(&conn, now_secs(), limit).map_err(to_string_err)
+}
+
+/// TMDB had no confident answer for this title: ask about it again in a month.
+#[tauri::command]
+pub fn mark_upgrade_checked(db: tauri::State<Db>, title_id: i64) -> Result<(), String> {
+    let conn = db.0.lock().map_err(to_string_err)?;
+    conn.execute(
+        "UPDATE titles SET upgrade_checked_at = ?2 WHERE id = ?1",
+        params![title_id, now_secs()],
+    )
+    .map_err(to_string_err)?;
+    Ok(())
+}
+
+/// Re-key a title to another provider's entry for the same title, in place.
+/// The row keeps its id, so files, resume points, playlists, track choices and
+/// local pictures stay with it, and `save_title` then fills it from the new
+/// provider. Watch history and My list name a title by its provider's ids, so
+/// their rows under the old ids are renamed with it.
+///
+/// A row the new entry already has with no files (left from an earlier match)
+/// gives way. Refused — false — when that row still has files: two rows for one
+/// title is a merge, which is not this.
 fn adopt(conn: &rusqlite::Connection, id: i64, provider: &str, provider_id: &str) -> rusqlite::Result<bool> {
-    let changed = conn.execute(
-        "UPDATE titles SET provider = ?2, provider_id = ?3
-          WHERE id = ?1
-            AND NOT EXISTS (SELECT 1 FROM titles WHERE provider = ?2 AND provider_id = ?3)",
+    let tx = conn.unchecked_transaction()?;
+    let Some((old_provider, old_id)) = tx
+        .query_row(
+            "SELECT provider, provider_id FROM titles WHERE id = ?1",
+            params![id],
+            |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)),
+        )
+        .ok()
+    else {
+        return Ok(false);
+    };
+    let taken: bool = tx.query_row(
+        "SELECT EXISTS (SELECT 1 FROM titles t JOIN media_files m ON m.title_id = t.id
+                         WHERE t.provider = ?1 AND t.provider_id = ?2 AND t.id <> ?3)",
+        params![provider, provider_id, id],
+        |r| r.get(0),
+    )?;
+    if taken {
+        return Ok(false);
+    }
+    tx.execute(
+        "DELETE FROM titles WHERE provider = ?1 AND provider_id = ?2 AND id <> ?3",
+        params![provider, provider_id, id],
+    )?;
+    tx.execute(
+        "UPDATE titles SET provider = ?2, provider_id = ?3, upgrade_checked_at = NULL WHERE id = ?1",
         params![id, provider, provider_id],
     )?;
-    Ok(changed == 1)
+    let tmdb = (provider == "tmdb").then_some(provider_id);
+    // OR IGNORE: an entry already kept under the new ids stays as it is, and
+    // the old one is still found by its IMDb or TMDB id.
+    tx.execute(
+        "UPDATE OR IGNORE watch_history
+            SET provider = ?3, provider_id = ?4, tmdb_id = COALESCE(tmdb_id, ?5)
+          WHERE provider = ?1 AND provider_id = ?2",
+        params![old_provider, old_id, provider, provider_id, tmdb],
+    )?;
+    tx.execute(
+        "UPDATE OR IGNORE my_list
+            SET provider = ?3, provider_id = ?4, tmdb_id = COALESCE(tmdb_id, ?5)
+          WHERE provider = ?1 AND provider_id = ?2",
+        params![old_provider, old_id, provider, provider_id, tmdb],
+    )?;
+    tx.commit()?;
+    Ok(true)
 }
 
 #[tauri::command]
@@ -799,7 +887,7 @@ pub fn list_unmatched(
 #[cfg(test)]
 mod tests {
     use super::{
-        adopt, episodes_for, map_title, stale_titles, titles_needing_detail, Title, TITLE_SELECT,
+        adopt, episodes_for, fallback_titles, map_title, stale_titles, titles_needing_detail, Title, TITLE_SELECT,
         TMDB_MAX_AGE_SECS,
     };
     use rusqlite::{named_params, params};
@@ -898,7 +986,90 @@ mod tests {
             })
             .unwrap();
         assert_eq!((provider.as_str(), id.as_str()), ("tmdb", "550"));
-        assert!(!adopt(&conn, 3, "tmdb", "551").unwrap());
+        // Row 4 has no files: a leftover, which gives way.
+        assert!(adopt(&conn, 3, "tmdb", "551").unwrap());
+        let rows: i64 = conn
+            .query_row("SELECT COUNT(*) FROM titles WHERE provider_id = '551'", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(rows, 1);
+    }
+
+    /// A TVmaze show moves to TMDB with its episodes' watch state, resume
+    /// points and My list; a TMDB row that still has files of its own refuses.
+    #[test]
+    fn a_fallback_show_keeps_its_watch_state_when_rekeyed() {
+        let conn = library("adopt-show");
+        conn.execute_batch(
+            "INSERT INTO titles (id, kind, provider, provider_id, title, fetched_at) VALUES
+                 (5, 'series', 'tvmaze', '77', 'Fallback Show', 0),
+                 (6, 'movie', 'omdb', 'tt9', 'Taken Film', 0),
+                 (7, 'movie', 'tmdb', '900', 'Taken Film', 0);
+             INSERT INTO media_files (id, root_id, path, parent_dir, file_name, extension,
+                     size_bytes, modified_at, first_seen_at, last_seen_at, match_status, title_id)
+                 VALUES (50, 1, 'C:/tv/a.mkv', 'C:/tv', 'a.mkv', 'mkv', 1, 0, 0, 0, 'matched', 5),
+                        (60, 1, 'C:/tv/b.mkv', 'C:/tv', 'b.mkv', 'mkv', 1, 0, 0, 0, 'matched', 6),
+                        (70, 1, 'C:/tv/c.mkv', 'C:/tv', 'c.mkv', 'mkv', 1, 0, 0, 0, 'matched', 7);
+             INSERT INTO playback_state (file_id, position_secs, duration_secs, completed, updated_at)
+                 VALUES (50, 600, 1200, 0, 1);
+             INSERT INTO watch_history (kind, provider, provider_id, season, episode,
+                     position_secs, duration_secs, completed, updated_at)
+                 VALUES ('series', 'tvmaze', '77', 1, 1, 1200, 1200, 1, 1);
+             INSERT INTO my_list (kind, provider, provider_id, added_at)
+                 VALUES ('series', 'tvmaze', '77', 1);",
+        )
+        .unwrap();
+        assert!(adopt(&conn, 5, "tmdb", "1400").unwrap());
+        let history: (String, String, String) = conn
+            .query_row("SELECT provider, provider_id, tmdb_id FROM watch_history", [], |r| {
+                Ok((r.get(0)?, r.get(1)?, r.get(2)?))
+            })
+            .unwrap();
+        assert_eq!(history, ("tmdb".into(), "1400".into(), "1400".into()));
+        let listed: String = conn
+            .query_row("SELECT provider_id FROM my_list WHERE provider = 'tmdb'", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(listed, "1400");
+        let (title_id, position): (i64, f64) = conn
+            .query_row(
+                "SELECT m.title_id, p.position_secs FROM media_files m
+                   JOIN playback_state p ON p.file_id = m.id WHERE m.id = 50",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!((title_id, position), (5, 600.0));
+        assert!(!adopt(&conn, 6, "tmdb", "900").unwrap(), "row 7 has a file of its own");
+    }
+
+    /// Never-asked fallback titles come first; one asked this month waits; a
+    /// title with no files, or a TMDB one, is not listed; by hand is said.
+    #[test]
+    fn fallback_titles_are_listed_never_asked_first() {
+        let conn = library("fallback-list");
+        conn.execute_batch(
+            "INSERT INTO titles (id, kind, provider, provider_id, title, year, fetched_at,
+                                 upgrade_checked_at) VALUES
+                 (20, 'movie', 'wikidata', 'Q1', 'Asked long ago', 2001, 0, 100),
+                 (21, 'movie', 'omdb', 'tt1', 'Never asked', NULL, 0, NULL),
+                 (22, 'series', 'tvmaze', '5', 'Asked today', NULL, 0, 99999990),
+                 (23, 'movie', 'wikidata', 'Q2', 'No files', NULL, 0, NULL),
+                 (24, 'movie', 'wikidata', 'Q3', 'By hand', NULL, 0, NULL);
+             INSERT INTO media_files (id, root_id, path, parent_dir, file_name, extension,
+                     size_bytes, modified_at, first_seen_at, last_seen_at, match_status,
+                     title_id, match_reason)
+                 VALUES (200, 1, 'C:/m/a.mkv', 'C:/m', 'a.mkv', 'mkv', 1, 0, 0, 0, 'matched', 20, NULL),
+                        (210, 1, 'C:/m/b.mkv', 'C:/m', 'b.mkv', 'mkv', 1, 0, 0, 0, 'matched', 21, NULL),
+                        (220, 1, 'C:/m/c.mkv', 'C:/m', 'c.mkv', 'mkv', 1, 0, 0, 0, 'matched', 22, NULL),
+                        (240, 1, 'C:/m/d.mkv', 'C:/m', 'd.mkv', 'mkv', 1, 0, 0, 0, 'matched', 24,
+                         'manual: “By hand” via wikidata');",
+        )
+        .unwrap();
+        let listed = fallback_titles(&conn, 100_000_000, 10).unwrap();
+        let ids: Vec<i64> = listed.iter().map(|t| t.id).collect();
+        assert_eq!(ids, vec![21, 24, 20]);
+        assert!(listed.iter().find(|t| t.id == 24).unwrap().by_hand);
+        assert!(!listed.iter().find(|t| t.id == 21).unwrap().by_hand);
+        assert_eq!(listed.iter().find(|t| t.id == 20).unwrap().year, Some(2001));
     }
 
     #[test]

@@ -910,13 +910,45 @@ export async function tmdbFindByImdb(
   imdbId: string,
   isSeries: boolean
 ): Promise<string | null> {
+  return tmdbFind(key, imdbId, 'imdb_id', isSeries);
+}
+
+/** Same, for a TheTVDB id — what TVmaze holds for a show it has no IMDb id for. */
+export async function tmdbFindByTvdb(
+  key: string,
+  tvdbId: string,
+  isSeries: boolean
+): Promise<string | null> {
+  return tmdbFind(key, tvdbId, 'tvdb_id', isSeries);
+}
+
+async function tmdbFind(
+  key: string,
+  id: string,
+  source: 'imdb_id' | 'tvdb_id',
+  isSeries: boolean
+): Promise<string | null> {
   const data = await tmdbGet<{
     movie_results?: Array<{ id: number }>;
     tv_results?: Array<{ id: number }>;
-  }>(key, `/find/${encodeURIComponent(imdbId)}`, { external_source: 'imdb_id' });
+  }>(key, `/find/${encodeURIComponent(id)}`, { external_source: source });
 
   const hit = (isSeries ? data.tv_results : data.movie_results)?.[0];
   return hit ? String(hit.id) : null;
+}
+
+/** The TheTVDB id TVmaze holds for one of its shows, or null. */
+export async function tvmazeTvdbId(showId: string): Promise<string | null> {
+  return tvmazeQueued(async () => {
+    const response = await fetchPolitely(
+      `https://api.tvmaze.com/shows/${encodeURIComponent(showId)}`,
+      'TVmaze show'
+    );
+    if (response.status === 404) return null;
+    if (!response.ok) throw new Error(`TVmaze show failed: HTTP ${response.status}`);
+    const show = (await response.json()) as TvmazeShow;
+    return show.externals?.thetvdb ? String(show.externals.thetvdb) : null;
+  });
 }
 
 /**

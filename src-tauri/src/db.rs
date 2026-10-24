@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use std::path::Path;
 
 /// The schema this build understands. Bump it with every new `SCHEMA_V*`.
-pub const SCHEMA_VERSION: i64 = 31;
+pub const SCHEMA_VERSION: i64 = 32;
 
 /// What can go wrong opening the library.
 ///
@@ -833,6 +833,14 @@ CREATE TABLE my_list (
 );
 "#;
 
+/// When a title matched through a fallback (Wikidata, OMDb, TVmaze) was last
+/// looked for on TMDB without a confident answer (match.ts,
+/// `upgradeFallbackTitles`), so the next scans ask about the others first and
+/// the same title is asked about again only a month later. NULL is never.
+const SCHEMA_V32: &str = r#"
+ALTER TABLE titles ADD COLUMN upgrade_checked_at INTEGER;
+"#;
+
 /// How long a statement waits for the write lock before giving up.
 ///
 /// Load-bearing from the moment there is more than one connection. SQLite
@@ -1051,6 +1059,7 @@ pub(crate) const MIGRATIONS: [&str; SCHEMA_VERSION as usize] = [
     SCHEMA_V15, SCHEMA_V16, SCHEMA_V17, SCHEMA_V18, SCHEMA_V19,
     SCHEMA_V20, SCHEMA_V21, SCHEMA_V22, SCHEMA_V23, SCHEMA_V24, SCHEMA_V25,
     SCHEMA_V26, SCHEMA_V27, SCHEMA_V28, SCHEMA_V29, SCHEMA_V30, SCHEMA_V31,
+    SCHEMA_V32,
 ];
 
 /// Bring the database up to [`SCHEMA_VERSION`].

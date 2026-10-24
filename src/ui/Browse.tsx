@@ -543,14 +543,15 @@ export default function Browse() {
           return;
         }
         if (outcome.status !== 'done') return;
-        const { filesAdded, matched, artworkStored, errors } = outcome.summary;
+        const { filesAdded, matched, artworkStored, movedToTmdb, errors } = outcome.summary;
         if (errors.length > 0) {
           console.warn('startup scan problems:', errors);
           setScanErrors(errors);
         }
         // Newly cached artwork counts too: without a reload, the shelves go on
         // showing the remote copies they loaded before the cache had them.
-        if (filesAdded > 0 || matched > 0 || artworkStored > 0) void load();
+        const moved = movedToTmdb.films + movedToTmdb.shows;
+        if (filesAdded > 0 || matched > 0 || artworkStored > 0 || moved > 0) void load();
       })
       .catch((e) => console.warn('startup scan:', e));
     return () => {

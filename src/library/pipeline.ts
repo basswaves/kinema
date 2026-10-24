@@ -50,7 +50,7 @@ import {
   loadProviderKeys,
   matchFiles,
   refreshStaleTitles,
-  upgradeWikidataFilms,
+  upgradeFallbackTitles,
 } from '../metadata/match';
 import { syncBuiltinKey } from '../metadata/builtinKey';
 import { refreshTomatometer } from '../metadata/scores';
@@ -84,6 +84,8 @@ export interface ScanSummary {
   artworkStored: number;
   /** Titles that gained a trailer key, logo or cast on this pass. */
   detailsFilled: number;
+  /** Titles matched through Wikidata, OMDb or TVmaze that moved to TMDB. */
+  movedToTmdb: { films: number; shows: number };
   /**
    * What the automatic intro/credits pass did, or declined to do.
    *
@@ -351,9 +353,10 @@ export async function runScanPipeline(): Promise<ScanOutcome> {
     await yieldToPlayback();
     const refreshed = await refreshStaleTitles();
     errors.push(...refreshed.errors);
-    // Films found through Wikidata get TMDB's pictures once a key works.
+    // Titles matched through a fallback get TMDB's pictures once a key works.
+    // Before artwork, so their pictures are cached on this scan.
     await yieldToPlayback();
-    const upgraded = await upgradeWikidataFilms();
+    const upgraded = await upgradeFallbackTitles();
     errors.push(...upgraded.errors);
     // After matching and details, so every IMDb id the library has is known.
     // Usually nothing: the file is fetched weekly at most.
@@ -402,6 +405,7 @@ export async function runScanPipeline(): Promise<ScanOutcome> {
       unmatched,
       artworkStored: art.stored,
       detailsFilled: details.found,
+      movedToTmdb: { films: upgraded.films, shows: upgraded.shows },
       detectNotes,
       errors,
       parseError: lastParseError,

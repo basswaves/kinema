@@ -139,6 +139,15 @@ const SKIPTRO_URL = 'https://github.com/MikeSiLVO/skiptro-releases';
  */
 const SKIPTRO_SAVE_DEBOUNCE_MS = 600;
 
+/** "12 films got pictures from TMDB", for titles a fallback had matched. */
+function movedLine(moved: { films: number; shows: number } | undefined): string | null {
+  if (!moved || moved.films + moved.shows === 0) return null;
+  const what = [moved.films && count(moved.films, 'film'), moved.shows && count(moved.shows, 'show')]
+    .filter(Boolean)
+    .join(' and ');
+  return `${what} got pictures from TMDB`;
+}
+
 function summaryLine(s: ScanSummary): string {
   const parts = [
     `${count(s.filesAdded, 'new file')}`,
@@ -147,6 +156,8 @@ function summaryLine(s: ScanSummary): string {
   ];
   if (s.artworkStored) parts.push(`${count(s.artworkStored, 'image')} cached`);
   if (s.detailsFilled) parts.push(`${count(s.detailsFilled, 'title')} enriched`);
+  const moved = movedLine(s.movedToTmdb);
+  if (moved) parts.push(moved);
   // The scan collected these all along and nothing ever rendered them, so an
   // unreachable share reported a perfectly cheerful "0 new files".
   if (s.errors.length) parts.push(count(s.errors.length, 'problem'));

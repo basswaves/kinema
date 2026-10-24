@@ -59,7 +59,11 @@ pub async fn make_report(app: tauri::AppHandle) -> Result<Report, String> {
         let zip = write_zip(&entries, now_secs());
         std::fs::write(&path, zip).map_err(to_string_err)?;
         crate::log!("report: saved {} ({} files)", path.display(), entries.len());
-        show(&app, &path);
+        // A self-test runs beside someone using the PC: no file manager over
+        // their work. The log line above is the proof it would have shown.
+        if crate::selftest::plan_path().is_none() {
+            show(&app, &path);
+        }
         Ok(Report {
             path: path.to_string_lossy().into_owned(),
             files: entries.into_iter().map(|(name, _)| name).collect(),

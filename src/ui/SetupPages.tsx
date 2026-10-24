@@ -113,7 +113,7 @@ export default function SetupPages({ onClose }: Props) {
           <>
             <p className="muted">
               For a film that does not come with the subtitles you want, Kinema can look online.
-              It works without an account; one adds more a day.
+              It works without an account (5 downloads a day); a free account allows 20 a day.
             </p>
             <OpenSubtitlesSection />
           </>

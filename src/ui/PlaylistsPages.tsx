@@ -444,7 +444,14 @@ export function PlaylistsRail({ onOpen }: { onOpen: (id: number) => void }) {
     focusable: lists.length > 0,
   });
 
-  if (lists.length === 0) return null;
+  // Empty (or still loading), still its element, unseen: as Rail.tsx says.
+  if (lists.length === 0) {
+    return (
+      <FocusContext.Provider value={focusKey}>
+        <section className="rail" ref={ref} style={{ display: 'none' }} />
+      </FocusContext.Provider>
+    );
+  }
   return (
     <FocusContext.Provider value={focusKey}>
       <section className="rail" ref={ref}>

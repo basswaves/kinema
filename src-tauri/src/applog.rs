@@ -90,6 +90,7 @@ fn stamp() -> u64 {
 /// Append one line. Never fails the caller: a log that cannot be written must
 /// not take down whatever was trying to report something.
 pub fn write(level: &str, message: &str) {
+    let message = hide_keys(message);
     let line = format!("[{}][{}] {}\n", stamp(), level.to_uppercase(), message);
 
     // Still printed in development, where there is a console to read it in.
@@ -105,6 +106,35 @@ pub fn write(level: &str, message: &str) {
     if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
         let _ = file.write_all(line.as_bytes());
     }
+}
+
+/// Query parameters that carry a key. A failed request's error names its whole
+/// URL, TMDB's and OMDb's keys included, and the log goes into Send a report's
+/// zip — attached to a public issue.
+const KEY_PARAMS: [&str; 2] = ["api_key=", "apikey="];
+
+/// `message` with the value of every key parameter replaced by `…`.
+fn hide_keys(message: &str) -> std::borrow::Cow<'_, str> {
+    if !KEY_PARAMS.iter().any(|p| message.contains(p)) {
+        return std::borrow::Cow::Borrowed(message);
+    }
+    let mut out = String::with_capacity(message.len());
+    let mut rest = message;
+    while let Some((at, param)) = KEY_PARAMS
+        .iter()
+        .filter_map(|p| rest.find(p).map(|i| (i, *p)))
+        .min_by_key(|(i, _)| *i)
+    {
+        let value = at + param.len();
+        out.push_str(&rest[..value]);
+        out.push('…');
+        let end = rest[value..]
+            .find(|c: char| c == '&' || c == ')' || c == '"' || c.is_whitespace())
+            .map_or(rest.len(), |i| value + i);
+        rest = &rest[end..];
+    }
+    out.push_str(rest);
+    std::borrow::Cow::Owned(out)
 }
 
 /// What a panic says, as one paragraph for the log. Split from the hook so the
@@ -226,6 +256,16 @@ mod tests {
             written.contains("[RUST] skiptro: confidence 0.61 for x.mkv"),
             "got {written}"
         );
+    }
+
+    #[test]
+    fn keys_in_a_url_are_hidden() {
+        assert_eq!(
+            hide_keys("error sending request for url (https://api.themoviedb.org/3/x?api_key=abc123&query=a)"),
+            "error sending request for url (https://api.themoviedb.org/3/x?api_key=…&query=a)"
+        );
+        assert_eq!(hide_keys("https://www.omdbapi.com/?apikey=k1 and ?api_key=k2"), "https://www.omdbapi.com/?apikey=… and ?api_key=…");
+        assert_eq!(hide_keys("nothing here"), "nothing here");
     }
 
     #[test]

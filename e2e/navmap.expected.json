@@ -250,8 +250,8 @@
       "Cancel": { "U": "Shut down the PC", "D": "Close Kinema", "L": "·", "R": "·" }
     },
     "player": {
-      "← Back": { "U": "·", "D": "Position", "L": "·", "R": "·" },
-      "Position": { "U": "← Back", "D": "Play", "L": "·", "R": "·" },
+      "Back": { "U": "·", "D": "Position", "L": "·", "R": "·" },
+      "Position": { "U": "Back", "D": "Play", "L": "·", "R": "·" },
       "Play": { "U": "Position", "D": "·", "L": "Back 10 seconds", "R": "Forward 10 seconds" },
       "Keyboard and remote controls": { "U": "Position", "D": "·", "L": "·", "R": "Back 10 seconds" },
       "Back 10 seconds": { "U": "Position", "D": "·", "L": "Keyboard and remote controls", "R": "Play" },

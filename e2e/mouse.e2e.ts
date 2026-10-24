@@ -117,7 +117,7 @@ test('the player by mouse: controls, pause, full screen, seek bar, volume and Ba
   await expect.poll(async () => (await mpv(page)).volume).toBeGreaterThan(lower);
 
   // Back leaves the player.
-  await page.getByRole('button', { name: '← Back' }).click();
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
   await expect(page.locator('.player')).toHaveCount(0);
 });
 

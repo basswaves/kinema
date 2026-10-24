@@ -35,7 +35,7 @@ import {
 import FocusButton from '../ui/FocusButton';
 import { endsAtLabel } from '../ui/format';
 import { useTvMode } from '../ui/tv';
-import { episodeRefLabel, type EpisodeRef, type PlaybackTarget } from './api';
+import { episodeRefName, type EpisodeRef, type PlaybackTarget } from './api';
 import { isPaused, seekBy, seekTo, setPaused } from './engine';
 import { PLAYER_PLAY_KEY, PLAYER_SHELL_KEY } from './focusKeys';
 import { ALL_ARROWS, useFocusGroup } from '../ui/focusGroups';
@@ -176,7 +176,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   const folder = useFolderNeighbours(target.resumeByPath && !target.playlist ? target.path : null);
   const steps = useMemo<Steps>(() => {
     const episode = (e: EpisodeRef | null): Step | null =>
-      e && { kind: 'episode', name: episodeRefLabel(e), play: () => playNeighbour(e) };
+      e && { kind: 'episode', name: episodeRefName(e), play: () => playNeighbour(e) };
     const file = (path: string | null): Step | null =>
       path === null
         ? null
@@ -438,7 +438,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       </div>
 
       <div className="player-top">
-        <FocusButton className="back-button" onSelect={() => void exit()}>
+        <FocusButton className="back-button" label="Back" title="Back" onSelect={() => void exit()}>
           ← Back
         </FocusButton>
         <span className="player-label">

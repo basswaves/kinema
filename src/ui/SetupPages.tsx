@@ -261,7 +261,16 @@ export default function SetupPages({ onClose }: Props) {
   const [sawScan, setSawScan] = useState(false);
   if (scan && !sawScan) setSawScan(true);
 
-  if (!page) return null;
+  // The element even before the system's answer gives the pages: the focus
+  // container measures it once, at mount ("Component added without a node
+  // reference"). The same shape as below, so React keeps the one element.
+  if (!page) {
+    return (
+      <FocusContext.Provider value={focusKey}>
+        <div className="first-run setup-pages" ref={ref} />
+      </FocusContext.Provider>
+    );
+  }
 
   return (
     <FocusContext.Provider value={focusKey}>

@@ -76,20 +76,59 @@ const MIN_PER_GENRE = 4;
  */
 export const HERO_PLAY_FOCUS_KEY = 'hero-play';
 
-export default function Home({
+/**
+ * Home, or what stands in for it: the setup pages, the first run, the first
+ * scan. Apart from the rows below because a focus container measures its
+ * element once, when it mounts: Home's used to mount on an empty library with
+ * no element (the console's "Component added without a node reference"), and
+ * kept no place on the screen once the titles came.
+ */
+export default function Home(props: Props) {
+  const { titles, loaded, hasVideos = false, setupOpen, onSetupClosed, onFirstScan } = props;
+  const scan = useScanStatus();
+
+  // Until finished or left, however soon the first scan fills the library
+  // behind them: titles arriving must not take the questions away mid-answer.
+  if (setupOpen) return <SetupPages onClose={onSetupClosed} />;
+
+  // An empty library is a first run far more often than it is a mistake, so it
+  // gets the setup panel rather than a sentence pointing at Settings. It also
+  // covers the other way to arrive here — every root removed — where the same
+  // two controls are exactly what is needed.
+  // A library of videos alone (videos.ts) is not a first run: Home shows its
+  // Continue Watching, and the videos themselves are on the Library page.
+  if (titles.length === 0 && !hasVideos) {
+    // Nothing rather than the setup panel while the first read is in flight:
+    // the view behind is already opaque, and a blank moment is better than a
+    // panel that flashes up at every launch and takes focus with it.
+    if (!loaded) return null;
+    // Setup finished while the first scan is still finding titles: what it is
+    // doing, not the Welcome page again, which read as setup starting over.
+    if (scan) {
+      return (
+        <section className="first-run first-scan">
+          <h1>Reading your library</h1>
+          <p className="muted">{scanWords(scan)}</p>
+          <p className="muted">Your films and shows appear here as soon as they are found.</p>
+        </section>
+      );
+    }
+    return <FirstRun onScan={onFirstScan} />;
+  }
+
+  return <HomeRows {...props} />;
+}
+
+function HomeRows({
   titles,
-  loaded,
   resumable,
   onSelect,
   onPlay,
   onResume,
   onRemoveResumable,
   onSeeAll,
-  onFirstScan,
-  hasVideos = false,
   onOpenPlaylist,
   setupOpen,
-  onSetupClosed,
   reviewCount,
   onReview,
   keyRejected,
@@ -144,37 +183,6 @@ export default function Home({
   // A page (focus.ts): Play, even from the top bar the library's own restore
   // parked the ring on while the titles loaded.
   useClaimFocus(HERO_PLAY_FOCUS_KEY, Boolean(hero) && !setupOpen, true);
-
-  const scan = useScanStatus();
-
-  // Until finished or left, however soon the first scan fills the library
-  // behind them: titles arriving must not take the questions away mid-answer.
-  if (setupOpen) return <SetupPages onClose={onSetupClosed} />;
-
-  // An empty library is a first run far more often than it is a mistake, so it
-  // gets the setup panel rather than a sentence pointing at Settings. It also
-  // covers the other way to arrive here — every root removed — where the same
-  // two controls are exactly what is needed.
-  // A library of videos alone (videos.ts) is not a first run: Home shows its
-  // Continue Watching, and the videos themselves are on the Library page.
-  if (titles.length === 0 && !hasVideos) {
-    // Nothing rather than the setup panel while the first read is in flight:
-    // the view behind is already opaque, and a blank moment is better than a
-    // panel that flashes up at every launch and takes focus with it.
-    if (!loaded) return null;
-    // Setup finished while the first scan is still finding titles: what it is
-    // doing, not the Welcome page again, which read as setup starting over.
-    if (scan) {
-      return (
-        <section className="first-run first-scan">
-          <h1>Reading your library</h1>
-          <p className="muted">{scanWords(scan)}</p>
-          <p className="muted">Your films and shows appear here as soon as they are found.</p>
-        </section>
-      );
-    }
-    return <FirstRun onScan={onFirstScan} />;
-  }
 
   return (
     <FocusContext.Provider value={focusKey}>

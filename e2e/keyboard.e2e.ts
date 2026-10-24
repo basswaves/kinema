@@ -118,6 +118,28 @@ test('a Videos folder: Library, Play all through a sub-folder, then on to the ne
   await expect(page.locator('button[title^="Next: clip 10 "]')).toBeAttached();
 });
 
+test('a Videos folder with no sub-folder: + Playlist by keyboard, the focused video named at the foot', async ({
+  page,
+}) => {
+  await page.addInitScript(() => localStorage.setItem('kinemaMockRootVideos', '1'));
+  await open(page, 'windows');
+  await press(page, 'ArrowUp');
+  for (let i = 0; i < 6 && (await focused(page)) !== 'Library'; i++) await press(page, 'ArrowRight');
+  await press(page, 'Enter');
+  await expect.poll(() => focused(page)).toContain('Home videos');
+  await press(page, 'Enter');
+  await expect.poll(() => focused(page)).toContain('Birthday 2024-05-02');
+  await expect(page.locator('.video-facts-name')).toHaveText(/Birthday/);
+  await press(page, 'ArrowUp');
+  expect(await focused(page)).toContain('Play all');
+  await press(page, 'ArrowRight');
+  expect(await focused(page)).toContain('+ Playlist');
+  await press(page, 'ArrowDown');
+  await press(page, 'ArrowRight');
+  expect(await focused(page)).toContain('Garden');
+  await expect(page.locator('.video-facts-name')).toHaveText('Garden');
+});
+
 test('Linux: straight to the receiver takes its card for the film and gives it back', async ({
   page,
 }) => {
@@ -302,7 +324,9 @@ test('add without a match, rename it, and send it back to find a match', async (
   await press(page, 'Enter');
   await expect.poll(() => focused(page)).toBe('▶ Play S02E03');
 
-  // Renamed in place.
+  // Renamed in place (past My list, which sits beside Play).
+  await press(page, 'ArrowRight');
+  await expect.poll(() => focused(page)).toBe('+ My list');
   await press(page, 'ArrowRight');
   await expect.poll(() => focused(page)).toBe('Rename');
   await press(page, 'Enter');

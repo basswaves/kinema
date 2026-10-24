@@ -626,6 +626,10 @@ const mockVideos = [
   { id: 9004, dir: 'D:/Videos/Summer trip', name: 'clip 2.mp4' },
   { id: 9005, dir: 'D:/Videos/Summer trip', name: 'clip 10.mp4' },
 ];
+function shownVideos() {
+  const only = typeof localStorage !== 'undefined' && localStorage.getItem('kinemaMockRootVideos') === '1';
+  return only ? mockVideos.filter((v) => v.dir === VIDEOS_ROOT.path) : mockVideos;
+}
 const videoPrefs = new Map<string, TitlePrefs>();
 
 function videoItem(v: (typeof mockVideos)[number]) {
@@ -1372,8 +1376,9 @@ const handlers: Record<string, Handler> = {
     mockPlaylistAdd(list, [{ path: 'E:/Elsewhere/clip.mp4', file_id: null }]);
     return { id: list.id, name: list.name, library: 0, loose: 1, skipped: 1 };
   },
-  list_videos: () => mockVideos.map(videoItem),
-  list_all_videos: () => mockVideos.map(videoItem),
+  // `kinemaMockRootVideos=1`: only the folder's own two files.
+  list_videos: () => shownVideos().map(videoItem),
+  list_all_videos: () => shownVideos().map(videoItem),
   video_frame: () => null,
   get_video_prefs: (a) =>
     videoPrefs.get(String(mockVideos.find((v) => v.id === num(a, 'fileId'))?.dir)) ?? {

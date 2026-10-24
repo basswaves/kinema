@@ -40,6 +40,9 @@ interface Props {
   title?: string;
   /** The name read out for a button whose content is an icon. */
   label?: string;
+  /** Called when the ring lands here or the pointer moves over it: what a
+   *  page shows about the control in hand follows either. */
+  onHighlight?: () => void;
 }
 
 export default function FocusButton({
@@ -51,11 +54,13 @@ export default function FocusButton({
   disabled = false,
   title,
   label,
+  onHighlight,
 }: Props) {
   const { ref, focused } = useFocusable<object, HTMLButtonElement>({
     focusKey,
     focusable: !disabled,
     onEnterPress: onSelect,
+    onFocus: onHighlight,
   });
 
   useEffect(() => {
@@ -72,6 +77,7 @@ export default function FocusButton({
       title={title}
       aria-label={label}
       onClick={onSelect}
+      onMouseEnter={onHighlight}
     >
       {children}
     </button>

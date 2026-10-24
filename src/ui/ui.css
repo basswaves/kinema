@@ -3881,6 +3881,25 @@ kbd {
   width: 16.75rem;
 }
 
+/* The badges of the video in hand, kept at the foot of the view while the
+   page scrolls under it. Painted: it sits over tiles, never over a film. */
+.video-facts {
+  position: sticky;
+  bottom: 0;
+  margin: 1.5rem calc(-1 * var(--gutter)) -3.75rem;
+  padding: 0.75rem var(--gutter) 1rem;
+  background: rgba(10, 10, 12, 0.94);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.video-facts-name {
+  font-weight: 600;
+}
+
+.video-facts .media-badges {
+  margin-top: 0.5rem;
+}
+
 .video-tile-art {
   position: relative;
   display: block;

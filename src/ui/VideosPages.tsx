@@ -21,6 +21,7 @@ import { useEffect, useMemo, useState } from 'react';
 import AddFolder from './AddFolder';
 import FocusButton from './FocusButton';
 import Art from './Art';
+import MediaBadges from './MediaBadges';
 import FocusGroup from './FocusGroup';
 import { PlaylistDialog } from './PlaylistPicker';
 import type { NewItem } from '../library/playlists';
@@ -252,6 +253,8 @@ export function VideosPage({
   /** A group being added to a playlist, and the sentence after. */
   const [adding, setAdding] = useState<{ what: string; items: NewItem[] } | null>(null);
   const [added, setAdded] = useState<string | null>(null);
+  /** The video in hand — focused or under the pointer — whose badges show. */
+  const [shown, setShown] = useState<VideoItem | null>(null);
   const first = groups[0]?.items[0];
   useClaimFocus(first ? `video:${first.id}` : 'videos:back', videos !== null, true);
 
@@ -288,52 +291,78 @@ export function VideosPage({
         )}
         {groups.map((group) => (
           <section key={group.dir} className="videos-group">
-            {(group.name || groups.length > 1) && (
-              // A row that is arrived at on Play all, and left by its own box:
-              // + Playlist beside it lies between two tiles, and the engines
-              // disagreed on which was nearer.
-              <FocusGroup kind="row" current={`video-group:${group.dir}`} className="videos-group-head">
-                <h3>{group.name || 'In this folder'}</h3>
-                <FocusButton
-                  focusKey={`video-group:${group.dir}`}
-                  className="btn-secondary"
-                  onSelect={() => {
-                    const start = playAllStart(group);
-                    if (start) onPlay(videoTarget(start));
-                  }}
-                >
-                  ▶ Play all
-                </FocusButton>
-                <FocusButton
-                  className="btn-secondary"
-                  onSelect={() =>
-                    setAdding({
-                      what: group.name ? `“${group.name}”` : 'these videos',
-                      items: group.items.map((v) => ({ path: v.path, file_id: v.id })),
-                    })
-                  }
-                >
-                  + Playlist
-                </FocusButton>
-              </FocusGroup>
-            )}
+            {/* The row is there even with no heading (a folder holding only
+                its own videos), or its videos could be added to a playlist
+                only from the player. A row that is arrived at on Play all,
+                and left by its own box: + Playlist beside it lies between
+                two tiles, and the engines disagreed on which was nearer. */}
+            <FocusGroup kind="row" current={`video-group:${group.dir}`} className="videos-group-head">
+              {(group.name || groups.length > 1) && <h3>{group.name || 'In this folder'}</h3>}
+              <FocusButton
+                focusKey={`video-group:${group.dir}`}
+                className="btn-secondary"
+                onSelect={() => {
+                  const start = playAllStart(group);
+                  if (start) onPlay(videoTarget(start));
+                }}
+              >
+                ▶ Play all
+              </FocusButton>
+              <FocusButton
+                className="btn-secondary"
+                onSelect={() =>
+                  setAdding({
+                    what: group.name
+                      ? `“${group.name}”`
+                      : group.items.length === 1
+                        ? `“${videoName(group.items[0].file_name)}”`
+                        : 'these videos',
+                    items: group.items.map((v) => ({ path: v.path, file_id: v.id })),
+                  })
+                }
+              >
+                + Playlist
+              </FocusButton>
+            </FocusGroup>
             <FocusGroup
               kind="list"
               current={group.items[0] ? `video:${group.items[0].id}` : undefined}
               className="videos-tiles"
             >
               {group.items.map((video) => (
-                <VideoTile key={video.id} video={video} onPlay={onPlay} />
+                <VideoTile
+                  key={video.id}
+                  video={video}
+                  onPlay={onPlay}
+                  onHighlight={() => setShown(video)}
+                />
               ))}
             </FocusGroup>
           </section>
         ))}
+        {shown && (
+          // What the file holds, as a film's page shows it; kept in view at
+          // the foot of the page, since the tile in hand may be far down.
+          <div className="video-facts">
+            <div className="video-facts-name">{videoName(shown.file_name)}</div>
+            <MediaBadges fileId={shown.id} kind="video" studios={[]} />
+          </div>
+        )}
       </div>
     </FocusContext.Provider>
   );
 }
 
-export function VideoTile({ video, onPlay }: { video: VideoItem; onPlay: (t: PlaybackTarget) => void }) {
+export function VideoTile({
+  video,
+  onPlay,
+  onHighlight,
+}: {
+  video: VideoItem;
+  onPlay: (t: PlaybackTarget) => void;
+  /** The tile is focused or under the pointer. */
+  onHighlight?: () => void;
+}) {
   const percent =
     video.duration_secs && !video.completed
       ? Math.min(100, (video.position_secs / video.duration_secs) * 100)
@@ -346,6 +375,7 @@ export function VideoTile({ video, onPlay }: { video: VideoItem; onPlay: (t: Pla
       label={videoName(video.file_name)}
       className="video-tile"
       onSelect={() => onPlay(videoTarget(video))}
+      onHighlight={onHighlight}
     >
       <span className="video-tile-art">
         <Art local={video.frame} remote={null} lazy fallback={<span className="video-tile-plain">▶</span>} />

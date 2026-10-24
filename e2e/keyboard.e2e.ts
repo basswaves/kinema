@@ -1920,3 +1920,15 @@ test('a folder that holds folders already added: Not now leaves everything as it
   await expect(page.locator('.merge-offer')).toHaveCount(0);
   await expect(page.locator('.first-run-roots li')).toHaveCount(0);
 });
+
+test('Android: Home shows a new version beside the titles to review, as a computer does', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('kinemaMockSystem', 'android');
+    localStorage.setItem('kinemaMockUpdate', '99.0.0');
+    localStorage.setItem('kinemaMockReview', '3');
+  });
+  await page.goto('/');
+  const settings = page.locator('.top-nav button', { hasText: 'Settings' });
+  await expect(settings.locator('.nav-badge')).toBeVisible();
+  await expect(settings.locator('.nav-dot')).toBeVisible();
+});

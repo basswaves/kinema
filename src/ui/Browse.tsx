@@ -1036,7 +1036,10 @@ function TopNav({
                 {reviewCount}
               </span>
             )}
-            {name === 'settings' && reviewCount === 0 && hasUpdate && (
+            {/* Beside a count too: a library with titles to review hid it for
+                good, which read as "Android has no update notice" (owner,
+                2026-10-24). */}
+            {name === 'settings' && hasUpdate && (
               <span className="nav-dot" aria-label="A new version is available" />
             )}
           </FocusButton>

@@ -24,6 +24,7 @@ import { keepOnScreen } from '../ui/focus';
 import { openLink } from '../ui/links';
 import { addWithoutMatch, listNeedsReview } from '../metadata/api';
 import { readLocalName, shelfOf } from './localTitle';
+import { plainReason } from './plainReason';
 import type { MediaFile } from './api';
 import {
   applyMatch,
@@ -159,8 +160,8 @@ export default function FixMatch({ onChanged }: Props) {
     return (
       <section className="fixmatch">
         <p className="muted">
-          Nothing needs attention: every parsed file is matched. Files the matcher refuses to
-          guess at appear here, with the reason it gave.
+          Nothing needs attention: every file found has its title. Files Kinema will not guess
+          at appear here, with the reason.
         </p>
         <GuideLink />
       </section>
@@ -172,7 +173,7 @@ export default function FixMatch({ onChanged }: Props) {
       <header className="fixmatch-head">
         <h2>Needs attention</h2>
         <span className="muted">
-          {pending.length} group{pending.length === 1 ? '' : 's'} the matcher would not guess at
+          {pending.length} title{pending.length === 1 ? '' : 's'} Kinema would not guess at
         </span>
       </header>
 
@@ -362,11 +363,11 @@ function GroupRow({
     onKeep(read.name, read.year, isSeries);
   }, [localName, localYear, isSeries, onKeep]);
 
-  // Reasons are the scorer's own words, and they are genuinely diagnostic —
-  // "title 78%, year off by 2" tells you exactly what happened. What they do
-  // not do is tell a first-time user what to *do*, and the queue only works if
-  // people act on it. So each one gets a plain sentence in front of it, and
-  // keeps its own wording underneath for anyone who wants it.
+  // Reasons are genuinely diagnostic — "title 78%, year off by 2" tells you
+  // exactly what happened. What they do not do is tell a first-time user what
+  // to *do*, and the queue only works if people act on it. So each one gets a
+  // plain sentence in front of it, and its facts underneath in plain words
+  // (`plainReason`; the advice still matches on the scorer's own wording).
   const reason = group.untitled
     ? 'no title in the file name or its folders'
     : withoutQueries(group.files.find((f) => f.match_reason)?.match_reason ?? 'not matched yet');
@@ -438,7 +439,7 @@ function GroupRow({
           </span>
         </div>
         <div className="fixmatch-advice">{advice}</div>
-        <div className="fixmatch-reason">{reason}</div>
+        <div className="fixmatch-reason">{plainReason(reason)}</div>
       </div>
 
       {open && (

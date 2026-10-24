@@ -376,6 +376,7 @@ pub fn run() {
             settings::open_log_folder,
             reach::check_reach,
             report::make_report,
+            report::show_report,
             tracking::link_qr,
             settings::open_backup_folder,
             simkl::simkl_status,

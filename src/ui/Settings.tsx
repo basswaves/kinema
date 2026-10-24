@@ -43,7 +43,7 @@ import ConfirmButton from './ConfirmButton';
 import MergeOffer, { type MergeOfferState } from './MergeOffer';
 import EquipmentSection from './EquipmentSection';
 import WhatLeavesSection from './WhatLeavesSection';
-import { REPORT_WORDS, sendReport } from './report';
+import { makeReport as packReport, openReportForm, REPORT_WORDS, reportSaved, showReport } from './report';
 import SoundSection from './SoundSection';
 import ScreenSection from './ScreenSection';
 import { capabilitiesNow, useCapabilities, type Capabilities } from '../capabilities';
@@ -296,19 +296,16 @@ export default function Settings({
   );
   const [writingNfo, setWritingNfo] = useState(false);
   /** How the last Send a report went, said under its button. */
-  const [report, setReport] = useState<{ text: string; failed: boolean } | null>(null);
+  const [report, setReport] = useState<{ text: string; failed: boolean; path?: string } | null>(
+    null
+  );
   const makeReport = useCallback(async () => {
     try {
-      const made = await sendReport();
-      setReport({
-        text:
-          `Saved ${made.path} (${made.files.join(', ')}), shown in its folder. ` +
-          'Attach it to the form that opened in your browser.',
-        failed: false,
-      });
+      const made = await packReport();
+      setReport({ text: reportSaved(made), failed: false, path: made.path });
     } catch (e) {
       setReport({
-        text: `The report could not be made: ${userError(e)} The form opened anyway; Open log folder has the logs.`,
+        text: `The report could not be made: ${userError(e)} Open log folder has the logs; the report form can still be sent without them.`,
         failed: true,
       });
     }
@@ -1685,6 +1682,28 @@ export default function Settings({
                       </FocusButton>
                     )}
                   </div>
+                  {can?.opens_folders && report && (
+                    <div className="settings-row">
+                      <FocusButton
+                        keepInView="nearest"
+                        className="btn-secondary"
+                        onSelect={() => void openReportForm().catch((e) => setError(userError(e)))}
+                      >
+                        Open the report form
+                      </FocusButton>
+                      {report.path && (
+                        <FocusButton
+                          keepInView="nearest"
+                          className="btn-secondary"
+                          onSelect={() =>
+                            void showReport(report.path as string).catch((e) => setError(userError(e)))
+                          }
+                        >
+                          Show the file
+                        </FocusButton>
+                      )}
+                    </div>
+                  )}
                   {can?.opens_folders && (
                     <p className={report?.failed ? 'settings-warn' : report ? 'settings-ok' : 'settings-hint'}>
                       {report?.text ?? REPORT_WORDS}

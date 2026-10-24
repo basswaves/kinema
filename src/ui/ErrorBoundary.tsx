@@ -13,11 +13,20 @@
  * dead for exactly the reason this screen exists. Native focus, Enter, and the
  * arrow keys handled below work whatever went wrong above.
  */
-import { Component, Fragment, useEffect, useRef, type ErrorInfo, type ReactNode } from 'react';
+import {
+  Component,
+  Fragment,
+  useEffect,
+  useRef,
+  useState,
+  type ErrorInfo,
+  type ReactNode,
+} from 'react';
 import { openLogFolder } from '../metadata/api';
 import { powerAction } from './api';
 import { capabilitiesNow } from '../capabilities';
-import { sendReport } from './report';
+import { makeReport, openReportForm, reportSaved, showReport, type Report } from './report';
+import { rawError } from './errors';
 
 interface Props {
   children: ReactNode;
@@ -55,6 +64,19 @@ export default class ErrorBoundary extends Component<Props, State> {
 
 function CrashScreen({ onRetry }: { onRetry: () => void }) {
   const row = useRef<HTMLDivElement>(null);
+  /** Send a report's outcome, said on this screen: it used to fail without a word. */
+  const [report, setReport] = useState<{ made?: Report; text: string } | null>(null);
+  const pack = () => {
+    makeReport().then(
+      (made) => setReport({ made, text: reportSaved(made) }),
+      (e: unknown) => {
+        console.error('Send a report from the crash screen failed:', e);
+        setReport({
+          text: `The report could not be made: ${rawError(e)}. Open log folder has the logs; the report form can still be sent without them.`,
+        });
+      }
+    );
+  };
 
   // Arrow keys step between the buttons, so a remote can use them.
   useEffect(() => {
@@ -88,12 +110,26 @@ function CrashScreen({ onRetry }: { onRetry: () => void }) {
         </button>
         {/* Desktop only: Android has no folder to save into (Share the log, in Settings). */}
         {capabilitiesNow()?.opens_folders && (
+          <button type="button" className="btn-secondary" onClick={pack}>
+            Send a report
+          </button>
+        )}
+        {report && (
           <button
             type="button"
             className="btn-secondary"
-            onClick={() => void sendReport().catch(() => undefined)}
+            onClick={() => void openReportForm().catch(() => undefined)}
           >
-            Send a report
+            Open the report form
+          </button>
+        )}
+        {report?.made && (
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => void showReport(report.made!.path).catch(() => undefined)}
+          >
+            Show the file
           </button>
         )}
         <button
@@ -111,6 +147,7 @@ function CrashScreen({ onRetry }: { onRetry: () => void }) {
           Close Kinema
         </button>
       </div>
+      {report && <p className="crash-report">{report.text}</p>}
     </div>
   );
 }

@@ -1723,6 +1723,7 @@ const handlers: Record<string, Handler> = {
     shader_cache: 'C:\\fixture\\shadercache',
   }),
   open_log_folder: () => null,
+  show_report: () => null,
   make_report: () => ({
     path: 'C:\\Users\\you\\Downloads\\kinema-report-2026-10-23-1405.zip',
     files: ['app.log', 'app.previous.log', 'mpv.log', 'equipment.txt'],

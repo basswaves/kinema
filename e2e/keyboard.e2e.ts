@@ -1486,7 +1486,7 @@ test('Settings → Privacy lists what leaves the computer, and goes to the switc
     .toBe(true);
 });
 
-test('Developer tools: Send a report says what it packs, saves it and opens the form', async ({
+test('Developer tools: Send a report says which file to attach, and opens the form only on its own press', async ({
   page,
 }) => {
   // Developer tools are made for a mouse on a desktop (notes/CLAUDE.md).
@@ -1498,14 +1498,17 @@ test('Developer tools: Send a report says what it packs, saves it and opens the 
   await expect(tools).toContainText('replaced by ~');
   await tools.locator('button', { hasText: 'Send a report' }).click();
   await expect(tools.locator('.settings-ok')).toContainText(
-    'Downloads\\kinema-report-2026-10-23-1405.zip (app.log, app.previous.log, mpv.log, equipment.txt)'
+    'Saved kinema-report-2026-10-23-1405.zip in C:\\Users\\you\\Downloads (app.log, app.previous.log, mpv.log, equipment.txt)'
   );
+  const opened = () =>
+    page.evaluate(
+      () => (window as unknown as { __kinemaMock: { openedLinks: string[] } }).__kinemaMock.openedLinks
+    );
+  // The browser would cover the note: nothing opens until it is asked for.
+  expect(await opened()).not.toContain('https://github.com/Basswaves/kinema/issues/new?template=bug_report.yml');
+  await tools.locator('button', { hasText: 'Open the report form' }).click();
   await expect
-    .poll(() =>
-      page.evaluate(
-        () => (window as unknown as { __kinemaMock: { openedLinks: string[] } }).__kinemaMock.openedLinks
-      )
-    )
+    .poll(opened)
     .toContain('https://github.com/Basswaves/kinema/issues/new?template=bug_report.yml');
 });
 

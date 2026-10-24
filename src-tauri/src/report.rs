@@ -1,9 +1,10 @@
 //! Send a report: the logs and the equipment check, packed into one zip for
 //! a bug report (Settings → Developer tools, and the crash screen).
 //!
-//! Kinema sends nothing itself. The zip goes to the Downloads folder, the
-//! file manager shows it, and the user attaches it to the form that opens in
-//! their browser. Before anything is packed, the home folder's path is
+//! Kinema sends nothing itself. The zip goes to the Downloads folder and
+//! Kinema says where; the file manager and the bug-report form open only when
+//! the user presses for them, so neither covers the note saying which file to
+//! attach (owner, 2026-10-24: the form opening at once hid it). Before anything is packed, the home folder's path is
 //! replaced by `~` everywhere, so the user name in it stays out of a public
 //! issue (owner, 2026-10-23); film and folder names stay, since they are
 //! often the bug.
@@ -25,7 +26,7 @@ pub struct Report {
     pub files: Vec<String>,
 }
 
-/// Pack the report, save it, and show it in the file manager.
+/// Pack the report and save it. Showing it is `show_report`'s, on a press.
 #[tauri::command]
 pub async fn make_report(app: tauri::AppHandle) -> Result<Report, String> {
     crate::jobs::off_main(move || {
@@ -59,17 +60,33 @@ pub async fn make_report(app: tauri::AppHandle) -> Result<Report, String> {
         let zip = write_zip(&entries, now_secs());
         std::fs::write(&path, zip).map_err(to_string_err)?;
         crate::log!("report: saved {} ({} files)", path.display(), entries.len());
-        // A self-test runs beside someone using the PC: no file manager over
-        // their work. The log line above is the proof it would have shown.
-        if crate::selftest::plan_path().is_none() {
-            show(&app, &path);
-        }
         Ok(Report {
             path: path.to_string_lossy().into_owned(),
             files: entries.into_iter().map(|(name, _)| name).collect(),
         })
     })
     .await
+}
+
+/// Show a saved report in the file manager — only a file `make_report` named.
+#[tauri::command]
+pub fn show_report(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    let path = Path::new(&path);
+    let named = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .is_some_and(|n| n.starts_with("kinema-report-") && n.ends_with(".zip"));
+    if !named || !path.is_file() {
+        return Err(format!("not a saved report: {}", path.display()));
+    }
+    // A self-test runs beside someone using the PC: no file manager over
+    // their work. The log line is the proof it would have shown.
+    if crate::selftest::plan_path().is_some() {
+        crate::log!("report: would show {}", path.display());
+        return Ok(());
+    }
+    show(&app, path);
+    Ok(())
 }
 
 /// Select the file in the file manager; failing that, open its folder.

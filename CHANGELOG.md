@@ -7,6 +7,13 @@ makes no stability promises.
 
 ## [Unreleased]
 
+## [0.13.1] — 2026-10-24
+
+Fixes for what the first outside tester met: when TMDB gives no answer, Kinema
+tries again and on TMDB's second address, and says what really failed instead
+of "could not identify" or "no internet". Send a report says which file to
+attach before the form opens.
+
 ### Changed
 
 - **Matching says what really failed.** When TMDB gives no answer, Kinema
@@ -17,6 +24,8 @@ makes no stability promises.
   works (checked against Wikidata), instead of "Couldn't reach the internet".
   Other services' failures name their host. Settings -> Privacy lists
   `api.tmdb.org`.
+  The log records the full cause and whether a proxy is set (never its
+  address), for Send a report.
 - **Send a report** saves the zip and says its name and folder. "Open the
   report form" and "Show the file" are separate presses, so the browser no
   longer covers the note. The crash screen says the same, where a failed
@@ -33,10 +42,18 @@ makes no stability promises.
   log, which goes into Send a report's zip. A lookup that got no answer no
   longer says "could not identify this"; the next scan asks again.
 - Re-watching a watched film or episode keeps it watched; a re-watch stopped
-  before 80 % can be resumed.
+  before 80 % can be resumed. Where a play finished is no longer kept as a
+  position (library schema 26 → 27, which clears it on the files already
+  watched), so a finished film is never offered as a resume.
 - A year written twice in a name ("Film 2017 (2017)") no longer stays in the
   title and stops it matching.
 - Self-tests never run Skiptro, whose database is the real one.
+
+### For contributors
+
+- **The Kinema MCP** (`.mcp.json`, `scripts/mcp/`): Claude Code or another MCP
+  client can drive the real release app on a copy of the library — state,
+  keys, clicks, mpv properties, logs, read-only SQL. See CONTRIBUTING.
 
 ## [0.13.0] — 2026-10-23
 

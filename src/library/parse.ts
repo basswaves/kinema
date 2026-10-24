@@ -138,6 +138,17 @@ export function recordParseError(message: string) {
   lastParseError = message;
 }
 
+/**
+ * `Film 2017 (2017)`: guessit takes the bracketed year and leaves the bare one
+ * in the title, which then matched nothing ("Film 2017" is not a film). A
+ * title that is only that number ("1917", "2012") keeps it.
+ */
+function withoutYear(title: string, year: number | null): string {
+  if (year === null) return title;
+  const cut = title.replace(new RegExp(`[\\s.]+${year}$`), '').trim();
+  return cut || title;
+}
+
 function runGuessit(input: string, kind: LibraryKind): Guess {
   // A programming error, not a bad filename: some caller started parsing
   // without loading the parser. Thrown rather than folded into `lastParseError`
@@ -172,10 +183,11 @@ function runGuessit(input: string, kind: LibraryKind): Guess {
 
   const title = firstOf(raw.title as string | string[] | undefined);
   const type = raw.type as string | undefined;
+  const year = typeof raw.year === 'number' ? raw.year : null;
 
   return {
-    title: typeof title === 'string' && title.trim() ? title.trim() : null,
-    year: typeof raw.year === 'number' ? raw.year : null,
+    title: typeof title === 'string' && title.trim() ? withoutYear(title.trim(), year) : null,
+    year,
     season: typeof firstOf(raw.season) === 'number' ? (firstOf(raw.season) as number) : null,
     episode: typeof firstOf(raw.episode) === 'number' ? (firstOf(raw.episode) as number) : null,
     episodeLast: lastOf(raw.episode),

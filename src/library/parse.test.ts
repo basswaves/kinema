@@ -34,6 +34,13 @@ beforeAll(async () => {
 });
 
 describe('parseMediaFile', () => {
+  it('takes a year written twice out of the title', () => {
+    const named = parseMediaFile(file('A Long Film Name 2017 (2017).mkv', 'D:/Films'), 'movies');
+    expect([named.title, named.year]).toEqual(['A Long Film Name', 2017]);
+    const folder = parseMediaFile(file('movie.mkv', 'D:/Films/Some Film 2017 (2017)'), 'movies');
+    expect([folder.title, folder.year]).toEqual(['Some Film', 2017]);
+  });
+
   it('keeps both ends of a double-episode file', () => {
     const parsed = parseMediaFile(file('Show.Name.S01E01E02.1080p.mkv', 'D:/TV/Show Name'), 'tv');
     expect(parsed.title).toBe('Show Name');

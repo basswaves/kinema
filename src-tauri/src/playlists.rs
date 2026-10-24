@@ -224,6 +224,27 @@ fn create(conn: &Connection, name: &str) -> Result<i64, String> {
     Ok(conn.last_insert_rowid())
 }
 
+/// `name`, or `name (2)`, `(3)`… when a playlist is already called that: an
+/// imported list named like one there was a second with the same name.
+fn free_name(conn: &Connection, name: &str) -> Result<String, String> {
+    let taken = |n: &str| -> Result<bool, String> {
+        conn.query_row("SELECT EXISTS(SELECT 1 FROM playlists WHERE name = ?1)", params![n], |r| r.get(0))
+            .map_err(to_string_err)
+    };
+    let name = name.trim();
+    if !taken(name)? {
+        return Ok(name.to_string());
+    }
+    let mut n = 2;
+    loop {
+        let candidate = format!("{name} ({n})");
+        if !taken(&candidate)? {
+            return Ok(candidate);
+        }
+        n += 1;
+    }
+}
+
 fn add(conn: &Connection, playlist_id: i64, items: &[NewItem]) -> Result<Added, String> {
     let tx = conn.unchecked_transaction().map_err(to_string_err)?;
     let result = add_rows(&tx, playlist_id, items)?;
@@ -444,6 +465,7 @@ fn import(conn: &Connection, list: &Path, exists: impl Fn(&Path) -> bool) -> Res
     }
     // One transaction: a failure leaves no empty playlist behind.
     let tx = conn.unchecked_transaction().map_err(to_string_err)?;
+    result.name = free_name(&tx, &result.name)?;
     result.id = create(&tx, &result.name)?;
     add_rows(&tx, result.id, &items)?;
     tx.commit().map_err(to_string_err)?;
@@ -773,6 +795,19 @@ mod tests {
         assert_eq!((result.name.as_str(), result.library, result.loose, result.skipped), ("Road trip", 1, 1, 2));
         let items = listed(&conn, result.id);
         assert_eq!((items[0].file_id, items[1].kind.as_str()), (Some(1), "loose"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn an_import_named_like_a_playlist_there_gets_a_number() {
+        let conn = library();
+        create(&conn, "Road trip").unwrap();
+        create(&conn, "Road trip (2)").unwrap();
+        let dir = std::env::temp_dir().join(format!("kinema-m3u-name-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let list = dir.join("Road trip.m3u");
+        std::fs::write(&list, "#EXTM3U\nC:/m/film.mkv\n").unwrap();
+        assert_eq!(import(&conn, &list, |_| false).unwrap().name, "Road trip (3)");
         let _ = std::fs::remove_dir_all(&dir);
     }
 

@@ -130,7 +130,7 @@ what shapes it.
 
 1. Download the file for your system from the
    [Releases](https://github.com/Basswaves/kinema/releases/latest) page and open
-   it ([Windows](#install), [Linux](#linux), [Android](#android)).
+   it ([Windows](#install), [Linux](#linux), [Android TV](#android-tv)).
 2. Answer two questions — where you will watch, and which folder your films are
    in. A local drive, a USB drive and a NAS share all work.
 3. Press **Scan my library**. Posters and descriptions arrive by themselves;
@@ -248,7 +248,7 @@ title, keep it under its own name, or ignore it. The full guide is at
 
 Everything is on the [Releases](https://github.com/Basswaves/kinema/releases)
 page: an installer and a ZIP for Windows, packages for Linux ([below](#linux)), and an `.apk`
-for Android TV ([below](#android-early-version)).
+for Android TV ([below](#android-tv-early-version)).
 
 On Windows you can use either file:
 
@@ -330,14 +330,15 @@ SDR before it reaches it. On Hyprland, which switches HDR on by itself for a
 full-screen HDR film, add `bitdepth, 10` to the TV's monitor rule: without
 it HDR goes out at 8 bits per colour, and smooth gradients show bands.
 
-### Android
+### Android TV
 
-Since 0.10.0, as an early version (beta), for Android TV boxes: download
+Made for Android TV boxes and TVs with Android TV or Google TV; not made for
+phones and tablets yet. Since 0.10.0, as an early version (beta): download
 `kinema-android.apk` from the Releases page, copy it to the device (a
 USB stick works) and open it from a file manager. Android asks once to allow
 installs from that source, because Kinema is not from an app store. What has
 been tried and what is missing is under
-[Android (early version)](#android-early-version).
+[Android TV (early version)](#android-tv-early-version).
 
 The file is signed with Kinema's own key. To check it is the one that was
 published, compare the checksum beside it (`sha256sum -c`), and the certificate
@@ -483,13 +484,13 @@ desktop and fall back safely, rather than tested on every one —
 see [When something goes wrong](#when-something-goes-wrong).
 
 **Android TV**, since 0.10.0, as an early version (beta): see
-[Android (early version)](#android-early-version) for what is tested and what
+[Android TV (early version)](#android-tv-early-version) for what is tested and what
 is missing. **macOS** is planned for later, after the Windows, Linux and
 Android work in hand; a port is welcome sooner, and
 [CONTRIBUTING.md](CONTRIBUTING.md) ("More than one platform") says how the
 code is arranged for one.
 
-| | Windows 11 | Linux | Android (early version) |
+| | Windows 11 | Linux | Android TV (early version) |
 |---|---|---|---|
 | Builds and passes its tests | ✓ | ✓ | ✓ |
 | Library, matching, artwork, accounts | ✓ | ✓ | ✓ |
@@ -503,9 +504,9 @@ code is arranged for one.
 | Blu-ray folders (`BDMV`), disc images (`.iso`) | ✓ the main film, with chapters and track languages; no menus | ✓ through the system's mpv | not yet |
 | Encrypted Blu-ray discs (AACS, BD+) | not played; Kinema says so | not played; Kinema says so | — |
 
-### Android (early version)
+### Android TV (early version)
 
-Installed by hand ([above](#android)). It plays through Android's own media
+Installed by hand ([above](#android-tv)). It plays through Android's own media
 player (Media3) rather than mpv, so Dolby Vision and sound passed straight to
 a receiver are Android's to do; Kinema shows what Android reports and, where
 sound will not open, falls back rather than not playing. The interface is
@@ -615,7 +616,7 @@ says how to build, check and submit one. Anything exploitable goes to
 
 ## Known limitations
 
-- **Android is an early version.** See [above](#android-early-version) for
+- **Android TV is an early version.** See [above](#android-tv-early-version) for
   what is untested and missing. macOS is planned for later (see
   [Platform support](#platform-support)).
 - **Tested on a small number of setups.** HDR passthrough, bitstreaming to a

@@ -333,7 +333,7 @@
       <div class="rv"><span class="k">03</span><h3>Remembers where you were</h3><p>Per file, and offers the next episode. Posters show what you have watched.</p></div>
       <div class="rv"><span class="k">04</span><h3>Skips intros, recaps and credits</h3><p>From community databases, chapter markers, or by comparing a season's audio. Where a film has a scene after its credits, Skip takes you straight to it.</p></div>
       <div class="rv"><span class="k">05</span><h3>Subtitles that fit</h3><p>In your language when the audio is in another, forced subtitles for foreign lines, and online search when a file has none in yours.</p></div>
-      <div class="rv"><span class="k">06</span><h3>Plays through mpv</h3><p>Hardware decoding, HDR converted for screens that cannot show it, the picture-based subtitles of Blu-ray discs, and untouched 4K disc copies (remuxes). On Android it uses Android's own media player, which takes Dolby Vision and receiver sound from the system.</p></div>
+      <div class="rv"><span class="k">06</span><h3>Plays through mpv</h3><p>Hardware decoding, HDR converted for screens that cannot show it, the picture-based subtitles of Blu-ray discs, and untouched 4K disc copies (remuxes). On Android TV it uses Android's own media player, which takes Dolby Vision and receiver sound from the system.</p></div>
       <div class="rv"><span class="k">07</span><h3>Works from the sofa</h3><p>Browsing, search with an on-screen keyboard, playing, subtitles and resume all work with a D-pad. The TV layout fills the screen with bigger text.</p></div>
       <div class="rv"><span class="k">08</span><h3>Yours, and offline</h3><p>Posters and descriptions are cached locally. No account, no telemetry, and a weekly safety copy of your watch history and resume points. Settings → Privacy lists every service Kinema can contact, what it sends and what stops it.</p></div>
       <div class="rv"><span class="k">09</span><h3>Tracks what you watch, if you want</h3><p>Connect SIMKL or Trakt and what you finish is added to your account. Nothing else is sent, and it stays off until you connect it.</p></div>
@@ -424,6 +424,7 @@
         <span class="rec">Your system</span>
         <h3>Android TV</h3>
         <div class="sub">APK · early version</div>
+        <p><strong>Made for Android TV boxes and TVs with Android TV or Google TV.</strong> Not made for phones and tablets yet.</p>
         <p>An early version, installed by hand: copy the <code>.apk</code> to the box (a USB stick works) and open it. Android asks once to allow installs from that source.</p>
         <p>Tried so far on one TV box and an emulator, so reports from other boxes are especially welcome.</p>
         <a class="btn primary" href="https://github.com/basswaves/kinema/releases/latest/download/kinema-android.apk">Download the APK</a>
@@ -499,7 +500,7 @@
   var os=/Android/i.test(ua)?"android":/Windows/i.test(ua)?"windows":/Linux|X11/i.test(ua)?"linux":"";
   if(os){
     html.setAttribute("data-os",os);
-    var label={windows:"Windows",linux:"Linux",android:"Android"}[os];
+    var label={windows:"Windows",linux:"Linux",android:"Android TV"}[os];
     var B="https://github.com/basswaves/kinema/releases/latest/download/";
     var direct={windows:B+"kinema-windows-x64-setup.exe",android:B+"kinema-android.apk"}[os];
     document.querySelectorAll("[data-dl]").forEach(function(a){

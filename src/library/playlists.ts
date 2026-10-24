@@ -42,6 +42,10 @@ export interface PlaylistSummary {
   image_url: string | null;
   image_path: string | null;
   updated_at: number;
+  /** Plays in a random order, every item once a round (playlists.rs). */
+  shuffle: boolean;
+  /** Starts again at the end. */
+  repeat: boolean;
 }
 
 /** What is added: a path, and its library file where it has one. */
@@ -80,6 +84,8 @@ export const setPlaylistCurrent = (playlistId: number, itemId: number) =>
   invoke<void>('set_playlist_current', { playlistId, itemId });
 export const playlistStep = (playlistId: number, itemId: number, forward: boolean) =>
   invoke<PlaylistEntry | null>('playlist_step', { playlistId, itemId, forward });
+export const setPlaylistMode = (playlistId: number, mode: { shuffle: boolean; repeat: boolean }) =>
+  invoke<void>('set_playlist_mode', { playlistId, mode });
 export const exportPlaylist = (playlistId: number, path: string) =>
   invoke<number>('export_playlist', { playlistId, path });
 export const importPlaylist = (path: string) => invoke<Imported>('import_playlist', { path });

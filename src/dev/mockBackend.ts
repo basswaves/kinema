@@ -1156,6 +1156,8 @@ interface MockPlaylist {
   current: number | null;
   updated: number;
   items: { item_id: number; path: string; file_id: number | null }[];
+  shuffle?: boolean;
+  repeat?: boolean;
 }
 const playlists: MockPlaylist[] = [];
 let playlistSeq = 0;
@@ -1238,6 +1240,8 @@ function mockSummary(list: MockPlaylist) {
     image_url: null,
     image_path: null,
     updated_at: list.updated,
+    shuffle: list.shuffle ?? false,
+    repeat: list.repeat ?? false,
   };
 }
 const playlistOf = (id: number) => playlists.find((p) => p.id === id);
@@ -1330,12 +1334,24 @@ const handlers: Record<string, Handler> = {
     }
     return null;
   },
+  // Shuffled, the mock's round is the playlist backwards: known, for the
+  // tests, and plainly not the playlist's own order.
   playlist_step: (a) => {
     const list = playlistOf(num(a, 'playlistId'));
     if (!list) return null;
-    const at = list.items.findIndex((i) => i.item_id === num(a, 'itemId'));
-    const next = at < 0 ? undefined : list.items[at + (a.forward ? 1 : -1)];
+    const order = list.shuffle ? [...list.items].reverse() : list.items;
+    const at = order.findIndex((i) => i.item_id === num(a, 'itemId'));
+    let next = at < 0 ? (list.shuffle && a.forward ? order[0] : undefined) : order[at + (a.forward ? 1 : -1)];
+    if (!next && at >= 0 && a.forward && list.repeat) {
+      next = list.shuffle && order.length > 1 && order[0].item_id === num(a, 'itemId') ? order[1] : order[0];
+    }
     return next ? mockEntry(next) : null;
+  },
+  set_playlist_mode: (a) => {
+    const list = playlistOf(num(a, 'playlistId'));
+    const mode = a.mode as { shuffle: boolean; repeat: boolean };
+    if (list) Object.assign(list, mode);
+    return null;
   },
   export_playlist: (a) => playlistOf(num(a, 'playlistId'))?.items.length ?? 0,
   import_playlist: () => {

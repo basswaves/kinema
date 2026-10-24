@@ -461,6 +461,7 @@ pub fn run() {
             playlists::move_playlist_item,
             playlists::set_playlist_current,
             playlists::playlist_step,
+            playlists::set_playlist_mode,
             playlists::export_playlist,
             playlists::import_playlist,
             videos::list_videos,

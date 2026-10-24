@@ -102,6 +102,29 @@ test('a playlist plays in its own order through Up next, and carries on there', 
   await expect(page.getByRole('button', { name: /Carry on: Example Film/ })).toBeVisible();
 });
 
+test('shuffle and repeat on the playlist page, by remote, kept for the playlist', async ({ page }) => {
+  await home(page, 'series', true);
+  await openEvening(page);
+  await moveTo(page, 'ArrowRight', 'Shuffle: Off');
+  await press(page, 'Enter');
+  await expect.poll(() => focused(page)).toBe('Shuffle: On');
+  await moveTo(page, 'ArrowRight', 'Repeat: Off');
+  await press(page, 'Enter');
+  await expect.poll(() => focused(page)).toBe('Repeat: On');
+
+  // Play takes the shuffled round's first (the mock's round is the playlist
+  // backwards), not the playlist's own first item.
+  for (let i = 0; i < 4 && (await focused(page)) !== '▶ Play'; i++) await press(page, 'ArrowLeft');
+  await expect.poll(() => focused(page)).toBe('▶ Play');
+  await press(page, 'Enter');
+  await expect.poll(() => mpvPath(page)).toContain('S01E01');
+
+  // Kept: back on the page, both are still on.
+  await backTo(page, '.playlist-page');
+  await expect(page.getByRole('button', { name: 'Shuffle: On' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Repeat: On' })).toBeVisible();
+});
+
 test("+ Playlist on a film's page makes a playlist by name", async ({ page }) => {
   await home(page, 'film', false);
   await press(page, 'ArrowRight');

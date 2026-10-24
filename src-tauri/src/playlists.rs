@@ -16,6 +16,13 @@
 //! the playlist with no second mechanism. The item last started is kept
 //! (`current_item`), and Play on the playlist carries on there.
 //!
+//! **Shuffle and repeat** (schema 30) are kept per playlist. Shuffled, the
+//! order is a round of every item in a random order, kept with the playlist
+//! (`shuffle_order`), so nothing plays twice before all have played, Previous
+//! goes back the way it came, and Up next names what Next will play. Repeat
+//! starts again at the end: from the top in order, or with a new round, the
+//! item just played first in it so it does not come straight back.
+//!
 //! **`.m3u`** is the plain list every player reads: `#EXTM3U`, then an
 //! `#EXTINF` line (length, name) and the path for each item. Reading takes
 //! paths relative to the list's own folder and `file://` addresses; web
@@ -64,6 +71,15 @@ pub struct PlaylistSummary {
     pub image_url: Option<String>,
     pub image_path: Option<String>,
     pub updated_at: i64,
+    pub shuffle: bool,
+    pub repeat: bool,
+}
+
+/// How a playlist plays: shuffled or in its own order, round again or once.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct PlayMode {
+    pub shuffle: bool,
+    pub repeat: bool,
 }
 
 /// What is asked to be added: a path, and its library file when known.
@@ -168,18 +184,25 @@ fn entries(conn: &Connection, playlist_id: i64, art: &str, frames: &Path) -> Res
 }
 
 fn summaries(conn: &Connection, art: &str, frames: &Path) -> Result<Vec<PlaylistSummary>, String> {
-    let lists: Vec<(i64, String, Option<i64>, i64)> = {
+    type Row = (i64, String, Option<i64>, i64, PlayMode);
+    let lists: Vec<Row> = {
         let mut stmt = conn
-            .prepare("SELECT id, name, current_item, updated_at FROM playlists ORDER BY updated_at DESC, id DESC")
+            .prepare(
+                "SELECT id, name, current_item, updated_at, shuffle, repeat_all FROM playlists
+                  ORDER BY updated_at DESC, id DESC",
+            )
             .map_err(to_string_err)?;
         let rows = stmt
-            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))
+            .query_map([], |r| {
+                let mode = PlayMode { shuffle: r.get::<_, i64>(4)? != 0, repeat: r.get::<_, i64>(5)? != 0 };
+                Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, mode))
+            })
             .map_err(to_string_err)?;
         rows.collect::<rusqlite::Result<Vec<_>>>().map_err(to_string_err)?
     };
     lists
         .into_iter()
-        .map(|(id, name, current_item, updated_at)| {
+        .map(|(id, name, current_item, updated_at, mode)| {
             let items = entries(conn, id, art, frames)?;
             let pictured = items.iter().find(|e| e.image_path.is_some() || e.image_url.is_some());
             Ok(PlaylistSummary {
@@ -190,6 +213,8 @@ fn summaries(conn: &Connection, art: &str, frames: &Path) -> Result<Vec<Playlist
                 image_url: pictured.and_then(|e| e.image_url.clone()),
                 image_path: pictured.and_then(|e| e.image_path.clone()),
                 updated_at,
+                shuffle: mode.shuffle,
+                repeat: mode.repeat,
             })
         })
         .collect()
@@ -212,6 +237,111 @@ fn step(
     } else {
         items[..here].iter().rev().find(playable).cloned()
     }
+}
+
+fn play_mode(conn: &Connection, playlist_id: i64) -> Result<(PlayMode, Vec<i64>), String> {
+    let row = conn
+        .query_row(
+            "SELECT shuffle, repeat_all, shuffle_order FROM playlists WHERE id = ?1",
+            params![playlist_id],
+            |r| {
+                let mode = PlayMode { shuffle: r.get::<_, i64>(0)? != 0, repeat: r.get::<_, i64>(1)? != 0 };
+                Ok((mode, parse_order(&r.get::<_, String>(2)?)))
+            },
+        )
+        .optional()
+        .map_err(to_string_err)?;
+    Ok(row.unwrap_or_default())
+}
+
+fn parse_order(text: &str) -> Vec<i64> {
+    text.split(',').filter_map(|s| s.trim().parse().ok()).collect()
+}
+
+fn save_order(conn: &Connection, playlist_id: i64, order: &[i64]) -> Result<(), String> {
+    let text = order.iter().map(i64::to_string).collect::<Vec<_>>().join(",");
+    conn.execute("UPDATE playlists SET shuffle_order = ?2 WHERE id = ?1", params![playlist_id, text])
+        .map_err(to_string_err)?;
+    Ok(())
+}
+
+/// A number below `n`, from the standard library's own random keys: a
+/// shuffle needs no more than that, and no crate for it.
+fn random_below(n: usize) -> usize {
+    use std::hash::{BuildHasher, Hasher};
+    let mut h = std::collections::hash_map::RandomState::new().build_hasher();
+    h.write_u64(now_secs() as u64);
+    (h.finish() % n.max(1) as u64) as usize
+}
+
+/// `ids` in a random order (Fisher-Yates, `pick(n)` below `n`), with `first`
+/// moved to the front when it is there.
+fn shuffled(mut ids: Vec<i64>, first: Option<i64>, pick: &mut impl FnMut(usize) -> usize) -> Vec<i64> {
+    for i in (1..ids.len()).rev() {
+        ids.swap(i, pick(i + 1));
+    }
+    if let Some(at) = first.and_then(|f| ids.iter().position(|&id| id == f)) {
+        let id = ids.remove(at);
+        ids.insert(0, id);
+    }
+    ids
+}
+
+/// The kept round made to fit the playlist now: items removed since are
+/// dropped, items added since go at the end.
+fn fitted(order: &[i64], items: &[PlaylistEntry]) -> Vec<i64> {
+    let mut out: Vec<i64> = order.iter().copied().filter(|id| items.iter().any(|e| e.item_id == *id)).collect();
+    for e in items {
+        if !out.contains(&e.item_id) {
+            out.push(e.item_id);
+        }
+    }
+    out
+}
+
+/// What plays after (or before) `item_id` in the playlist's mode, and the
+/// shuffled round to keep when it changed. `item_id` not in the playlist
+/// (Play with nothing started) means the round's first.
+fn step_in_mode(
+    items: &[PlaylistEntry],
+    item_id: i64,
+    forward: bool,
+    (mode, order): (PlayMode, &[i64]),
+    exists: impl Fn(&Path) -> bool,
+    pick: &mut impl FnMut(usize) -> usize,
+) -> (Option<PlaylistEntry>, Option<Vec<i64>>) {
+    let playable = |e: &PlaylistEntry| !e.missing && (e.file_id.is_some() || exists(Path::new(&e.path)));
+    let known = items.iter().any(|e| e.item_id == item_id);
+    if !mode.shuffle {
+        let next = step(items, item_id, forward, &exists);
+        if next.is_some() || !mode.repeat || !known {
+            return (next, None);
+        }
+        // Round again: from the top going forward, from the end going back.
+        let again = if forward { items.iter().find(|e| playable(e)) } else { items.iter().rev().find(|e| playable(e)) };
+        return (again.cloned(), None);
+    }
+
+    let all = || items.iter().map(|e| e.item_id).collect::<Vec<_>>();
+    let round = if order.is_empty() { shuffled(all(), known.then_some(item_id), pick) } else { fitted(order, items) };
+    let changed = round != order;
+    let first = |ids: &[i64], back: bool| -> Option<PlaylistEntry> {
+        let mut found = ids.iter().filter_map(|id| items.iter().find(|e| e.item_id == *id)).filter(|e| playable(e));
+        if back { found.next_back() } else { found.next() }.cloned()
+    };
+    let next = match round.iter().position(|&id| id == item_id) {
+        None if forward => first(&round, false),
+        None => None,
+        Some(k) if forward => first(&round[k + 1..], false),
+        Some(k) => first(&round[..k], true),
+    };
+    if next.is_some() || !forward || !mode.repeat || !known {
+        return (next, changed.then_some(round));
+    }
+    // The round is over: a new one, with the item just played at its front.
+    let fresh = shuffled(all(), Some(item_id), pick);
+    let next = first(fresh.get(1..).unwrap_or(&[]), false).or_else(|| first(&fresh, false));
+    (next, Some(fresh))
 }
 
 // ---- changing ---------------------------------------------------------------
@@ -573,14 +703,37 @@ pub async fn playlist_step(
 ) -> Result<Option<PlaylistEntry>, String> {
     crate::jobs::off_main(move || {
         let (art, frames) = places(&app)?;
-        let items = {
+        let (items, mode, order) = {
             let db = app.state::<Db>();
             let conn = db.0.lock().map_err(to_string_err)?;
-            entries(&conn, playlist_id, &art, &frames)?
+            let (mode, order) = play_mode(&conn, playlist_id)?;
+            (entries(&conn, playlist_id, &art, &frames)?, mode, order)
         };
-        Ok(step(&items, item_id, forward, Path::is_file))
+        let (next, round) =
+            step_in_mode(&items, item_id, forward, (mode, &order), Path::is_file, &mut random_below);
+        if let Some(round) = round {
+            let db = app.state::<Db>();
+            let conn = db.0.lock().map_err(to_string_err)?;
+            save_order(&conn, playlist_id, &round)?;
+        }
+        Ok(next)
     })
     .await
+}
+
+/// Shuffle and repeat, kept for the playlist. Turning shuffle on or off
+/// forgets the round: the next step makes a new one.
+#[tauri::command]
+pub fn set_playlist_mode(db: tauri::State<Db>, playlist_id: i64, mode: PlayMode) -> Result<(), String> {
+    let conn = db.0.lock().map_err(to_string_err)?;
+    conn.execute(
+        "UPDATE playlists SET shuffle_order = CASE WHEN shuffle = ?2 THEN shuffle_order ELSE '' END,
+                              shuffle = ?2, repeat_all = ?3
+          WHERE id = ?1",
+        params![playlist_id, mode.shuffle as i64, mode.repeat as i64],
+    )
+    .map_err(to_string_err)?;
+    Ok(())
 }
 
 /// Write the playlist as `.m3u` to `path`; the number of items written.
@@ -688,6 +841,99 @@ mod tests {
         assert_eq!(next.file_id, Some(2), "the playlist's order, not the show's; the missing film skipped");
         assert_eq!(step(&items, items[2].item_id, false, there).unwrap().file_id, Some(3));
         assert!(step(&items, items[2].item_id, true, there).is_none(), "the end of the playlist ends it");
+    }
+
+    /// Steps through `n` presses from `start`, keeping the round as the command does.
+    fn walk(items: &[PlaylistEntry], mode: PlayMode, start: i64, n: usize) -> Vec<i64> {
+        let mut order: Vec<i64> = Vec::new();
+        let mut at = start;
+        let mut seen = Vec::new();
+        let mut seed = 7usize;
+        let mut pick = |k: usize| {
+            seed = seed.wrapping_mul(31).wrapping_add(11);
+            seed % k
+        };
+        for _ in 0..n {
+            let (next, round) = step_in_mode(items, at, true, (mode, &order), |_| true, &mut pick);
+            if let Some(round) = round {
+                order = round;
+            }
+            let Some(next) = next else { break };
+            at = next.item_id;
+            seen.push(at);
+        }
+        seen
+    }
+
+    fn five(conn: &Connection) -> Vec<PlaylistEntry> {
+        let id = create(conn, "x").unwrap();
+        let paths = ["C:/l/1.mkv", "C:/l/2.mkv", "C:/l/3.mkv", "C:/l/4.mkv", "C:/l/5.mkv"];
+        add(conn, id, &paths.map(|p| item(p, None))).unwrap();
+        listed(conn, id)
+    }
+
+    #[test]
+    fn repeat_in_order_starts_again_at_the_top() {
+        let conn = library();
+        let items = five(&conn);
+        let ids: Vec<i64> = items.iter().map(|e| e.item_id).collect();
+        let mode = PlayMode { shuffle: false, repeat: true };
+        let seen = walk(&items, mode, ids[3], 3);
+        assert_eq!(seen, vec![ids[4], ids[0], ids[1]]);
+        let once = walk(&items, PlayMode::default(), ids[3], 3);
+        assert_eq!(once, vec![ids[4]], "without repeat the end ends it");
+    }
+
+    #[test]
+    fn shuffle_plays_every_item_once_before_any_again() {
+        let conn = library();
+        let items = five(&conn);
+        let ids: Vec<i64> = items.iter().map(|e| e.item_id).collect();
+        // Play with nothing started (an id not in the playlist): the round's first, then the rest.
+        let once = walk(&items, PlayMode { shuffle: true, repeat: false }, 0, 10);
+        let mut sorted = once.clone();
+        sorted.sort();
+        assert_eq!(sorted, ids, "each item once, then the end: {once:?}");
+
+        let looped = walk(&items, PlayMode { shuffle: true, repeat: true }, ids[2], 12);
+        assert_eq!(looped.len(), 12);
+        // Each round is every item but the one that ended the round before
+        // (it counts as the new round's first), so none comes straight back.
+        let mut before = ids[2];
+        for round in looped.chunks(4) {
+            let mut r = round.to_vec();
+            r.sort();
+            assert_eq!(r, ids.iter().copied().filter(|&i| i != before).collect::<Vec<_>>(), "{looped:?}");
+            before = round[3];
+        }
+    }
+
+    #[test]
+    fn shuffled_previous_goes_back_the_way_it_came_and_the_mode_is_kept() {
+        let conn = library();
+        let items = five(&conn);
+        let mode = PlayMode { shuffle: true, repeat: false };
+        let mut pick = |k: usize| k - 1;
+        let (a, round) = step_in_mode(&items, 0, true, (mode, &[]), |_| true, &mut pick);
+        let round = round.unwrap();
+        let a = a.unwrap().item_id;
+        let (b, kept) = step_in_mode(&items, a, true, (mode, &round), |_| true, &mut pick);
+        assert!(kept.is_none(), "the same round, not a new one");
+        let b = b.unwrap().item_id;
+        let (back, _) = step_in_mode(&items, b, false, (mode, &round), |_| true, &mut pick);
+        assert_eq!(back.unwrap().item_id, a);
+
+        let id = conn.query_row("SELECT id FROM playlists", [], |r| r.get::<_, i64>(0)).unwrap();
+        save_order(&conn, id, &round).unwrap();
+        conn.execute("UPDATE playlists SET shuffle = 1", []).unwrap();
+        assert_eq!(play_mode(&conn, id).unwrap(), (mode, round.clone()));
+        // Turning shuffle off forgets the round.
+        conn.execute(
+            "UPDATE playlists SET shuffle_order = CASE WHEN shuffle = 0 THEN shuffle_order ELSE '' END, shuffle = 0",
+            [],
+        )
+        .unwrap();
+        assert_eq!(play_mode(&conn, id).unwrap(), (PlayMode::default(), vec![]));
     }
 
     #[test]

@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use std::path::Path;
 
 /// The schema this build understands. Bump it with every new `SCHEMA_V*`.
-pub const SCHEMA_VERSION: i64 = 29;
+pub const SCHEMA_VERSION: i64 = 30;
 
 /// What can go wrong opening the library.
 ///
@@ -805,6 +805,15 @@ ALTER TABLE title_prefs ADD COLUMN sub2_lang TEXT;
 ALTER TABLE video_prefs ADD COLUMN sub2_lang TEXT;
 "#;
 
+/// How a playlist plays, kept per playlist (playlists.rs): shuffled or in its
+/// own order, and round again from the start at the end. `shuffle_order` is
+/// the shuffled round as item ids, comma-separated; empty when not shuffled.
+const SCHEMA_V30: &str = r#"
+ALTER TABLE playlists ADD COLUMN shuffle INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE playlists ADD COLUMN repeat_all INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE playlists ADD COLUMN shuffle_order TEXT NOT NULL DEFAULT '';
+"#;
+
 /// How long a statement waits for the write lock before giving up.
 ///
 /// Load-bearing from the moment there is more than one connection. SQLite
@@ -1022,7 +1031,7 @@ pub(crate) const MIGRATIONS: [&str; SCHEMA_VERSION as usize] = [
     SCHEMA_V9, SCHEMA_V10, SCHEMA_V11, SCHEMA_V12, SCHEMA_V13, SCHEMA_V14,
     SCHEMA_V15, SCHEMA_V16, SCHEMA_V17, SCHEMA_V18, SCHEMA_V19,
     SCHEMA_V20, SCHEMA_V21, SCHEMA_V22, SCHEMA_V23, SCHEMA_V24, SCHEMA_V25,
-    SCHEMA_V26, SCHEMA_V27, SCHEMA_V28, SCHEMA_V29,
+    SCHEMA_V26, SCHEMA_V27, SCHEMA_V28, SCHEMA_V29, SCHEMA_V30,
 ];
 
 /// Bring the database up to [`SCHEMA_VERSION`].

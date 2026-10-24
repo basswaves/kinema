@@ -32,9 +32,11 @@ import {
   listPlaylists,
   movePlaylistItem,
   playlistEntries,
+  playlistStep,
   playlistTarget,
   removePlaylistItem,
   renamePlaylist,
+  setPlaylistMode,
   startEntry,
   type PlaylistEntry,
   type PlaylistSummary,
@@ -238,6 +240,23 @@ export function PlaylistPage({
       .catch((e) => setNote(userError(e)));
   };
 
+  // Shuffled, Play carries on with the item started last if it was left part
+  // way, and otherwise takes the next one in the shuffled round.
+  const play = () => {
+    if (!start || !list) return;
+    const carryOn = start.item_id === list.current_item;
+    const next = list.shuffle && !carryOn ? playlistStep(id, list.current_item ?? 0, true) : null;
+    void Promise.resolve(next)
+      .catch(() => null)
+      .then((entry) => onPlay(playlistTarget(entry ?? start, id)));
+  };
+
+  const setMode = (mode: { shuffle: boolean; repeat: boolean }) => {
+    setPlaylistMode(id, mode)
+      .then(load)
+      .catch((e) => setNote(userError(e)));
+  };
+
   const exportList = () => {
     if (!list) return;
     void save({ defaultPath: `${list.name}.m3u`, filters: M3U })
@@ -298,8 +317,24 @@ export function PlaylistPage({
           ) : (
             <>
               {start && (
-                <FocusButton focusKey={PLAY_KEY} className="btn-primary" onSelect={() => onPlay(playlistTarget(start, id))}>
+                <FocusButton focusKey={PLAY_KEY} className="btn-primary" onSelect={play}>
                   {start.item_id === list?.current_item ? `▶ Carry on: ${entryLabel(start)}` : '▶ Play'}
+                </FocusButton>
+              )}
+              {list && entries && entries.length > 1 && (
+                <FocusButton
+                  className={`btn-secondary ${list.shuffle ? 'active' : ''}`}
+                  onSelect={() => setMode({ shuffle: !list.shuffle, repeat: list.repeat })}
+                >
+                  {`Shuffle: ${list.shuffle ? 'On' : 'Off'}`}
+                </FocusButton>
+              )}
+              {list && entries && entries.length > 0 && (
+                <FocusButton
+                  className={`btn-secondary ${list.repeat ? 'active' : ''}`}
+                  onSelect={() => setMode({ shuffle: list.shuffle, repeat: !list.repeat })}
+                >
+                  {`Repeat: ${list.repeat ? 'On' : 'Off'}`}
                 </FocusButton>
               )}
               <FocusButton focusKey={RENAME_KEY} className="btn-secondary" onSelect={() => setRenaming(list?.name ?? '')}>

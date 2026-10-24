@@ -37,6 +37,8 @@ interface Props {
   onRemoveResumable: (item: ContinueItem) => void;
   /** Open a rail's full contents as a grid. */
   onSeeAll: (heading: string, titles: Title[]) => void;
+  /** Play something, from the whole library (somethingPick.ts). */
+  onPlaySomething: () => void;
   /** Start the first scan, from the first-run panel. */
   onFirstScan: () => void;
   /** A Videos folder with something in it: a library, if not of titles. */
@@ -128,6 +130,7 @@ function HomeRows({
   onResume,
   onRemoveResumable,
   onSeeAll,
+  onPlaySomething,
   onOpenPlaylist,
   setupOpen,
   reviewCount,
@@ -196,7 +199,9 @@ function HomeRows({
   return (
     <FocusContext.Provider value={focusKey}>
       <div className="home" ref={ref}>
-        {hero && <Hero title={hero} onPlay={onPlay} onSelect={onSelect} />}
+        {hero && (
+          <Hero title={hero} onPlay={onPlay} onSelect={onSelect} onPlaySomething={onPlaySomething} />
+        )}
 
         <HomeNotices
           scanTrouble={scanTrouble}
@@ -253,10 +258,12 @@ function Hero({
   title,
   onPlay,
   onSelect,
+  onPlaySomething,
 }: {
   title: Title;
   onPlay: (title: Title) => void;
   onSelect: (title: Title) => void;
+  onPlaySomething: () => void;
 }) {
   // A row landing on Play (NAV-MAP, agreed 2026-10-11): Up from a notice
   // under it is Play, whichever notice button it came from.
@@ -310,6 +317,16 @@ function Hero({
               onSelect={() => onSelect(title)}
             >
               More info
+            </FocusButton>
+            {/* The day's pick is one suggestion; this is the next one, for
+                when that is not it. In the hero's row, where Home lands. */}
+            <FocusButton
+              focusKey="hero-something"
+              className="btn-secondary"
+              keepInView="page-top"
+              onSelect={onPlaySomething}
+            >
+              Play something
             </FocusButton>
           </div>
         </div>

@@ -42,6 +42,8 @@ const GROUPS: Group[] = [
       [['Enter'], 'Choose the highlighted thing'],
       [['Esc'], 'Go back'],
       [['?'], 'Show this list'],
+      [['L'], 'Put the highlighted film or show on My list, or take it off (also on its page)'],
+      [['S'], 'Play something: Kinema picks, you say Play or Another (Home, a genre or a shelf)'],
       [['F11'], 'Switch between desk and TV layout (TV is full screen)', 'windowed'],
       [['Ctrl', 'Shift', 'T'], 'The same, another way', 'windowed'],
     ],

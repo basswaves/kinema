@@ -78,6 +78,8 @@ import OnScreenKeyboard from './OnScreenKeyboard';
 import { useTypingFocus } from './typing';
 import { isTvMode, useTvMode } from './tv';
 import LeaveDialog from './LeaveDialog';
+import PlaySomething from './PlaySomething';
+import { isPlaySomethingKey, type Pool } from './somethingPick';
 import { registerSelfTestPlay, runSelfTest, selfTestPlan } from '../selftest';
 import { startEngine } from '../player/engine';
 import './ui.css';
@@ -228,6 +230,8 @@ export default function Browse() {
   }, [stack]);
   /** The Close / Sleep / Shut down dialog, TV mode only (LeaveDialog.tsx). */
   const [leaving, setLeaving] = useState(false);
+  /** Play something's answer is up, picking from this. */
+  const [something, setSomething] = useState<Pool | null>(null);
   const [query, setQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
   /** The startup scan could not run at all. Not an error — see below. */
@@ -721,6 +725,24 @@ export default function Browse() {
     return view.titleIds.map((id) => byId.get(id)).filter((t): t is Title => t !== undefined);
   }, [view, titles]);
 
+  // Play something: on Home from the whole library, on a grid from what it
+  // shows. S does the same as the button.
+  const somethingPool = useMemo<Pool | null>(() => {
+    if (view.name === 'home') return titles.length > 0 ? { titles, from: null } : null;
+    if (view.name === 'grid') return { titles: gridTitles, from: view.heading };
+    return null;
+  }, [view, titles, gridTitles]);
+  useEffect(() => {
+    if (!somethingPool || something || leaving || setupOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!isPlaySomethingKey(e)) return;
+      e.preventDefault();
+      setSomething(somethingPool);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [somethingPool, something, leaving, setupOpen]);
+
   // Back navigation, the way a remote expects it.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -861,6 +883,7 @@ export default function Browse() {
                 .catch((e) => setError(userError(e)))
             }
             onSeeAll={openGrid}
+            onPlaySomething={() => somethingPool && setSomething(somethingPool)}
             onResume={(item) =>
               void startPlayback(
                 item.kind === 'video'
@@ -945,6 +968,7 @@ export default function Browse() {
             showBack={!view.kind}
             onSelect={openDetail}
             onBack={goBack}
+            onPlaySomething={() => somethingPool && setSomething(somethingPool)}
           />
         )}
 
@@ -980,6 +1004,14 @@ export default function Browse() {
         )}
 
         {leaving && <LeaveDialog onClose={() => setLeaving(false)} />}
+        {something && (
+          <PlaySomething
+            pool={something}
+            resumable={resumable}
+            onPlay={(title) => void playTitle(title)}
+            onClose={() => setSomething(null)}
+          />
+        )}
       </FocusContext.Provider>
     </div>
   );
@@ -1080,12 +1112,14 @@ function GridView({
   showBack,
   onSelect,
   onBack,
+  onPlaySomething,
 }: {
   heading: string;
   titles: Title[];
   showBack: boolean;
   onSelect: (title: Title) => void;
   onBack: () => void;
+  onPlaySomething: () => void;
 }) {
   const { ref, focusKey } = useFocusable({
     focusKey: GRID_FOCUS_KEY,
@@ -1135,6 +1169,17 @@ function GridView({
           <h2 className="grid-heading">
             {heading} <span className="muted">{shown.length}</span>
           </h2>
+          {/* Within what this page shows: a genre, a collection, a shelf. */}
+          {titles.length > 0 && (
+            <FocusButton
+              focusKey="grid-play-something"
+              className="btn-secondary grid-something"
+              keepInView="page-top"
+              onSelect={onPlaySomething}
+            >
+              Play something
+            </FocusButton>
+          )}
         </div>
         {/* A row landing on the order in use (NAV-MAP, agreed 2026-10-11):
             Up from the first row of films is the order you chose. */}

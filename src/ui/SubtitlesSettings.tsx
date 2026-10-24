@@ -4,6 +4,9 @@
  * - `ForcedSubtitleRows`, in Language & subtitles: whether forced subtitles show with
  *   subtitles off (on by default), and whether Kinema fetches them from
  *   OpenSubtitles for a file with none (off by default) — decided 2026-09-30.
+ * - `SubtitleStyleRows`, in Language & subtitles: how big subtitles are drawn
+ *   and a dark box behind them, for the screen Kinema is on (subtitleStyle.ts);
+ *   the player's subtitle panel has the same two.
  * - `OpenSubtitlesSection`, under them: an optional OpenSubtitles account,
  *   for 20 downloads a day instead of 5. OpenSubtitles has no phone approval,
  *   so this is the one place Kinema asks for a password; it is kept encrypted
@@ -20,6 +23,14 @@ import { useClaimFocus } from './focus';
 import { getSetting, setSetting } from '../metadata/api';
 import { useCapabilities } from '../capabilities';
 import { FORCED_KEY } from '../player/trackChoice';
+import { screenHere } from '../player/displaySwitch';
+import {
+  readSubStyle,
+  saveSubStyle,
+  SUB_SIZES,
+  type SubSize,
+  type SubStyle,
+} from '../player/subtitleStyle';
 import {
   AUTO_FORCED_KEY,
   signInOpenSubtitles,
@@ -27,6 +38,64 @@ import {
   subtitleStatus,
   type SubtitleStatus,
 } from '../player/onlineSubtitles';
+
+/**
+ * Subtitle size and the box behind them, for the screen this window is on.
+ * Readability — the distance to the screen and the eyes watching — never a
+ * look to pick (HISTORY, round 5). Media3 draws Android's captions itself.
+ */
+export function SubtitleStyleRows({ onError }: { onError: (message: string) => void }) {
+  const caps = useCapabilities();
+  const [screen, setScreen] = useState<{ id: string | null; name: string | null } | null>(null);
+  const [style, setStyle] = useState<SubStyle | null>(null);
+  const desktop = caps?.engine !== 'media3';
+
+  useEffect(() => {
+    if (!desktop) return;
+    void (async () => {
+      const here = await screenHere();
+      setScreen(here);
+      setStyle(await readSubStyle(here.id));
+    })();
+  }, [desktop]);
+
+  if (!desktop) {
+    return (
+      <p className="settings-hint">
+        Subtitle size and a dark box behind them are on computers only for now.
+      </p>
+    );
+  }
+  if (!style || !screen) return null;
+  const change = (next: SubStyle) => {
+    setStyle(next);
+    void saveSubStyle(screen.id, next).catch((e) => onError(userError(e)));
+  };
+  const where = screen.name ? `on ${screen.name}` : 'on this screen';
+  return (
+    <>
+      <ChoiceRow
+        label="Subtitle size"
+        choices={SUB_SIZES.map((s) => ({ value: s.id, label: s.label }))}
+        value={style.size}
+        onChange={(v) => change({ ...style, size: v as SubSize })}
+        note={`How big subtitles are drawn ${where} — for the distance you sit from it and the eyes watching. Each screen keeps its own; the player's Audio & subtitles panel changes it too.`}
+        hint="Picture subtitles (Blu-ray, DVD) are drawn pictures: they only change size. Subtitles with their own styling keep their look."
+      />
+      <ChoiceRow
+        label="Dark box behind subtitles"
+        choices={[
+          { value: 'off', label: 'Off' },
+          { value: 'on', label: 'On' },
+        ]}
+        value={style.box ? 'on' : 'off'}
+        onChange={(v) => change({ ...style, box: v === 'on' })}
+        note="A dark box behind each line, so white text stays readable on a bright picture. Also for forced subtitles and those from OpenSubtitles."
+        hint="Text subtitles only: picture subtitles carry their own background, and subtitles with their own styling keep it."
+      />
+    </>
+  );
+}
 
 export function ForcedSubtitleRows({ onError }: { onError: (message: string) => void }) {
   const [show, setShow] = useState<boolean | null>(null);

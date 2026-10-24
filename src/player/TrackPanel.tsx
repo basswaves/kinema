@@ -11,6 +11,7 @@ import type { Track } from './engine';
 import { describeTracks } from './tracks';
 import { languageBadge, languageName } from './language';
 import { describeOffer, type Offer } from './onlineSubtitles';
+import { nextSize, sizeLabel, type SubStyle } from './subtitleStyle';
 
 /**
  * "Find subtitles online" — present only when this copy of Kinema has an
@@ -79,6 +80,8 @@ export default function TrackPanel({
   onDetails,
   online,
   playlistItem,
+  subStyle,
+  onSubStyle,
 }: {
   audioTracks: Track[];
   subTracks: Track[];
@@ -98,6 +101,12 @@ export default function TrackPanel({
    * Playback details is, so the bar does not grow. None for a trailer.
    */
   playlistItem?: NewItem | null;
+  /**
+   * How big the subtitles are drawn on this screen, and the box behind them
+   * (subtitleStyle.ts). None where Media3 draws them (Android).
+   */
+  subStyle?: SubStyle | null;
+  onSubStyle?: (style: SubStyle) => void;
 }) {
   const [adding, setAdding] = useState(false);
   const [added, setAdded] = useState<string | null>(null);
@@ -191,6 +200,30 @@ export default function TrackPanel({
           </>
         )}
         <p className="track-note">Remembered for this show.</p>
+        {subStyle && onSubStyle && (
+          <>
+            <div className="track-panel-head">
+              <span>Reading them</span>
+            </div>
+            <FocusButton
+              className="track-option"
+              keepInView="nearest"
+              onSelect={() => onSubStyle({ ...subStyle, size: nextSize(subStyle.size) })}
+            >
+              Size: {sizeLabel(subStyle.size)}
+            </FocusButton>
+            <FocusButton
+              className={`track-option ${subStyle.box ? 'active' : ''}`}
+              keepInView="nearest"
+              onSelect={() => onSubStyle({ ...subStyle, box: !subStyle.box })}
+            >
+              Dark box behind: {subStyle.box ? 'On' : 'Off'}
+            </FocusButton>
+            <p className="track-note">
+              For this screen. Picture subtitles (Blu-ray, DVD) only change size.
+            </p>
+          </>
+        )}
         <FocusButton className="track-option" keepInView="nearest" onSelect={onDetails}>
           Playback details ›
         </FocusButton>

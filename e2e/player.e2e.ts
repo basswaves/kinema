@@ -554,6 +554,47 @@ test('the track panel by remote: choose, find online, and Back to its button', a
   await expect(page.locator('.player')).toBeAttached();
 });
 
+/** Open the Audio & subtitles panel by remote. */
+async function openTrackPanel(page: Page) {
+  await press(page, 'ArrowDown');
+  for (let i = 0; i < 6 && (await focused(page)) !== 'Audio & subtitles'; i++) {
+    await press(page, 'ArrowRight');
+  }
+  await expect.poll(() => focused(page)).toBe('Audio & subtitles');
+  await press(page, 'Enter');
+  const panel = page.locator('.track-panel');
+  await expect(panel).toBeVisible();
+  return panel;
+}
+
+/** Walk the ring down the panel to `target` and press it. */
+async function pressInPanel(page: Page, target: ReturnType<Page['locator']>) {
+  await expect(target).toBeVisible();
+  for (let i = 0; i < 20 && !(await target.evaluate((el) => el.classList.contains('focused'))); i++) {
+    await press(page, 'ArrowDown');
+  }
+  await press(page, 'Enter');
+}
+
+test('subtitle size and a dark box, by remote, kept for this screen', async ({ page }) => {
+  await play(page, 'series');
+  // The screen's size is put on as the file starts: Normal by default.
+  await expect.poll(() => sets(page)).toContain('sub-scale=1');
+
+  const panel = await openTrackPanel(page);
+  await pressInPanel(page, panel.locator('.track-option', { hasText: 'Size: Normal' }));
+  await expect.poll(() => sets(page)).toContain('sub-scale=1.3');
+  await expect(panel.locator('.track-option', { hasText: 'Size: Large' })).toBeVisible();
+
+  await pressInPanel(page, panel.locator('.track-option', { hasText: 'Dark box behind: Off' }));
+  await expect.poll(() => sets(page)).toContain('sub-border-style=background-box');
+  await expect(panel.locator('.track-option', { hasText: 'Dark box behind: On' })).toBeVisible();
+
+  await expect
+    .poll(() => call<string | null>(page, '/src/metadata/api.ts', 'getSetting', 'subtitle_style'))
+    .toContain('"size":"large","box":true');
+});
+
 test('sound that will not open falls back, and says so', async ({ page }) => {
   await play(page, 'series', (p) =>
     p.evaluate(() => {

@@ -39,7 +39,11 @@ import FocusInput from './FocusInput';
 import BackupSection from './BackupSection';
 import VideoPlayerSection from './VideoPlayerSection';
 import AccountSection, { AccountAppFields } from './AccountSection';
-import { ForcedSubtitleRows, OpenSubtitlesSection } from './SubtitlesSettings';
+import {
+  ForcedSubtitleRows,
+  OpenSubtitlesSection,
+  SubtitleStyleRows,
+} from './SubtitlesSettings';
 import ConfirmButton from './ConfirmButton';
 import MergeOffer, { type MergeOfferState } from './MergeOffer';
 import EquipmentSection from './EquipmentSection';
@@ -1402,6 +1406,7 @@ export default function Settings({
                 <section className="settings-section">
                   <h2>Language and subtitles</h2>
                   <LanguageSection onError={setError} />
+                  <SubtitleStyleRows onError={setError} />
                   <ForcedSubtitleRows onError={setError} />
                 </section>
                 <OpenSubtitlesSection />

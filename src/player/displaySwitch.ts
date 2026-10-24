@@ -123,6 +123,22 @@ export async function switchSettingsHere(screen: { gdi_name: string }): Promise<
   return switchSettingsFor(policies, screenIdOf(equipment, screen.gdi_name));
 }
 
+/**
+ * The screen the picture is on now, by its stable id and the name the
+ * equipment check gave it — for settings kept per screen (subtitle size).
+ * Both null where it is not known, which those settings treat as one screen.
+ */
+export async function screenHere(): Promise<{ id: string | null; name: string | null }> {
+  try {
+    const screen = await invoke<Screen>('screen_now', { screen: await pictureScreen() });
+    const equipment = await getEquipment().catch(() => null);
+    const id = screenIdOf(equipment, screen.gdi_name);
+    return { id, name: equipment?.displays.find((d) => d.id === id)?.name ?? null };
+  } catch {
+    return { id: null, name: null };
+  }
+}
+
 /** Whether a switch could happen at all right now — before a file is opened. */
 export async function mayswitch(): Promise<boolean> {
   if (bySystem()) return matchOn(await getSetting(DISPLAY_MATCH_KEY));

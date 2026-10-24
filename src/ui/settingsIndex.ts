@@ -137,6 +137,20 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   },
   {
     section: 'subtitles',
+    label: 'Subtitle size',
+    about: 'bigger larger text read far away eyesight font scale',
+    values: ['Small', 'Normal', 'Large', 'Larger'],
+    when: (can) => can.engine !== 'media3',
+  },
+  {
+    section: 'subtitles',
+    label: 'Dark box behind subtitles',
+    about: 'background black box contrast readable bright picture',
+    values: ['Off', 'On'],
+    when: (can) => can.engine !== 'media3',
+  },
+  {
+    section: 'subtitles',
     label: 'Find forced subtitles online',
     find: 'When a file has no forced subtitles, find them online',
     about: 'OpenSubtitles download automatically',

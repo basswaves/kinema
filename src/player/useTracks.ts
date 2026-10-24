@@ -2,13 +2,15 @@
  * The file's audio and subtitle tracks: reading them, putting this title's
  * remembered languages on (else the defaults in Settings — trackChoice.ts),
  * forced subtitles from OpenSubtitles where the file has none, and a choice
- * in the track panel, which is remembered for the whole title.
+ * in the track panel, which is remembered for the whole title. Also how big
+ * the subtitles are drawn on this screen (subtitleStyle.ts).
  */
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { getTitlePrefs, setTitlePrefs, type PlaybackTarget, type TitlePrefs } from './api';
 import { getVideoPrefs, setVideoPrefs } from '../library/videos';
 import {
   chooseTrack as playTrack,
+  hasMpv,
   openPath,
   readTracks,
   showSubtitles,
@@ -18,6 +20,8 @@ import {
 import { canonicalLang, systemLanguage } from './language';
 import { forcedSubtitle, loadSubtitle } from './onlineSubtitles';
 import { samePath } from './session';
+import { screenHere } from './displaySwitch';
+import { applySubStyle, DEFAULT_STYLE, readSubStyle, saveSubStyle, type SubStyle } from './subtitleStyle';
 import { chooseTracks, forcedTrack, readLanguageDefaults, spokenTrack } from './trackChoice';
 
 /**
@@ -49,6 +53,9 @@ export function useTracks({
   const [sid, setSid] = useState<number | null>(null);
   const [aid, setAid] = useState<number | null>(null);
   const [subVisible, setSubVisible] = useState(true);
+  /** Subtitle size and box for the screen the picture is on (desktop). */
+  const [subStyle, setSubStyle] = useState<SubStyle>(DEFAULT_STYLE);
+  const styleScreen = useRef<string | null>(null);
   /**
    * The last audio track that was playing. mpv deselects the track when its
    * output fails to open, so this is what the fallback puts back.
@@ -60,6 +67,19 @@ export function useTracks({
 
   /** Apply this title's remembered languages to the freshly loaded file. */
   const applyPrefs = useCallback(async () => {
+    // The size first, so the first line is drawn at it. Read per file: the
+    // window may have moved to another screen since the last one.
+    try {
+      if (hasMpv()) {
+        styleScreen.current = (await screenHere()).id;
+        const style = await readSubStyle(styleScreen.current);
+        setSubStyle(style);
+        await applySubStyle(style);
+      }
+    } catch (e) {
+      console.warn('could not apply the subtitle size', e);
+    }
+
     const list = await readTracks();
     setTracks(list);
 
@@ -168,6 +188,20 @@ export function useTracks({
     [target.titleId, videoFile, fail]
   );
 
+  /** A new size or box, for this screen from now on. */
+  const changeSubStyle = useCallback(
+    async (style: SubStyle) => {
+      setSubStyle(style);
+      try {
+        await applySubStyle(style);
+        await saveSubStyle(styleScreen.current, style);
+      } catch (e) {
+        fail(e);
+      }
+    },
+    [fail]
+  );
+
   /** Read the list again, for the track panel as it opens. */
   const refreshTracks = useCallback(() => readTracks().then(setTracks), []);
 
@@ -182,5 +216,7 @@ export function useTracks({
     showFetched,
     chooseTrack,
     refreshTracks,
+    subStyle,
+    changeSubStyle,
   };
 }

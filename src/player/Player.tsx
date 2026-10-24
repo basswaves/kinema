@@ -36,7 +36,7 @@ import FocusButton from '../ui/FocusButton';
 import { endsAtLabel } from '../ui/format';
 import { useTvMode } from '../ui/tv';
 import { episodeRefName, type EpisodeRef, type PlaybackTarget } from './api';
-import { isPaused, seekBy, seekTo, setPaused } from './engine';
+import { hasMpv, isPaused, seekBy, seekTo, setPaused } from './engine';
 import { PLAYER_PLAY_KEY, PLAYER_SHELL_KEY } from './focusKeys';
 import { ALL_ARROWS, useFocusGroup } from '../ui/focusGroups';
 import PlayerControls from './PlayerControls';
@@ -94,6 +94,8 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     showFetched,
     chooseTrack,
     refreshTracks,
+    subStyle,
+    changeSubStyle,
   } = useTracks({ target, fail });
 
   // Every control in the player hangs off this container, so the OSD has one
@@ -482,6 +484,8 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           online={onlinePanel}
           onClose={closeTracks}
           onDetails={openStatsFromTracks}
+          subStyle={hasMpv() ? subStyle : null}
+          onSubStyle={(style) => void changeSubStyle(style)}
           playlistItem={
             target.fileId !== null || target.resumeByPath
               ? { path: target.path, file_id: target.fileId }

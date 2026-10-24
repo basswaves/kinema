@@ -17,6 +17,7 @@
  * — the app closed half-way — opens them again (`SETUP_PAGES_KEY`). Settings →
  * Library → Run setup again brings them back at any time.
  */
+import { scanWords } from '../library/scanWords';
 import {
   useFocusable,
   FocusContext,
@@ -271,8 +272,7 @@ export default function SetupPages({ onClose }: Props) {
           </span>
           {scan ? (
             <span>
-              Reading your library meanwhile: {scan.stage}
-              {scan.detail ? ` · ${scan.detail}` : ''}
+              Reading your library meanwhile: {scanWords(scan)}
             </span>
           ) : (
             sawScan && <span>Your library is ready.</span>

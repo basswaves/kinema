@@ -6,6 +6,7 @@
  * it keeps typing responsive on a TV remote.
  */
 import { describeError, userError } from './errors';
+import { scanStageWords } from '../library/scanWords';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   init as initSpatial,
@@ -1026,7 +1027,7 @@ function TopNav({
         >
           ?
         </FocusButton>
-        {scan && <span className="nav-count">{`${scan.stage}…`}</span>}
+        {scan && <span className="nav-count">{scanStageWords(scan.stage)}</span>}
       </nav>
     </FocusContext.Provider>
   );

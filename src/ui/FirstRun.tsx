@@ -31,6 +31,7 @@
  * asked while it is being read.
  */
 import { userError } from './errors';
+import { scanStageWords } from '../library/scanWords';
 import { FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { openLink } from './links';
@@ -308,7 +309,7 @@ export default function FirstRun({ onScan }: Props) {
               disabled={!hasRoots || scan !== null}
               onSelect={() => void scanNow()}
             >
-              {scan ? `${scan.stage}…` : 'Scan my library'}
+              {scan ? scanStageWords(scan.stage) : 'Scan my library'}
             </FocusButton>
             <span className="muted">
               {hasRoots

@@ -15,6 +15,7 @@
  * to be needed when no mouse is present.
  */
 import { userError } from './errors';
+import { scanStageWords, scanWords } from '../library/scanWords';
 import LanguageSection from './LanguageSection';
 import ChoiceRow from './ChoiceRow';
 import { getVersion } from '@tauri-apps/api/app';
@@ -853,15 +854,14 @@ export default function Settings({
                       {scan?.stage === 'detecting'
                         ? 'Stop detection'
                         : scan
-                          ? `${scan.stage}…`
+                          ? scanStageWords(scan.stage)
                           : 'Scan now'}
                     </FocusButton>
                   </div>
 
                   {scan && (
                     <p className="settings-progress">
-                      {scan.stage}
-                      {scan.detail ? `: ${scan.detail}` : ''}
+                      {scanWords(scan)}
                     </p>
                   )}
 

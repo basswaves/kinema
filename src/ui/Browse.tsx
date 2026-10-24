@@ -301,6 +301,32 @@ export default function Browse() {
     []
   );
 
+  /**
+   * The player moving on — Up next, Next, Previous — in place, without a step.
+   * Once it has moved on to another episode of a show, Back goes to that
+   * show's page rather than to wherever the first episode was started (Home's
+   * Continue rail, say): the show is what is being watched now. A playlist or
+   * a Videos folder keeps going back to where it was started.
+   */
+  const playOn = useCallback(
+    (target: PlaybackTarget) =>
+      setStack((s) => {
+        const next = replace<View>(s, { name: 'player', target });
+        const show =
+          target.titleId !== null && !target.playlist && !target.video
+            ? titles.find((t) => t.id === target.titleId && t.kind === 'series')
+            : undefined;
+        const below = next.length > 1 ? next[next.length - 2].view : null;
+        if (!show || (below?.name === 'detail' && below.title.id === show.id)) return next;
+        return [
+          ...next.slice(0, -1),
+          { view: { name: 'detail', title: show }, returnFocus: null },
+          next[next.length - 1],
+        ];
+      }),
+    [titles]
+  );
+
   /** Leaving the player: Back, or Kinema closes if it was started for the file. */
   const exitPlayer = useCallback(() => {
     if (closeWhenDone.current) setClosing(true);
@@ -740,7 +766,7 @@ export default function Browse() {
     return (
       <Player
         target={view.target}
-        onPlayTarget={(target) => setStack((s) => replace(s, { name: 'player', target }))}
+        onPlayTarget={playOn}
         // Back to the page Play was pressed on. Home re-reads the library
         // whenever it is shown, so what just played is reflected there too.
         // Started for the file, Kinema closes instead.

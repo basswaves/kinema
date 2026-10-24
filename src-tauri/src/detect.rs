@@ -133,6 +133,13 @@ fn run_step(
     step: &str,
     args: &[String],
 ) -> Result<StepReport, String> {
+    // A self-test's library is a copy, but Skiptro's database is the real
+    // one: a scan started in a test run must not write to it (round 4, found
+    // when an MCP run reached automatic detection).
+    if crate::selftest::plan_path().is_some() {
+        crate::log!("detect: self-test, Skiptro not run ({step})");
+        return Err("Skiptro is not run in a self-test".into());
+    }
     let mut command = Command::new(exe);
     command.args(args).stdout(Stdio::piped()).stderr(Stdio::piped());
 

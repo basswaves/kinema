@@ -31,6 +31,18 @@ describe('Settings search', () => {
     for (const e of SETTINGS_INDEX) expect(sections.has(e.section), e.label).toBe(true);
   });
 
+  it('finds a setting by the words its section shows for it', () => {
+    // Typed as read off the screen: every entry, by its visible text.
+    const all = { ...desktop, network_shares: true, system_output: true } as Capabilities;
+    const lost = SETTINGS_INDEX.filter(
+      (e) => !searchSettings(e.find ?? e.label, all).some((m) => m.entry === e)
+    ).map((e) => e.find ?? e.label);
+    expect(lost).toEqual([]);
+    expect(searchSettings('find them online', desktop)[0]?.entry.label).toBe(
+      'Find forced subtitles online'
+    );
+  });
+
   it('puts a name before a description', () => {
     const found = searchSettings('subtitles', desktop).map((m) => m.entry.label);
     expect(found[0]).toBe('Subtitles');

@@ -305,12 +305,13 @@ export function searchSettings(query: string, can: Capabilities | null): Setting
     if (can && entry.when && !entry.when(can)) return;
     const sectionName = SECTION_NAMES[entry.section];
     const value = entry.values?.find(has);
-    const everything = [entry.label, entry.about ?? '', sectionName, ...(entry.values ?? [])].join(
-      ' '
-    );
+    // What the section says on screen counts as the name too (S3: "find
+    // them online", read off the screen, found nothing).
+    const names = entry.find ? [entry.label, entry.find] : [entry.label];
+    const everything = [...names, entry.about ?? '', sectionName, ...(entry.values ?? [])].join(' ');
     let score: number;
-    if (plain(entry.label).startsWith(plain(query).trim())) score = 4;
-    else if (has(entry.label)) score = 3;
+    if (names.some((n) => plain(n).startsWith(plain(query).trim()))) score = 4;
+    else if (names.some(has)) score = 3;
     else if (value) score = 2;
     else if (has(everything)) score = 1;
     else return;

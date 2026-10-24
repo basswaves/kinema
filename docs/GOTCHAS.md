@@ -64,6 +64,14 @@ await command('set', ['sid', String(3)]); // works
 JS numbers always cross as `MPV_FORMAT_DOUBLE`, which those handlers don't implement.
 Booleans map fine to flags; plain numeric properties like `volume` are fine.
 
+### `secondary-sid` carries over to the next file as a number
+
+Like `sid`, mpv keeps `secondary-sid` as a track number for the next file,
+where it picks whatever track happens to have that number. So it is set on
+every file, `no` included, never left alone because "nothing is chosen".
+Set it through `command('set', ['secondary-sid', ...])`, as with `sid` above;
+the typed property API sends a double and fails.
+
 ### Observed properties are registered once, at init
 
 Only properties in the init config's `observedProperties` ever emit change events, and

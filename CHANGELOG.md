@@ -20,6 +20,21 @@ makes no stability promises.
 - **A title kept without a match** ("Add without a match") now gets a picture
   taken from its file when there is none beside it (desktop; Android shows its
   name as before).
+- **Subtitle size, and a dark box behind them.** Four sizes (Small, Normal,
+  Large, Larger) and an optional dark box, for people who sit far from the
+  screen, see less well, or lose white text on a bright picture. Kept per
+  screen, so a desk monitor and a TV can differ. In Settings → Language and
+  subtitles and in the player's Audio & subtitles panel ("Reading them"), by
+  mouse, keyboard and remote. Applied as each file starts, so forced
+  subtitles and OpenSubtitles files follow too. Picture subtitles (Blu-ray,
+  DVD) only scale; styled subtitles keep their look, scaled. Desktop only;
+  Android says so in Settings, since Media3 draws its own captions.
+- **A second subtitle language, at the top.** Choose it in the player's Audio
+  & subtitles panel ("Second subtitles, at the top"). Text subtitles only,
+  never the same track as the first. Remembered per title, and per Videos
+  folder; None clears it. Desktop only (Media3 shows one text track).
+- Library upgrade to schema 29 (`sub2_lang` in `title_prefs` and
+  `video_prefs`).
 
 ### Changed
 

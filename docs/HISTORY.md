@@ -3732,6 +3732,38 @@ and a Jellyfin source further out. Decisions made along the way:
   match".
 - Library upgrade to schema 28 (`local_art` table).
 
+## Subtitle size, a box, and a second language (2026-10-24)
+
+Three settings that look like taste and are not, added under the rule that
+settings describe a person's needs or the equipment, never taste.
+
+- **Why these pass.** How big subtitles must be depends on how far someone
+  sits from the screen and how well they see. The dark box is for eyes that
+  lose white text on a bright picture. mpv can know neither, so the app
+  cannot decide them. That is the whole case for asking.
+- **Per screen**, like refresh rate, HDR and sound are per device: a desk
+  monitor at arm's length and a TV across the room want different sizes.
+  Kept under the screen's stable id from the equipment check (`*` when it is
+  unknown), setting `subtitle_style`.
+- **Four sizes** (Small, Normal, Large, Larger: mpv `sub-scale` 0.8, 1, 1.3,
+  1.6) and a box on or off. mpv 0.38 and later draw the box with
+  `sub-border-style=background-box` and `sub-back-color=#C0000000`; an older
+  mpv (0.37, as in Ubuntu 24.04) gets `opaque-box` and `sub-border-color`.
+  Applied as each file starts, so forced subtitles and OpenSubtitles files
+  follow without their own code.
+- **Picture subtitles** (Blu-ray PGS, DVD) only scale. Typeset ASS keeps its
+  own look, scaled. Nothing else is offered.
+- **What is deliberately absent:** font, colour and position. Those are
+  taste, and the same rule that refuses a sharpness slider refuses them.
+- **A second language at the top** (mpv `secondary-sid`) serves a need as
+  well: people learning a language, and households with two. Chosen in the
+  Audio & subtitles panel, text tracks only, never the track that is the
+  first; choosing the second as the first clears the second. Remembered per
+  title and per Videos folder (schema 29, `sub2_lang`). None clears it.
+- **Android: desktop only, and said.** Media3 draws its own captions and
+  shows one text track; changing either needs Kotlin in the parked Android
+  plugin. Settings says so rather than showing a control that does nothing.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

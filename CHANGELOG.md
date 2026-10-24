@@ -25,14 +25,49 @@ makes no stability promises.
   for this name"), and counts titles, not "groups the matcher would not guess
   at".
 - The Welcome page's folders each have a Remove button.
+- **Network drives (Android) explain themselves.** The first steps say what a
+  network drive is (your NAS, or a computer sharing a folder), that it needs
+  that shared folder with its user name and password, and that guest sign-in
+  is not possible yet. When a computer shares no folder yet, the share step
+  says so and how to share one on Windows (right-click, Properties, Sharing,
+  Share), with Try again. A path typed for a folder on that computer is
+  explained instead of being opened.
+- **Send a report** keeps each log's last 16 MB at most (mpv's own log can
+  grow large), and the zip is never left half-written.
+- **Settings search** finds a setting by the words shown for it on screen.
 
 ### Fixed
 
+- A network drive's refusals ("Bad Network Name", wrong password, locked
+  user, closed connection) are said in Kinema's words, never as a raw status
+  code.
+- Home: the dot for a new Kinema version shows beside the count of titles to
+  review. It was hidden whenever titles waited for review, which is why
+  Android TV seemed to have no update notice on Home.
+- Home and the setup pages no longer log "Component added without a node
+  reference", and Home's remote navigation keeps its place when titles first
+  arrive in an empty library.
+- Importing an .m3u named like an existing playlist names the new one "Name
+  (2)" instead of making a second playlist with the same name.
+- A Videos folder's typed name is kept when adding it merges library folders
+  inside it.
+- After a minute of not asking an unreachable TMDB, Kinema again takes three
+  failed requests in a row before it stops asking, not one.
+- Needs attention: "answers now" (TMDB dropped once but answers again) is no
+  longer repeated for every later title of the same scan.
+- The log hides key values in any letter case (API_KEY=, ApiKey=) and access
+  tokens too.
 - Leaving the player after it moved on to another episode of a show goes to
   that show's page, not Home.
 - Finishing the setup pages while the first scan is still finding titles shows
   "Reading your library" with what it is doing, instead of the Welcome page
   again.
+
+### For contributors
+
+- The Kinema MCP's `kinema_app` takes `env` for one run, e.g. a dead
+  `HTTPS_PROXY` with `NO_PROXY` for `www.wikidata.org` to make TMDB
+  unreachable.
 
 ## [0.13.1] — 2026-10-24
 

@@ -34,7 +34,16 @@ export default memo(function Rail({ heading, titles, onSelect, onSeeAll }: Props
     focusable: titles.length > 0,
   });
 
-  if (titles.length === 0) return null;
+  // Empty, still its element, unseen: the focus area measures it once, at
+  // mount ("Component added without a node reference" otherwise). Same shape
+  // as below, so React keeps the one element when there is something to show.
+  if (titles.length === 0) {
+    return (
+      <FocusContext.Provider value={focusKey}>
+        <section className="rail" ref={ref} style={{ display: 'none' }} />
+      </FocusContext.Provider>
+    );
+  }
 
   const shown = titles.slice(0, RAIL_LIMIT);
   const hasMore = Boolean(onSeeAll) && titles.length > shown.length;

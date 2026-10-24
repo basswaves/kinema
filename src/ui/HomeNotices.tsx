@@ -85,7 +85,16 @@ export default function HomeNotices({
     current: first,
     focusable: !empty,
   });
-  if (empty) return null;
+  // Empty, still its element, unseen: the focus area measures it once, at
+  // mount ("Component added without a node reference" otherwise). Same shape
+  // as below, so React keeps the one element when there is something to show.
+  if (empty) {
+    return (
+      <FocusContext.Provider value={focusKey}>
+        <section className="home-notices" ref={ref} style={{ display: 'none' }} />
+      </FocusContext.Provider>
+    );
+  }
   // Only additions to an "only these" list can be done here in a press; a
   // question never answered is answered where all three answers are.
   const onlyAdds = upgrades.every((u) => u.action === 'add');

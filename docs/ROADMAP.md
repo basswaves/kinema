@@ -33,11 +33,7 @@ measured in each file ("everything in Dolby Vision", "Atmos films I have not
 seen"); favourites and a watchlist; actor pages; a richer title page. For the
 library: two copies of one film shown as versions of it; importing what you
 have watched, and where you stopped, from Kodi, Jellyfin, Plex and Emby;
-moving a whole library to a new computer; and every title identified through a
-fallback (Wikidata, OMDb or TVmaze, used when TMDB could not be asked) moving
-to TMDB by itself once it can be, for its pictures and the rest — today only
-films whose Wikidata entry names their TMDB id do. Shuffle and repeat for playlists,
-and the picture and sound badges for a video.
+and moving a whole library to a new computer.
 
 **Plays anything, accurately.** Dolby Vision checked end to end on the
 desktop; 3D (below); more of the raw facts — what the TV and receiver said

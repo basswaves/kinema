@@ -3813,6 +3813,38 @@ settings describe a person's needs or the equipment, never taste.
 - **Navigation:** on the Movies and TV shows grids, Up from the order row now
   reaches Play something before the top bar (approved nav map).
 
+## Every fallback match moves up to TMDB (2026-10-25)
+
+Successor to "Films found through Wikidata move to TMDB by id", which covered
+only Wikidata films that held a TMDB id.
+
+- **All fallbacks, same order of trust.** Wikidata and OMDb (films) and TVmaze
+  (shows) are used only when no TMDB key works. At each scan up to 40 such
+  titles are tried, by the cheapest certain thing first: the TMDB id held;
+  TMDB's find-by-IMDb-id; for shows, the TheTVDB id TVmaze holds; and only
+  then a TMDB search, under the normal rules (0.75, the 0.05 margin, the year).
+- **A hand match or an NFO's id moves only by an id, never by search.** The
+  person said what it is; a search must not overrule that.
+- **No confident answer leaves the title as it is.** It is not sent to Needs
+  attention: it already has a match, and a wrong one is worse than none. It is
+  asked again a month later (schema 32, `titles.upgrade_checked_at`) so a big
+  library is not searched on every scan.
+- **Fetched first, changed after.** The new data is in hand before anything is
+  touched, and the row is re-keyed in place: files, resume points, playlists,
+  track choices and local pictures stay; watch history and My list rows under
+  the old ids are renamed. An empty TMDB row for the same entry (left by an
+  earlier match) gives way; one with files of its own refuses, since that is a
+  merge, not this.
+- **No new hosts** (TMDB, TVmaze), so `whatLeaves.json` is unchanged.
+
+## Videos page: badges and playlists (2026-10-25)
+
+- The focused or hovered video's badges show at the foot of the page, from the
+  file's own facts, as on a film's page (same rule as the badges decision).
+- A Videos folder holding only its own videos had no heading and so no Play
+  all / + Playlist row; it has one now, so a single video can go to a playlist
+  from the page.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

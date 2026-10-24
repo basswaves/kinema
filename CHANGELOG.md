@@ -64,6 +64,24 @@ makes no stability promises.
   when nothing fits does it take anything not yet watched (a show not started
   begins at episode 1).
 - Library upgrade to schema 31 (`my_list`).
+- **Fallback matches move up to TMDB, all of them.** Kinema uses Wikidata and
+  OMDb (films) or TVmaze (shows) only when no TMDB key works. Once one does,
+  each scan moves up to 40 of those titles to TMDB, by the TMDB id held; else
+  by the IMDb id; else (shows) by the TheTVDB id TVmaze holds; else by a TMDB
+  search under the usual rules. A title matched by hand or by an NFO's id moves
+  only by an id, never by search. With no confident answer it stays as it is
+  (never sent to Needs attention) and is asked again a month later. Files,
+  resume points, playlists, track choices and local pictures stay; watch
+  history and My list follow. The last scan line in Settings says "12 films
+  and 2 shows got pictures from TMDB". Before, only Wikidata films that named
+  their TMDB id moved.
+- Library upgrade to schema 32 (`upgrade_checked_at` on `titles`).
+- **Videos: badges for the focused video.** The video you highlight or hover
+  shows its picture and sound badges at the foot of a Videos page, from the
+  file's own facts, as on a film's page.
+- **A Videos folder with only its own videos** (no sub-folders) now has the
+  Play all and + Playlist row, so even a single video can be added to a
+  playlist from the page, not only from the player.
 
 ### Changed
 

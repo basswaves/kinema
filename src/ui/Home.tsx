@@ -22,6 +22,8 @@ import { useFocusGroup } from './focusGroups';
 import type { ContinueItem } from '../player/api';
 import { parseGenres, type Title } from './api';
 import { pickHero } from './hero';
+import { useScanStatus } from '../library/pipeline';
+import { scanWords } from '../library/scanWords';
 
 interface Props {
   titles: Title[];
@@ -143,6 +145,8 @@ export default function Home({
   // parked the ring on while the titles loaded.
   useClaimFocus(HERO_PLAY_FOCUS_KEY, Boolean(hero) && !setupOpen, true);
 
+  const scan = useScanStatus();
+
   // Until finished or left, however soon the first scan fills the library
   // behind them: titles arriving must not take the questions away mid-answer.
   if (setupOpen) return <SetupPages onClose={onSetupClosed} />;
@@ -157,7 +161,19 @@ export default function Home({
     // Nothing rather than the setup panel while the first read is in flight:
     // the view behind is already opaque, and a blank moment is better than a
     // panel that flashes up at every launch and takes focus with it.
-    return loaded ? <FirstRun onScan={onFirstScan} /> : null;
+    if (!loaded) return null;
+    // Setup finished while the first scan is still finding titles: what it is
+    // doing, not the Welcome page again, which read as setup starting over.
+    if (scan) {
+      return (
+        <section className="first-run first-scan">
+          <h1>Reading your library</h1>
+          <p className="muted">{scanWords(scan)}</p>
+          <p className="muted">Your films and shows appear here as soon as they are found.</p>
+        </section>
+      );
+    }
+    return <FirstRun onScan={onFirstScan} />;
   }
 
   return (

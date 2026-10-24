@@ -40,7 +40,7 @@ pub async fn make_report(app: tauri::AppHandle) -> Result<Report, String> {
         // This session and the one before: a crash is usually in the last one.
         for name in ["app.log", "app.previous.log", "mpv.log", "mpv.previous.log"] {
             if let Ok(bytes) = std::fs::read(logs.join(name)) {
-                entries.push((name.to_string(), bytes));
+                entries.push((name.to_string(), last_part(bytes)));
             }
         }
         entries.push(("equipment.txt".into(), equipment.into_bytes()));
@@ -57,8 +57,16 @@ pub async fn make_report(app: tauri::AppHandle) -> Result<Report, String> {
             .filter(|d| d.is_dir())
             .map_or_else(|| crate::data_dir(&app), Ok)?;
         let path = folder.join(format!("kinema-report-{}.zip", stamp(now_secs())));
-        let zip = write_zip(&entries, now_secs());
-        std::fs::write(&path, zip).map_err(to_string_err)?;
+        let zip = write_zip(&entries, now_secs()).map_err(to_string_err)?;
+        // Beside it first: a full disk or a pulled drive leaves no half zip
+        // under the name the screen gives.
+        let part = path.with_extension("zip.part");
+        std::fs::write(&part, zip)
+            .and_then(|()| std::fs::rename(&part, &path))
+            .map_err(|e| {
+                let _ = std::fs::remove_file(&part);
+                to_string_err(e)
+            })?;
         crate::log!("report: saved {} ({} files)", path.display(), entries.len());
         Ok(Report {
             path: path.to_string_lossy().into_owned(),
@@ -176,15 +184,31 @@ fn civil(days: i64) -> (i64, u32, u32) {
     (yoe + era * 400 + i64::from(m <= 2), m, d)
 }
 
-/// A zip of `entries`, each deflated, with UTF-8 names. No zip64: the logs
-/// rotate at 8 MB (applog.rs), far under its 4 GB limit.
-pub fn write_zip(entries: &[(String, Vec<u8>)], secs: i64) -> Vec<u8> {
+/// The most of one log a report carries. app.log rotates at 8 MB (applog.rs),
+/// but mpv writes its own log and only a launch starts it afresh: a long
+/// session's can be far larger, and the end is where the fault is.
+const MAX_LOG: usize = 16 * 1024 * 1024;
+
+/// `bytes`, or its last [`MAX_LOG`] with a line saying what was left out.
+fn last_part(bytes: Vec<u8>) -> Vec<u8> {
+    if bytes.len() <= MAX_LOG {
+        return bytes;
+    }
+    let cut = bytes.len() - MAX_LOG;
+    let mut out = format!("[the first {cut} bytes of this log are left out]\n").into_bytes();
+    out.extend_from_slice(&bytes[cut..]);
+    out
+}
+
+/// A zip of `entries`, each deflated, with UTF-8 names. No zip64: each log is
+/// cut to [`MAX_LOG`], far under its 4 GB limit, and there are five at most.
+pub fn write_zip(entries: &[(String, Vec<u8>)], secs: i64) -> std::io::Result<Vec<u8>> {
     let (time, date) = dos_time(secs);
     let mut out = Vec::new();
     let mut central = Vec::new();
     for (name, data) in entries {
         let mut deflate = flate2::write::DeflateEncoder::new(Vec::new(), flate2::Compression::default());
-        let packed = deflate.write_all(data).and_then(|()| deflate.finish()).unwrap_or_default();
+        let packed = deflate.write_all(data).and_then(|()| deflate.finish())?;
         let mut crc = flate2::Crc::new();
         crc.update(data);
         let offset = out.len() as u32;
@@ -222,7 +246,7 @@ pub fn write_zip(entries: &[(String, Vec<u8>)], secs: i64) -> Vec<u8> {
     out.extend_from_slice(&(central.len() as u32).to_le_bytes());
     out.extend_from_slice(&central_at.to_le_bytes());
     out.extend_from_slice(&0u16.to_le_bytes()); // comment
-    out
+    Ok(out)
 }
 
 /// MS-DOS time and date, as zip keeps them (UTC here; two-second steps).
@@ -237,6 +261,17 @@ fn dos_time(secs: i64) -> (u16, u16) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_log_past_the_limit_keeps_its_end_and_says_so() {
+        let small = b"short".to_vec();
+        assert_eq!(last_part(small.clone()), small);
+        let mut big = vec![b'a'; MAX_LOG];
+        big.extend_from_slice(b"the end");
+        let kept = last_part(big);
+        assert!(kept.starts_with(b"[the first 7 bytes of this log are left out]\n"));
+        assert!(kept.ends_with(b"the end"));
+    }
 
     #[test]
     fn the_stamp_is_the_utc_date_and_minute() {
@@ -268,7 +303,7 @@ mod tests {
             ("app.log".to_string(), b"hello hello hello hello".to_vec()),
             ("equipment.txt".to_string(), "screen \u{2014} ok\n".as_bytes().to_vec()),
         ];
-        let zip = write_zip(&entries, 1_792_764_309);
+        let zip = write_zip(&entries, 1_792_764_309).unwrap();
         // For checking with a real unzip tool (`unzip -t`, Expand-Archive).
         if let Ok(out) = std::env::var("KINEMA_REPORT_ZIP_OUT") {
             std::fs::write(out, &zip).unwrap();

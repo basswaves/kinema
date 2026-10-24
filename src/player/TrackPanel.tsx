@@ -55,6 +55,7 @@ const MAX_OFFERS = 8;
 /** Focus is aimed at the panel the moment it opens — see Player. */
 export const TRACK_PANEL_KEY = 'player-track-panel';
 const ADD_KEY = 'player-track-panel:playlist';
+const SECOND_KEY = 'player-track-panel:second';
 
 /**
  * Audio and subtitle selection.
@@ -135,6 +136,13 @@ export default function TrackPanel({
   const subLines = describeTracks(subTracks);
   const seconds = onSecond ? secondChoices(subTracks, subVisible ? sid : null) : [];
   const secondNow = subTracks.find((t) => t.id === sid2) ?? null;
+  // A choice closes the list and gives the ring back to its button, as Add to
+  // a playlist does: left open, a stray OK picked again (round 5, D).
+  const pickSecond = (track: Track | null) => {
+    void setFocus(SECOND_KEY);
+    setSecondOpen(false);
+    onSecond?.(track);
+  };
 
   return (
     <FocusContext.Provider value={focusKey}>
@@ -254,6 +262,7 @@ export default function TrackPanel({
         {seconds.length > 0 && onSecond && (
           <>
             <FocusButton
+              focusKey={SECOND_KEY}
               className="track-option"
               keepInView="nearest"
               onSelect={() => setSecondOpen((open) => !open)}
@@ -267,7 +276,7 @@ export default function TrackPanel({
                 <FocusButton
                   className={`track-option track-second ${sid2 == null ? 'active' : ''}`}
                   keepInView="nearest"
-                  onSelect={() => onSecond(null)}
+                  onSelect={() => pickSecond(null)}
                 >
                   None
                 </FocusButton>
@@ -276,7 +285,7 @@ export default function TrackPanel({
                     key={track.id}
                     className={`track-option track-second ${sid2 === track.id ? 'active' : ''}`}
                     keepInView="nearest"
-                    onSelect={() => onSecond(track)}
+                    onSelect={() => pickSecond(track)}
                   >
                     <TrackText track={track} line={subLines.get(track.id)} />
                   </FocusButton>

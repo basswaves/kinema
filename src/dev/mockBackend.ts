@@ -1437,6 +1437,7 @@ const handlers: Record<string, Handler> = {
   list_wikidata_films: () => [],
   adopt_provider: () => false,
   cache_artwork: () => ({ stored: 0, failed: 0 }),
+  find_local_pictures: () => ({ found: 0, frames: 0 }),
   artwork_stats: () => ({ files: 0, bytes: 0, failed: 0 }),
   find_local_trailer: () => null,
 

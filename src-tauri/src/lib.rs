@@ -34,6 +34,7 @@ mod kscreen;
 mod mutter;
 #[cfg(target_os = "linux")]
 mod wlroots;
+mod local_art;
 mod netshare;
 mod nfo;
 mod overlay;
@@ -188,6 +189,11 @@ fn open_library(app: &tauri::AppHandle) -> Result<(), String> {
         Ok(0) => {}
         Ok(n) => log!("artwork: {n} cached paths rewritten for this system"),
         Err(e) => log!("artwork: could not check cached paths: {e}"),
+    }
+    match local_art::use_this_systems_separator(&primary) {
+        Ok(0) => {}
+        Ok(n) => log!("local pictures: {n} paths rewritten for this system"),
+        Err(e) => log!("local pictures: could not check paths: {e}"),
     }
     // Not under a self-test, whose library is a throwaway copy.
     if selftest::plan_path().is_none() {
@@ -424,6 +430,7 @@ pub fn run() {
             artwork::cache_artwork,
             artwork::artwork_stats,
             artwork::clear_artwork_cache,
+            local_art::find_local_pictures,
             playback::save_progress,
             playback::get_progress,
             playback::get_loose_progress,

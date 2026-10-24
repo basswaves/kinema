@@ -316,6 +316,8 @@ returns both, and the UI falls back to the URL whenever the local file is missin
 so a half-built or hand-deleted cache degrades to the pre-cache behaviour rather than
 to blank posters. `local_path` is stored *relative* to app data, because the cache and
 the database live in the same directory and should move together.
+Pictures found beside the user's files (`local_art`) are copies in the same folder,
+named `local-…`; clearing the cache keeps them, and they win over provider pictures.
 
 **Track memory stores languages, not indices.** Track numbering differs between releases
 of the same show, so "index 3" would pick the wrong track on the next episode; "da"

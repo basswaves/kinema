@@ -44,7 +44,7 @@ import {
 } from './parse';
 import { parseInWorker } from './parseClient';
 import { yieldToPlayback } from './playback';
-import { cacheArtwork, listUnmatched } from '../metadata/api';
+import { cacheArtwork, findLocalPictures, listUnmatched } from '../metadata/api';
 import {
   backfillTitleDetails,
   loadProviderKeys,
@@ -374,6 +374,9 @@ export async function runScanPipeline(): Promise<ScanOutcome> {
     // browsing should not need the network afterwards.
     await yieldToPlayback();
     setStatus({ stage: 'artwork', detail: '' });
+    // Pictures beside the files first: TMDB's are fetched only where none is.
+    // Its failure costs only those pictures, never the run.
+    await findLocalPictures().catch((e: unknown) => console.warn('local pictures:', e));
     const art = await cacheArtwork();
     if (art.failed > 0) errors.push(`${count(art.failed, 'artwork download')} failed`);
 

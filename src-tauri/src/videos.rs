@@ -350,27 +350,40 @@ pub async fn video_frame(
     };
     let Some(path) = path else { return Ok(None) };
 
-    let _one = TAKING.lock().await;
-    // Taken while this one waited its turn (the same tile asked twice).
-    if let Some(found) = cached_frame(&frames, file_id) {
-        return Ok(Some(found));
-    }
-    crate::jobs::wait_while_playing_async().await;
     let target = frame_path(&frames, file_id);
-    let taken = crate::jobs::off_main(move || {
-        std::fs::create_dir_all(&frames).map_err(to_string_err)?;
-        Ok(take_frame(Path::new(&path), &target, ffmpeg.as_deref()))
-    })
-    .await?;
+    let taken = take_in_turn(path, target, ffmpeg, FRAME_WIDTH).await?;
     if taken.is_none() {
         FAILED.lock().map_err(to_string_err)?.push(file_id);
     }
     Ok(taken)
 }
 
-/// How wide a frame is kept: a tile is never drawn wider than this on a 4K
-/// screen at the TV layout's scale, and 480 px keeps each file near 10 KB.
-#[cfg(not(target_os = "android"))]
+/// Take a frame `width` wide into `target`, unless one is there already: one
+/// at a time, and never while a film plays. Shared with the frame taken for a
+/// title kept without a match (`local_art.rs`).
+pub(crate) async fn take_in_turn(
+    video: String,
+    target: PathBuf,
+    ffmpeg: Option<String>,
+    width: u32,
+) -> Result<Option<String>, String> {
+    let _one = TAKING.lock().await;
+    // Taken while this one waited its turn (the same tile asked twice).
+    if target.is_file() {
+        return Ok(Some(target.to_string_lossy().into_owned()));
+    }
+    crate::jobs::wait_while_playing_async().await;
+    crate::jobs::off_main(move || {
+        if let Some(dir) = target.parent() {
+            std::fs::create_dir_all(dir).map_err(to_string_err)?;
+        }
+        Ok(take_frame(Path::new(&video), &target, ffmpeg.as_deref(), width))
+    })
+    .await
+}
+
+/// How wide a tile's frame is kept: a tile is never drawn wider than this on a
+/// 4K screen at the TV layout's scale, and 480 px keeps each file near 10 KB.
 const FRAME_WIDTH: u32 = 480;
 
 /// Where in the file the frame is taken: past an opening title or a fade from
@@ -379,11 +392,11 @@ const FRAME_WIDTH: u32 = 480;
 const FRAME_AT_PERCENT: u32 = 20;
 
 #[cfg(not(target_os = "android"))]
-fn take_frame(video: &Path, target: &Path, ffmpeg: Option<&str>) -> Option<String> {
+fn take_frame(video: &Path, target: &Path, ffmpeg: Option<&str>, width: u32) -> Option<String> {
     let started = std::time::Instant::now();
-    let how = if mpv_frame::take(video, target).is_some() {
+    let how = if mpv_frame::take(video, target, width).is_some() {
         "libmpv"
-    } else if ffmpeg_frame(video, target, ffmpeg) {
+    } else if ffmpeg_frame(video, target, ffmpeg, width) {
         "ffmpeg"
     } else {
         crate::log!("video frame: none could be taken from {}", video.display());
@@ -396,12 +409,12 @@ fn take_frame(video: &Path, target: &Path, ffmpeg: Option<&str>) -> Option<Strin
 /// Android has no mpv, and a frame there would mean a decoder of its own; the
 /// page draws a plain picture instead (the owner's decision 3, round 2).
 #[cfg(target_os = "android")]
-fn take_frame(_video: &Path, _target: &Path, _ffmpeg: Option<&str>) -> Option<String> {
+fn take_frame(_video: &Path, _target: &Path, _ffmpeg: Option<&str>, _width: u32) -> Option<String> {
     None
 }
 
 #[cfg(not(target_os = "android"))]
-fn ffmpeg_frame(video: &Path, target: &Path, configured: Option<&str>) -> bool {
+fn ffmpeg_frame(video: &Path, target: &Path, configured: Option<&str>, width: u32) -> bool {
     let ffmpeg = crate::ffmpeg::resolve(configured);
     if !crate::ffmpeg::is_available(&ffmpeg) {
         return false;
@@ -414,7 +427,7 @@ fn ffmpeg_frame(video: &Path, target: &Path, configured: Option<&str>) -> bool {
     command
         .args(["-v", "error", "-ss", &format!("{at:.1}"), "-i"])
         .arg(video)
-        .args(["-frames:v", "1", "-vf", &format!("scale={FRAME_WIDTH}:-2"), "-y"])
+        .args(["-frames:v", "1", "-vf", &format!("scale={width}:-2"), "-y"])
         .arg(target);
     command.status().is_ok_and(|s| s.success()) && target.is_file()
 }
@@ -424,7 +437,7 @@ fn ffmpeg_frame(video: &Path, target: &Path, configured: Option<&str>) -> bool {
 /// is found: beside the program, then its `lib` folder, then the system's.
 #[cfg(not(target_os = "android"))]
 mod mpv_frame {
-    use super::{FRAME_AT_PERCENT, FRAME_WIDTH};
+    use super::FRAME_AT_PERCENT;
     use std::ffi::{c_char, c_int, c_void, CString};
     use std::path::Path;
     use std::time::{Duration, Instant};
@@ -476,10 +489,10 @@ mod mpv_frame {
         .as_ref()
     }
 
-    pub fn take(video: &Path, target: &Path) -> Option<()> {
+    pub fn take(video: &Path, target: &Path, width: u32) -> Option<()> {
         let lib = library()?;
         let out = tempdir(target)?;
-        let result = grab(lib, video, &out);
+        let result = grab(lib, video, &out, width);
         let produced = std::fs::read_dir(&out)
             .ok()
             .and_then(|mut entries| entries.find_map(|e| e.ok().map(|e| e.path())));
@@ -496,7 +509,7 @@ mod mpv_frame {
         Some(dir)
     }
 
-    fn grab(lib: &libloading::Library, video: &Path, out: &Path) -> Option<()> {
+    fn grab(lib: &libloading::Library, video: &Path, out: &Path, width: u32) -> Option<()> {
         // SAFETY: the signatures are libmpv's client API (client.h), stable
         // across libmpv 2.x; the handle is used on this thread only and
         // destroyed before returning.
@@ -527,7 +540,7 @@ mod mpv_frame {
                 // Software decoding: one frame, and never a fight with the
                 // player's own decoder for the graphics card.
                 ("hwdec", "no".to_string()),
-                ("vf", format!("scale={FRAME_WIDTH}:-2")),
+                ("vf", format!("scale={width}:-2")),
                 ("ytdl", "no".to_string()),
                 ("load-scripts", "no".to_string()),
             ];

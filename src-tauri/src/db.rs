@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use std::path::Path;
 
 /// The schema this build understands. Bump it with every new `SCHEMA_V*`.
-pub const SCHEMA_VERSION: i64 = 27;
+pub const SCHEMA_VERSION: i64 = 28;
 
 /// What can go wrong opening the library.
 ///
@@ -781,6 +781,22 @@ UPDATE playback_state SET position_secs = 0 WHERE completed = 1;
 UPDATE watch_history SET position_secs = 0 WHERE completed = 1;
 "#;
 
+/// Pictures found beside the files — a `poster.jpg` or `<film>-fanart.jpg`
+/// left by Kodi, Jellyfin or tinyMediaManager — and the frame taken for a
+/// title kept without a match (`local_art.rs`). One per title and kind; the
+/// copy in the artwork folder is what the page shows, the source is only read.
+const SCHEMA_V28: &str = r#"
+CREATE TABLE local_art (
+    title_id   INTEGER NOT NULL REFERENCES titles(id) ON DELETE CASCADE,
+    kind       TEXT    NOT NULL,          -- 'poster' | 'backdrop'
+    source     TEXT    NOT NULL,          -- the file beside the video, or 'frame'
+    size       INTEGER NOT NULL,
+    modified   INTEGER NOT NULL,
+    local_path TEXT    NOT NULL,          -- 'artwork' + separator + name
+    PRIMARY KEY (title_id, kind)
+);
+"#;
+
 /// How long a statement waits for the write lock before giving up.
 ///
 /// Load-bearing from the moment there is more than one connection. SQLite
@@ -998,7 +1014,7 @@ pub(crate) const MIGRATIONS: [&str; SCHEMA_VERSION as usize] = [
     SCHEMA_V9, SCHEMA_V10, SCHEMA_V11, SCHEMA_V12, SCHEMA_V13, SCHEMA_V14,
     SCHEMA_V15, SCHEMA_V16, SCHEMA_V17, SCHEMA_V18, SCHEMA_V19,
     SCHEMA_V20, SCHEMA_V21, SCHEMA_V22, SCHEMA_V23, SCHEMA_V24, SCHEMA_V25,
-    SCHEMA_V26, SCHEMA_V27,
+    SCHEMA_V26, SCHEMA_V27, SCHEMA_V28,
 ];
 
 /// Bring the database up to [`SCHEMA_VERSION`].

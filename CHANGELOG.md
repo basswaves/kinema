@@ -7,6 +7,20 @@ makes no stability promises.
 
 ## [Unreleased]
 
+### Added
+
+- **Pictures already in your library are used.** A poster.jpg, folder.jpg,
+  cover.jpg, fanart.jpg, backdrop.jpg or background.jpg beside a film, or
+  `<file name>-poster.jpg` / `-fanart.jpg` (also .png, .webp), and the same in
+  a show's folder (above its season folders), as Kodi, Jellyfin and
+  tinyMediaManager leave them. They win over TMDB's, which are fetched only
+  for what is missing. They are found after each scan, so adding or removing
+  one shows at the next scan. Read only, never written. Works on network
+  shares too.
+- **A title kept without a match** ("Add without a match") now gets a picture
+  taken from its file when there is none beside it (desktop; Android shows its
+  name as before).
+
 ### Changed
 
 - **Up next names the episode.** Up next and the playlist's Up next card say

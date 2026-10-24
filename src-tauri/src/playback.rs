@@ -403,9 +403,19 @@ const CONTINUE_SELECT: &str = "
            COALESCE(p.position_secs, 0), p.duration_secs,
            COALESCE(e.still_url, t.backdrop_url, t.poster_url),
            COALESCE(p.updated_at, 0),
-           (SELECT :art || a.local_path FROM artwork_cache a
-             WHERE a.url = COALESCE(e.still_url, t.backdrop_url, t.poster_url)
-               AND a.local_path <> ''),
+           COALESCE(
+             (SELECT :art || a.local_path FROM artwork_cache a
+               WHERE a.url = e.still_url AND a.local_path <> ''),
+             -- With no still, the title's picture: one beside the files first.
+             CASE WHEN e.still_url IS NULL THEN COALESCE(
+               (SELECT :art || l.local_path FROM local_art l
+                 WHERE l.title_id = t.id AND l.kind = 'backdrop'),
+               (SELECT :art || a.local_path FROM artwork_cache a
+                 WHERE a.url = t.backdrop_url AND a.local_path <> ''),
+               (SELECT :art || l.local_path FROM local_art l
+                 WHERE l.title_id = t.id AND l.kind = 'poster'),
+               (SELECT :art || a.local_path FROM artwork_cache a
+                 WHERE a.url = t.poster_url AND a.local_path <> '')) END),
            p.fraction
       FROM media_files m
       JOIN titles t ON t.id = m.title_id

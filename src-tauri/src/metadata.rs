@@ -306,10 +306,15 @@ const TITLE_SELECT: &str = "
            t.runtime_mins, t.poster_url, t.backdrop_url, t.rating,
            (SELECT COUNT(*) FROM media_files m WHERE m.title_id = t.id),
            (SELECT MIN(m.first_seen_at) FROM media_files m WHERE m.title_id = t.id),
-           (SELECT :art || a.local_path FROM artwork_cache a
-             WHERE a.url = t.poster_url   AND a.local_path <> ''),
-           (SELECT :art || a.local_path FROM artwork_cache a
-             WHERE a.url = t.backdrop_url AND a.local_path <> ''),
+           -- A picture beside the files wins over TMDB's (local_art.rs).
+           COALESCE((SELECT :art || l.local_path FROM local_art l
+                      WHERE l.title_id = t.id AND l.kind = 'poster'),
+                    (SELECT :art || a.local_path FROM artwork_cache a
+                      WHERE a.url = t.poster_url   AND a.local_path <> '')),
+           COALESCE((SELECT :art || l.local_path FROM local_art l
+                      WHERE l.title_id = t.id AND l.kind = 'backdrop'),
+                    (SELECT :art || a.local_path FROM artwork_cache a
+                      WHERE a.url = t.backdrop_url AND a.local_path <> '')),
            t.trailer_key, t.trailer_site,
            t.logo_url,
            (SELECT :art || a.local_path FROM artwork_cache a

@@ -149,6 +149,14 @@ export const resetMatches = () => invoke<number>('reset_matches');
  */
 export const cacheArtwork = () => invoke<CacheResult>('cache_artwork');
 
+/**
+ * Pictures already beside the files (poster.jpg, fanart.jpg, `<file>-poster.jpg`)
+ * win over TMDB's; a title kept without a match and with none gets a frame from
+ * its file. Run after a scan, before `cacheArtwork`, which then skips what was found.
+ */
+export const findLocalPictures = () =>
+  invoke<{ found: number; frames: number }>('find_local_pictures');
+
 export const artworkStats = () => invoke<ArtworkStats>('artwork_stats');
 
 export const clearArtworkCache = () => invoke<number>('clear_artwork_cache');

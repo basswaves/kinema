@@ -108,7 +108,9 @@ enum Kind {
     Other,
 }
 
-/// Every artwork URL the library knows about, with what each one is.
+/// Every artwork URL the library knows about, with what each one is. A
+/// title's poster or backdrop found beside its files (`local_art.rs`) is used
+/// instead of TMDB's, so TMDB's is not fetched.
 ///
 /// Keying the cache by URL is what makes adding a kind a one-line change here
 /// rather than a new table and a new download path each time. The kind comes
@@ -117,9 +119,11 @@ enum Kind {
 /// the picture.
 fn all_urls(conn: &rusqlite::Connection) -> rusqlite::Result<Vec<(String, Kind)>> {
     let mut stmt = conn.prepare(
-        "SELECT poster_url,   1 FROM titles   WHERE poster_url   IS NOT NULL AND poster_url   <> ''
+        "SELECT poster_url,   1 FROM titles t WHERE poster_url   IS NOT NULL AND poster_url   <> ''
+            AND NOT EXISTS (SELECT 1 FROM local_art l WHERE l.title_id = t.id AND l.kind = 'poster')
          UNION ALL
-         SELECT backdrop_url, 2 FROM titles   WHERE backdrop_url IS NOT NULL AND backdrop_url <> ''
+         SELECT backdrop_url, 2 FROM titles t WHERE backdrop_url IS NOT NULL AND backdrop_url <> ''
+            AND NOT EXISTS (SELECT 1 FROM local_art l WHERE l.title_id = t.id AND l.kind = 'backdrop')
          UNION ALL
          SELECT logo_url,     4 FROM titles   WHERE logo_url     IS NOT NULL AND logo_url     <> ''
          UNION ALL
@@ -608,7 +612,10 @@ pub async fn clear_artwork_cache(
         if dir.exists() {
             for entry in std::fs::read_dir(&dir).map_err(to_string_err)? {
                 let entry = entry.map_err(to_string_err)?;
-                if entry.path().is_file() && std::fs::remove_file(entry.path()).is_ok() {
+                // Pictures found beside the files are copies, not downloads:
+                // the next scan would only bring them back.
+                let copied = entry.file_name().to_string_lossy().starts_with("local-");
+                if !copied && entry.path().is_file() && std::fs::remove_file(entry.path()).is_ok() {
                     removed += 1;
                 }
             }
@@ -766,11 +773,13 @@ mod tests {
     fn each_url_is_known_by_the_column_it_came_from() {
         let conn = rusqlite::Connection::open_in_memory().unwrap();
         conn.execute_batch(
-            "CREATE TABLE titles (poster_url TEXT, backdrop_url TEXT, logo_url TEXT);
+            "CREATE TABLE titles (id INTEGER PRIMARY KEY, poster_url TEXT, backdrop_url TEXT, logo_url TEXT);
+             CREATE TABLE local_art (title_id INTEGER, kind TEXT);
              CREATE TABLE episodes (still_url TEXT);
              CREATE TABLE people (profile_url TEXT);
              CREATE TABLE studios (logo_url TEXT);
-             INSERT INTO titles VALUES ('p', 'b', 'l'), ('p', 'b', NULL), ('both', 'both', '');
+             INSERT INTO titles (poster_url, backdrop_url, logo_url)
+                  VALUES ('p', 'b', 'l'), ('p', 'b', NULL), ('both', 'both', '');
              INSERT INTO episodes VALUES ('s'), ('s');
              INSERT INTO people VALUES ('f');
              INSERT INTO studios VALUES ('st');",

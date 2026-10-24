@@ -3699,6 +3699,39 @@ and a Jellyfin source further out. Decisions made along the way:
   it saves the zip and says where; opening the form and showing the file are
   their own presses.
 
+## Pictures already in the library (2026-10-24)
+
+- **The local picture wins** (owner's choice, asked by the first outside
+  tester). A picture put beside a file was chosen by a person, often curated in
+  Kodi, Jellyfin or tinyMediaManager; TMDB's first choice is only its most
+  voted. TMDB still fills in what is missing, and its picture is not even
+  downloaded where a local one is used.
+- **Folder names count only when the folder holds nothing but that title.**
+  poster.jpg, folder.jpg, fanart.jpg and the like: for a show, nothing but that
+  show below its folder, and unmatched files count as someone else's. A
+  poster.jpg in a folder of fifty films belongs to none of them. Names carrying
+  the file's name count anywhere. A wrong picture is worse than none, the same
+  rule as matching.
+- **Copied into the artwork folder** as `local-<title>-<kind>-<time>.<ext>`,
+  because the page may load pictures from nowhere else (GOTCHAS, Tauri). The
+  time in the name makes a changed picture a new address the webview has not
+  cached. Clearing the artwork cache keeps these copies; they are not
+  downloads. Read through files.rs, so smb:// shares Kinema opens itself work
+  like drive letters, UNC paths and Linux mounts.
+- **Found after every scan, not at start-up.** It runs in the pipeline just
+  before the artwork downloads. The scan has just read the folders, so a share
+  that is asleep is not woken at launch. A folder that cannot be read changes
+  nothing: what was found before stays.
+- **Not read yet:** season pictures (season01-poster.jpg), since no screen shows
+  a season's picture, and episode thumbnails (`-thumb.jpg`).
+- **The frame for a title kept without a match** reuses the Videos
+  frame-taking: one at a time, waiting while a film plays. 1280 px wide, since
+  it is also the detail page's backdrop, from the first file (a show's first
+  episode). A picture beside the files still wins over the frame. Not on
+  Android (no mpv there). Taken after the scan and right after "Add without a
+  match".
+- Library upgrade to schema 28 (`local_art` table).
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

@@ -22,7 +22,7 @@ import FocusButton from '../ui/FocusButton';
 import FocusInput from '../ui/FocusInput';
 import { keepOnScreen } from '../ui/focus';
 import { openLink } from '../ui/links';
-import { addWithoutMatch, listNeedsReview } from '../metadata/api';
+import { addWithoutMatch, findLocalPictures, listNeedsReview } from '../metadata/api';
 import { readLocalName, shelfOf } from './localTitle';
 import { plainReason } from './plainReason';
 import type { MediaFile } from './api';
@@ -223,6 +223,9 @@ export default function FixMatch({ onChanged }: Props) {
                 name,
                 year
               );
+              // Its picture: one beside the files, else a frame from the file.
+              // In the background; the next visit to the shelf shows it.
+              void findLocalPictures().catch((e: unknown) => console.warn('local pictures:', e));
               return `Added “${name}” to ${shelfOf(isSeries)} without a match.`;
             })
           }

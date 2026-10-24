@@ -463,7 +463,7 @@ export default function LibraryView() {
                   is ambiguous between "provider has none" and "wrong provider
                   was used". */}
               <div className="title-card-provider">via {title.provider}</div>
-              {!title.backdrop_url && <div className="title-card-warn">no backdrop</div>}
+              {!title.backdrop_url && !title.backdrop_path && <div className="title-card-warn">no backdrop</div>}
               {title.file_count > 0 && (
                 <button
                   className="title-card-unlink"

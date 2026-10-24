@@ -99,9 +99,19 @@ const ENTRY_SELECT: &str = "
            m.parsed_season, m.parsed_episode, e.name,
            COALESCE(p.position_secs, 0), p.duration_secs, COALESCE(p.completed, 0),
            COALESCE(e.still_url, t.backdrop_url, t.poster_url),
-           (SELECT ?2 || a.local_path FROM artwork_cache a
-             WHERE a.url = COALESCE(e.still_url, t.backdrop_url, t.poster_url)
-               AND a.local_path <> ''),
+           COALESCE(
+             (SELECT ?2 || a.local_path FROM artwork_cache a
+               WHERE a.url = e.still_url AND a.local_path <> ''),
+             -- With no still, the title's picture: one beside the files first.
+             CASE WHEN e.still_url IS NULL THEN COALESCE(
+               (SELECT ?2 || l.local_path FROM local_art l
+                 WHERE l.title_id = t.id AND l.kind = 'backdrop'),
+               (SELECT ?2 || a.local_path FROM artwork_cache a
+                 WHERE a.url = t.backdrop_url AND a.local_path <> ''),
+               (SELECT ?2 || l.local_path FROM local_art l
+                 WHERE l.title_id = t.id AND l.kind = 'poster'),
+               (SELECT ?2 || a.local_path FROM artwork_cache a
+                 WHERE a.url = t.poster_url AND a.local_path <> '')) END),
            COALESCE(m.missing, 0)
       FROM playlist_items i
       LEFT JOIN media_files m

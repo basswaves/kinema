@@ -3999,3 +3999,31 @@ kbd {
 .playlist-row-note {
   font-size: 0.875rem;
 }
+
+/* Sound delay in the player's panel: the amount, then a step each way and
+   back to none, on one line so the list stays short. */
+.track-delay {
+  display: flex;
+  align-items: center;
+  gap: 0.3125rem;
+  margin-bottom: 0.3125rem;
+}
+
+.track-delay-label {
+  flex: 1;
+  font-size: 0.75rem;
+}
+
+.track-delay .track-option {
+  width: auto;
+  margin-bottom: 0;
+  text-align: center;
+}
+
+/* An amount between its two step buttons (Settings → Sound delay). */
+.choice-value {
+  min-width: 4.5rem;
+  align-self: center;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}

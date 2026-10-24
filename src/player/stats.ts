@@ -41,6 +41,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { readProperty, type ScalarFormat, mpvGet } from './engine';
 import { outputCheck, type OutputFacts } from './outputCheck';
 import { readSwitchPolicies, screenIdOf, switchSettingsFor } from './displaySwitch';
+import { describeDelay } from './audioDelay';
 import { goesDirect, readAudioSettings, targetDevice } from './audioOutput';
 import { getEquipment, type DisplayMode } from './equipment';
 import { capabilitiesNow, screenOwner } from '../capabilities';
@@ -735,6 +736,8 @@ export async function readPlaybackStats(): Promise<StatGroup[]> {
   const outFormat = await readProperty<string>('audio-out-params/format', 'string');
   const exclusive = await readProperty<boolean>('audio-exclusive', 'flag');
   const ao = await readProperty<string>('current-ao', 'string');
+  // What mpv is doing, not what was asked: the panel says only what is known.
+  const audioDelay = await readProperty<number>('audio-delay', 'double');
 
   // ---- health ----
   const dropped = await readProperty<number>('frame-drop-count', 'int64');
@@ -961,6 +964,15 @@ export async function readPlaybackStats(): Promise<StatGroup[]> {
         },
         describeAudioPath(outFormat, exclusive, capabilitiesNow()?.system),
         { label: 'Output', value: text(ao) },
+        {
+          label: 'Delay',
+          value:
+            audioDelay === null
+              ? '—'
+              : `${describeDelay(Math.round(audioDelay * 1000))}${
+                  audioDelay !== 0 ? ' for this device' : ''
+                }`,
+        },
       ],
     },
     {

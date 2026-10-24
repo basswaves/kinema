@@ -111,6 +111,12 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   },
   {
     section: 'picture',
+    label: 'Sound delay',
+    about: 'audio delay lip sync out of step late early milliseconds receiver',
+    when: (can) => can.equipment_detection && can.audio_direct,
+  },
+  {
+    section: 'picture',
     label: 'Match the screen to the film',
     about: 'refresh rate resolution display',
     when: (can) => can.system_output,

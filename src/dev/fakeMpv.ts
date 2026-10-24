@@ -63,6 +63,13 @@ export interface FakeMpvState {
    * Answered only while a file is open, as mpv does.
    */
   extra: Record<string, unknown>;
+  /** `audio-delay`, in seconds, as set. */
+  audioDelay: number;
+  /**
+   * The chapters every file opened from now on has (none by default, so the
+   * player's ordinary screens stay as they are): set before Play.
+   */
+  chapters: { time: number; title: string | null }[];
 }
 
 /** How long each fixture file runs. Unknown paths get a TV-episode length. */
@@ -88,6 +95,8 @@ const state: FakeMpvState = {
   currentAo: 'wasapi',
   fullscreen: true,
   extra: {},
+  audioDelay: 0,
+  chapters: [],
 };
 
 let ticker: number | undefined;
@@ -252,6 +261,11 @@ export function setProperty(name: string, value: unknown): null {
     change('pause', state.paused);
   }
   if (name === 'volume') state.volume = Number(value);
+  if (name === 'audio-delay') state.audioDelay = Number(value);
+  if (name === 'chapter') {
+    const chapter = state.chapters[Number(value)];
+    if (chapter) seek(chapter.time);
+  }
   if (name === 'aid' || name === 'sid') selectedTrack[name] = Number(value);
   if (name === 'sub-visibility') state.subVisible = value === true || value === 'yes';
   if (name === 'mute') state.mute = value === true || value === 'yes';
@@ -291,10 +305,22 @@ export function getProperty(name: string): unknown {
       return state.path === null ? null : state.currentAo;
     case 'track-list/count':
       return state.path === null ? 0 : tracks().length;
+    case 'audio-delay':
+      return state.audioDelay;
     case 'chapters':
-      return 0;
+      return state.path === null ? 0 : state.chapters.length;
+    case 'chapter': {
+      if (state.path === null || state.chapters.length === 0) return null;
+      const before = state.chapters.filter((c) => c.time <= state.position).length;
+      return before - 1;
+    }
     default: {
       if (state.path !== null && name in state.extra) return state.extra[name];
+      const chapter = /^chapter-list\/(\d+)\/(time|title)$/.exec(name);
+      if (chapter && state.path !== null) {
+        const c = state.chapters[Number(chapter[1])];
+        if (c) return chapter[2] === 'time' ? c.time : c.title;
+      }
       const field = trackField(name);
       if (field !== undefined) return field;
       throw new Error(`property unavailable: ${name}`);

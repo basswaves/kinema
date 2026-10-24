@@ -17,6 +17,7 @@
 import { userError } from './errors';
 import { useCallback, useEffect, useState } from 'react';
 import ChoiceRow from './ChoiceRow';
+import FocusButton from './FocusButton';
 import DeviceChoice from './DeviceChoice';
 import { soundOptions } from './deviceOptions';
 import { savePolicy, type DevicePolicy } from '../player/devicePolicy';
@@ -30,10 +31,19 @@ import {
   goesDirect,
   planAudio,
   readAudioSettings,
+  soundDeviceNow,
   targetDevice,
+  type SoundDevice,
   type AudioSettings,
   type Override,
 } from '../player/audioOutput';
+import {
+  DELAY_STEP_MS,
+  delayLabel,
+  describeDelay,
+  readDelay,
+  saveDelay,
+} from '../player/audioDelay';
 
 
 function formatLabel(device: AudioDevice | null, codec: string): string {
@@ -46,6 +56,76 @@ function detected(device: AudioDevice | null, codec: string): string {
 }
 
 /** `system` is for the wording only: "through Windows", "through Linux". */
+/**
+ * The sound delay kept for the device the sound will go to (audioDelay.ts),
+ * read again whenever the chosen device changes.
+ */
+function SoundDelayRow({
+  deviceId,
+  onError,
+}: {
+  deviceId: string | null;
+  onError: (message: string) => void;
+}) {
+  const [here, setHere] = useState<{ device: SoundDevice | null; ms: number } | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    void soundDeviceNow()
+      .then(async (device) => ({ device, ms: await readDelay(device?.id ?? null) }))
+      .then((next) => {
+        if (live) setHere(next);
+      })
+      .catch((e) => console.warn('settings: sound delay not read', e));
+    return () => {
+      live = false;
+    };
+  }, [deviceId]);
+
+  if (!here) return null;
+  const change = (ms: number) => {
+    void saveDelay(here.device?.id ?? null, ms)
+      .then((kept) => setHere({ device: here.device, ms: kept }))
+      .catch((e) => onError(userError(e)));
+  };
+
+  return (
+    <div className="choice-row">
+      <div className="choice-label">
+        Sound delay{here.device ? ` for ${here.device.name}` : ''}
+      </div>
+      <div className="choice-options">
+        <FocusButton
+          className="choice"
+          keepInView="nearest"
+          label={`Sound ${DELAY_STEP_MS} ms earlier`}
+          onSelect={() => change(here.ms - DELAY_STEP_MS)}
+        >
+          −{DELAY_STEP_MS} ms
+        </FocusButton>
+        <span className="choice-value">{delayLabel(here.ms)}</span>
+        <FocusButton
+          className="choice"
+          keepInView="nearest"
+          label={`Sound ${DELAY_STEP_MS} ms later`}
+          onSelect={() => change(here.ms + DELAY_STEP_MS)}
+        >
+          +{DELAY_STEP_MS} ms
+        </FocusButton>
+        <FocusButton className="choice" keepInView="nearest" onSelect={() => change(0)}>
+          No delay
+        </FocusButton>
+      </div>
+      <p className="choice-note">
+        {describeDelay(here.ms)}. A receiver or TV that works on the sound or the picture can put
+        them out of step by the same amount on every film: later if the sound comes before the
+        lips, earlier if it comes after. Kept for each sound device, and also in the player's Audio
+        and subtitles panel (Ctrl + and Ctrl − on a keyboard).
+      </p>
+    </div>
+  );
+}
+
 export default function SoundSection({
   onError,
   system,
@@ -156,6 +236,8 @@ export default function SoundSection({
             : `${system} default plays wherever ${system} plays; sent straight to the receiver, it is the one device that takes surround formats. If a device chosen here is unplugged, Kinema uses the ${system} default until it is back.`
         }
       />
+
+      <SoundDelayRow deviceId={settings.deviceId} onError={onError} />
 
       {settings.direct.policy !== 'off' && (
         <>

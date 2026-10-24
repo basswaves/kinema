@@ -11,6 +11,7 @@ import type { Track } from './engine';
 import { describeTracks, secondChoices } from './tracks';
 import { languageBadge, languageName } from './language';
 import { describeOffer, type Offer } from './onlineSubtitles';
+import { DELAY_STEP_MS, delayLabel } from './audioDelay';
 import { nextSize, sizeLabel, type SubStyle } from './subtitleStyle';
 
 /**
@@ -82,6 +83,7 @@ export default function TrackPanel({
   playlistItem,
   subStyle,
   onSubStyle,
+  delay,
   sid2,
   onSecond,
 }: {
@@ -109,6 +111,11 @@ export default function TrackPanel({
    */
   subStyle?: SubStyle | null;
   onSubStyle?: (style: SubStyle) => void;
+  /**
+   * The sound delay kept for the device the sound goes to (audioDelay.ts),
+   * and a step of it. None where Media3 plays the sound (Android).
+   */
+  delay?: { ms: number; onChange: (delta: number, reset?: boolean) => void } | null;
   /**
    * The second subtitles, drawn at the top (mpv's `secondary-sid`), and
    * choosing them. None where Media3 plays: it shows one text track.
@@ -147,6 +154,40 @@ export default function TrackPanel({
             <TrackText track={track} line={audioLines.get(track.id)} />
           </FocusButton>
         ))}
+        {delay && (
+          <>
+            <div className="track-delay">
+              <span className="track-delay-label">Sound delay: {delayLabel(delay.ms)}</span>
+              <FocusButton
+                className="track-option"
+                keepInView="nearest"
+                label={`Sound ${DELAY_STEP_MS} ms earlier`}
+                onSelect={() => delay.onChange(-DELAY_STEP_MS)}
+              >
+                −{DELAY_STEP_MS}
+              </FocusButton>
+              <FocusButton
+                className="track-option"
+                keepInView="nearest"
+                label={`Sound ${DELAY_STEP_MS} ms later`}
+                onSelect={() => delay.onChange(DELAY_STEP_MS)}
+              >
+                +{DELAY_STEP_MS}
+              </FocusButton>
+              <FocusButton
+                className="track-option"
+                keepInView="nearest"
+                label="No sound delay"
+                onSelect={() => delay.onChange(0, true)}
+              >
+                0
+              </FocusButton>
+            </div>
+            <p className="track-note">
+              For this sound device: later if the sound comes before the lips, earlier if after.
+            </p>
+          </>
+        )}
 
         <div className="track-panel-head">
           <span>Subtitles</span>

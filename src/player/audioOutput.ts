@@ -185,19 +185,35 @@ let lastApplied = '';
  * the plan says `auto` there. Null where `auto` is a sound server that picks
  * for itself (Linux), and after a fallback. For soundWatch.ts.
  */
-let soundDevice: { mpv: string; name: string } | null = null;
+let soundDevice: SoundDevice | null = null;
 export const currentSoundDevice = () => soundDevice;
 
+/** A device the sound goes to: its endpoint id, mpv's name for it, a person's. */
+export interface SoundDevice {
+  id: string;
+  mpv: string;
+  name: string;
+}
+
 /** Which device `plan` sends the sound to, given the one it was made for. */
-export function deviceInUse(
-  plan: AudioPlan,
-  device: AudioDevice | null
-): { mpv: string; name: string } | null {
+export function deviceInUse(plan: AudioPlan, device: AudioDevice | null): SoundDevice | null {
   if (!device) return null;
-  if (plan.device === mpvDeviceName(device.id)) return { mpv: plan.device, name: device.name };
+  if (plan.device === mpvDeviceName(device.id))
+    return { id: device.id, mpv: plan.device, name: device.name };
   if (plan.device === 'auto' && device.is_default)
-    return { mpv: mpvDeviceName(device.id), name: device.name };
+    return { id: device.id, mpv: mpvDeviceName(device.id), name: device.name };
   return null;
+}
+
+/**
+ * The device the next file's sound will go to, worked out as
+ * `applyAudioPlan` does — for Settings, which names it before anything plays.
+ */
+export async function soundDeviceNow(): Promise<SoundDevice | null> {
+  const settings = await readAudioSettings();
+  const equipment = await getEquipment().catch(() => null);
+  const device = targetDevice(equipment, settings.deviceId);
+  return deviceInUse(planAudio(settings, device), device);
 }
 
 /**

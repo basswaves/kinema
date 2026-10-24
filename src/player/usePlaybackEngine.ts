@@ -5,6 +5,7 @@
  * limit, and stopping when the player closes. What each event *means* is
  * session.ts's to decide.
  */
+import { applyAudioDelay } from './audioDelay';
 import { useEffect, useLayoutEffect, useRef, type Dispatch, type RefObject } from 'react';
 import { capabilitiesNow } from '../capabilities';
 import { getSetting } from '../metadata/api';
@@ -174,6 +175,10 @@ export function usePlaybackEngine({
         // Where the system routes the sound itself (Android), it is not ours.
         if (!capabilitiesNow()?.system_output) {
           await applyAudioPlan().catch((e) => console.warn('audio: plan not applied', e));
+          // And the delay kept for that device (audioDelay.ts).
+          await applyAudioDelay(currentSoundDevice()?.id ?? null).catch((e) =>
+            console.warn('audio: delay not applied', e)
+          );
         }
         if (cancelled) return;
 

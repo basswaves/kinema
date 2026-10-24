@@ -87,6 +87,9 @@ export default function SystemOutputSection({
           'The screen goes black for a second or two as a film starts and after it ends, while the TV catches up.'
         }
       />
+      <p className="settings-hint">
+        A sound delay for each sound device is on computers only for now.
+      </p>
     </section>
   );
 }

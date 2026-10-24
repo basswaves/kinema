@@ -50,6 +50,7 @@ describe('deviceInUse', () => {
 
   it('names the device the plan names', () => {
     expect(deviceInUse(plan(RECEIVER), { ...device, is_default: false })).toEqual({
+      id: '{0.0.0.00000000}.{aaaa}',
       mpv: RECEIVER,
       name: 'Receiver',
     });

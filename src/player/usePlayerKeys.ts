@@ -5,6 +5,7 @@
  * takes whatever is on offer. The spatial system has its own handler, and
  * exactly one of the two acts on any press (docs/GOTCHAS.md).
  */
+import { DELAY_STEP_MS } from './audioDelay';
 import { useEffect } from 'react';
 import type { EpisodeRef } from './api';
 import type { Steps } from './useNeighbours';
@@ -45,6 +46,7 @@ export function usePlayerKeys({
   resumedFrom,
   startOver,
   playNow,
+  changeDelay,
 }: {
   /** Space, OK with nothing on offer, and the remote's play/pause. */
   togglePauseByKey: () => Promise<void>;
@@ -79,9 +81,20 @@ export function usePlayerKeys({
   resumedFrom: number | null;
   startOver: () => void;
   playNow: () => void;
+  /** Ctrl + / Ctrl − (mpv's keys) and Ctrl 0: the sound delay (audioDelay.ts). */
+  changeDelay: (delta: number, reset?: boolean) => void;
 }) {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && !e.altKey && !e.metaKey) {
+        const delta =
+          e.key === '+' || e.key === '=' ? DELAY_STEP_MS : e.key === '-' ? -DELAY_STEP_MS : null;
+        if (delta !== null || e.key === '0') {
+          e.preventDefault();
+          changeDelay(delta ?? 0, delta === null);
+          return;
+        }
+      }
       switch (e.key) {
         case ' ':
           e.preventDefault();
@@ -253,6 +266,7 @@ export function usePlayerKeys({
     resumedFrom,
     startOver,
     playNow,
+    changeDelay,
   ]);
 
   /**

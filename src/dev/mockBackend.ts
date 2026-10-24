@@ -1948,11 +1948,13 @@ const handlers: Record<string, Handler> = {
     return { read: storage.read, allFiles: storage.allFiles };
   },
   share_logins: () => shareLogins,
-  // One NAS announces itself; a typed `nas` is the same box.
+  // One NAS announces itself; a typed `nas` is the same box. A typed `laptop`
+  // answers and takes the same password, but shares no folder (a tester's
+  // laptop, 2026-10-24).
   'plugin:network|find_servers': () => ({ servers: [{ name: 'Living room NAS', host: 'nas' }] }),
   check_server: (a) => {
     const server = String(a.server);
-    if (server !== 'nas') {
+    if (server !== 'nas' && server !== 'laptop') {
       throw new Error(`Nothing answers as a network drive at ${server}. Check the address, and that the NAS or computer is on.`);
     }
     return null;
@@ -1962,11 +1964,11 @@ const handlers: Record<string, Handler> = {
     if (!shareLogins.some((l) => l.server === server)) {
       throw new Error(`${server} needs a sign-in first: not allowed`);
     }
-    return ['films', 'tv'];
+    return server === 'laptop' ? [] : ['films', 'tv'];
   },
   save_share_login: (a) => {
     const server = String(a.server);
-    if (server !== 'nas') throw new Error(`Could not reach ${server}: no answer`);
+    if (server !== 'nas' && server !== 'laptop') throw new Error(`Could not reach ${server}: no answer`);
     if (!a.user) throw new Error('Kinema cannot connect as a guest yet. Enter a user name and password.');
     if (a.password !== 'secret') throw new Error(`${server} did not accept that user name and password.`);
     const i = shareLogins.findIndex((l) => l.server === server);
@@ -1986,6 +1988,11 @@ const handlers: Record<string, Handler> = {
     // A share on the mock NAS reads only once Kinema is signed in to it.
     if (path.startsWith('smb://') && !shareLogins.some((l) => path.startsWith(`smb://${l.server}/`))) {
       throw new Error(`not allowed to read ${path}`);
+    }
+    if (path.startsWith('smb://laptop/')) {
+      throw new Error(
+        `could not read ${path}: Server returned an error message with status: Bad Network Name (0xc00000cc).`
+      );
     }
     const listing = mockDrives[path];
     if (!listing) throw new Error(`could not read ${String(a.path)}`);

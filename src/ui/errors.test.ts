@@ -93,3 +93,37 @@ describe('endsAtLabel', () => {
     expect(endsAtLabel(10, null, 0)).toBeNull();
   });
 });
+
+describe('a network drive’s refusal', () => {
+  const smb = (code: string, name = 'Some Status') =>
+    `Server returned an error message with status: ${name} (0x${code}).`;
+
+  it('names the shared folder that is not there, never the raw status', () => {
+    const shown = describeError(
+      `could not read smb://laptop/Users\\someone\\Downloads: ${smb('c00000cc', 'Bad Network Name')}`
+    );
+    expect(shown).toBe(
+      'laptop has no shared folder called “Users”. Pick one of the folders it shares, or share the folder on laptop first.'
+    );
+    expect(shown).not.toMatch(/0xc|status/i);
+  });
+
+  it('says a wrong user name or password, a locked user and a closed connection in words', () => {
+    expect(describeError(`Could not reach nas: ${smb('c000006d')}`)).toBe(
+      'nas did not accept that user name and password.'
+    );
+    expect(describeError(`could not read smb://nas/films/A: ${smb('c0000234')}`)).toMatch(/locked on nas/);
+    expect(describeError(`could not read smb://nas/films: ${smb('c000035c')}`)).toBe(
+      'nas closed the connection. Try again.'
+    );
+    expect(describeError(`Kinema could not ask nas for its shares: ${smb('c000006e')}`)).toMatch(
+      /^nas does not let that user sign in over the network/
+    );
+  });
+
+  it('keeps the code of one it has no words for, for a report', () => {
+    expect(describeError(`could not read smb://nas/films: ${smb('c0000999')}`)).toBe(
+      'nas refused with an error Kinema has no words for yet (code 0xc0000999). Try again, or send a report.'
+    );
+  });
+});

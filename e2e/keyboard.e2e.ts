@@ -1734,6 +1734,53 @@ test('Android: a NAS that does not announce itself, typed, and its share named',
   await expect(browser.locator('input').first()).toBeFocused();
 });
 
+test('Android: a computer that shares no folder says so, and a typed path is explained', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('kinemaMockSystem', 'android');
+    localStorage.setItem('kinemaMockEmpty', '1');
+  });
+  await page.goto('/');
+  await expect.poll(() => focused(page)).toBe('Add movies folder');
+  await press(page, 'Enter');
+  const browser = page.locator('.folder-browser');
+  for (let i = 0; i < 4 && !(await focused(page))?.startsWith('Network drives'); i++) {
+    await press(page, 'ArrowDown');
+  }
+  await press(page, 'Enter');
+  for (let i = 0; i < 4 && (await focused(page)) !== 'Type an addressA computer or a NAS not listed'; i++) {
+    await press(page, 'ArrowDown');
+  }
+  await press(page, 'Enter');
+  await browser.locator('input').fill('laptop');
+  await press(page, 'Enter');
+  await press(page, 'Enter');
+  await expect(browser.locator('.folder-where')).toHaveText('Network drives › laptop');
+  await browser.locator('input').first().fill('someone');
+  await browser.locator('.folder-password input').fill('secret');
+  await browser.getByRole('button', { name: 'Connect' }).click();
+  // Nothing shared: said in words, with the ring on Try again.
+  await expect(browser).toContainText('laptop shares no folders yet');
+  await expect.poll(() => focused(page)).toBe('Try again');
+  await press(page, 'Enter');
+  await expect(browser).toContainText('laptop shares no folders yet');
+  // A path on the laptop is not a share's name, and Open does not take it.
+  const field = browser.locator('input');
+  await field.fill('C:\\Users\\someone\\Downloads\\Movie');
+  await expect(browser.locator('.leave-error')).toContainText(
+    'That is a path on the computer, not a shared folder’s name. Type the name the folder is shared as, such as Movie'
+  );
+  await browser.getByRole('button', { name: 'Open' }).click();
+  await expect(browser.locator('.folder-where')).toHaveText('Network drives › laptop');
+  // A name the laptop does not share: its own words, never the status.
+  await field.fill('Movie');
+  await browser.getByRole('button', { name: 'Open' }).click();
+  await expect(browser.locator('.leave-error')).toHaveText(
+    'laptop has no shared folder called “Movie”. Pick one of the folders it shares, or share the folder on laptop first.'
+  );
+  await expect(browser).not.toContainText('0xc00000cc');
+  await expect(browser).not.toContainText('No folders inside');
+});
+
 test('Android: OK opens the keyboard, its Enter moves on, and Connect waits to be pressed', async ({ page }) => {
   await page.setViewportSize({ width: 960, height: 540 });
   await page.addInitScript(() => {

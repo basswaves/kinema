@@ -16,7 +16,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { getCurrentFocusKey, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 import FocusButton from './FocusButton';
 import FocusInput from './FocusInput';
-import { userError } from './errors';
+import { rawError, userError } from './errors';
 import { carryKeyboard } from './typing';
 import {
   checkServer,
@@ -284,6 +284,7 @@ function Shares({
   const [shares, setShares] = useState<string[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [typed, setTyped] = useState('');
+  const [asked, setAsked] = useState(0);
 
   useEffect(() => {
     let live = true;
@@ -291,22 +292,22 @@ function Shares({
       .then((s) => live && setShares(s))
       .catch((e: unknown) => {
         if (!live) return;
-        const message = userError(e);
-        // A kept login the server no longer takes asks again.
-        if (message.includes('needs a sign-in')) onStep({ step: 'sign-in', server });
+        // A kept login the server no longer takes asks again. On the raw text:
+        // the words shown for it say what was refused, not this.
+        if (rawError(e).includes('needs a sign-in')) onStep({ step: 'sign-in', server });
         else {
-          setError(message);
+          setError(userError(e));
           setShares([]);
         }
       });
     return () => {
       live = false;
     };
-  }, [server, onStep]);
+  }, [server, onStep, asked]);
 
   useEffect(() => {
-    if (shares) void setFocus(shares.length > 0 ? netKey(0) : 'net-share');
-  }, [shares]);
+    if (shares) void setFocus(shares.length > 0 ? netKey(0) : error ? 'net-share' : 'net-again');
+  }, [shares, error]);
 
   const open = (share: string) =>
     onOpen({
@@ -336,10 +337,37 @@ function Shares({
     );
   }
   const typedShare = typed.trim().replace(/^[/\\]+|[/\\]+$/g, '');
+  // A path on the other computer is not a share's name: what a person types
+  // when that computer shares nothing (a tester typed a Downloads path).
+  const typedPath = /[/\\]/.test(typedShare) || /^[a-z]:/i.test(typedShare);
+  const lastPart = typedShare.split(/[/\\:]/).filter(Boolean).pop() ?? '';
+  // The server answered and shares nothing a person would pick.
+  const none = !error;
   return (
     <div className="folder-note">
+      {none && (
+        <>
+          <p>
+            {server.name} shares no folders yet. On that computer or NAS, share the folder with
+            your films first — on Windows: right-click the folder → Properties → Sharing → Share —
+            then come back and press Try again.
+          </p>
+          <FocusButton
+            focusKey="net-again"
+            className="btn-secondary"
+            keepInView="nearest"
+            onSelect={() => {
+              setShares(null);
+              setError(null);
+              setAsked((n) => n + 1);
+            }}
+          >
+            Try again
+          </FocusButton>
+        </>
+      )}
       <label className="settings-field">
-        <span>The shared folder’s name on {server.name}, such as films</span>
+        <span>Or type the name the folder is shared as on {server.name}, such as films</span>
         <FocusInput
           focusKey="net-share"
           className="settings-input"
@@ -348,11 +376,17 @@ function Shares({
           onEnter={() => void setFocus('net-open')}
         />
       </label>
+      {typedPath && (
+        <p className="leave-error">
+          That is a path on the computer, not a shared folder’s name. Type the name the folder is
+          shared as{lastPart ? <>, such as {lastPart}</> : null} — after sharing it on {server.name}.
+        </p>
+      )}
       {error && <p className="leave-error">{error}</p>}
       <FocusButton
         focusKey="net-open"
         className="btn-primary"
-        onSelect={() => typedShare && open(typedShare)}
+        onSelect={() => typedShare && !typedPath && open(typedShare)}
       >
         Open
       </FocusButton>

@@ -49,7 +49,56 @@ function noAnswer(raw: string): string {
     : 'Couldn’t reach the service. Check the connection and try again.';
 }
 
+/**
+ * A network drive's refusal, which arrives as the SMB library's status line —
+ * "Server returned an error message with status: Bad Network Name
+ * (0xc00000cc)" — in front of a person who typed a folder's path on a laptop
+ * (a tester, 2026-10-24). The codes are Windows' NTSTATUS values, the same on
+ * every NAS. The server and the shared folder come from the address in front.
+ */
+export function smbWords(raw: string): string {
+  const code = /status: [^(]*\(0x([0-9a-f]{8})\)/i.exec(raw)?.[1].toLowerCase() ?? '';
+  const where = /smb:\/\/([^/\\\s:]+)(?:\/([^/\\:]+))?/i.exec(raw);
+  const server =
+    where?.[1] ?? /(?:could not ask|could not reach) (\S+?)[: ]/i.exec(raw)?.[1] ?? /^(\S+) needs a sign-in/.exec(raw)?.[1] ?? 'The network drive';
+  const share = where?.[2];
+  switch (code) {
+    case 'c00000cc': // BAD_NETWORK_NAME
+      return share
+        ? `${server} has no shared folder called “${share}”. Pick one of the folders it shares, or share the folder on ${server} first.`
+        : `${server} has no shared folder by that name. Share the folder on ${server} first.`;
+    case 'c000006d': // LOGON_FAILURE
+      return `${server} did not accept that user name and password.`;
+    case 'c0000022': // ACCESS_DENIED
+      return `${server} let Kinema in, but that user may not read this folder. On ${server}, give the user permission to read the shared folder.`;
+    case 'c000006e': // ACCOUNT_RESTRICTION: most often a user with no password
+      return `${server} does not let that user sign in over the network — most often because the user has no password. Give it one on ${server}, or use another user.`;
+    case 'c0000072': // ACCOUNT_DISABLED
+      return `That user is switched off on ${server}. Use another user, or switch it on there.`;
+    case 'c0000234': // ACCOUNT_LOCKED_OUT
+      return `That user is locked on ${server} after too many wrong passwords. Wait a while, or unlock it there.`;
+    case 'c0000071': // PASSWORD_EXPIRED
+    case 'c0000224': // PASSWORD_MUST_CHANGE
+      return `That user’s password on ${server} has to be changed first. Change it there, then sign in again.`;
+    case 'c000015b': // LOGON_TYPE_NOT_GRANTED
+      return `${server} does not let that user sign in from the network. Use another user, or allow it there.`;
+    case 'c000000f': // NO_SUCH_FILE
+    case 'c0000034': // OBJECT_NAME_NOT_FOUND
+    case 'c000003a': // OBJECT_PATH_NOT_FOUND
+      return `That folder or file is not on ${server} any more. It may have been moved or renamed.`;
+    case 'c0000043': // SHARING_VIOLATION
+      return `Another program on ${server} has that file open. Try again in a moment.`;
+    case 'c00000c9': // NETWORK_NAME_DELETED
+    case 'c0000203': // USER_SESSION_DELETED
+    case 'c000035c': // NETWORK_SESSION_EXPIRED
+      return `${server} closed the connection. Try again.`;
+    default:
+      return `${server} refused with an error Kinema has no words for yet (code ${code ? `0x${code}` : 'unknown'}). Try again, or send a report.`;
+  }
+}
+
 const RULES: [RegExp, string | ((raw: string) => string)][] = [
+  [/(?:message status|with status): [^(]*\(0x[0-9a-f]{8}\)/i, smbWords],
   [
     /input\/output error|stale file handle/i,
     'The disk or network drive did not answer. Check that it is connected, then try again.',

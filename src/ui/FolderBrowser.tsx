@@ -412,7 +412,7 @@ export default function FolderBrowser({ request }: { request: FolderRequest }) {
                   </FocusButton>
                 </li>
               ))}
-              {listing.folders.length === 0 && <li className="muted">No folders inside.</li>}
+              {listing.folders.length === 0 && !error && <li className="muted">No folders inside.</li>}
             </ul>
           )}
 

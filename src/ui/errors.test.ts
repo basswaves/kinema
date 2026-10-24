@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { describeError } from './errors';
+import { describeError, withoutQueries } from './errors';
 import { count, endsAtLabel } from './format';
 
 const system = vi.hoisted(() => ({ name: null as string | null }));
@@ -54,6 +54,12 @@ describe('describeError', () => {
       'Couldn’t reach api.tvmaze.com. Check the connection and try again.'
     );
     expect(describeError('dns error')).not.toMatch(/internet/);
+  });
+
+  it('never shows a query string, where keys travel', () => {
+    const raw = 'Film: TMDB said (https://api.example.org/3/search/movie?api_key=SECRET&query=x) no';
+    expect(withoutQueries(raw)).toBe('Film: TMDB said (https://api.example.org/3/search/movie) no');
+    expect(describeError(raw)).not.toMatch(/SECRET/);
   });
 
   it('shows anything it does not recognise as it is, minus the prefix', () => {

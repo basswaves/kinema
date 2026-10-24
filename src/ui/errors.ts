@@ -85,6 +85,15 @@ const RULES: [RegExp, string | ((raw: string) => string)][] = [
   ],
 ];
 
+/**
+ * `text` with every web address cut at its `?`. A failed request's error
+ * names its whole URL, keys included (TMDB's built-in one was on a tester's
+ * screen); the host and path are what tell anyone anything.
+ */
+export function withoutQueries(text: string): string {
+  return text.replace(/(https?:\/\/[^\s?)"']+)\?[^\s)"']*/g, '$1');
+}
+
 /** The raw text of anything thrown. */
 export function rawError(e: unknown): string {
   if (e instanceof Error) return e.message;
@@ -97,7 +106,7 @@ export function describeError(e: unknown): string {
   for (const [pattern, message] of RULES) {
     if (pattern.test(raw)) return typeof message === 'string' ? message : message(raw);
   }
-  return raw.replace(/^error:\s*/i, '') || 'Something went wrong.';
+  return withoutQueries(raw.replace(/^error:\s*/i, '')) || 'Something went wrong.';
 }
 
 /**
@@ -105,6 +114,6 @@ export function describeError(e: unknown): string {
  * a person who needs the technical detail will look for it.
  */
 export function userError(e: unknown): string {
-  console.warn('shown to the user:', rawError(e));
+  console.warn('shown to the user:', withoutQueries(rawError(e)));
   return describeError(e);
 }

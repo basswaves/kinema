@@ -15,7 +15,7 @@
  */
 import { count } from '../ui/format';
 import { describeFailure } from '../metadata/reach';
-import { userError } from '../ui/errors';
+import { userError, withoutQueries } from '../ui/errors';
 import { setFocus, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import FocusButton from '../ui/FocusButton';
@@ -287,7 +287,8 @@ function adviceFor(reason: string): string {
   if (/no provider available/.test(reason)) {
     return 'Kinema had no way to look this up when it was scanned. Search for it below.';
   }
-  if (/could not be reached|did not answer, but answers now/.test(reason)) {
+  // A lookup that got no answer decided nothing: it is not "could not identify".
+  if (/could not be reached|did not answer, but answers now|error sending request/.test(reason)) {
     return 'Kinema could not reach the service it looks titles up with when this was scanned. The next scan asks again, or search below.';
   }
   if (/no candidates (returned|scored)/.test(reason)) {
@@ -368,7 +369,7 @@ function GroupRow({
   // keeps its own wording underneath for anyone who wants it.
   const reason = group.untitled
     ? 'no title in the file name or its folders'
-    : (group.files.find((f) => f.match_reason)?.match_reason ?? 'not matched yet');
+    : withoutQueries(group.files.find((f) => f.match_reason)?.match_reason ?? 'not matched yet');
   const advice = group.untitled
     ? 'Kinema could not read a title from this file or the folders around it. Search for what it is below.'
     : adviceFor(reason);

@@ -44,6 +44,7 @@ import {
   type TmdbKeySource,
 } from './builtinKey';
 import { pickBest, type Candidate, type ScoreContext } from './score';
+import { withoutQueries } from '../ui/errors';
 import { explainUnreachable } from './reach';
 import { wikidataGetMovie, wikidataSearch } from './wikidata';
 import { nfoForGroup, resolveNfoIds, sourceName } from './nfo';
@@ -559,9 +560,7 @@ export async function matchFiles(
               console.warn(`matching: ${sentence}`);
               return sentence;
             }))
-          : e instanceof Error
-            ? e.message
-            : String(e);
+          : withoutQueries(e instanceof Error ? e.message : String(e));
       const message = `${group.title}: ${why}`;
       errorsByGroup[index] = message;
 

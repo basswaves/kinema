@@ -176,6 +176,7 @@ export function useUpNext({
             path: upNext.path,
             label: episodeRefLabel(upNext),
             fileId: upNext.file_id,
+            episodeName: upNext.video ? null : upNext.name,
             titleId: target.titleId,
             video: upNext.video,
           }

@@ -154,6 +154,22 @@ export function episodeRefLabel(episode: EpisodeRef): string {
 }
 
 /**
+ * What a neighbouring episode is called where the show is already known — Up
+ * next and the Next button: `S05E02 · Its name`, or a playlist item's label
+ * with its episode's name. Never just the show, which says nothing about
+ * which episode comes.
+ */
+export function episodeRefName(episode: EpisodeRef): string {
+  const named = (label: string, name: string | null | undefined) =>
+    name ? `${label} · ${name}` : label;
+  if (episode.target) return named(episode.target.label, episode.target.episodeName);
+  if (episode.video) return videoName(episode.name ?? episode.path);
+  const s = String(episode.season).padStart(2, '0');
+  const e = String(episode.episode).padStart(2, '0');
+  return named(`S${s}E${e}`, episode.name);
+}
+
+/**
  * Store a resume point. `creditsStart` is where the credits begin when that is
  * known from a marker or a named chapter — never from the tail guess — so a
  * position inside them counts as watched even short of 94%.

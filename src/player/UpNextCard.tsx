@@ -6,7 +6,7 @@
  * still running underneath, so the card offers rather than announces.
  */
 import FocusButton from '../ui/FocusButton';
-import { episodeRefLabel, type EpisodeRef } from './api';
+import { episodeRefName, type EpisodeRef } from './api';
 
 export default function UpNextCard({
   episode,
@@ -25,18 +25,7 @@ export default function UpNextCard({
     <div className="up-next">
       <div className="up-next-body">
         <div className="up-next-label">Up next</div>
-        <div className="up-next-title">
-          {episode.video || episode.target ? (
-            // A video in the same folder (videos.rs), or a playlist's next
-            // item, whatever it is: its own name says it.
-            episodeRefLabel(episode)
-          ) : (
-            <>
-              S{String(episode.season).padStart(2, '0')}E{String(episode.episode).padStart(2, '0')}
-              {episode.name ? ` · ${episode.name}` : ''}
-            </>
-          )}
-        </div>
+        <div className="up-next-title">{episodeRefName(episode)}</div>
         <div className="up-next-actions">
           <FocusButton className="btn-primary" onSelect={onPlay}>
             {countdown !== null ? `▶ Play now (${countdown})` : '▶ Play next'}

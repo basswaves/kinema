@@ -542,6 +542,12 @@ async function tmdbFetch(
   params?: Record<string, string>
 ): Promise<Response> {
   if (Date.now() - tmdbDownSince < TMDB_DOWN_MS) throw new Unreachable('TMDB', TMDB_HOSTS);
+  // The minute is over: a fresh start, so it again takes three in a row —
+  // not one, as when the count was left standing (0.13.1 review).
+  if (tmdbDownSince > 0) {
+    tmdbDownSince = 0;
+    tmdbFailuresInARow = 0;
+  }
   const first = await preferredTmdbHost();
   for (let i = 0; i < TMDB_HOSTS.length; i++) {
     const index = (first + i) % TMDB_HOSTS.length;

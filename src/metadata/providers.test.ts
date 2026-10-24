@@ -290,5 +290,15 @@ describe('TMDB with no answer from its first address', () => {
     calls.length = 0;
     expect(await settle(tmdbSearch('key', 'Next', null, 'movie'))).toBeInstanceOf(Unreachable);
     expect(calls).toHaveLength(0);
+    // After the minute it takes three in a row again, not one.
+    vi.setSystemTime(Date.now() + 60_001);
+    for (let n = 0; n < 3; n++) {
+      calls.length = 0;
+      await settle(tmdbSearch('key', `Later ${n}`, null, 'movie'));
+      expect(calls).toHaveLength(4);
+    }
+    calls.length = 0;
+    await settle(tmdbSearch('key', 'Later again', null, 'movie'));
+    expect(calls).toHaveLength(0);
   });
 });

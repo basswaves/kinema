@@ -230,8 +230,10 @@ export default function AccountSection({ service }: { service: Service }) {
       </h2>
       <p className="settings-intro">
         Adds what you finish watching in Kinema to your {text.name} account, including anything you
-        mark as watched. It only ever adds: nothing comes back from {text.name}, and marking
-        something as not watched here leaves {text.name} as it is.
+        mark as watched.{' '}
+        {service === 'trakt'
+          ? 'Where you stop part-way is also sent, and read back so another device can carry on (once connected, a switch here turns that off). Nothing else comes back from Trakt, and marking something as not watched here leaves Trakt as it is.'
+          : `It only ever adds: nothing comes back from ${text.name}, and marking something as not watched here leaves ${text.name} as it is.`}
       </p>
       {error && <p className="settings-warn">{error}</p>}
 

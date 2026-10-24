@@ -126,7 +126,7 @@ async function waitForHooks(timeoutMs) {
   throw new Error('the page came up but the self-test hooks did not (is the exe older than the code?)');
 }
 
-async function start({ fresh = false, exe } = {}) {
+async function start({ fresh = false, exe, env = {} } = {}) {
   if (app) return { already: true, ...status() };
   const exePath = resolve(exe ?? join(root, 'src-tauri', 'target', 'release', 'kinema.exe'));
   if (!existsSync(exePath)) throw new Error(`no exe at ${exePath}; build it (npx tauri build --no-bundle)`);
@@ -141,8 +141,10 @@ async function start({ fresh = false, exe } = {}) {
   const port = await freePort();
   const child = spawn(exePath, [], {
     cwd: dirname(exePath),
+    // `env` first, so a run cannot point the app at another plan or port.
     env: {
       ...process.env,
+      ...Object.fromEntries(Object.entries(env).map(([k, v]) => [k, String(v)])),
       KINEMA_SELFTEST: planFile,
       WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port}`,
     },
@@ -324,6 +326,12 @@ const TOOLS = [
         action: { enum: ['start', 'stop', 'status'] },
         fresh: { type: 'boolean' },
         exe: { type: 'string', description: 'Another kinema.exe to run.' },
+        env: {
+          type: 'object',
+          additionalProperties: { type: 'string' },
+          description:
+            'Extra environment variables for this run only, e.g. {"HTTPS_PROXY":"http://127.0.0.1:9","NO_PROXY":"www.wikidata.org"} to make TMDB unreachable while Wikidata answers.',
+        },
       },
       required: ['action'],
     },

@@ -88,3 +88,13 @@ export async function startFfmpegInstall(): Promise<void> {
     void off.then((stop) => stop());
   }
 }
+
+/**
+ * "Found ffmpeg at ffmpeg." was said when it was found by name on the PATH:
+ * a bare name is where the system looked, not a place.
+ */
+export function ffmpegFoundWords(resolved: string): string {
+  return /[\\/]/.test(resolved)
+    ? `Found ffmpeg at ${resolved}.`
+    : 'Found ffmpeg in the folders the system searches for programs (PATH).';
+}

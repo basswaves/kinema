@@ -22,7 +22,7 @@
 import { useEffect, useState } from 'react';
 import { openLink } from './links';
 import { FfmpegInstallButton, FfmpegInstallStatus, FfmpegLacks } from './FfmpegInstall';
-import { FFMPEG_INSTALL_WORDS, useFfmpegInstall } from './ffmpegInstallState';
+import { FFMPEG_INSTALL_WORDS, ffmpegFoundWords, useFfmpegInstall } from './ffmpegInstallState';
 import { FFMPEG_PATH_KEY, ffmpegStatus, type FfmpegStatus } from '../library/api';
 import { getSetting, setSetting } from '../metadata/api';
 import { useCapabilities } from '../capabilities';
@@ -127,7 +127,7 @@ export default function ExtrasSetup() {
         {ffmpeg && (
           <p className={ffmpeg.available ? 'settings-ok' : 'settings-warn'}>
             {ffmpeg.available
-              ? `Found ffmpeg at ${ffmpeg.resolved}.`
+              ? ffmpegFoundWords(ffmpeg.resolved)
               : 'ffmpeg is not installed, or not where Kinema looks.'}
           </p>
         )}

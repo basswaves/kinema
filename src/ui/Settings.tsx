@@ -32,7 +32,7 @@ import {
 import { openLink } from './links';
 import FocusButton from './FocusButton';
 import { FfmpegInstallButton, FfmpegInstallStatus, FfmpegLacks } from './FfmpegInstall';
-import { FFMPEG_DOWNLOAD_URL, FFMPEG_INSTALL_WORDS, useFfmpegInstall } from './ffmpegInstallState';
+import { FFMPEG_DOWNLOAD_URL, FFMPEG_INSTALL_WORDS, ffmpegFoundWords, useFfmpegInstall } from './ffmpegInstallState';
 import { count, formatBytes } from './format';
 import FocusInput from './FocusInput';
 import BackupSection from './BackupSection';
@@ -1145,7 +1145,7 @@ export default function Settings({
                     {ffmpeg && (
                       <p className={ffmpeg.available ? 'settings-ok' : 'settings-warn'}>
                         {ffmpeg.available
-                          ? `Found ffmpeg at ${ffmpeg.resolved}.`
+                          ? ffmpegFoundWords(ffmpeg.resolved)
                           : `Could not find ffmpeg (looked for "${ffmpeg.resolved}"). Install it, ` +
                             `or type the full path to ffmpeg.exe here. Without it, this detection ` +
                             `and the picture and sound details on a title's page are skipped. ` +

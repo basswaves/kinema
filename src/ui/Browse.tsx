@@ -551,21 +551,24 @@ export default function Browse() {
     let cancelled = false;
     void selfTestPlan().then((plan) => {
       if (!plan || cancelled) return;
-      const play = () =>
+      // An interactive run (the Kinema MCP) names its own file on each `play`.
+      const play = (target?: Partial<PlaybackTarget>) =>
         openView(
           {
             name: 'player',
             target: {
-              path: plan.path,
-              label: plan.label ?? 'Self-test',
-              fileId: plan.fileId,
-              titleId: plan.titleId,
-              playlist: plan.playlist,
+              path: target?.path ?? plan.path,
+              label: target?.label ?? plan.label ?? 'Self-test',
+              fileId: target?.fileId ?? plan.fileId,
+              titleId: target?.titleId ?? plan.titleId,
+              playlist: target?.playlist ?? plan.playlist,
             },
           },
           null
         );
-      if (plan.openAfter) window.setTimeout(play, plan.openAfter * 1000);
+      if (plan.interactive) {
+        // Nothing opens by itself: the tester drives it.
+      } else if (plan.openAfter) window.setTimeout(play, plan.openAfter * 1000);
       else play();
       // The same opening again for a plan's `play` action (leak runs).
       registerSelfTestPlay(play);

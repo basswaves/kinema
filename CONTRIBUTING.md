@@ -332,6 +332,29 @@ It never writes to the real library: the app runs on a snapshot copy in
 `<plan folder>\data`, and skips the startup scan and automatic detection.
 The plan format is documented at the top of the script.
 
+### The Kinema MCP (Claude Code)
+
+`scripts/mcp/kinema-mcp.mjs` is a small MCP server with no dependencies,
+registered in `.mcp.json`. In a Claude Code session in this project it gives
+tools to start the release build as an `interactive` self-test (a copy of the
+library, never SIMKL or Trakt, muted, the window on the second screen), then
+read the screen and focus, send keys, typing and clicks, call self-test
+functions, read mpv properties and logs, query the library copy read-only and
+take a picture of Kinema's window. Contributors without Claude Code can ignore it.
+
+The app itself listens on nothing, in any build. The launcher alone opens
+WebView2's debugging port, on loopback, for that one run. `selftestMcp.test.ts`
+fails if a port or devtools is configured in the app, if the self-test hooks
+are set outside the interactive self-test, or if the server is put in the
+bundle. Windows only: WebKitGTK has no such port, so Linux keeps `selftest.sh`.
+Its pictures are for testing, never for the README or the site.
+
+Which to use: `dev:mock` for interface work and D-pad flows, the cheapest and
+with no real player. The MCP for what only the real window and mpv show,
+explored step by step. `selftest.ps1` plans for repeatable timed runs and
+measurements. `npm run test:ui` stays the proof for flows; the MCP is for
+looking, not a replacement for tests.
+
 For Rust changes:
 
 ```bash

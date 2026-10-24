@@ -41,6 +41,7 @@ import {
   showSubtitles,
   startEngine,
 } from './player/engine';
+import type { PlaybackTarget } from './player/api';
 import { capabilitiesNow } from './capabilities';
 import { countCallbacks, expandActions } from './selftestPlan';
 import { setTvMode } from './ui/tv';
@@ -154,8 +155,9 @@ async function leakSample() {
  * Browse's way of opening the plan's file — the same call `openAfter` makes —
  * for the `play` action. Set while Browse is up; the page owns the screens.
  */
-let openPlanFile: (() => void) | null = null;
-export function registerSelfTestPlay(open: (() => void) | null) {
+type OpenPlayer = (target?: Partial<PlaybackTarget>) => void;
+let openPlanFile: OpenPlayer | null = null;
+export function registerSelfTestPlay(open: OpenPlayer | null) {
   openPlanFile = open;
 }
 
@@ -363,6 +365,13 @@ export interface SelfTestPlan {
    * that is already up.
    */
   openAfter?: number;
+  /**
+   * Driven from outside instead of by `actions` (scripts/mcp/kinema-mcp.mjs):
+   * nothing opens by itself, the run never ends by itself, and the hooks are
+   * on `window.__kinemaSelfTest` for the tester to call. `path`, `seconds`
+   * and `actions` are then ignored.
+   */
+  interactive?: boolean;
   /** Take a leak sample every this many seconds, from the start to the end. */
   leakEvery?: number;
   actions?: SelfTestAction[];
@@ -433,8 +442,53 @@ function screen(): Record<string, string | null> {
   };
 }
 
+/**
+ * An interactive run: off the main screen, on top, muted, and the hooks a
+ * tester needs on the window, where WebView2's debugging port reaches them.
+ * Only ever under a self-test plan, which only a launcher can set.
+ */
+async function startInteractive(plan: SelfTestPlan): Promise<void> {
+  const win = getCurrentWindow();
+  await CALLABLE.moveToScreen(-1 as never).catch((e) =>
+    console.warn('selftest: no second screen', e)
+  );
+  await win.setAlwaysOnTop(true).catch(() => {});
+  if (plan.mute !== false) {
+    void startEngine()
+      .then(() => mpvCommand('set', ['mute', 'yes']))
+      .catch((e) => console.warn('selftest: could not mute', e));
+  }
+  (window as unknown as { __kinemaSelfTest: unknown }).__kinemaSelfTest = {
+    screen,
+    names: () => Object.keys(CALLABLE),
+    call: (fn: string, args: unknown[] = []) => {
+      const target = CALLABLE[fn] as ((...a: unknown[]) => Promise<unknown>) | undefined;
+      if (!target) throw new Error(`no callable ${fn}; see names()`);
+      return target(...args);
+    },
+    play: (target?: Partial<PlaybackTarget>) => {
+      if (!openPlanFile) throw new Error('the player opens from Browse only');
+      openPlanFile(target);
+    },
+    seek: (to: number) => seekTo(to),
+    probe: async (names: string[]) => {
+      const out: Record<string, string | null> = {};
+      for (const name of names) {
+        out[name] = await mpvGet(name, 'string').then(
+          (value) => (value == null ? null : String(value)),
+          () => null
+        );
+      }
+      return out;
+    },
+    nowPlaying,
+  };
+  console.info('selftest: interactive run ready');
+}
+
 /** Carry out the plan, then hand the report to Rust, which writes it and quits. */
 export async function runSelfTest(plan: SelfTestPlan): Promise<void> {
+  if (plan.interactive) return startInteractive(plan);
   const started = performance.now();
   const now = () => Math.round((performance.now() - started) / 10) / 100;
   const timeline: Entry[] = [];

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "kinema": {
+      "command": "node",
+      "args": ["scripts/mcp/kinema-mcp.mjs"]
+    }
+  }
+}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { canonicalLang, languageName, sameLanguage } from './language';
 import type { Track } from './engine';
-import { describeTrack, describeTracks, findTrackByLang } from './tracks';
+import { describeTrack, describeTracks, findTrackByLang, secondChoices, secondTrackFor } from './tracks';
 
 const track = (fields: Partial<Track>): Track => ({
   id: 1,
@@ -102,5 +102,25 @@ describe('describeTracks', () => {
     expect(lines.get(3)).toBe('Italian · picture subtitles · track 3');
     expect(lines.get(4)).toBe('Italian · picture subtitles · track 4');
     expect(lines.get(5)).toBe('English');
+  });
+});
+
+describe('second subtitles', () => {
+  const subs = [
+    track({ id: 1, type: 'sub', lang: 'eng', codec: 'subrip' }),
+    track({ id: 2, type: 'sub', lang: 'nor', codec: 'hdmv_pgs_subtitle' }),
+    track({ id: 3, type: 'sub', lang: 'nor', codec: 'subrip' }),
+    track({ id: 1, type: 'audio', lang: 'eng' }),
+  ];
+
+  it('offers text tracks other than the first, never pictures or sound', () => {
+    expect(secondChoices(subs, 1).map((t) => t.id)).toEqual([3]);
+    expect(secondChoices(subs, null).map((t) => t.id)).toEqual([1, 3]);
+  });
+
+  it('finds the remembered language among them, or none', () => {
+    expect(secondTrackFor(subs, 'no', 1)?.id).toBe(3);
+    expect(secondTrackFor(subs, 'en', 1)).toBeNull();
+    expect(secondTrackFor(subs, null, 1)).toBeNull();
   });
 });

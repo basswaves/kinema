@@ -184,13 +184,14 @@ pub fn get_video_prefs(db: tauri::State<Db>, file_id: i64) -> Result<TitlePrefs,
 fn prefs_for(conn: &Connection, file_id: i64) -> Result<TitlePrefs, String> {
     let Some(dir) = dir_of(conn, file_id)? else { return Ok(no_prefs()) };
     conn.query_row(
-        "SELECT audio_lang, sub_lang, sub_enabled FROM video_prefs WHERE dir = ?1",
+        "SELECT audio_lang, sub_lang, sub_enabled, sub2_lang FROM video_prefs WHERE dir = ?1",
         params![dir],
         |r| {
             Ok(TitlePrefs {
                 audio_lang: r.get(0)?,
                 sub_lang: r.get(1)?,
                 sub_enabled: r.get::<_, i64>(2)? != 0,
+                sub2_lang: r.get(3)?,
                 chosen: true,
             })
         },
@@ -201,7 +202,7 @@ fn prefs_for(conn: &Connection, file_id: i64) -> Result<TitlePrefs, String> {
 }
 
 fn no_prefs() -> TitlePrefs {
-    TitlePrefs { audio_lang: None, sub_lang: None, sub_enabled: true, chosen: false }
+    TitlePrefs { audio_lang: None, sub_lang: None, sub_enabled: true, sub2_lang: None, chosen: false }
 }
 
 #[tauri::command]
@@ -213,14 +214,22 @@ pub fn set_video_prefs(db: tauri::State<Db>, file_id: i64, prefs: TitlePrefs) ->
 fn store_prefs(conn: &Connection, file_id: i64, prefs: &TitlePrefs) -> Result<(), String> {
     let Some(dir) = dir_of(conn, file_id)? else { return Ok(()) };
     conn.execute(
-        "INSERT INTO video_prefs (dir, audio_lang, sub_lang, sub_enabled, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5)
+        "INSERT INTO video_prefs (dir, audio_lang, sub_lang, sub_enabled, sub2_lang, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)
          ON CONFLICT(dir) DO UPDATE SET
             audio_lang  = excluded.audio_lang,
             sub_lang    = excluded.sub_lang,
             sub_enabled = excluded.sub_enabled,
+            sub2_lang   = excluded.sub2_lang,
             updated_at  = excluded.updated_at",
-        params![dir, prefs.audio_lang, prefs.sub_lang, prefs.sub_enabled as i64, now_secs()],
+        params![
+            dir,
+            prefs.audio_lang,
+            prefs.sub_lang,
+            prefs.sub_enabled as i64,
+            prefs.sub2_lang,
+            now_secs()
+        ],
     )
     .map_err(to_string_err)?;
     Ok(())
@@ -623,10 +632,17 @@ mod tests {
     fn track_choices_are_kept_per_folder() {
         let conn = library();
         assert!(!prefs_for(&conn, 1).unwrap().chosen);
-        let prefs = TitlePrefs { audio_lang: Some("nor".into()), sub_lang: None, sub_enabled: false, chosen: true };
+        let prefs = TitlePrefs {
+            audio_lang: Some("nor".into()),
+            sub_lang: None,
+            sub_enabled: false,
+            sub2_lang: Some("eng".into()),
+            chosen: true,
+        };
         store_prefs(&conn, 1, &prefs).unwrap();
         let same_folder = prefs_for(&conn, 3).unwrap();
         assert_eq!(same_folder.audio_lang.as_deref(), Some("nor"));
+        assert_eq!(same_folder.sub2_lang.as_deref(), Some("eng"));
         assert!(!prefs_for(&conn, 4).unwrap().chosen, "another folder has its own");
     }
 

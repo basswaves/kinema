@@ -159,3 +159,25 @@ export function findTrackByLang(
   if (candidates.length === 0) return null;
   return candidates.find((t) => !t.forced) ?? candidates[0];
 }
+
+/** Drawn pictures (Blu-ray PGS, DVD): mpv can scale them, nothing more. */
+export const isPictureSubtitle = (track: Track) =>
+  subtitleKind(track.codec) === 'picture subtitles';
+
+/**
+ * The tracks that can be the second subtitles, drawn at the top: text only,
+ * since mpv draws picture subtitles as the first track alone, and never the
+ * track that is already the first.
+ */
+export function secondChoices(tracks: Track[], sid: number | null): Track[] {
+  return tracks.filter((t) => t.type === 'sub' && t.id !== sid && !isPictureSubtitle(t));
+}
+
+/** The second track for a remembered language, if this file has one. */
+export function secondTrackFor(
+  tracks: Track[],
+  lang: string | null | undefined,
+  sid: number | null
+): Track | null {
+  return findTrackByLang(secondChoices(tracks, sid), 'sub', lang ?? null);
+}

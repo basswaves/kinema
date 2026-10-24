@@ -69,6 +69,10 @@ pub struct TitlePrefs {
     pub audio_lang: Option<String>,
     pub sub_lang: Option<String>,
     pub sub_enabled: bool,
+    /// A second subtitle language, drawn at the top (desktop only). Missing
+    /// from an older caller means none.
+    #[serde(default)]
+    pub sub2_lang: Option<String>,
     /// Whether anything has been chosen for this title at all. Without a
     /// choice the default languages in Settings apply; with one, the title's
     /// own choice wins. Ignored when saving — saving is the choice.
@@ -784,13 +788,14 @@ pub fn previous_episode(db: tauri::State<Db>, file_id: i64) -> Result<Option<Epi
 pub fn get_title_prefs(db: tauri::State<Db>, title_id: i64) -> Result<TitlePrefs, String> {
     let conn = db.0.lock().map_err(to_string_err)?;
     conn.query_row(
-        "SELECT audio_lang, sub_lang, sub_enabled FROM title_prefs WHERE title_id = ?1",
+        "SELECT audio_lang, sub_lang, sub_enabled, sub2_lang FROM title_prefs WHERE title_id = ?1",
         params![title_id],
         |r| {
             Ok(TitlePrefs {
                 audio_lang: r.get(0)?,
                 sub_lang: r.get(1)?,
                 sub_enabled: r.get::<_, i64>(2)? != 0,
+                sub2_lang: r.get(3)?,
                 chosen: true,
             })
         },
@@ -800,6 +805,7 @@ pub fn get_title_prefs(db: tauri::State<Db>, title_id: i64) -> Result<TitlePrefs
             audio_lang: None,
             sub_lang: None,
             sub_enabled: true,
+            sub2_lang: None,
             chosen: false,
         }),
         other => Err(to_string_err(other)),
@@ -814,18 +820,20 @@ pub fn set_title_prefs(
 ) -> Result<(), String> {
     let conn = db.0.lock().map_err(to_string_err)?;
     conn.execute(
-        "INSERT INTO title_prefs (title_id, audio_lang, sub_lang, sub_enabled, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5)
+        "INSERT INTO title_prefs (title_id, audio_lang, sub_lang, sub_enabled, sub2_lang, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)
          ON CONFLICT(title_id) DO UPDATE SET
             audio_lang  = excluded.audio_lang,
             sub_lang    = excluded.sub_lang,
             sub_enabled = excluded.sub_enabled,
+            sub2_lang   = excluded.sub2_lang,
             updated_at  = excluded.updated_at",
         params![
             title_id,
             prefs.audio_lang,
             prefs.sub_lang,
             prefs.sub_enabled as i64,
+            prefs.sub2_lang,
             now_secs()
         ],
     )

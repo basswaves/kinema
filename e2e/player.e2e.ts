@@ -595,6 +595,29 @@ test('subtitle size and a dark box, by remote, kept for this screen', async ({ p
     .toContain('"size":"large","box":true');
 });
 
+test('second subtitles at the top, by remote, remembered for the show and cleared', async ({ page }) => {
+  await play(page, 'series');
+  // None remembered: mpv is told so, or it would keep the last file's number.
+  await expect.poll(() => sets(page)).toContain('secondary-sid=no');
+
+  const panel = await openTrackPanel(page);
+  await pressInPanel(page, panel.locator('.track-option', { hasText: 'Second subtitles, at the top: None' }));
+  await pressInPanel(page, panel.locator('.track-second', { hasText: 'Norwegian' }).first());
+  await expect.poll(() => sets(page)).toContain('secondary-sid=2');
+  await expect(panel.locator('.track-option', { hasText: 'at the top: Norwegian' })).toBeVisible();
+  await expect
+    .poll(() => call<{ sub2_lang?: string | null }>(page, '/src/player/api.ts', 'getTitlePrefs', 1))
+    .toMatchObject({ sub2_lang: 'nor' });
+
+  await pressInPanel(page, panel.locator('.track-second', { hasText: 'None' }));
+  await expect
+    .poll(async () => (await sets(page)).filter((s) => s.startsWith('secondary-sid=')).at(-1))
+    .toBe('secondary-sid=no');
+  await expect
+    .poll(() => call<{ sub2_lang?: string | null }>(page, '/src/player/api.ts', 'getTitlePrefs', 1))
+    .toMatchObject({ sub2_lang: null });
+});
+
 test('sound that will not open falls back, and says so', async ({ page }) => {
   await play(page, 'series', (p) =>
     p.evaluate(() => {

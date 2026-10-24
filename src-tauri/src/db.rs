@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use std::path::Path;
 
 /// The schema this build understands. Bump it with every new `SCHEMA_V*`.
-pub const SCHEMA_VERSION: i64 = 28;
+pub const SCHEMA_VERSION: i64 = 29;
 
 /// What can go wrong opening the library.
 ///
@@ -797,6 +797,14 @@ CREATE TABLE local_art (
 );
 "#;
 
+/// A second subtitle language shown at the top of the picture with the first
+/// (mpv's `secondary-sid`), remembered per title and per Videos folder like
+/// the first. NULL is none.
+const SCHEMA_V29: &str = r#"
+ALTER TABLE title_prefs ADD COLUMN sub2_lang TEXT;
+ALTER TABLE video_prefs ADD COLUMN sub2_lang TEXT;
+"#;
+
 /// How long a statement waits for the write lock before giving up.
 ///
 /// Load-bearing from the moment there is more than one connection. SQLite
@@ -1014,7 +1022,7 @@ pub(crate) const MIGRATIONS: [&str; SCHEMA_VERSION as usize] = [
     SCHEMA_V9, SCHEMA_V10, SCHEMA_V11, SCHEMA_V12, SCHEMA_V13, SCHEMA_V14,
     SCHEMA_V15, SCHEMA_V16, SCHEMA_V17, SCHEMA_V18, SCHEMA_V19,
     SCHEMA_V20, SCHEMA_V21, SCHEMA_V22, SCHEMA_V23, SCHEMA_V24, SCHEMA_V25,
-    SCHEMA_V26, SCHEMA_V27, SCHEMA_V28,
+    SCHEMA_V26, SCHEMA_V27, SCHEMA_V28, SCHEMA_V29,
 ];
 
 /// Bring the database up to [`SCHEMA_VERSION`].

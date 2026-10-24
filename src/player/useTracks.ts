@@ -3,12 +3,14 @@
  * remembered languages on (else the defaults in Settings — trackChoice.ts),
  * forced subtitles from OpenSubtitles where the file has none, and a choice
  * in the track panel, which is remembered for the whole title. Also how big
- * the subtitles are drawn on this screen (subtitleStyle.ts).
+ * the subtitles are drawn on this screen (subtitleStyle.ts), and a second
+ * subtitle track at the top, remembered for the title like the first.
  */
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { getTitlePrefs, setTitlePrefs, type PlaybackTarget, type TitlePrefs } from './api';
 import { getVideoPrefs, setVideoPrefs } from '../library/videos';
 import {
+  chooseSecondTrack,
   chooseTrack as playTrack,
   hasMpv,
   openPath,
@@ -22,6 +24,7 @@ import { forcedSubtitle, loadSubtitle } from './onlineSubtitles';
 import { samePath } from './session';
 import { screenHere } from './displaySwitch';
 import { applySubStyle, DEFAULT_STYLE, readSubStyle, saveSubStyle, type SubStyle } from './subtitleStyle';
+import { secondTrackFor } from './tracks';
 import { chooseTracks, forcedTrack, readLanguageDefaults, spokenTrack } from './trackChoice';
 
 /**
@@ -53,6 +56,8 @@ export function useTracks({
   const [sid, setSid] = useState<number | null>(null);
   const [aid, setAid] = useState<number | null>(null);
   const [subVisible, setSubVisible] = useState(true);
+  /** The second subtitles, drawn at the top (mpv only); null: none. */
+  const [sid2, setSid2] = useState<number | null>(null);
   /** Subtitle size and box for the screen the picture is on (desktop). */
   const [subStyle, setSubStyle] = useState<SubStyle>(DEFAULT_STYLE);
   const styleScreen = useRef<string | null>(null);
@@ -86,12 +91,14 @@ export function useTracks({
     // This title's own choice if there is one, else the defaults in Settings
     // — see trackChoice.ts. A trailer (no title) takes the defaults too.
     let showForced = true;
+    let sub2Lang: string | null = null;
     try {
       const [prefs, defaults] = await Promise.all([
         prefsOf(target.titleId, videoFile),
         readLanguageDefaults(),
       ]);
       showForced = defaults.forced;
+      sub2Lang = prefs?.sub2_lang ?? null;
       const [mode, lang] = defaults.subs.split(':');
       setWantedSubLang(mode !== 'off' && lang ? lang : systemLanguage());
       const choice = chooseTracks(list, prefs, defaults);
@@ -112,6 +119,20 @@ export function useTracks({
 
     const visible = await subtitlesShown();
     setSubVisible(visible);
+
+    // The second subtitles in the remembered language, or none — set either
+    // way, since mpv would keep the last file's number (engine.ts).
+    if (hasMpv()) {
+      const firstId = updated.find((t) => t.type === 'sub' && t.selected)?.id ?? null;
+      const second = secondTrackFor(updated, sub2Lang, firstId);
+      try {
+        await chooseSecondTrack(second?.id ?? null);
+        setSid2(second?.id ?? null);
+      } catch (e) {
+        console.warn('could not show the second subtitles', e);
+        setSid2(null);
+      }
+    }
 
     // Forced subtitles from OpenSubtitles, for a file with none of its own —
     // only when switched on (Rust checks), never over full subtitles, and in
@@ -159,6 +180,13 @@ export function useTracks({
   const chooseTrack = useCallback(
     async (kind: 'audio' | 'sub', track: Track | null) => {
       try {
+        // The second subtitles cannot be the first as well: chosen as the
+        // first, it stops being the second.
+        const clearsSecond = kind === 'sub' && track !== null && track.id === sid2;
+        if (clearsSecond) {
+          await chooseSecondTrack(null);
+          setSid2(null);
+        }
         if (kind === 'sub' && track === null) {
           await showSubtitles(false);
           setSubVisible(false);
@@ -179,13 +207,47 @@ export function useTracks({
             audio_lang: kind === 'audio' ? (track?.lang ?? null) : current.audio_lang,
             sub_lang: kind === 'sub' ? (track?.lang ?? null) : current.sub_lang,
             sub_enabled: kind === 'sub' ? track !== null : current.sub_enabled,
+            sub2_lang: clearsSecond ? null : (current.sub2_lang ?? null),
           });
         }
       } catch (e) {
         fail(e);
       }
     },
-    [target.titleId, videoFile, fail]
+    [target.titleId, videoFile, fail, sid2]
+  );
+
+  /** The second subtitles, or none; remembered for the whole title. */
+  const chooseSecond = useCallback(
+    async (track: Track | null) => {
+      try {
+        await chooseSecondTrack(track?.id ?? null);
+        setSid2(track?.id ?? null);
+        const current = await prefsOf(target.titleId, videoFile);
+        if (current) {
+          // Nothing chosen here yet: keep what is playing now as the choice,
+          // or saving the second would replace the defaults with nothing.
+          const langOf = (type: string, id: number | null) =>
+            tracks.find((t) => t.type === type && t.id === id)?.lang ?? null;
+          const first = current.chosen
+            ? current
+            : {
+                audio_lang: langOf('audio', aid),
+                sub_lang: langOf('sub', sid),
+                sub_enabled: subVisible,
+              };
+          await storePrefs(target.titleId, videoFile, {
+            audio_lang: first.audio_lang,
+            sub_lang: first.sub_lang,
+            sub_enabled: first.sub_enabled,
+            sub2_lang: track?.lang ?? null,
+          });
+        }
+      } catch (e) {
+        fail(e);
+      }
+    },
+    [target.titleId, videoFile, fail, tracks, aid, sid, subVisible]
   );
 
   /** A new size or box, for this screen from now on. */
@@ -218,5 +280,7 @@ export function useTracks({
     refreshTracks,
     subStyle,
     changeSubStyle,
+    sid2,
+    chooseSecond,
   };
 }

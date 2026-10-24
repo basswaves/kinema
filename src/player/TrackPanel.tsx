@@ -8,7 +8,7 @@ import type { NewItem } from '../library/playlists';
 import { useFocusGroup } from '../ui/focusGroups';
 import FocusButton from '../ui/FocusButton';
 import type { Track } from './engine';
-import { describeTracks } from './tracks';
+import { describeTracks, secondChoices } from './tracks';
 import { languageBadge, languageName } from './language';
 import { describeOffer, type Offer } from './onlineSubtitles';
 import { nextSize, sizeLabel, type SubStyle } from './subtitleStyle';
@@ -82,6 +82,8 @@ export default function TrackPanel({
   playlistItem,
   subStyle,
   onSubStyle,
+  sid2,
+  onSecond,
 }: {
   audioTracks: Track[];
   subTracks: Track[];
@@ -107,9 +109,16 @@ export default function TrackPanel({
    */
   subStyle?: SubStyle | null;
   onSubStyle?: (style: SubStyle) => void;
+  /**
+   * The second subtitles, drawn at the top (mpv's `secondary-sid`), and
+   * choosing them. None where Media3 plays: it shows one text track.
+   */
+  sid2?: number | null;
+  onSecond?: ((track: Track | null) => void) | null;
 }) {
   const [adding, setAdding] = useState(false);
   const [added, setAdded] = useState<string | null>(null);
+  const [secondOpen, setSecondOpen] = useState(false);
 
   // A closed menu (NAV-MAP N1, agreed 2026-10-11): focus never walks out to
   // the controls behind it; Up on the top goes round to the bottom and back;
@@ -117,6 +126,8 @@ export default function TrackPanel({
   const { ref, focusKey } = useFocusGroup<HTMLElement>('menu', { focusKey: TRACK_PANEL_KEY });
   const audioLines = describeTracks(audioTracks);
   const subLines = describeTracks(subTracks);
+  const seconds = onSecond ? secondChoices(subTracks, subVisible ? sid : null) : [];
+  const secondNow = subTracks.find((t) => t.id === sid2) ?? null;
 
   return (
     <FocusContext.Provider value={focusKey}>
@@ -195,6 +206,41 @@ export default function TrackPanel({
                     {describeOffer(offer)}
                   </FocusButton>
                 ))}
+              </>
+            )}
+          </>
+        )}
+        {seconds.length > 0 && onSecond && (
+          <>
+            <FocusButton
+              className="track-option"
+              keepInView="nearest"
+              onSelect={() => setSecondOpen((open) => !open)}
+            >
+              {`Second subtitles, at the top: ${
+                secondNow ? (languageName(secondNow.lang) ?? subLines.get(secondNow.id)) : 'None'
+              } ${secondOpen ? '⌄' : '›'}`}
+            </FocusButton>
+            {secondOpen && (
+              <>
+                <FocusButton
+                  className={`track-option track-second ${sid2 == null ? 'active' : ''}`}
+                  keepInView="nearest"
+                  onSelect={() => onSecond(null)}
+                >
+                  None
+                </FocusButton>
+                {seconds.map((track) => (
+                  <FocusButton
+                    key={track.id}
+                    className={`track-option track-second ${sid2 === track.id ? 'active' : ''}`}
+                    keepInView="nearest"
+                    onSelect={() => onSecond(track)}
+                  >
+                    <TrackText track={track} line={subLines.get(track.id)} />
+                  </FocusButton>
+                ))}
+                <p className="track-note">Text subtitles only.</p>
               </>
             )}
           </>

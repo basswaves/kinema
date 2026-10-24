@@ -123,6 +123,8 @@ export interface TitlePrefs {
   audio_lang: string | null;
   sub_lang: string | null;
   sub_enabled: boolean;
+  /** The second subtitles' language, drawn at the top (desktop); null: none. */
+  sub2_lang?: string | null;
   /** Something was chosen in this title; false means the defaults apply. */
   chosen?: boolean;
 }

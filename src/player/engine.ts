@@ -657,6 +657,17 @@ export async function chooseTrack(kind: 'audio' | 'sub', id: number): Promise<vo
   await command('set', [kind === 'audio' ? 'aid' : 'sid', String(id)]);
 }
 
+/**
+ * The second subtitles, drawn at the top (`secondary-sid`), or none. Set on
+ * every file, `no` included: like `sid`, mpv keeps the number for the next
+ * file, where it would pick whatever track has it. mpv only; Media3 shows
+ * one text track.
+ */
+export async function chooseSecondTrack(id: number | null): Promise<void> {
+  if (isMedia3()) return;
+  await command('set', ['secondary-sid', id === null ? 'no' : String(id)]);
+}
+
 /** Show or hide the subtitles, keeping the track chosen. */
 export async function showSubtitles(visible: boolean): Promise<void> {
   if (isMedia3()) return media3.showSubtitles(visible);

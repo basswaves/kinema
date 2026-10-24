@@ -96,6 +96,8 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     refreshTracks,
     subStyle,
     changeSubStyle,
+    sid2,
+    chooseSecond,
   } = useTracks({ target, fail });
 
   // Every control in the player hangs off this container, so the OSD has one
@@ -486,6 +488,8 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           onDetails={openStatsFromTracks}
           subStyle={hasMpv() ? subStyle : null}
           onSubStyle={(style) => void changeSubStyle(style)}
+          sid2={sid2}
+          onSecond={hasMpv() ? (track) => void chooseSecond(track) : null}
           playlistItem={
             target.fileId !== null || target.resumeByPath
               ? { path: target.path, file_id: target.fileId }

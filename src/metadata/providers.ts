@@ -482,13 +482,24 @@ const TMDB_HOST_KEY = 'tmdb_api_host';
 const TMDB_CONNECT_TIMEOUT_MS = 15_000;
 
 /**
- * After both addresses failed, how long further requests fail at once instead
- * of each waiting out two timeouts — a library of films behind a blocking
- * network would otherwise take most of an hour to be told no.
+ * A connection that fails is tried again after these waits, on each address
+ * in turn: a slow or flaky line drops a connection now and then, and one bad
+ * moment used to cost a title its match (a tester's lookups failed now and
+ * then and cleared after a restart).
  */
+const TMDB_RETRY_WAITS_MS = [0, 1_000];
+
+/**
+ * After this many requests in a row found no address answering, further
+ * requests fail at once for `TMDB_DOWN_MS` instead of each waiting out every
+ * retry — a library behind a network that blocks TMDB would otherwise take
+ * most of an hour to be told no. Never after one: that is the flaky line.
+ */
+const TMDB_DOWN_AFTER = 3;
 const TMDB_DOWN_MS = 60_000;
 
 let tmdbHost: Promise<number> | null = null;
+let tmdbFailuresInARow = 0;
 let tmdbDownSince = 0;
 
 function preferredTmdbHost(): Promise<number> {
@@ -524,7 +535,7 @@ export class Unreachable extends Error {
   }
 }
 
-/** One TMDB request, at whichever address answers. */
+/** One TMDB request, at whichever address answers, with a retry on each. */
 async function tmdbFetch(
   key: string,
   path: string,
@@ -535,25 +546,30 @@ async function tmdbFetch(
   for (let i = 0; i < TMDB_HOSTS.length; i++) {
     const index = (first + i) % TMDB_HOSTS.length;
     const host = TMDB_HOSTS[index];
-    try {
-      const response = await fetchPolitely(
-        tmdbUrl(key, path, params, host),
-        `TMDB ${path}`,
-        undefined,
-        TMDB_CONNECT_TIMEOUT_MS
-      );
-      tmdbDownSince = 0;
-      if (index !== first) {
-        console.warn(`TMDB: ${TMDB_HOSTS[first]} gave no answer, ${host} did; using ${host}`);
-        tmdbHost = Promise.resolve(index);
-        await setSetting(TMDB_HOST_KEY, host).catch(() => undefined);
+    for (const wait of TMDB_RETRY_WAITS_MS) {
+      if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+      try {
+        const response = await fetchPolitely(
+          tmdbUrl(key, path, params, host),
+          `TMDB ${path}`,
+          undefined,
+          TMDB_CONNECT_TIMEOUT_MS
+        );
+        tmdbFailuresInARow = 0;
+        tmdbDownSince = 0;
+        if (index !== first) {
+          console.warn(`TMDB: ${TMDB_HOSTS[first]} gave no answer, ${host} did; using ${host}`);
+          tmdbHost = Promise.resolve(index);
+          await setSetting(TMDB_HOST_KEY, host).catch(() => undefined);
+        }
+        return response;
+      } catch (e) {
+        console.warn(`TMDB ${path}: no answer from ${host}:`, e instanceof Error ? e.message : String(e));
       }
-      return response;
-    } catch (e) {
-      console.warn(`TMDB ${path}: no answer from ${host}:`, e instanceof Error ? e.message : String(e));
     }
   }
-  tmdbDownSince = Date.now();
+  tmdbFailuresInARow++;
+  if (tmdbFailuresInARow >= TMDB_DOWN_AFTER) tmdbDownSince = Date.now();
   throw new Unreachable('TMDB', TMDB_HOSTS);
 }
 

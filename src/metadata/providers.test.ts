@@ -263,24 +263,30 @@ describe('TMDB with no answer from its first address', () => {
   };
   const hostOf = (i: number) => new URL(calls[i].url).host;
 
-  it('asks the second address, then keeps to the one that answered', async () => {
+  it('tries again once, then the second address, then keeps to the one that answered', async () => {
     deadHosts.add('api.themoviedb.org');
     responses = [{ status: 200, body: { results: [] } }, { status: 200, body: { results: [] } }];
     await settle(tmdbSearch('key', 'A film', null, 'movie'));
-    expect(calls.map((_, i) => hostOf(i))).toEqual(['api.themoviedb.org', 'api.tmdb.org']);
+    expect(calls.map((_, i) => hostOf(i))).toEqual([
+      'api.themoviedb.org',
+      'api.themoviedb.org',
+      'api.tmdb.org',
+    ]);
 
     calls.length = 0;
     await settle(tmdbSearch('key', 'Another', null, 'movie'));
     expect(calls.map((_, i) => hostOf(i))).toEqual(['api.tmdb.org']);
   });
 
-  it('says it could not be reached when neither answers, and stops asking for a while', async () => {
+  it('says it could not be reached when neither answers, and stops asking only after three', async () => {
     deadHosts.add('api.tmdb.org');
-    const e = await settle(tmdbSearch('key', 'A film', null, 'movie'));
-    expect(e).toBeInstanceOf(Unreachable);
-    expect(String(e)).toMatch(/api\.themoviedb\.org or api\.tmdb\.org/);
-    expect(calls).toHaveLength(2);
-
+    for (let n = 0; n < 3; n++) {
+      calls.length = 0;
+      const e = await settle(tmdbSearch('key', `Film ${n}`, null, 'movie'));
+      expect(e).toBeInstanceOf(Unreachable);
+      expect(String(e)).toMatch(/api\.themoviedb\.org or api\.tmdb\.org/);
+      expect(calls).toHaveLength(4);
+    }
     calls.length = 0;
     expect(await settle(tmdbSearch('key', 'Next', null, 'movie'))).toBeInstanceOf(Unreachable);
     expect(calls).toHaveLength(0);

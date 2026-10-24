@@ -3691,8 +3691,10 @@ and a Jellyfin source further out. Decisions made along the way:
   so a blocked network is not an hour of timeouts.
 - **Re-watching keeps the tick** (owner, 2026-10-24). One completed flag
   stays, and `save` keeps MAX(old, new). `resume.ts` offers a re-watch
-  position below 80 %, because finishing happens at the credits, past that
-  share.
+  position below 80 %. Finishing can happen at a credits marker from half
+  way, below that share, so where a play finished is stored as 0 (review
+  before 0.13.1); schema 27 clears the positions older versions kept on
+  watched files, where they finished or were marked watched by hand.
 - **Send a report no longer opens the browser at once** (owner, 2026-10-24):
   it saves the zip and says where; opening the form and showing the file are
   their own presses.

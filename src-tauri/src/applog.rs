@@ -111,29 +111,32 @@ pub fn write(level: &str, message: &str) {
 /// Query parameters that carry a key. A failed request's error names its whole
 /// URL, TMDB's and OMDb's keys included, and the log goes into Send a report's
 /// zip — attached to a public issue.
-const KEY_PARAMS: [&str; 2] = ["api_key=", "apikey="];
+const KEY_PARAMS: [&str; 4] = ["api_key=", "apikey=", "access_token=", "token="];
 
-/// `message` with the value of every key parameter replaced by `…`.
+/// `message` with the value of every key parameter replaced by `…`, in any
+/// case — `API_KEY=` too (0.13.1 review) — as devlog.ts hides them on its side.
 fn hide_keys(message: &str) -> std::borrow::Cow<'_, str> {
-    if !KEY_PARAMS.iter().any(|p| message.contains(p)) {
+    // ASCII lowercasing keeps every byte where it was, so positions found in
+    // `lower` cut `message` in the same places.
+    let lower = message.to_ascii_lowercase();
+    if !KEY_PARAMS.iter().any(|p| lower.contains(p)) {
         return std::borrow::Cow::Borrowed(message);
     }
     let mut out = String::with_capacity(message.len());
-    let mut rest = message;
+    let mut from = 0;
     while let Some((at, param)) = KEY_PARAMS
         .iter()
-        .filter_map(|p| rest.find(p).map(|i| (i, *p)))
+        .filter_map(|p| lower[from..].find(p).map(|i| (from + i, *p)))
         .min_by_key(|(i, _)| *i)
     {
         let value = at + param.len();
-        out.push_str(&rest[..value]);
+        out.push_str(&message[from..value]);
         out.push('…');
-        let end = rest[value..]
-            .find(|c: char| c == '&' || c == ')' || c == '"' || c.is_whitespace())
-            .map_or(rest.len(), |i| value + i);
-        rest = &rest[end..];
+        from = message[value..]
+            .find(|c: char| matches!(c, '&' | ')' | '"' | '\'' | '#') || c.is_whitespace())
+            .map_or(message.len(), |i| value + i);
     }
-    out.push_str(rest);
+    out.push_str(&message[from..]);
     std::borrow::Cow::Owned(out)
 }
 
@@ -266,6 +269,7 @@ mod tests {
         );
         assert_eq!(hide_keys("https://www.omdbapi.com/?apikey=k1 and ?api_key=k2"), "https://www.omdbapi.com/?apikey=… and ?api_key=…");
         assert_eq!(hide_keys("nothing here"), "nothing here");
+        assert_eq!(hide_keys("?API_KEY=k1&ApiKey=k2 'access_token=t1' x"), "?API_KEY=…&ApiKey=… 'access_token=…' x");
     }
 
     #[test]

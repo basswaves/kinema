@@ -7,6 +7,33 @@ makes no stability promises.
 
 ## [Unreleased]
 
+### Changed
+
+- **Up next names the episode.** Up next and the playlist's Up next card say
+  "S05E02 · its name". The episode's name also stays in the player's top line
+  after Up next has moved on.
+- **Audio & subtitles** tells apart tracks that would read the same: picture
+  or text subtitles, then the track's number in the file. Audio tracks too.
+- The player's Next and Previous episode buttons name the episode, not the
+  show. Back has a name for screen readers and the test tools even while the
+  controls are hidden.
+- **Scan progress in plain words** everywhere: "Reading file names…" and
+  "Finding the titles · 348 of 397", where it said "parsing…" and "matching:
+  348/397".
+- **Needs attention says why** in plain words ("The name is 52 % alike, the
+  year is the same; another title looked just as likely", "Nothing came back
+  for this name"), and counts titles, not "groups the matcher would not guess
+  at".
+- The Welcome page's folders each have a Remove button.
+
+### Fixed
+
+- Leaving the player after it moved on to another episode of a show goes to
+  that show's page, not Home.
+- Finishing the setup pages while the first scan is still finding titles shows
+  "Reading your library" with what it is doing, instead of the Welcome page
+  again.
+
 ## [0.13.1] — 2026-10-24
 
 Fixes for what the first outside tester met: when TMDB gives no answer, Kinema

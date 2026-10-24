@@ -130,6 +130,11 @@ function Servers({ onStep }: { onStep: (next: NetStep) => void }) {
           </FocusButton>
         </li>
       </ul>
+      <p className="muted folder-note">
+        A network drive is your NAS, or a computer that shares a folder with your films. It needs
+        that shared folder, and you need its user name and password — Kinema cannot connect as a
+        guest yet.
+      </p>
       {found === null ? (
         <p className="muted folder-note">Looking for network drives…</p>
       ) : (
@@ -265,8 +270,9 @@ function SignIn({ server, onStep }: { server: Server; onStep: (next: NetStep) =>
         {busy ? 'Connecting…' : 'Connect'}
       </FocusButton>
       <p className="muted">
-        The user name and password you use for {server.name}. Kinema keeps them locked on this
-        device, and only reads from the drive.
+        Your user name and password on {server.name} — the ones you sign in to that NAS or
+        computer with. Kinema cannot connect as a guest yet. It keeps them locked on this device,
+        and only reads from the drive.
       </p>
     </div>
   );

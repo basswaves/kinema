@@ -558,6 +558,10 @@ export async function matchFiles(
         e instanceof Unreachable
           ? await (unreachable ??= explainUnreachable(e).then((sentence) => {
               console.warn(`matching: ${sentence}`);
+              // A passing drop is not kept for the run: the next title with no
+              // answer asks again rather than saying "answers now" once TMDB
+              // has gone for good (0.13.1 review).
+              if (sentence.includes('answers now')) unreachable = null;
               return sentence;
             }))
           : withoutQueries(e instanceof Error ? e.message : String(e));

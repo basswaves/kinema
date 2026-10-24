@@ -604,11 +604,15 @@ test('second subtitles at the top, by remote, remembered for the show and cleare
   await pressInPanel(page, panel.locator('.track-option', { hasText: 'Second subtitles, at the top: None' }));
   await pressInPanel(page, panel.locator('.track-second', { hasText: 'Norwegian' }).first());
   await expect.poll(() => sets(page)).toContain('secondary-sid=2');
-  await expect(panel.locator('.track-option', { hasText: 'at the top: Norwegian' })).toBeVisible();
+  // The choice closes the list and hands the ring back to its button, so a
+  // stray OK does not pick again.
+  await expect(panel.locator('.track-second')).toHaveCount(0);
+  await expect.poll(() => focused(page)).toContain('at the top: Norwegian');
   await expect
     .poll(() => call<{ sub2_lang?: string | null }>(page, '/src/player/api.ts', 'getTitlePrefs', 1))
     .toMatchObject({ sub2_lang: 'nor' });
 
+  await press(page, 'Enter');
   await pressInPanel(page, panel.locator('.track-second', { hasText: 'None' }));
   await expect
     .poll(async () => (await sets(page)).filter((s) => s.startsWith('secondary-sid=')).at(-1))
@@ -616,6 +620,82 @@ test('second subtitles at the top, by remote, remembered for the show and cleare
   await expect
     .poll(() => call<{ sub2_lang?: string | null }>(page, '/src/player/api.ts', 'getTitlePrefs', 1))
     .toMatchObject({ sub2_lang: null });
+});
+
+test('a sound delay for this device, by remote and keys, said and kept', async ({ page }) => {
+  await play(page, 'series');
+  // Put on as each file starts, none by default.
+  await expect.poll(() => sets(page)).toContain('audio-delay=0.000');
+
+  const panel = await openTrackPanel(page);
+  const later = panel.getByRole('button', { name: 'Sound 10 ms later' });
+  for (let i = 0; i < 20 && (await panel.locator('.track-delay .focused').count()) === 0; i++) {
+    await press(page, 'ArrowDown');
+  }
+  for (let i = 0; i < 3 && !(await later.evaluate((el) => el.classList.contains('focused'))); i++) {
+    await press(page, 'ArrowRight');
+  }
+  await press(page, 'Enter', 2);
+  await expect.poll(() => sets(page)).toContain('audio-delay=0.020');
+  await expect(panel.locator('.track-delay-label')).toHaveText('Sound delay: +20 ms');
+  await expect(page.locator('.player-notice')).toHaveText('Sound delayed by 20 ms for this device');
+  await expect
+    .poll(() => call<string | null>(page, '/src/metadata/api.ts', 'getSetting', 'audio_delay'))
+    .toMatch(/":20\}$/);
+
+  // mpv's own keys on a keyboard: Ctrl − earlier, Ctrl 0 back to none.
+  await press(page, 'Control+-', 3);
+  await expect.poll(() => sets(page)).toContain('audio-delay=-0.010');
+  await expect(page.locator('.player-notice')).toHaveText('Sound 10 ms earlier for this device');
+  await press(page, 'Control+0');
+  await expect
+    .poll(async () => (await sets(page)).filter((s) => s.startsWith('audio-delay=')).at(-1))
+    .toBe('audio-delay=0.000');
+  await expect
+    .poll(() => call<string | null>(page, '/src/metadata/api.ts', 'getSetting', 'audio_delay'))
+    .toBe('{}');
+});
+
+test('the chapter list by remote: the one playing marked, OK jumps there', async ({ page }) => {
+  await play(page, 'series', (p) =>
+    p.evaluate(() => {
+      (window as unknown as { __fakeMpv: { chapters: unknown[] } }).__fakeMpv.chapters = [
+        { time: 0, title: 'Opening' },
+        { time: 120, title: null },
+        { time: 240, title: 'Last part' },
+      ];
+    })
+  );
+  await press(page, 'ArrowDown');
+  for (let i = 0; i < 6 && (await focused(page)) !== 'Chapters'; i++) {
+    await press(page, 'ArrowRight');
+  }
+  await expect.poll(() => focused(page)).toBe('Chapters');
+  await press(page, 'Enter');
+  const panel = page.locator('.chapter-panel');
+  await expect(panel).toBeVisible();
+  await expect(panel.locator('.chapter-option.active')).toContainText('Opening');
+  // The ring opens on the chapter playing.
+  await expect.poll(() => focused(page)).toContain('Opening');
+
+  await press(page, 'ArrowDown');
+  await expect.poll(() => focused(page)).toContain('Chapter 2');
+  await press(page, 'Enter');
+  await expect(panel).toBeHidden();
+  await expect.poll(async () => (await mpv(page)).position).toBeGreaterThanOrEqual(120);
+  await expect.poll(() => focused(page)).toBe('Chapters');
+
+  await press(page, 'Enter');
+  await expect(panel.locator('.chapter-option.active')).toContainText('Chapter 2');
+  await press(page, 'Escape');
+  await expect(panel).toBeHidden();
+});
+
+test('no chapter list for a file without chapters', async ({ page }) => {
+  await play(page, 'series');
+  await press(page, 'ArrowDown');
+  await expect(page.locator('.player-controls')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Chapters' })).toHaveCount(0);
 });
 
 test('sound that will not open falls back, and says so', async ({ page }) => {

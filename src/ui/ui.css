@@ -4027,3 +4027,12 @@ kbd {
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
+
+/* The chapter list: each start time in a column of its own before the name. */
+.chapter-time {
+  display: inline-block;
+  min-width: 3.5rem;
+  margin-right: 0.5rem;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}

@@ -10,4 +10,5 @@
 export const PLAYER_SHELL_KEY = 'player-shell';
 export const PLAYER_PLAY_KEY = 'player-play';
 export const PLAYER_TRACKS_KEY = 'player-tracks-button';
+export const PLAYER_CHAPTERS_KEY = 'player-chapters-button';
 export const PLAYER_SEEK_KEY = 'player-seek';

@@ -248,6 +248,7 @@ export function useSkipMarkers({
     dismissed,
     dismiss: setDismissed,
     performSkip,
+    chapters,
     setChapters,
     countedCreditsStart,
   };

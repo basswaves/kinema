@@ -1,16 +1,17 @@
 /**
- * The player's two panels: Audio & subtitles (the track panel) and the stats
- * panel (on `i`, a remote's Info key, or from Audio & subtitles), with the
- * focus ring following each in and back out.
+ * The player's panels: Audio & subtitles (the track panel), the stats panel
+ * (on `i`, a remote's Info key, or from Audio & subtitles) and the chapter
+ * list, with the focus ring following each in and back out.
  */
 import { setFocus } from '@noriginmedia/norigin-spatial-navigation';
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import { PLAYER_PLAY_KEY, PLAYER_TRACKS_KEY } from './focusKeys';
+import { PLAYER_CHAPTERS_KEY, PLAYER_PLAY_KEY, PLAYER_TRACKS_KEY } from './focusKeys';
 import { hasMpv } from './engine';
 import { readPlaybackStats, type StatGroup } from './stats';
 import { readMedia3Stats } from './statsMedia3';
 import { TRACK_PANEL_KEY } from './TrackPanel';
 import { STATS_CLOSE_KEY } from './StatsPanel';
+import { CHAPTER_PANEL_KEY } from './ChapterPanel';
 
 /** Stats refresh. Fast enough to watch a drop counter, slow enough to be free. */
 const STATS_REFRESH_MS = 1000;
@@ -26,9 +27,22 @@ export function usePanels({
 }) {
   const [showTracks, setShowTracks] = useState(false);
   const [showStats, setShowStats] = useState(false);
+  const [showChapters, setShowChapters] = useState(false);
   const [stats, setStats] = useState<StatGroup[]>([]);
 
-  const openTracks = useCallback(() => setShowTracks(true), []);
+  const openTracks = useCallback(() => {
+    setShowChapters(false);
+    setShowTracks(true);
+  }, []);
+  /** The chapter list (ChapterPanel), one panel at a time with the tracks. */
+  const openChapters = useCallback(() => {
+    setShowTracks(false);
+    setShowChapters(true);
+  }, []);
+  const closeChapters = useCallback(() => {
+    if (osdFocusRef.current) void setFocus(PLAYER_CHAPTERS_KEY);
+    setShowChapters(false);
+  }, [osdFocusRef]);
   /**
    * Opened from Audio & subtitles — the way in without a keyboard's `i`: the
    * ring goes into the panel and comes back to that button after.
@@ -111,6 +125,10 @@ export function usePanels({
   useEffect(() => {
     if (osdFocus && showTracks) void setFocus(TRACK_PANEL_KEY);
   }, [showTracks, osdFocus]);
+  // The chapter list lands on the chapter playing (its group's `current`).
+  useEffect(() => {
+    if (osdFocus && showChapters) void setFocus(CHAPTER_PANEL_KEY);
+  }, [showChapters, osdFocus]);
 
   return {
     showTracks,
@@ -121,5 +139,8 @@ export function usePanels({
     openStatsFromTracks,
     closeStats,
     stats,
+    showChapters,
+    openChapters,
+    closeChapters,
   };
 }

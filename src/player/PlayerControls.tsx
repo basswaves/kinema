@@ -8,9 +8,10 @@ import FocusButton from '../ui/FocusButton';
 import { formatTime } from '../ui/format';
 import { setShortcutsOpen } from '../ui/shortcutsState';
 import type { Steps } from './useNeighbours';
-import { PLAYER_PLAY_KEY, PLAYER_TRACKS_KEY } from './focusKeys';
+import { PLAYER_CHAPTERS_KEY, PLAYER_PLAY_KEY, PLAYER_TRACKS_KEY } from './focusKeys';
 import {
   BackTenIcon,
+  ChaptersIcon,
   ForwardTenIcon,
   FullscreenIcon,
   NextIcon,
@@ -38,6 +39,9 @@ interface Props {
    */
   steps: Steps;
   showTracks: boolean;
+  /** The file has chapters to choose between: the Chapters button shows. */
+  hasChapters: boolean;
+  showChapters: boolean;
   volume: number;
   muted: boolean;
   /** Sound bitstreamed to a receiver: the volume here would do nothing. */
@@ -57,6 +61,8 @@ interface Props {
   onTogglePause: () => void;
   /** Audio & subtitles: opens the track panel, or closes it. */
   onTracks: () => void;
+  /** Chapters: opens the chapter list, or closes it. */
+  onChapters: () => void;
   onVolumeChange: (delta: number) => void;
   onVolumeSet: (level: number, save: boolean) => void;
   onToggleMute: () => void;
@@ -69,6 +75,8 @@ function PlayerControls({
   paused,
   steps,
   showTracks,
+  hasChapters,
+  showChapters,
   volume,
   muted,
   receiver,
@@ -82,6 +90,7 @@ function PlayerControls({
   onSeekBy,
   onTogglePause,
   onTracks,
+  onChapters,
   onVolumeChange,
   onVolumeSet,
   onToggleMute,
@@ -194,6 +203,16 @@ function PlayerControls({
           )}
         </div>
         <div className="player-group player-group-right">
+          {hasChapters && (
+            <FocusButton
+              focusKey={PLAYER_CHAPTERS_KEY}
+              className={`labelled-button ${showChapters ? 'active' : ''}`}
+              onSelect={onChapters}
+            >
+              <ChaptersIcon />
+              <span>Chapters</span>
+            </FocusButton>
+          )}
           <FocusButton
             focusKey={PLAYER_TRACKS_KEY}
             className={`labelled-button ${showTracks ? 'active' : ''}`}

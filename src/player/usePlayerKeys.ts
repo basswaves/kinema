@@ -35,6 +35,8 @@ export function usePlayerKeys({
   leaveOsdFocus,
   showTracks,
   showStats,
+  showChapters,
+  closeChapters,
   closeTracks,
   closeStats,
   openStats,
@@ -69,6 +71,8 @@ export function usePlayerKeys({
   leaveOsdFocus: () => void;
   showTracks: boolean;
   showStats: boolean;
+  showChapters: boolean;
+  closeChapters: () => void;
   closeTracks: () => void;
   closeStats: () => void;
   openStats: () => void;
@@ -116,7 +120,9 @@ export function usePlayerKeys({
         case 'Backspace':
         case 'BrowserBack':
           e.preventDefault();
-          if (showTracks) {
+          if (showChapters) {
+            closeChapters();
+          } else if (showTracks) {
             closeTracks();
           } else if (showStats) {
             closeStats();
@@ -256,6 +262,8 @@ export function usePlayerKeys({
     leaveOsdFocus,
     showTracks,
     showStats,
+    showChapters,
+    closeChapters,
     closeTracks,
     closeStats,
     openStats,

@@ -36,7 +36,7 @@ import FocusButton from '../ui/FocusButton';
 import { endsAtLabel } from '../ui/format';
 import { useTvMode } from '../ui/tv';
 import { episodeRefName, type EpisodeRef, type PlaybackTarget } from './api';
-import { hasMpv, isPaused, seekBy, seekTo, setPaused } from './engine';
+import { hasMpv, isPaused, seekBy, seekTo, setPaused, type Chapter } from './engine';
 import { PLAYER_PLAY_KEY, PLAYER_SHELL_KEY } from './focusKeys';
 import { ALL_ARROWS, useFocusGroup } from '../ui/focusGroups';
 import PlayerControls from './PlayerControls';
@@ -45,6 +45,7 @@ import SkipButton from './SkipButton';
 import { skipPromptFor } from './skip';
 import StatsPanel from './StatsPanel';
 import TrackPanel from './TrackPanel';
+import ChapterPanel from './ChapterPanel';
 import UpNextCard from './UpNextCard';
 import { useFolderNeighbours, useNeighbours, type Step, type Steps } from './useNeighbours';
 import { useOnlineSubtitles } from './useOnlineSubtitles';
@@ -123,6 +124,9 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     openStatsFromTracks,
     closeStats,
     stats,
+    showChapters,
+    openChapters,
+    closeChapters,
   } = usePanels({ osdFocus, osdFocusRef });
   const { delayMs, changeDelay } = useAudioDelay(setNotice);
 
@@ -153,6 +157,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     dismissed,
     dismiss,
     performSkip,
+    chapters,
     setChapters,
     countedCreditsStart,
   } = useSkipMarkers({ target, session, neighbours, showOsd, fail, dispatch });
@@ -303,6 +308,17 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     openTracks();
     void refreshTracks();
   }, [showTracks, closeTracks, openTracks, refreshTracks]);
+  const onChapters = useCallback(() => {
+    if (showChapters) closeChapters();
+    else openChapters();
+  }, [showChapters, closeChapters, openChapters]);
+  const jumpToChapter = useCallback(
+    (chapter: Chapter) => {
+      closeChapters();
+      void seekTo(chapter.time);
+    },
+    [closeChapters]
+  );
   const onFullscreen = useCallback(() => void toggleFullscreen(), [toggleFullscreen]);
 
   /**
@@ -341,6 +357,8 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     leaveOsdFocus,
     showTracks,
     showStats,
+    showChapters,
+    closeChapters,
     closeTracks,
     closeStats,
     openStats,
@@ -358,7 +376,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   // The controls step back out of the way on their own (useOsd.ts).
   useOsdIdleLeave({
     osdFocus,
-    idle: !paused && !showTracks && !showStats && upNext === null,
+    idle: !paused && !showTracks && !showStats && !showChapters && upNext === null,
     leaveOsdFocus,
   });
 
@@ -478,6 +496,15 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           the one thing it is for. */}
       {showStats && <StatsPanel stats={stats} onClose={closeStats} />}
 
+      {showChapters && (
+        <ChapterPanel
+          chapters={chapters}
+          timePos={timePos ?? 0}
+          onJump={jumpToChapter}
+          onClose={closeChapters}
+        />
+      )}
+
       {showTracks && (
         <TrackPanel
           audioTracks={audioTracks}
@@ -522,6 +549,9 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         onSeekBy={onSeekBy}
         onTogglePause={onTogglePause}
         onTracks={onTracks}
+        hasChapters={chapters.length >= 2}
+        showChapters={showChapters}
+        onChapters={onChapters}
         onVolumeChange={changeVolume}
         onVolumeSet={setVolumeLevel}
         onToggleMute={toggleMute}

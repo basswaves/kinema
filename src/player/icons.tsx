@@ -83,6 +83,12 @@ export const SubtitlesIcon = () => (
   </Icon>
 );
 
+export const ChaptersIcon = () => (
+  <Icon>
+    <path d="M5 6.5h2M5 12h2M5 17.5h2M10 6.5h9M10 12h9M10 17.5h9" />
+  </Icon>
+);
+
 export const VolumeIcon = ({ muted }: { muted: boolean }) => (
   <Icon>
     <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor" />

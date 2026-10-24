@@ -17,6 +17,8 @@ export interface MergeOfferState {
   path: string;
   kind: LibraryKind;
   inside: LibraryRoot[];
+  /** A Videos folder's typed name, kept through the merge. */
+  name?: string;
 }
 
 interface Props {

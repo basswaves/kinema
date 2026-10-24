@@ -677,7 +677,7 @@ export default function Settings({
       try {
         const inside = await rootsToMerge(folder.path, 'videos');
         if (inside.length > 0) {
-          setMergeOffer({ path: folder.path, kind: 'videos', inside });
+          setMergeOffer({ path: folder.path, kind: 'videos', inside, name: folder.name });
           return;
         }
         await addLibraryRoot(folder.path, 'videos', folder.name);
@@ -695,7 +695,7 @@ export default function Settings({
       setMergeOffer(null);
       setError(null);
       try {
-        await mergeLibraryRoots(offer.path, offer.kind);
+        await mergeLibraryRoots(offer.path, offer.kind, offer.name);
         await refresh();
         setNote(`Merged into ${offer.path}. Scan to pick up what else it holds.`);
       } catch (e) {

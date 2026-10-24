@@ -28,7 +28,7 @@ const NAME_KEY = 'folders-name';
 type Step =
   | { step: 'kind' }
   | { step: 'name'; name: string }
-  | { step: 'merge'; kind: LibraryKind; inside: LibraryRoot[] };
+  | { step: 'merge'; kind: LibraryKind; inside: LibraryRoot[]; name?: string };
 
 export default function AddFolder({
   path,
@@ -56,7 +56,7 @@ export default function AddFolder({
     try {
       const inside = await rootsToMerge(path, kind);
       if (inside.length > 0) {
-        setAt({ step: 'merge', kind, inside });
+        setAt({ step: 'merge', kind, inside, name });
         return;
       }
       await addLibraryRoot(path, kind, name);
@@ -66,11 +66,11 @@ export default function AddFolder({
     }
   };
 
-  const merge = async (kind: LibraryKind) => {
+  const merge = async (kind: LibraryKind, name?: string) => {
     setError(null);
     try {
-      await mergeLibraryRoots(path, kind);
-      onAdded(lastPart(path));
+      await mergeLibraryRoots(path, kind, name);
+      onAdded(name ?? lastPart(path));
     } catch (e) {
       setError(userError(e));
     }
@@ -141,7 +141,7 @@ export default function AddFolder({
       {at.step === 'merge' && (
         <MergeOffer
           offer={{ path, kind: at.kind, inside: at.inside }}
-          onMerge={() => void merge(at.kind)}
+          onMerge={() => void merge(at.kind, at.name)}
           onCancel={onCancel}
         />
       )}

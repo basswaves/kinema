@@ -222,6 +222,7 @@ pub async fn merge_library_roots(
     db: tauri::State<'_, Db>,
     path: String,
     kind: String,
+    name: Option<String>,
 ) -> Result<i64, String> {
     check_kind(&kind)?;
     let probe = path.clone();
@@ -229,10 +230,10 @@ pub async fn merge_library_roots(
         return Err(format!("not a directory: {path}"));
     }
     let mut conn = db.0.lock().map_err(to_string_err)?;
-    merge_roots(&mut conn, &path, &kind)
+    merge_roots(&mut conn, &path, &kind, name.as_deref())
 }
 
-fn merge_roots(conn: &mut rusqlite::Connection, path: &str, kind: &str) -> Result<i64, String> {
+fn merge_roots(conn: &mut rusqlite::Connection, path: &str, kind: &str, name: Option<&str>) -> Result<i64, String> {
     let candidate = comparable(path);
     let roots = list_roots(conn)?;
     for root in &roots {
@@ -258,8 +259,16 @@ fn merge_roots(conn: &mut rusqlite::Connection, path: &str, kind: &str) -> Resul
     let tx = conn.transaction().map_err(to_string_err)?;
     tx.execute(
         "INSERT INTO library_roots (path, kind, added_at, name) VALUES (?1, ?2, ?3, ?4)",
-        // A Videos folder keeps the name of the first one merged into it.
-        params![path, kind, now_secs(), inside.iter().find_map(|r| r.name.clone())],
+        // A Videos folder keeps the name typed for it, else the first merged one's.
+        params![
+            path,
+            kind,
+            now_secs(),
+            name.map(str::trim)
+                .filter(|n| !n.is_empty())
+                .map(str::to_string)
+                .or_else(|| inside.iter().find_map(|r| r.name.clone()))
+        ],
     )
     .map_err(to_string_err)?;
     let new_id = tx.last_insert_rowid();
@@ -553,13 +562,17 @@ mod tests {
 
         // The film folder is a different kind, so the whole merge is refused
         // and nothing changes.
-        let refused = merge_roots(&mut conn, r"D:\Media", "tv").unwrap_err();
+        let refused = merge_roots(&mut conn, r"D:\Media", "tv", None).unwrap_err();
         assert!(refused.contains("movies library folder"), "got {refused}");
         assert_eq!(root_ids_of_files(&conn), vec![(1, 1), (2, 2), (3, 3)]);
 
         conn.execute("DELETE FROM library_roots WHERE id = 3", []).unwrap();
-        let id = merge_roots(&mut conn, r"D:\Media", "tv").unwrap();
+        // A typed name is kept through the merge (S5: it was lost).
+        let id = merge_roots(&mut conn, r"D:\Media", "tv", Some(" Home videos ")).unwrap();
         assert_eq!(root_ids_of_files(&conn), vec![(1, id), (2, id)]);
+        let name: Option<String> =
+            conn.query_row("SELECT name FROM library_roots WHERE id = ?1", [id], |r| r.get(0)).unwrap();
+        assert_eq!(name.as_deref(), Some("Home videos"));
         let roots: i64 = conn.query_row("SELECT COUNT(*) FROM library_roots", [], |r| r.get(0)).unwrap();
         assert_eq!(roots, 1);
         let position: f64 = conn
@@ -573,10 +586,10 @@ mod tests {
     fn merging_refuses_what_is_not_a_parent() {
         let mut conn = library();
         // Inside an existing folder, and the same folder: not parents.
-        assert!(merge_roots(&mut conn, r"D:\Media\Shows A\Season 1", "tv").is_err());
-        assert!(merge_roots(&mut conn, r"D:\Media\Shows A", "tv").is_err());
+        assert!(merge_roots(&mut conn, r"D:\Media\Shows A\Season 1", "tv", None).is_err());
+        assert!(merge_roots(&mut conn, r"D:\Media\Shows A", "tv", None).is_err());
         // A sibling with a shared prefix holds nothing.
-        assert!(merge_roots(&mut conn, r"D:\Media2", "tv").is_err());
+        assert!(merge_roots(&mut conn, r"D:\Media2", "tv", None).is_err());
         assert!(roots_inside(&conn, r"D:\Media2").unwrap().is_empty());
         assert_eq!(root_ids_of_files(&conn), vec![(1, 1), (2, 2), (3, 3)]);
     }

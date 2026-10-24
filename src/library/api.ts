@@ -73,8 +73,9 @@ export const addLibraryRoot = (path: string, kind: LibraryKind, name?: string) =
 export const libraryRootsInside = (path: string) =>
   invoke<LibraryRoot[]>('library_roots_inside', { path });
 
-export const mergeLibraryRoots = (path: string, kind: LibraryKind) =>
-  invoke<number>('merge_library_roots', { path, kind });
+/** `name`: a Videos folder's typed name; the first merged one's if none. */
+export const mergeLibraryRoots = (path: string, kind: LibraryKind, name?: string) =>
+  invoke<number>('merge_library_roots', { path, kind, name: name ?? null });
 
 /**
  * The library folders a newly picked folder would swallow, when merging them is

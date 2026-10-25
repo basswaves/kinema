@@ -544,8 +544,12 @@ html {
   display: flex;
   gap: 0.75rem;
   /* Vertical padding leaves room for the focus ring and the scale-up of the
-     first and last card, which would otherwise be clipped by the gutter. */
-  padding: 0.25rem var(--gutter) 0.625rem;
+     first and last card, which would otherwise be clipped by the gutter.
+     `overflow-x: auto` clips vertically too, so the top needs the whole
+     scale-up of a card (~10px) plus the ring and its offset (up to 6px);
+     the negative margin keeps the gap under the heading as it was. */
+  margin-top: -0.75rem;
+  padding: 1.25rem var(--gutter) 0.875rem;
   overflow-x: auto;
   scrollbar-width: none;
 }

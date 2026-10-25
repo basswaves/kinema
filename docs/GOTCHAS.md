@@ -941,6 +941,16 @@ covered the middle button entirely, so Right went straight from the first to
 the third. The row had lost its `gap` (below). **Do:** every row of buttons
 needs a real `gap`, not buttons that happen to touch.
 
+A gap is not enough on a **wide** button, because a share grows with its size:
+a title page's Version button, as long as a release name, grew nearly 30 px a
+side at 106 % — three times the row's gap — and the button to its right
+painted over its ring (every `.btn-secondary` has `backdrop-filter`, so each
+is its own layer, drawn in page order). **Do:** a highlighted control gets
+`position: relative` and a `z-index`, and a button's growth is capped at a
+fixed amount: `scale(min(1.06, calc(1 + 0.75 / var(--w, 1))))`, where `--w`
+is its width in rem, set by `noteWidth` in `FocusButton` when the highlight
+arrives (CSS cannot read an element's own width).
+
 ### A control overlaid on a card is unreachable, wherever you put it
 
 The corollary of "Focus cannot travel up into an overlay nav" and the focus

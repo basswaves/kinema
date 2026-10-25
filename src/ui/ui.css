@@ -489,7 +489,9 @@ html {
 
 .btn-primary:hover,
 .btn-secondary:hover {
-  transform: scale(1.04);
+  position: relative;
+  z-index: 1;
+  transform: scale(min(1.04, calc(1 + 0.5 / var(--w, 1))));
 }
 
 /* Focus ring for D-pad navigation. Must be clearly visible from three metres
@@ -517,11 +519,17 @@ html {
   outline-offset: 2px;
 }
 
+/* The highlighted control grows, and always draws over its neighbours, or the
+   next one along paints across its ring. Buttons grow by a share of their size
+   up to a fixed amount (`--w`, their width in rem, from `noteWidth`): a share
+   alone is nearly thirty pixels a side on a button as wide as a version name. */
 .btn-primary.focused,
 .btn-secondary.focused {
+  position: relative;
+  z-index: 2;
   outline: var(--focus-ring) solid #fff;
   outline-offset: 3px;
-  transform: scale(1.06);
+  transform: scale(min(1.06, calc(1 + 0.75 / var(--w, 1))));
 }
 
 /* ---- rails -------------------------------------------------------------- */
@@ -592,6 +600,8 @@ html {
 
 .see-all-card:hover,
 .see-all-card.focused {
+  position: relative;
+  z-index: 1;
   background: rgba(255, 255, 255, 0.12);
   transform: scale(1.07);
 }
@@ -622,6 +632,8 @@ html {
 
 .card:hover,
 .card.focused {
+  position: relative;
+  z-index: 1;
   transform: scale(1.07);
 }
 
@@ -740,6 +752,8 @@ html {
 
 .continue-body:hover,
 .continue-body.focused {
+  position: relative;
+  z-index: 1;
   transform: scale(1.05);
 }
 
@@ -3523,7 +3537,9 @@ kbd {
   color: #0a0a0c;
   outline: var(--focus-ring) solid #fff;
   outline-offset: 3px;
-  transform: scale(1.04);
+  position: relative;
+  z-index: 2;
+  transform: scale(min(1.04, calc(1 + 0.75 / var(--w, 1))));
 }
 
 .leave-cancel {
@@ -3686,7 +3702,9 @@ kbd {
   color: #0a0a0c;
   outline: var(--focus-ring) solid #fff;
   outline-offset: 3px;
-  transform: scale(1.02);
+  position: relative;
+  z-index: 2;
+  transform: scale(min(1.02, calc(1 + 0.75 / var(--w, 1))));
 }
 
 .folder-item.focused .muted {

@@ -628,3 +628,20 @@ export function installReadOn(): void {
     true
   );
 }
+
+/**
+ * Tells the stylesheet how wide a control is, in rem, as `--w`.
+ *
+ * A highlighted button grows by a share of its size, which is a few pixels on
+ * an ordinary button and nearly thirty either side on one as wide as a version
+ * name — wider than the gap, so it ran into its neighbours. The CSS caps the
+ * growth at a fixed amount with `min(share, 1 + fixed / var(--w))`; it cannot
+ * read an element's own width, so this hands it over. Read when the highlight
+ * arrives (focus or pointer), before the transform applies; without it the CSS
+ * falls back to the plain share.
+ */
+export function noteWidth(node: HTMLElement | null): void {
+  if (!node) return;
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  node.style.setProperty('--w', String(node.offsetWidth / rem));
+}

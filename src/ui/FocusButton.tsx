@@ -8,8 +8,8 @@
  * discover it. One component keeps the two input methods from drifting apart.
  */
 import { useFocusable } from '@noriginmedia/norigin-spatial-navigation';
-import { useEffect, type ReactNode } from 'react';
-import { keepOnScreen, scrollPageToTop } from './focus';
+import { useEffect, useLayoutEffect, type ReactNode } from 'react';
+import { keepOnScreen, noteWidth, scrollPageToTop } from './focus';
 
 export type KeepInView = 'nearest' | 'page-top';
 
@@ -63,6 +63,12 @@ export default function FocusButton({
     onFocus: onHighlight,
   });
 
+  // Its label can change while it is highlighted (a version picked), so the
+  // width is read again on each render that holds the ring.
+  useLayoutEffect(() => {
+    if (focused) noteWidth(ref.current);
+  });
+
   useEffect(() => {
     if (!focused || !keepInView) return;
     if (keepInView === 'page-top') scrollPageToTop(ref.current);
@@ -77,7 +83,10 @@ export default function FocusButton({
       title={title}
       aria-label={label}
       onClick={onSelect}
-      onMouseEnter={onHighlight}
+      onMouseEnter={(e) => {
+        noteWidth(e.currentTarget);
+        onHighlight?.();
+      }}
     >
       {children}
     </button>

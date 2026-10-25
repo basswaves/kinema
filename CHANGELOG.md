@@ -7,6 +7,14 @@ makes no stability promises.
 
 ## [Unreleased]
 
+## [0.14.0] — 2026-10-25
+
+Subtitles you can read and two languages at once, several files of one film
+as versions you can choose, My list and Play something, pictures already in
+your folders, a sound delay for each sound device, a chapter list, shuffle and
+repeat for playlists, plain words in scanning and Needs attention, and clearer
+help for network shares.
+
 ### Added
 
 - **Pictures already in your library are used.** A poster.jpg, folder.jpg,
@@ -33,8 +41,6 @@ makes no stability promises.
   & subtitles panel ("Second subtitles, at the top"). Text subtitles only,
   never the same track as the first. Remembered per title, and per Videos
   folder; None clears it. Desktop only (Media3 shows one text track).
-- Library upgrade to schema 29 (`sub2_lang` in `title_prefs` and
-  `video_prefs`).
 - **A sound delay for each sound device.** In 10 ms steps, for receivers or
   TVs that put the sound out of step with the lips. In the player's Audio &
   subtitles panel (-10 / +10 / 0, works with a remote), with Ctrl + / Ctrl - /
@@ -47,8 +53,6 @@ makes no stability promises.
 - **Shuffle and repeat on a playlist's page**, kept for each playlist. Shuffle
   plays every item once before any plays again; Previous goes back the way it
   came; repeat starts again from the top (or with a new shuffled round).
-- Library upgrade to schema 30 (`shuffle`, `repeat_all`, `shuffle_order` on
-  playlists).
 - **My list.** One list for anything to keep handy, to watch later or loved.
   "+ My list" sits beside Play on a film's or a show's page; L on a
   highlighted card or page puts it on or takes it off (a small red ribbon on
@@ -63,7 +67,6 @@ makes no stability promises.
   in Needs attention or a Videos clip, and not the last few picks again. Only
   when nothing fits does it take anything not yet watched (a show not started
   begins at episode 1).
-- Library upgrade to schema 31 (`my_list`).
 - **Fallback matches move up to TMDB, all of them.** Kinema uses Wikidata and
   OMDb (films) or TVmaze (shows) only when no TMDB key works. Once one does,
   each scan moves up to 40 of those titles to TMDB, by the TMDB id held; else
@@ -75,7 +78,6 @@ makes no stability promises.
   history and My list follow. The last scan line in Settings says "12 films
   and 2 shows got pictures from TMDB". Before, only Wikidata films that named
   their TMDB id moved.
-- Library upgrade to schema 32 (`upgrade_checked_at` on `titles`).
 - **Videos: badges for the focused video.** The video you highlight or hover
   shows its picture and sound badges at the foot of a Videos page, from the
   file's own facts, as on a film's page.
@@ -104,10 +106,13 @@ makes no stability promises.
 - **Settings → Library: "Here more than once".** How many films and episodes
   are in more than one file, with a list of each version and the total size.
   Kinema never deletes a file.
-- Library upgrade to schema 33 (`version_choice`).
 
 ### Changed
 
+- **The library is upgraded on first start** (schema 27 to 33, for pictures
+  found beside files, the second subtitle language, playlist shuffle and
+  repeat, My list, fallback matches and versions). A safety copy is made
+  first; an older Kinema cannot open the upgraded library.
 - **The website's disc guide is rewritten** as "How to rip your DVDs, Blu-rays
   and 4K discs": DVD, Blu-ray and 4K in one page, step by step with drawings,
   picking the right title (including discs with many fake titles), which

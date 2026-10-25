@@ -720,8 +720,8 @@ pub fn mark_upgrade_checked(db: tauri::State<Db>, title_id: i64) -> Result<(), S
 /// Re-key a title to another provider's entry for the same title, in place.
 /// The row keeps its id, so files, resume points, playlists, track choices and
 /// local pictures stay with it, and `save_title` then fills it from the new
-/// provider. Watch history and My list name a title by its provider's ids, so
-/// their rows under the old ids are renamed with it.
+/// provider. Watch history, My list and the version picked name a title by
+/// its provider's ids, so their rows under the old ids are renamed with it.
 ///
 /// A row the new entry already has with no files (left from an earlier match)
 /// gives way. Refused — false — when that row still has files: two rows for one
@@ -766,6 +766,12 @@ fn adopt(conn: &rusqlite::Connection, id: i64, provider: &str, provider_id: &str
     )?;
     tx.execute(
         "UPDATE OR IGNORE my_list
+            SET provider = ?3, provider_id = ?4, tmdb_id = COALESCE(tmdb_id, ?5)
+          WHERE provider = ?1 AND provider_id = ?2",
+        params![old_provider, old_id, provider, provider_id, tmdb],
+    )?;
+    tx.execute(
+        "UPDATE OR IGNORE version_choice
             SET provider = ?3, provider_id = ?4, tmdb_id = COALESCE(tmdb_id, ?5)
           WHERE provider = ?1 AND provider_id = ?2",
         params![old_provider, old_id, provider, provider_id, tmdb],
@@ -1015,7 +1021,9 @@ mod tests {
                      position_secs, duration_secs, completed, updated_at)
                  VALUES ('series', 'tvmaze', '77', 1, 1, 1200, 1200, 1, 1);
              INSERT INTO my_list (kind, provider, provider_id, added_at)
-                 VALUES ('series', 'tvmaze', '77', 1);",
+                 VALUES ('series', 'tvmaze', '77', 1);
+             INSERT INTO version_choice (kind, provider, provider_id, path, key, updated_at)
+                 VALUES ('series', 'tvmaze', '77', 'C:/tv/a.mkv', '1080p', 1);",
         )
         .unwrap();
         assert!(adopt(&conn, 5, "tmdb", "1400").unwrap());
@@ -1029,6 +1037,10 @@ mod tests {
             .query_row("SELECT provider_id FROM my_list WHERE provider = 'tmdb'", [], |r| r.get(0))
             .unwrap();
         assert_eq!(listed, "1400");
+        let chosen: String = conn
+            .query_row("SELECT provider_id FROM version_choice WHERE provider = 'tmdb'", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(chosen, "1400");
         let (title_id, position): (i64, f64) = conn
             .query_row(
                 "SELECT m.title_id, p.position_secs FROM media_files m

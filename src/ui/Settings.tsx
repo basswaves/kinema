@@ -31,6 +31,7 @@ import {
   type ShareLogin,
 } from '../library/folders';
 import { openLink } from './links';
+import DuplicatesSection from './DuplicatesSection';
 import FocusButton from './FocusButton';
 import { FfmpegInstallButton, FfmpegInstallStatus, FfmpegLacks } from './FfmpegInstall';
 import { FFMPEG_DOWNLOAD_URL, FFMPEG_INSTALL_WORDS, ffmpegFoundWords, useFfmpegInstall } from './ffmpegInstallState';
@@ -960,6 +961,8 @@ export default function Settings({
                     />
                   )}
                 </section>
+
+                <DuplicatesSection />
 
                 <section className="settings-section">
                   <h2>Setup</h2>

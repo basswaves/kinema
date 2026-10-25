@@ -23,6 +23,9 @@ import { readLocalName } from '../library/localTitle';
 import FocusGroup from './FocusGroup';
 import MediaBadges, { BadgeRows } from './MediaBadges';
 import HeavyFileNotice from './HeavyFileNotice';
+import VersionDialog from './VersionDialog';
+import { useChosenVersion, useTitleVersions } from './useVersions';
+import { chooseVersion, pickVersion, readVersions, type Version } from '../library/versions';
 import { PlaylistDialog } from './PlaylistPicker';
 import type { NewItem } from '../library/playlists';
 import { useSeasonBadges } from './seasonBadges';
@@ -86,6 +89,7 @@ interface Props {
 const DETAIL_FOCUS_KEY = 'detail-root';
 const DETAIL_PLAY_KEY = 'detail-play';
 const DETAIL_LIST_KEY = 'detail-my-list';
+const DETAIL_VERSION_KEY = 'detail-version';
 const DETAIL_FIRST_EPISODE_KEY = 'detail-first-episode';
 
 /**
@@ -259,21 +263,69 @@ export default function TitleDetailView({ title, onPlayFile, onBack, onFindMatch
    * What Play starts: the next episode for a series, the file for a film. The
    * label names the episode so a press is never a surprise.
    */
+  const versionsHere = useTitleVersions(title.id, detail);
+  const { versions, chosen } = useChosenVersion(
+    title.kind === 'series'
+      ? nextUp
+        ? versionsHere.groups.get(`${nextUp.season}:${nextUp.episode}`)
+        : undefined
+      : versionsHere.groups.get('film'),
+    versionsHere.choice,
+    versionsHere.screen
+  );
+  const [versionsOpen, setVersionsOpen] = useState(false);
+  const { setChoice } = versionsHere;
+  const pickedVersion = useCallback(
+    (v: Version) => {
+      setChoice({ path: v.path, key: v.key });
+      void chooseVersion(title.id, v.path, v.key).catch((e) =>
+        console.warn('version choice not kept', e)
+      );
+    },
+    [title.id, setChoice]
+  );
+
   const primary = useMemo((): (PlayRequest & { what: string }) | null => {
+    // A film or episode here more than once: the version picked (versions.ts).
+    const file = chosen ? { path: chosen.path, fileId: chosen.file_id } : null;
     if (title.kind === 'series') {
       if (!nextUp) return null;
       const code = `S${String(nextUp.season).padStart(2, '0')}E${String(nextUp.episode).padStart(2, '0')}`;
       return {
-        path: nextUp.path,
+        path: file?.path ?? nextUp.path,
         label: episodeLabel(name, nextUp.season, nextUp.episode),
-        fileId: nextUp.file_id,
+        fileId: file?.fileId ?? nextUp.file_id,
         episodeName: nextUp.name,
         what: ` ${code}`,
       };
     }
     if (!detail?.movie_path) return null;
-    return { path: detail.movie_path, label: name, fileId: detail.movie_file_id, what: '' };
-  }, [title.kind, name, nextUp, detail]);
+    return {
+      path: file?.path ?? detail.movie_path,
+      label: name,
+      fileId: file?.fileId ?? detail.movie_file_id,
+      what: '',
+    };
+  }, [title.kind, name, nextUp, detail, chosen]);
+
+  /**
+   * An episode row's Play: where that episode is here more than once, the
+   * version with the words picked last time, else the one that fits the screen.
+   */
+  const playEpisode = useCallback(
+    async (request: PlayRequest, season: number, episode: number) => {
+      const files = versionsHere.groups.get(`${season}:${episode}`);
+      if (files) {
+        const v = pickVersion(await readVersions(files), versionsHere.choice, versionsHere.screen);
+        if (v) {
+          onPlayFile({ ...request, path: v.path, fileId: v.file_id });
+          return;
+        }
+      }
+      onPlayFile(request);
+    },
+    [versionsHere, onPlayFile]
+  );
 
   /**
    * Where that would resume, by the player's own rule — so "Resume 1:02:14"
@@ -635,6 +687,19 @@ export default function TitleDetailView({ title, onPlayFile, onBack, onFindMatch
                     Play from start
                   </FocusButton>
                 )}
+                {/* The same film or episode in more than one file: which one
+                    Play uses, by its words, and the list to pick another. */}
+                {primary && chosen && versions.length > 1 && (
+                  <FocusButton
+                    focusKey={DETAIL_VERSION_KEY}
+                    className="btn-secondary"
+                    keepInView="page-top"
+                    label={`Version: ${chosen.words}. Choose another`}
+                    onSelect={() => setVersionsOpen(true)}
+                  >
+                    Version · {chosen.key}
+                  </FocusButton>
+                )}
 
                 {/* Beside Play: keeping it for later is decided on the same
                     look as playing it now. L does the same from anywhere on
@@ -652,18 +717,15 @@ export default function TitleDetailView({ title, onPlayFile, onBack, onFindMatch
                     A film is a single file, so this is the only place it can
                     go — and it is what makes "watched" correctable when a
                     stopped playback never reached the completion threshold. */}
-                {title.kind !== 'series' && detail?.movie_file_id != null && (
+                {title.kind !== 'series' && primary?.fileId != null && (
                   <FocusButton
-                    className={`btn-secondary ${detail.movie_watched ? 'watched-on' : ''}`}
+                    className={`btn-secondary ${detail?.movie_watched ? 'watched-on' : ''}`}
                     keepInView="page-top"
                     onSelect={() =>
-                      void toggleWatched(
-                        detail.movie_file_id as number,
-                        !detail.movie_watched
-                      )
+                      void toggleWatched(primary.fileId as number, !detail?.movie_watched)
                     }
                   >
-                    {detail.movie_watched ? '✓ Watched' : 'Mark watched'}
+                    {detail?.movie_watched ? '✓ Watched' : 'Mark watched'}
                   </FocusButton>
                 )}
 
@@ -750,6 +812,23 @@ export default function TitleDetailView({ title, onPlayFile, onBack, onFindMatch
               </FocusGroup>
               {renameError && <div className="detail-error">{renameError}</div>}
               {playlistNote && <div className="detail-note">{playlistNote}</div>}
+              {versionsOpen && chosen && (
+                <VersionDialog
+                  what={primary?.what ? `${name}${primary.what}` : name}
+                  versions={versions}
+                  current={chosen.file_id}
+                  onChoose={pickedVersion}
+                  onClose={() => {
+                    setVersionsOpen(false);
+                    // Back on the button once the page has drawn the new
+                    // choice: in the real app the row's own current (Play)
+                    // took the ring otherwise.
+                    requestAnimationFrame(() =>
+                      requestAnimationFrame(() => setFocus(DETAIL_VERSION_KEY))
+                    );
+                  }}
+                />
+              )}
               {playlistFor && (
                 <PlaylistDialog
                   items={playlistFor.items}
@@ -779,7 +858,7 @@ export default function TitleDetailView({ title, onPlayFile, onBack, onFindMatch
                 seasonBadges && <BadgeRows rows={seasonBadges.rows} heading={seasonHeading} />
               ) : (
                 <MediaBadges
-                  fileId={detail?.movie_file_id ?? null}
+                  fileId={primary?.fileId ?? detail?.movie_file_id ?? null}
                   kind={title.kind}
                   studios={studios}
                 />
@@ -889,12 +968,16 @@ export default function TitleDetailView({ title, onPlayFile, onBack, onFindMatch
                     }
                     onPlay={() =>
                       episode.file_path &&
-                      onPlayFile({
-                        path: episode.file_path,
-                        label: episodeLabel(name, episode.season, episode.episode),
-                        fileId: episode.file_id,
-                        episodeName: episode.name,
-                      })
+                      void playEpisode(
+                        {
+                          path: episode.file_path,
+                          label: episodeLabel(name, episode.season, episode.episode),
+                          fileId: episode.file_id,
+                          episodeName: episode.name,
+                        },
+                        episode.season,
+                        episode.episode
+                      )
                     }
                   />
                 ))}

@@ -139,6 +139,32 @@ export async function screenHere(): Promise<{ id: string | null; name: string | 
   }
 }
 
+/**
+ * What the screen the picture is on can show: its biggest mode, and whether it
+ * can show HDR (null where that is not known). Null where the screen is not
+ * known at all, or the system shows the picture itself (Android) — which
+ * version fits is then not decided by the screen (versions.ts).
+ */
+export async function screenCanShow(): Promise<{
+  width: number;
+  height: number;
+  hdr: boolean | null;
+} | null> {
+  if (bySystem()) return null;
+  try {
+    const screen = await invoke<Screen>('screen_now', { screen: await pictureScreen() });
+    let { width, height } = screen;
+    for (const m of screen.modes) {
+      if (m.width * m.height > width * height) ({ width, height } = m);
+    }
+    if (width <= 0 || height <= 0) return null;
+    const hdr = screen.hdr === 'unknown' ? null : screen.hdr !== 'unsupported';
+    return { width, height, hdr };
+  } catch {
+    return null;
+  }
+}
+
 /** Whether a switch could happen at all right now — before a file is opened. */
 export async function mayswitch(): Promise<boolean> {
   if (bySystem()) return matchOn(await getSetting(DISPLAY_MATCH_KEY));

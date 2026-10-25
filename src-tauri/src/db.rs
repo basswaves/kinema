@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use std::path::Path;
 
 /// The schema this build understands. Bump it with every new `SCHEMA_V*`.
-pub const SCHEMA_VERSION: i64 = 32;
+pub const SCHEMA_VERSION: i64 = 33;
 
 /// What can go wrong opening the library.
 ///
@@ -841,6 +841,25 @@ const SCHEMA_V32: &str = r#"
 ALTER TABLE titles ADD COLUMN upgrade_checked_at INTEGER;
 "#;
 
+/// The version of a film or show picked last time (versions.rs): the file's
+/// path, and its words without the size, which carry a show's choice over to
+/// its other episodes. By the provider's ids, as my_list, so it comes through
+/// matching again.
+const SCHEMA_V33: &str = r#"
+CREATE TABLE version_choice (
+    id          INTEGER PRIMARY KEY,
+    kind        TEXT    NOT NULL,
+    provider    TEXT    NOT NULL,
+    provider_id TEXT    NOT NULL,
+    imdb_id     TEXT,
+    tmdb_id     TEXT,
+    path        TEXT    NOT NULL,
+    key         TEXT    NOT NULL,
+    updated_at  INTEGER NOT NULL,
+    UNIQUE (kind, provider, provider_id)
+);
+"#;
+
 /// How long a statement waits for the write lock before giving up.
 ///
 /// Load-bearing from the moment there is more than one connection. SQLite
@@ -1059,7 +1078,7 @@ pub(crate) const MIGRATIONS: [&str; SCHEMA_VERSION as usize] = [
     SCHEMA_V15, SCHEMA_V16, SCHEMA_V17, SCHEMA_V18, SCHEMA_V19,
     SCHEMA_V20, SCHEMA_V21, SCHEMA_V22, SCHEMA_V23, SCHEMA_V24, SCHEMA_V25,
     SCHEMA_V26, SCHEMA_V27, SCHEMA_V28, SCHEMA_V29, SCHEMA_V30, SCHEMA_V31,
-    SCHEMA_V32,
+    SCHEMA_V32, SCHEMA_V33,
 ];
 
 /// Bring the database up to [`SCHEMA_VERSION`].

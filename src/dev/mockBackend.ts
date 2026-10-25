@@ -430,6 +430,52 @@ function fileBitrate(file: FixtureFile): number {
  * as a library without ffprobe would be.
  */
 function mockFileFacts(fileId: number) {
+  // The film's second copy (kinemaMockVersions): a 1080p SDR encode.
+  const copy = versionFiles().find((f) => f.file_id === fileId && f.file_id !== 201);
+  if (copy) {
+    const film = filmFacts(201);
+    if (!film?.details?.video) return null;
+    return {
+      ...film,
+      file_name: copy.path.slice(copy.path.lastIndexOf('\\') + 1),
+      size_bytes: copy.size_bytes,
+      details: {
+        ...film.details,
+        bit_rate: 12_000_000,
+        video: {
+          ...film.details.video,
+          codec: 'h264',
+          bit_depth: 8,
+          width: 1920,
+          height: 1080,
+          transfer: 'sdr',
+          dolby_vision: null,
+          mastering_peak_nits: null,
+        },
+      },
+    };
+  }
+  return filmFacts(fileId);
+}
+
+/**
+ * The film here twice (versions.rs) when kinemaMockVersions is set: the 4K
+ * remux and a 1080p encode beside it. Otherwise nothing is here twice.
+ */
+function versionFiles() {
+  if (flag('kinemaMockVersions') !== '1') return [];
+  return [
+    { file_id: 201, path: files.find((f) => f.id === 201)?.path ?? '', size_bytes: 66_000_000_000 },
+    {
+      file_id: 202,
+      path: 'C:\\fixture\\Example Film (2017)\\Example.Film.2017.1080p.BluRay.x264-GRP.mkv',
+      size_bytes: 9_000_000_000,
+    },
+  ].map((f) => ({ ...f, season: null, episode: null, episode_last: null }));
+}
+let versionChoiceMock: { path: string; key: string } | null = null;
+
+function filmFacts(fileId: number) {
   const file = files.find((f) => f.id === fileId);
   if (!file) return null;
   const cut = file.path.lastIndexOf('\\');
@@ -1361,6 +1407,27 @@ const handlers: Record<string, Handler> = {
     if (list) Object.assign(list, mode);
     return null;
   },
+  // Versions (versions.rs): the film twice under kinemaMockVersions.
+  title_versions: (a) => (num(a, 'titleId') === FILM_ID ? versionFiles() : []),
+  version_choice: () => versionChoiceMock,
+  choose_version: (a) => {
+    versionChoiceMock = { path: String(a.path), key: String(a.key) };
+    return null;
+  },
+  duplicate_titles: () =>
+    versionFiles().length > 1
+      ? [
+          {
+            title_id: FILM_ID,
+            title: 'Example Film',
+            year: 2017,
+            season: null,
+            episode: null,
+            file_ids: versionFiles().map((f) => f.file_id),
+            size_bytes: versionFiles().reduce((n, f) => n + f.size_bytes, 0),
+          },
+        ]
+      : [],
   // My list (my_list.rs), newest first; kept for the mock's life.
   my_list: () => [...myList.entries()].sort((a, b) => b[1] - a[1]).map(([title_id, added_at]) => ({ title_id, added_at })),
   set_in_my_list: (a) => {

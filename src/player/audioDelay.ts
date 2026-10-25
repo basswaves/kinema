@@ -100,11 +100,21 @@ export async function applyAudioDelay(deviceId: string | null): Promise<number> 
   return ms;
 }
 
-/** From the player: a step later or earlier (`delta` in ms), or 0 with `reset`. */
+/** Saves one after another, so the last press is the one kept. */
+let saving: Promise<unknown> = Promise.resolve();
+
+/**
+ * From the player: a step later or earlier (`delta` in ms), or 0 with `reset`.
+ * The amount moves on the press, before the save: a held key repeats faster
+ * than the setting is written, and every repeat must count.
+ */
 export async function changeAudioDelay(delta: number, reset = false): Promise<number> {
   const { deviceId, ms } = applied;
-  const next = await saveDelay(deviceId, reset ? 0 : ms + delta);
+  const next = clamp(reset ? 0 : ms + delta);
   applied = { deviceId, ms: next };
+  const saved = saving.then(() => saveDelay(deviceId, next));
+  saving = saved.catch(() => undefined);
   await setMpv(next);
+  await saved;
   return next;
 }

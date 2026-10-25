@@ -219,9 +219,10 @@ footer .legal{grid-column:1/-1;border-top:1px solid var(--line);padding-top:24px
 .dl code,.dl-note code{font-size:.82rem}
 .dl-note{margin-top:22px}
 .dl-note a{color:#c2c2cc}
-.page{padding:72px 0 80px}
+.page{padding-top:72px;padding-bottom:80px}
 .page h1{font-size:clamp(2rem,4vw,2.8rem);margin-bottom:18px}
 .page h2{font-size:1.4rem;margin:38px 0 8px}
+.page h3{font-size:1.1rem;margin:26px 0 6px}
 .page p{color:var(--muted);max-width:46rem;margin:0 0 12px}
 .page .line{margin:0 0 6px}
 .page .line b{color:var(--text)}

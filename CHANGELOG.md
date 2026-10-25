@@ -82,6 +82,29 @@ makes no stability promises.
 - **A Videos folder with only its own videos** (no sub-folders) now has the
   Play all and + Playlist row, so even a single video can be added to a
   playlist from the page, not only from the player.
+- **Several files of one film or episode are one title with versions.** A
+  "Version · 4K UHD · HDR10" button sits beside Play when the film (or the
+  episode Play means) is in more than one file. It opens a list naming each
+  file in plain words: resolution, HDR (Dolby Vision, HDR10+, HDR10, HLG),
+  edition, then size, e.g. "4K UHD · HDR10 · Director's Cut · 58 GB". Where two
+  would read the same, the video codec, then the source, then the file's own
+  name are added. Works by mouse, keyboard and remote. Episode rows on a show
+  page play the same way.
+- **Play picks the version for you.** The one you chose last time for that
+  title. The first time, the one that fits the screen the picture is on: one
+  it can show whole, then HDR where the screen shows HDR, then the most
+  pixels, then the bigger file. An edition is never preferred by itself. Where
+  the screen is not known (Android, or the query fails) it is the biggest
+  picture, as before.
+- **Your choice is remembered per title**, by the provider's ids, so it
+  survives matching again. A show's choice carries over to other episodes by
+  its words: picking "720p" once means the 720p copy of the next episode,
+  where there is one. Resume points and watched marks are shared between
+  versions, as they already were.
+- **Settings → Library: "Here more than once".** How many films and episodes
+  are in more than one file, with a list of each version and the total size.
+  Kinema never deletes a file.
+- Library upgrade to schema 33 (`version_choice`).
 
 ### Changed
 
@@ -151,6 +174,10 @@ makes no stability promises.
 - The Kinema MCP's `kinema_app` takes `env` for one run, e.g. a dead
   `HTTPS_PROXY` with `NO_PROXY` for `www.wikidata.org` to make TMDB
   unreachable.
+- Versions: `versions.rs` (`title_versions`, `version_choice`,
+  `choose_version`, `duplicate_titles`; 4 tests), `versions.ts` (the rule; 9
+  tests), `VersionDialog.tsx`, `useVersions.ts`, `DuplicatesSection.tsx`, and
+  `e2e/versions.e2e.ts` on the mock's `kinemaMockVersions` flag.
 
 ## [0.13.1] — 2026-10-24
 

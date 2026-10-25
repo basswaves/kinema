@@ -546,6 +546,14 @@ ids, not `titles.id`, so matching again does not lose it. `myList.ts` is the one
 store in the interface; it writes behind the press and reads back if the write
 fails. Never sent to SIMKL or Trakt.
 
+**Versions of one title are one title.** Files of one film or episode share a
+`titles` row; `versions.rs` lists them and `versions.ts` names them and picks
+one for Play (the last choice, else what the screen can show whole, HDR where
+it shows HDR, then pixels, then size; an edition is never preferred by itself).
+The choice is in `version_choice` (schema 33), keyed by the provider's ids like
+My list. Resume and watched stay shared across versions (`history.rs`). Kinema
+never deletes a duplicate.
+
 **Forced subtitles are not "subtitles on."** Subtitles off means no full
 subtitles; it has never meant missing what is said in another language. So a
 forced track in the language being spoken shows whenever full subtitles do

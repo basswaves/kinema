@@ -3845,6 +3845,38 @@ only Wikidata films that held a TMDB id.
   all / + Playlist row; it has one now, so a single video can go to a playlist
   from the page.
 
+## Duplicates become one title with versions (2026-10-25)
+
+- **Owner's choice, 2026-10-24:** a film or episode in more than one file is
+  one title with versions, not separate cards.
+- **Already true:** several files of one title were one `titles` row with
+  several `media_files` rows, so one card. Play took the largest file, and
+  `history.rs` kept resume points and watched ticks in step across the copies.
+- **Kept as it was: resume and watched are shared across versions.** A film
+  watched is watched, whichever copy. A resume point carries over to the other
+  copy; for an edition of a different length it lands near the same scene, not
+  exactly. That was accepted rather than keeping two resume points per title.
+- **New:** a "Version" button beside Play, only when what Play means is in more
+  than one file. Each file is named in Kinema's own words from the badges'
+  facts and the name's edition (resolution, HDR, edition, size); the codec,
+  source or file name are added only where two would read the same.
+- **Which version Play uses:** the one picked last time; the first time, the
+  one that fits the screen best: one it can show whole (not more pixels than
+  the biggest mode, with 5 % room; not HDR where the screen cannot show it),
+  then HDR where it can, then the most pixels, then the bigger file. This is
+  equipment detected, never taste, so an edition is never preferred by itself.
+  With no screen facts (Android, or the query fails) it is the biggest
+  picture, as before. The rule is in `src/library/versions.ts`.
+- **The choice is kept per title** in `version_choice` (schema 33), by the
+  provider's ids like My list, so matching again does not lose it. It stores
+  the file's path and the version's words without the size. A show's choice
+  carries to other episodes by those words.
+- **Settings → Library → "Here more than once"** counts the films and episodes
+  in more than one file and lists them with their total size. It says Kinema
+  never deletes a file. It is not in Settings search: there is nothing to set.
+- **Android:** the shared code runs there. Untested on a box; Android is
+  parked.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

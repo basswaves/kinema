@@ -12,6 +12,7 @@ import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-naviga
 import { memo } from 'react';
 import Card from './Card';
 import FocusButton from './FocusButton';
+import RailTrack from './RailTrack';
 import type { Title } from './api';
 
 /** How many cards a rail shows before deferring to "See all". */
@@ -54,10 +55,25 @@ export default memo(function Rail({ heading, titles, onSelect, onSeeAll, listRai
     <FocusContext.Provider value={focusKey}>
       <section className="rail" ref={ref}>
         <h2 className="rail-heading">
-          {heading}
+          {/* The heading opens the whole shelf, as See all does, for a mouse
+              that cannot reach the end of the row (GitHub #12). Out of the
+              focus tree: See all is the remote's way there. */}
+          {hasMore ? (
+            <button
+              type="button"
+              tabIndex={-1}
+              className="rail-heading-link"
+              title={`See all ${titles.length}`}
+              onClick={() => onSeeAll?.(heading, titles)}
+            >
+              {heading}
+            </button>
+          ) : (
+            heading
+          )}
           {hasMore && <span className="rail-count">{titles.length}</span>}
         </h2>
-        <div className="rail-track">
+        <RailTrack>
           {shown.map((title) => (
             <Card
               key={title.id}
@@ -82,7 +98,7 @@ export default memo(function Rail({ heading, titles, onSelect, onSeeAll, listRai
               <span className="see-all-label">See all {titles.length}</span>
             </FocusButton>
           )}
-        </div>
+        </RailTrack>
       </section>
     </FocusContext.Provider>
   );

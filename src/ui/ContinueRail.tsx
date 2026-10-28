@@ -11,6 +11,7 @@ import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-naviga
 import { useEffect } from 'react';
 import Art from './Art';
 import FocusButton from './FocusButton';
+import RailTrack from './RailTrack';
 import type { ContinueItem } from '../player/api';
 import { keepOnScreen } from './focus';
 
@@ -57,7 +58,7 @@ export default function ContinueRail({ items, onResume, onRemove }: Props) {
     <FocusContext.Provider value={focusKey}>
       <section className="rail" ref={ref}>
         <h2 className="rail-heading">Continue watching</h2>
-        <div className="rail-track">
+        <RailTrack>
           {items.map((item) => (
             <ContinueCard
               key={item.file_id}
@@ -66,7 +67,7 @@ export default function ContinueRail({ items, onResume, onRemove }: Props) {
               onRemove={onRemove}
             />
           ))}
-        </div>
+        </RailTrack>
       </section>
     </FocusContext.Provider>
   );

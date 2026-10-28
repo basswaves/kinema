@@ -20,6 +20,7 @@ import FocusInput from './FocusInput';
 import { useClaimFocus } from './focus';
 import { count } from './format';
 import { userError } from './errors';
+import RailTrack from './RailTrack';
 import { useCapabilities } from '../capabilities';
 import type { PlaybackTarget } from '../player/api';
 import {
@@ -491,11 +492,11 @@ export function PlaylistsRail({ onOpen }: { onOpen: (id: number) => void }) {
     <FocusContext.Provider value={focusKey}>
       <section className="rail" ref={ref}>
         <h2 className="rail-heading">Playlists</h2>
-        <div className="rail-track">
+        <RailTrack>
           {lists.map((list) => (
             <PlaylistTile key={list.id} list={list} onSelect={() => onOpen(list.id)} />
           ))}
-        </div>
+        </RailTrack>
       </section>
     </FocusContext.Provider>
   );

@@ -25,7 +25,7 @@
  * is the cover shown *before* a file's first frame, which exists precisely
  * because a transparent window with no frame up shows the desktop.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type WheelEvent } from 'react';
 import {
   doesFocusableExist,
   FocusContext,
@@ -62,6 +62,7 @@ import { useTracks } from './useTracks';
 import { useAudioDelay } from './useAudioDelay';
 import { useUpNext } from './useUpNext';
 import { useVolume } from './useVolume';
+import { VOLUME_STEP, wheelVolumeSteps } from './volume';
 import { nameOf, noteFirstFrame, targetFor } from '../library/opened';
 import { isSoundLostNotice } from './soundWatch';
 
@@ -335,6 +336,19 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   // ---- volume -------------------------------------------------------------
   const { volume, muted, receiver, setVolumeLevel, changeVolume, toggleMute, volumeKey } =
     useVolume({ fail, showOsd, osdVisible, path: target.path, frameShown: session.frameShown });
+  // The wheel over the picture is the volume, as in VLC, mpv and MPC (GitHub
+  // #11). Not over a panel or list, which scroll, nor over the volume control,
+  // which has its own. With the sound going to a receiver it only brings up
+  // the bar that says the receiver has the volume (volumeKey).
+  const wheelCarried = useRef(0);
+  const onWheel = (e: WheelEvent) => {
+    if ((e.target as HTMLElement).closest('.volume-control, .track-panel, .up-next, .stats-panel')) {
+      return;
+    }
+    const { steps, carried } = wheelVolumeSteps(wheelCarried.current, e.deltaY, e.deltaMode);
+    wheelCarried.current = carried;
+    if (steps !== 0) volumeKey(() => changeVolume(steps * VOLUME_STEP));
+  };
   // How long a double-click took to become a picture, for the log (opened.ts).
   useEffect(() => {
     if (session.frameShown) noteFirstFrame(target.path);
@@ -432,6 +446,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           return;
         void togglePause();
       }}
+      onWheel={onWheel}
       onDoubleClick={(e) => {
         if (
           (e.target as HTMLElement).closest(

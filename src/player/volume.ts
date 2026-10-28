@@ -35,3 +35,26 @@ export async function savedVolume(): Promise<number> {
 export async function persistVolume(level: number): Promise<void> {
   await setSetting(VOLUME_KEY, String(level));
 }
+
+/** One notch of an ordinary mouse wheel, in pixels (`WheelEvent.deltaMode` 0). */
+const WHEEL_NOTCH_PX = 100;
+
+/**
+ * Volume steps for a turn of the wheel over the picture, and what is left over.
+ *
+ * A mouse sends one event of about 100 px a notch; a touchpad sends dozens of a
+ * few pixels each, which as a step apiece would swing the volume from silent to
+ * full in one stroke. So the travel is added up and a step taken per notch's
+ * worth. Lines (WebKitGTK, Firefox) and pages are turned into pixels first.
+ * Up is louder, as on every player.
+ */
+export function wheelVolumeSteps(
+  carried: number,
+  deltaY: number,
+  deltaMode: number
+): { steps: number; carried: number } {
+  const px = deltaMode === 1 ? deltaY * 33 : deltaMode === 2 ? deltaY * 800 : deltaY;
+  const total = carried + px;
+  const notches = Math.trunc(total / WHEEL_NOTCH_PX);
+  return { steps: -notches, carried: total - notches * WHEEL_NOTCH_PX };
+}

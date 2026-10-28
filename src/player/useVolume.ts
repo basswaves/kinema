@@ -3,7 +3,7 @@
  * volume instead (sound bitstreamed to it, where this level would do
  * nothing). The level is remembered across films (volume.ts).
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { setMuted as applyMute, setVolume as applyVolume, soundGoesUntouched } from './engine';
 import { clampVolume, persistVolume, savedVolume } from './volume';
 
@@ -23,6 +23,11 @@ export function useVolume({
   frameShown: boolean;
 }) {
   const [volume, setVolume] = useState(100);
+  // The level as last set, ahead of the render that shows it. Steps arrive
+  // faster than renders — a quick turn of the wheel, a held key, each behind
+  // volumeKey's await — and a step taken from the rendered `volume` started
+  // from the same old level each time: three notches moved it once.
+  const levelNow = useRef(100);
   const [muted, setMuted] = useState(false);
   /** Sound bitstreamed to a receiver: this volume would do nothing. */
   const [receiver, setReceiver] = useState(false);
@@ -33,6 +38,7 @@ export function useVolume({
     void savedVolume().then((level) => {
       if (!live) return;
       setVolume(level);
+      levelNow.current = level;
       void applyVolume(level).catch((e) => console.warn('volume: could not apply', e));
     });
     return () => {
@@ -47,6 +53,7 @@ export function useVolume({
   const setVolumeLevel = useCallback(
     (value: number, save = true) => {
       const level = clampVolume(value);
+      levelNow.current = level;
       setVolume(level);
       void applyVolume(level).catch(fail);
       if (save) void persistVolume(level).catch((e) => console.warn('volume: could not save', e));
@@ -61,8 +68,8 @@ export function useVolume({
   );
 
   const changeVolume = useCallback(
-    (delta: number) => setVolumeLevel(volume + delta),
-    [volume, setVolumeLevel]
+    (delta: number) => setVolumeLevel(levelNow.current + delta),
+    [setVolumeLevel]
   );
 
   const toggleMute = useCallback(() => {

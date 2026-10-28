@@ -116,6 +116,14 @@ test('the player by mouse: controls, pause, full screen, seek bar, volume and Ba
   await page.mouse.wheel(0, -100);
   await expect.poll(async () => (await mpv(page)).volume).toBeGreaterThan(lower);
 
+  // The wheel over the film is the volume too (GitHub #11): two notches down,
+  // two steps, not one.
+  const level = (await mpv(page)).volume;
+  await page.mouse.move(film.x, film.y);
+  await page.mouse.wheel(0, 100);
+  await page.mouse.wheel(0, 100);
+  await expect.poll(async () => (await mpv(page)).volume).toBe(level - 10);
+
   // Back leaves the player.
   await page.getByRole('button', { name: 'Back', exact: true }).click();
   await expect(page.locator('.player')).toHaveCount(0);
@@ -274,4 +282,29 @@ test('right-click: Copy on marked text, a text field keeps its own menu, nothing
   const field = page.locator('input').first();
   await field.click({ button: 'right' });
   expect((await seen('__menus')).at(-1)).toBe(false);
+});
+
+test('rails by mouse: the edge arrows, and the heading opens the whole shelf (GitHub #12)', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.removeItem('kinemaMockSystem');
+    localStorage.setItem('kinemaMockTitles', '60');
+  });
+  await page.goto('/');
+  const rail = page.locator('.rail', { has: page.locator('.rail-heading-link') }).first();
+  await rail.scrollIntoViewIfNeeded();
+  const track = rail.locator('.rail-track');
+  const scrolled = () => track.evaluate((el) => el.scrollLeft);
+  expect(await scrolled()).toBe(0);
+  await expect(rail.locator('.rail-edge-left')).toHaveCount(0);
+
+  await rail.hover();
+  await rail.locator('.rail-edge-right').click();
+  await expect.poll(scrolled).toBeGreaterThan(100);
+  await rail.locator('.rail-edge-left').click();
+  await expect.poll(scrolled).toBe(0);
+
+  const heading = await rail.locator('.rail-heading-link').innerText();
+  await rail.locator('.rail-heading-link').click();
+  await expect(page.locator('.rail')).toHaveCount(0);
+  await expect(page.getByText(heading, { exact: false }).first()).toBeVisible();
 });

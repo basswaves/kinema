@@ -41,7 +41,16 @@ async function filmPage(page: Page): Promise<void> {
 
 /** Press `key` until the ring's text contains `text` (at most `max` presses). */
 async function until(page: Page, key: string, text: string, max = 8): Promise<void> {
-  for (let i = 0; i < max && !((await focused(page)) ?? '').includes(text); i++) await press(page, key);
+  for (let i = 0; i < max; i++) {
+    const before = (await focused(page)) ?? '';
+    if (before.includes(text)) break;
+    await page.keyboard.press(key);
+    // Wait for the ring to move before looking again: on a busy machine (the
+    // flows run side by side) a press can land after a fixed pause, and the
+    // next press then steps past the control.
+    await expect.poll(() => focused(page), { timeout: 1500 }).not.toBe(before).catch(() => {});
+    await page.waitForTimeout(150);
+  }
   expect(await focused(page)).toContain(text);
 }
 
@@ -80,6 +89,9 @@ test('Version by keyboard: the best fit first, another picked, Play uses it, rem
 test('Back closes the Version list and leaves the choice alone', async ({ page }) => {
   await open(page);
   await filmPage(page);
+  // The button appears once the versions are read; a ring moved before that
+  // passes the place it then appears in.
+  await expect(page.getByRole('button', { name: /^Version:/ })).toBeVisible();
   await until(page, 'ArrowRight', 'Version');
   await press(page, 'Enter');
   await expect(page.getByRole('dialog', { name: 'Version' })).toBeVisible();

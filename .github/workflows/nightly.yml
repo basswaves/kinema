@@ -5,7 +5,8 @@
 # it is neither, and it disagrees with both on one tie (GOTCHAS, "Playwright's
 # WebKit on Windows"). A release session reads last night's result instead of
 # running it again. A difference from e2e/navmap.expected.json fails the run;
-# the generated map is kept as an artifact to read.
+# the generated map is kept as an artifact to read. Two workers: with five on
+# a four-core runner, scrolling settings pages had not settled when measured.
 name: Nightly
 
 on:
@@ -42,7 +43,7 @@ jobs:
         run: npx playwright install --with-deps webkit
 
       - name: Navigation map
-        run: npx playwright test -c playwright.nav.config.ts --project ${{ matrix.engine }}
+        run: npx playwright test -c playwright.nav.config.ts --project ${{ matrix.engine }} --workers=2
 
       - uses: actions/upload-artifact@v7
         if: always()

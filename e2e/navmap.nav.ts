@@ -16,12 +16,20 @@
  * navmapReport.ts), with one file per engine and system beside them. Not
  * under test-results/: Playwright empties that at the start of every run, so
  * one `npm run test:ui` afterwards deleted the map.
+ *
+ * Side by side: each system's walk is PARTS tests, which share out the screens
+ * as they reach them (`claim`), each writing its own file in
+ * navmap-results/parts/; the last part to finish puts them together, in the
+ * order the screens are written below, as `<engine>.<system>.json`. The
+ * config runs Windows first (Linux and Android copy its moves for identical
+ * screens), then Linux and Android, then the map.
  */
 import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { approve } from './navmapExpected';
 import { writeReports } from './navmapReport';
+import { PARTS_DIR } from './navmapSetup';
 import {
   DIRS,
   type Dir,
@@ -40,6 +48,12 @@ const OUT = join(process.cwd(), 'navmap-results');
 /** NAV_ONLY=regex runs only the screens whose id matches; NAV_SYSTEMS=windows,linux likewise. */
 const ONLY = process.env.NAV_ONLY ? new RegExp(process.env.NAV_ONLY) : null;
 const ONLY_SYSTEMS = process.env.NAV_SYSTEMS?.split(',') ?? null;
+
+/**
+ * Tests per system. More than there are workers costs nothing (a part that
+ * starts once every screen is claimed walks none), fewer leaves workers idle.
+ */
+const PARTS = 8;
 
 // ---- in the page ------------------------------------------------------------
 
@@ -565,14 +579,33 @@ function skip(id: string, name: string, note: string): ScreenResult {
 
 type Baselines = Map<string, ScreenResult>;
 
+/** What one screen (or one held-key test) gave, numbered by its place in `walkSystem`. */
+interface Unit {
+  seq: number;
+  screens: ScreenResult[];
+  lag: LagResult[];
+}
+
 interface Ctx {
   browser: Browser;
   baseURL: string;
+  engine: string;
   system: System;
   contexts: Map<string, BrowserContext>;
   baselines: Baselines;
-  out: ScreenResult[];
-  lag: LagResult[];
+  /** The next screen's number: every part counts every screen, so the numbers agree. */
+  seq: number;
+  units: Unit[];
+}
+
+/** True for the one part that gets here first: it walks the screen, the others pass it by. */
+function claim(ctx: Ctx, seq: number): boolean {
+  try {
+    writeFileSync(join(PARTS_DIR, `${ctx.engine}.${ctx.system}.${seq}.claim`), '', { flag: 'wx' });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Boots a page for one screen, runs it, closes it; a screen that cannot be reached is skipped with its reason. */
@@ -583,20 +616,24 @@ async function screen(
   b: Omit<Boot, 'system'>,
   run: (page: Page) => Promise<ScreenResult[] | ScreenResult | null>
 ): Promise<void> {
+  const seq = ctx.seq++;
   if (ONLY && !ONLY.test(id)) return;
+  if (!claim(ctx, seq)) return;
+  const out: ScreenResult[] = [];
   let page: Page | null = null;
   try {
     page = await boot(ctx, { ...b, system: ctx.system });
     const r = await run(page);
     const list = r === null ? [] : Array.isArray(r) ? r : [r];
-    if (list.length === 0) ctx.out.push(skip(id, name, 'Could not be reached by the arrows from Home.'));
-    ctx.out.push(...list);
+    if (list.length === 0) out.push(skip(id, name, 'Could not be reached by the arrows from Home.'));
+    out.push(...list);
   } catch (e) {
     if (id === 'home') throw e;
-    ctx.out.push(skip(id, name, `Could not be reached: ${String(e instanceof Error ? e.message : e).split('\n')[0]}`));
+    out.push(skip(id, name, `Could not be reached: ${String(e instanceof Error ? e.message : e).split('\n')[0]}`));
   } finally {
     await page?.close();
   }
+  ctx.units.push({ seq, screens: out, lag: [] });
 }
 
 const base = (ctx: Ctx, id: string) => ctx.baselines.get(id) ?? null;
@@ -893,15 +930,19 @@ async function walkSystem(ctx: Ctx): Promise<void> {
   // ---- held keys: how far focus runs ahead of the page ----
   if (!ONLY || ONLY.test('lag')) {
     const runLag = async (name: string, b: Omit<Boot, 'system'>, prep: (p: Page) => Promise<boolean>, key: string) => {
+      const seq = ctx.seq++;
+      if (!claim(ctx, seq)) return;
+      const lag: LagResult[] = [];
       let page: Page | null = null;
       try {
         page = await boot(ctx, { ...b, system: ctx.system });
-        if (await prep(page)) ctx.lag.push(await hold(page, name, key));
+        if (await prep(page)) lag.push(await hold(page, name, key));
       } catch {
         /* a lag test that cannot be set up is simply absent */
       } finally {
         await page?.close();
       }
+      ctx.units.push({ seq, screens: [], lag });
     };
     await runLag('Home, Down through the rails', {}, async () => true, 'ArrowDown');
     await runLag(
@@ -939,44 +980,82 @@ function readSystem(engine: string, system: string): SystemResult | null {
   return existsSync(file) ? (JSON.parse(readFileSync(file, 'utf8')) as SystemResult) : null;
 }
 
+/** One part's file in navmap-results/parts/. */
+interface Part {
+  started: number;
+  ended: number;
+  units: Unit[];
+}
+
+const partFile = (engine: string, system: string, part: number) => join(PARTS_DIR, `${engine}.${system}.part${part}.json`);
+
+/**
+ * Once every part of a system has written its file: one `<engine>.<system>.json`,
+ * the screens in `walkSystem`'s order, the time from the first part's start to
+ * the last one's end. Written by the first part to see all of them.
+ */
+function mergeParts(engine: string, system: System): void {
+  const files = Array.from({ length: PARTS }, (_, k) => partFile(engine, system, k + 1));
+  if (!files.every(existsSync)) return;
+  try {
+    writeFileSync(join(PARTS_DIR, `${engine}.${system}.merged`), '', { flag: 'wx' });
+  } catch {
+    return;
+  }
+  const parts = files.map((f) => JSON.parse(readFileSync(f, 'utf8')) as Part);
+  const units = parts.flatMap((p) => p.units).sort((a, b) => a.seq - b.seq);
+  const started = Math.min(...parts.map((p) => p.started));
+  const ended = Math.max(...parts.map((p) => p.ended));
+  const result: SystemResult = {
+    system,
+    engine,
+    seconds: Math.round((ended - started) / 1000),
+    screens: units.flatMap((u) => u.screens),
+    lag: units.flatMap((u) => u.lag),
+  };
+  writeFileSync(join(OUT, `${engine}.${system}.json`), JSON.stringify(result, null, 1));
+  console.log(`${engine}/${system}: ${result.seconds}s, ${result.screens.length} screens`);
+}
+
+/** The engine is the project's `metadata.engine` (its name is `webkit`, `webkit-windows`, …). */
+const engineOf = (info: { project: { name: string; metadata: { engine?: string } } }) =>
+  info.project.metadata.engine ?? info.project.name;
+
 for (const system of SYSTEMS) {
-  test(`walk the screens as ${system}`, async ({ browser, baseURL }, info) => {
-    if (ONLY_SYSTEMS && !ONLY_SYSTEMS.includes(system)) test.skip();
-    const engine = info.project.name;
-    const t0 = Date.now();
-    const baselines: Baselines = new Map();
-    if (system !== 'windows') {
-      for (const s of readSystem(engine, 'windows')?.screens ?? []) baselines.set(s.id, s);
-    }
-    const ctx: Ctx = {
-      browser,
-      baseURL: baseURL ?? 'http://localhost:1441',
-      system,
-      contexts: new Map(),
-      baselines,
-      out: [],
-      lag: [],
-    };
-    try {
-      await walkSystem(ctx);
-    } finally {
-      for (const c of ctx.contexts.values()) await c.close();
-    }
-    mkdirSync(OUT, { recursive: true });
-    const result: SystemResult = {
-      system,
-      engine,
-      seconds: Math.round((Date.now() - t0) / 1000),
-      screens: ctx.out,
-      lag: ctx.lag,
-    };
-    writeFileSync(join(OUT, `${engine}.${system}.json`), JSON.stringify(result, null, 1));
-    console.log(`${engine}/${system}: ${result.seconds}s, ${ctx.out.length} screens`);
-  });
+  for (let part = 1; part <= PARTS; part++) {
+    test(`walk the screens as ${system}, part ${part} of ${PARTS}`, async ({ browser, baseURL }, info) => {
+      if (ONLY_SYSTEMS && !ONLY_SYSTEMS.includes(system)) test.skip();
+      const engine = engineOf(info);
+      const started = Date.now();
+      const baselines: Baselines = new Map();
+      if (system !== 'windows') {
+        for (const s of readSystem(engine, 'windows')?.screens ?? []) baselines.set(s.id, s);
+      }
+      mkdirSync(PARTS_DIR, { recursive: true });
+      const ctx: Ctx = {
+        browser,
+        baseURL: baseURL ?? 'http://localhost:1441',
+        engine,
+        system,
+        contexts: new Map(),
+        baselines,
+        seq: 0,
+        units: [],
+      };
+      try {
+        await walkSystem(ctx);
+      } finally {
+        for (const c of ctx.contexts.values()) await c.close();
+      }
+      const out: Part = { started, ended: Date.now(), units: ctx.units };
+      writeFileSync(partFile(engine, system, part), JSON.stringify(out));
+      mergeParts(engine, system);
+    });
+  }
 }
 
 test('write the map', async ({ browserName: _browserName }, info) => {
-  const engine = info.project.name;
+  const engine = engineOf(info);
   const systems = SYSTEMS.map((s) => readSystem(engine, s)).filter((s): s is SystemResult => s !== null);
   mkdirSync(OUT, { recursive: true });
   const filter = { only: ONLY, systems: ONLY_SYSTEMS };

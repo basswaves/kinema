@@ -1,0 +1,40 @@
+# The checks too slow for every push, once a night: the full navigation map
+# (`npm run test:nav`) in both engines a release is checked in — Edge (the
+# engine of WebView2 and Android) and WebKit (Linux's) — on Windows, exactly as
+# on the maintainer's PC. A release session reads last night's result instead
+# of running it again. A difference from e2e/navmap.expected.json fails the
+# run; the generated map is kept as an artifact to read.
+name: Nightly
+
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  navmap:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install WebKit
+        run: npx playwright install webkit
+
+      - name: Navigation map, Edge and WebKit
+        run: npm run test:nav
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: navmap
+          path: navmap-results/
+          retention-days: 14

@@ -4,10 +4,24 @@
 # below is separate rather than folded into `check`.
 name: CI
 
+# Docs, the website and the changelog cannot break the app; a push that only
+# touches them (pages.yml publishes the site) skips the 15-minute run.
 on:
   push:
     branches: [main, master]
+    paths-ignore:
+      - 'docs/**'
+      - 'site/**'
+      - '**/*.md'
+      - '.github/workflows/pages.yml'
+      - '.github/workflows/winget.yml'
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - 'site/**'
+      - '**/*.md'
+      - '.github/workflows/pages.yml'
+      - '.github/workflows/winget.yml'
   workflow_dispatch:
 
 # A new push to the same branch makes the previous run irrelevant.
@@ -81,15 +95,6 @@ jobs:
       - name: Build the frontend
         run: npm run build
 
-      # The interface by keyboard, against dev:mock, in WebKit — the engine
-      # Linux's window uses. Once, on x86 Linux: the engines are what differ,
-      # not the processors. Playwright's WebKit is fetched here, never shipped.
-      - name: Keyboard tests in WebKit
-        if: matrix.os == 'ubuntu-24.04'
-        run: |
-          npx playwright install --with-deps webkit
-          npm run test:ui
-
       # No libmpv needed. It is loaded dynamically at runtime rather than
       # linked, so the 95 MB download is not a test dependency.
       - name: Rust tests
@@ -100,6 +105,48 @@ jobs:
       # the only way they stay cheap is by never being allowed to pile up.
       - name: Rust lints
         run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+
+  ui:
+    # The interface by keyboard, against dev:mock, in WebKit — the engine
+    # Linux's window uses. Once, on x86 Linux: the engines are what differ,
+    # not the processors. Its own job beside the builds (it needs no Rust),
+    # with several workers: in the build job, one at a time, it was the
+    # longest step (~9 min). Playwright's WebKit is fetched here, never shipped.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: actions/cache@v4
+        id: pw-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install WebKit
+        run: |
+          if [ '${{ steps.pw-cache.outputs.cache-hit }}' = 'true' ]; then
+            npx playwright install-deps webkit
+          else
+            npx playwright install --with-deps webkit
+          fi
+
+      - name: Keyboard tests in WebKit
+        run: npm run test:ui
+
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-results
+          path: test-results/
+          retention-days: 7
 
   android:
     # The Android app, built the way a TV box or a phone installs it, so a

@@ -59,6 +59,8 @@ src-tauri/app.log
 /notes/
 /CLAUDE.md
 test-results/
+# scripts/verify.mjs: each step's full output and eslint's cache.
+.verify/
 navmap-results/
 playwright-report/
 __pycache__/

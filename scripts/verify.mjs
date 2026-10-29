@@ -4,7 +4,7 @@
  *
  *   npm run verify              what the changes since origin/master need
  *   npm run verify -- --all     everything (before a release, or when unsure)
- *   npm run verify -- js rust ui   just these groups (also: build, nav)
+ *   npm run verify -- js rust ui   just these groups (also: build, nav, smoke)
  *   npm run verify -- --dry     say what would run, run nothing
  *
  * What runs is picked from the changed files (committed since the base, staged,
@@ -25,7 +25,7 @@
  * which is not Linux's WebKitGTK and so rarely worth its minutes.
  */
 import { spawn, execSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -68,6 +68,11 @@ function changedFiles() {
   return [...files];
 }
 
+// The private word list (scripts/privacy-check.mjs): when there is one, every
+// run checks what the change adds, docs-only changes included.
+const privacyList =
+  existsSync(process.env.KINEMA_PRIVATE_WORDS ?? '') || existsSync(join(root, 'notes', 'private-words.txt'));
+
 if (!all && groups.size === 0) {
   const files = changedFiles();
   if (files === null) {
@@ -85,7 +90,7 @@ if (!all && groups.size === 0) {
     if (js) groups.add('js').add('build');
     if (rust) groups.add('rust');
     if (ui) groups.add('ui');
-    if (groups.size === 0) {
+    if (groups.size === 0 && !privacyList) {
       console.log(`Nothing to check: ${files.length} changed file(s), none of them code.`);
       process.exit(0);
     }
@@ -100,6 +105,7 @@ const pwProjects =
 
 /** Each lane runs its steps in order; lanes run side by side. */
 const lanes = [];
+if (privacyList) lanes.push([{ name: 'privacy', cmd: `node scripts/privacy-check.mjs --base ${base}` }]);
 if (groups.has('js')) {
   lanes.push([{ name: 'tsc', cmd: 'npx tsc --noEmit' }]);
   lanes.push([{ name: 'tsc e2e', cmd: 'npx tsc --noEmit -p tsconfig.e2e.json' }]);
@@ -118,6 +124,11 @@ if (groups.has('rust')) {
 }
 if (groups.has('ui')) {
   lanes.push([{ name: 'playwright', cmd: `npx playwright test ${pwProjects} --reporter=dot` }]);
+}
+if (groups.has('smoke')) {
+  // Linux only, never picked by itself: the real app plays a clip headless
+  // (scripts/smoke.sh), with the newest built exe.
+  lanes.push([{ name: 'smoke', cmd: 'bash scripts/smoke.sh' }]);
 }
 if (groups.has('nav')) {
   lanes.push([{ name: 'test:nav', cmd: `npx playwright test -c playwright.nav.config.ts ${pwProjects}` }]);
@@ -158,6 +169,8 @@ function runStep(step) {
 /** One short fact from a step's output: how many tests, or nothing. */
 function summarise(name, out) {
   const pick = (re) => out.match(re)?.[0] ?? '';
+  if (name === 'smoke') return out.trim().split('\n').pop().slice(0, 120);
+  if (name === 'privacy') return out.trim().split('\n')[0];
   if (name === 'vitest') return pick(/Tests\s+[^\n]+/).replace(/\s+/g, ' ');
   if (name === 'cargo test') {
     let passed = 0;

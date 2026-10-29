@@ -131,7 +131,10 @@ files need, side by side: `check`, the bundler, cargo test and clippy, and the
 keyboard flows (Edge on Windows, WebKit elsewhere). One line per step; a
 failing step prints the end of its output, and every step's full output is in
 `.verify/`. `npm run verify -- --all` runs everything; `npm run verify -- js
-rust` runs chosen groups (`js`, `build`, `rust`, `ui`, `nav`). The separate
+rust` runs chosen groups (`js`, `build`, `rust`, `ui`, `nav`). If a private
+word list exists (`notes/private-words.txt`, or `KINEMA_PRIVATE_WORDS`), it
+also checks what the change adds against it (`scripts/privacy-check.mjs`):
+the maintainer's guard for "nothing personal", below. The separate
 commands below still work and are what it runs.
 
 ```bash
@@ -346,6 +349,19 @@ clock) — then exits. Screenshots of the first seconds are saved beside it.
 It never writes to the real library: the app runs on a snapshot copy in
 `<plan folder>\data`, and skips the startup scan and automatic detection.
 The plan format is documented at the top of the script.
+
+### The real player, headless (Linux)
+
+`scripts/smoke.sh [exe]` makes a 10-second clip with ffmpeg, plays it with the
+built app and libmpv in a headless Sway (`scripts/headless-selftest.sh`) and
+checks the self-test report: the clock ran, mpv read the streams, nothing
+failed. One line, PASS or FAIL. CI runs it on every push, on a debug build;
+with no GPU there the picture goes to mpv's null output, so it proves the app,
+libmpv and the decoders, not the GPU path. `npm run verify -- smoke` runs it
+with the release build. Needs sway, grim, dbus, ffmpeg and libmpv.
+
+`node scripts/codemap.mjs [area]` prints one line per source file (size and
+the first line of its header comment): where things are, without opening them.
 
 ### The Kinema MCP (Claude Code)
 

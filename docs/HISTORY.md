@@ -3929,6 +3929,21 @@ one at a time on a clean master (none), in five parallel runs (the last two
 of this version); only the timings and the held-key figures, which vary from
 run to run anyway, differ.
 
+## The real player on every push (2026-10-29)
+
+Until now only a person's machine proved that the real app plays a real file:
+self-test plans and the MCP, by hand. `scripts/smoke.sh` does it on CI's x86
+Linux job: a debug build, a clip ffmpeg makes on the spot, libmpv in a
+headless Sway, and the report checked. Two things learned getting it to run
+in a container. mpv's renderer refuses a software OpenGL ("suspected software
+renderer"), and `opengl-sw` cannot be switched on once mpv runs, so the plan
+sets `vo=gpu-next,null` before the file opens; the GPU path stays the
+machines' job. And with no sound device the audio track is listed but not
+selected, so the check asks for the track, not for the sound. The keyboard
+flows split the same day: keyboard.e2e.ts (92 KB) became six files by area
+and kb.ts, so a session reads the part it changes and two sessions rarely
+edit one file.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

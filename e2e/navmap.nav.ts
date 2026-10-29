@@ -22,7 +22,7 @@
  * navmap-results/parts/; the last part to finish puts them together, in the
  * order the screens are written below, as `<engine>.<system>.json`. The
  * config runs Windows first (Linux and Android copy its moves for identical
- * screens), then Linux and Android, then the map.
+ * screens), then Linux and Android, then the held keys alone, then the map.
  */
 import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -579,11 +579,10 @@ function skip(id: string, name: string, note: string): ScreenResult {
 
 type Baselines = Map<string, ScreenResult>;
 
-/** What one screen (or one held-key test) gave, numbered by its place in `walkSystem`. */
+/** What one screen gave, numbered by its place in `walkSystem`. */
 interface Unit {
   seq: number;
   screens: ScreenResult[];
-  lag: LagResult[];
 }
 
 interface Ctx {
@@ -633,7 +632,7 @@ async function screen(
   } finally {
     await page?.close();
   }
-  ctx.units.push({ seq, screens: out, lag: [] });
+  ctx.units.push({ seq, screens: out });
 }
 
 const base = (ctx: Ctx, id: string) => ctx.baselines.get(id) ?? null;
@@ -927,12 +926,17 @@ async function walkSystem(ctx: Ctx): Promise<void> {
     }
   );
 
-  // ---- held keys: how far focus runs ahead of the page ----
+}
+
+/**
+ * Held keys: how far focus runs ahead of the page. Timed, so not beside the
+ * walks: the config runs these alone, one system after another, once every
+ * walk is done (on a busy processor a held key gave half the presses).
+ */
+async function holdKeys(ctx: Ctx): Promise<LagResult[]> {
+  const lag: LagResult[] = [];
   if (!ONLY || ONLY.test('lag')) {
     const runLag = async (name: string, b: Omit<Boot, 'system'>, prep: (p: Page) => Promise<boolean>, key: string) => {
-      const seq = ctx.seq++;
-      if (!claim(ctx, seq)) return;
-      const lag: LagResult[] = [];
       let page: Page | null = null;
       try {
         page = await boot(ctx, { ...b, system: ctx.system });
@@ -942,7 +946,6 @@ async function walkSystem(ctx: Ctx): Promise<void> {
       } finally {
         await page?.close();
       }
-      ctx.units.push({ seq, screens: [], lag });
     };
     await runLag('Home, Down through the rails', {}, async () => true, 'ArrowDown');
     await runLag(
@@ -971,6 +974,7 @@ async function walkSystem(ctx: Ctx): Promise<void> {
       'ArrowDown'
     );
   }
+  return lag;
 }
 
 // ---- the tests ------------------------------------------------------------------------------
@@ -1011,7 +1015,8 @@ function mergeParts(engine: string, system: System): void {
     engine,
     seconds: Math.round((ended - started) / 1000),
     screens: units.flatMap((u) => u.screens),
-    lag: units.flatMap((u) => u.lag),
+    // Filled in by `hold the keys as <system>`, after every walk.
+    lag: [],
   };
   writeFileSync(join(OUT, `${engine}.${system}.json`), JSON.stringify(result, null, 1));
   console.log(`${engine}/${system}: ${result.seconds}s, ${result.screens.length} screens`);
@@ -1053,6 +1058,37 @@ for (const system of SYSTEMS) {
     });
   }
 }
+
+// One worker, in order, with nothing else running (see `holdKeys`).
+test.describe('held keys', () => {
+  test.describe.configure({ mode: 'serial' });
+  for (const system of SYSTEMS) {
+    test(`hold the keys as ${system}`, async ({ browser, baseURL }, info) => {
+      if (ONLY_SYSTEMS && !ONLY_SYSTEMS.includes(system)) test.skip();
+      const engine = engineOf(info);
+      // Only into this run's walk: a system whose parts did not all finish keeps its old file.
+      if (!existsSync(join(PARTS_DIR, `${engine}.${system}.merged`))) return;
+      const ctx: Ctx = {
+        browser,
+        baseURL: baseURL ?? 'http://localhost:1441',
+        engine,
+        system,
+        contexts: new Map(),
+        baselines: new Map(),
+        seq: 0,
+        units: [],
+      };
+      let lag: LagResult[];
+      try {
+        lag = await holdKeys(ctx);
+      } finally {
+        for (const c of ctx.contexts.values()) await c.close();
+      }
+      const result = readSystem(engine, system);
+      if (result) writeFileSync(join(OUT, `${engine}.${system}.json`), JSON.stringify({ ...result, lag }, null, 1));
+    });
+  }
+});
 
 test('write the map', async ({ browserName: _browserName }, info) => {
   const engine = engineOf(info);

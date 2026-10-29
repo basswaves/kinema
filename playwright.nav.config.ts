@@ -38,23 +38,16 @@ export default defineConfig({
     baseURL: `http://localhost:${PORT}`,
     viewport: { width: 1920, height: 1080 },
   },
-  // Per engine, in order: the Windows walk; then Linux and Android, which copy
-  // Windows' moves for screens laid out the same; then the held keys, alone;
-  // then the map. The last is named after the engine, so `--project webkit`
-  // still runs them all. (With both engines, on Windows, one engine's held
-  // keys can overlap the other's walk: run `--project edge` and `--project
-  // webkit` one after the other when those numbers matter.)
+  // Per engine: the walks (Windows' parts first: Linux and Android wait for
+  // its result screen by screen, see navmap.nav.ts); then the held keys,
+  // alone; then the map. The last is named after the engine, so `--project
+  // webkit` still runs them all. (With both engines, on Windows, one engine's
+  // held keys can overlap the other's walk: run `--project edge` and
+  // `--project webkit` one after the other when those numbers matter.)
   projects: ENGINES.flatMap((e) => [
-    { name: `${e.name}-windows`, use: e.use, metadata: { engine: e.name }, grep: /walk the screens as windows/ },
-    {
-      name: `${e.name}-systems`,
-      use: e.use,
-      metadata: { engine: e.name },
-      grep: /walk the screens as (linux|android)/,
-      dependencies: [`${e.name}-windows`],
-    },
+    { name: `${e.name}-walk`, use: e.use, metadata: { engine: e.name }, grep: /walk the screens as/ },
     // Timed, so with nothing beside them: one worker, after every walk.
-    { name: `${e.name}-lag`, use: e.use, metadata: { engine: e.name }, grep: /hold the keys as/, dependencies: [`${e.name}-systems`] },
+    { name: `${e.name}-lag`, use: e.use, metadata: { engine: e.name }, grep: /hold the keys as/, dependencies: [`${e.name}-walk`] },
     { name: e.name, use: e.use, metadata: { engine: e.name }, grep: /write the map/, dependencies: [`${e.name}-lag`] },
   ]),
   webServer: {

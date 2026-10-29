@@ -27,7 +27,8 @@
     "test:nav": "playwright test -c playwright.nav.config.ts",
     "verify": "node scripts/verify.mjs",
     "tauri": "tauri",
-    "app:build": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-app.ps1"
+    "app:build": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-app.ps1",
+    "app:build:test": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-app.ps1 -Test"
   },
   "dependencies": {
     "@noriginmedia/norigin-spatial-navigation": "^3.3.0",

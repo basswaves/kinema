@@ -20,6 +20,9 @@
 #                                             paths a plan names); report.json, app.log and
 #                                             photos at SHOTS seconds (default 6,14) come back
 #                                             into DIR
+#   scripts/android-bench.sh mcp [PORT]        the installed build as an interactive self-test,
+#                                             its WebView forwarded to PORT (default 9223) for
+#                                             the Kinema MCP: kinema_app attach, then kinema_run
 #   scripts/android-bench.sh leak DIR [EVERY]   `selftest DIR`, and every EVERY seconds
 #                                             (default 20) while it runs, a row in
 #                                             DIR/meminfo.csv: the app's memory from `dumpsys
@@ -271,6 +274,32 @@ case "$cmd" in
     # So the next start is an ordinary one; the copied library stays for reading.
     adb_dev shell run-as "$pkg" rm -f selftest/plan.json
     echo "$dir/report.json"
+    ;;
+
+  mcp)
+    # The Kinema MCP on Android: the installed (debug) build started as an
+    # interactive self-test — a copy of the library, no SIMKL or Trakt — and
+    # its WebView's debugging socket forwarded to a port here. Then, in
+    # Claude Code: kinema_app {action:"attach", port:<printed>, android:true}
+    # and kinema_run with the steps. Every key goes in through the page, not
+    # `input keyevent`, and each check is one call instead of a photo per key.
+    pkg=com.kinema.app; port="${1:-9223}"
+    adb_dev shell am force-stop "$pkg"
+    adb_dev shell run-as "$pkg" rm -rf selftest/plan.json selftest/report.json
+    printf '{"interactive":true,"path":"","fileId":null,"titleId":null,"seconds":0}' \
+      | adb_dev shell "run-as $pkg sh -c 'mkdir -p selftest && cat > selftest/plan.json'"
+    adb_dev shell monkey -p "$pkg" -c android.intent.category.LEANBACK_LAUNCHER 1 >/dev/null 2>&1
+    socket=""
+    for _ in $(seq 1 30); do
+      pid="$(pid_of_app "$pkg")"
+      # A debug build's WebView opens webview_devtools_remote_<pid>; a release one does not.
+      [ -n "$pid" ] && socket="$(adb_dev shell cat /proc/net/unix | tr -d '\r' | grep -o "webview_devtools_remote_$pid" | head -1)"
+      [ -n "$socket" ] && break
+      sleep 1
+    done
+    [ -n "$socket" ] || die "no WebView debugging socket (is the installed build a debug one? scripts/android-bench.sh build, launch)"
+    adb_dev forward "tcp:$port" "localabstract:$socket" >/dev/null
+    echo "port $port (serial $(serial)); when done: kinema_app {action:\"stop\"}, then scripts/android-bench.sh adb forward --remove tcp:$port"
     ;;
 
   leak)

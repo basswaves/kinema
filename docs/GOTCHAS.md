@@ -1218,6 +1218,18 @@ pick on each call they named different items, and Previous could not retrace.
 
 ## Testing and tools
 
+### Playwright's WebKit on Windows is not Linux's WebKit
+
+Playwright ships its own WebKit build per system. The Windows one is neither
+WebKitGTK (Linux's window) nor Chromium (WebView2, Android's WebView), and it
+disagrees with both on one navigation tie: on Android's Settings → Intros, Up
+from "Off" lands on "30s before" there and on "At the end" in Edge and in
+WebKit on Linux. Every release from 0.13.0 to 0.14.0 approved that "WebKit-only
+tie" by hand. **Do:** take WebKit's answers from Linux (CI, WSL, a cloud
+session), Edge's from Windows; `npm run verify` and the nightly map already
+run them that way. A difference seen only in Windows WebKit is not a bug in
+Kinema.
+
 ### The dev server can go on serving a stylesheet from before an edit
 
 Seen during the September UX pass: after a run of edits to `ui.css`, a reload

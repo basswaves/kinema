@@ -1,9 +1,11 @@
 # The checks too slow for every push, once a night: the full navigation map
-# (`npm run test:nav`) in both engines a release is checked in — Edge (the
-# engine of WebView2 and Android) and WebKit (Linux's) — on Windows, exactly as
-# on the maintainer's PC. A release session reads last night's result instead
-# of running it again. A difference from e2e/navmap.expected.json fails the
-# run; the generated map is kept as an artifact to read.
+# (`npm run test:nav`) in the engines Kinema's windows really use — Edge on
+# Windows (the engine of WebView2, and Chromium like Android's WebView) and
+# WebKit on Linux (WebKitGTK's engine). Not Playwright's WebKit on Windows:
+# it is neither, and it disagrees with both on one tie (GOTCHAS, "Playwright's
+# WebKit on Windows"). A release session reads last night's result instead of
+# running it again. A difference from e2e/navmap.expected.json fails the run;
+# the generated map is kept as an artifact to read.
 name: Nightly
 
 on:
@@ -13,7 +15,16 @@ on:
 
 jobs:
   navmap:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            engine: edge
+          - os: ubuntu-24.04
+            engine: webkit
+    name: navmap (${{ matrix.engine }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
@@ -27,14 +38,15 @@ jobs:
         run: npm ci
 
       - name: Install WebKit
-        run: npx playwright install webkit
+        if: matrix.engine == 'webkit'
+        run: npx playwright install --with-deps webkit
 
-      - name: Navigation map, Edge and WebKit
-        run: npm run test:nav
+      - name: Navigation map
+        run: npx playwright test -c playwright.nav.config.ts --project ${{ matrix.engine }}
 
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: navmap
+          name: navmap-${{ matrix.engine }}
           path: navmap-results/
           retention-days: 14

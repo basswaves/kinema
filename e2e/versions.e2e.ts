@@ -1,7 +1,7 @@
 /**
  * Versions: the mock's film here twice (kinemaMockVersions) — the 4K Dolby
  * Vision remux and a 1080p encode. Keyboard first, then the mouse.
- * Against `dev:mock`; see keyboard.e2e.ts for the conventions.
+ * Against `dev:mock`; see kb.ts and keyboard-*.e2e.ts for the conventions.
  */
 import { expect, test, type Page } from '@playwright/test';
 

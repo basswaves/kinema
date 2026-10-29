@@ -132,7 +132,7 @@ const osdFocused = (page: Page) => page.locator('.player.osd-focused');
  * A person reads a prompt before answering it. Pressed in the instant it
  * appears, OK can reach the key handler from the moment before, which did
  * not know about the prompt yet and pauses instead (one run in two, in
- * WebKit) — the same as the Up next card in keyboard.e2e.ts.
+ * WebKit) — the same as the keyboard flows (keyboard-*.e2e.ts).
  */
 const readIt = (page: Page) => page.waitForTimeout(500);
 

@@ -1,6 +1,6 @@
 /**
  * My list and Play something: keyboard only first, then the mouse.
- * Against `dev:mock`; see keyboard.e2e.ts for the conventions.
+ * Against `dev:mock`; see kb.ts and keyboard-*.e2e.ts for the conventions.
  */
 import { expect, test, type Page } from '@playwright/test';
 
@@ -17,7 +17,7 @@ function focused(page: Page): Promise<string | undefined> {
 
 /**
  * Home, ring on the hero's Play. The date is not fixed: with it fixed every
- * key press carries one time and arrow keys are taken for repeats (keyboard.e2e.ts).
+ * key press carries one time and arrow keys are taken for repeats (kb.ts).
  */
 async function open(page: Page): Promise<void> {
   await page.addInitScript(() => localStorage.removeItem('kinemaMockSystem'));

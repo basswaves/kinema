@@ -39,8 +39,11 @@ export default defineConfig({
     viewport: { width: 1920, height: 1080 },
   },
   // Per engine, in order: the Windows walk; then Linux and Android, which copy
-  // Windows' moves for screens laid out the same; then the map. The last is
-  // named after the engine, so `--project webkit` still runs all three.
+  // Windows' moves for screens laid out the same; then the held keys, alone;
+  // then the map. The last is named after the engine, so `--project webkit`
+  // still runs them all. (With both engines, on Windows, one engine's held
+  // keys can overlap the other's walk: run `--project edge` and `--project
+  // webkit` one after the other when those numbers matter.)
   projects: ENGINES.flatMap((e) => [
     { name: `${e.name}-windows`, use: e.use, metadata: { engine: e.name }, grep: /walk the screens as windows/ },
     {
@@ -50,7 +53,9 @@ export default defineConfig({
       grep: /walk the screens as (linux|android)/,
       dependencies: [`${e.name}-windows`],
     },
-    { name: e.name, use: e.use, metadata: { engine: e.name }, grep: /write the map/, dependencies: [`${e.name}-systems`] },
+    // Timed, so with nothing beside them: one worker, after every walk.
+    { name: `${e.name}-lag`, use: e.use, metadata: { engine: e.name }, grep: /hold the keys as/, dependencies: [`${e.name}-systems`] },
+    { name: e.name, use: e.use, metadata: { engine: e.name }, grep: /write the map/, dependencies: [`${e.name}-lag`] },
   ]),
   webServer: {
     command: `npm run dev:mock -- --port ${PORT}`,

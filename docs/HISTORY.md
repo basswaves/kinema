@@ -3926,8 +3926,8 @@ a held key gave half the presses (Home, 33 → 15). One worker per core:
 6.6 minutes (2.7× faster); six workers, 5.6. The walks, unlike the flows,
 keep the processor busy, so more workers buy little. Same differences report as
 one at a time on a clean master (none), in five parallel runs (the last two
-of this version); only the
-timings and the held-key figures, which vary from run to run anyway, differ.
+of this version); only the timings and the held-key figures, which vary from
+run to run anyway, differ.
 
 ## Open items
 

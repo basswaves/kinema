@@ -3877,6 +3877,23 @@ only Wikidata films that held a TMDB id.
 - **Android:** the shared code runs there. Untested on a box; Android is
   parked.
 
+## Checks in one command, flows in parallel (2026-10-29)
+
+Verifying a change had grown into five commands run one after another, the
+keyboard flows the slowest by far: 122 flows in WebKit, one at a time, took
+8.6 minutes, mostly waiting on timers with the processor idle. Each flow
+already has its own page and the fake mpv keeps its clock in that page, so
+nothing stopped them running side by side. `fullyParallel` with six workers
+on four cores took 1.7 minutes and passed three runs in a row; eight workers
+started to fail, so the config stays at one per core (five on CI's
+four-core runner) and keeps `retries: 0` — a flaky flow is still a bug.
+
+`npm run verify` (scripts/verify.mjs) runs what the changed files need —
+nothing for docs, cargo only for Rust — side by side, one line per step, and
+the tail of a failing one. Check, bundler and flows together: 2.3 minutes
+instead of about 9.5. CI moved the flows into their own job beside the builds
+and skips pushes that touch only docs, the site or Markdown.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

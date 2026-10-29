@@ -120,7 +120,19 @@ every release build; submitting it is a separate, manual workflow
 
 ## Verifying
 
-Both of these, before saying something is done:
+One command, before saying something is done:
+
+```bash
+npm run verify
+```
+
+It looks at what changed since `origin/master` and runs only the checks those
+files need, side by side: `check`, the bundler, cargo test and clippy, and the
+keyboard flows (Edge on Windows, WebKit elsewhere). One line per step; a
+failing step prints the end of its output, and every step's full output is in
+`.verify/`. `npm run verify -- --all` runs everything; `npm run verify -- js
+rust` runs chosen groups (`js`, `build`, `rust`, `ui`, `nav`). The separate
+commands below still work and are what it runs.
 
 ```bash
 npm run check
@@ -161,10 +173,12 @@ WSL otherwise finds first) and Rust with clippy (rustup). After that, from
 PowerShell in the project root:
 
 ```powershell
-scripts\wsl.ps1 'npm run check'
-scripts\wsl.ps1 'cargo test --manifest-path src-tauri/Cargo.toml'
-scripts\wsl.ps1 'cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings'
+scripts\wsl.ps1 'npm run verify -- --all'
 ```
+
+(or the single steps: `scripts\wsl.ps1 'npm run check'`,
+`scripts\wsl.ps1 'cargo test --manifest-path src-tauri/Cargo.toml'`).
+
 
 It builds a copy of your working tree, uncommitted changes included, inside
 the distribution — never edit that copy. The traps behind that design are in

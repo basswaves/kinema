@@ -20,9 +20,10 @@
  * Side by side: each system's walk is PARTS tests, which share out the screens
  * as they reach them (`claim`), each writing its own file in
  * navmap-results/parts/; the last part to finish puts them together, in the
- * order the screens are written below, as `<engine>.<system>.json`. The
- * config runs Windows first (Linux and Android copy its moves for identical
- * screens), then Linux and Android, then the held keys alone, then the map.
+ * order the screens are written below, as `<engine>.<system>.json`. Linux
+ * and Android copy Windows' moves for screens laid out the same, so each of
+ * their screens waits for Windows' result for it (`windowsUnit`); the Windows
+ * parts come first and are well ahead. Then the held keys, alone; then the map.
  */
 import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -591,7 +592,10 @@ interface Ctx {
   engine: string;
   system: System;
   contexts: Map<string, BrowserContext>;
+  /** Windows' screens, for Linux and Android when Windows is not walked in this run. */
   baselines: Baselines;
+  /** Windows is walked in this run: wait for its result for each screen instead. */
+  awaitWindows: boolean;
   /** The next screen's number: every part counts every screen, so the numbers agree. */
   seq: number;
   units: Unit[];
@@ -618,6 +622,10 @@ async function screen(
   const seq = ctx.seq++;
   if (ONLY && !ONLY.test(id)) return;
   if (!claim(ctx, seq)) return;
+  if (ctx.awaitWindows) {
+    ctx.baselines.clear();
+    for (const s of await windowsUnit(ctx.engine, seq)) ctx.baselines.set(s.id, s);
+  }
   const out: ScreenResult[] = [];
   let page: Page | null = null;
   try {
@@ -631,8 +639,32 @@ async function screen(
     out.push(skip(id, name, `Could not be reached: ${String(e instanceof Error ? e.message : e).split('\n')[0]}`));
   } finally {
     await page?.close();
+    // Written even when Home throws, so that nothing waits for it in vain.
+    if (ctx.system === 'windows') writeFileSync(unitFile(ctx.engine, seq), JSON.stringify(out));
   }
   ctx.units.push({ seq, screens: out });
+}
+
+/** Windows' result for one screen, as soon as it is walked (see `windowsUnit`). */
+const unitFile = (engine: string, seq: number) => join(PARTS_DIR, `${engine}.windows.${seq}.json`);
+
+/**
+ * Linux and Android copy Windows' moves for a screen laid out the same, so each
+ * of their screens waits for Windows' result for it; not for the whole Windows
+ * walk. A Windows screen that never arrives (its worker gone) leaves the screen
+ * to be walked in full, which gives the same moves, more slowly.
+ */
+async function windowsUnit(engine: string, seq: number): Promise<ScreenResult[]> {
+  const file = unitFile(engine, seq);
+  const t0 = Date.now();
+  while (!existsSync(file)) {
+    if (Date.now() - t0 > 15 * 60_000) {
+      console.log(`${engine}: Windows' screen ${seq} never arrived; walked in full`);
+      return [];
+    }
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  return JSON.parse(readFileSync(file, 'utf8')) as ScreenResult[];
 }
 
 const base = (ctx: Ctx, id: string) => ctx.baselines.get(id) ?? null;
@@ -1022,7 +1054,7 @@ function mergeParts(engine: string, system: System): void {
   console.log(`${engine}/${system}: ${result.seconds}s, ${result.screens.length} screens`);
 }
 
-/** The engine is the project's `metadata.engine` (its name is `webkit`, `webkit-windows`, …). */
+/** The engine is the project's `metadata.engine` (its name is `webkit`, `webkit-walk`, …). */
 const engineOf = (info: { project: { name: string; metadata: { engine?: string } } }) =>
   info.project.metadata.engine ?? info.project.name;
 
@@ -1033,7 +1065,10 @@ for (const system of SYSTEMS) {
       const engine = engineOf(info);
       const started = Date.now();
       const baselines: Baselines = new Map();
-      if (system !== 'windows') {
+      // Windows walked beside: its result per screen (`windowsUnit`). Not
+      // walked (NAV_SYSTEMS): its last run's file, as before.
+      const awaitWindows = system !== 'windows' && (!ONLY_SYSTEMS || ONLY_SYSTEMS.includes('windows'));
+      if (system !== 'windows' && !awaitWindows) {
         for (const s of readSystem(engine, 'windows')?.screens ?? []) baselines.set(s.id, s);
       }
       mkdirSync(PARTS_DIR, { recursive: true });
@@ -1044,6 +1079,7 @@ for (const system of SYSTEMS) {
         system,
         contexts: new Map(),
         baselines,
+        awaitWindows,
         seq: 0,
         units: [],
       };
@@ -1075,6 +1111,7 @@ test.describe('held keys', () => {
         system,
         contexts: new Map(),
         baselines: new Map(),
+        awaitWindows: false,
         seq: 0,
         units: [],
       };

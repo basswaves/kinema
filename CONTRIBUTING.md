@@ -253,8 +253,9 @@ does in the player; a change there should leave all of it passing.
 
 The navigation checker presses every arrow from every control on every
 screen, at TV size, as Windows, Linux and Android, and writes where each one
-went as a plain-words map in `navmap-results/` (about 25 minutes; its own
-port, so it can run beside the tests above):
+went as a plain-words map in `navmap-results/` (about 7 minutes on four
+cores, every screen in its own page, one worker per core; its own port, so it
+can run beside the tests above, though both then share the processor):
 
 ```bash
 npm run test:nav

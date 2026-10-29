@@ -3914,6 +3914,21 @@ incremental, its own target folder) took 52 s, and 6 s for a change that
 compiles to nothing. It leaves dist-app and the shortcut alone, so the owner's
 copy of Kinema can stay open while a session tests.
 
+The navigation checker (`npm run test:nav`) was one test per system, each
+walking every screen in turn: 17.6 minutes in WebKit on four cores. Each
+system's walk is now eight tests that share the screens out as they reach
+them (a claim file per screen in `navmap-results/parts/`), and the last to
+finish merges them, in the usual order, into the same `<engine>.<system>.json`.
+Linux and Android copy Windows' moves for screens laid out the same, so each of
+their screens waits for Windows' result for that screen, not for the whole
+Windows walk. The held-key measurements run last and alone: beside the walks
+a held key gave half the presses (Home, 33 → 15). One worker per core:
+6.6 minutes (2.7× faster); six workers, 5.6. The walks, unlike the flows,
+keep the processor busy, so more workers buy little. Same differences report as
+one at a time on a clean master (none), in five parallel runs (the last two
+of this version); only the
+timings and the held-key figures, which vary from run to run anyway, differ.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

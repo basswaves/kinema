@@ -34,7 +34,14 @@ param(
     # Also build the per-user installer (tauri.installer.conf.json) from the
     # same exe, into src-tauri/target/release/bundle/nsis. Its uninstaller
     # removes everything again (src-tauri/windows/hooks.nsh).
-    [switch]$Installer
+    [switch]$Installer,
+    # A build for testing only (the Kinema MCP, self-tests): the same code
+    # without thin LTO and single-unit codegen, which are most of a release
+    # build's minutes, kept incremental, in its own target folder
+    # (src-tauri\target\fast) so neither build throws away the other's cache.
+    # Touches neither dist-app\ nor the shortcut, so the owner's own Kinema
+    # can stay open. The MCP starts whichever of the two exes is newer.
+    [switch]$Test
 )
 
 $ErrorActionPreference = 'Stop'
@@ -55,6 +62,13 @@ if (-not $onCI) {
 $root   = Split-Path -Parent $PSScriptRoot
 $libDir = Join-Path $root 'src-tauri\lib'
 $relDir = Join-Path $root 'src-tauri\target\release'
+if ($Test) {
+    $env:CARGO_TARGET_DIR = Join-Path $root 'src-tauri\target\fast'
+    $env:CARGO_PROFILE_RELEASE_LTO = 'false'
+    $env:CARGO_PROFILE_RELEASE_CODEGEN_UNITS = '16'
+    $env:CARGO_PROFILE_RELEASE_INCREMENTAL = 'true'
+    $relDir = Join-Path $env:CARGO_TARGET_DIR 'release'
+}
 $outDir = Join-Path $root 'dist-app'
 $dlls   = @('libmpv-2.dll', 'libmpv-wrapper.dll')
 
@@ -117,6 +131,13 @@ finally {
 
 $exe = Join-Path $relDir 'kinema.exe'
 if (-not (Test-Path $exe)) { throw "Build reported success but $exe is not there." }
+
+if ($Test) {
+    # Beside the exe, for the same reason as dist-app (above).
+    foreach ($dll in $dlls) { Copy-Item (Join-Path $libDir $dll) $relDir -Force }
+    Write-Host "Test build: $exe"
+    return
+}
 
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 Copy-Item $exe $outDir -Force

@@ -356,11 +356,26 @@ read the screen and focus, send keys, typing and clicks, call self-test
 functions, read mpv properties and logs, query the library copy read-only and
 take a picture of Kinema's window. Contributors without Claude Code can ignore it.
 
+`kinema_run` does a whole check in one call: a list of steps (keys, typing,
+clicks, wait until an expression is true, expect a value, read state, SQL,
+mpv properties, log lines), one result line each, stopping at the first
+failure with what was on screen. Prefer it to a call per key: every call is
+a turn for the model. `npm run app:build:test` builds the exe it starts in a
+few minutes less than a release (no whole-program optimisation, its own
+target folder, dist-app and the shortcut untouched); the MCP starts whichever
+build is newer.
+
+On Android, `scripts/android-bench.sh mcp` starts the installed debug build
+(emulator or a box with network debugging) as an interactive self-test and
+forwards its WebView's debugging socket; `kinema_app` `attach` then gives the
+same tools, with logs and SQL read from the device. Only a debug build's
+WebView has that socket; a release has none.
+
 The app itself listens on nothing, in any build. The launcher alone opens
 WebView2's debugging port, on loopback, for that one run. `selftestMcp.test.ts`
 fails if a port or devtools is configured in the app, if the self-test hooks
 are set outside the interactive self-test, or if the server is put in the
-bundle. Windows only: WebKitGTK has no such port, so Linux keeps `selftest.sh`.
+bundle. Windows and Android only: WebKitGTK has no such port, so Linux keeps `selftest.sh`.
 Its pictures are for testing, never for the README or the site.
 
 Which to use: `dev:mock` for interface work and D-pad flows, the cheapest and

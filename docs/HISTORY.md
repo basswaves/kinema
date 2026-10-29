@@ -3894,6 +3894,26 @@ the tail of a failing one. Check, bundler and flows together: 2.3 minutes
 instead of about 9.5. CI moved the flows into their own job beside the builds
 and skips pushes that touch only docs, the site or Markdown.
 
+The Kinema MCP had the same shape of cost one level up: one tool call per
+key, per look at the screen, per query, and every call is a turn the model
+pays for by re-reading everything before it. `kinema_run` takes a list of
+steps — keys, typing, clicks, "until" an expression is true, "expect" a
+value, SQL, mpv properties, log lines — and answers with one line per step,
+stopping at the first failure with what was on screen. `until` replaces
+guessed waits. Results are compact JSON, screenshots smaller. `attach` drives
+a Kinema that is already running with a debugging port, which is how the
+Android app is reached: `scripts/android-bench.sh mcp` starts a debug build as
+an interactive self-test and forwards its WebView's socket, so the box and the
+emulator get the same tools instead of `input keyevent` and a photo per key.
+
+And the exe those checks run: a release build is thin LTO in one codegen unit,
+right for what people install and slow to rebuild. Measured on four cores
+(Linux), one changed line of Kinema's own code took 277 s to rebuild that way;
+`npm run app:build:test` (the same optimisation level without LTO, 16 units,
+incremental, its own target folder) took 52 s, and 6 s for a change that
+compiles to nothing. It leaves dist-app and the shortcut alone, so the owner's
+copy of Kinema can stay open while a session tests.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

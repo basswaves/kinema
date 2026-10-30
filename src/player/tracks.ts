@@ -196,9 +196,12 @@ export function describeTrack(track: Track): string {
     );
   }
   const fileName = track.external ? externalName(track) : null;
-  // mpv titles a separate file by its name: said once, and only when there
-  // is no language to say instead.
-  const title = fileName && track.title === fileName ? null : informativeTitle(track);
+  // mpv titles a separate file by its name, or by the part of it after the
+  // film's (`en.srt`): said once, and only when there is no language to say
+  // instead.
+  const nameTitle =
+    fileName !== null && !!track.title && fileName.toLowerCase().endsWith(track.title.toLowerCase());
+  const title = nameTitle ? null : informativeTitle(track);
   parts.push(
     title,
     fileName && !language && !title ? fileName : null,

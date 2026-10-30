@@ -309,6 +309,17 @@ spaces, marks and capitals left out, and hand mpv the files its own search
 misses (`addSubtitlesBeside` in engine.ts) — not the others: a file handed
 over that mpv also finds itself is listed twice, and loses its language.
 
+### A subtitle file mpv finds itself is titled by the end of its name
+
+For `Film.en.srt` beside `Film.mkv`, mpv's `track-list/N/title` is `en.srt`
+— the part after the film's name, not the whole name — and `lang` is `en`.
+The mock gave the whole name, so a check for "title equals the file name"
+passed every test and the real app still printed "English · en.srt ·
+separate file" (cost a rebuild, 2026-10-30). Only short codes reach `lang`:
+`Film.English.srt` comes with none. **Do:** read `external-filename`, drop
+a title the file name ends with, and read a spelled-out tag yourself
+(`trackLanguage` in tracks.ts).
+
 ---
 
 ## Tauri

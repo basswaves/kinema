@@ -97,6 +97,8 @@ describe('describeTrack', () => {
         track({ type: 'sub', codec: 'subrip', external: true, title: name, externalFilename: `C:/films/${name}`, ...fields })
       );
     expect(file('Film.en.srt', { lang: 'en' })).toBe('English · separate file · SRT');
+    // mpv's own title for a file it found: the part after the film's name.
+    expect(file('Film.en.srt', { lang: 'en', title: 'en.srt' })).toBe('English · separate file · SRT');
     expect(file('Film.English.srt')).toBe('English · separate file · SRT');
     expect(file('Film.no.forced.srt', { forced: true })).toBe('Norwegian · Forced · separate file · SRT');
     expect(file('Film.Deutsch.srt')).toBe('German · separate file · SRT');

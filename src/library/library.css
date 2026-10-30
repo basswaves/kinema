@@ -292,6 +292,10 @@
 .library-table-wrap {
   flex: 1;
   min-height: 0;
+  /* A narrow window scrolls the table sideways rather than cutting off the
+     match column and the Unlink buttons (T21). */
+  min-width: 0;
+  overflow-x: auto;
 }
 
 .table-toolbar {

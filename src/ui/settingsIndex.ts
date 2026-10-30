@@ -73,6 +73,12 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   },
   {
     section: 'playback',
+    label: 'Still watching?',
+    about: 'autoplay next episode binge stop ask sleep fell asleep',
+    values: ['Off', 'On'],
+  },
+  {
+    section: 'playback',
     label: 'Frame timing',
     about: 'stutter smooth video sync judder',
     values: ['Match the sound', 'Match the screen'],

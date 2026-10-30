@@ -14,6 +14,13 @@ import {
 import { entryRef, playlistStep } from '../library/playlists';
 import type { Session } from './session';
 import type { SkipKind } from './skip';
+import {
+  listenForPresses,
+  readStillWatching,
+  rollOn,
+  shouldAsk,
+  targetStarted,
+} from './stillWatching';
 
 const NEXT_EPISODE_COUNTDOWN = 12;
 
@@ -49,6 +56,19 @@ export function useUpNext({
 }) {
   const [upNext, setUpNext] = useState<EpisodeRef | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
+  /** "Still watching?": the next episode asked for, not counted down to. */
+  const [asking, setAsking] = useState(false);
+  const [askOn, setAskOn] = useState(true);
+
+  // Any press while the player is up means someone is there (stillWatching.ts).
+  useEffect(() => listenForPresses(), []);
+  useEffect(() => {
+    let live = true;
+    void readStillWatching().then((on) => live && setAskOn(on));
+    return () => {
+      live = false;
+    };
+  }, []);
 
   // A card offering the *previous* file's next episode has no business
   // surviving into this one. Nothing else clears these: the countdown path
@@ -57,7 +77,9 @@ export function useUpNext({
     /* eslint-disable react-hooks/set-state-in-effect */
     setUpNext(null);
     setCountdown(null);
+    setAsking(false);
     /* eslint-enable react-hooks/set-state-in-effect */
+    targetStarted();
   }, [target.path, target.fileId, target.fromStart]);
 
   /**
@@ -85,7 +107,11 @@ export function useUpNext({
       const next = playlist
         ? await playlistStep(playlist.id, playlist.item, true).then((e) => e && entryRef(e, playlist.id))
         : await nextEpisode(target.fileId as number);
-      if (next) {
+      if (next && shouldAsk(askOn)) {
+        // Three rolled on untouched: ask, and count nothing down.
+        setUpNext(next);
+        setAsking(true);
+      } else if (next) {
         setUpNext(next);
         setCountdown(NEXT_EPISODE_COUNTDOWN);
       } else {
@@ -94,7 +120,7 @@ export function useUpNext({
     } catch {
       await exit();
     }
-  }, [target.fileId, target.playlist, exit, sessionRef]);
+  }, [target.fileId, target.playlist, exit, sessionRef, askOn]);
 
   /**
    * Offer the next episode as soon as the credits start, without ending the
@@ -120,8 +146,9 @@ export function useUpNext({
     // what makes the whole path self-correcting rather than one-way.
     //
     // A countdown means the file has genuinely ended and the next episode is
-    // coming regardless, so that card is not an offer and must not be withdrawn.
-    if (countdown !== null) return;
+    // coming regardless, so that card is not an offer and must not be withdrawn;
+    // nor is "Still watching?", asked once the file ended.
+    if (countdown !== null || asking) return;
 
     // Credits with a scene after them are not the end of anything yet.
     if (
@@ -142,6 +169,7 @@ export function useUpNext({
     activeKey,
     activeToScene,
     countdown,
+    asking,
     dismissed,
     neighbours.next,
     upNext,
@@ -171,6 +199,7 @@ export function useUpNext({
       /* Timer-driven state machine, not state derived from render. */
       /* eslint-disable react-hooks/set-state-in-effect */
       if (upNext) {
+        rollOn();
         onPlayTarget(
           upNext.target ?? {
             path: upNext.path,
@@ -191,12 +220,24 @@ export function useUpNext({
     return () => window.clearTimeout(id);
   }, [countdown, upNext, onPlayTarget, target.titleId]);
 
-  /** Up next's Play: now rather than when the countdown ends. */
-  const playNow = useCallback(() => setCountdown(0), []);
+  /**
+   * Up next's Play: now rather than when the countdown ends. Answering
+   * "Still watching?" plays it as a choice, which starts the count again.
+   */
+  const playNow = useCallback(() => {
+    if (asking && upNext) {
+      setAsking(false);
+      setUpNext(null);
+      playNeighbour(upNext);
+      return;
+    }
+    setCountdown(0);
+  }, [asking, upNext, playNeighbour]);
   /** Up next's Back to library, after a file that ended. */
   const leave = useCallback(() => {
     setCountdown(null);
     setUpNext(null);
+    setAsking(false);
     void exit();
   }, [exit]);
   /**
@@ -209,5 +250,14 @@ export function useUpNext({
     if (activeKey) dismiss(activeKey);
   }, [activeKey, dismiss]);
 
-  return { upNext, countdown, playNow, leave, keepWatching, playNeighbour, handlePlaybackEnded };
+  return {
+    upNext,
+    countdown,
+    asking,
+    playNow,
+    leave,
+    keepWatching,
+    playNeighbour,
+    handlePlaybackEnded,
+  };
 }

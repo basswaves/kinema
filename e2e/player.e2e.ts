@@ -924,3 +924,48 @@ test('waiting for data is said only when it lasts, and in words for what it wait
   await wait(null);
   await expect(note).toHaveCount(0);
 });
+
+test('Still watching? after three episodes rolled on untouched, answered by remote', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await play(page, 'series');
+  const card = page.locator('.up-next');
+  const toEnd = () =>
+    page.evaluate(() => {
+      const f = (window as unknown as { __fakeMpv: { position: number; duration: number } })
+        .__fakeMpv;
+      f.position = f.duration - 0.1;
+    });
+
+  // Three episodes roll on by themselves, nobody pressing anything.
+  for (const next of ['S01E02', 'S01E03', 'S01E04']) {
+    await toEnd();
+    await expect(card).toContainText('Play now');
+    await expect.poll(async () => (await mpv(page)).path, { timeout: 20_000 }).toContain(next);
+    await expect(card).toHaveCount(0);
+  }
+
+  // The fourth end asks, and counts nothing down.
+  await toEnd();
+  await expect(card).toContainText('Still watching?');
+  await expect(card).toContainText('Back to library');
+  await expect(card).not.toContainText('Play now');
+  await page.waitForTimeout(3000);
+  expect((await mpv(page)).path).toContain('S01E04');
+  // The one that finished counts as watched; the next one is untouched.
+  await expect
+    .poll(() => call<{ completed: boolean }>(page, '/src/player/api.ts', 'getProgress', 104))
+    .toMatchObject({ completed: true });
+
+  // Answered by remote: Up brings the ring to the card, OK on Play next.
+  await readIt(page);
+  await press(page, 'ArrowUp');
+  for (let i = 0; i < 4 && !(await focused(page))?.includes('Play next'); i++) {
+    await press(page, (await focused(page)) === 'Back to library' ? 'ArrowLeft' : 'ArrowUp');
+  }
+  await expect.poll(() => focused(page)).toContain('Play next');
+  await press(page, 'Enter');
+  await expect.poll(async () => (await mpv(page)).path).toContain('S01E05');
+  await expect(card).toHaveCount(0);
+});

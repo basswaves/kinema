@@ -170,8 +170,16 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     setChapters,
     countedCreditsStart,
   } = useSkipMarkers({ target, session, neighbours, showOsd, fail, dispatch });
-  const { upNext, countdown, playNow, leave, keepWatching, playNeighbour, handlePlaybackEnded } =
-    useUpNext({
+  const {
+    upNext,
+    countdown,
+    asking,
+    playNow,
+    leave,
+    keepWatching,
+    playNeighbour,
+    handlePlaybackEnded,
+  } = useUpNext({
       target,
       onPlayTarget,
       exit,
@@ -506,6 +514,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         <UpNextCard
           episode={upNext}
           countdown={countdown}
+          asking={asking}
           onPlay={playNow}
           onLeave={leave}
           onKeepWatching={keepWatching}

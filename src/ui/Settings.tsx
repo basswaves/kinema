@@ -109,6 +109,7 @@ import {
   DEFAULT_CREDITS_TAIL_SECS,
 } from '../player/skip';
 import { VIDEO_SYNC_KEY } from '../player/mpvOptions';
+import { STILL_WATCHING_KEY } from '../player/stillWatching';
 import { buildNfoExports, writeNfo } from '../metadata/nfo';
 import { detectLines } from '../library/detectReport';
 import FixMatch from '../library/FixMatch';
@@ -313,6 +314,7 @@ export default function Settings({
   const [autoSkip, setAutoSkip] = useState(false);
   const [creditsTail, setCreditsTail] = useState(DEFAULT_CREDITS_TAIL_SECS);
   const [displaySync, setDisplaySync] = useState(false);
+  const [stillWatching, setStillWatching] = useState(true);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [panel, setPanel] = useState<'none' | 'review' | 'developer'>(
@@ -459,6 +461,7 @@ export default function Settings({
       if (Number.isFinite(secs) && secs >= 0) setCreditsTail(secs);
 
       setDisplaySync((await getSetting(VIDEO_SYNC_KEY)) === 'display');
+      setStillWatching((await getSetting(STILL_WATCHING_KEY)) !== 'off');
 
       setSkiptroPath((await getSetting(SKIPTRO_PATH_KEY)) ?? '');
       setSkiptroDbPath((await getSetting(SKIPTRO_DB_PATH_KEY)) ?? '');
@@ -1043,6 +1046,19 @@ export default function Settings({
                     setContrast(v === 'on');
                   }}
                   note="For eyes that need it: every quiet line of text at full strength, the player's panels on solid black instead of see-through, and a thicker outline round what is highlighted."
+                />
+                <ChoiceRow
+                  label="Still watching?"
+                  choices={[
+                    { value: 'off', label: 'Off' },
+                    { value: 'on', label: 'On' },
+                  ]}
+                  value={stillWatching ? 'on' : 'off'}
+                  onChange={(v) => {
+                    setStillWatching(v === 'on');
+                    void setSetting(STILL_WATCHING_KEY, v).catch((e) => setError(userError(e)));
+                  }}
+                  note="After three episodes in a row that played on by themselves, with no key, mouse or remote pressed, Kinema asks before starting the next one, so a show does not run on to the end of the season for nobody."
                 />
                 {/* The one rendering switch in the app, and it exists only
                     because the right answer depends on hardware this code

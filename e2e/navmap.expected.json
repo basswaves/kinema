@@ -176,10 +176,12 @@
       "✓Auto": { "U": "✓On a TV", "D": "✓Off", "L": "Playback", "R": "Full" },
       "Full": { "U": "✓On a TV", "D": "✓Off", "L": "✓Auto", "R": "Light" },
       "Light": { "U": "✓On a TV", "D": "✓Off", "L": "Full", "R": "·" },
-      "✓Off": { "U": "✓Auto", "D": "✓Match the sound", "L": "Playback", "R": "On" },
-      "On": { "U": "✓Auto", "D": "✓Match the sound", "L": "✓Off", "R": "·" },
-      "✓Match the sound": { "U": "✓Off", "D": "Offer Kinema as a video player", "L": "Playback", "R": "Match the screen" },
-      "Match the screen": { "U": "✓Off", "D": "Offer Kinema as a video player", "L": "✓Match the sound", "R": "·" },
+      "✓Off": { "U": "✓Auto", "D": "✓On", "L": "Playback", "R": "On" },
+      "On": { "U": "✓Auto", "D": "✓On", "L": "✓Off", "R": "·" },
+      "Off": { "U": "✓Off", "D": "✓Match the sound", "L": "Playback", "R": "✓On" },
+      "✓On": { "U": "✓Off", "D": "✓Match the sound", "L": "Off", "R": "·" },
+      "✓Match the sound": { "U": "✓On", "D": "Offer Kinema as a video player", "L": "Playback", "R": "Match the screen" },
+      "Match the screen": { "U": "✓On", "D": "Offer Kinema as a video player", "L": "✓Match the sound", "R": "·" },
       "Offer Kinema as a video player": { "U": "✓Match the sound", "D": "·", "L": "Playback", "R": "·" }
     },
     "settings-picture": {
@@ -648,10 +650,12 @@
       "✓Auto": { "U": "✓On a TV", "D": "✓Off", "L": "Playback", "R": "Full" },
       "Full": { "U": "✓On a TV", "D": "✓Off", "L": "✓Auto", "R": "Light" },
       "Light": { "U": "✓On a TV", "D": "✓Off", "L": "Full", "R": "·" },
-      "✓Off": { "U": "✓Auto", "D": "✓Match the sound", "L": "Playback", "R": "On" },
-      "On": { "U": "✓Auto", "D": "✓Match the sound", "L": "✓Off", "R": "·" },
-      "✓Match the sound": { "U": "✓Off", "D": "Add Kinema to the app menu", "L": "Playback", "R": "Match the screen" },
-      "Match the screen": { "U": "✓Off", "D": "Add Kinema to the app menu", "L": "✓Match the sound", "R": "·" },
+      "✓Off": { "U": "✓Auto", "D": "✓On", "L": "Playback", "R": "On" },
+      "On": { "U": "✓Auto", "D": "✓On", "L": "✓Off", "R": "·" },
+      "Off": { "U": "✓Off", "D": "✓Match the sound", "L": "Playback", "R": "✓On" },
+      "✓On": { "U": "✓Off", "D": "✓Match the sound", "L": "Off", "R": "·" },
+      "✓Match the sound": { "U": "✓On", "D": "Add Kinema to the app menu", "L": "Playback", "R": "Match the screen" },
+      "Match the screen": { "U": "✓On", "D": "Add Kinema to the app menu", "L": "✓Match the sound", "R": "·" },
       "Add Kinema to the app menu": { "U": "✓Match the sound", "D": "·", "L": "Playback", "R": "·" }
     },
     "settings-picture": {
@@ -1099,10 +1103,12 @@
       "✓Auto": { "U": "Settings", "D": "✓Off", "L": "Playback", "R": "Full" },
       "Full": { "U": "Settings", "D": "✓Off", "L": "✓Auto", "R": "Light" },
       "Light": { "U": "Settings", "D": "✓Off", "L": "Full", "R": "·" },
-      "✓Off": { "U": "✓Auto", "D": "✓Match the sound", "L": "Playback", "R": "On" },
-      "On": { "U": "✓Auto", "D": "✓Match the sound", "L": "✓Off", "R": "·" },
-      "✓Match the sound": { "U": "✓Off", "D": "·", "L": "Playback", "R": "Match the screen" },
-      "Match the screen": { "U": "✓Off", "D": "·", "L": "✓Match the sound", "R": "·" }
+      "✓Off": { "U": "✓Auto", "D": "✓On", "L": "Playback", "R": "On" },
+      "On": { "U": "✓Auto", "D": "✓On", "L": "✓Off", "R": "·" },
+      "Off": { "U": "✓Off", "D": "✓Match the sound", "L": "Playback", "R": "✓On" },
+      "✓On": { "U": "✓Off", "D": "✓Match the sound", "L": "Off", "R": "·" },
+      "✓Match the sound": { "U": "✓On", "D": "·", "L": "Playback", "R": "Match the screen" },
+      "Match the screen": { "U": "✓On", "D": "·", "L": "✓Match the sound", "R": "·" }
     },
     "settings-picture": {
       "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "✓On" },

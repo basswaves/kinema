@@ -217,6 +217,16 @@ const TRACKS = [
   { type: 'sub', id: 1, lang: 'eng', codec: 'hdmv_pgs_subtitle', title: 'English SDH' },
   { type: 'sub', id: 2, lang: 'nor', codec: 'subrip' },
   { type: 'sub', id: 3, lang: 'nor', codec: 'subrip', forced: true },
+  // A file beside the film that mpv found itself, named with a language it
+  // does not read: no `lang`, its name as the title (round 5, T29).
+  {
+    type: 'sub',
+    id: 4,
+    codec: 'subrip',
+    external: true,
+    title: 'Example.Film.Danish.srt',
+    'external-filename': 'C:/fixture/Example.Film.Danish.srt',
+  },
 ] as const;
 
 const selectedTrack = { aid: 1, sid: 1 };

@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { canonicalLang, languageName, sameLanguage } from './language';
 import type { Track } from './engine';
-import { describeTrack, describeTracks, findTrackByLang, secondChoices, secondTrackFor } from './tracks';
+import {
+  describeTrack,
+  describeTracks,
+  findTrackByLang,
+  languageFromFileName,
+  secondChoices,
+  secondTrackFor,
+} from './tracks';
 
 const track = (fields: Partial<Track>): Track => ({
   id: 1,
@@ -69,14 +76,40 @@ describe('describeTrack', () => {
     );
   });
 
-  it('marks forced and SDH subtitles, without the codec', () => {
+  it('marks forced and SDH subtitles, and ends on the format word', () => {
     expect(describeTrack(track({ type: 'sub', lang: 'nor', codec: 'hdmv_pgs_subtitle', forced: true }))).toBe(
-      'Norwegian · Forced'
+      'Norwegian · Forced · PGS'
     );
     expect(describeTrack(track({ type: 'sub', lang: 'eng', codec: 'subrip', title: 'English SDH' }))).toBe(
-      'English · SDH'
+      'English · SDH · SRT'
     );
-    expect(describeTrack(track({ type: 'sub', codec: 'subrip', external: true }))).toBe('separate file');
+    expect(describeTrack(track({ type: 'sub', codec: 'dvd_subtitle', lang: 'fre' }))).toBe('French · VobSub');
+    expect(describeTrack(track({ type: 'sub', codec: 'webvtt', lang: 'eng' }))).toBe('English · WebVTT');
+    expect(describeTrack(track({ type: 'sub', codec: 'ass', lang: 'jpn', title: 'Signs & songs' }))).toBe(
+      'Japanese · Signs & songs · ASS'
+    );
+    expect(describeTrack(track({ type: 'sub', codec: 'subrip', external: true }))).toBe('separate file · SRT');
+  });
+
+  it("says a separate file's language from mpv, else its name's tag, else its name", () => {
+    const file = (name: string, fields: Partial<Track> = {}) =>
+      describeTrack(
+        track({ type: 'sub', codec: 'subrip', external: true, title: name, externalFilename: `C:/films/${name}`, ...fields })
+      );
+    expect(file('Film.en.srt', { lang: 'en' })).toBe('English · separate file · SRT');
+    expect(file('Film.English.srt')).toBe('English · separate file · SRT');
+    expect(file('Film.no.forced.srt', { forced: true })).toBe('Norwegian · Forced · separate file · SRT');
+    expect(file('Film.Deutsch.srt')).toBe('German · separate file · SRT');
+    // Nothing that reads as a language: the name, never a guess.
+    expect(file('Some.Film.2010.1080p.srt')).toBe('Some.Film.2010.1080p.srt · separate file · SRT');
+    expect(file('Film.GRP.srt')).toBe('Film.GRP.srt · separate file · SRT');
+  });
+
+  it('reads only the last dotted tag of a name as its language', () => {
+    expect(languageFromFileName('Film.eng.sdh.srt')).toBe('eng');
+    expect(languageFromFileName('Film.pt-BR.srt')).toBe('pt-br');
+    expect(languageFromFileName('The.Italian.Job.srt')).toBeNull();
+    expect(languageFromFileName('English.srt')).toBeNull();
   });
 });
 
@@ -97,11 +130,17 @@ describe('describeTracks', () => {
       track({ id: 4, type: 'sub', lang: 'ita', codec: 'hdmv_pgs_subtitle' }),
       track({ id: 5, type: 'sub', lang: 'eng', codec: 'subrip' }),
     ]);
-    expect(lines.get(1)).toBe('German · picture subtitles');
-    expect(lines.get(2)).toBe('German · text subtitles');
-    expect(lines.get(3)).toBe('Italian · picture subtitles · track 3');
-    expect(lines.get(4)).toBe('Italian · picture subtitles · track 4');
-    expect(lines.get(5)).toBe('English');
+    expect(lines.get(1)).toBe('German · PGS');
+    expect(lines.get(2)).toBe('German · SRT');
+    expect(lines.get(3)).toBe('Italian · PGS · track 3');
+    expect(lines.get(4)).toBe('Italian · PGS · track 4');
+    expect(lines.get(5)).toBe('English · SRT');
+    // A format with no word of its own still says what kind it is.
+    const odd = describeTracks([
+      track({ id: 1, type: 'sub', lang: 'ger', codec: 'xsub' }),
+      track({ id: 2, type: 'sub', lang: 'ger', codec: 'text' }),
+    ]);
+    expect(odd.get(1)).toBe('German · picture subtitles');
   });
 });
 

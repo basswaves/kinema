@@ -8,7 +8,7 @@ import type { NewItem } from '../library/playlists';
 import { useFocusGroup } from '../ui/focusGroups';
 import FocusButton from '../ui/FocusButton';
 import type { Track } from './engine';
-import { describeTracks, isPictureSubtitle, secondChoices } from './tracks';
+import { describeTracks, isPictureSubtitle, secondChoices, trackLanguage } from './tracks';
 import { languageBadge, languageName } from './language';
 import { describeOffer, type Offer } from './onlineSubtitles';
 import { DELAY_STEP_MS, delayLabel } from './audioDelay';
@@ -36,7 +36,7 @@ export interface OnlineSubtitles {
 
 /** A track's row: its language's short code, then the line describing it. */
 function TrackText({ track, line }: { track: Track; line: string | undefined }) {
-  const badge = languageBadge(track.lang);
+  const badge = languageBadge(trackLanguage(track));
   return (
     <>
       {badge && (

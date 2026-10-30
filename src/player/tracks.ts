@@ -3,7 +3,7 @@
  * are read and chosen through the engine (engine.ts), in Kinema's terms.
  */
 import type { Track } from './engine';
-import { languageName, sameLanguage } from './language';
+import { canonicalLang, languageName, sameLanguage } from './language';
 
 /** Codec names as they are printed on a disc box. */
 const AUDIO_CODECS: Record<string, string> = {
@@ -80,13 +80,112 @@ function informativeTitle(track: Track): string | null {
 }
 
 /**
+ * A subtitle's format, the short word a release names it by (round 5, T28):
+ * from the file, as the badges are. The same names on Android, where
+ * Media3Plugin.kt turns its MIME types into FFmpeg's.
+ */
+const SUBTITLE_FORMATS: Record<string, string> = {
+  subrip: 'SRT',
+  srt: 'SRT',
+  ass: 'ASS',
+  ssa: 'SSA',
+  webvtt: 'WebVTT',
+  hdmv_pgs_subtitle: 'PGS',
+  dvd_subtitle: 'VobSub',
+  dvb_subtitle: 'DVB',
+  mov_text: 'MP4 text',
+  ttml: 'TTML',
+};
+
+export function subtitleFormat(track: Track): string | null {
+  const codec = track.codec?.toLowerCase();
+  return codec ? (SUBTITLE_FORMATS[codec] ?? null) : null;
+}
+
+/** The file a separate subtitle came from, without its folder. */
+function externalName(track: Track): string | null {
+  const path = track.externalFilename;
+  return path ? (path.split(/[\\/]/).pop() ?? path) : null;
+}
+
+/** Tags in a subtitle's name that are not its language. */
+const NAME_FLAGS = new Set(['forced', 'sdh', 'cc', 'hi', 'default', 'full', 'sub', 'subs']);
+
+let namedLanguages: Map<string, string> | null = null;
+
+/**
+ * A language as a name spells it out — `English`, `Norsk`, `Deutsch` — to
+ * its code: every two-letter language, by its English name and its own.
+ * Built once, the first time a name is not a code.
+ */
+function languageFromName(word: string): string | null {
+  if (!namedLanguages) {
+    const found = new Map<string, string>();
+    try {
+      const english = new Intl.DisplayNames(['en'], { type: 'language', fallback: 'none' });
+      const letters = 'abcdefghijklmnopqrstuvwxyz';
+      for (const a of letters) {
+        for (const b of letters) {
+          const code = a + b;
+          const name = english.of(code);
+          if (!name) continue;
+          found.set(name.toLowerCase(), code);
+          try {
+            const own = new Intl.DisplayNames([code], { type: 'language', fallback: 'none' }).of(code);
+            if (own && !found.has(own.toLowerCase())) found.set(own.toLowerCase(), code);
+          } catch {
+            // No name of its own in this engine.
+          }
+        }
+      }
+    } catch {
+      // No language names at all: only codes are read.
+    }
+    namedLanguages = found;
+  }
+  return namedLanguages.get(word.toLowerCase()) ?? null;
+}
+
+/**
+ * The language a subtitle file's own name gives — `Film.en.srt`,
+ * `Film.no.forced.srt`, `Film.English.srt`, `Film.pt-BR.srt` — or null.
+ * Only the last tag set off by dots counts, once the flags (`forced`, `sdh`)
+ * are passed: a word further in is the film's title, not a language. Never
+ * guessed from anything else (Kinema never lies).
+ */
+export function languageFromFileName(name: string): string | null {
+  for (const part of name.split('.').slice(1, -1).reverse()) {
+    const word = part.trim().toLowerCase();
+    if (NAME_FLAGS.has(word)) continue;
+    if (/^[a-z]{2,3}(-[a-z]{2})?$/.test(word)) {
+      const code = canonicalLang(word);
+      return code && languageName(code) !== code.toUpperCase() ? word : null;
+    }
+    return /^\p{L}{4,}$/u.test(word) ? languageFromName(word) : null;
+  }
+  return null;
+}
+
+/**
+ * The track's language: as the engine says it, or, for a separate file with
+ * none, as the file's name tags it (round 5, T29) — mpv reads only short
+ * codes from a name, so `Film.English.srt` came through with none.
+ */
+export function trackLanguage(track: Track): string | undefined {
+  if (track.lang) return track.lang;
+  const name = track.external ? externalName(track) : null;
+  return (name && languageFromFileName(name)) || undefined;
+}
+
+/**
  * A line a person reads: "English · 7.1 · Dolby TrueHD Atmos",
- * "Norwegian · Forced", "English · SDH". It used to print mpv's own
- * spelling — "ENG · truehd", "hdmv_pgs_subtitle" — which nobody but a
- * developer can read.
+ * "Norwegian · Forced · PGS", "English · SDH · SRT". It used to print mpv's
+ * own spelling — "ENG · truehd", "hdmv_pgs_subtitle" — which nobody but a
+ * developer can read. A separate file with no language says its name.
  */
 export function describeTrack(track: Track): string {
-  const parts: (string | null)[] = [languageName(track.lang)];
+  const language = languageName(trackLanguage(track));
+  const parts: (string | null)[] = [language];
   if (track.type === 'audio') {
     parts.push(channelLayout(track.channels), audioFormat(track));
   } else {
@@ -95,7 +194,16 @@ export function describeTrack(track: Track): string {
       track.hearingImpaired || /\bsdh\b|\bcc\b/i.test(track.title ?? '') ? 'SDH' : null
     );
   }
-  parts.push(informativeTitle(track), track.external ? 'separate file' : null);
+  const fileName = track.external ? externalName(track) : null;
+  // mpv titles a separate file by its name: said once, and only when there
+  // is no language to say instead.
+  const title = fileName && track.title === fileName ? null : informativeTitle(track);
+  parts.push(
+    title,
+    fileName && !language && !title ? fileName : null,
+    track.external ? 'separate file' : null,
+    track.type === 'sub' ? subtitleFormat(track) : null
+  );
   const line = parts.filter((p): p is string => Boolean(p));
   return line.length > 0 ? line.join(' · ') : `Track ${track.id}`;
 }
@@ -125,7 +233,8 @@ export function describeTracks(tracks: Track[]): Map<number, string> {
 
   const withKind = new Map(lines);
   for (const t of tracks) {
-    const kind = t.type === 'sub' ? subtitleKind(t.codec) : null;
+    // The format word already says it, where there is one.
+    const kind = t.type === 'sub' && !subtitleFormat(t) ? subtitleKind(t.codec) : null;
     if (alike(t.id) && kind) withKind.set(t.id, `${lines.get(t.id)} · ${kind}`);
   }
   const result = new Map(withKind);
@@ -155,7 +264,7 @@ export function findTrackByLang(
   lang: string | null
 ): Track | null {
   if (!lang) return null;
-  const candidates = tracks.filter((t) => t.type === type && sameLanguage(t.lang, lang));
+  const candidates = tracks.filter((t) => t.type === type && sameLanguage(trackLanguage(t), lang));
   if (candidates.length === 0) return null;
   return candidates.find((t) => !t.forced) ?? candidates[0];
 }

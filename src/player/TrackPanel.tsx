@@ -12,6 +12,7 @@ import { describeTracks, isPictureSubtitle, secondChoices, trackLanguage } from 
 import { languageBadge, languageName } from './language';
 import { describeOffer, type Offer } from './onlineSubtitles';
 import { DELAY_STEP_MS, delayLabel } from './audioDelay';
+import { SUB_BIG_STEP_MS, SUB_STEP_MS, subDelayLabel } from './subDelay';
 import { nextSize, sizeLabel, type SubStyle } from './subtitleStyle';
 
 /**
@@ -85,6 +86,7 @@ export default function TrackPanel({
   subStyle,
   onSubStyle,
   delay,
+  timing,
   sid2,
   onSecond,
 }: {
@@ -117,6 +119,11 @@ export default function TrackPanel({
    * and a step of it. None where Media3 plays the sound (Android).
    */
   delay?: { ms: number; onChange: (delta: number, reset?: boolean) => void } | null;
+  /**
+   * The subtitle timing kept for this file (subDelay.ts), and a step of it.
+   * None where Media3 plays: it has no subtitle offset.
+   */
+  timing?: { ms: number; onChange: (delta: number, reset?: boolean) => void } | null;
   /**
    * The second subtitles, drawn at the top (mpv's `secondary-sid`), and
    * choosing them. None where Media3 plays: it shows one text track.
@@ -301,6 +308,36 @@ export default function TrackPanel({
           </>
         )}
         <p className="track-note">Remembered for this show.</p>
+        {timing && subTracks.length > 0 && (
+          <>
+            <div className="track-delay">
+              <span className="track-delay-label">Timing: {subDelayLabel(timing.ms)}</span>
+              {[-SUB_BIG_STEP_MS, -SUB_STEP_MS, SUB_STEP_MS, SUB_BIG_STEP_MS].map((step) => (
+                <FocusButton
+                  key={step}
+                  className="track-option"
+                  keepInView="nearest"
+                  label={`Subtitles ${Math.abs(step) / 1000} s ${step < 0 ? 'earlier' : 'later'}`}
+                  onSelect={() => timing.onChange(step)}
+                >
+                  {step < 0 ? '−' : '+'}
+                  {Math.abs(step) / 1000}
+                </FocusButton>
+              ))}
+              <FocusButton
+                className="track-option"
+                keepInView="nearest"
+                label="Subtitles at their own timing"
+                onSelect={() => timing.onChange(0, true)}
+              >
+                0
+              </FocusButton>
+            </div>
+            <p className="track-note">
+              For this file: earlier if the words come after they are said, later if before.
+            </p>
+          </>
+        )}
         {subStyle && onSubStyle && (
           <>
             <div className="track-panel-head">

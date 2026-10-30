@@ -6,6 +6,7 @@
  * exactly one of the two acts on any press (docs/GOTCHAS.md).
  */
 import { DELAY_STEP_MS } from './audioDelay';
+import { SUB_BIG_STEP_MS, SUB_STEP_MS } from './subDelay';
 import { useEffect } from 'react';
 import type { EpisodeRef } from './api';
 import type { Steps } from './useNeighbours';
@@ -49,6 +50,7 @@ export function usePlayerKeys({
   startOver,
   playNow,
   changeDelay,
+  changeTiming,
 }: {
   /** Space, OK with nothing on offer, and the remote's play/pause. */
   togglePauseByKey: () => Promise<void>;
@@ -87,6 +89,8 @@ export function usePlayerKeys({
   playNow: () => void;
   /** Ctrl + / Ctrl − (mpv's keys) and Ctrl 0: the sound delay (audioDelay.ts). */
   changeDelay: (delta: number, reset?: boolean) => void;
+  /** z / x, as mpv has them, and Shift for a bigger step: subtitle timing (subDelay.ts). */
+  changeTiming: (delta: number, reset?: boolean) => void;
 }) {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -202,6 +206,15 @@ export function usePlayerKeys({
         case 'm':
           volumeKey(toggleMute);
           break;
+        // Subtitle timing: z earlier, x later, as mpv's own keys.
+        case 'z':
+        case 'Z':
+        case 'x':
+        case 'X': {
+          const step = e.key === 'Z' || e.key === 'X' ? SUB_BIG_STEP_MS : SUB_STEP_MS;
+          changeTiming(e.key.toLowerCase() === 'z' ? -step : step);
+          break;
+        }
         case '-':
         case '9':
           volumeKey(() => changeVolume(-VOLUME_STEP));
@@ -275,6 +288,7 @@ export function usePlayerKeys({
     startOver,
     playNow,
     changeDelay,
+    changeTiming,
   ]);
 
   /**

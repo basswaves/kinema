@@ -665,7 +665,9 @@ test('a sound delay for this device, by remote and keys, said and kept', async (
   }
   await press(page, 'Enter', 2);
   await expect.poll(() => sets(page)).toContain('audio-delay=0.020');
-  await expect(panel.locator('.track-delay-label')).toHaveText('Sound delay: +20 ms');
+  await expect(panel.locator('.track-delay-label', { hasText: 'Sound' })).toHaveText(
+    'Sound delay: +20 ms'
+  );
   await expect(page.locator('.player-notice')).toHaveText('Sound delayed by 20 ms for this device');
   await expect
     .poll(() => call<string | null>(page, '/src/metadata/api.ts', 'getSetting', 'audio_delay'))
@@ -681,6 +683,65 @@ test('a sound delay for this device, by remote and keys, said and kept', async (
     .toBe('audio-delay=0.000');
   await expect
     .poll(() => call<string | null>(page, '/src/metadata/api.ts', 'getSetting', 'audio_delay'))
+    .toBe('{}');
+});
+
+test('subtitle lines and timing: formats, the separate file by language, earlier and later', async ({
+  page,
+}) => {
+  await play(page, 'series');
+  // Put on as each file starts, none by default: mpv keeps the last file's.
+  await expect.poll(() => sets(page)).toContain('sub-delay=0.000');
+
+  const panel = await openTrackPanel(page);
+  // Each line ends on its format (T28); the separate file says the language
+  // its name tags, where mpv gave none (T29).
+  await expect(panel.locator('.track-option', { hasText: 'English · SDH · PGS' })).toBeVisible();
+  await expect(panel.locator('.track-option', { hasText: 'Norwegian · Forced · SRT' })).toBeVisible();
+  await expect(panel.locator('.track-option', { hasText: 'Danish · separate file · SRT' })).toBeVisible();
+  // The English track is pictures: no box goes behind it, and the panel says so (T27).
+  await expect(panel.locator('.track-note', { hasText: 'No box on picture subtitles' })).toHaveCount(0);
+  await pressInPanel(page, panel.locator('.track-option', { hasText: 'English · SDH · PGS' }));
+  await expect.poll(() => sets(page)).toContain('sid=1');
+  await expect(panel.locator('.track-note', { hasText: 'No box on picture subtitles' })).toBeVisible();
+
+  const later = panel.getByRole('button', { name: 'Subtitles 0.5 s later' });
+  for (let i = 0; i < 25 && !(await panel.locator('.track-delay .focused').count()); i++) {
+    await press(page, 'ArrowDown');
+  }
+  // The sound delay's row comes first; the subtitles' is the one under it.
+  if (!(await later.evaluate((el) => !!el.closest('.track-delay')?.querySelector('.focused')))) {
+    await press(page, 'ArrowDown');
+  }
+  for (let i = 0; i < 5 && !(await later.evaluate((el) => el.classList.contains('focused'))); i++) {
+    await press(page, 'ArrowRight');
+  }
+  await press(page, 'Enter', 2);
+  await expect.poll(() => sets(page)).toContain('sub-delay=1.000');
+  await expect(panel.locator('.track-delay-label', { hasText: 'Timing:' })).toHaveText('Timing: +1 s');
+  await expect(page.locator('.player-notice')).toHaveText('Subtitles 1 s later, for this file');
+  await expect
+    .poll(() => call<string | null>(page, '/src/metadata/api.ts', 'getSetting', 'subtitle_delay'))
+    .toMatch(/":1000\}$/);
+
+  // mpv's own keys: z a step earlier, Z a big one.
+  await press(page, 'z', 3);
+  await expect.poll(() => sets(page)).toContain('sub-delay=0.700');
+  await press(page, 'Shift+Z');
+  await expect.poll(() => sets(page)).toContain('sub-delay=0.200');
+  await expect(page.locator('.player-notice')).toHaveText('Subtitles 0.2 s later, for this file');
+
+  // 0 puts them back, and the file is forgotten.
+  const reset = panel.getByRole('button', { name: 'Subtitles at their own timing' });
+  for (let i = 0; i < 6 && !(await reset.evaluate((el) => el.classList.contains('focused'))); i++) {
+    await press(page, 'ArrowRight');
+  }
+  await press(page, 'Enter');
+  await expect
+    .poll(async () => (await sets(page)).filter((s) => s.startsWith('sub-delay=')).at(-1))
+    .toBe('sub-delay=0.000');
+  await expect
+    .poll(() => call<string | null>(page, '/src/metadata/api.ts', 'getSetting', 'subtitle_delay'))
     .toBe('{}');
 });
 

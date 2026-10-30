@@ -6,6 +6,7 @@
  * session.ts's to decide.
  */
 import { applyAudioDelay } from './audioDelay';
+import { applySubDelay } from './subDelay';
 import { useEffect, useLayoutEffect, useRef, type Dispatch, type RefObject } from 'react';
 import { capabilitiesNow } from '../capabilities';
 import { getSetting } from '../metadata/api';
@@ -178,6 +179,13 @@ export function usePlaybackEngine({
           // And the delay kept for that device (audioDelay.ts).
           await applyAudioDelay(currentSoundDevice()?.id ?? null).catch((e) =>
             console.warn('audio: delay not applied', e)
+          );
+        }
+        // The subtitle timing kept for this file, or none: mpv keeps the
+        // last file's otherwise (subDelay.ts).
+        if (hasMpv()) {
+          await applySubDelay(target.path).catch((e) =>
+            console.warn('subtitles: timing not applied', e)
           );
         }
         if (cancelled) return;

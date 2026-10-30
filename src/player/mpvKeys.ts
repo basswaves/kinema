@@ -48,7 +48,7 @@ export const MPV_KEYS: ReadonlyArray<readonly [mpv: string, dom: string]> = [
   ['FORWARD', 'MediaFastForward'],
   ['REWIND', 'MediaRewind'],
   // The player's letter and number keys (usePlayerKeys.ts), and the controls list.
-  ...['i', 'f', 'm', 'n', 'p', '0', '9', '-', '+', '=', '?'].map((k) => [k, k] as const),
+  ...['i', 'f', 'm', 'n', 'p', '0', '9', '-', '+', '=', '?', 'z', 'x', 'Z', 'X'].map((k) => [k, k] as const),
 ];
 
 /** mpv's property the bindings write (see above). */

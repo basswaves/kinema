@@ -60,6 +60,7 @@ import { useScrub } from './useScrub';
 import { useSkipMarkers } from './useSkipMarkers';
 import { useTracks } from './useTracks';
 import { useAudioDelay } from './useAudioDelay';
+import { useSubDelay } from './useSubDelay';
 import { useUpNext } from './useUpNext';
 import { useVolume } from './useVolume';
 import { VOLUME_STEP, wheelVolumeSteps } from './volume';
@@ -130,6 +131,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     closeChapters,
   } = usePanels({ osdFocus, osdFocusRef });
   const { delayMs, changeDelay } = useAudioDelay(setNotice);
+  const { subDelayMs, changeTiming } = useSubDelay(setNotice);
 
   const onlinePanel = useOnlineSubtitles({
     target,
@@ -386,6 +388,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     startOver,
     playNow,
     changeDelay,
+    changeTiming,
   });
 
   // The controls step back out of the way on their own (useOsd.ts).
@@ -535,6 +538,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           subStyle={hasMpv() ? subStyle : null}
           onSubStyle={(style) => void changeSubStyle(style)}
           delay={hasMpv() ? { ms: delayMs, onChange: changeDelay } : null}
+          timing={hasMpv() ? { ms: subDelayMs, onChange: changeTiming } : null}
           sid2={sid2}
           onSecond={hasMpv() ? (track) => void chooseSecond(track) : null}
           playlistItem={

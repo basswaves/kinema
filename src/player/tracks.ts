@@ -109,7 +109,8 @@ function externalName(track: Track): string | null {
 }
 
 /** Tags in a subtitle's name that are not its language. */
-const NAME_FLAGS = new Set(['forced', 'sdh', 'cc', 'hi', 'default', 'full', 'sub', 'subs']);
+// Not `hi`: that is Hindi, as subtitle_files.rs reads it.
+const NAME_FLAGS = new Set(['forced', 'sdh', 'cc', 'default', 'full', 'sub', 'subs']);
 
 let namedLanguages: Map<string, string> | null = null;
 

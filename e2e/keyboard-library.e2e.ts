@@ -94,9 +94,11 @@ test('add without a match, rename it, and send it back to find a match', async (
   await press(page, 'Enter');
   await expect.poll(() => focused(page)).toBe('▶ Play S02E03');
 
-  // Renamed in place (past My list, which sits beside Play).
+  // Renamed in place (past My list and Mark show watched, which sit beside Play).
   await press(page, 'ArrowRight');
   await expect.poll(() => focused(page)).toBe('+ My list');
+  await press(page, 'ArrowRight');
+  await expect.poll(() => focused(page)).toBe('Mark show watched');
   await press(page, 'ArrowRight');
   await expect.poll(() => focused(page)).toBe('Rename');
   await press(page, 'Enter');

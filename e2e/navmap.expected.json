@@ -98,11 +98,12 @@
     },
     "detail-movie": {
       "← Back": { "U": "Home", "D": "▶ Play", "L": "·", "R": "·" },
-      "▶ Play": { "U": "← Back", "D": "·", "L": "·", "R": "+ My list" },
-      "+ My list": { "U": "← Back", "D": "·", "L": "▶ Play", "R": "Mark watched" },
-      "Mark watched": { "U": "← Back", "D": "·", "L": "+ My list", "R": "+ Playlist" },
-      "+ Playlist": { "U": "← Back", "D": "·", "L": "Mark watched", "R": "Wrong title?" },
-      "Wrong title?": { "U": "← Back", "D": "·", "L": "+ Playlist", "R": "·" }
+      "▶ Play": { "U": "← Back", "D": "Show the film's file details", "L": "·", "R": "+ My list" },
+      "+ My list": { "U": "← Back", "D": "Show the film's file details", "L": "▶ Play", "R": "Mark watched" },
+      "Mark watched": { "U": "← Back", "D": "Show the film's file details", "L": "+ My list", "R": "+ Playlist" },
+      "+ Playlist": { "U": "← Back", "D": "Show the film's file details", "L": "Mark watched", "R": "Wrong title?" },
+      "Wrong title?": { "U": "← Back", "D": "Show the film's file details", "L": "+ Playlist", "R": "·" },
+      "Show the film's file details": { "U": "▶ Play", "D": "·", "L": "·", "R": "·" }
     },
     "detail-series": {
       "← Back": { "U": "Home", "D": "▶ Play S01E01", "L": "·", "R": "·" },
@@ -124,9 +125,10 @@
       "Episode 4": { "U": "Add to a playlist #3", "D": "Episode 5", "L": "·", "R": "Mark watched #4" },
       "Mark watched #4": { "U": "Add to a playlist #3", "D": "Episode 5", "L": "Episode 4", "R": "Add to a playlist #4" },
       "Add to a playlist #4": { "U": "Add to a playlist #3", "D": "Episode 5", "L": "Mark watched #4", "R": "·" },
-      "Episode 5": { "U": "Add to a playlist #4", "D": "·", "L": "·", "R": "Mark watched #5" },
-      "Mark watched #5": { "U": "Add to a playlist #4", "D": "·", "L": "Episode 5", "R": "Add to a playlist #5" },
-      "Add to a playlist #5": { "U": "Add to a playlist #4", "D": "·", "L": "Mark watched #5", "R": "·" }
+      "Episode 5": { "U": "Add to a playlist #4", "D": "Show the episode's file details", "L": "·", "R": "Mark watched #5" },
+      "Mark watched #5": { "U": "Add to a playlist #4", "D": "Show the episode's file details", "L": "Episode 5", "R": "Add to a playlist #5" },
+      "Add to a playlist #5": { "U": "Add to a playlist #4", "D": "Show the episode's file details", "L": "Mark watched #5", "R": "·" },
+      "Show the episode's file details": { "U": "Add to a playlist #5", "D": "·", "L": "·", "R": "·" }
     },
     "detail-saga": {
       "← Back": { "U": "Home", "D": "▶ Play S01E01", "L": "·", "R": "·" },
@@ -142,9 +144,10 @@
       "Episode 1": { "U": "Season 1", "D": "Episode 2", "L": "·", "R": "Mark watched #1" },
       "Mark watched #1": { "U": "Season 1", "D": "Episode 2", "L": "Episode 1", "R": "Add to a playlist #1" },
       "Add to a playlist #1": { "U": "Season 1", "D": "Episode 2", "L": "Mark watched #1", "R": "·" },
-      "Episode 2": { "U": "Add to a playlist #1", "D": "·", "L": "·", "R": "Mark watched #2" },
-      "Mark watched #2": { "U": "Add to a playlist #1", "D": "·", "L": "Episode 2", "R": "Add to a playlist #2" },
-      "Add to a playlist #2": { "U": "Add to a playlist #1", "D": "·", "L": "Mark watched #2", "R": "·" }
+      "Episode 2": { "U": "Add to a playlist #1", "D": "Show the episode's file details", "L": "·", "R": "Mark watched #2" },
+      "Mark watched #2": { "U": "Add to a playlist #1", "D": "Show the episode's file details", "L": "Episode 2", "R": "Add to a playlist #2" },
+      "Add to a playlist #2": { "U": "Add to a playlist #1", "D": "Show the episode's file details", "L": "Mark watched #2", "R": "·" },
+      "Show the episode's file details": { "U": "Add to a playlist #2", "D": "·", "L": "·", "R": "·" }
     },
     "settings-library": {
       "Home": { "U": "·", "D": "Library #2", "L": "·", "R": "Movies" },
@@ -576,11 +579,12 @@
     },
     "detail-movie": {
       "← Back": { "U": "Home", "D": "▶ Play", "L": "·", "R": "·" },
-      "▶ Play": { "U": "← Back", "D": "·", "L": "·", "R": "+ My list" },
-      "+ My list": { "U": "← Back", "D": "·", "L": "▶ Play", "R": "Mark watched" },
-      "Mark watched": { "U": "← Back", "D": "·", "L": "+ My list", "R": "+ Playlist" },
-      "+ Playlist": { "U": "← Back", "D": "·", "L": "Mark watched", "R": "Wrong title?" },
-      "Wrong title?": { "U": "← Back", "D": "·", "L": "+ Playlist", "R": "·" }
+      "▶ Play": { "U": "← Back", "D": "Show the film's file details", "L": "·", "R": "+ My list" },
+      "+ My list": { "U": "← Back", "D": "Show the film's file details", "L": "▶ Play", "R": "Mark watched" },
+      "Mark watched": { "U": "← Back", "D": "Show the film's file details", "L": "+ My list", "R": "+ Playlist" },
+      "+ Playlist": { "U": "← Back", "D": "Show the film's file details", "L": "Mark watched", "R": "Wrong title?" },
+      "Wrong title?": { "U": "← Back", "D": "Show the film's file details", "L": "+ Playlist", "R": "·" },
+      "Show the film's file details": { "U": "▶ Play", "D": "·", "L": "·", "R": "·" }
     },
     "detail-series": {
       "← Back": { "U": "Home", "D": "▶ Play S01E01", "L": "·", "R": "·" },
@@ -602,9 +606,10 @@
       "Episode 4": { "U": "Add to a playlist #3", "D": "Episode 5", "L": "·", "R": "Mark watched #4" },
       "Mark watched #4": { "U": "Add to a playlist #3", "D": "Episode 5", "L": "Episode 4", "R": "Add to a playlist #4" },
       "Add to a playlist #4": { "U": "Add to a playlist #3", "D": "Episode 5", "L": "Mark watched #4", "R": "·" },
-      "Episode 5": { "U": "Add to a playlist #4", "D": "·", "L": "·", "R": "Mark watched #5" },
-      "Mark watched #5": { "U": "Add to a playlist #4", "D": "·", "L": "Episode 5", "R": "Add to a playlist #5" },
-      "Add to a playlist #5": { "U": "Add to a playlist #4", "D": "·", "L": "Mark watched #5", "R": "·" }
+      "Episode 5": { "U": "Add to a playlist #4", "D": "Show the episode's file details", "L": "·", "R": "Mark watched #5" },
+      "Mark watched #5": { "U": "Add to a playlist #4", "D": "Show the episode's file details", "L": "Episode 5", "R": "Add to a playlist #5" },
+      "Add to a playlist #5": { "U": "Add to a playlist #4", "D": "Show the episode's file details", "L": "Mark watched #5", "R": "·" },
+      "Show the episode's file details": { "U": "Add to a playlist #5", "D": "·", "L": "·", "R": "·" }
     },
     "detail-saga": {
       "← Back": { "U": "Home", "D": "▶ Play S01E01", "L": "·", "R": "·" },
@@ -620,9 +625,10 @@
       "Episode 1": { "U": "Season 1", "D": "Episode 2", "L": "·", "R": "Mark watched #1" },
       "Mark watched #1": { "U": "Season 1", "D": "Episode 2", "L": "Episode 1", "R": "Add to a playlist #1" },
       "Add to a playlist #1": { "U": "Season 1", "D": "Episode 2", "L": "Mark watched #1", "R": "·" },
-      "Episode 2": { "U": "Add to a playlist #1", "D": "·", "L": "·", "R": "Mark watched #2" },
-      "Mark watched #2": { "U": "Add to a playlist #1", "D": "·", "L": "Episode 2", "R": "Add to a playlist #2" },
-      "Add to a playlist #2": { "U": "Add to a playlist #1", "D": "·", "L": "Mark watched #2", "R": "·" }
+      "Episode 2": { "U": "Add to a playlist #1", "D": "Show the episode's file details", "L": "·", "R": "Mark watched #2" },
+      "Mark watched #2": { "U": "Add to a playlist #1", "D": "Show the episode's file details", "L": "Episode 2", "R": "Add to a playlist #2" },
+      "Add to a playlist #2": { "U": "Add to a playlist #1", "D": "Show the episode's file details", "L": "Mark watched #2", "R": "·" },
+      "Show the episode's file details": { "U": "Add to a playlist #2", "D": "·", "L": "·", "R": "·" }
     },
     "settings-library": {
       "Home": { "U": "·", "D": "Library #2", "L": "·", "R": "Movies" },
@@ -1035,11 +1041,12 @@
     },
     "detail-movie": {
       "← Back": { "U": "Home", "D": "▶ Play", "L": "·", "R": "·" },
-      "▶ Play": { "U": "← Back", "D": "·", "L": "·", "R": "+ My list" },
-      "+ My list": { "U": "← Back", "D": "·", "L": "▶ Play", "R": "Mark watched" },
-      "Mark watched": { "U": "← Back", "D": "·", "L": "+ My list", "R": "+ Playlist" },
-      "+ Playlist": { "U": "← Back", "D": "·", "L": "Mark watched", "R": "Wrong title?" },
-      "Wrong title?": { "U": "← Back", "D": "·", "L": "+ Playlist", "R": "·" }
+      "▶ Play": { "U": "← Back", "D": "Show the film's file details", "L": "·", "R": "+ My list" },
+      "+ My list": { "U": "← Back", "D": "Show the film's file details", "L": "▶ Play", "R": "Mark watched" },
+      "Mark watched": { "U": "← Back", "D": "Show the film's file details", "L": "+ My list", "R": "+ Playlist" },
+      "+ Playlist": { "U": "← Back", "D": "Show the film's file details", "L": "Mark watched", "R": "Wrong title?" },
+      "Wrong title?": { "U": "← Back", "D": "Show the film's file details", "L": "+ Playlist", "R": "·" },
+      "Show the film's file details": { "U": "▶ Play", "D": "·", "L": "·", "R": "·" }
     },
     "detail-series": {
       "← Back": { "U": "Home", "D": "▶ Play S01E01", "L": "·", "R": "·" },
@@ -1061,9 +1068,10 @@
       "Episode 4": { "U": "Add to a playlist #3", "D": "Episode 5", "L": "·", "R": "Mark watched #4" },
       "Mark watched #4": { "U": "Add to a playlist #3", "D": "Episode 5", "L": "Episode 4", "R": "Add to a playlist #4" },
       "Add to a playlist #4": { "U": "Add to a playlist #3", "D": "Episode 5", "L": "Mark watched #4", "R": "·" },
-      "Episode 5": { "U": "Add to a playlist #4", "D": "·", "L": "·", "R": "Mark watched #5" },
-      "Mark watched #5": { "U": "Add to a playlist #4", "D": "·", "L": "Episode 5", "R": "Add to a playlist #5" },
-      "Add to a playlist #5": { "U": "Add to a playlist #4", "D": "·", "L": "Mark watched #5", "R": "·" }
+      "Episode 5": { "U": "Add to a playlist #4", "D": "Show the episode's file details", "L": "·", "R": "Mark watched #5" },
+      "Mark watched #5": { "U": "Add to a playlist #4", "D": "Show the episode's file details", "L": "Episode 5", "R": "Add to a playlist #5" },
+      "Add to a playlist #5": { "U": "Add to a playlist #4", "D": "Show the episode's file details", "L": "Mark watched #5", "R": "·" },
+      "Show the episode's file details": { "U": "Add to a playlist #5", "D": "·", "L": "·", "R": "·" }
     },
     "detail-saga": {
       "← Back": { "U": "Home", "D": "▶ Play S01E01", "L": "·", "R": "·" },
@@ -1079,9 +1087,10 @@
       "Episode 1": { "U": "Season 1", "D": "Episode 2", "L": "·", "R": "Mark watched #1" },
       "Mark watched #1": { "U": "Season 1", "D": "Episode 2", "L": "Episode 1", "R": "Add to a playlist #1" },
       "Add to a playlist #1": { "U": "Season 1", "D": "Episode 2", "L": "Mark watched #1", "R": "·" },
-      "Episode 2": { "U": "Add to a playlist #1", "D": "·", "L": "·", "R": "Mark watched #2" },
-      "Mark watched #2": { "U": "Add to a playlist #1", "D": "·", "L": "Episode 2", "R": "Add to a playlist #2" },
-      "Add to a playlist #2": { "U": "Add to a playlist #1", "D": "·", "L": "Mark watched #2", "R": "·" }
+      "Episode 2": { "U": "Add to a playlist #1", "D": "Show the episode's file details", "L": "·", "R": "Mark watched #2" },
+      "Mark watched #2": { "U": "Add to a playlist #1", "D": "Show the episode's file details", "L": "Episode 2", "R": "Add to a playlist #2" },
+      "Add to a playlist #2": { "U": "Add to a playlist #1", "D": "Show the episode's file details", "L": "Mark watched #2", "R": "·" },
+      "Show the episode's file details": { "U": "Add to a playlist #2", "D": "·", "L": "·", "R": "·" }
     },
     "settings-library": {
       "Home": { "U": "·", "D": "Library #2", "L": "·", "R": "Movies" },

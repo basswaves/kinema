@@ -1023,8 +1023,10 @@ export default function Browse() {
 
         {view.name === 'detail' && (
           <TitleDetailView
+            key={view.title.id}
             title={view.title}
             onBack={goBack}
+            onOpenTitle={openDetail}
             onFindMatch={() =>
               setStack((s) => replace(s, { name: 'settings', section: 'review' }))
             }

@@ -130,7 +130,7 @@ test('a studio logo with lettering on a plate keeps its lettering', async ({ pag
 });
 
 test('Down with nothing further down reads on, and Up reads back', async ({ page }) => {
-  // A film's page ends in its picture and sound badges under Play, never
+  // A film's page ends in its file details under their button, never
   // focusable; in a short window they are more than fits beneath it.
   await open(page, 'windows');
   for (let i = 0; i < 6 && !(await focused(page))?.startsWith('Example Film'); i++) {
@@ -140,7 +140,15 @@ test('Down with nothing further down reads on, and Up reads back', async ({ page
   await expect.poll(() => focused(page)).toBe('▶ Play');
   await page.setViewportSize({ width: 1280, height: 300 });
   await page.waitForTimeout(400);
-  const lastRow = page.locator('.media-badges .badge-row').last();
+  const details = '▾ File details';
+  for (let i = 0; i < 6 && !(await focused(page))?.includes('File details'); i++) {
+    await press(page, 'ArrowDown');
+    await page.waitForTimeout(200);
+  }
+  await press(page, 'Enter');
+  await expect.poll(() => focused(page)).toBe(details);
+  await page.waitForTimeout(400);
+  const lastRow = page.locator('.file-info-row').last();
   const rowShown = () =>
     lastRow.evaluate((el) => el.getBoundingClientRect().bottom <= window.innerHeight);
   expect(await rowShown()).toBe(false);
@@ -150,9 +158,9 @@ test('Down with nothing further down reads on, and Up reads back', async ({ page
     await page.waitForTimeout(400);
   }
   expect(await rowShown()).toBe(true);
-  expect(await focused(page)).toBe('▶ Play');
+  expect(await focused(page)).toBe(details);
 
-  // Back up: Play comes back into view before focus moves anywhere.
+  // Back up: the button comes back into view before focus moves anywhere.
   const inView = () =>
     page.evaluate(() => {
       const r = document.querySelector('.focused')?.getBoundingClientRect();
@@ -163,7 +171,7 @@ test('Down with nothing further down reads on, and Up reads back', async ({ page
     await page.waitForTimeout(400);
   }
   expect(await inView()).toBe(true);
-  expect(await focused(page)).toBe('▶ Play');
+  expect(await focused(page)).toBe(details);
 });
 
 test('reading on and back never leaves the ring half under the top bar', async ({ page }) => {

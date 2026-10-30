@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use std::path::Path;
 
 /// The schema this build understands. Bump it with every new `SCHEMA_V*`.
-pub const SCHEMA_VERSION: i64 = 33;
+pub const SCHEMA_VERSION: i64 = 34;
 
 /// What can go wrong opening the library.
 ///
@@ -860,6 +860,24 @@ CREATE TABLE version_choice (
 );
 "#;
 
+/// What a title's page says beyond the overview (TMDB's detail request,
+/// nothing more asked): who directed and wrote a film or created a show, the
+/// collection a film belongs to, and whether a show has ended or when its next
+/// episode airs. NULL is never asked, so every TMDB title is fetched once more
+/// (`titles_needing_detail`); an empty string is asked and TMDB has none.
+/// Names are tab-separated, as the cast is for search.
+const SCHEMA_V34: &str = r#"
+ALTER TABLE titles ADD COLUMN directors TEXT;
+ALTER TABLE titles ADD COLUMN writers TEXT;
+ALTER TABLE titles ADD COLUMN collection_id TEXT;
+ALTER TABLE titles ADD COLUMN collection_name TEXT;
+ALTER TABLE titles ADD COLUMN show_status TEXT;
+ALTER TABLE titles ADD COLUMN next_air_date TEXT;
+ALTER TABLE titles ADD COLUMN next_air_season INTEGER;
+ALTER TABLE titles ADD COLUMN next_air_episode INTEGER;
+CREATE INDEX titles_collection ON titles(collection_id) WHERE collection_id IS NOT NULL AND collection_id <> '';
+"#;
+
 /// How long a statement waits for the write lock before giving up.
 ///
 /// Load-bearing from the moment there is more than one connection. SQLite
@@ -1082,7 +1100,7 @@ pub(crate) const MIGRATIONS: [&str; SCHEMA_VERSION as usize] = [
     SCHEMA_V15, SCHEMA_V16, SCHEMA_V17, SCHEMA_V18, SCHEMA_V19,
     SCHEMA_V20, SCHEMA_V21, SCHEMA_V22, SCHEMA_V23, SCHEMA_V24, SCHEMA_V25,
     SCHEMA_V26, SCHEMA_V27, SCHEMA_V28, SCHEMA_V29, SCHEMA_V30, SCHEMA_V31,
-    SCHEMA_V32, SCHEMA_V33,
+    SCHEMA_V32, SCHEMA_V33, SCHEMA_V34,
 ];
 
 /// Bring the database up to [`SCHEMA_VERSION`].

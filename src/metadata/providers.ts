@@ -51,6 +51,20 @@ export interface TitleMetadata {
   certification?: string | null;
   /** Production companies (a film) or networks (a series). TMDB only. */
   studios?: Studio[];
+  /**
+   * The page's credits line: a film's directors (a show's creators) and a
+   * film's writers. TMDB only; empty when it lists none.
+   */
+  directors?: string[];
+  writers?: string[];
+  /** The collection a film belongs to; empty strings when none. TMDB only. */
+  collection_id?: string;
+  collection_name?: string;
+  /** A show's state (`Ended`, `Returning Series`…) and next episode; '' when none. */
+  show_status?: string;
+  next_air_date?: string;
+  next_air_season?: number | null;
+  next_air_episode?: number | null;
 }
 
 export interface Studio {
@@ -86,6 +100,28 @@ interface TmdbImage {
   iso_639_1?: string | null;
   vote_average?: number;
   width?: number;
+}
+
+/** One entry from TMDB's `/credits` crew list. */
+interface TmdbCrewMember {
+  name?: string;
+  job?: string;
+}
+
+/** The writing jobs a credits line names; a novel's author is not one of them. */
+const WRITING_JOBS = new Set(['Screenplay', 'Writer', 'Story', 'Teleplay']);
+
+/** How many names a credits line keeps. */
+const CREW_LIMIT = 4;
+
+/** Names in TMDB's order, each once, for the jobs asked. */
+export function crewNames(crew: TmdbCrewMember[] | undefined, jobs: (job: string) => boolean): string[] {
+  const names: string[] = [];
+  for (const member of crew ?? []) {
+    const name = member.name?.trim();
+    if (name && jobs(member.job ?? '') && !names.includes(name)) names.push(name);
+  }
+  return names.slice(0, CREW_LIMIT);
 }
 
 /** One entry from TMDB's `/credits` cast list. */
@@ -674,7 +710,11 @@ export async function tmdbGetTitle(
     external_ids?: { imdb_id: string | null };
     videos?: { results: TmdbVideo[] };
     images?: { logos?: TmdbImage[] };
-    credits?: { cast?: TmdbCastMember[] };
+    credits?: { cast?: TmdbCastMember[]; crew?: TmdbCrewMember[] };
+    belongs_to_collection?: { id: number; name?: string } | null;
+    created_by?: Array<{ name?: string }>;
+    status?: string;
+    next_episode_to_air?: { air_date?: string; season_number?: number; episode_number?: number } | null;
     release_dates?: TmdbReleaseDates;
     content_ratings?: TmdbContentRatings;
     production_companies?: TmdbCompany[];
@@ -731,6 +771,20 @@ export async function tmdbGetTitle(
       })),
     certification: usCertification(kind, detail.release_dates, detail.content_ratings),
     studios: pickStudios(kind, detail.networks, detail.production_companies),
+    // A show's crew changes by episode; who made it is `created_by`.
+    directors:
+      kind === 'movie'
+        ? crewNames(detail.credits?.crew, (job) => job === 'Director')
+        : crewNames(detail.created_by, () => true),
+    writers: kind === 'movie' ? crewNames(detail.credits?.crew, (job) => WRITING_JOBS.has(job)) : [],
+    collection_id: detail.belongs_to_collection ? String(detail.belongs_to_collection.id) : '',
+    collection_name: detail.belongs_to_collection?.name?.trim() ?? '',
+    ...(kind === 'series' && {
+      show_status: detail.status ?? '',
+      next_air_date: detail.next_episode_to_air?.air_date ?? '',
+      next_air_season: detail.next_episode_to_air?.season_number ?? null,
+      next_air_episode: detail.next_episode_to_air?.episode_number ?? null,
+    }),
   };
 }
 

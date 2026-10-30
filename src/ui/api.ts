@@ -88,6 +88,20 @@ export interface TitleDetail {
   movie_path: string | null;
   movie_file_id: number | null;
   movie_watched: boolean;
+  about: About;
+}
+
+/** What the page says beyond the overview; TMDB's, empty for other providers. */
+export interface About {
+  directors: string[];
+  writers: string[];
+  collection_name: string | null;
+  /** The collection's films the library holds, oldest first; this one too. */
+  collection: Title[];
+  show_status: string | null;
+  next_air_date: string | null;
+  next_air_season: number | null;
+  next_air_episode: number | null;
 }
 
 export const listTitles = () => invoke<Title[]>('list_titles');

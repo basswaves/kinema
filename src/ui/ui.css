@@ -1268,6 +1268,54 @@ html {
   font-size: 0.75rem;
 }
 
+/* "Directed by …", "Ended": under the overview, quieter than it. */
+.detail-crew {
+  margin: -0.5rem 0 0.75rem;
+  font-size: 0.875rem;
+  opacity: 0.75;
+}
+.detail-crew + .detail-crew {
+  margin-top: -0.5rem;
+}
+
+.detail-collection {
+  margin: 2rem 0 0.5rem;
+}
+.detail-collection .rail-track {
+  align-items: flex-start;
+  margin-top: 0;
+  padding-top: 0.75rem;
+}
+.detail-collection-play {
+  align-self: center;
+  flex: 0 0 auto;
+}
+
+/* File details: the text is there to be copied. */
+.file-info {
+  margin: 2rem 0 1rem;
+}
+.file-info-list {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0.75rem 0 0;
+  font-size: 0.875rem;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.file-info-row {
+  display: grid;
+  grid-template-columns: 6.5rem 1fr;
+  gap: 0.75rem;
+}
+.file-info-row dt {
+  opacity: 0.6;
+}
+.file-info-row dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .detail-error {
   padding: 0.625rem 0.875rem;
   border-radius: 0.5rem;

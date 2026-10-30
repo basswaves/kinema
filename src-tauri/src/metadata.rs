@@ -40,6 +40,28 @@ pub struct TitleInput {
     /// is stored; present and empty means TMDB lists none.
     #[serde(default)]
     pub studios: Option<Vec<StudioInput>>,
+    /// A film's directors, or a show's creators, and a film's writers, in
+    /// TMDB's order. Absent from other providers (keep what is stored); empty
+    /// when TMDB lists none.
+    #[serde(default)]
+    pub directors: Option<Vec<String>>,
+    #[serde(default)]
+    pub writers: Option<Vec<String>>,
+    /// The collection a film belongs to; empty strings when TMDB says none.
+    #[serde(default)]
+    pub collection_id: Option<String>,
+    #[serde(default)]
+    pub collection_name: Option<String>,
+    /// A show's state as TMDB words it (`Ended`, `Returning Series`,
+    /// `Canceled`…) and its next episode, `YYYY-MM-DD`; empty when none.
+    #[serde(default)]
+    pub show_status: Option<String>,
+    #[serde(default)]
+    pub next_air_date: Option<String>,
+    #[serde(default)]
+    pub next_air_season: Option<i64>,
+    #[serde(default)]
+    pub next_air_episode: Option<i64>,
 }
 
 #[derive(Deserialize)]
@@ -158,6 +180,79 @@ pub struct TitleDetail {
     pub movie_path: Option<String>,
     pub movie_file_id: Option<i64>,
     pub movie_watched: bool,
+    pub about: About,
+}
+
+/// What the page says beyond the overview, all from TMDB's detail request.
+/// Empty for other providers' titles: the line is left out, never guessed.
+#[derive(Serialize, Default)]
+pub struct About {
+    pub directors: Vec<String>,
+    pub writers: Vec<String>,
+    pub collection_name: Option<String>,
+    /// The collection's films the library holds, oldest first — this one too.
+    pub collection: Vec<Title>,
+    pub show_status: Option<String>,
+    pub next_air_date: Option<String>,
+    pub next_air_season: Option<i64>,
+    pub next_air_episode: Option<i64>,
+}
+
+fn names(joined: Option<String>) -> Vec<String> {
+    joined
+        .map(|s| s.split('\t').filter(|n| !n.is_empty()).map(str::to_owned).collect())
+        .unwrap_or_default()
+}
+
+fn joined(names: &Option<Vec<String>>) -> Option<String> {
+    names.as_ref().map(|n| n.join("\t"))
+}
+
+type AboutRow = (
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<i64>,
+    Option<i64>,
+);
+
+pub(crate) fn about_for(conn: &rusqlite::Connection, art: &str, title_id: i64) -> rusqlite::Result<About> {
+    let (directors, writers, collection_id, collection_name, show_status, date, season, episode): AboutRow =
+        conn.query_row(
+            "SELECT directors, writers, collection_id, collection_name, show_status,
+                    next_air_date, next_air_season, next_air_episode
+               FROM titles WHERE id = ?1",
+            params![title_id],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?, r.get(7)?)),
+        )?;
+    let some = |s: Option<String>| s.filter(|v| !v.is_empty());
+    let collection = match some(collection_id) {
+        Some(id) => {
+            let mut stmt = conn.prepare(&format!(
+                "{TITLE_SELECT} WHERE t.collection_id = :c AND t.kind = 'movie'
+                   AND EXISTS (SELECT 1 FROM media_files m WHERE m.title_id = t.id AND m.missing = 0)
+                 ORDER BY t.year IS NULL, t.year, t.title"
+            ))?;
+            let rows = stmt.query_map(named_params! { ":art": art, ":c": id }, map_title)?;
+            rows.collect::<rusqlite::Result<Vec<_>>>()?
+        }
+        None => Vec::new(),
+    };
+    // A collection with only this film in the library: nothing to say.
+    let several = collection.len() > 1;
+    Ok(About {
+        directors: names(directors),
+        writers: names(writers),
+        collection_name: if several { some(collection_name) } else { None },
+        collection: if several { collection } else { Vec::new() },
+        show_status: some(show_status),
+        next_air_date: some(date),
+        next_air_season: season,
+        next_air_episode: episode,
+    })
 }
 
 /// Upsert by (provider, provider_id) so re-matching never duplicates a title.
@@ -170,8 +265,11 @@ pub fn save_title(db: tauri::State<Db>, title: TitleInput) -> Result<i64, String
         "INSERT INTO titles
             (kind, provider, provider_id, imdb_id, tmdb_id, title, year, overview,
              genres, runtime_mins, rating, poster_url, backdrop_url, fetched_at,
-             trailer_key, trailer_site, logo_url, certification)
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18)
+             trailer_key, trailer_site, logo_url, certification, directors, writers,
+             collection_id, collection_name, show_status, next_air_date, next_air_season,
+             next_air_episode)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,
+                 ?21,?22,?23,?24,?25,?26)
          ON CONFLICT(provider, provider_id) DO UPDATE SET
             imdb_id = excluded.imdb_id, tmdb_id = excluded.tmdb_id,
             title = excluded.title, year = excluded.year, overview = excluded.overview,
@@ -185,12 +283,27 @@ pub fn save_title(db: tauri::State<Db>, title: TitleInput) -> Result<i64, String
             trailer_key  = COALESCE(excluded.trailer_key,  titles.trailer_key),
             trailer_site = COALESCE(excluded.trailer_site, titles.trailer_site),
             logo_url     = COALESCE(excluded.logo_url,     titles.logo_url),
-            certification = COALESCE(excluded.certification, titles.certification)",
+            certification = COALESCE(excluded.certification, titles.certification),
+            directors       = COALESCE(excluded.directors,       titles.directors),
+            writers         = COALESCE(excluded.writers,         titles.writers),
+            collection_id   = COALESCE(excluded.collection_id,   titles.collection_id),
+            collection_name = COALESCE(excluded.collection_name, titles.collection_name),
+            show_status     = COALESCE(excluded.show_status,     titles.show_status),
+            -- The next episode goes with the status: TMDB sent both or neither.
+            next_air_date    = CASE WHEN excluded.show_status IS NULL THEN titles.next_air_date
+                                    ELSE excluded.next_air_date END,
+            next_air_season  = CASE WHEN excluded.show_status IS NULL THEN titles.next_air_season
+                                    ELSE excluded.next_air_season END,
+            next_air_episode = CASE WHEN excluded.show_status IS NULL THEN titles.next_air_episode
+                                    ELSE excluded.next_air_episode END",
         params![
             title.kind, title.provider, title.provider_id, title.imdb_id, title.tmdb_id,
             title.title, title.year, title.overview, title.genres, title.runtime_mins,
             title.rating, title.poster_url, title.backdrop_url, now_secs(),
-            title.trailer_key, title.trailer_site, title.logo_url, title.certification
+            title.trailer_key, title.trailer_site, title.logo_url, title.certification,
+            joined(&title.directors), joined(&title.writers), title.collection_id,
+            title.collection_name, title.show_status, title.next_air_date,
+            title.next_air_season, title.next_air_episode
         ],
     )
     .map_err(to_string_err)?;
@@ -480,7 +593,10 @@ pub fn get_title_detail(
         rows
     };
 
+    let about = about_for(&conn, &art, title_id).map_err(to_string_err)?;
+
     Ok(TitleDetail {
+        about,
         title,
         episodes,
         cast,
@@ -618,7 +734,8 @@ pub struct TrailerTarget {
 /// turn still lands inside the limit.
 pub const TMDB_MAX_AGE_SECS: i64 = 170 * 24 * 60 * 60;
 
-/// Titles whose TMDB data is older than `TMDB_MAX_AGE_SECS`, oldest first.
+/// Titles whose TMDB data is older than `TMDB_MAX_AGE_SECS`, oldest first,
+/// and running shows whose next episode has aired since.
 /// Only TMDB's: TVmaze and OMDb set no such limit.
 pub(crate) fn stale_titles(
     conn: &rusqlite::Connection,
@@ -627,10 +744,17 @@ pub(crate) fn stale_titles(
 ) -> rusqlite::Result<Vec<TrailerTarget>> {
     let mut stmt = conn.prepare(
         "SELECT id, provider_id, kind FROM titles
-          WHERE provider = 'tmdb' AND fetched_at < ?1
+          WHERE provider = 'tmdb'
+            AND (fetched_at < ?1
+                 -- A running show whose next episode has aired: its new
+                 -- episodes and next date, a day after the last fetch at the
+                 -- soonest, so a date TMDB has not moved on is not asked
+                 -- about at every scan.
+                 OR (kind = 'series' AND next_air_date IS NOT NULL AND next_air_date <> ''
+                     AND next_air_date < date(?3, 'unixepoch') AND fetched_at < ?3 - 86400))
           ORDER BY fetched_at, id LIMIT ?2",
     )?;
-    let rows = stmt.query_map(params![now - TMDB_MAX_AGE_SECS, limit], |r| {
+    let rows = stmt.query_map(params![now - TMDB_MAX_AGE_SECS, limit, now], |r| {
         Ok(TrailerTarget {
             id: r.get(0)?,
             tmdb_id: r.get(1)?,
@@ -809,11 +933,14 @@ pub fn list_titles_needing_detail(db: tauri::State<Db>) -> Result<Vec<TrailerTar
 /// See [`list_titles_needing_detail`]. `certification` joined the list in
 /// schema 16, so every TMDB title matched before it is fetched once more — the
 /// one-time refresh that brings existing titles their age rating and studios.
+/// `directors` (schema 34) does the same for the page's credits, collection
+/// and a show's status.
 fn titles_needing_detail(conn: &rusqlite::Connection) -> rusqlite::Result<Vec<TrailerTarget>> {
     let mut stmt = conn.prepare(
         "SELECT id, tmdb_id, kind FROM titles
           WHERE tmdb_id IS NOT NULL AND tmdb_id <> ''
-            AND (trailer_key IS NULL OR logo_url IS NULL OR certification IS NULL)
+            AND (trailer_key IS NULL OR logo_url IS NULL OR certification IS NULL
+                 OR directors IS NULL)
           ORDER BY id",
     )?;
     let rows = stmt.query_map([], |r| {
@@ -893,7 +1020,7 @@ pub fn list_unmatched(
 #[cfg(test)]
 mod tests {
     use super::{
-        adopt, episodes_for, fallback_titles, map_title, stale_titles, titles_needing_detail, Title, TITLE_SELECT,
+        about_for, adopt, episodes_for, fallback_titles, map_title, stale_titles, titles_needing_detail, Title, TITLE_SELECT,
         TMDB_MAX_AGE_SECS,
     };
     use rusqlite::{named_params, params};
@@ -941,11 +1068,70 @@ mod tests {
                                  trailer_key, logo_url, certification) VALUES
                  (2, 'movie',  'tmdb',   '22', '22', 'Rated',   0, '', '', 'R'),
                  (3, 'movie',  'tmdb',   '33', '33', 'Unrated', 0, '', '', ''),
-                 (4, 'series', 'tvmaze', '44', NULL, 'Show',    0, NULL, NULL, NULL);",
+                 (4, 'series', 'tvmaze', '44', NULL, 'Show',    0, NULL, NULL, NULL);
+             UPDATE titles SET directors = '';",
         )
         .unwrap();
         let ids: Vec<i64> = titles_needing_detail(&conn).unwrap().iter().map(|t| t.id).collect();
         assert_eq!(ids, vec![1]);
+        // Fetched before the page's credits were kept (schema 34): once more.
+        conn.execute("UPDATE titles SET directors = NULL WHERE id = 2", []).unwrap();
+        let ids: Vec<i64> = titles_needing_detail(&conn).unwrap().iter().map(|t| t.id).collect();
+        assert_eq!(ids, vec![1, 2]);
+    }
+
+    /// A running show is fetched again once its next episode has aired — new
+    /// episodes, a new date — but not more than once a day, and not before.
+    #[test]
+    fn a_running_show_is_refreshed_once_its_next_episode_has_aired() {
+        let conn = library("next-air");
+        let day = 86_400;
+        let now = TMDB_MAX_AGE_SECS + 100 * day; // 1970-07-08 or so
+        conn.execute_batch(&format!(
+            "UPDATE titles SET fetched_at = {recent}, next_air_date = '1970-01-02' WHERE id = 1;
+             INSERT INTO titles (id, kind, provider, provider_id, title, fetched_at, next_air_date) VALUES
+                 (2, 'series', 'tmdb', '22', 'Airs later', {old}, '2999-01-01'),
+                 (3, 'series', 'tmdb', '33', 'Aired',      {old}, '1970-01-02'),
+                 (4, 'series', 'tmdb', '44', 'Ended',      {old}, '');",
+            recent = now - 10,
+            old = now - 2 * day,
+        ))
+        .unwrap();
+        let ids: Vec<i64> = stale_titles(&conn, now, 10).unwrap().iter().map(|t| t.id).collect();
+        assert_eq!(ids, vec![3]);
+    }
+
+    /// A film's collection lists the films of it the library holds, oldest
+    /// first; a collection of one says nothing, and other providers say nothing.
+    #[test]
+    fn a_collection_lists_the_films_held_in_order() {
+        let conn = library("collection");
+        conn.execute_batch(
+            "INSERT INTO titles (id, kind, provider, provider_id, title, year, fetched_at,
+                                 collection_id, collection_name, directors) VALUES
+                 (2, 'movie', 'tmdb', '22', 'Part Two', 2004, 0, '9', 'The Saga', 'A Director'),
+                 (3, 'movie', 'tmdb', '33', 'Part One', 2001, 0, '9', 'The Saga', ''),
+                 (4, 'movie', 'tmdb', '44', 'Not held', 2007, 0, '9', 'The Saga', ''),
+                 (5, 'movie', 'tmdb', '55', 'Alone',    2010, 0, '8', 'Other',    NULL);",
+        )
+        .unwrap();
+        for (id, title) in [(201, 2), (202, 3), (203, 5)] {
+            conn.execute(
+                "INSERT INTO media_files (id, root_id, path, parent_dir, file_name, extension,
+                     size_bytes, modified_at, first_seen_at, last_seen_at, match_status, title_id)
+                 VALUES (?1, 1, ?2, 'C:/films', ?2, 'mkv', 1, 0, 0, 0, 'matched', ?3)",
+                params![id, format!("C:/films/{id}.mkv"), title],
+            )
+            .unwrap();
+        }
+        let about = about_for(&conn, "", 2).unwrap();
+        assert_eq!(about.directors, vec!["A Director"]);
+        assert_eq!(about.collection_name.as_deref(), Some("The Saga"));
+        let held: Vec<i64> = about.collection.iter().map(|t| t.id).collect();
+        assert_eq!(held, vec![3, 2]);
+        let alone = about_for(&conn, "", 5).unwrap();
+        assert!(alone.collection.is_empty() && alone.collection_name.is_none());
+        assert!(alone.directors.is_empty());
     }
 
     /// Only TMDB's data has an age limit, and the oldest is refreshed first.

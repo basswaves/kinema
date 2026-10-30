@@ -9,6 +9,15 @@ makes no stability promises.
 
 ### Added
 
+- **More on a title's page.** "Ends at 22:47" beside the runtime (from where
+  Play would resume); who directed and wrote a film, or created a show;
+  whether a show has ended or when its next season or episode airs; the
+  other films of a collection you have, in order, with **Play the series**
+  from the first one not watched; and **File details** — name, folder,
+  size, container, bitrate, audio and subtitle languages, selectable to
+  copy. All from TMDB's own answer and the file: a title matched elsewhere
+  simply has fewer lines. A running show is looked up again once its next
+  episode has aired, so new episodes appear.
 - **Smart collections.** Home shows Dolby Vision, Dolby Atmos, DTS:X, HDR10+
   and 4K shelves when the library has titles for them — read from the files
   themselves, never their names, so a shelf never claims what a file lacks. A

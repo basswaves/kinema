@@ -20,7 +20,7 @@ import { mockIPC, mockWindows } from '@tauri-apps/api/mocks';
 import * as fakeMedia3 from './fakeMedia3';
 import * as fakeMpv from './fakeMpv';
 import type { ContinueItem, EpisodeRef, Progress, SkipMarkers, TitlePrefs } from '../player/api';
-import type { Episode, Studio, Title, TitleDetail } from '../ui/api';
+import type { About, Episode, Studio, Title, TitleDetail } from '../ui/api';
 
 // The setup this is ultimately for: a 4K HDR TV behind a receiver that takes
 // everything, next to this dev machine's SDR monitor and onboard sound — plus a
@@ -888,6 +888,7 @@ function titleDetail(titleId: number): TitleDetail {
     movie_path: movie?.path ?? null,
     movie_file_id: movie?.id ?? null,
     movie_watched: movie ? (playback.get(movie.id)?.completed ?? false) : false,
+    about: aboutOf(titleId),
   };
 }
 
@@ -995,6 +996,68 @@ const extraTitles: StoredTitle[] = Array.from({ length: EXTRA_TITLES }, (_, i) =
   poster_url: null,
   poster_path: null,
 }));
+
+/**
+ * `kinemaMockPeople=1`: two films from TMDB in one collection, with credits,
+ * an actor they share with Example Show — the title page's credits line,
+ * collection row and cast, and an actor's page.
+ */
+const PEOPLE = flag('kinemaMockPeople') === '1';
+const PART_ONE_ID = 21;
+const PART_TWO_ID = 22;
+const ABOUT_NONE: About = {
+  directors: [],
+  writers: [],
+  collection_name: null,
+  collection: [],
+  show_status: null,
+  next_air_date: null,
+  next_air_season: null,
+  next_air_episode: null,
+};
+/** What TMDB's detail request said, per title. */
+const ABOUT: Record<number, Partial<About> & { collection_id?: string }> = PEOPLE
+  ? {
+      [SERIES_ID]: { directors: ['Ida Creator'], show_status: 'Ended' },
+      [PART_ONE_ID]: {
+        directors: ['Dee Rector'],
+        writers: ['Wren Writer', 'Ira Author'],
+        collection_id: '900',
+        collection_name: 'Example Collection',
+      },
+      [PART_TWO_ID]: { directors: ['Dee Rector'], collection_id: '900', collection_name: 'Example Collection' },
+    }
+  : {};
+if (PEOPLE) {
+  for (const [id, name, year] of [
+    [PART_ONE_ID, 'Example Part One', 2011],
+    [PART_TWO_ID, 'Example Part Two', 2014],
+  ] as const) {
+    titles.push({ ...titles[1], id, provider: 'tmdb', title: name, year, added_at: 3 + id, certification: 'PG-13' });
+    files.push({
+      id: id * 10,
+      titleId: id,
+      path: `C:\\fixture\\${name} (${year})\\${name.replace(/ /g, '.')}.${year}.1080p.mkv`,
+      season: null,
+      episode: null,
+      duration: 5400,
+      markers: null,
+    });
+  }
+}
+
+function aboutOf(titleId: number): About {
+  const about = ABOUT[titleId];
+  if (!about) return ABOUT_NONE;
+  const { collection_id: collectionId, ...rest } = about;
+  const collection = collectionId
+    ? titles
+        .filter((t) => ABOUT[t.id]?.collection_id === collectionId)
+        .sort((a, b) => (a.year ?? 0) - (b.year ?? 0))
+        .map(withWatchState)
+    : [];
+  return { ...ABOUT_NONE, ...rest, collection };
+}
 
 const SLOW_DETECT = flag('kinemaMockSlowDetect') === '1';
 const ON_LINUX = flag('kinemaMockSystem') === 'linux';

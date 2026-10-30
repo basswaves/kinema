@@ -42,7 +42,10 @@ import {
   type EpisodeRef,
 } from '../player/api';
 import { resumePoint, resumeShare } from '../player/resume';
-import { formatTime } from './format';
+import { endsAtLabel, formatTime } from './format';
+import { creditLines, secondsLeft, showStatusLine, todayString } from './aboutTitle';
+import FileInfo from './FileInfo';
+import Card from './Card';
 import { isMyListKey, toggleMyList, useOnMyList } from '../library/myList';
 import {
   findLocalTrailer,
@@ -76,6 +79,8 @@ interface Props {
   onFindMatch?: () => void;
   /** "Wrong title?" linked the files to another title (its id) or unlinked them (null). */
   onRelinked?: (titleId: number | null) => void;
+  /** Another title's page: a film of the same collection. */
+  onOpenTitle?: (title: Title) => void;
 }
 
 /**
@@ -109,7 +114,19 @@ const RENAME_INPUT_KEY = 'detail-rename-input';
 const RENAME_BUTTON_KEY = 'detail-rename-button';
 const DETAIL_SEASONS_KEY = 'detail-seasons';
 const DETAIL_EPISODES_KEY = 'detail-episodes';
-const DETAIL_AREAS = [DETAIL_BACK_KEY, DETAIL_ACTIONS_KEY, DETAIL_SEASONS_KEY, DETAIL_EPISODES_KEY];
+/** Under the episodes: the film's collection, the cast, the file's details. */
+const DETAIL_COLLECTION_KEY = 'detail-collection';
+const DETAIL_CAST_KEY = 'detail-cast';
+const DETAIL_FILE_KEY = 'detail-file';
+const DETAIL_AREAS = [
+  DETAIL_BACK_KEY,
+  DETAIL_ACTIONS_KEY,
+  DETAIL_SEASONS_KEY,
+  DETAIL_EPISODES_KEY,
+  DETAIL_COLLECTION_KEY,
+  DETAIL_CAST_KEY,
+  DETAIL_FILE_KEY,
+];
 
 const seasonKey = (s: number) => `detail-season:${s}`;
 
@@ -174,6 +191,7 @@ export default function TitleDetailView({
   onBack,
   onFindMatch,
   onRelinked,
+  onOpenTitle,
 }: Props) {
   /**
    * A title kept without a match (`provider = 'local'`, local_title.rs): its
@@ -372,6 +390,23 @@ export default function TitleDetailView({
     };
   }, [primaryFileId]);
 
+  /**
+   * "Ends at 22:47": when what Play starts would finish if started now, from
+   * where it would resume. Moved on each minute while the page is open.
+   */
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const playMins =
+    (title.kind === 'series'
+      ? detail?.episodes.find((e) => nextUp && e.season === nextUp.season && e.episode === nextUp.episode)
+          ?.runtime_mins
+      : null) ?? title.runtime_mins;
+  const left = primary ? secondsLeft(playMins, resumeAt, resumeAtShare) : null;
+  const endsAt = left !== null ? endsAtLabel(0, left, now) : null;
+
   const seasons = useMemo(() => {
     if (!detail) return [];
     // Specials (season 0) last: they are extras, and first in the row they
@@ -513,6 +548,26 @@ export default function TitleDetailView({
     }
   }, [detail, showWatched, title.id]);
 
+  /** The collection's first film not watched yet, and Play for it. */
+  const collectionNext = detail?.about.collection.find((t) => !t.watched) ?? null;
+  const playCollection = useCallback(
+    async (film: Title) => {
+      try {
+        const other = await getTitleDetail(film.id);
+        if (!other.movie_path) return;
+        onPlayFile({
+          path: other.movie_path,
+          label: film.title,
+          fileId: other.movie_file_id,
+          titleId: film.id,
+        });
+      } catch (e) {
+        setError(userError(e));
+      }
+    },
+    [onPlayFile]
+  );
+
   // The landing spot for a series: the first episode in the visible season that
   // is actually playable. Missing episodes are rendered but not focusable, so
   // aiming at one would leave focus nowhere.
@@ -620,6 +675,7 @@ export default function TitleDetailView({
                 {[
                   year,
                   runtimeLabel(title.runtime_mins),
+                  endsAt ? `Ends at ${endsAt}` : null,
                   title.kind === 'series' ? `${ownedCount} episodes in library` : null,
                   title.kind === 'series' && watchedCount > 0
                     ? `${watchedCount} watched`
@@ -655,6 +711,17 @@ export default function TitleDetailView({
               {title.overview && title.provider === 'wikidata' && (
                 <p className="detail-credit muted">From Wikipedia · CC BY-SA 4.0</p>
               )}
+              {detail &&
+                [
+                  ...creditLines(detail.about, title.kind),
+                  ...(title.kind === 'series' ? [showStatusLine(detail.about, todayString())] : []),
+                ]
+                  .filter(Boolean)
+                  .map((line) => (
+                    <p className="detail-crew" key={line}>
+                      {line}
+                    </p>
+                  ))}
 
               <FocusGroup
                 kind="row"
@@ -1051,6 +1118,40 @@ export default function TitleDetailView({
               </FocusGroup>
             </>
           )}
+
+          {/* The collection's films the library holds, in order, and Play for
+              the first one not watched yet (TMDB `belongs_to_collection`). */}
+          {detail && detail.about.collection.length > 1 && (
+            <section className="detail-collection">
+              <h2 className="cast-heading">Part of {detail.about.collection_name}</h2>
+              <FocusGroup kind="row" focusKey={DETAIL_COLLECTION_KEY} className="rail-track">
+                {collectionNext && (
+                  <FocusButton
+                    className="btn-secondary detail-collection-play"
+                    keepInView="nearest"
+                    onSelect={() => void playCollection(collectionNext)}
+                  >
+                    ▶ Play the series from {collectionNext.title}
+                  </FocusButton>
+                )}
+                {detail.about.collection.map((film) => (
+                  <Card
+                    key={film.id}
+                    title={film}
+                    focusKey={`detail-collection:${film.id}`}
+                    note={film.id === title.id ? 'This film' : null}
+                    onSelect={(t) => (t.id === title.id ? undefined : onOpenTitle?.(t))}
+                  />
+                ))}
+              </FocusGroup>
+            </section>
+          )}
+
+          <FileInfo
+            focusKey={DETAIL_FILE_KEY}
+            fileId={primary?.fileId ?? detail?.movie_file_id ?? null}
+            what={title.kind === 'series' ? 'episode' : 'film'}
+          />
         </div>
       </div>
     </FocusContext.Provider>

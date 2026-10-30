@@ -77,3 +77,68 @@ test('Back from a title lands on the same card, scroll and all', async ({ page }
   const box = await page.locator('.focused').boundingBox();
   expect(box && box.y >= 0 && box.y < 600).toBe(true);
 });
+
+async function openFirstShow(page: Page): Promise<void> {
+  await open(page, '0');
+  await page.getByRole('button', { name: 'TV shows' }).first().click();
+  await expect(page.locator('.search .card').first()).toBeVisible();
+  await press(page, 'Enter');
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+}
+
+test('a whole show marked watched in one press, and back again', async ({ page }) => {
+  await openFirstShow(page);
+  const rows = page.locator('button[aria-label="Mark watched"], button[aria-label^="Watched. Press"]');
+  const watchedRows = () => page.locator('button[aria-label^="Watched. Press"]').count();
+  const button = page.getByRole('button', { name: /^(Mark show watched|✓ Show watched)$/ });
+  await expect(button).toHaveText('Mark show watched');
+  await button.click();
+  await expect(button).toHaveText('✓ Show watched');
+  const all = await rows.count();
+  expect(all).toBeGreaterThan(0);
+  expect(await watchedRows()).toBe(all);
+  await button.click();
+  await expect(button).toHaveText('Mark show watched');
+  expect(await watchedRows()).toBe(0);
+});
+
+test('Back stays at the top of a title page while it scrolls, never over the focused episode', async ({ page }) => {
+  await openFirstShow(page);
+  const back = page.getByRole('button', { name: '← Back' });
+  const gap = await page.evaluate(() => {
+    const b = document.querySelector('.browse')!;
+    return b.scrollHeight - b.clientHeight;
+  });
+  expect(gap).toBeGreaterThan(200);
+  await page.evaluate(() => document.querySelector('.browse')!.scrollTo({ top: 400, behavior: 'instant' }));
+  const top = async () => (await back.boundingBox())!.y;
+  await expect.poll(top).toBeLessThan(160);
+  // By keyboard down the episodes: the ring's control stays clear of Back.
+  for (let i = 0; i < 10; i++) {
+    await press(page, 'ArrowDown');
+    const backBox = (await back.boundingBox())!;
+    const ring = await page.locator('.focused').boundingBox();
+    if (ring && ring.y > backBox.y + backBox.height) continue;
+    // Above Back means scrolled out of the way, not hidden under it.
+    expect(ring === null || ring.y + ring.height <= backBox.y || ring.y >= backBox.y + backBox.height).toBe(true);
+  }
+  // The mouse: Back still there and it goes back.
+  await back.click();
+  await expect(page.locator('.search .card').first()).toBeVisible();
+});
+
+test('the developer tools library table scrolls sideways in a narrow window', async ({ page }) => {
+  await page.setViewportSize({ width: 700, height: 700 });
+  await open(page, '0');
+  await page.locator('.top-bar button, nav button', { hasText: 'Settings' }).first().click();
+  await page.locator('.settings-nav button', { hasText: 'Advanced' }).click();
+  await page.locator('.settings-section', { hasText: 'Developer tools' }).locator('button', { hasText: /Show developer tools/ }).click();
+  const wrap = page.locator('.library-table-wrap');
+  await expect(wrap).toBeVisible();
+  const fits = await wrap.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    return { overflowX: getComputedStyle(el).overflowX, right: r.right, vw: window.innerWidth };
+  });
+  expect(fits.overflowX).toBe('auto');
+  expect(fits.right).toBeLessThanOrEqual(fits.vw);
+});

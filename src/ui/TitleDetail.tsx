@@ -494,6 +494,25 @@ export default function TitleDetailView({
   const ownedCount = detail?.episodes.filter((e) => e.file_path).length ?? 0;
   const watchedCount = detail?.episodes.filter((e) => e.file_path && e.watched).length ?? 0;
 
+  /**
+   * Every episode of the show, one way or the other. Each one goes through
+   * set_watched like a single press; what SIMKL and Trakt are told queues in
+   * the outbox and leaves as one batch a moment later (send_soon).
+   */
+  const showWatched = ownedCount > 0 && watchedCount === ownedCount;
+  const markShow = useCallback(async () => {
+    try {
+      for (const episode of detail?.episodes ?? []) {
+        if (episode.file_path && episode.file_id !== null && episode.watched !== !showWatched) {
+          await setWatched(episode.file_id, !showWatched);
+        }
+      }
+      setDetail(await getTitleDetail(title.id));
+    } catch (e) {
+      setError(userError(e));
+    }
+  }, [detail, showWatched, title.id]);
+
   // The landing spot for a series: the first episode in the visible season that
   // is actually playable. Missing episodes are rendered but not focusable, so
   // aiming at one would leave focus nowhere.
@@ -741,6 +760,16 @@ export default function TitleDetailView({
                     }
                   >
                     {detail?.movie_watched ? '✓ Watched' : 'Mark watched'}
+                  </FocusButton>
+                )}
+
+                {title.kind === 'series' && ownedCount > 0 && (
+                  <FocusButton
+                    className={`btn-secondary ${showWatched ? 'watched-on' : ''}`}
+                    keepInView="page-top"
+                    onSelect={() => void markShow()}
+                  >
+                    {showWatched ? '✓ Show watched' : 'Mark show watched'}
                   </FocusButton>
                 )}
 

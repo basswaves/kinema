@@ -210,8 +210,22 @@ test('Wrong title? on the title page: the queue’s search, by remote; Back clos
   }
   await press(page, 'Enter');
   await expect.poll(() => focused(page)).toBe('▶ Play');
-  // Last in the row under the title.
-  for (let i = 0; i < 8 && (await focused(page)) !== 'Wrong title?'; i++) await press(page, 'ArrowRight');
+  // The versions arrive a moment after the page; the row is whole once they have.
+  const row = page.locator('.detail-actions button');
+  await expect(row.filter({ hasText: 'Version' })).toBeVisible();
+  // Right walks the row in reading order, over the line it wraps at, to the
+  // last button; Left walks it back.
+  const names = (await row.allTextContents()).map((t) => t.trim());
+  expect(names.at(-1)).toBe('Wrong title?');
+  for (const name of names.slice(1)) {
+    await press(page, 'ArrowRight');
+    await expect.poll(() => focused(page)).toBe(name);
+  }
+  for (const name of names.slice(0, -1).reverse()) {
+    await press(page, 'ArrowLeft');
+    await expect.poll(() => focused(page)).toBe(name);
+  }
+  for (let i = 1; i < names.length; i++) await press(page, 'ArrowRight');
   await expect.poll(() => focused(page)).toBe('Wrong title?');
 
   // Opens on the search box, the title's name in it, and what is linked said.

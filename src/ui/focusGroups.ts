@@ -122,15 +122,17 @@ export function resolveInGroup(
   const sideways = direction === 'left' || direction === 'right';
   const f = fromBox;
   // Left and Right stay in the row: only controls level with this one. (A
-  // menu's track list is a column; Right from a track went up to "close".)
-  const level = sideways && (kind === 'panel' || (kind === 'menu' && !wraps(wrap, direction)));
+  // menu's track list is a column; Right from a track went up to "close". A
+  // row that wraps went back up to its first line from the second.)
+  const level =
+    sideways &&
+    (kind === 'panel' || kind === 'row' || (kind === 'menu' && !wraps(wrap, direction)));
   const pool = level ? boxes.filter((b) => b.top < f.bottom && b.bottom > f.top) : boxes;
   const key = pickNext(fromBox, pool, direction, kind === 'menu' && wraps(wrap, direction));
   if (key !== null) return siblings.find((s) => s.focusKey === key) ?? null;
-  // A row too wide for the window wraps onto a second line, and nothing is
-  // further right of its line's last button: Right goes on in reading order
-  // (Left back), as text does, or the wrapped buttons are out of a remote's
-  // reach. Up and Down still leave the row.
+  // A row too wide for the window wraps onto a second line. From the end of a
+  // line, Right goes on in reading order (Left back), as text does, or the
+  // wrapped buttons are out of a remote's reach. Up and Down still leave it.
   if (kind !== 'row' || !sideways) return null;
   const order = siblings
     .filter((s) => s.focusKey === from || boxes.some((b) => b.key === s.focusKey))

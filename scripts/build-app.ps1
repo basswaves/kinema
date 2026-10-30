@@ -73,8 +73,16 @@ $outDir = Join-Path $root 'dist-app'
 $dlls   = @('libmpv-2.dll', 'libmpv-wrapper.dll')
 
 # cargo cannot overwrite an exe Windows still has open, and the failure surfaces
-# as a confusing linker error rather than a clear one.
-$running = Get-Process kinema -ErrorAction SilentlyContinue
+# as a confusing linker error rather than a clear one. Only a Kinema run from an
+# exe this build writes is in the way: a test build leaves dist-app\ and the
+# release folder alone, so the owner's own copy can stay open. One whose path
+# cannot be read counts as in the way.
+$writes = @($relDir)
+if (-not $Test) { $writes += $outDir }
+$running = Get-Process kinema -ErrorAction SilentlyContinue | Where-Object {
+    $exePath = $_.Path
+    -not $exePath -or ($writes | Where-Object { $exePath.StartsWith($_ + '\', 'OrdinalIgnoreCase') })
+}
 if ($running) {
     $pids = $running.Id -join ', '
     throw "Kinema is running (PID $pids). Close it first: the release exe cannot be written while Windows holds it open."

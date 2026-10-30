@@ -377,6 +377,8 @@ function pageScroller(node: HTMLElement): HTMLElement | null {
  */
 const TOP_BAR_REM = 4.5;
 const TV_SAFE_TOP_REM = 1.25;
+/** What a title page's sticky Back adds under the bar (`.detail > .back-button` in ui.css). */
+const BACK_BAR_REM = 1.75;
 
 /**
  * The room the top bar takes, in pixels, at the current scale and layout.
@@ -385,13 +387,14 @@ const TV_SAFE_TOP_REM = 1.25;
  * that change the size of a rem: reading the root's font size on every press
  * made the browser settle its styles first.
  */
-let topBar: { tv: string | undefined; px: number } | null = null;
+let topBar: { tv: string | undefined; px: number; rem: number } | null = null;
 let topBarWatched = false;
 
 function topBarPx(): number {
   const root = document.documentElement;
   const tv = root.dataset.tv;
-  if (topBar && topBar.tv === tv) return topBar.px;
+  const back = document.querySelector('.detail > .back-button') ? BACK_BAR_REM : 0;
+  if (topBar && topBar.tv === tv) return topBar.px + back * topBar.rem;
   if (!topBarWatched) {
     topBarWatched = true;
     window.addEventListener('resize', () => {
@@ -400,8 +403,8 @@ function topBarPx(): number {
   }
   const rem = parseFloat(getComputedStyle(root).fontSize);
   const px = (TOP_BAR_REM + (tv === 'on' ? TV_SAFE_TOP_REM : 0)) * rem;
-  topBar = { tv, px };
-  return px;
+  topBar = { tv, px, rem };
+  return px + back * rem;
 }
 
 const HEADING = /^H[1-3]$/;

@@ -1037,6 +1037,19 @@ html {
   cursor: pointer;
 }
 
+/* On a title's page Back stays under the top bar while the episodes scroll by
+   (T25). What it covers is accounted for twice: the extra scroll-margin here
+   and BACK_BAR_REM in focus.ts, so a focused episode is never left under it. */
+.detail > .back-button {
+  position: sticky;
+  top: calc(3.25rem + var(--safe-top));
+  align-self: flex-start;
+}
+
+.browse .detail * {
+  scroll-margin-top: calc(6.25rem + var(--safe-top));
+}
+
 .back-button:hover {
   background: rgba(255, 255, 255, 0.16);
 }

@@ -117,6 +117,18 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   },
   {
     section: 'picture',
+    label: 'Volume levelling',
+    about: 'loudness normalise night mode quiet loud explosions whisper compress dynamic range',
+    when: (can) => can.equipment_detection && can.audio_direct,
+  },
+  {
+    section: 'picture',
+    label: 'Dialogue lift',
+    about: 'dialogue boost speech clear voices centre center channel hard to hear',
+    when: (can) => can.equipment_detection && can.audio_direct,
+  },
+  {
+    section: 'picture',
     label: 'Match the screen to the film',
     about: 'refresh rate resolution display',
     when: (can) => can.system_output,

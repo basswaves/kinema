@@ -42,6 +42,7 @@ import { readProperty, type ScalarFormat, mpvGet } from './engine';
 import { outputCheck, type OutputFacts } from './outputCheck';
 import { readSwitchPolicies, screenIdOf, switchSettingsFor } from './displaySwitch';
 import { describeDelay } from './audioDelay';
+import { appliedLevel, describeLevel } from './soundLevel';
 import { goesDirect, readAudioSettings, targetDevice } from './audioOutput';
 import { getEquipment, type DisplayMode } from './equipment';
 import { capabilitiesNow, screenOwner } from '../capabilities';
@@ -369,6 +370,23 @@ export function describeAudioPath(
         value: `decoded · through ${mixer}`,
         note: `mixed to ${system}'s speaker setup; no Atmos or DTS:X`,
       };
+}
+
+/** Levelling and the dialogue lift (soundLevel.ts): what mpv's `af` holds now. */
+function levellingRow(): StatRow {
+  const { af, level, notApplied } = appliedLevel();
+  if (notApplied === 'passthrough' && (level.levelling !== 'off' || level.dialogue)) {
+    return {
+      label: 'Levelling',
+      value: 'off for this track',
+      note: 'the sound goes to the receiver untouched; levelling works only on sound Kinema decodes',
+    };
+  }
+  return {
+    label: 'Levelling',
+    value: af ? describeLevel(level) : 'none',
+    note: af ? 'on the decoded sound, before it leaves Kinema' : undefined,
+  };
 }
 
 export interface HdrFacts {
@@ -973,6 +991,7 @@ export async function readPlaybackStats(): Promise<StatGroup[]> {
                   audioDelay !== 0 ? ' for this device' : ''
                 }`,
         },
+        levellingRow(),
       ],
     },
     {

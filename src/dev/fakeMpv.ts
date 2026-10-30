@@ -212,7 +212,7 @@ export function command(name: string, args: unknown[]): null {
  */
 const TRACKS = [
   { type: 'video', id: 1, codec: 'hevc' },
-  { type: 'audio', id: 1, lang: 'eng', codec: 'truehd', channels: 8, profile: 'Dolby TrueHD + Dolby Atmos' },
+  { type: 'audio', id: 1, lang: 'eng', codec: 'truehd', channels: 8, 'demux-channels': '7.1', profile: 'Dolby TrueHD + Dolby Atmos' },
   { type: 'audio', id: 2, lang: 'eng', codec: 'ac3', channels: 2, title: 'Commentary with the director' },
   { type: 'sub', id: 1, lang: 'eng', codec: 'hdmv_pgs_subtitle', title: 'English SDH' },
   { type: 'sub', id: 2, lang: 'nor', codec: 'subrip' },

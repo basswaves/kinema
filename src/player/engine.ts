@@ -574,6 +574,10 @@ export interface Track {
   profile?: string;
   /** Subtitles for the deaf and hard of hearing (SDH). */
   hearingImpaired?: boolean;
+  /** Audio description: the file's own flag (mpv's `visual-impaired`). */
+  visualImpaired?: boolean;
+  /** Audio only: the channel layout as mpv names it (`5.1(side)`). */
+  layout?: string;
   /** A separate file's path, as mpv opened it. */
   externalFilename?: string;
 }
@@ -612,6 +616,8 @@ export async function readTracks(): Promise<Track[]> {
       hearingImpaired,
       sourceId,
       externalFilename,
+      visualImpaired,
+      layout,
     ] = await Promise.all([
       readProperty<string>(at('type'), 'string'),
       readProperty<number>(at('id'), 'int64'),
@@ -627,6 +633,8 @@ export async function readTracks(): Promise<Track[]> {
       readProperty<boolean>(at('hearing-impaired'), 'flag'),
       joinLanguages ? readProperty<number>(at('src-id'), 'int64') : null,
       readProperty<string>(at('external-filename'), 'string'),
+      readProperty<boolean>(at('visual-impaired'), 'flag'),
+      readProperty<string>(at('demux-channels'), 'string'),
     ]);
     if (!type) return null;
     return {
@@ -643,6 +651,8 @@ export async function readTracks(): Promise<Track[]> {
       profile: profile ?? undefined,
       hearingImpaired: hearingImpaired ?? false,
       externalFilename: externalFilename ?? undefined,
+      visualImpaired: visualImpaired ?? false,
+      layout: layout ?? undefined,
     };
   };
 

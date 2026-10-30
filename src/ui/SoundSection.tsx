@@ -22,6 +22,14 @@ import DeviceChoice from './DeviceChoice';
 import { soundOptions } from './deviceOptions';
 import { savePolicy, type DevicePolicy } from '../player/devicePolicy';
 import { setSetting } from '../metadata/api';
+import {
+  DIALOGUE_KEY,
+  LEVELLING_KEY,
+  LEVELLINGS,
+  readDefaultLevel,
+  type Levelling,
+  type SoundLevel,
+} from '../player/soundLevel';
 import { getEquipment, type AudioDevice, type Equipment } from '../player/equipment';
 import {
   AUDIO_DEVICE_KEY,
@@ -56,6 +64,49 @@ function detected(device: AudioDevice | null, codec: string): string {
 }
 
 /** `system` is for the wording only: "through Windows", "through Linux". */
+/**
+ * Levelling and the dialogue lift, as every title starts (soundLevel.ts);
+ * the player's Audio & subtitles panel changes them per title. For the room
+ * and the ears listening — night, speech lost under the music — and never on
+ * sound that goes to the receiver untouched.
+ */
+function LevelRows({ onError }: { onError: (message: string) => void }) {
+  const [level, setLevel] = useState<SoundLevel | null>(null);
+  useEffect(() => {
+    void readDefaultLevel().then(setLevel);
+  }, []);
+  if (!level) return null;
+  return (
+    <>
+      <ChoiceRow
+        label="Volume levelling"
+        choices={LEVELLINGS.map((l) => ({ value: l.id, label: l.label }))}
+        value={level.levelling}
+        onChange={(v) => {
+          setLevel({ ...level, levelling: v as Levelling });
+          void setSetting(LEVELLING_KEY, v).catch((e) => onError(userError(e)));
+        }}
+        note="Brings quiet scenes up and loud ones down, so the whisper and the explosion are closer — for late at night, or speech that gets lost. Each step evens out more."
+        hint="Only on sound Kinema decodes: a track sent to the receiver untouched is never changed. The player's Audio & subtitles panel changes it for one title."
+      />
+      <ChoiceRow
+        label="Dialogue lift"
+        choices={[
+          { value: 'off', label: 'Off' },
+          { value: 'on', label: 'On' },
+        ]}
+        value={level.dialogue ? 'on' : 'off'}
+        onChange={(v) => {
+          setLevel({ ...level, dialogue: v === 'on' });
+          void setSetting(DIALOGUE_KEY, v).catch((e) => onError(userError(e)));
+        }}
+        note="Raises the centre channel, where films put the speech, and lowers the others by as much — clearer voices, no louder overall."
+        hint="For surround tracks (5.1, 7.1), which have a centre channel; stereo has none to lift. Not on sound sent to the receiver untouched."
+      />
+    </>
+  );
+}
+
 /**
  * The sound delay kept for the device the sound will go to (audioDelay.ts),
  * read again whenever the chosen device changes.
@@ -238,6 +289,7 @@ export default function SoundSection({
       />
 
       <SoundDelayRow deviceId={settings.deviceId} onError={onError} />
+      <LevelRows onError={onError} />
 
       {settings.direct.policy !== 'off' && (
         <>

@@ -686,6 +686,49 @@ test('a sound delay for this device, by remote and keys, said and kept', async (
     .toBe('{}');
 });
 
+test('levelling and the dialogue lift by remote, kept for the title', async ({ page }) => {
+  await play(page, 'series');
+  const panel = await openTrackPanel(page);
+  const more = panel.getByRole('button', { name: 'Levelling: More' });
+  await expect(more).toBeVisible();
+  for (let i = 0; i < 25 && (await panel.locator('.track-level .focused').count()) === 0; i++) {
+    await press(page, 'ArrowDown');
+  }
+  for (let i = 0; i < 4 && !(await more.evaluate((el) => el.classList.contains('focused'))); i++) {
+    await press(page, 'ArrowRight');
+  }
+  await press(page, 'Enter');
+  await expect
+    .poll(() => sets(page))
+    .toContain('af=@kinema:lavfi=[dynaudnorm=f=250:g=21:p=0.9:m=6]');
+  await expect(page.locator('.player-notice')).toHaveText(
+    'Sound as mixed, levelling more, for this title'
+  );
+
+  // The fixture's track is 7.1: the centre channel can be lifted.
+  await pressInPanel(page, panel.getByRole('button', { name: 'Dialogue lift: off' }));
+  await expect.poll(async () => (await sets(page)).at(-1)).toMatch(/^af=.*pan=7\.1\|.*FC=1\.413\*FC.*dynaudnorm/);
+  await expect
+    .poll(() => call<string | null>(page, '/src/metadata/api.ts', 'getSetting', 'sound_by_title'))
+    .toMatch(/"levelling":"more","dialogue":true/);
+});
+
+test('no levelling on a track that goes to the receiver untouched, and the panel says why', async ({
+  page,
+}) => {
+  await play(page, 'series', async (p) => {
+    await call(p, '/src/metadata/api.ts', 'setSetting', 'sound_levelling', 'most');
+    await p.evaluate(() => {
+      const f = window as unknown as { __fakeMpv: { extra: Record<string, unknown> } };
+      f.__fakeMpv.extra['audio-spdif'] = 'ac3,eac3,truehd';
+    });
+  });
+  const panel = await openTrackPanel(page);
+  await expect(panel.locator('.track-level-off')).toContainText('goes to the receiver untouched');
+  await expect(panel.getByRole('button', { name: 'Levelling: Most' })).toHaveCount(0);
+  expect((await sets(page)).filter((s) => s.startsWith('af=@kinema'))).toEqual([]);
+});
+
 test('subtitle lines and timing: formats, the separate file by language, earlier and later', async ({
   page,
 }) => {

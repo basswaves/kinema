@@ -7,6 +7,16 @@ makes no stability promises.
 
 ## [Unreleased]
 
+### Added
+
+- **Volume levelling and a dialogue lift** (desktop). Levelling brings quiet
+  scenes up and loud ones down, in three steps; the dialogue lift raises the
+  centre channel of a surround track, where the speech is, and lowers the
+  others by as much. A default in Settings → Picture & sound, changed per title
+  in the player's Audio & subtitles panel, and shown in the details panel
+  (`I`). Only on sound Kinema decodes: a track sent to the receiver untouched
+  is never changed, and the panel says so.
+
 ## [0.14.0] — 2026-10-25
 
 Subtitles you can read and two languages at once, several files of one film

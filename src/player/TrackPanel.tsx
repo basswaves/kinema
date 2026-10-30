@@ -12,6 +12,7 @@ import { describeTracks, isPictureSubtitle, secondChoices, trackLanguage } from 
 import { languageBadge, languageName } from './language';
 import { describeOffer, type Offer } from './onlineSubtitles';
 import { DELAY_STEP_MS, delayLabel } from './audioDelay';
+import { LEVELLINGS, type NotApplied, type SoundLevel } from './soundLevel';
 import { SUB_BIG_STEP_MS, SUB_STEP_MS, subDelayLabel } from './subDelay';
 import { nextSize, sizeLabel, type SubStyle } from './subtitleStyle';
 
@@ -72,6 +73,68 @@ const SECOND_KEY = 'player-track-panel:second';
  * mixed audio and subtitle languages it is the control reached most often, and
  * until now a remote could not reach it at all.
  */
+/**
+ * Levelling in four steps and the dialogue lift, for this title. Not offered
+ * for a track that goes to the receiver untouched, and said why: Kinema
+ * never alters the film's own bitstream.
+ */
+function LevelRows({
+  level,
+  notApplied,
+  canLift,
+  changeLevel,
+}: {
+  level: SoundLevel;
+  notApplied: NotApplied;
+  canLift: boolean;
+  changeLevel: (next: SoundLevel) => void;
+}) {
+  if (notApplied === 'passthrough') {
+    return (
+      <p className="track-note track-level-off">
+        Levelling and the dialogue lift are off for this track: it goes to the receiver untouched,
+        and they work only on sound Kinema decodes.
+      </p>
+    );
+  }
+  return (
+    <>
+      <div className="track-delay track-level">
+        <span className="track-delay-label">Levelling</span>
+        {LEVELLINGS.map((l) => (
+          <FocusButton
+            key={l.id}
+            className={`track-option ${level.levelling === l.id ? 'active' : ''}`}
+            keepInView="nearest"
+            label={`Levelling: ${l.label}`}
+            onSelect={() => changeLevel({ ...level, levelling: l.id })}
+          >
+            {l.label}
+          </FocusButton>
+        ))}
+      </div>
+      {canLift && (
+        <div className="track-delay track-level">
+          <span className="track-delay-label">Dialogue</span>
+          <FocusButton
+            className={`track-option ${level.dialogue ? 'active' : ''}`}
+            keepInView="nearest"
+            label={level.dialogue ? 'Dialogue lift: on' : 'Dialogue lift: off'}
+            onSelect={() => changeLevel({ ...level, dialogue: !level.dialogue })}
+          >
+            {level.dialogue ? 'Lifted' : 'As mixed'}
+          </FocusButton>
+        </div>
+      )}
+      <p className="track-note">
+        Levelling brings quiet scenes up and loud ones down
+        {canLift ? '; the dialogue lift raises the centre channel, where the speech is' : ''}.
+        Kept for this title.
+      </p>
+    </>
+  );
+}
+
 export default function TrackPanel({
   audioTracks,
   subTracks,
@@ -86,6 +149,7 @@ export default function TrackPanel({
   subStyle,
   onSubStyle,
   delay,
+  level,
   timing,
   sid2,
   onSecond,
@@ -119,6 +183,16 @@ export default function TrackPanel({
    * and a step of it. None where Media3 plays the sound (Android).
    */
   delay?: { ms: number; onChange: (delta: number, reset?: boolean) => void } | null;
+  /**
+   * Levelling and the dialogue lift kept for this title (soundLevel.ts);
+   * `notApplied` when the track goes to the receiver untouched.
+   */
+  level?: {
+    level: SoundLevel;
+    notApplied: NotApplied;
+    canLift: boolean;
+    changeLevel: (next: SoundLevel) => void;
+  } | null;
   /**
    * The subtitle timing kept for this file (subDelay.ts), and a step of it.
    * None where Media3 plays: it has no subtitle offset.
@@ -208,6 +282,7 @@ export default function TrackPanel({
             </p>
           </>
         )}
+        {level && <LevelRows {...level} />}
 
         <div className="track-panel-head">
           <span>Subtitles</span>

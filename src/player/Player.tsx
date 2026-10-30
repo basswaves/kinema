@@ -61,6 +61,7 @@ import { useSkipMarkers } from './useSkipMarkers';
 import { useTracks } from './useTracks';
 import { useAudioDelay } from './useAudioDelay';
 import { useSubDelay } from './useSubDelay';
+import { useSoundLevel } from './useSoundLevel';
 import { useUpNext } from './useUpNext';
 import { useVolume } from './useVolume';
 import { VOLUME_STEP, wheelVolumeSteps } from './volume';
@@ -132,6 +133,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   } = usePanels({ osdFocus, osdFocusRef });
   const { delayMs, changeDelay } = useAudioDelay(setNotice);
   const { subDelayMs, changeTiming } = useSubDelay(setNotice);
+  const sound = useSoundLevel({ target, tracks, aid, say: setNotice });
 
   const onlinePanel = useOnlineSubtitles({
     target,
@@ -539,6 +541,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           onSubStyle={(style) => void changeSubStyle(style)}
           delay={hasMpv() ? { ms: delayMs, onChange: changeDelay } : null}
           timing={hasMpv() ? { ms: subDelayMs, onChange: changeTiming } : null}
+          level={hasMpv() && sound.level ? { ...sound, level: sound.level } : null}
           sid2={sid2}
           onSecond={hasMpv() ? (track) => void chooseSecond(track) : null}
           playlistItem={

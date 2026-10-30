@@ -29,6 +29,7 @@ import {
 import {
   omdbGetMovie,
   omdbSearch,
+  tmdbAltTitles,
   tmdbFindByImdb,
   tmdbFindByTvdb,
   tmdbGetEpisodes,
@@ -48,11 +49,17 @@ import {
   usableBuiltinKey,
   type TmdbKeySource,
 } from './builtinKey';
-import { pickBest, type Candidate, type ScoreContext } from './score';
+import {
+  normaliseTitle,
+  pickBest,
+  type Candidate,
+  type ScoreContext,
+  type ScoredCandidate,
+} from './score';
 import { withoutQueries } from '../ui/errors';
 import { explainUnreachable } from './reach';
 import { wikidataGetMovie, wikidataSearch } from './wikidata';
-import { nfoForGroup, resolveNfoIds, sourceName } from './nfo';
+import { idsInName, nfoForGroup, resolveIds, resolveNfoIds, sourceName, type NfoIds } from './nfo';
 import { yieldToPlayback } from '../library/playback';
 
 export interface MatchProgress {
@@ -85,6 +92,26 @@ export interface FileGroup {
 }
 
 /**
+ * A file name as words to search with, for a file the parser found no title
+ * in: no extension, no brackets, dots and underscores as spaces, and nothing
+ * from the year or the first release tag on. "F1 [2025]" was sent to TMDB as
+ * it was, brackets and year as words. The whole name when that leaves nothing.
+ */
+export function searchableName(fileName: string): string {
+  const bare = fileName.replace(/\.[a-z0-9]{2,4}$/i, '');
+  const words = bare
+    .replace(/[[({][^\])}]*[\])}]/g, ' ')
+    .replace(/[._]+/g, ' ')
+    .replace(
+      /\s(?:19|20)\d{2}(?!\d)[\s\S]*$|\s(?:2160p|1080p|720p|480p|4k|uhd|bluray|blu ray|remux|web ?dl|webrip|hdtv|x26[45]|h ?26[45]|hevc)\b[\s\S]*$/i,
+      ''
+    )
+    .replace(/\s+/g, ' ')
+    .trim();
+  return words || bare;
+}
+
+/**
  * Group by parsed title so each distinct show/film is resolved once.
  *
  * `includeUntitled` makes a group of one for each file with no title at all,
@@ -104,7 +131,7 @@ export function groupFiles(
         groups.set(`untitled::${file.id}`, {
           key: `untitled::${file.id}`,
           title: file.file_name.replace(/\.[^.]+$/, ''),
-          year: null,
+          year: file.parsed_year,
           isSeries: file.parsed_season !== null || file.parsed_episode !== null,
           files: [file],
           maxSeason: file.parsed_season,
@@ -118,7 +145,7 @@ export function groupFiles(
     // it came from — a mislabelled root should not force the wrong provider.
     const isSeries = file.parsed_season !== null || file.parsed_episode !== null;
     const key = `${isSeries ? 'tv' : 'movie'}::${file.parsed_title.toLowerCase()}::${
-      isSeries ? '' : file.parsed_year ?? ''
+      isSeries ? '' : (file.parsed_year ?? '')
     }`;
 
     let group = groups.get(key);
@@ -381,7 +408,12 @@ async function tmdbIdFor(key: string, target: FallbackTitle): Promise<string | n
     if (found) return found;
   }
   if (target.by_hand) return null;
-  const candidates = await tmdbSearch(key, target.title, target.year, isSeries ? 'series' : 'movie');
+  const candidates = await tmdbSearch(
+    key,
+    target.title,
+    target.year,
+    isSeries ? 'series' : 'movie'
+  );
   const { best, matched } = pickBest(candidates, {
     parsedTitle: target.title,
     parsedYear: target.year,
@@ -452,6 +484,71 @@ export async function returnFilesToReview(files: MediaFile[]): Promise<void> {
   await returnToReview(files.map((f) => f.id));
 }
 
+/** The last part of a folder path. */
+function folderName(dir: string): string {
+  const parts = dir.split(/[\\/]/).filter(Boolean);
+  return parts[parts.length - 1] ?? '';
+}
+
+/**
+ * The id a group's names carry, or null. A film's own file name first, then
+ * its folder; a show's folder and the one above it (`Show [tmdbid-1]/Season
+ * 1`), never an episode's file name, whose id would be the episode's. When the
+ * files of one group disagree, there is no id: it is not ours to choose.
+ */
+export function idsInGroupNames(group: FileGroup): NfoIds | null {
+  let found: NfoIds | null = null;
+  for (const file of group.files) {
+    const folder = file.parent_dir;
+    const above = folder.replace(/[\\/]+[^\\/]*[\\/]*$/, '');
+    // A folder's id counts only for the title the folder is named after: a
+    // folder of many films must not lend its one id to all of them.
+    const named = (dir: string) => {
+      const name = folderName(dir);
+      return normaliseTitle(name).includes(normaliseTitle(group.title)) ? name : '';
+    };
+    const names = group.isSeries ? [named(folder), named(above)] : [file.file_name, named(folder)];
+    const ids = names.map(idsInName).find((x) => x !== null) ?? null;
+    if (!ids) continue;
+    if (found && (found.imdb !== ids.imdb || found.tmdb !== ids.tmdb)) return null;
+    found = ids;
+  }
+  return found;
+}
+
+/** How many close candidates have their alternative titles asked for. */
+const ALT_TITLE_CANDIDATES = 3;
+
+/**
+ * The scorer did not decide on plain names: ask TMDB for the other names of
+ * the few best candidates with the year exact or one off, and score again.
+ * "Indiana Jones and the Raiders of the Lost Ark" is one of those names, not
+ * the title. Never without a year: a name shared across decades is not
+ * evidence.
+ */
+async function withAltTitles(
+  key: string,
+  candidates: Candidate[],
+  scored: ScoredCandidate[],
+  ctx: ScoreContext,
+  isSeries: boolean
+): Promise<Candidate[]> {
+  const year = ctx.parsedYear;
+  if (!year) return candidates;
+  const ask = scored
+    .filter((c) => c.year !== null && Math.abs(c.year - year) <= 1)
+    .slice(0, ALT_TITLE_CANDIDATES)
+    .map((c) => c.providerId);
+  if (ask.length === 0) return candidates;
+  const names = new Map<string, string[]>();
+  for (const id of ask) {
+    names.set(id, await tmdbAltTitles(key, id, isSeries ? 'series' : 'movie').catch(() => []));
+  }
+  return candidates.map((c) =>
+    names.has(c.providerId) ? { ...c, altTitles: names.get(c.providerId) } : c
+  );
+}
+
 /**
  * Decide which provider entry a group refers to. Deliberately fetches nothing
  * beyond the search: a group that fails to match should cost one request, and
@@ -491,6 +588,22 @@ async function resolveGroup(
     }
   }
 
+  // An id in the file or folder name: the same decision written into a name
+  // instead of a file beside it. An NFO's id came first and wins.
+  const named = idsInGroupNames(group);
+  if (named) {
+    const resolved = await resolveIds(named, group.isSeries, keys);
+    if (resolved) {
+      return {
+        provider: resolved.provider,
+        providerId: resolved.providerId,
+        confidence: 1,
+        reason: `name: ${resolved.via}`,
+        matched: true,
+      };
+    }
+  }
+
   // The NFO's own title, when it has one, is what gets searched from here on.
   // Recorded in the reason either way: a match made against a different title
   // from the one on the filename should be obvious when reading it back.
@@ -503,15 +616,26 @@ async function resolveGroup(
     nfoNote = ` · searched as “${searchTitle}” from ${sourceName(nfo.source)}`;
   }
 
+  // "Spider-Man - Across the Spider-Verse": the whole name is searched, and so
+  // is the part before " - ", which is sometimes all of the title.
+  const cut = searchTitle.indexOf(' - ');
+  const shorter = cut > 0 ? searchTitle.slice(0, cut).trim() : '';
+
   const ctx: ScoreContext = {
     parsedTitle: searchTitle,
     parsedYear: searchYear,
+    otherParsedTitles: shorter ? [shorter] : undefined,
     maxSeason: group.maxSeason,
   };
 
   const provider = providerFor(group, keys);
 
-  const candidates = await searchProvider(provider, keys, searchTitle, searchYear, group.isSeries);
+  let candidates = await searchProvider(provider, keys, searchTitle, searchYear, group.isSeries);
+  if (shorter) {
+    const more = await searchProvider(provider, keys, shorter, searchYear, group.isSeries);
+    const seen = new Set(candidates.map((c) => c.providerId));
+    candidates = [...candidates, ...more.filter((c) => !seen.has(c.providerId))];
+  }
 
   if (candidates.length === 0) {
     return {
@@ -523,7 +647,12 @@ async function resolveGroup(
     };
   }
 
-  const { best, matched } = pickBest(candidates, ctx);
+  let { best, matched } = pickBest(candidates, ctx);
+  if (!matched && provider === 'tmdb' && keys.tmdb) {
+    const plain = pickBest(candidates, ctx).all;
+    candidates = await withAltTitles(keys.tmdb, candidates, plain, ctx, group.isSeries);
+    ({ best, matched } = pickBest(candidates, ctx));
+  }
   if (!best) {
     return {
       provider,

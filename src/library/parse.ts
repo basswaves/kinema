@@ -149,6 +149,40 @@ function withoutYear(title: string, year: number | null): string {
   return cut || title;
 }
 
+/**
+ * A film's title, with the pieces guessit moves into fields of their own put
+ * back. `Dune.Part.Two.2024` is `{title: "Dune", part: 2}` — searched as
+ * "Dune" it matched "The Dune" (2025). `F1 (2025)` is `{film: 1}` with no title
+ * at all. `Spider-Man - Across the Spider-Verse` is "Spider-Man" with the rest
+ * as an `alternative_title`; the whole name is kept, and the matcher searches
+ * the part before " - " as well. A number of a CD (`cd`) is not part of the
+ * title and stays out.
+ */
+function filmTitle(input: string, raw: Record<string, unknown>): string | null {
+  let title = firstOf(raw.title as string | string[] | undefined);
+  if (typeof title !== 'string' || !title.trim()) {
+    // `F1`, `F9`: the name starts with the film's own number. guessit also
+    // reads `Film f01` as film 1, but there "Film" is the title and stays.
+    const lead = /^f(\d{1,2})(?![a-z0-9])/i.exec(input);
+    return typeof raw.film === 'number' && lead && Number(lead[1]) === raw.film
+      ? `F${raw.film}`
+      : null;
+  }
+  title = title.trim();
+  const alt = firstOf(raw.alternative_title as string | string[] | undefined);
+  if (typeof alt === 'string' && alt.trim()) {
+    const words = (s: string) =>
+      s
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+    if (words(input).includes(`${words(title)} ${words(alt)}`)) title = `${title} - ${alt.trim()}`;
+  }
+  const part = firstOf(raw.part as number | number[] | undefined);
+  if (typeof part === 'number' && !/\bpart\b/i.test(title)) title = `${title} Part ${part}`;
+  return title;
+}
+
 function runGuessit(input: string, kind: LibraryKind): Guess {
   // A programming error, not a bad filename: some caller started parsing
   // without loading the parser. Thrown rather than folded into `lastParseError`
@@ -181,9 +215,9 @@ function runGuessit(input: string, kind: LibraryKind): Guess {
     };
   }
 
-  const title = firstOf(raw.title as string | string[] | undefined);
   const type = raw.type as string | undefined;
   const year = typeof raw.year === 'number' ? raw.year : null;
+  const title = kind === 'movies' ? filmTitle(input, raw) : firstOf(raw.title as string | string[]);
 
   return {
     title: typeof title === 'string' && title.trim() ? withoutYear(title.trim(), year) : null,
@@ -243,7 +277,10 @@ function parentOf(dir: string): string | null {
 
 /** Comparable form of a path: separators unified, case folded, no trailing slash. */
 function comparablePath(path: string): string {
-  return path.replace(/[\\/]+/g, '/').replace(/\/$/, '').toLowerCase();
+  return path
+    .replace(/[\\/]+/g, '/')
+    .replace(/\/$/, '')
+    .toLowerCase();
 }
 
 export interface ParsedFile extends Guess {
@@ -257,11 +294,7 @@ export interface ParsedFile extends Guess {
  * climb to the show folder below: never to the library folder itself or above,
  * because "TV" or "Serier" is not a show.
  */
-export function parseMediaFile(
-  file: MediaFile,
-  kind: LibraryKind,
-  rootPath?: string
-): ParsedFile {
+export function parseMediaFile(file: MediaFile, kind: LibraryKind, rootPath?: string): ParsedFile {
   const fromFile = runGuessit(file.file_name, kind);
   const fileScore = scoreGuess(fromFile, kind);
 

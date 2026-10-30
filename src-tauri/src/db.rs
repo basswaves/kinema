@@ -910,6 +910,10 @@ pub fn open(path: &Path) -> Result<Connection, DbError> {
         backup_before_upgrade(&conn, &dir.join(BACKUP_DIR))?;
     }
     migrate(&conn)?;
+    let reasked = crate::lifecycle::reask_after_new_rules(&conn)?;
+    if reasked > 0 {
+        crate::log!("matching: new rules; {reasked} refused or untitled file(s) will be read again");
+    }
     Ok(conn)
 }
 

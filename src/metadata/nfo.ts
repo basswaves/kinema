@@ -114,12 +114,21 @@ export interface NfoResolution {
  * Returns null when nothing resolves, which is not a failure — the caller falls
  * through to searching by the NFO's title.
  */
-export async function resolveNfoIds(
+export function resolveNfoIds(
   nfo: Nfo,
   isSeries: boolean,
   keys: ProviderKeys
 ): Promise<NfoResolution | null> {
-  const { tmdb, imdb, tvdb } = nfo.ids;
+  return resolveIds(nfo.ids, isSeries, keys);
+}
+
+/** The same for ids from anywhere — an NFO, or a file or folder name. */
+export async function resolveIds(
+  ids: NfoIds,
+  isSeries: boolean,
+  keys: ProviderKeys
+): Promise<NfoResolution | null> {
+  const { tmdb, imdb, tvdb } = ids;
 
   if (keys.tmdb) {
     if (tmdb) {
@@ -157,6 +166,20 @@ export async function resolveNfoIds(
   }
 
   return null;
+}
+
+const IMDB_IN_NAME = /(?:^|[^a-z0-9])imdb(?:id)?[-=](tt\d{6,10})(?![0-9])/i;
+const TMDB_IN_NAME = /(?:^|[^a-z0-9])tmdb(?:id)?[-=](\d{1,9})(?![0-9])/i;
+
+/**
+ * An id written into a file or folder name: Jellyfin's `[imdbid-tt…]` and
+ * `[tmdbid-…]`, Plex's and Emby's `{imdb-tt…}` and `{tmdb-…}`, or the bare
+ * `imdb-tt…` / `tmdb-…`, in any case. Null when the name carries none.
+ */
+export function idsInName(name: string): NfoIds | null {
+  const imdb = IMDB_IN_NAME.exec(name)?.[1]?.toLowerCase() ?? null;
+  const tmdb = TMDB_IN_NAME.exec(name)?.[1] ?? null;
+  return imdb || tmdb ? { tmdb, imdb, tvdb: null } : null;
 }
 
 /** Just the filename, for a reason string that has to stay readable. */

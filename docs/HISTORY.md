@@ -3973,6 +3973,66 @@ which landed on Search's edge. Where a control lines up with the next row's
 right end and starts inside it, the start is now measured from the right
 (navGeometry.ts). It changed no move in Edge.
 
+## Matching more, as safely (2026-10-30)
+
+A read-only look at one library (380 matched, 20 refused) found that most
+refusals were not doubt but faults: the clear winner was there and was not
+seen. The rule stays — 0.75, a 0.05 margin over every other candidate, and
+Needs attention for the rest. What changed is how a winner is seen.
+
+- **Ties that were not ties.** The score was held to 1 *before* candidates
+  were compared, so a title with the exact year (1.12) and the same title a
+  year off (1.04) both read 1.0, and the matcher refused two films that were
+  not alike. Candidates are now compared by the raw score; only what is
+  stored and shown is held to 0..1. Leading articles are still ignored for
+  similarity ("Strays" is "The Strays" in spelling), but a literal match
+  gets 0.02 — less than the margin, so it puts the literal one first and
+  never decides on its own.
+- **Votes as well as popularity.** TMDB keeps stubs under the same name and
+  year as the real film. Popularity is this week's traffic and can be 5
+  against 2; votes are years of people: 1828 against 95, 613 against 2. A tie
+  is now also settled when the best has ten times the other's votes and at
+  least 50. The threefold popularity rule stays. Neither may point the other
+  way, and the best must beat *every* candidate within the margin, not only
+  the second — two real films with votes of the same order are still a
+  coin-flip and refused. And the exact year no longer picks a same-name stub
+  over the film a year off that has ten times the votes and three times the
+  popularity (a file named for its release year).
+- **Ids in names.** `[imdbid-tt…]`, `[tmdbid-…]` (Jellyfin), `{imdb-tt…}`,
+  `{tmdb-…}` (Plex, Emby) and the bare forms, on a film's file name or its
+  own folder, a show's folder or the one above a season folder. The same
+  path as an NFO id; an NFO wins. A folder's id counts only for the title the
+  folder is named after, so a folder of many films cannot lend one id to all.
+- **Other names.** A candidate is also scored by its title before ": "
+  (0.9 of the value, so "Alien" stays "Alien" and not "Alien: Covenant"), its
+  original title and, only when the plain names did not decide and the year
+  is exact or one off, TMDB's alternative titles for the top three (0.95). A
+  file name written "Title - Subtitle" is searched whole and as the part
+  before " - ", and each candidate keeps its better score.
+- **The parser ate part of the title.** guessit moves `part` and `film` into
+  fields of their own: `Dune.Part.Two.2024` was searched as "Dune" and
+  matched "The Dune" (2025); `F1 (2025)` had no title at all. The part goes
+  back ("Dune Part 2"; "Part Two", "Part II" and "Part 2" compare equal), a
+  candidate naming another part, or none, loses 0.15; `F<n>` at the start of
+  a name with guessit's `film` number is the title. `cd` stays out; guessit
+  gives films no `episode_title`.
+- **Asked once more.** A refusal is never re-asked by itself (the same
+  question, the same answer), so the refused and untitled files of an
+  existing library go back to the parser once when these rules arrive
+  (`MATCHER_RULES` in lifecycle.rs, a setting rather than a schema version, so
+  an older build still opens the library). Held files stay held.
+
+A dry run on that library's copy, with TMDB's real answers: 17 of the 21
+refused files now match, each checked against its name; none of the 379
+matched changes. The four left: a test clip, a MakeMKV title name, a
+transliterated title TMDB does not know, and one film whose same-name rival
+(the same words with "The") neither votes nor popularity set clearly apart —
+still refused. That dry run
+also caught the one match the raw scores would have moved (GOTCHAS).
+
+Running time as a tie-break was left for later; OpenSubtitles' file hash was
+turned down (crowd-tagged, never for own rips, a request per file).
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

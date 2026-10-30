@@ -34,6 +34,7 @@ import {
   providerForKind,
   searchProvider,
   returnFilesToReview,
+  searchableName,
   type FileGroup,
   type Provider,
 } from '../metadata/match';
@@ -337,7 +338,9 @@ function GroupRow({
   /** Keep the group as a title of its own, under this name, year and kind. */
   onKeep: (name: string, year: number | null, isSeries: boolean) => void;
 }) {
-  const [query, setQuery] = useState(group.title);
+  // An untitled group is named after its file; searched as it is, "F1 [2025]"
+  // sent its brackets and year to the provider as words (T13).
+  const [query, setQuery] = useState(group.untitled ? searchableName(group.title) : group.title);
   const [isSeries, setIsSeries] = useState(group.isSeries);
   const [results, setResults] = useState<Candidate[] | null>(null);
   /**

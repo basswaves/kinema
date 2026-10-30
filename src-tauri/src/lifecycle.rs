@@ -213,6 +213,49 @@ pub fn reset_matches(conn: &Connection) -> rusqlite::Result<usize> {
     )
 }
 
+/// The rules the matcher and parser follow, as stored in `settings`. Raise it
+/// when a change to them can turn a refusal into a match (MATCHING.md, round
+/// 6: ties, ids in names, other names, parts), so a library refused under the
+/// old rules is read and asked once more under the new ones.
+pub const MATCHER_RULES: &str = "2";
+const MATCHER_RULES_KEY: &str = "matcher_rules";
+
+/// Once per [`MATCHER_RULES`]: files the matcher refused, and files with no
+/// title read from their name, go back to the parser — and from there to the
+/// matcher. Never a held file (a person decided), an ignored one, or one with a
+/// title (matched, or kept under its own name). A refusal is otherwise never
+/// re-asked (see `MATCHABLE_WHERE`), so without this a library would keep every
+/// refusal the old rules made.
+pub fn reask_after_new_rules(conn: &Connection) -> rusqlite::Result<usize> {
+    let stored: Option<String> = conn
+        .query_row(
+            "SELECT value FROM settings WHERE key = ?1",
+            [MATCHER_RULES_KEY],
+            |r| r.get(0),
+        )
+        .ok();
+    if stored.as_deref() == Some(MATCHER_RULES) {
+        return Ok(0);
+    }
+    let n = conn.execute(
+        "UPDATE media_files
+            SET match_status = 'unparsed', parsed_at = NULL, parsed_title = NULL,
+                parsed_year = NULL, parsed_season = NULL, parsed_episode = NULL,
+                parsed_kind = NULL, parsed_from = NULL, parsed_json = NULL,
+                parsed_episode_last = NULL, match_confidence = NULL, match_reason = NULL
+          WHERE match_hold = 0 AND title_id IS NULL
+            AND (match_status = 'unmatched'
+                 OR (match_status IN ('parsed', 'failed') AND parsed_title IS NULL))",
+        [],
+    )?;
+    conn.execute(
+        "INSERT INTO settings (key, value) VALUES (?1, ?2)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        [MATCHER_RULES_KEY, MATCHER_RULES],
+    )?;
+    Ok(n)
+}
+
 /// Developer tools: parse everything again. Match links go too — a file that
 /// claims to be unparsed while pointing at a title is an inconsistent state.
 pub fn reset_parses(conn: &Connection) -> rusqlite::Result<usize> {
@@ -394,6 +437,23 @@ mod tests {
         // Choosing a title by hand is the one thing that ends the hold.
         matched(&mut conn, &[1], 7, None, Some("chosen by hand")).unwrap();
         assert_eq!(state(&conn, 1), ("matched".into(), Some(7), 0));
+    }
+
+    #[test]
+    fn new_rules_read_refused_files_again_once() {
+        let mut conn = library(&[1, 2, 3]);
+        refused(&mut conn, &[1], Some(0.7), "ambiguous").unwrap();
+        matched(&mut conn, &[2], 7, Some(0.9), None).unwrap();
+        unlinked(&mut conn, &[3], "wrong show").unwrap();
+        conn.execute("DELETE FROM settings WHERE key = 'matcher_rules'", []).unwrap();
+
+        assert_eq!(reask_after_new_rules(&conn).unwrap(), 1);
+        assert_eq!(state(&conn, 1).0, "unparsed");
+        assert_eq!(state(&conn, 2).0, "matched");
+        assert_eq!(state(&conn, 3), ("unmatched".into(), None, 1));
+
+        refused(&mut conn, &[1], Some(0.7), "ambiguous").unwrap();
+        assert_eq!(reask_after_new_rules(&conn).unwrap(), 0);
     }
 
     #[test]

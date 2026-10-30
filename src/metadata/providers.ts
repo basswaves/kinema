@@ -596,6 +596,8 @@ interface TmdbSearchResult {
   id: number;
   title?: string;
   name?: string;
+  original_title?: string;
+  original_name?: string;
   release_date?: string;
   first_air_date?: string;
   popularity?: number;
@@ -625,11 +627,30 @@ export async function tmdbSearch(
     year: yearOf(r.release_date ?? r.first_air_date ?? null),
     popularity: r.popularity ?? null,
     voteCount: r.vote_count ?? null,
+    originalTitle: r.original_title ?? r.original_name ?? null,
     // A smaller size than the detail fetch uses: these are thumbnails in a
     // picker, and eight originals would be tens of megabytes.
     posterUrl: r.poster_path ? `https://image.tmdb.org/t/p/w185${r.poster_path}` : null,
     overview: r.overview || null,
   }));
+}
+
+/**
+ * TMDB's other names for one title, for scoring a close candidate whose plain
+ * name did not decide ("Star Wars: Episode IV - A New Hope"). The same host
+ * and queue as any detail fetch.
+ */
+export async function tmdbAltTitles(
+  key: string,
+  id: string,
+  kind: 'movie' | 'series'
+): Promise<string[]> {
+  const data = await tmdbGet<{
+    titles?: Array<{ title?: string }>;
+    results?: Array<{ title?: string }>;
+  }>(key, `/${kind === 'movie' ? 'movie' : 'tv'}/${encodeURIComponent(id)}/alternative_titles`);
+  const names = (data.titles ?? data.results ?? []).map((t) => t.title?.trim() ?? '');
+  return [...new Set(names.filter(Boolean))];
 }
 
 export async function tmdbGetTitle(

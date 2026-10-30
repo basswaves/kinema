@@ -568,6 +568,19 @@ marker source can do.
 
 ---
 
+### A fix to the matcher's ties can move a match that was right by luck
+
+Comparing raw scores instead of scores held to 1 fixed ties like "The Courier"
+2020 against 2019, and every unit test passed. The dry run on a real library
+showed one film that had been matched right *because of* the clamp: its file
+said 2020, the film is 2019, and TMDB also holds a same-name stub dated 2020.
+Clamped, the two tied and popularity chose the film; raw, the exact year
+(0.12 against 0.04) chose the stub — a wrong match, no error, the poster just
+a different one. Now an entry of the same name a year off that has ten times
+the votes *and* three times the popularity goes first (`score.ts`). Any change
+to scoring needs the dry run against a real library's answers, not only
+tests: compare every matched file before and after.
+
 ## Child processes
 
 ### Draining stdout and stderr in sequence can deadlock

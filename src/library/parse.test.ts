@@ -41,6 +41,36 @@ describe('parseMediaFile', () => {
     expect([folder.title, folder.year]).toEqual(['Some Film', 2017]);
   });
 
+  /** guessit moves these out of `title`; the matcher needs them back (MATCHING.md step 4). */
+  it('puts a film’s part back into its title', () => {
+    const title = (name: string) => parseMediaFile(file(name, 'D:/Films'), 'movies').title;
+    expect(title('Dune.Part.Two.2024.2160p.mkv')).toBe('Dune Part 2');
+    expect(title('The.Hunger.Games.Mockingjay.Part.2.2015.mkv')).toBe(
+      'The Hunger Games Mockingjay Part 2'
+    );
+  });
+
+  it('reads F1 as a title, and leaves Film f01 alone', () => {
+    const title = (name: string) => parseMediaFile(file(name, 'D:/Films'), 'movies').title;
+    expect(title('F1 [2025].mkv')).toBe('F1');
+    expect(title('F1 (2025).mkv')).toBe('F1');
+    expect(title('F1.2025.2160p.mkv')).toBe('F1');
+    expect(title('Film f01.mkv')).not.toBe('F1');
+  });
+
+  it('keeps the whole name of a title written with " - "', () => {
+    const parsed = parseMediaFile(
+      file('Spider-Man - Across the Spider-Verse (2023).mkv', 'D:/Films'),
+      'movies'
+    );
+    expect([parsed.title, parsed.year]).toEqual(['Spider-Man - Across the Spider-Verse', 2023]);
+  });
+
+  it('leaves a CD number out of the title', () => {
+    const parsed = parseMediaFile(file('Avatar CD1 2009.avi', 'D:/Films'), 'movies');
+    expect(parsed.title).toBe('Avatar');
+  });
+
   it('keeps both ends of a double-episode file', () => {
     const parsed = parseMediaFile(file('Show.Name.S01E01E02.1080p.mkv', 'D:/TV/Show Name'), 'tv');
     expect(parsed.title).toBe('Show Name');

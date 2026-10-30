@@ -1082,6 +1082,19 @@ same every time it renders, and unique on the page: cards are keyed by where
 they sit as well as what they show (`rail:<heading>:<id>`, `grid:<id>`,
 `search:<id>`), because one title appears in several rails at once.
 
+### Back restores the page's scroll, and a grid's landing claim must not undo it
+
+Back puts the ring on the remembered card, but the returning view is built at
+the top, so the page stayed there (or ended wherever the card's focus scroll
+put it). `open()` now keeps `.browse`'s scrollTop with the entry and
+`returnFocusTo` sets it just before the ring lands. A grid's page claim
+(`useClaimFocus`, 450 ms second look) then saw "no input since arrival" and
+pulled the ring back to the first card with a smooth scroll to the top; it now
+leaves a ring that is within where Back just put it. **In a test of scroll
+under parallel load:** Look `Auto` may switch to the light look mid-run
+(cards 38 px tall, the grid short, the page clamped to the top) — set
+`setLook('full')` first, or the flow fails in one engine only.
+
 ### Every press measures every sibling of the focused control
 
 Left to itself the library answers an arrow press by calling

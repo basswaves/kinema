@@ -81,6 +81,8 @@ interface Props {
   onRelinked?: (titleId: number | null) => void;
   /** Another title's page: a film of the same collection. */
   onOpenTitle?: (title: Title) => void;
+  /** A cast member's page, by TMDB's id. */
+  onOpenPerson?: (personId: string, name: string) => void;
 }
 
 /**
@@ -192,6 +194,7 @@ export default function TitleDetailView({
   onFindMatch,
   onRelinked,
   onOpenTitle,
+  onOpenPerson,
 }: Props) {
   /**
    * A title kept without a match (`provider = 'local'`, local_title.rs): its
@@ -1002,36 +1005,6 @@ export default function TitleDetailView({
 
           {error && <div className="detail-error">{error}</div>}
 
-          {/* Not focusable. Nothing here is actionable — this app has no
-              "more from this person" to navigate to — and a row of dead
-              landing spots between the buttons and the episode list would put
-              ten presses in the way of the thing you came for. */}
-          {detail && detail.cast.length > 0 && (
-            <section className="cast">
-              <h2 className="cast-heading">Cast</h2>
-              <div className="cast-track">
-                {detail.cast.map((person) => (
-                  <div className="cast-member" key={`${person.name}-${person.character ?? ''}`}>
-                    <div className="cast-photo">
-                      <Art
-                        local={person.profile_path}
-                        remote={person.profile_url}
-                        lazy
-                        fallback={
-                          <div className="cast-photo-empty">
-                            {person.name.slice(0, 1).toUpperCase()}
-                          </div>
-                        }
-                      />
-                    </div>
-                    <div className="cast-name">{person.name}</div>
-                    {person.character && <div className="cast-role">{person.character}</div>}
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
           {seasons.length > 0 && (
             <>
               <FocusGroup
@@ -1143,6 +1116,59 @@ export default function TitleDetailView({
                     onSelect={(t) => (t.id === title.id ? undefined : onOpenTitle?.(t))}
                   />
                 ))}
+              </FocusGroup>
+            </section>
+          )}
+
+          {/* Each one with TMDB's id opens their page (PersonPage.tsx): what
+              of the library they are in. Under the episodes and the
+              collection, so the cast is never in the way of Play. */}
+          {detail && detail.cast.length > 0 && (
+            <section className="cast">
+              <h2 className="cast-heading">Cast</h2>
+              <FocusGroup
+                kind="row"
+                focusKey={DETAIL_CAST_KEY}
+                focusable={detail.cast.some((p) => p.person_id) && Boolean(onOpenPerson)}
+                className="cast-track"
+              >
+                {detail.cast.map((person) => {
+                  const face = (
+                    <>
+                      <div className="cast-photo">
+                        <Art
+                          local={person.profile_path}
+                          remote={person.profile_url}
+                          lazy
+                          fallback={
+                            <div className="cast-photo-empty">
+                              {person.name.slice(0, 1).toUpperCase()}
+                            </div>
+                          }
+                        />
+                      </div>
+                      <div className="cast-name">{person.name}</div>
+                      {person.character && <div className="cast-role">{person.character}</div>}
+                    </>
+                  );
+                  const key = `${person.name}-${person.character ?? ''}`;
+                  return person.person_id && onOpenPerson ? (
+                    <FocusButton
+                      key={key}
+                      focusKey={`detail-cast:${person.person_id}`}
+                      className="cast-member"
+                      keepInView="nearest"
+                      label={person.character ? `${person.name}, ${person.character}` : person.name}
+                      onSelect={() => onOpenPerson(person.person_id as string, person.name)}
+                    >
+                      {face}
+                    </FocusButton>
+                  ) : (
+                    <div className="cast-member" key={key}>
+                      {face}
+                    </div>
+                  );
+                })}
               </FocusGroup>
             </section>
           )}

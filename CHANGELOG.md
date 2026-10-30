@@ -18,6 +18,11 @@ makes no stability promises.
   copy. All from TMDB's own answer and the file: a title matched elsewhere
   simply has fewer lines. A running show is looked up again once its next
   episode has aired, so new episodes appear.
+- **Actor pages.** The cast on a title's page can be chosen now (mouse,
+  keyboard or remote): their picture, a short biography and every film and
+  show of yours they are in — by TMDB's id for that person, never by name —
+  and on a desktop a link to their IMDb page. TMDB is asked about a person
+  only when their page opens, and again a month later at most.
 - **Smart collections.** Home shows Dolby Vision, Dolby Atmos, DTS:X, HDR10+
   and 4K shelves when the library has titles for them — read from the files
   themselves, never their names, so a shelf never claims what a file lacks. A

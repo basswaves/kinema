@@ -80,6 +80,9 @@ pub struct Studio {
 
 #[derive(Deserialize)]
 pub struct CastInput {
+    /// TMDB's id for the person; absent from other providers.
+    #[serde(default)]
+    pub person_id: Option<String>,
     pub name: String,
     pub character: Option<String>,
     pub profile_url: Option<String>,
@@ -87,6 +90,8 @@ pub struct CastInput {
 
 #[derive(Serialize)]
 pub struct CastMember {
+    /// TMDB's id: their page opens from here. None for a name only.
+    pub person_id: Option<String>,
     pub name: String,
     pub character: Option<String>,
     pub profile_url: Option<String>,
@@ -326,8 +331,8 @@ pub fn save_title(db: tauri::State<Db>, title: TitleInput) -> Result<i64, String
 
         let mut stmt = tx
             .prepare(
-                "INSERT INTO people (title_id, name, character, profile_url, ord)
-                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                "INSERT INTO people (title_id, name, character, profile_url, ord, person_id)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             )
             .map_err(to_string_err)?;
 
@@ -337,7 +342,8 @@ pub fn save_title(db: tauri::State<Db>, title: TitleInput) -> Result<i64, String
                 person.name,
                 person.character,
                 person.profile_url,
-                index as i64
+                index as i64,
+                person.person_id
             ])
             .map_err(to_string_err)?;
         }
@@ -544,7 +550,8 @@ pub fn get_title_detail(
             .prepare(
                 "SELECT p.name, p.character, p.profile_url,
                         (SELECT :art || a.local_path FROM artwork_cache a
-                          WHERE a.url = p.profile_url AND a.local_path <> '')
+                          WHERE a.url = p.profile_url AND a.local_path <> ''),
+                        p.person_id
                    FROM people p
                   WHERE p.title_id = :id
                   ORDER BY p.ord",
@@ -556,6 +563,7 @@ pub fn get_title_detail(
         let rows = stmt
             .query_map(named_params! { ":art": &art, ":id": title_id }, |r| {
                 Ok(CastMember {
+                    person_id: r.get(4)?,
                     name: r.get(0)?,
                     character: r.get(1)?,
                     profile_url: r.get(2)?,

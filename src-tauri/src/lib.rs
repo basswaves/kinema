@@ -41,6 +41,7 @@ mod local_art;
 mod netshare;
 mod nfo;
 mod overlay;
+mod people;
 mod pointer;
 mod omdb;
 mod opened;
@@ -423,6 +424,8 @@ pub fn run() {
             local_title::find_match_for_local,
             metadata::list_titles,
             metadata::get_title_detail,
+            people::get_person,
+            people::save_person,
             metadata::list_unmatched,
             metadata::list_needs_review,
             metadata::count_needs_review,

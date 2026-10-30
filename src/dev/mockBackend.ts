@@ -20,7 +20,7 @@ import { mockIPC, mockWindows } from '@tauri-apps/api/mocks';
 import * as fakeMedia3 from './fakeMedia3';
 import * as fakeMpv from './fakeMpv';
 import type { ContinueItem, EpisodeRef, Progress, SkipMarkers, TitlePrefs } from '../player/api';
-import type { About, Episode, Studio, Title, TitleDetail } from '../ui/api';
+import type { About, CastMember, Episode, Studio, Title, TitleDetail } from '../ui/api';
 
 // The setup this is ultimately for: a 4K HDR TV behind a receiver that takes
 // everything, next to this dev machine's SDR monitor and onboard sound — plus a
@@ -883,7 +883,7 @@ function titleDetail(titleId: number): TitleDetail {
   return {
     title: withWatchState(title),
     episodes,
-    cast: [],
+    cast: castOf(titleId),
     studios: STUDIOS[titleId] ?? [],
     movie_path: movie?.path ?? null,
     movie_file_id: movie?.id ?? null,
@@ -1044,6 +1044,44 @@ if (PEOPLE) {
       markers: null,
     });
   }
+}
+
+/** The billed cast with TMDB's ids, per title: Pat Fixture is in three; Sam has none. */
+const PEOPLE_CAST: Record<number, [string, string, string][]> = PEOPLE
+  ? {
+      [SERIES_ID]: [['501', 'Pat Fixture', 'The host'], ['', 'Sam Example', 'A guest']],
+      [PART_ONE_ID]: [['501', 'Pat Fixture', 'The hero'], ['503', 'Lee Mock', 'The rival']],
+      [PART_TWO_ID]: [['501', 'Pat Fixture', 'The hero']],
+    }
+  : {};
+
+function castOf(titleId: number): CastMember[] {
+  return (PEOPLE_CAST[titleId] ?? []).map(([person_id, name, character]) => ({
+    person_id: person_id || null,
+    name,
+    character,
+    profile_url: null,
+    profile_path: null,
+  }));
+}
+
+/** get_person (people.rs): what the stored cast knows; "TMDB" adds a biography. */
+const fetchedPeople = new Set<string>();
+function personOf(personId: string) {
+  const held = titles.filter((t) => PEOPLE_CAST[t.id]?.some(([id]) => id === personId));
+  if (held.length === 0) return null;
+  const name = PEOPLE_CAST[held[0].id].find(([id]) => id === personId)![1];
+  const fetched = fetchedPeople.has(personId);
+  return {
+    person_id: personId,
+    name,
+    biography: fetched ? `${name} is a fixture actor.` : null,
+    profile_url: null,
+    profile_path: null,
+    imdb_id: fetched ? 'nm0000001' : null,
+    fresh: fetched,
+    title_ids: [...held].sort((a, b) => (b.year ?? 0) - (a.year ?? 0)).map((t) => t.id),
+  };
 }
 
 function aboutOf(titleId: number): About {
@@ -1633,6 +1671,10 @@ const handlers: Record<string, Handler> = {
         : [...titles, ...extraTitles].map(withWatchState)
     ),
   get_title_detail: (a) => titleDetail(num(a, 'titleId')),
+  get_person: (a) => personOf(String(a?.personId)),
+  save_person: (a) => {
+    fetchedPeople.add(String((a?.person as { person_id: string }).person_id));
+  },
   file_facts: (a) => mockFileFacts(num(a, 'fileId')),
   // Smart collections (collections.rs), when kinemaMockTraits is set: two
   // titles with Atmos and 4K, one with Dolby Vision — so Home has the Atmos

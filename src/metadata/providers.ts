@@ -18,6 +18,7 @@ import { fetch } from '@tauri-apps/plugin-http';
 import { getSetting, setSetting } from './api';
 import { noteTmdbRejection } from './builtinKey';
 import type { Candidate } from './score';
+import type { PersonInput } from '../library/person';
 
 export interface TitleMetadata {
   kind: 'movie' | 'series';
@@ -73,6 +74,8 @@ export interface Studio {
 }
 
 export interface CastMember {
+  /** TMDB's id for the person: their page (people.rs). TMDB only. */
+  person_id?: string | null;
   name: string;
   character: string | null;
   profile_url: string | null;
@@ -126,6 +129,7 @@ export function crewNames(crew: TmdbCrewMember[] | undefined, jobs: (job: string
 
 /** One entry from TMDB's `/credits` cast list. */
 interface TmdbCastMember {
+  id?: number;
   name?: string;
   character?: string;
   profile_path?: string | null;
@@ -763,6 +767,7 @@ export async function tmdbGetTitle(
       .filter((c) => c.name?.trim())
       .slice(0, CAST_LIMIT)
       .map((c) => ({
+        person_id: c.id ? String(c.id) : null,
         name: (c.name as string).trim(),
         character: c.character?.trim() || null,
         // A smaller size than posters use: these are drawn at about 5rem, and
@@ -785,6 +790,36 @@ export async function tmdbGetTitle(
       next_air_season: detail.next_episode_to_air?.season_number ?? null,
       next_air_episode: detail.next_episode_to_air?.episode_number ?? null,
     }),
+  };
+}
+
+/**
+ * A person's page: their name, biography, IMDb id and every film and show
+ * they acted in, as `movie:603` / `tv:1399` — one request, made when their
+ * page opens (library/person.ts), never ahead.
+ */
+export async function tmdbGetPerson(key: string, id: string): Promise<PersonInput> {
+  const person = await tmdbGet<{
+    id: number;
+    name?: string;
+    biography?: string;
+    profile_path?: string | null;
+    external_ids?: { imdb_id?: string | null };
+    combined_credits?: { cast?: Array<{ id?: number; media_type?: string }> };
+  }>(key, `/person/${encodeURIComponent(id)}`, {
+    append_to_response: 'external_ids,combined_credits',
+  });
+  const credits = new Set<string>();
+  for (const c of person.combined_credits?.cast ?? []) {
+    if (c.id && (c.media_type === 'movie' || c.media_type === 'tv')) credits.add(`${c.media_type}:${c.id}`);
+  }
+  return {
+    person_id: String(person.id),
+    name: person.name?.trim() ?? '',
+    biography: person.biography?.trim() || null,
+    profile_url: person.profile_path ? `https://image.tmdb.org/t/p/w185${person.profile_path}` : null,
+    imdb_id: person.external_ids?.imdb_id || null,
+    credits: [...credits],
   };
 }
 

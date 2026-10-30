@@ -65,6 +65,8 @@ export interface Episode {
 }
 
 export interface CastMember {
+  /** TMDB's id: the cast member's page opens from it. Null for a name only. */
+  person_id: string | null;
   name: string;
   character: string | null;
   profile_url: string | null;

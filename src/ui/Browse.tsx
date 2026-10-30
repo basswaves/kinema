@@ -87,6 +87,7 @@ import { isTvMode, useTvMode } from './tv';
 import LeaveDialog from './LeaveDialog';
 import CardMenuHost from './CardMenu';
 import CollectionPage from './CollectionPage';
+import PersonPage from './PersonPage';
 import PlaySomething from './PlaySomething';
 import { isPlaySomethingKey, type Pool } from './somethingPick';
 import { registerSelfTestPlay, runSelfTest, selfTestPlan } from '../selftest';
@@ -152,6 +153,8 @@ type View =
   | { name: 'grid'; heading: string; titleIds?: number[]; kind?: 'movie' | 'series' }
   // A smart collection (CollectionPage.tsx): a kept one by id, or a new one.
   | { name: 'collection'; id: string | null; kind?: 'movie' | 'series' }
+  // An actor's page (PersonPage.tsx), from a title's cast: TMDB's id.
+  | { name: 'person'; id: string; personName: string }
   | { name: 'player'; target: PlaybackTarget };
 
 
@@ -1021,12 +1024,24 @@ export default function Browse() {
           />
         )}
 
+        {view.name === 'person' && (
+          <PersonPage
+            key={view.id}
+            personId={view.id}
+            name={view.personName}
+            titles={titles}
+            onSelect={openDetail}
+            onBack={goBack}
+          />
+        )}
+
         {view.name === 'detail' && (
           <TitleDetailView
             key={view.title.id}
             title={view.title}
             onBack={goBack}
             onOpenTitle={openDetail}
+            onOpenPerson={(id, personName) => openView({ name: 'person', id, personName })}
             onFindMatch={() =>
               setStack((s) => replace(s, { name: 'settings', section: 'review' }))
             }

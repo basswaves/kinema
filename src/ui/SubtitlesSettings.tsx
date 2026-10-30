@@ -22,7 +22,7 @@ import { userError } from './errors';
 import { useClaimFocus } from './focus';
 import { getSetting, setSetting } from '../metadata/api';
 import { useCapabilities } from '../capabilities';
-import { FORCED_KEY } from '../player/trackChoice';
+import { DESCRIPTION_KEY, FORCED_KEY, SDH_KEY } from '../player/trackChoice';
 import { screenHere } from '../player/displaySwitch';
 import {
   readSubStyle,
@@ -92,6 +92,59 @@ export function SubtitleStyleRows({ onError }: { onError: (message: string) => v
         onChange={(v) => change({ ...style, box: v === 'on' })}
         note="A dark box behind each line, so white text stays readable on a bright picture. Also for forced subtitles and those from OpenSubtitles."
         hint="Text subtitles only: picture subtitles carry their own background, and subtitles with their own styling keep it."
+      />
+    </>
+  );
+}
+
+/**
+ * Audio description and subtitles for the deaf and hard of hearing: needs of
+ * the person watching, applied to every title as the languages are
+ * (trackChoice.ts). Off by default — the plain track, as before.
+ */
+export function AccessibleTrackRows({ onError }: { onError: (message: string) => void }) {
+  const [description, setDescription] = useState<boolean | null>(null);
+  const [sdh, setSdh] = useState(false);
+
+  useEffect(() => {
+    void (async () => {
+      setSdh((await getSetting(SDH_KEY).catch(() => null)) === 'on');
+      setDescription((await getSetting(DESCRIPTION_KEY).catch(() => null)) === 'on');
+    })();
+  }, []);
+
+  if (description === null) return null;
+  const save = (key: string, on: boolean) =>
+    void setSetting(key, on ? 'on' : 'off').catch((e) => onError(userError(e)));
+  return (
+    <>
+      <ChoiceRow
+        label="Audio description"
+        choices={[
+          { value: 'off', label: 'Off' },
+          { value: 'on', label: 'When the file has it' },
+        ]}
+        value={description ? 'on' : 'off'}
+        onChange={(v) => {
+          setDescription(v === 'on');
+          save(DESCRIPTION_KEY, v === 'on');
+        }}
+        note="A narrator saying what happens on screen, for people who cannot see it. Chosen in the audio language you watch in, where the file has such a track — marked as one, or named Audio Description."
+        hint="Off leaves it out even where a file opens with it. A choice made in the player is kept for that title."
+      />
+      <ChoiceRow
+        label="Subtitles for the deaf and hard of hearing"
+        choices={[
+          { value: 'off', label: 'Plain ones first' },
+          { value: 'on', label: 'These first' },
+        ]}
+        value={sdh ? 'on' : 'off'}
+        onChange={(v) => {
+          setSdh(v === 'on');
+          save(SDH_KEY, v === 'on');
+        }}
+        note="Subtitles that also say who is speaking and what can be heard — [door slams], music. Where a file has both kinds in your language, these are chosen first."
+        hint="Marked SDH or CC by the file or in its name."
       />
     </>
   );

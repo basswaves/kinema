@@ -67,6 +67,12 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   },
   {
     section: 'playback',
+    label: 'High contrast',
+    about: 'accessibility low vision eyesight readable text contrast outline focus',
+    values: ['Off', 'On'],
+  },
+  {
+    section: 'playback',
     label: 'Frame timing',
     about: 'stutter smooth video sync judder',
     values: ['Match the sound', 'Match the screen'],
@@ -152,6 +158,18 @@ export const SETTINGS_INDEX: SettingEntry[] = [
     label: 'Forced subtitles',
     about: 'foreign parts signs alien language',
     values: ['Show them', 'Off'],
+  },
+  {
+    section: 'subtitles',
+    label: 'Audio description',
+    about: 'accessibility blind low vision narrator described visually impaired AD',
+    values: ['Off', 'When the file has it'],
+  },
+  {
+    section: 'subtitles',
+    label: 'Subtitles for the deaf and hard of hearing',
+    about: 'accessibility SDH CC closed captions hearing impaired deaf',
+    values: ['Plain ones first', 'These first'],
   },
   {
     section: 'subtitles',

@@ -9,6 +9,7 @@ import { useFolderRequest } from './library/folders';
 import Shortcuts from './ui/Shortcuts';
 import { setShortcutsOpen, useShortcutsOpen } from './ui/shortcutsState';
 import { loadLook } from './ui/lightLook';
+import { loadContrast } from './ui/contrast';
 import { loadTvMode, setTvMode, useTvMode } from './ui/tv';
 import './App.css';
 
@@ -53,6 +54,11 @@ export default function App() {
   // The light look (lightLook.ts): decided once, a moment after Home appears.
   useEffect(() => {
     void loadLook();
+  }, []);
+
+  // High contrast (contrast.ts), before anything is read on screen.
+  useEffect(() => {
+    void loadContrast();
   }, []);
 
   // Ctrl+Shift+T toggles the layout without a trip to the settings screen.

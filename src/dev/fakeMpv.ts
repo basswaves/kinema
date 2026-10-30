@@ -214,6 +214,8 @@ const TRACKS = [
   { type: 'video', id: 1, codec: 'hevc' },
   { type: 'audio', id: 1, lang: 'eng', codec: 'truehd', channels: 8, 'demux-channels': '7.1', profile: 'Dolby TrueHD + Dolby Atmos' },
   { type: 'audio', id: 2, lang: 'eng', codec: 'ac3', channels: 2, title: 'Commentary with the director' },
+  // Audio description, marked by the file (round 6): left out unless asked for.
+  { type: 'audio', id: 3, lang: 'eng', codec: 'eac3', channels: 6, 'demux-channels': '5.1(side)', title: 'English', 'visual-impaired': true },
   { type: 'sub', id: 1, lang: 'eng', codec: 'hdmv_pgs_subtitle', title: 'English SDH' },
   { type: 'sub', id: 2, lang: 'nor', codec: 'subrip' },
   { type: 'sub', id: 3, lang: 'nor', codec: 'subrip', forced: true },
@@ -258,6 +260,7 @@ function trackField(name: string): unknown {
     case 'external':
     case 'default':
     case 'hearing-impaired':
+    case 'visual-impaired':
       return Boolean(track[match[2]]);
     default:
       return track[match[2]] ?? null;

@@ -713,6 +713,26 @@ test('levelling and the dialogue lift by remote, kept for the title', async ({ p
     .toMatch(/"levelling":"more","dialogue":true/);
 });
 
+test('audio description and SDH subtitles when the person asks for them', async ({ page }) => {
+  await play(page, 'series', async (p) => {
+    await call(p, '/src/metadata/api.ts', 'setSetting', 'audio_description', 'on');
+    await call(p, '/src/metadata/api.ts', 'setSetting', 'lang_subs', 'always:en');
+    await call(p, '/src/metadata/api.ts', 'setSetting', 'subtitles_sdh', 'on');
+  });
+  // The fixture's third audio track is flagged audio description.
+  await expect.poll(() => sets(page)).toContain('aid=3');
+  const panel = await openTrackPanel(page);
+  await expect(panel.locator('.track-option.active', { hasText: 'Audio description' })).toBeVisible();
+  await expect(panel.locator('.track-option.active', { hasText: 'SDH' })).toBeVisible();
+});
+
+test('no audio description unless asked', async ({ page }) => {
+  await play(page, 'series');
+  const panel = await openTrackPanel(page);
+  await expect(panel.locator('.track-option', { hasText: 'Audio description' })).toBeVisible();
+  expect(await sets(page)).not.toContain('aid=3');
+});
+
 test('no levelling on a track that goes to the receiver untouched, and the panel says why', async ({
   page,
 }) => {

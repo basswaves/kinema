@@ -41,6 +41,7 @@ import BackupSection from './BackupSection';
 import VideoPlayerSection from './VideoPlayerSection';
 import AccountSection, { AccountAppFields } from './AccountSection';
 import {
+  AccessibleTrackRows,
   ForcedSubtitleRows,
   OpenSubtitlesSection,
   SubtitleStyleRows,
@@ -58,6 +59,7 @@ import { lastPart } from '../library/videos';
 import { useFocusGroup } from './focusGroups';
 import { setTvMode, useTvMode } from './tv';
 import { setLook, useLook, type LookSetting } from './lightLook';
+import { highContrast, setContrast } from './contrast';
 import {
   addLibraryRoot,
   mergeLibraryRoots,
@@ -394,6 +396,7 @@ export default function Settings({
     window.setTimeout(() => void setFocus('osk:a'), 50);
   }, [tvMode]);
   const look = useLook();
+  const [contrast, setContrastState] = useState(highContrast);
   const can = useCapabilities();
   /** Windows, ffmpeg missing, or an install under way: the one-press install. */
   const offerFfmpegInstall = Boolean(
@@ -1028,6 +1031,19 @@ export default function Settings({
                         : `Auto chose ${look.reason}.`
                   }
                 />
+                <ChoiceRow
+                  label="High contrast"
+                  choices={[
+                    { value: 'off', label: 'Off' },
+                    { value: 'on', label: 'On' },
+                  ]}
+                  value={contrast ? 'on' : 'off'}
+                  onChange={(v) => {
+                    setContrastState(v === 'on');
+                    setContrast(v === 'on');
+                  }}
+                  note="For eyes that need it: every quiet line of text at full strength, the player's panels on solid black instead of see-through, and a thicker outline round what is highlighted."
+                />
                 {/* The one rendering switch in the app, and it exists only
                     because the right answer depends on hardware this code
                     cannot see. Everything else the app decides for itself. */}
@@ -1428,6 +1444,7 @@ export default function Settings({
                   <LanguageSection onError={setError} />
                   <SubtitleStyleRows onError={setError} />
                   <ForcedSubtitleRows onError={setError} />
+                  <AccessibleTrackRows onError={setError} />
                 </section>
                 <OpenSubtitlesSection />
               </>

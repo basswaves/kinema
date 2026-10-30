@@ -21,7 +21,7 @@ function focused(page: Page): Promise<string | undefined> {
 }
 
 async function moveTo(page: Page, key: 'ArrowDown' | 'ArrowUp' | 'ArrowRight', text: string) {
-  for (let i = 0; i < 14 && !(await focused(page))?.startsWith(text); i++) await press(page, key);
+  for (let i = 0; i < 25 && !(await focused(page))?.startsWith(text); i++) await press(page, key);
   expect(await focused(page)).toMatch(new RegExp(`^${text.replace(/[()\\+?.]/g, '\\$&')}`));
 }
 

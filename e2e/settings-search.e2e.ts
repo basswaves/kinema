@@ -182,3 +182,29 @@ test('a click on a match lands on it as OK does', async ({ page }) => {
     })
     .toBe(true);
 });
+
+test('high contrast by remote: found, switched on, kept', async ({ page }) => {
+  await openSettings(page);
+  await toSearchBox(page);
+  await page.keyboard.type('contrast');
+  await press(page, 'Enter');
+  await press(page, 'Enter');
+  await expect.poll(() => focused(page)).toBe('✓Off');
+  await press(page, 'ArrowRight');
+  await expect.poll(() => focused(page)).toBe('On');
+  await press(page, 'Enter');
+  await expect(page.locator('html')).toHaveAttribute('data-contrast', 'high');
+  await expect
+    .poll(() =>
+      page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--focus-ring').trim())
+    )
+    .toBe('5px');
+  await expect
+    .poll(() =>
+      page.evaluate(async (m) => {
+        const api = await import(/* @vite-ignore */ m);
+        return api.getSetting('high_contrast') as Promise<string | null>;
+      }, '/src/metadata/api.ts')
+    )
+    .toBe('on');
+});

@@ -102,3 +102,45 @@ describe('chooseTracks', () => {
     expect(chooseTracks(untagged, null, off).sid).toBeNull();
   });
 });
+
+describe('audio description and SDH, as the person needs them', () => {
+  /** English with an audio description (flag and title), and plain and SDH subtitles. */
+  const described = [
+    t(1, 'audio', 'eng', { selected: true }),
+    t(2, 'audio', 'eng', { title: 'English AD' }),
+    t(3, 'audio', 'nor'),
+    t(4, 'audio', 'nor', { visualImpaired: true }),
+    t(5, 'sub', 'eng'),
+    t(6, 'sub', 'eng', { hearingImpaired: true }),
+  ];
+  const english = { audio: 'original', subs: 'always:en', forced: true };
+
+  it('leaves the description and SDH alone when not asked', () => {
+    expect(chooseTracks(described, null, english)).toEqual({ aid: null, sid: 5, subVisible: true });
+  });
+
+  it('chooses the description in the file’s own language, and SDH, when asked', () => {
+    expect(chooseTracks(described, null, { ...english, description: true, sdh: true })).toEqual({
+      aid: 2,
+      sid: 6,
+      subVisible: true,
+    });
+  });
+
+  it('in a chosen language, and in a title’s own choice', () => {
+    const want = { ...english, audio: 'no', description: true };
+    expect(chooseTracks(described, null, want).aid).toBe(4);
+    const prefs = { chosen: true, audio_lang: 'nor', sub_lang: 'eng', sub_enabled: true };
+    expect(chooseTracks(described, prefs as never, want).aid).toBe(4);
+  });
+
+  it('moves off a description the file opens with when it is not wanted', () => {
+    const opensDescribed = described.map((x) => ({ ...x, selected: x.id === 2 }));
+    expect(chooseTracks(opensDescribed, null, english).aid).toBe(1);
+  });
+
+  it('keeps the file’s track when there is no description to choose', () => {
+    const plain = described.filter((x) => x.id !== 2 && x.id !== 4);
+    expect(chooseTracks(plain, null, { ...english, description: true }).aid).toBeNull();
+  });
+});

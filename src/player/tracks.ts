@@ -188,12 +188,13 @@ export function describeTrack(track: Track): string {
   const language = languageName(trackLanguage(track));
   const parts: (string | null)[] = [language];
   if (track.type === 'audio') {
-    parts.push(channelLayout(track.channels), audioFormat(track));
-  } else {
     parts.push(
-      track.forced ? 'Forced' : null,
-      track.hearingImpaired || /\bsdh\b|\bcc\b/i.test(track.title ?? '') ? 'SDH' : null
+      isAudioDescription(track) ? 'Audio description' : null,
+      channelLayout(track.channels),
+      audioFormat(track)
     );
+  } else {
+    parts.push(track.forced ? 'Forced' : null, isHearingImpaired(track) ? 'SDH' : null);
   }
   const fileName = track.external ? externalName(track) : null;
   // mpv titles a separate file by its name, or by the part of it after the
@@ -265,13 +266,30 @@ export function describeTracks(tracks: Track[]): Map<number, string> {
 export function findTrackByLang(
   tracks: Track[],
   type: 'audio' | 'sub',
-  lang: string | null
+  lang: string | null,
+  prefer?: (track: Track) => boolean
 ): Track | null {
   if (!lang) return null;
   const candidates = tracks.filter((t) => t.type === type && sameLanguage(trackLanguage(t), lang));
   if (candidates.length === 0) return null;
-  return candidates.find((t) => !t.forced) ?? candidates[0];
+  const full = candidates.filter((t) => !t.forced);
+  return (prefer && full.find(prefer)) || full[0] || candidates[0];
 }
+
+/**
+ * Audio description — a narrator saying what is on screen, for people who
+ * cannot see it. The file's own flag (Matroska's "visual impaired"), or a
+ * title that says so: "Audio Description", "Descriptive", "English AD".
+ */
+export const isAudioDescription = (track: Track) =>
+  track.type === 'audio' &&
+  (!!track.visualImpaired ||
+    /\baudio[ -]?descri|\bdescriptive\b|\bdescribed\b/i.test(track.title ?? '') ||
+    /\bAD\b/.test(track.title ?? ''));
+
+/** Subtitles for the deaf and hard of hearing: the flag, or SDH / CC in the title. */
+export const isHearingImpaired = (track: Track) =>
+  !!track.hearingImpaired || /\bsdh\b|\bcc\b/i.test(track.title ?? '');
 
 /** Drawn pictures (Blu-ray PGS, DVD): mpv can scale them, nothing more. */
 export const isPictureSubtitle = (track: Track) =>

@@ -16,6 +16,19 @@ makes no stability promises.
   in the player's Audio & subtitles panel, and shown in the details panel
   (`I`). Only on sound Kinema decodes: a track sent to the receiver untouched
   is never changed, and the panel says so.
+- **Accessibility settings.** Audio description (Settings → Language &
+  subtitles): where a file has a described track in the language you watch
+  in — marked by the file or named so — it is chosen; off, it is left out
+  even where a file opens with it. Subtitles for the deaf and hard of
+  hearing first, where a file has both kinds. **High contrast** (Settings →
+  Playback): quiet text at full strength, the player's panels on solid black,
+  a thicker outline round what is highlighted. Audio tracks now say "Audio
+  description" in the player's panel.
+
+### Changed
+
+- A few small grey labels (counts, notes in the player's panels and the
+  details panel) are a little brighter, to meet the WCAG contrast minimum.
 
 ## [0.14.0] — 2026-10-25
 

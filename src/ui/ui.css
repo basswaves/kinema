@@ -198,7 +198,7 @@ html {
 .nav-count {
   margin-left: 0.75rem;
   font-size: 0.75rem;
-  opacity: 0.4;
+  opacity: 0.6;
 }
 
 /* Something waits in Settings: the review queue. */
@@ -948,7 +948,7 @@ html {
 
 .continue-remaining {
   font-size: 0.6875rem;
-  opacity: 0.42;
+  opacity: 0.6;
 }
 
 /*
@@ -3209,7 +3209,7 @@ html {
 .track-note {
   margin: 0.625rem 0 0;
   font-size: 0.65625rem;
-  opacity: 0.45;
+  opacity: 0.6;
 }
 
 /* ---- up next ------------------------------------------------------------- */
@@ -3321,7 +3321,7 @@ html {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  opacity: 0.45;
+  opacity: 0.6;
 }
 
 .stats-row {
@@ -3347,7 +3347,7 @@ html {
   display: block;
   font-style: normal;
   font-size: 11px;
-  opacity: 0.4;
+  opacity: 0.6;
 }
 
 /* Something in this row is costing quality. Amber rather than red: none of it
@@ -4273,4 +4273,49 @@ kbd {
   margin-right: 0.5rem;
   opacity: 0.7;
   font-variant-numeric: tabular-nums;
+}
+
+/*
+ * High contrast (contrast.ts; a need, not a look). Every quiet line of text
+ * at full strength, the player's panels solid, a thicker ring. Nothing moves
+ * or changes size, so the navigation map is the same either way. States that
+ * are dimmed on purpose (a missing episode, a watched still) stay dimmed:
+ * they say something by being dim.
+ */
+:root[data-contrast='high'] {
+  --focus-ring: 5px;
+}
+:root[data-contrast='high'][data-tv='on'] {
+  --focus-ring: 6px;
+}
+:root[data-contrast='high'] :is(
+    .nav-count, .hero-meta, .rail-count, .card-meta, .continue-meta, .continue-remaining,
+    .media-badges-note, .heavy-file-note, .media-badges-heading, .badge-row-heading,
+    .media-badge-label, .cast-role, .episode-row.watched .episode-name, .episode-overview,
+    .episode-runtime, .muted, .first-run-lede, .first-run-optional, .device-choice-detail,
+    .equipment-format, .volume-control.receiver .volume-value, .volume-pop-hint,
+    .track-panel-head, .track-empty, .track-note, .up-next-label, .stats-empty,
+    .stats-group h3, .stats-label, .stats-note, .stats-row.warn .stats-note,
+    .stats-group.wide-labels .stats-label, .shortcuts-plus, .library-tile-meta,
+    .video-tile-date, .folders-heading, .chapter-time
+  ) {
+  opacity: 1;
+}
+:root[data-contrast='high'] :is(
+    .top-nav button, .crash-screen p, .detail-meta, .season-tabs button, .settings-nav button,
+    .settings-section h3, .what-leaves-state, .what-leaves-list dt,
+    .settings-section .choice-note, .settings-section .choice-hint,
+    .settings-section .settings-hint, .folder-where, .watched-toggle, .episode-add
+  ) {
+  color: #f5f5f7;
+}
+:root[data-contrast='high'] .folder-item.focused .muted {
+  color: #0a0a0c;
+}
+:root[data-contrast='high'] :is(
+    .track-panel, .stats-panel, .up-next, .player-notice
+  ) {
+  background: #000;
+  border-color: #f5f5f7;
+  backdrop-filter: none;
 }

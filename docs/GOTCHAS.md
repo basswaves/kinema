@@ -1825,6 +1825,20 @@ against the source file you just edited.
 
 ---
 
+### Splitting one file's changes over two commits: never `--unidiff-zero`
+
+Without `git add -p` (no interactive tools here), staging some hunks of a
+file by piping `git diff` into `git apply --cached` works — but with `-U0`
+and `--unidiff-zero` the pure insertions land on the wrong side of their
+neighbours: a component's opening line moved below the code that followed it,
+a fallback prop went to another `<Art>`. No error; the commit was simply a
+different file (caught only by `git diff HEAD`). Use `-U3` hunks and plain
+`git apply --cached`, write and read the patch as **bytes** (Python's text
+mode on Windows turns every `
+` into `
+` in the index), and check
+`git diff` afterwards shows only the other feature's lines.
+
 ## Linux, and building it from Windows
 
 ### A Windows path in a test is one file name on Linux

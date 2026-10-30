@@ -8,7 +8,7 @@ import type { NewItem } from '../library/playlists';
 import { useFocusGroup } from '../ui/focusGroups';
 import FocusButton from '../ui/FocusButton';
 import type { Track } from './engine';
-import { describeTracks, secondChoices } from './tracks';
+import { describeTracks, isPictureSubtitle, secondChoices } from './tracks';
 import { languageBadge, languageName } from './language';
 import { describeOffer, type Offer } from './onlineSubtitles';
 import { DELAY_STEP_MS, delayLabel } from './audioDelay';
@@ -136,6 +136,11 @@ export default function TrackPanel({
   const subLines = describeTracks(subTracks);
   const seconds = onSecond ? secondChoices(subTracks, subVisible ? sid : null) : [];
   const secondNow = subTracks.find((t) => t.id === sid2) ?? null;
+  // Picture subtitles are drawn as they were made: no box goes behind them
+  // (round 5, T27: the switch read "On" with nothing drawn, and the general
+  // hint below it was missed).
+  const shown = subVisible ? subTracks.find((t) => t.id === sid) : undefined;
+  const pictureShown = shown !== undefined && isPictureSubtitle(shown);
   // A choice closes the list and gives the ring back to its button, as Add to
   // a playlist does: left open, a stray OK picked again (round 5, D).
   const pickSecond = (track: Track | null) => {
@@ -316,7 +321,9 @@ export default function TrackPanel({
               Dark box behind: {subStyle.box ? 'On' : 'Off'}
             </FocusButton>
             <p className="track-note">
-              For this screen. Picture subtitles (Blu-ray, DVD) only change size.
+              {pictureShown
+                ? 'No box on picture subtitles: they are drawn as made, and only change size.'
+                : 'For this screen. Picture subtitles (Blu-ray, DVD) only change size.'}
             </p>
           </>
         )}

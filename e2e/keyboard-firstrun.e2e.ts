@@ -490,6 +490,9 @@ test('first run: a folder whose files all go unnamed ends on what was found, nev
     localStorage.setItem('kinemaMockEmpty', '1');
     localStorage.setItem('kinemaMockNoMatch', '1');
     localStorage.setItem('kinemaMockReview', 'items');
+    // The count of files to review arrives after Home is up, as in the real
+    // app: the ring still ends on Review them.
+    localStorage.setItem('kinemaMockSlowReview', '6000');
   });
   await firstRunToSetupPage(page, 'windows', 'Picture and sound');
   // Through every page to Finish, by remote.
@@ -505,7 +508,9 @@ test('first run: a folder whose files all go unnamed ends on what was found, nev
   // Not the Welcome page and its setup again (INBOX #10): what was found.
   await expect(page.locator('.nothing-named h1')).toContainText('could not name them');
   await expect(page.locator('.first-run h1', { hasText: 'Welcome' })).toHaveCount(0);
-  await expect.poll(() => focused(page)).toBe('Review them');
+  await expect(page.locator('.nothing-named button', { hasText: 'Review them' })).toHaveCount(0);
+  await expect.poll(() => focused(page)).toBe('Add another folder');
+  await expect.poll(() => focused(page), { timeout: 15_000 }).toBe('Review them');
   await press(page, 'ArrowRight');
   await expect.poll(() => focused(page)).toBe('Add another folder');
 

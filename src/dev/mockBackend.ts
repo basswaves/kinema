@@ -1538,7 +1538,13 @@ const handlers: Record<string, Handler> = {
     return null;
   },
   find_match_for_local: (a) => releaseLocal(num(a, 'titleId')),
-  count_needs_review: () => reviewCount(),
+  // `kinemaMockSlowReview` (ms): the count comes after Home is up, as on a
+  // big library.
+  count_needs_review: () => {
+    const slow = Number(flag('kinemaMockSlowReview') ?? 0) || 0;
+    const n = reviewCount();
+    return slow ? new Promise((resolve) => window.setTimeout(() => resolve(n), slow)) : n;
+  },
   latest_release: () =>
     UPDATE ? { version: UPDATE, url: 'https://github.com/Basswaves/kinema/releases' } : null,
   list_titles_needing_detail: () => [],

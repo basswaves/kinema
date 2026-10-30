@@ -144,6 +144,7 @@ export default function Home(props: Props) {
 }
 
 const NOTHING_NAMED_FOCUS_KEY = 'nothing-named';
+const NOTHING_NAMED_REVIEW_KEY = 'nothing-named:review';
 
 /** A library with folders and no title in it yet. */
 function NothingNamed({
@@ -159,6 +160,10 @@ function NothingNamed({
 }) {
   const { ref, focusKey } = useFocusGroup('panel', { focusKey: NOTHING_NAMED_FOCUS_KEY });
   useClaimFocus(NOTHING_NAMED_FOCUS_KEY, true, true);
+  // The count of files to review comes after Home is up: the ring, already on
+  // Add another folder, moves to Review them when it appears, unless a key was
+  // pressed meanwhile.
+  useClaimFocus(NOTHING_NAMED_REVIEW_KEY, reviewCount > 0, true);
   return (
     <FocusContext.Provider value={focusKey}>
       <section className="first-run first-scan nothing-named" ref={ref}>
@@ -184,7 +189,12 @@ function NothingNamed({
         )}
         <div className="settings-row">
           {reviewCount > 0 && (
-            <FocusButton className="btn-primary" keepInView="nearest" onSelect={onReview}>
+            <FocusButton
+              focusKey={NOTHING_NAMED_REVIEW_KEY}
+              className="btn-primary"
+              keepInView="nearest"
+              onSelect={onReview}
+            >
               Review them
             </FocusButton>
           )}

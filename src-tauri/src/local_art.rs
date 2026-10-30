@@ -2,7 +2,8 @@
 //!
 //! **Pictures beside the files.** Kodi, Jellyfin and tinyMediaManager leave a
 //! film's poster and backdrop beside it — `poster.jpg`, `folder.jpg`,
-//! `fanart.jpg`, `<file name>-poster.jpg` — and a show's in its folder. Where
+//! `fanart.jpg`, `<file name>-poster.jpg`, and Plex's `<file name>.jpg` —
+//! and a show's in its folder. Where
 //! one is there it is used, and TMDB's picture only fills in what is missing
 //! (the owner's choice, 2026-10-24: whoever put a picture there chose it).
 //! Read, never written, like every sidecar.
@@ -163,11 +164,15 @@ fn stem(name: &str) -> &str {
 
 /// The picture for `kind` among a folder's file names (lower case → real path),
 /// best name first: the file's own names, then the folder's where it may.
+/// `bare`: a picture named exactly like the video (`Film (2001).jpg`) is its
+/// poster, as Plex reads it — for a film only: beside an episode the same
+/// name is that episode's still (Kodi, Jellyfin), never the show's poster.
 fn pick(
     listing: &HashMap<String, PathBuf>,
     kind: Kind,
     stems: &[&str],
     folder_names: bool,
+    bare: bool,
 ) -> Option<Found> {
     let (suffixes, names): (&[&str], &[&str]) = match kind {
         Kind::Poster => (&POSTER_SUFFIXES, &POSTER_NAMES),
@@ -178,6 +183,9 @@ fn pick(
         for suffix in suffixes {
             wanted.push(format!("{}{suffix}", s.to_lowercase()));
         }
+    }
+    if bare && matches!(kind, Kind::Poster) {
+        wanted.extend(stems.iter().map(|s| s.to_lowercase()));
     }
     if folder_names {
         wanted.extend(names.iter().map(|n| n.to_string()));
@@ -244,8 +252,8 @@ fn look(
         let name = last_part(&show).to_string();
         let stems = [name.as_str()];
         return Some(Look {
-            poster: pick(&listing, Kind::Poster, &stems, own),
-            backdrop: pick(&listing, Kind::Backdrop, &stems, own),
+            poster: pick(&listing, Kind::Poster, &stems, own, false),
+            backdrop: pick(&listing, Kind::Backdrop, &stems, own, false),
         });
     }
     let mut result = Look { poster: None, backdrop: None };
@@ -257,10 +265,10 @@ fn look(
         let stems: Vec<&str> = files.iter().filter(|f| f.dir == dir).map(|f| stem(&f.name)).collect();
         let own = only_this(dir, false);
         if result.poster.is_none() {
-            result.poster = pick(&listing, Kind::Poster, &stems, own);
+            result.poster = pick(&listing, Kind::Poster, &stems, own, true);
         }
         if result.backdrop.is_none() {
-            result.backdrop = pick(&listing, Kind::Backdrop, &stems, own);
+            result.backdrop = pick(&listing, Kind::Backdrop, &stems, own, true);
         }
     }
     Some(result)
@@ -595,6 +603,36 @@ mod tests {
         let seen = look(false, &files, &own, 7, &mut lister).expect("read");
         assert_eq!(found_name(&seen.poster), Some("film (2001)-poster.jpg"));
         assert!(seen.backdrop.is_none(), "fanart.jpg belongs to no one film here");
+    }
+
+    #[test]
+    fn a_picture_named_like_the_film_is_its_poster_even_in_a_shared_folder() {
+        let files = [file(1, "D:/Films", "Some Film [2011].mkv")];
+        let own = owners(&[("D:/Films", 7), ("D:/Films", 8)]);
+        let mut lister = |_: &str| {
+            Some(listing(&["Some Film [2011].mkv", "Some Film [2011].PNG", "Other [2018].jpg"]))
+        };
+        let seen = look(false, &files, &own, 7, &mut lister).expect("read");
+        assert_eq!(found_name(&seen.poster), Some("some film [2011].png"));
+        assert!(seen.backdrop.is_none(), "a bare name is a poster, not a backdrop");
+    }
+
+    #[test]
+    fn a_name_with_poster_in_it_wins_over_the_bare_name() {
+        let files = [file(1, "/m", "Film.mkv")];
+        let own = owners(&[("/m", 7)]);
+        let mut lister = |_: &str| Some(listing(&["Film.jpg", "Film-poster.jpg", "poster.jpg"]));
+        let seen = look(false, &files, &own, 7, &mut lister).expect("read");
+        assert_eq!(found_name(&seen.poster), Some("film-poster.jpg"));
+    }
+
+    #[test]
+    fn an_episode_s_own_picture_is_never_the_show_s_poster() {
+        let files = [file(1, "/tv/Show/Season 1", "Show S01E01.mkv")];
+        let own = owners(&[("/tv/Show/Season 1", 7)]);
+        let mut lister = |_: &str| Some(listing(&["Show S01E01.jpg"]));
+        let seen = look(true, &files, &own, 7, &mut lister).expect("read");
+        assert!(seen.poster.is_none());
     }
 
     #[test]

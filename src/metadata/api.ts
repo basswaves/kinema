@@ -150,7 +150,7 @@ export const resetMatches = () => invoke<number>('reset_matches');
 export const cacheArtwork = () => invoke<CacheResult>('cache_artwork');
 
 /**
- * Pictures already beside the files (poster.jpg, fanart.jpg, `<file>-poster.jpg`)
+ * Pictures already beside the files (poster.jpg, fanart.jpg, `<file>-poster.jpg`, a film's `<file>.jpg`)
  * win over TMDB's; a title kept without a match and with none gets a frame from
  * its file. Run after a scan, before `cacheArtwork`, which then skips what was found.
  */

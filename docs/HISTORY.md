@@ -3722,6 +3722,11 @@ and a Jellyfin source further out. Decisions made along the way:
   before the artwork downloads. The scan has just read the folders, so a share
   that is asleep is not woken at launch. A folder that cannot be read changes
   nothing: what was found before stays.
+- **`<file name>.jpg` beside a film is its poster** (added 2026-10-30, a
+  tester coming from Plex). After `-poster`/`-cover`, before the folder's own
+  names, and in a shared folder too, since it carries the file's name. Films
+  only: beside an episode the same name is that episode's still in Kodi and
+  Jellyfin, never the show's poster.
 - **Not read yet:** season pictures (season01-poster.jpg), since no screen shows
   a season's picture, and episode thumbnails (`-thumb.jpg`).
 - **The frame for a title kept without a match** reuses the Videos

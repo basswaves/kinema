@@ -77,6 +77,8 @@ import {
   setSetting,
   unlinkFiles,
 } from './metadata/api';
+import { tmdbGetTitle } from './metadata/providers';
+import { saveTitle } from './metadata/api';
 import {
   backfillTitleDetails,
   loadProviderKeys,
@@ -161,6 +163,17 @@ export function registerSelfTestPlay(open: OpenPlayer | null) {
   openPlanFile = open;
 }
 
+/**
+ * One title fetched from TMDB again and saved, by the path the six-month
+ * refresh takes (`refreshStaleTitles`): what a chosen poster must outlive.
+ */
+async function refetchTitle(titleId: number): Promise<number> {
+  const keys = await loadProviderKeys();
+  const at = await invoke<{ kind: string; tmdb_id: string | null }>('poster_options', { titleId });
+  if (!keys.tmdb || !at.tmdb_id) throw new Error('no TMDB key, or not a TMDB title');
+  return saveTitle(await tmdbGetTitle(keys.tmdb, at.tmdb_id, at.kind === 'series' ? 'series' : 'movie'));
+}
+
 const CALLABLE: Record<string, (...args: never[]) => Promise<unknown>> = {
   // A library built from nothing: a folder added as Settings adds it, and a
   // whole scan — so a plan on an empty copy checks the library side end to end:
@@ -220,6 +233,7 @@ const CALLABLE: Record<string, (...args: never[]) => Promise<unknown>> = {
   refreshStaleTitles,
   // The details pass: titles missing something TMDB has, fetched once more.
   backfillTitleDetails,
+  refetchTitle,
   // What SIMKL and Trakt look like from here — which, under a self-test, must
   // be "not available": a self-test never talks to either.
   simklStatus,

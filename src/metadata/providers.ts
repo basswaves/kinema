@@ -823,6 +823,36 @@ export async function tmdbGetPerson(key: string, id: string): Promise<PersonInpu
   };
 }
 
+/** One of TMDB's posters for a title, as a choice (library/posters.ts). */
+export interface TmdbPoster {
+  url: string;
+  /** ISO 639-1 of the lettering on it, or null for none. */
+  language: string | null;
+}
+
+/** How many of TMDB's posters the choice offers: the best-rated ones. */
+const POSTER_CHOICES = 24;
+
+/**
+ * TMDB's posters for one title with English lettering or none, best rated
+ * first. Asked for when the poster list is opened (T20), never ahead.
+ */
+export async function tmdbPosters(
+  key: string,
+  id: string,
+  kind: 'movie' | 'series'
+): Promise<TmdbPoster[]> {
+  const data = await tmdbGet<{ posters?: TmdbImage[] }>(
+    key,
+    `/${kind === 'movie' ? 'movie' : 'tv'}/${encodeURIComponent(id)}/images`,
+    { include_image_language: 'en,null' }
+  );
+  return [...(data.posters ?? [])]
+    .sort((a, b) => (b.vote_average ?? 0) - (a.vote_average ?? 0))
+    .slice(0, POSTER_CHOICES)
+    .map((p) => ({ url: `${TMDB_IMAGE}${p.file_path}`, language: p.iso_639_1 || null }));
+}
+
 interface TmdbSeason {
   episodes?: Array<{
     season_number: number;

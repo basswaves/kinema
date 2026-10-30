@@ -16,7 +16,7 @@
  * and `playback.rs` ever disagree on an edge case, Rust is right and this is
  * only as good as the check it is being used for.
  */
-import { mockIPC, mockWindows } from '@tauri-apps/api/mocks';
+import { mockConvertFileSrc, mockIPC, mockWindows } from '@tauri-apps/api/mocks';
 import * as fakeMedia3 from './fakeMedia3';
 import * as fakeMpv from './fakeMpv';
 import type { ContinueItem, EpisodeRef, Progress, SkipMarkers, TitlePrefs } from '../player/api';
@@ -1084,6 +1084,30 @@ function personOf(personId: string) {
   };
 }
 
+/**
+ * Posters (posters.rs) for Example Part Two: TMDB's as fetched and a picture
+ * beside its file; a choice is kept by title and put back after a refresh.
+ */
+const FETCHED_POSTER = 'https://image.tmdb.org/t/p/original/first.jpg';
+const LOCAL_POSTER = 'C:\\fixture\\Example Part Two (2014)\\poster.jpg';
+const posterChoice = new Map<number, string>();
+function posterOptions(titleId: number) {
+  const title = titleById(titleId);
+  return {
+    kind: title?.kind ?? 'movie',
+    tmdb_id: title?.provider === 'tmdb' ? String(titleId) : null,
+    poster_url: posterChoice.get(titleId) || (titleId === PART_TWO_ID ? FETCHED_POSTER : null),
+    local_path: titleId === PART_TWO_ID ? LOCAL_POSTER : null,
+    chosen: posterChoice.get(titleId) ?? null,
+  };
+}
+/** What the title shows, as TITLE_SELECT has it: 'local' for the picture beside the file. */
+function posterOf(titleId: number): string | null {
+  const o = posterOptions(titleId);
+  if (o.chosen) return o.chosen;
+  return o.local_path ? 'local' : o.poster_url;
+}
+
 function aboutOf(titleId: number): About {
   const about = ABOUT[titleId];
   if (!about) return ABOUT_NONE;
@@ -1672,6 +1696,10 @@ const handlers: Record<string, Handler> = {
     ),
   get_title_detail: (a) => titleDetail(num(a, 'titleId')),
   get_person: (a) => personOf(String(a?.personId)),
+  poster_options: (a) => posterOptions(num(a, 'titleId')),
+  choose_poster: (a) => {
+    posterChoice.set(num(a, 'titleId'), String(a.url));
+  },
   save_person: (a) => {
     fetchedPeople.add(String((a?.person as { person_id: string }).person_id));
   },
@@ -2320,6 +2348,8 @@ export function installMockBackend(): void {
       return handler((payload ?? {}) as Args);
     },
   );
+  // A picture beside a file (posters.rs) has a path, as on a real disk.
+  mockConvertFileSrc('windows');
   fakeMpv.exposeFakeMpv();
   fakeMedia3.init((path) => files.find((f) => f.path === path)?.duration ?? 1500);
   fakeMedia3.exposeFakeMedia3();
@@ -2338,6 +2368,7 @@ export function installMockBackend(): void {
     dropFiles: (paths: string[]) =>
       emitEvent('tauri://drag-drop', { paths, position: { x: 10, y: 10 } }),
     playerOffer: () => ({ offered: playerOffered, defaultAppsOpened }),
+    posterOf,
   };
   document.title = 'Kinema (mock backend)';
 }

@@ -23,6 +23,10 @@ makes no stability promises.
   show of yours they are in — by TMDB's id for that person, never by name —
   and on a desktop a link to their IMDb page. TMDB is asked about a person
   only when their page opens, and again a month later at most.
+- **Choose a title's poster.** **Poster** on a title's page lists TMDB's
+  posters for it and the picture beside its file; the one you pick is shown
+  everywhere and kept when the title's details are fetched again, the
+  six-month refresh included. Nothing is written beside your files.
 - **Smart collections.** Home shows Dolby Vision, Dolby Atmos, DTS:X, HDR10+
   and 4K shelves when the library has titles for them — read from the files
   themselves, never their names, so a shelf never claims what a file lacks. A

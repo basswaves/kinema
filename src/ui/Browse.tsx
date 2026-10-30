@@ -1042,6 +1042,7 @@ export default function Browse() {
             onBack={goBack}
             onOpenTitle={openDetail}
             onOpenPerson={(id, personName) => openView({ name: 'person', id, personName })}
+            onPosterChosen={() => void load()}
             onFindMatch={() =>
               setStack((s) => replace(s, { name: 'settings', section: 'review' }))
             }

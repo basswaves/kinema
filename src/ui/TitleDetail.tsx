@@ -26,6 +26,7 @@ import FocusGroup from './FocusGroup';
 import MediaBadges, { BadgeRows } from './MediaBadges';
 import HeavyFileNotice from './HeavyFileNotice';
 import VersionDialog from './VersionDialog';
+import PosterDialog from './PosterDialog';
 import WrongTitle from '../library/WrongTitle';
 import { useChosenVersion, useTitleVersions } from './useVersions';
 import { chooseVersion, pickVersion, readVersions, type Version } from '../library/versions';
@@ -83,6 +84,8 @@ interface Props {
   onOpenTitle?: (title: Title) => void;
   /** A cast member's page, by TMDB's id. */
   onOpenPerson?: (personId: string, name: string) => void;
+  /** A poster was chosen: the library's cards show it too. */
+  onPosterChosen?: () => void;
 }
 
 /**
@@ -195,6 +198,7 @@ export default function TitleDetailView({
   onRelinked,
   onOpenTitle,
   onOpenPerson,
+  onPosterChosen,
 }: Props) {
   /**
    * A title kept without a match (`provider = 'local'`, local_title.rs): its
@@ -308,6 +312,16 @@ export default function TitleDetailView({
   const [versionsOpen, setVersionsOpen] = useState(false);
   /** The "Wrong title?" search is up (WrongTitle.tsx). */
   const [wrongOpen, setWrongOpen] = useState(false);
+  /** The poster list is up (PosterDialog.tsx, T20). */
+  const [postersOpen, setPostersOpen] = useState(false);
+  const posterChosen = useCallback(async () => {
+    try {
+      setDetail(await getTitleDetail(title.id));
+    } catch (e) {
+      setError(userError(e));
+    }
+    onPosterChosen?.();
+  }, [title.id, onPosterChosen]);
   const { setChoice } = versionsHere;
   const pickedVersion = useCallback(
     (v: Version) => {
@@ -922,6 +936,19 @@ export default function TitleDetailView({
                   </FocusButton>
                 )}
 
+                {/* Which picture the title shows everywhere: TMDB's or the one
+                    beside its files (T20). A person's choice of content. */}
+                {!isLocal && (
+                  <FocusButton
+                    className="btn-secondary"
+                    keepInView="page-top"
+                    label="Poster: choose the picture this title shows"
+                    onSelect={() => setPostersOpen(true)}
+                  >
+                    Poster
+                  </FocusButton>
+                )}
+
                 {/* Matched by Kinema or by hand, and wrong: fixed here, with the
                     same search as Needs attention (T19). Last in the row: the
                     rarest thing anyone comes to a title's page for. */}
@@ -947,6 +974,14 @@ export default function TitleDetailView({
                   isSeries={title.kind === 'series'}
                   onClose={() => setWrongOpen(false)}
                   onDone={onRelinked}
+                />
+              )}
+              {postersOpen && (
+                <PosterDialog
+                  titleId={title.id}
+                  name={name}
+                  onChosen={() => void posterChosen()}
+                  onClose={() => setPostersOpen(false)}
                 />
               )}
               {versionsOpen && chosen && (

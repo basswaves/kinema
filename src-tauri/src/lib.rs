@@ -42,6 +42,7 @@ mod netshare;
 mod nfo;
 mod overlay;
 mod people;
+mod posters;
 mod pointer;
 mod omdb;
 mod opened;
@@ -426,6 +427,8 @@ pub fn run() {
             metadata::get_title_detail,
             people::get_person,
             people::save_person,
+            posters::poster_options,
+            posters::choose_poster,
             metadata::list_unmatched,
             metadata::list_needs_review,
             metadata::count_needs_review,

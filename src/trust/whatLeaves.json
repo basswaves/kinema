@@ -6,8 +6,8 @@
       "id": "tmdb",
       "name": "TMDB (The Movie Database)",
       "hosts": ["api.themoviedb.org", "api.tmdb.org", "image.tmdb.org"],
-      "sends": "The title and year read from a file or folder name (or an IMDb number written in one, or in an NFO beside the file), the TMDB number of a close candidate when asking for its other names, then the TMDB number of each match, and of an actor whose page you open, with Kinema's key or yours. Pictures are asked for by their address.",
-      "when": "When a scan finds a film or show that has not been matched yet, when a title's details are over six months old (TMDB's terms) or a running show's next episode has aired, when you open an actor's page (once a month at most), and when a poster or backdrop is first shown.",
+      "sends": "The title and year read from a file or folder name (or an IMDb number written in one, or in an NFO beside the file), the TMDB number of a close candidate when asking for its other names, then the TMDB number of each match, and of an actor whose page you open or a title whose posters you list, with Kinema's key or yours. Pictures are asked for by their address.",
+      "when": "When a scan finds a film or show that has not been matched yet, when a title's details are over six months old (TMDB's terms) or a running show's next episode has aired, when you open an actor's page (once a month at most) or a title's poster list, and when a poster or backdrop is first shown.",
       "stop": "No switch: TMDB is how Kinema knows what your films and shows are. A folder you remove is no longer looked up."
     },
     {

@@ -349,6 +349,9 @@ pub fn save_title(db: tauri::State<Db>, title: TitleInput) -> Result<i64, String
         }
     }
 
+    // A poster chosen for the title outlives every fetch (posters.rs).
+    crate::posters::apply(&tx, title_id).map_err(to_string_err)?;
+
     if let Some(studios) = &title.studios {
         tx.execute("DELETE FROM studios WHERE title_id = ?1", params![title_id])
             .map_err(to_string_err)?;
@@ -420,14 +423,18 @@ pub fn reset_matches(db: tauri::State<Db>) -> Result<usize, String> {
 /// `:art` is the absolute prefix for cached artwork. Prepending it here rather
 /// than storing absolute paths keeps the database portable — the cache lives
 /// beside it in app data, and both move together.
-const TITLE_SELECT: &str = "
+pub(crate) const TITLE_SELECT: &str = "
     SELECT t.id, t.kind, t.provider, t.title, t.year, t.overview, t.genres,
            t.runtime_mins, t.poster_url, t.backdrop_url, t.rating,
            (SELECT COUNT(*) FROM media_files m WHERE m.title_id = t.id),
            (SELECT MIN(m.first_seen_at) FROM media_files m WHERE m.title_id = t.id),
-           -- A picture beside the files wins over TMDB's (local_art.rs).
+           -- A picture beside the files wins over TMDB's (local_art.rs),
+           -- unless one of TMDB's was chosen for the title (posters.rs).
            COALESCE((SELECT :art || l.local_path FROM local_art l
-                      WHERE l.title_id = t.id AND l.kind = 'poster'),
+                      WHERE l.title_id = t.id AND l.kind = 'poster'
+                        AND NOT EXISTS (SELECT 1 FROM poster_choice c
+                             WHERE c.kind = t.kind AND c.provider = t.provider
+                               AND c.provider_id = t.provider_id AND c.url <> '')),
                     (SELECT :art || a.local_path FROM artwork_cache a
                       WHERE a.url = t.poster_url   AND a.local_path <> '')),
            COALESCE((SELECT :art || l.local_path FROM local_art l

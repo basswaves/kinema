@@ -390,10 +390,10 @@ const BACK_BAR_REM = 1.75;
 let topBar: { tv: string | undefined; px: number; rem: number } | null = null;
 let topBarWatched = false;
 
-function topBarPx(): number {
+function topBarPx(withBack = false): number {
   const root = document.documentElement;
   const tv = root.dataset.tv;
-  const back = document.querySelector('.detail > .back-button') ? BACK_BAR_REM : 0;
+  const back = withBack && document.querySelector('.detail > .back-button') ? BACK_BAR_REM : 0;
   if (topBar && topBar.tv === tv) return topBar.px + back * topBar.rem;
   if (!topBarWatched) {
     topBarWatched = true;
@@ -468,7 +468,9 @@ export function keepOnScreen(node: HTMLElement | null, inline: 'center' | 'neare
   if (!page) return;
   const box = node.getBoundingClientRect();
   const view = page.getBoundingClientRect();
-  const bar = topBarPx();
+  // A title page's sticky Back is under the bar too; reading on (below) keeps
+  // to the bar alone, or a short window could not scroll its last rows in.
+  const bar = topBarPx(true);
   // Measured from the content's top, so a scroll already under way does not
   // change the answer.
   const scroll = page.scrollTop;

@@ -63,6 +63,8 @@ test('Back from a title lands on the same card, scroll and all', async ({ page }
   });
   await expect(page.locator('.search .card').first()).toBeVisible();
   await press(page, 'ArrowDown', 6);
+  // The last press may still be scrolling smoothly: read once it has settled.
+  await page.waitForTimeout(800);
   const before = await focused(page);
   const scrollBefore = await page.evaluate(() => document.querySelector('.browse')?.scrollTop ?? 0);
   expect(scrollBefore).toBeGreaterThan(100);

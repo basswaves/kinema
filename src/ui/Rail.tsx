@@ -27,9 +27,11 @@ interface Props {
   onSeeAll?: (heading: string, titles: Title[]) => void;
   /** My list's rail: a card taken off the list leaves it (Card.tsx). */
   listRail?: boolean;
+  /** A kept collection's: its page is always one press away, short or not. */
+  openLabel?: string;
 }
 
-export default memo(function Rail({ heading, titles, onSelect, onSeeAll, listRail }: Props) {
+export default memo(function Rail({ heading, titles, onSelect, onSeeAll, listRail, openLabel }: Props) {
   // Not a place to move to while empty — see ContinueRail.tsx.
   const { ref, focusKey } = useFocusable({
     trackChildren: true,
@@ -49,7 +51,7 @@ export default memo(function Rail({ heading, titles, onSelect, onSeeAll, listRai
   }
 
   const shown = titles.slice(0, RAIL_LIMIT);
-  const hasMore = Boolean(onSeeAll) && titles.length > shown.length;
+  const hasMore = Boolean(onSeeAll) && (titles.length > shown.length || Boolean(openLabel));
 
   return (
     <FocusContext.Provider value={focusKey}>
@@ -63,7 +65,7 @@ export default memo(function Rail({ heading, titles, onSelect, onSeeAll, listRai
               type="button"
               tabIndex={-1}
               className="rail-heading-link"
-              title={`See all ${titles.length}`}
+              title={openLabel ?? `See all ${titles.length}`}
               onClick={() => onSeeAll?.(heading, titles)}
             >
               {heading}
@@ -71,7 +73,7 @@ export default memo(function Rail({ heading, titles, onSelect, onSeeAll, listRai
           ) : (
             heading
           )}
-          {hasMore && <span className="rail-count">{titles.length}</span>}
+          {hasMore && titles.length > shown.length && <span className="rail-count">{titles.length}</span>}
         </h2>
         <RailTrack>
           {shown.map((title) => (
@@ -95,7 +97,7 @@ export default memo(function Rail({ heading, titles, onSelect, onSeeAll, listRai
               onSelect={() => onSeeAll?.(heading, titles)}
             >
               <span className="see-all-arrow">→</span>
-              <span className="see-all-label">See all {titles.length}</span>
+              <span className="see-all-label">{openLabel ?? `See all ${titles.length}`}</span>
             </FocusButton>
           )}
         </RailTrack>

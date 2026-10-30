@@ -23,7 +23,8 @@
       "Example Film #2": { "U": "Example Saga #2", "D": "·", "L": "·", "R": "·" }
     },
     "movies": {
-      "Play something": { "U": "Movies", "D": "Recently added ↓", "L": "·", "R": "·" },
+      "Play something": { "U": "Movies", "D": "Recently added ↓", "L": "·", "R": "New collection" },
+      "New collection": { "U": "Movies", "D": "Recently added ↓", "L": "Play something", "R": "·" },
       "Recently added ↓": { "U": "Play something", "D": "Extra Film 60", "L": "·", "R": "A–Z" },
       "A–Z": { "U": "Play something", "D": "Extra Film 60", "L": "Recently added ↓", "R": "Year" },
       "Year": { "U": "Play something", "D": "Extra Film 60", "L": "A–Z", "R": "Rating" },
@@ -50,7 +51,8 @@
       "Example Film": { "U": "Extra Film 7", "D": "·", "L": "Extra Film 1", "R": "·" }
     },
     "tv": {
-      "Play something": { "U": "TV shows", "D": "Recently added ↓", "L": "·", "R": "·" },
+      "Play something": { "U": "TV shows", "D": "Recently added ↓", "L": "·", "R": "New collection" },
+      "New collection": { "U": "TV shows", "D": "Recently added ↓", "L": "Play something", "R": "·" },
       "Recently added ↓": { "U": "Play something", "D": "Example Show", "L": "·", "R": "A–Z" },
       "A–Z": { "U": "Play something", "D": "Example Show", "L": "Recently added ↓", "R": "Year" },
       "Year": { "U": "Play something", "D": "Example Show", "L": "A–Z", "R": "Rating" },
@@ -499,7 +501,8 @@
       "Example Film #2": { "U": "Example Saga #2", "D": "·", "L": "·", "R": "·" }
     },
     "movies": {
-      "Play something": { "U": "Movies", "D": "Recently added ↓", "L": "·", "R": "·" },
+      "Play something": { "U": "Movies", "D": "Recently added ↓", "L": "·", "R": "New collection" },
+      "New collection": { "U": "Movies", "D": "Recently added ↓", "L": "Play something", "R": "·" },
       "Recently added ↓": { "U": "Play something", "D": "Extra Film 60", "L": "·", "R": "A–Z" },
       "A–Z": { "U": "Play something", "D": "Extra Film 60", "L": "Recently added ↓", "R": "Year" },
       "Year": { "U": "Play something", "D": "Extra Film 60", "L": "A–Z", "R": "Rating" },
@@ -526,7 +529,8 @@
       "Example Film": { "U": "Extra Film 7", "D": "·", "L": "Extra Film 1", "R": "·" }
     },
     "tv": {
-      "Play something": { "U": "TV shows", "D": "Recently added ↓", "L": "·", "R": "·" },
+      "Play something": { "U": "TV shows", "D": "Recently added ↓", "L": "·", "R": "New collection" },
+      "New collection": { "U": "TV shows", "D": "Recently added ↓", "L": "Play something", "R": "·" },
       "Recently added ↓": { "U": "Play something", "D": "Example Show", "L": "·", "R": "A–Z" },
       "A–Z": { "U": "Play something", "D": "Example Show", "L": "Recently added ↓", "R": "Year" },
       "Year": { "U": "Play something", "D": "Example Show", "L": "A–Z", "R": "Rating" },
@@ -956,7 +960,8 @@
       "Example Film #2": { "U": "Example Saga #2", "D": "·", "L": "·", "R": "·" }
     },
     "movies": {
-      "Play something": { "U": "Movies", "D": "Recently added ↓", "L": "·", "R": "·" },
+      "Play something": { "U": "Movies", "D": "Recently added ↓", "L": "·", "R": "New collection" },
+      "New collection": { "U": "Movies", "D": "Recently added ↓", "L": "Play something", "R": "·" },
       "Recently added ↓": { "U": "Play something", "D": "Extra Film 60", "L": "·", "R": "A–Z" },
       "A–Z": { "U": "Play something", "D": "Extra Film 60", "L": "Recently added ↓", "R": "Year" },
       "Year": { "U": "Play something", "D": "Extra Film 60", "L": "A–Z", "R": "Rating" },
@@ -983,7 +988,8 @@
       "Example Film": { "U": "Extra Film 7", "D": "·", "L": "Extra Film 1", "R": "·" }
     },
     "tv": {
-      "Play something": { "U": "TV shows", "D": "Recently added ↓", "L": "·", "R": "·" },
+      "Play something": { "U": "TV shows", "D": "Recently added ↓", "L": "·", "R": "New collection" },
+      "New collection": { "U": "TV shows", "D": "Recently added ↓", "L": "Play something", "R": "·" },
       "Recently added ↓": { "U": "Play something", "D": "Example Show", "L": "·", "R": "A–Z" },
       "A–Z": { "U": "Play something", "D": "Example Show", "L": "Recently added ↓", "R": "Year" },
       "Year": { "U": "Play something", "D": "Example Show", "L": "A–Z", "R": "Rating" },

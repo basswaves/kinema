@@ -1,6 +1,7 @@
 mod analyse;
 mod applog;
 mod aspect;
+mod collections;
 mod audio_reserve;
 mod capabilities;
 mod artwork;
@@ -496,6 +497,7 @@ pub fn run() {
             omdb::save_omdb_scores,
             probe::file_facts,
             probe::season_facts,
+            collections::title_traits,
             aspect::measure_pictures,
             equipment::get_equipment,
             equipment::check_equipment,

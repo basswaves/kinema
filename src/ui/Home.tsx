@@ -27,6 +27,13 @@ import { pickHero } from './hero';
 import { useScanStatus } from '../library/pipeline';
 import { scanWords } from '../library/scanWords';
 import { useMyList } from '../library/myList';
+import {
+  fits,
+  readyMadeRails,
+  ruleName,
+  useSavedCollections,
+  useTitleTraits,
+} from '../library/collections';
 
 interface Props {
   titles: Title[];
@@ -51,6 +58,8 @@ interface Props {
   onAddFolder?: () => void;
   /** A playlist's tile on its rail (PlaylistsPages.tsx). */
   onOpenPlaylist: (id: number) => void;
+  /** A kept smart collection's page (CollectionPage.tsx). */
+  onOpenCollection: (id: string) => void;
   /** The setup pages are up, in front of everything else here. */
   setupOpen: boolean;
   onSetupClosed: () => void;
@@ -223,6 +232,7 @@ function HomeRows({
   onSeeAll,
   onPlaySomething,
   onOpenPlaylist,
+  onOpenCollection,
   setupOpen,
   reviewCount,
   onReview,
@@ -265,6 +275,21 @@ function HomeRows({
 
   const series = useMemo(() => titles.filter((t) => t.kind === 'series'), [titles]);
   const movies = useMemo(() => titles.filter((t) => t.kind === 'movie'), [titles]);
+
+  // Smart collections (library/collections.ts): the user's own, and the
+  // ready-made ones the library has titles for.
+  const traits = useTitleTraits(titles);
+  const savedCollections = useSavedCollections();
+  const ownRails = useMemo(
+    () =>
+      savedCollections.map((c) => ({
+        id: c.id,
+        name: ruleName(c.rule),
+        titles: titles.filter((t) => fits(t, traits, c.rule)),
+      })),
+    [savedCollections, titles, traits]
+  );
+  const readyRails = useMemo(() => readyMadeRails(titles, traits), [titles, traits]);
 
   const genreRails = useMemo(() => {
     if (titles.length < GENRE_MIN_LIBRARY) return [];
@@ -316,6 +341,16 @@ function HomeRows({
         {/* Hidden while empty, as every rail is (Rail.tsx). */}
         <Rail heading="My list" titles={myList} onSelect={onSelect} onSeeAll={onSeeAll} listRail />
         <PlaylistsRail onOpen={onOpenPlaylist} />
+        {ownRails.map((c) => (
+          <Rail
+            key={c.id}
+            heading={c.name}
+            titles={c.titles}
+            onSelect={onSelect}
+            onSeeAll={() => onOpenCollection(c.id)}
+            openLabel="Open collection"
+          />
+        ))}
 
         <Rail
           heading="Recently added"
@@ -331,6 +366,15 @@ function HomeRows({
             <Rail heading="Movies" titles={movies} onSelect={onSelect} onSeeAll={onSeeAll} />
           </>
         )}
+        {readyRails.map((c) => (
+          <Rail
+            key={c.name}
+            heading={c.name}
+            titles={c.titles}
+            onSelect={onSelect}
+            onSeeAll={onSeeAll}
+          />
+        ))}
         {genreRails.map(([genre, list]) => (
           <Rail
             key={genre}

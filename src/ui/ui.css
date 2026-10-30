@@ -1733,6 +1733,22 @@ html {
   margin-left: 0.75rem;
 }
 
+/* A smart collection's choices (CollectionPage.tsx): one row per kind of
+   choice, wrapping when a library has many genres. */
+.collection-row {
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.collection-hint {
+  margin: -0.5rem 0 1rem;
+}
+
+.collection-page .card-grid,
+.collection-page .search-grid {
+  margin-top: 1rem;
+}
+
 .grid-head .back-button {
   position: static;
   margin: 0;

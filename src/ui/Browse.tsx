@@ -85,6 +85,7 @@ import OnScreenKeyboard from './OnScreenKeyboard';
 import { useTypingFocus } from './typing';
 import { isTvMode, useTvMode } from './tv';
 import LeaveDialog from './LeaveDialog';
+import CollectionPage from './CollectionPage';
 import PlaySomething from './PlaySomething';
 import { isPlaySomethingKey, type Pool } from './somethingPick';
 import { registerSelfTestPlay, runSelfTest, selfTestPlan } from '../selftest';
@@ -148,6 +149,8 @@ type View =
   // rows after a reload rather than a snapshot taken when it was opened.
   // `kind` is a whole shelf from the top bar, read live from the library.
   | { name: 'grid'; heading: string; titleIds?: number[]; kind?: 'movie' | 'series' }
+  // A smart collection (CollectionPage.tsx): a kept one by id, or a new one.
+  | { name: 'collection'; id: string | null; kind?: 'movie' | 'series' }
   | { name: 'player'; target: PlaybackTarget };
 
 
@@ -874,6 +877,7 @@ export default function Browse() {
             }}
             onAddFolder={() => openView({ name: 'settings', section: 'folders' })}
             onOpenPlaylist={(id) => openView({ name: 'playlist', id })}
+            onOpenCollection={(id) => openView({ name: 'collection', id })}
             setupOpen={setupOpen}
             onSetupClosed={closeSetup}
             reviewCount={reviewCount}
@@ -988,6 +992,21 @@ export default function Browse() {
             onSelect={openDetail}
             onBack={goBack}
             onPlaySomething={() => somethingPool && setSomething(somethingPool)}
+            onNewCollection={
+              view.kind ? () => openView({ name: 'collection', id: null, kind: view.kind }) : undefined
+            }
+          />
+        )}
+
+        {view.name === 'collection' && (
+          <CollectionPage
+            key={view.id ?? 'new'}
+            titles={titles}
+            id={view.id}
+            kind={view.kind}
+            onSelect={openDetail}
+            onBack={goBack}
+            onSaved={(id) => setStack((s) => replace(s, { name: 'collection', id }))}
           />
         )}
 
@@ -1148,6 +1167,7 @@ function GridView({
   onSelect,
   onBack,
   onPlaySomething,
+  onNewCollection,
 }: {
   heading: string;
   titles: Title[];
@@ -1155,6 +1175,8 @@ function GridView({
   onSelect: (title: Title) => void;
   onBack: () => void;
   onPlaySomething: () => void;
+  /** A whole shelf's: a smart collection made from it (CollectionPage.tsx). */
+  onNewCollection?: () => void;
 }) {
   const { ref, focusKey } = useFocusable({
     focusKey: GRID_FOCUS_KEY,
@@ -1211,6 +1233,16 @@ function GridView({
               onSelect={onPlaySomething}
             >
               Play something
+            </FocusButton>
+          )}
+          {onNewCollection && titles.length > 0 && (
+            <FocusButton
+              focusKey="grid-new-collection"
+              className="btn-secondary"
+              keepInView="page-top"
+              onSelect={onNewCollection}
+            >
+              New collection
             </FocusButton>
           )}
         </div>

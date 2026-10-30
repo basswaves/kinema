@@ -9,6 +9,13 @@ makes no stability promises.
 
 ### Added
 
+- **Smart collections.** Home shows Dolby Vision, Dolby Atmos, DTS:X, HDR10+
+  and 4K shelves when the library has titles for them — read from the files
+  themselves, never their names, so a shelf never claims what a file lacks. A
+  show counts only when every episode has it. Make your own from Movies or TV
+  shows → **New collection**: picture and sound, films or shows, unwatched,
+  rating, decade, genre; it becomes a shelf on Home that keeps itself up to
+  date.
 - **Mark a whole show watched in one press** (or not watched again), beside
   My list on a show's page. SIMKL and Trakt are told as one batch.
 - **A grid's order can be flipped.** Pressing the order already chosen

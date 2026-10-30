@@ -138,11 +138,15 @@ test('every setting the search knows is found on its section, next to its name',
   const missed: string[] = [];
   for (const { label, find } of entries.filter((e) => !e.label.startsWith('Continue where'))) {
     const box = page.locator('.settings-search-box input');
-    await box.fill(label);
-    await page
-      .locator('.settings-search-result', { has: page.locator('span:first-child', { hasText: label }) })
-      .first()
-      .click();
+    // Again until it holds: the last pick's ring can still be settling, and
+    // the box taking it mid-fill dropped the whole name under load.
+    await expect(async () => {
+      await box.fill(label);
+      await page
+        .locator('.settings-search-result', { has: page.locator('span:first-child', { hasText: label }) })
+        .first()
+        .click({ timeout: 2000 });
+    }).toPass({ timeout: 15_000 });
     // The ring on a control in the same row, field or part as the name.
     const near = await page
       .waitForFunction(

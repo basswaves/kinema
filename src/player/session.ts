@@ -50,6 +50,8 @@ export interface Session {
   timePos: number | null;
   duration: number | null;
   paused: boolean;
+  /** Playback is held for data (buffering.ts); false again when it goes on. */
+  waiting: boolean;
   /** The seek bar is being dragged: pushes would fight the thumb. */
   scrubbing: boolean;
   /**
@@ -79,6 +81,7 @@ export type Event =
   | { type: 'time-pos'; value: number | null }
   | { type: 'duration'; value: number | null }
   | { type: 'pause'; value: boolean }
+  | { type: 'waiting'; value: boolean }
   /** `eof-reached`, from the observer or the poll, or `end-file` with reason `eof`. */
   | { type: 'eof' }
   /** The credits were skipped: the same end as a natural one. */
@@ -111,6 +114,7 @@ export function initialSession(path: string): Session {
     timePos: null,
     duration: null,
     paused: false,
+    waiting: false,
     scrubbing: false,
     ended: false,
     resumedFrom: null,
@@ -214,6 +218,9 @@ export function reduce(state: Session, event: Event): Session {
     case 'duration':
       if (!state.open) return state;
       return { ...state, duration: event.value };
+
+    case 'waiting':
+      return state.waiting === event.value ? state : { ...state, waiting: event.value };
 
     case 'pause':
       return state.paused === event.value ? state : { ...state, paused: event.value };

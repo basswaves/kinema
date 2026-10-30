@@ -32,6 +32,12 @@ export interface FakeMpvState {
   speed: number;
   /** Delay before `file-loaded`, in ms — a NAS is not instant. */
   loadDelayMs: number;
+  /**
+   * Set to a percentage to stand in for a share that ran dry: playback is
+   * held for data (`paused-for-cache`) and refilling, until set back to null
+   * through `__fakeMpvWait`.
+   */
+  cacheBuffering: number | null;
   /** Every command received, newest last, for assertions. */
   commands: Array<{ name: string; args: unknown[] }>;
   volume: number;
@@ -84,6 +90,7 @@ const state: FakeMpvState = {
   position: 0,
   paused: false,
   eof: false,
+  cacheBuffering: null,
   speed: 1,
   loadDelayMs: 300,
   commands: [],
@@ -113,6 +120,7 @@ function startTicking(): void {
   window.clearInterval(ticker);
   ticker = window.setInterval(() => {
     if (state.paused || state.eof || state.path === null || state.duration === null) return;
+    if (state.cacheBuffering !== null) return;
     state.position = Math.min(state.duration, state.position + (TICK_MS / 1000) * state.speed);
     change('time-pos', state.position);
     if (state.position >= state.duration) {
@@ -304,6 +312,10 @@ export function getProperty(name: string): unknown {
       return state.fullscreen;
     case 'eof-reached':
       return state.eof;
+    case 'paused-for-cache':
+      return state.cacheBuffering !== null;
+    case 'cache-buffering-state':
+      return state.cacheBuffering ?? 100;
     case 'sub-visibility':
       return state.subVisible;
     case 'volume':
@@ -352,5 +364,12 @@ export function init(durations: DurationLookup): string {
 /** Handle on the fake, for driving it from DevTools or the browser pane. */
 export function exposeFakeMpv(): FakeMpvState {
   (window as unknown as { __fakeMpv: FakeMpvState }).__fakeMpv = state;
+  // Held for data at `percent`, or going again with null (the property push).
+  (window as unknown as { __fakeMpvWait: (percent: number | null) => void }).__fakeMpvWait = (
+    percent
+  ) => {
+    state.cacheBuffering = percent;
+    change('paused-for-cache', percent !== null);
+  };
   return state;
 }

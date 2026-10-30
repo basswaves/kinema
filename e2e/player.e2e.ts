@@ -899,3 +899,28 @@ test('Back steps out of full screen before it leaves the player', async ({ page 
   await expect(page.locator('.player')).toHaveCount(0);
   await expect.poll(() => focused(page)).toContain('Play');
 });
+
+test('waiting for data is said only when it lasts, and in words for what it waits on', async ({
+  page,
+}) => {
+  await play(page, 'series');
+  const wait = (percent: number | null) =>
+    page.evaluate(
+      (p) => (window as unknown as { __fakeMpvWait: (p: number | null) => void }).__fakeMpvWait(p),
+      percent
+    );
+  const note = page.locator('.player-waiting');
+
+  // A short refill, as after a seek: nothing said.
+  await wait(60);
+  await page.waitForTimeout(800);
+  await wait(null);
+  await page.waitForTimeout(1200);
+  await expect(note).toHaveCount(0);
+
+  // A real wait: said, with how far the refill is, and gone when it plays on.
+  await wait(40);
+  await expect(note).toHaveText('Waiting for the drive to read more of the film — 40 %');
+  await wait(null);
+  await expect(note).toHaveCount(0);
+});

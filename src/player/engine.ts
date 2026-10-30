@@ -120,6 +120,9 @@ const OBSERVED = [
   // means mpv never emits `end-file` at the end of playback. `eof-reached` is
   // the signal that actually fires under that option.
   ['eof-reached', 'flag', 'none'],
+  // Playback held because the cache ran dry: the film is waiting for data
+  // (buffering.ts). Observed, so it needs a full restart to start arriving.
+  ['paused-for-cache', 'flag', 'none'],
   // A key pressed on mpv's own window (mpvKeys.ts). Never changes where mpv
   // has no window of its own.
   [KEY_PROPERTY, 'string', 'none'],
@@ -228,6 +231,8 @@ export type PlaybackEvent =
   /** The last frame is on screen and held there. */
   | { type: 'reached-end' }
   | { type: 'paused'; value: boolean }
+  /** Playback held for data, or going again (mpv's `paused-for-cache`). */
+  | { type: 'waiting'; value: boolean }
   | { type: 'position'; value: number | null }
   | { type: 'duration'; value: number | null }
   /**
@@ -287,6 +292,9 @@ export async function onPlaybackEvent(handle: (event: PlaybackEvent) => void): P
         break;
       case 'duration':
         handle({ type: 'duration', value: data as number | null });
+        break;
+      case 'paused-for-cache':
+        handle({ type: 'waiting', value: data === true });
         break;
       case 'eof-reached':
         if (data === true) handle({ type: 'reached-end' });

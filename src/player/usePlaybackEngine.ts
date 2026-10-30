@@ -373,6 +373,7 @@ export function usePlaybackEngine({
       }
 
       if (event.type === 'paused') dispatch({ type: 'pause', value: event.value });
+      if (event.type === 'waiting') dispatch({ type: 'waiting', value: event.value });
       if (event.type === 'position') dispatch({ type: 'time-pos', value: event.value });
       if (event.type === 'duration') dispatch({ type: 'duration', value: event.value });
       // The real end-of-playback signal while keep-open holds the last frame.

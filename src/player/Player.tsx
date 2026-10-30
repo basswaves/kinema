@@ -63,6 +63,7 @@ import { useAudioDelay } from './useAudioDelay';
 import { useSubDelay } from './useSubDelay';
 import { useSoundLevel } from './useSoundLevel';
 import { useUpNext } from './useUpNext';
+import { useBuffering } from './buffering';
 import { useVolume } from './useVolume';
 import { VOLUME_STEP, wheelVolumeSteps } from './volume';
 import { nameOf, noteFirstFrame, targetFor } from '../library/opened';
@@ -80,6 +81,8 @@ const AUDIO_NOTICE_MS = 12000;
 export default function Player({ target, onExit, onPlayTarget }: Props) {
   const tv = useTvMode();
   const { session, dispatch, sessionRef, fail } = usePlaybackSession(target.path);
+  /** Waiting for data, said once it has lasted (buffering.ts). */
+  const waitNote = useBuffering(session.waiting, session.frameShown, target.path);
   const { timePos, duration, paused, error } = session;
   /**
    * Something the viewer should know that is not an error: the screen being
@@ -471,6 +474,11 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       <div className="player-messages">
         {error && <div className="player-error">{error}</div>}
         {notice && <div className="player-notice">{notice}</div>}
+        {waitNote && (
+          <div className="player-notice player-waiting" role="status">
+            {waitNote}
+          </div>
+        )}
 
         {/* Resuming is automatic, so this is where starting over is offered —
             for as long as the notice shows, OK means "from the beginning". */}

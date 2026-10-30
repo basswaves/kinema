@@ -57,6 +57,11 @@ for (const f of git('ls-files --others --exclude-standard').split('\n').filter(B
   for (const l of text.split('\n')) lines.push([f, l]);
 }
 for (const l of git(`log --format=%B ${mergeBase}..HEAD`).split('\n')) lines.push(['commit message', l]);
+// Who made each commit: a session with the wrong identity put a personal
+// address on public commits once, and only the metadata showed it.
+for (const l of git(`log --format=%an%x20%ae%x20%cn%x20%ce ${mergeBase}..HEAD`).split('\n')) {
+  lines.push(['commit author/committer', l]);
+}
 
 const hits = [];
 for (const [where, text] of lines) {

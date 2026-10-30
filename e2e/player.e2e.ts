@@ -554,6 +554,25 @@ test('the track panel by remote: choose, find online, and Back to its button', a
     )
   ).toBe(true);
 
+  // Another one, read once fetched: it stops far short of this file, and
+  // the panel says so (VENTIC.md, candidates read).
+  const other = panel.locator('.track-offer', { hasText: 'Example.Release.2' });
+  for (let i = 0; i < 12 && !(await other.evaluate((el) => el.classList.contains('focused'))); i++) {
+    await press(page, 'ArrowDown');
+  }
+  await press(page, 'Enter');
+  await expect(panel.locator('.track-note', { hasText: 'Showing: Example.Release.2' })).toContainText(
+    "They end at 15:00 of this file's 25:00: likely made for another cut"
+  );
+  await press(page, 'Escape');
+  await expect(panel).toHaveCount(0);
+  await press(page, 'ArrowDown');
+  for (let i = 0; i < 6 && (await focused(page)) !== 'Audio & subtitles'; i++) {
+    await press(page, 'ArrowRight');
+  }
+  await press(page, 'Enter');
+  await expect(panel).toBeVisible();
+
   // Back closes the panel with the ring on the button that opened it.
   await press(page, 'Escape');
   await expect(panel).toHaveCount(0);

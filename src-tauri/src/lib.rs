@@ -362,6 +362,7 @@ pub fn run() {
             procstats::process_stats,
             procstats::read_rate,
             subtitle_files::subtitle_files,
+            subtitle_files::subtitle_span,
             overlay::overlay_frame,
             overlay::overlay_reset,
             pointer::pointer_script,

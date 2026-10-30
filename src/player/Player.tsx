@@ -138,6 +138,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     wantedSubLang,
     showTracks,
     showFetched,
+    duration,
   });
 
   const { matchScreen, exit, toggleFullscreen, backOut } = useScreen({

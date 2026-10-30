@@ -115,6 +115,56 @@ fn is_language_code(word: &str) -> bool {
     }
 }
 
+/// What a subtitle file covers, read from its own cue times: how many cues,
+/// and when the first starts and the last ends. "Subtitle candidates read
+/// before offering" (VENTIC.md), for the one already fetched: a file that
+/// stops far short of the film, or runs past its end, was made for another
+/// cut, and the panel says so rather than leaving it to be found out.
+#[derive(Serialize, Debug, PartialEq)]
+pub struct SubtitleSpan {
+    pub cues: usize,
+    pub first_secs: f64,
+    pub last_secs: f64,
+}
+
+/// `01:02:03,456` (SRT), `01:02:03.456` and `02:03.456` (WebVTT).
+fn cue_time(text: &str) -> Option<f64> {
+    let stamp = text.split_whitespace().next()?.replace(',', ".");
+    let parts: Vec<&str> = stamp.split(':').collect();
+    if parts.len() < 2 || parts.len() > 3 {
+        return None;
+    }
+    let mut secs = 0.0;
+    for part in &parts {
+        secs = secs * 60.0 + part.parse::<f64>().ok()?;
+    }
+    Some(secs)
+}
+
+/// The span of a text subtitle's cues (SRT, WebVTT), or None when it has none.
+pub fn span_of(text: &str) -> Option<SubtitleSpan> {
+    let mut span: Option<SubtitleSpan> = None;
+    for line in text.lines() {
+        let Some((start, end)) = line.split_once("-->") else { continue };
+        let (Some(start), Some(end)) = (cue_time(start), cue_time(end)) else { continue };
+        let s = span.get_or_insert(SubtitleSpan { cues: 0, first_secs: start, last_secs: end });
+        s.cues += 1;
+        s.first_secs = s.first_secs.min(start);
+        s.last_secs = s.last_secs.max(end);
+    }
+    span
+}
+
+/// The span of the subtitle file at `path`; None when it cannot be read or
+/// holds no cues Kinema can read, which says nothing either way.
+#[tauri::command]
+pub async fn subtitle_span(path: String) -> Result<Option<SubtitleSpan>, String> {
+    crate::jobs::off_main(move || {
+        Ok(std::fs::read(&path).ok().and_then(|bytes| span_of(&String::from_utf8_lossy(&bytes))))
+    })
+    .await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -212,5 +262,15 @@ mod tests {
     fn a_film_named_only_in_marks_claims_nothing() {
         let film = Path::new("/films/A film/---.mkv");
         assert!(beside(film, entries(&["A film.srt"])).is_empty());
+    }
+
+    #[test]
+    fn a_subtitle_s_span_is_read_from_its_cue_times() {
+        let srt = ["1", "00:01:02,500 --> 00:01:04,000", "Hello", "", "2", "01:58:00,000 --> 01:58:03,250", "Bye", ""].join("\n");
+        assert_eq!(span_of(&srt), Some(SubtitleSpan { cues: 2, first_secs: 62.5, last_secs: 7083.25 }));
+        let vtt = ["WEBVTT", "", "00:05.000 --> 00:07.000 line:90%", "Hi"].join("\n");
+        assert_eq!(span_of(&vtt), Some(SubtitleSpan { cues: 1, first_secs: 5.0, last_secs: 7.0 }));
+        assert_eq!(span_of("no cues here"), None);
+        assert_eq!(span_of("1 --> x"), None);
     }
 }

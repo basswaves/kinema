@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeOffer, searchLanguages, subtitleTitle, type Offer } from './onlineSubtitles';
+import { coverageNote, describeOffer, searchLanguages, subtitleTitle, type Offer } from './onlineSubtitles';
 
 describe('searchLanguages', () => {
   it('offers the wanted language, then the spoken one, then English, once each', () => {
@@ -44,6 +44,25 @@ describe('subtitleTitle', () => {
     expect(subtitleTitle(true, 'Short.Name')).toBe('Forced · OpenSubtitles · Short.Name');
     expect(subtitleTitle(false, 'A.Very.Long.Release.Name.2019.1080p.BluRay.x264')).toBe(
       'OpenSubtitles · A.Very.Long.Release.Name.2019.1…'
+    );
+  });
+});
+
+describe('coverageNote', () => {
+  const span = (last: number) => ({ cues: 900, first_secs: 30, last_secs: last });
+  it('says nothing when the subtitles cover the film, or nothing is known', () => {
+    expect(coverageNote(span(6600), 7200)).toBeNull();
+    expect(coverageNote(span(7300), 7200)).toBeNull();
+    expect(coverageNote(null, 7200)).toBeNull();
+    expect(coverageNote(span(100), null)).toBeNull();
+    expect(coverageNote(span(100), 300)).toBeNull();
+  });
+  it('says when they stop far short, or run past the end', () => {
+    expect(coverageNote(span(3600), 7200)).toBe(
+      "They end at 1:00:00 of this file's 2:00:00: likely made for another cut, or one part of it."
+    );
+    expect(coverageNote(span(7500), 7200)).toBe(
+      'They run to 2:05:00, past the end of this file (2:00:00): likely timed for another cut.'
     );
   });
 });

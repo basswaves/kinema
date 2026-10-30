@@ -1902,6 +1902,12 @@ const handlers: Record<string, Handler> = {
     return `C:\\fixture\\subs\\${String(a.offerFileId)}.srt`;
   },
   forced_subtitle: () => null,
+  // What a fetched subtitle covers (subtitle_files.rs): the second of the
+  // fixture's offers stops at a quarter of an hour, made for another cut.
+  subtitle_span: (a) =>
+    String(a.path).endsWith('20.srt')
+      ? { cues: 200, first_secs: 30, last_secs: 900 }
+      : null,
 
   // SIMKL and Trakt (simkl.rs, trakt.rs), with the stand-ins above
   ...Object.fromEntries(

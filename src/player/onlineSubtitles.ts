@@ -10,6 +10,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { canonicalLang, languageName } from './language';
 import { addSubtitle } from './engine';
+import { formatTime } from '../ui/format';
 
 /** Setting key: `'on'` fetches forced subtitles by themselves. Off by default. */
 export const AUTO_FORCED_KEY = 'opensubtitles_forced';
@@ -53,6 +54,35 @@ export const signOutOpenSubtitles = () => invoke<void>('opensubtitles_sign_out')
 /** Search, and fetch the best. Null when nothing was found. */
 export const findSubtitles = (fileId: number, path: string, language: string) =>
   invoke<Found | null>('find_subtitles', { fileId, path, language });
+
+/** How far a subtitle file runs, read from its cue times (subtitle_files.rs). */
+export interface SubtitleSpan {
+  cues: number;
+  first_secs: number;
+  last_secs: number;
+}
+
+/** The span of the file at `path`; null when it cannot be read. */
+export const subtitleSpan = (path: string) =>
+  invoke<SubtitleSpan | null>('subtitle_span', { path }).catch(() => null);
+
+/**
+ * Whether a fetched subtitle covers this file, read before anything is said
+ * about it (VENTIC.md, "candidates read before offering"): one that stops far
+ * short of the film, or runs well past its end, was made for another cut or
+ * one part of it. Null when it fits, or when there is nothing to go by — a
+ * short file, no duration yet, no cues read: then nothing is claimed.
+ */
+export function coverageNote(span: SubtitleSpan | null, duration: number | null): string | null {
+  if (!span || !duration || duration < 600) return null;
+  if (span.last_secs > duration + 120) {
+    return `They run to ${formatTime(span.last_secs)}, past the end of this file (${formatTime(duration)}): likely timed for another cut.`;
+  }
+  if (span.last_secs < duration * 0.7) {
+    return `They end at ${formatTime(span.last_secs)} of this file's ${formatTime(duration)}: likely made for another cut, or one part of it.`;
+  }
+  return null;
+}
 
 /** Fetch one particular subtitle from the list. */
 export const fetchSubtitle = (fileId: number, offerFileId: number, language: string) =>

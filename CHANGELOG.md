@@ -16,6 +16,10 @@ makes no stability promises.
   shows → **New collection**: picture and sound, films or shows, unwatched,
   rating, decade, genre; it becomes a shelf on Home that keeps itself up to
   date.
+- **A menu on cards**: Play or Resume, Mark watched, My list, Add to playlist,
+  Open page and (desktop, films) Show the file in its folder. Right-click a
+  card or press its **⋯**; from the keyboard the Menu key (or Shift+F10); on a
+  remote, hold OK.
 - **Mark a whole show watched in one press** (or not watched again), beside
   My list on a show's page. SIMKL and Trakt are told as one batch.
 - **A grid's order can be flipped.** Pressing the order already chosen

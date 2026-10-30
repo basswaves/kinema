@@ -1121,6 +1121,17 @@ the ring on the next screen's first button before the spatial library saw
 the same keydown, which then pressed that button too. **Do:** FocusInput
 stops the event when its `onEnter` takes it.
 
+### OK held: every repeat must stop at the card, even after it opened the menu
+
+The card menu opens on OK held (Card.tsx). Once the card had decided "menu",
+it let the next repeat through untouched; the menu was drawn by then, the
+spatial library took the repeat as a press on its first item, Play, and the
+film started. The e2e flow, with repeats seconds apart, passed; the real app,
+with repeats 60 ms apart, did not. No error. **Do:** a card swallows every
+Enter while focused, repeats included, and the menu's guard against the same
+held key registers in `useLayoutEffect`, before paint. Test a hold with
+real-rate repeats.
+
 ### A control that turns disabled under the ring strands it there
 
 On the playlist page, ↑ on the first row was disabled, since nothing is above

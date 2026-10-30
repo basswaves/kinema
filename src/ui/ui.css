@@ -3951,6 +3951,48 @@ kbd {
   filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.6));
 }
 
+/* The card menu's way in for a pointer (cardMenuStore.ts): shown on hover. */
+.card-more {
+  position: absolute;
+  top: 0.375rem;
+  right: 0.375rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  font-size: 1.125rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.card:hover .card-more {
+  opacity: 1;
+}
+
+.card-more:hover {
+  background: rgba(0, 0, 0, 0.9);
+}
+
+.card-menu-note {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  z-index: 61;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 0.75rem 1.25rem;
+  border-radius: 0.5rem;
+  background: #14141a;
+  color: #fff;
+  box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.6);
+}
+
 :root[data-look='light'] .card-watched {
   box-shadow: none;
 }

@@ -85,6 +85,7 @@ import OnScreenKeyboard from './OnScreenKeyboard';
 import { useTypingFocus } from './typing';
 import { isTvMode, useTvMode } from './tv';
 import LeaveDialog from './LeaveDialog';
+import CardMenuHost from './CardMenu';
 import CollectionPage from './CollectionPage';
 import PlaySomething from './PlaySomething';
 import { isPlaySomethingKey, type Pool } from './somethingPick';
@@ -1058,6 +1059,13 @@ export default function Browse() {
         )}
 
         {leaving && <LeaveDialog onClose={() => setLeaving(false)} />}
+        {/* The menu on cards (cardMenuStore.ts), over whichever screen the card is on. */}
+        <CardMenuHost
+          onPlay={(title) => void playTitle(title)}
+          onOpen={openDetail}
+          onChanged={() => void load()}
+        />
+
         {something && (
           <PlaySomething
             pool={something}

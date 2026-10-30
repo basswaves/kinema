@@ -16,6 +16,7 @@ import type { Title } from './api';
 import { posterState, sizedPoster } from './poster';
 import { keepOnScreen, recoverFocusSoon } from './focus';
 import { isMyListKey, toggleMyList, useOnMyList } from '../library/myList';
+import { HOLD_MS, NO_RELEASE_MS, isMenuKey, openCardMenu } from './cardMenuStore';
 
 interface Props {
   title: Title;
@@ -77,6 +78,54 @@ export default memo(function Card({ title, onSelect, focusKey: key, note, goesWh
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [focused, title.id, goesWhenUnlisted, listed]);
 
+  // OK chooses on its release, so that OK held can be the card's menu
+  // (cardMenuStore.ts); the Menu key opens it at once. Ahead of the spatial
+  // library (capture phase), which would open the page on the key going down.
+  useEffect(() => {
+    if (!focused) return;
+    let downAt = 0;
+    let fallback = 0;
+    const settle = (menu: boolean) => {
+      window.clearTimeout(fallback);
+      downAt = 0;
+      if (menu) openCardMenu(title, focusKey, true);
+      else onSelect(title);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (isMenuKey(e)) {
+        e.preventDefault();
+        e.stopPropagation();
+        openCardMenu(title, focusKey);
+        return;
+      }
+      if (e.key !== 'Enter' || e.ctrlKey || e.altKey || e.metaKey) return;
+      // Every Enter, repeats included: one let through would reach the menu
+      // this hold just opened, before it is ready to refuse it.
+      e.preventDefault();
+      e.stopPropagation();
+      if (!downAt) {
+        if (e.repeat) return; // the tail of a hold already decided
+        downAt = performance.now();
+        // No release and no repeats: a remote that cannot hold; a press.
+        fallback = window.setTimeout(() => downAt && settle(false), NO_RELEASE_MS);
+      } else if (performance.now() - downAt >= HOLD_MS) {
+        settle(true);
+      }
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' || !downAt) return;
+      e.stopPropagation();
+      settle(performance.now() - downAt >= HOLD_MS);
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    window.addEventListener('keyup', onKeyUp, true);
+    return () => {
+      window.clearTimeout(fallback);
+      window.removeEventListener('keydown', onKeyDown, true);
+      window.removeEventListener('keyup', onKeyUp, true);
+    };
+  }, [focused, title, focusKey, onSelect]);
+
   return (
     <FocusContext.Provider value={focusKey}>
       <div
@@ -86,6 +135,10 @@ export default memo(function Card({ title, onSelect, focusKey: key, note, goesWh
         }}
         className={`card ${focused ? 'focused' : ''}`}
         onClick={() => onSelect(title)}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          openCardMenu(title, focusKey);
+        }}
         role="button"
         tabIndex={0}
       >
@@ -97,6 +150,21 @@ export default memo(function Card({ title, onSelect, focusKey: key, note, goesWh
             fallback={<DrawnPoster title={title.title} year={title.year} />}
           />
           {state.badge && <span className="card-badge">{state.badge}</span>}
+          {/* For a pointer: the menu the remote opens by holding OK. Not a
+              focus stop — a control on a card is unreachable by arrows
+              (docs/GOTCHAS.md); the card itself is the remote's way in. */}
+          <span
+            className="card-more"
+            role="button"
+            aria-label={`More for ${title.title}`}
+            title="More"
+            onClick={(e) => {
+              e.stopPropagation();
+              openCardMenu(title, focusKey);
+            }}
+          >
+            ⋯
+          </span>
           {listed && <span className="card-listed" aria-label="On My list" title="On My list" />}
           {state.watched && (
             <span className="card-watched" aria-label="Watched">

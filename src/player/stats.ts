@@ -43,6 +43,7 @@ import { outputCheck, type OutputFacts } from './outputCheck';
 import { readSwitchPolicies, screenIdOf, switchSettingsFor } from './displaySwitch';
 import { describeDelay } from './audioDelay';
 import { appliedLevel, describeLevel } from './soundLevel';
+import { startRow } from './startTime';
 import { goesDirect, readAudioSettings, targetDevice } from './audioOutput';
 import { getEquipment, type DisplayMode } from './equipment';
 import { capabilitiesNow, screenOwner } from '../capabilities';
@@ -997,6 +998,7 @@ export async function readPlaybackStats(): Promise<StatGroup[]> {
     {
       heading: 'Health',
       rows: [
+        startRow(),
         {
           label: 'Dropped frames',
           value: `${dropped ?? 0} output · ${decoderDropped ?? 0} decoder`,

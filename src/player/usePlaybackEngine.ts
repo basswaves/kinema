@@ -55,6 +55,7 @@ import {
   type Event,
   type Session,
 } from './session';
+import { noteStart } from './startTime';
 
 /**
  * The longest the black cover may stay up waiting for a first frame. A file
@@ -121,6 +122,11 @@ export function usePlaybackEngine({
   /** The sound check below, for the sound watch to run after it reopens the sound. */
   const checkAudio = useRef<(() => void) | null>(null);
 
+  // Play → first picture (startTime.ts): logged once, kept for the details panel.
+  useEffect(() => {
+    noteStart(session.firstFrameMs, session.frameShown, target.path);
+  }, [session.firstFrameMs, session.frameShown, target.path]);
+
   // ---- load, resume, and apply remembered tracks --------------------------
   useEffect(() => {
     let cancelled = false;
@@ -135,7 +141,7 @@ export function usePlaybackEngine({
      * Runs after the progress-save cleanup — React runs every cleanup before
      * any effect — which has already written the outgoing file's position.
      */
-    dispatch({ type: 'load', path: target.path });
+    dispatch({ type: 'load', path: target.path, at: performance.now() });
     setNotice(null);
     audioFallback.current = 0;
 
@@ -276,7 +282,7 @@ export function usePlaybackEngine({
 
     onPlaybackEvent((event) => {
       if (event.type === 'restarted') {
-        dispatch({ type: 'playback-restart' });
+        dispatch({ type: 'playback-restart', at: performance.now() });
         // mpv's way of failing to open the sound, and its fallbacks. Media3
         // falls back by itself and says so (`audio-fallback`).
         if (hasMpv()) checkAudioSoon();

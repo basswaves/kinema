@@ -10,6 +10,7 @@
  * system (stats.ts).
  */
 import { playerFacts, type PlayerFacts } from './engine';
+import { startRow } from './startTime';
 import { bitrate, describeCadence, num, resolution, resolutionClass, type StatGroup } from './stats';
 
 const DASH = '—';
@@ -187,5 +188,9 @@ export function media3Groups(facts: PlayerFacts): StatGroup[] {
 }
 
 export async function readMedia3Stats(): Promise<StatGroup[]> {
-  return media3Groups(await playerFacts());
+  // Start goes with Decoding: a group of its own would be one more stop for
+  // the remote, and a change to every map of this panel.
+  return media3Groups(await playerFacts()).map((g) =>
+    g.heading === 'Decoding' ? { ...g, rows: [startRow(), ...g.rows] } : g
+  );
 }

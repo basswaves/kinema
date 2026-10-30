@@ -217,3 +217,23 @@ describe('discFailedMessage', () => {
     expect(discFailedMessage({ protection: null, said: [] })).toContain('may be incomplete');
   });
 });
+
+describe('play → first picture', () => {
+  it('is measured from the load to this file’s first frame, once', () => {
+    const s = run(
+      openOn(),
+      { type: 'load', path: B, at: 1000 },
+      { type: 'playback-restart', at: 1100 }, // the outgoing file's: not counted
+      { type: 'file-loaded' },
+      { type: 'playback-restart', at: 1420 },
+      { type: 'playback-restart', at: 9000 } // a later seek
+    );
+    expect(s.firstFrameMs).toBe(420);
+  });
+
+  it('is not invented when the cover came off by timeout', () => {
+    const s = run(initialSession(A), { type: 'load', path: B, at: 0 }, { type: 'cover-timeout' });
+    expect(s.frameShown).toBe(true);
+    expect(s.firstFrameMs).toBeNull();
+  });
+});

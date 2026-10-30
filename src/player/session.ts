@@ -39,6 +39,14 @@ export interface Session {
   open: boolean;
   /** Its first frame is up, so the black cover can come off. */
   frameShown: boolean;
+  /** When the file was asked for (ms, `performance.now()`), where the load said. */
+  startedAt: number | null;
+  /**
+   * Milliseconds from asking for the file to its first picture, as the
+   * engine reported it; null until then, and for good where the cover came
+   * off by timeout — nothing was measured, so nothing is shown.
+   */
+  firstFrameMs: number | null;
   timePos: number | null;
   duration: number | null;
   paused: boolean;
@@ -57,7 +65,7 @@ export interface Session {
 
 export type Event =
   /** A new target: forget everything about the previous file. */
-  | { type: 'load'; path: string }
+  | { type: 'load'; path: string; at?: number }
   | { type: 'file-loaded' }
   /**
    * The open file's own position and length, read on `file-loaded`. `path`
@@ -65,7 +73,7 @@ export type Event =
    * outgoing file.
    */
   | { type: 'opened'; path: string | null; timePos: number | null; duration: number | null; resumedFrom: number | null }
-  | { type: 'playback-restart' }
+  | { type: 'playback-restart'; at?: number }
   /** No first frame in time — a file with no video, or an event that never came. */
   | { type: 'cover-timeout' }
   | { type: 'time-pos'; value: number | null }
@@ -98,6 +106,8 @@ export function initialSession(path: string): Session {
     loaded: false,
     open: false,
     frameShown: false,
+    startedAt: null,
+    firstFrameMs: null,
     timePos: null,
     duration: null,
     paused: false,
@@ -154,7 +164,12 @@ export function reduce(state: Session, event: Event): Session {
   switch (event.type) {
     case 'load':
       // Pause state carries over: it belongs to mpv, not to the file.
-      return { ...initialSession(event.path), seq: state.seq + 1, paused: state.paused };
+      return {
+        ...initialSession(event.path),
+        seq: state.seq + 1,
+        paused: state.paused,
+        startedAt: event.at ?? null,
+      };
 
     case 'file-loaded':
       return state.loaded ? state : { ...state, loaded: true };
@@ -172,7 +187,15 @@ export function reduce(state: Session, event: Event): Session {
     case 'playback-restart':
       // Only after `file-loaded`: a restart belonging to the outgoing file
       // must not uncover the gap before the new one.
-      return state.loaded && !state.frameShown ? { ...state, frameShown: true } : state;
+      if (!state.loaded || state.frameShown) return state;
+      return {
+        ...state,
+        frameShown: true,
+        firstFrameMs:
+          event.at !== undefined && state.startedAt !== null
+            ? Math.max(0, Math.round(event.at - state.startedAt))
+            : null,
+      };
 
     case 'cover-timeout':
       return state.frameShown ? state : { ...state, frameShown: true };

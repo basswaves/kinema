@@ -182,6 +182,10 @@ test('the controls by remote: the ring, the seek bar, Back, and handing the arro
 });
 
 test('a run of quick skips is one seek, and a held key seeks when let go', async ({ page }) => {
+  // The page's timers on a clock this test can stop: real time between taps
+  // includes a round trip to the browser, which on a busy machine passed the
+  // half second that ends a run, and the seek went out after the third tap.
+  await page.clock.install({ time: new Date(DAYS.series) });
   await play(page, 'series');
   const seeks = () =>
     page.evaluate(
@@ -196,17 +200,22 @@ test('a run of quick skips is one seek, and a held key seeks when let go', async
 
   // Six taps, as quick as a person taps — a press and a release each. One
   // seek, after they stop, to where all six lead.
+  // Time stands still while each key goes in, and moves exactly 250 ms
+  // between them, however slow the machine.
   let before = await seeks();
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 100));
   for (let i = 0; i < 6; i++) {
     await page.keyboard.press('ArrowRight');
-    await page.waitForTimeout(250);
+    await page.clock.runFor(250);
   }
   expect(await seeks()).toBe(before);
-  await expect.poll(seeks).toBe(before + 1);
-  await page.waitForTimeout(800);
+  await page.clock.runFor(400);
+  expect(await seeks()).toBe(before + 1);
+  await page.clock.runFor(800);
   expect(await seeks()).toBe(before + 1);
   // 10 s a tap for four, then 30 s: two minutes on, not ten seconds.
   expect((await mpv(page)).position).toBeGreaterThan(195);
+  await page.clock.resume();
 
   // Held, with the key's own repeats: sent a moment after it is let go
   // (sooner than after taps), in case the release was one step of a hold.

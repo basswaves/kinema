@@ -969,3 +969,26 @@ test('Still watching? after three episodes rolled on untouched, answered by remo
   await expect.poll(async () => (await mpv(page)).path).toContain('S01E05');
   await expect(card).toHaveCount(0);
 });
+
+test('a show’s chosen version carries to its next episode', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('kinemaMockEpisodeVersions', '1'));
+  // The 720p copy chosen for the saga (title 3), as its Version list does.
+  const choose = async (p: Page) => {
+    const key = await p.evaluate(async () => {
+      const v = await import(/* @vite-ignore */ '/src/library/versions.ts');
+      const first = (await v.titleVersions(3)).filter(
+        (f: { episode: number | null }) => f.episode === 1
+      );
+      const named = await v.readVersions(first);
+      const small = named.find((n: { height: number }) => n.height === 720);
+      await v.chooseVersion(3, small.path, small.key);
+      return small.key as string;
+    });
+    expect(key).toContain('720p');
+  };
+  await play(page, 'saga', choose);
+
+  // Next episode, by key: the 720p copy of S01E02, not the file listed first.
+  await press(page, 'n');
+  await expect.poll(async () => (await mpv(page)).path).toContain('S01E02.720p');
+});

@@ -155,7 +155,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   });
 
   // ---- the episodes either side, skipping, and Up next ---------------------
-  const neighbours = useNeighbours(target.fileId, target.playlist);
+  const neighbours = useNeighbours(target.fileId, target.playlist, target.titleId);
   const {
     active,
     activeKey,

@@ -7,6 +7,7 @@
 import { useEffect, useState } from 'react';
 import { entryRef, playlistStep, setPlaylistCurrent } from '../library/playlists';
 import { folderNeighbours, nextEpisode, previousEpisode, type EpisodeRef, type PlaybackTarget } from './api';
+import { inChosenVersion } from './episodeVersion';
 
 /** Where previous or next goes: an episode, or a file in the same folder. */
 export interface Step {
@@ -20,7 +21,11 @@ export interface Steps {
   next: Step | null;
 }
 
-export function useNeighbours(fileId: number | null, playlist?: PlaybackTarget['playlist']) {
+export function useNeighbours(
+  fileId: number | null,
+  playlist?: PlaybackTarget['playlist'],
+  titleId: number | null = null
+) {
   /** The episodes either side of this file, or null where there is none. */
   const [neighbours, setNeighbours] = useState<{
     prev: EpisodeRef | null;
@@ -62,7 +67,11 @@ export function useNeighbours(fileId: number | null, playlist?: PlaybackTarget['
     }
 
     if (fileId === null) return;
-    void Promise.all([previousEpisode(fileId), nextEpisode(fileId)])
+    // In the show's chosen version, where an episode is here more than once.
+    void Promise.all([
+      previousEpisode(fileId).then((e) => inChosenVersion(e, titleId)),
+      nextEpisode(fileId).then((e) => inChosenVersion(e, titleId)),
+    ])
       .then(([prev, next]) => {
         if (!cancelled) setNeighbours({ prev, next });
       })
@@ -71,7 +80,7 @@ export function useNeighbours(fileId: number | null, playlist?: PlaybackTarget['
     return () => {
       cancelled = true;
     };
-  }, [fileId, playlistId, playlistItem]);
+  }, [fileId, playlistId, playlistItem, titleId]);
 
   return neighbours;
 }

@@ -12,6 +12,7 @@ import {
   type PlaybackTarget,
 } from './api';
 import { entryRef, playlistStep } from '../library/playlists';
+import { inChosenVersion } from './episodeVersion';
 import type { Session } from './session';
 import type { SkipKind } from './skip';
 import {
@@ -106,7 +107,7 @@ export function useUpNext({
       // the file began.
       const next = playlist
         ? await playlistStep(playlist.id, playlist.item, true).then((e) => e && entryRef(e, playlist.id))
-        : await nextEpisode(target.fileId as number);
+        : await nextEpisode(target.fileId as number).then((e) => inChosenVersion(e, target.titleId));
       if (next && shouldAsk(askOn)) {
         // Three rolled on untouched: ask, and count nothing down.
         setUpNext(next);
@@ -120,7 +121,7 @@ export function useUpNext({
     } catch {
       await exit();
     }
-  }, [target.fileId, target.playlist, exit, sessionRef, askOn]);
+  }, [target.fileId, target.titleId, target.playlist, exit, sessionRef, askOn]);
 
   /**
    * Offer the next episode as soon as the credits start, without ending the

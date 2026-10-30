@@ -430,6 +430,18 @@ function fileBitrate(file: FixtureFile): number {
  * as a library without ffprobe would be.
  */
 function mockFileFacts(fileId: number) {
+  // A saga episode's second copy (kinemaMockEpisodeVersions): a 720p encode.
+  const episodeCopy = sagaCopies().find((c) => c.file_id === fileId);
+  if (episodeCopy) {
+    const original = filmFacts(episodeCopy.of);
+    if (!original?.details?.video) return null;
+    return {
+      ...original,
+      file_name: episodeCopy.path.slice(episodeCopy.path.lastIndexOf('\\') + 1),
+      size_bytes: episodeCopy.size_bytes,
+      details: { ...original.details, video: { ...original.details.video, width: 1280, height: 720 } },
+    };
+  }
   // The film's second copy (kinemaMockVersions): a 1080p SDR encode.
   const copy = versionFiles().find((f) => f.file_id === fileId && f.file_id !== 201);
   if (copy) {
@@ -474,6 +486,45 @@ function versionFiles() {
   ].map((f) => ({ ...f, season: null, episode: null, episode_last: null }));
 }
 let versionChoiceMock: { path: string; key: string } | null = null;
+
+/**
+ * The saga's first two episodes here twice when kinemaMockEpisodeVersions is
+ * set: the 1080p files and a 720p copy of each, for a show's chosen version
+ * carrying to its next episode.
+ */
+function sagaCopies() {
+  if (flag('kinemaMockEpisodeVersions') !== '1') return [];
+  return [301, 302].map((of, i) => {
+    const original = files.find((f) => f.id === of);
+    return {
+      file_id: 351 + i,
+      of,
+      path: (original?.path ?? '').replace(/\.mkv$/, '.720p.mkv'),
+      size_bytes: 700_000_000,
+      season: 1,
+      episode: i + 1,
+      episode_last: null,
+    };
+  });
+}
+
+/** The saga's versions: each original beside its copy. */
+function sagaVersionFiles() {
+  const copies = sagaCopies();
+  if (copies.length === 0) return [];
+  const originals = copies.map((c) => {
+    const f = files.find((x) => x.id === c.of);
+    return {
+      file_id: c.of,
+      path: f?.path ?? '',
+      size_bytes: 2_400_000_000,
+      season: c.season,
+      episode: c.episode,
+      episode_last: null,
+    };
+  });
+  return [...originals, ...copies.map(({ of: _of, ...c }) => c)];
+}
 
 function filmFacts(fileId: number) {
   const file = files.find((f) => f.id === fileId);
@@ -1408,7 +1459,12 @@ const handlers: Record<string, Handler> = {
     return null;
   },
   // Versions (versions.rs): the film twice under kinemaMockVersions.
-  title_versions: (a) => (num(a, 'titleId') === FILM_ID ? versionFiles() : []),
+  title_versions: (a) =>
+    num(a, 'titleId') === FILM_ID
+      ? versionFiles()
+      : num(a, 'titleId') === SAGA_ID
+        ? sagaVersionFiles()
+        : [],
   version_choice: () => versionChoiceMock,
   choose_version: (a) => {
     versionChoiceMock = { path: String(a.path), key: String(a.key) };

@@ -974,8 +974,8 @@ test('a show’s chosen version carries to its next episode', async ({ page }) =
   await page.addInitScript(() => localStorage.setItem('kinemaMockEpisodeVersions', '1'));
   // The 720p copy chosen for the saga (title 3), as its Version list does.
   const choose = async (p: Page) => {
-    const key = await p.evaluate(async () => {
-      const v = await import(/* @vite-ignore */ '/src/library/versions.ts');
+    const key = await p.evaluate(async (m) => {
+      const v = await import(/* @vite-ignore */ m);
       const first = (await v.titleVersions(3)).filter(
         (f: { episode: number | null }) => f.episode === 1
       );
@@ -983,7 +983,7 @@ test('a show’s chosen version carries to its next episode', async ({ page }) =
       const small = named.find((n: { height: number }) => n.height === 720);
       await v.chooseVersion(3, small.path, small.key);
       return small.key as string;
-    });
+    }, '/src/library/versions.ts');
     expect(key).toContain('720p');
   };
   await play(page, 'saga', choose);

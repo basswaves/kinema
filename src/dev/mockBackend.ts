@@ -1520,6 +1520,8 @@ const handlers: Record<string, Handler> = {
       .filter((f) => f.season === num(a, 'season'))
       .map((f) => ({ file_id: f.id, ...mockFileFacts(f.id) })),
   list_unmatched: () => [],
+  // "Wrong title?" → Unlink: the files go to Needs attention (not kept here).
+  unlink_files: (a) => (a.fileIds as number[]).length,
   list_needs_review: () => (flag('kinemaMockReview') === 'items' ? reviewItems() : []),
   add_without_match: (a) =>
     addWithoutMatch(

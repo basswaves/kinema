@@ -280,3 +280,25 @@
 .fixmatch-input.fixmatch-year {
   flex: 0 0 6rem;
 }
+
+/* "Wrong title?" on a title's page (WrongTitle.tsx): the queue's search in a
+   dialog, wide enough for its results. */
+.leave.wrong-title {
+  max-width: 46rem;
+  max-height: 88vh;
+  overflow-y: auto;
+  text-align: left;
+}
+
+.leave.wrong-title h2 {
+  margin-bottom: 0.5rem;
+}
+
+.wrong-title-foot {
+  margin-top: 0.875rem;
+}
+
+.wrong-title-note {
+  margin: 0.5rem 0 0;
+  font-size: 0.8125rem;
+}

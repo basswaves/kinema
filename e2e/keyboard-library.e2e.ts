@@ -196,3 +196,43 @@ for (const [system, sections] of [
     if (system === 'linux') await expect(equipment).not.toContainText('Windows');
   });
 }
+
+test('Wrong title? on the title page: the queue’s search, by remote; Back closes it, Unlink goes to the queue', async ({
+  page,
+}) => {
+  await page.addInitScript(() => localStorage.setItem('kinemaMockVersions', '1'));
+  await open(page, 'windows');
+  for (let i = 0; i < 6 && !(await focused(page))?.startsWith('Example Film'); i++) {
+    await press(page, 'ArrowDown');
+  }
+  await press(page, 'Enter');
+  await expect.poll(() => focused(page)).toBe('▶ Play');
+  // Last in the row under the title.
+  for (let i = 0; i < 8 && (await focused(page)) !== 'Wrong title?'; i++) await press(page, 'ArrowRight');
+  await expect.poll(() => focused(page)).toBe('Wrong title?');
+
+  // Opens on the search box, the title's name in it, and what is linked said.
+  await press(page, 'Enter');
+  const dialog = page.locator('[role="dialog"][aria-label="Wrong title?"]');
+  await expect(dialog).toContainText('2 files are linked to “Example Film” (2017)');
+  await expect(dialog.locator('.fixmatch-input')).toHaveValue('Example Film');
+  await expect.poll(() => page.evaluate(() => document.activeElement?.className ?? '')).toContain('fixmatch-input');
+
+  // Back closes it; the ring is back on the button.
+  await press(page, 'Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect.poll(() => focused(page)).toBe('Wrong title?');
+
+  // Again, down to Unlink: the files wait in Needs attention, which opens.
+  await press(page, 'Enter');
+  await expect(dialog).toHaveCount(1);
+  // Down to the foot row (either of its two, by each engine's measure), then along it.
+  for (let i = 0; i < 4 && !/^(Unlink, decide later|Cancel)$/.test((await focused(page)) ?? ''); i++) {
+    await press(page, 'ArrowDown');
+  }
+  for (let i = 0; i < 2 && (await focused(page)) !== 'Unlink, decide later'; i++) await press(page, 'ArrowLeft');
+  await expect.poll(() => focused(page)).toBe('Unlink, decide later');
+  await press(page, 'Enter');
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator('.settings-section h2').first()).toHaveText('Folders');
+});

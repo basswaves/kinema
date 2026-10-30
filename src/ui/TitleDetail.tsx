@@ -26,6 +26,7 @@ import FocusGroup from './FocusGroup';
 import MediaBadges, { BadgeRows } from './MediaBadges';
 import HeavyFileNotice from './HeavyFileNotice';
 import VersionDialog from './VersionDialog';
+import WrongTitle from '../library/WrongTitle';
 import { useChosenVersion, useTitleVersions } from './useVersions';
 import { chooseVersion, pickVersion, readVersions, type Version } from '../library/versions';
 import { PlaylistDialog } from './PlaylistPicker';
@@ -73,6 +74,8 @@ interface Props {
    * it was on no longer exists. Opens the review queue in its place.
    */
   onFindMatch?: () => void;
+  /** "Wrong title?" linked the files to another title (its id) or unlinked them (null). */
+  onRelinked?: (titleId: number | null) => void;
 }
 
 /**
@@ -165,7 +168,13 @@ function progressPercent(episode: Episode): number | null {
   return pct >= 1 ? Math.min(pct, 100) : null;
 }
 
-export default function TitleDetailView({ title, onPlayFile, onBack, onFindMatch }: Props) {
+export default function TitleDetailView({
+  title,
+  onPlayFile,
+  onBack,
+  onFindMatch,
+  onRelinked,
+}: Props) {
   /**
    * A title kept without a match (`provider = 'local'`, local_title.rs): its
    * name and year are the person's, so they can change them here, and send it
@@ -276,6 +285,8 @@ export default function TitleDetailView({ title, onPlayFile, onBack, onFindMatch
     versionsHere.screen
   );
   const [versionsOpen, setVersionsOpen] = useState(false);
+  /** The "Wrong title?" search is up (WrongTitle.tsx). */
+  const [wrongOpen, setWrongOpen] = useState(false);
   const { setChoice } = versionsHere;
   const pickedVersion = useCallback(
     (v: Version) => {
@@ -811,11 +822,34 @@ export default function TitleDetailView({ title, onPlayFile, onBack, onFindMatch
                       : `+ Playlist (${seasonWords})`}
                   </FocusButton>
                 )}
+
+                {/* Matched by Kinema or by hand, and wrong: fixed here, with the
+                    same search as Needs attention (T19). Last in the row: the
+                    rarest thing anyone comes to a title's page for. */}
+                {!isLocal && onRelinked && (
+                  <FocusButton
+                    className="btn-secondary"
+                    keepInView="page-top"
+                    onSelect={() => setWrongOpen(true)}
+                  >
+                    Wrong title?
+                  </FocusButton>
+                )}
                   </>
                 )}
               </FocusGroup>
               {renameError && <div className="detail-error">{renameError}</div>}
               {playlistNote && <div className="detail-note">{playlistNote}</div>}
+              {wrongOpen && onRelinked && (
+                <WrongTitle
+                  titleId={title.id}
+                  name={name}
+                  year={year ?? null}
+                  isSeries={title.kind === 'series'}
+                  onClose={() => setWrongOpen(false)}
+                  onDone={onRelinked}
+                />
+              )}
               {versionsOpen && chosen && (
                 <VersionDialog
                   what={primary?.what ? `${name}${primary.what}` : name}

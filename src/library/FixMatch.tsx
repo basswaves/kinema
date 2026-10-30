@@ -17,7 +17,7 @@ import { count } from '../ui/format';
 import { describeFailure } from '../metadata/reach';
 import { userError, withoutQueries } from '../ui/errors';
 import { setFocus, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import FocusButton from '../ui/FocusButton';
 import FocusInput from '../ui/FocusInput';
 import { keepOnScreen } from '../ui/focus';
@@ -338,21 +338,7 @@ function GroupRow({
   /** Keep the group as a title of its own, under this name, year and kind. */
   onKeep: (name: string, year: number | null, isSeries: boolean) => void;
 }) {
-  // An untitled group is named after its file; searched as it is, "F1 [2025]"
-  // sent its brackets and year to the provider as words (T13).
-  const [query, setQuery] = useState(group.untitled ? searchableName(group.title) : group.title);
   const [isSeries, setIsSeries] = useState(group.isSeries);
-  const [results, setResults] = useState<Candidate[] | null>(null);
-  /**
-   * The provider and kind that produced `results`. A provider id is only
-   * meaningful for the endpoint it came from, so linking must use these rather
-   * than the live controls: toggling "TV series" after a search and then
-   * linking would otherwise look up a TV id against the movie endpoint and
-   * store whatever came back.
-   */
-  const [used, setUsed] = useState<{ provider: Provider; isSeries: boolean } | null>(null);
-  const [searching, setSearching] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
   // Named from the file to start with (the parsed title, or the file name when
   // there was none) — editable, since a file name is rarely what anyone calls
   // a home video.
@@ -381,26 +367,6 @@ function GroupRow({
     ? 'Kinema could not read a title from this file or the folders around it. Search for what it is below.'
     : adviceFor(reason);
 
-
-
-  const search = useCallback(async () => {
-    setSearching(true);
-    setSearchError(null);
-    try {
-      const keys = await loadProviderKeys();
-      const provider = providerForKind(isSeries, keys);
-      // The year is deliberately not passed. The parsed year is often the very
-      // thing that made the automatic match fail, so filtering by it here would
-      // hide the entry being searched for.
-      const found = await searchProvider(provider, keys, query.trim(), null, isSeries);
-      setResults(found);
-      setUsed({ provider, isSeries });
-    } catch (e) {
-      setSearchError(await describeFailure(e));
-    } finally {
-      setSearching(false);
-    }
-  }, [query, isSeries]);
 
   // The summary is the row's own control: it expands the group. Focusable in
   // its own right rather than as a button, because it carries the title and the
@@ -459,81 +425,19 @@ function GroupRow({
             {group.files.length > 8 && <li className="muted">…and {group.files.length - 8} more</li>}
           </ul>
 
-          <div className="fixmatch-search">
-            <FocusInput
-              className="fixmatch-input"
-              value={query}
-              onChange={setQuery}
-              onEnter={() => void search()}
-              placeholder="Search for the right title…"
-            />
-            {/* A button showing its state rather than a checkbox: a checkbox is
-                a poor target for a remote, and this screen has to work from
-                one. */}
-            <FocusButton keepInView="nearest" onSelect={() => setIsSeries((v) => !v)}>
-              {isSeries ? 'TV series' : 'Movie'}
-            </FocusButton>
-            <FocusButton
-              className="primary"
-              keepInView="nearest"
-              disabled={searching || !query.trim()}
-              onSelect={() => void search()}
-            >
-              {searching ? 'Searching…' : 'Search'}
-            </FocusButton>
-            <FocusButton keepInView="nearest" disabled={busy} onSelect={onIgnore}>
-              Ignore these
-            </FocusButton>
-          </div>
-
-          {searchError && <div className="fixmatch-error">{searchError}</div>}
-
-          {results && results.length === 0 && (
-            <p className="muted">No results. Try a shorter or differently spelled query.</p>
-          )}
-
-          {results && results.length > 0 && used && (
-            <>
-              {/* Which provider answered is load-bearing, not decoration: the
-                  same query against TMDB and TVmaze returns different entries,
-                  and it explains a missing backdrop or a thin plot. */}
-              <div className="fixmatch-source">
-                <span className="provider-pill on">{used.provider}</span>
-                <span>
-                  {results.length} result{results.length === 1 ? '' : 's'}, searched as a{' '}
-                  {used.isSeries ? 'TV series' : 'movie'}
-                </span>
-              </div>
-              <div className="fixmatch-results">
-                {results.map((candidate) => (
-                  <div key={candidate.providerId} className="fixmatch-candidate">
-                    {candidate.posterUrl ? (
-                      <img src={candidate.posterUrl} alt="" loading="lazy" />
-                    ) : (
-                      <div className="poster-placeholder">no poster</div>
-                    )}
-                    <div className="fixmatch-candidate-text">
-                      <div className="fixmatch-candidate-name">
-                        {candidate.title}
-                        {candidate.year ? ` (${candidate.year})` : ''}
-                      </div>
-                      {candidate.overview && (
-                        <p className="fixmatch-candidate-overview">{candidate.overview}</p>
-                      )}
-                    </div>
-                    <FocusButton
-                      className="primary"
-                      keepInView="nearest"
-                      disabled={busy}
-                      onSelect={() => onLink(used.provider, candidate, used.isSeries)}
-                    >
-                      Link {group.files.length} file{group.files.length === 1 ? '' : 's'}
-                    </FocusButton>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
+          <MatchSearch
+            initialQuery={group.untitled ? searchableName(group.title) : group.title}
+            isSeries={isSeries}
+            onToggleSeries={() => setIsSeries((v) => !v)}
+            busy={busy}
+            linkLabel={`Link ${group.files.length} file${group.files.length === 1 ? '' : 's'}`}
+            onLink={onLink}
+            extra={
+              <FocusButton keepInView="nearest" disabled={busy} onSelect={onIgnore}>
+                Ignore these
+              </FocusButton>
+            }
+          />
 
           {/* For what no database will ever list — a home video, a fan edit.
               Nothing is looked up or guessed: the name is the person's, so the
@@ -568,5 +472,146 @@ function GroupRow({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * The search half of fixing a match: a name, Movie or TV series, Search, and
+ * what the provider answered, each with its own Link. Shared by Needs
+ * attention and the title page's "Wrong title?" (WrongTitle.tsx), so both
+ * follow the same rule: nothing is linked but the entry a person picks.
+ */
+export function MatchSearch({
+  initialQuery,
+  isSeries,
+  onToggleSeries,
+  busy,
+  linkLabel,
+  onLink,
+  extra,
+  inputFocusKey,
+}: {
+  initialQuery: string;
+  isSeries: boolean;
+  onToggleSeries: () => void;
+  busy: boolean;
+  linkLabel: string;
+  onLink: (provider: Provider, candidate: Candidate, isSeries: boolean) => void;
+  /** More controls at the end of the search row (Ignore these). */
+  extra?: ReactNode;
+  /** The search box's, for a dialog that opens on it. */
+  inputFocusKey?: string;
+}) {
+  // An untitled group is named after its file; searched as it is, "F1 [2025]"
+  // sent its brackets and year to the provider as words (T13).
+  const [query, setQuery] = useState(initialQuery);
+  const [results, setResults] = useState<Candidate[] | null>(null);
+  /**
+   * The provider and kind that produced `results`. A provider id is only
+   * meaningful for the endpoint it came from, so linking must use these rather
+   * than the live controls: toggling "TV series" after a search and then
+   * linking would otherwise look up a TV id against the movie endpoint and
+   * store whatever came back.
+   */
+  const [used, setUsed] = useState<{ provider: Provider; isSeries: boolean } | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+
+  const search = useCallback(async () => {
+    setSearching(true);
+    setSearchError(null);
+    try {
+      const keys = await loadProviderKeys();
+      const provider = providerForKind(isSeries, keys);
+      // The year is deliberately not passed. The parsed year is often the very
+      // thing that made the automatic match fail, so filtering by it here would
+      // hide the entry being searched for.
+      const found = await searchProvider(provider, keys, query.trim(), null, isSeries);
+      setResults(found);
+      setUsed({ provider, isSeries });
+    } catch (e) {
+      setSearchError(await describeFailure(e));
+    } finally {
+      setSearching(false);
+    }
+  }, [query, isSeries]);
+
+  return (
+    <>
+      <div className="fixmatch-search">
+        <FocusInput
+          focusKey={inputFocusKey}
+          className="fixmatch-input"
+          value={query}
+          onChange={setQuery}
+          onEnter={() => void search()}
+          placeholder="Search for the right title…"
+        />
+        {/* A button showing its state rather than a checkbox: a checkbox is
+            a poor target for a remote, and this screen has to work from
+            one. */}
+        <FocusButton keepInView="nearest" onSelect={onToggleSeries}>
+          {isSeries ? 'TV series' : 'Movie'}
+        </FocusButton>
+        <FocusButton
+          className="primary"
+          keepInView="nearest"
+          disabled={searching || !query.trim()}
+          onSelect={() => void search()}
+        >
+          {searching ? 'Searching…' : 'Search'}
+        </FocusButton>
+        {extra}
+      </div>
+
+      {searchError && <div className="fixmatch-error">{searchError}</div>}
+
+      {results && results.length === 0 && (
+        <p className="muted">No results. Try a shorter or differently spelled query.</p>
+      )}
+
+      {results && results.length > 0 && used && (
+        <>
+          {/* Which provider answered is load-bearing, not decoration: the
+              same query against TMDB and TVmaze returns different entries,
+              and it explains a missing backdrop or a thin plot. */}
+          <div className="fixmatch-source">
+            <span className="provider-pill on">{used.provider}</span>
+            <span>
+              {results.length} result{results.length === 1 ? '' : 's'}, searched as a{' '}
+              {used.isSeries ? 'TV series' : 'movie'}
+            </span>
+          </div>
+          <div className="fixmatch-results">
+            {results.map((candidate) => (
+              <div key={candidate.providerId} className="fixmatch-candidate">
+                {candidate.posterUrl ? (
+                  <img src={candidate.posterUrl} alt="" loading="lazy" />
+                ) : (
+                  <div className="poster-placeholder">no poster</div>
+                )}
+                <div className="fixmatch-candidate-text">
+                  <div className="fixmatch-candidate-name">
+                    {candidate.title}
+                    {candidate.year ? ` (${candidate.year})` : ''}
+                  </div>
+                  {candidate.overview && (
+                    <p className="fixmatch-candidate-overview">{candidate.overview}</p>
+                  )}
+                </div>
+                <FocusButton
+                  className="primary"
+                  keepInView="nearest"
+                  disabled={busy}
+                  onSelect={() => onLink(used.provider, candidate, used.isSeries)}
+                >
+                  {linkLabel}
+                </FocusButton>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </>
   );
 }

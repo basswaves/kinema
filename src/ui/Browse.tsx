@@ -1000,6 +1000,22 @@ export default function Browse() {
             onFindMatch={() =>
               setStack((s) => replace(s, { name: 'settings', section: 'review' }))
             }
+            onRelinked={(id) =>
+              // The page it was on is the wrong title's: the right one's in its
+              // place, or, unlinked, the queue where the files now wait.
+              void listTitles()
+                .then((list) => {
+                  const right = id === null ? undefined : list.find((t) => t.id === id);
+                  setStack((s) =>
+                    replace(
+                      s,
+                      right ? { name: 'detail', title: right } : { name: 'settings', section: 'review' }
+                    )
+                  );
+                })
+                .catch((e: unknown) => setError(userError(e)))
+                .finally(() => void load())
+            }
             onPlayFile={(request) =>
               void startPlayback({
                 ...request,

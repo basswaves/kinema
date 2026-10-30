@@ -244,7 +244,7 @@ export function searchProvider(
  * differ, which is what makes a manual fix auditable afterwards.
  */
 export async function applyMatch(
-  files: MediaFile[],
+  files: Pick<MediaFile, 'id'>[],
   provider: Provider,
   providerId: string,
   isSeries: boolean,

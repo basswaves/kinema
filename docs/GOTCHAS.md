@@ -729,6 +729,18 @@ player's track panel sent the ring to Pause this way. `closeTracks` and
 `closeStats` in `usePanels.ts` aim at the opener while the panel still exists,
 so there is nothing left for the library to restore.
 
+"First" means *finished*, not *called*: `setFocus` is asynchronous, and the
+library only records the new key when it completes. Unmount the focused
+control in the same tick and, under load, the library still counts it as
+focused — so it schedules the restore *after* `setFocus` has cancelled any
+pending one, and 300 ms later the ring leaves the opener. Home's scan notice
+lost its ring to the next notice's Choose this way, about one OK in four with
+the machine busy, never on a quiet one. `dismissScanTrouble` in `Browse.tsx`
+removes the notice in `setFocus(…).finally(…)`, and the player's panels close
+the same way (`closeOnto` in `usePanels.ts`, which skips the close when the
+panel was opened again meanwhile). Found only by running the flow 30 times
+over 12 workers.
+
 ### …and a claim that succeeds can still be overwritten
 
 `useClaimFocus` did all of the above and a remote was *still* dead after every

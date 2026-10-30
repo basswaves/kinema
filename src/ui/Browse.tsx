@@ -244,12 +244,17 @@ export default function Browse() {
   const dismissScanTrouble = useCallback(() => {
     // OK by remote takes its own notice away: the ring goes to Play first, so
     // the library's own restore does not pick a neighbour by itself. A click
-    // with the ring elsewhere leaves it there.
+    // with the ring elsewhere leaves it there. The notice goes only once the
+    // ring is there: setFocus is asynchronous, and OK unmounting while the
+    // library still holds it as focused starts that restore anyway, which
+    // then took the ring to the next notice's button.
+    const clear = () => {
+      setScanFailed(null);
+      setScanErrors([]);
+    };
     if (getCurrentFocusKey() === SCAN_OK_KEY && doesFocusableExist(HERO_PLAY_FOCUS_KEY)) {
-      void setFocus(HERO_PLAY_FOCUS_KEY);
-    }
-    setScanFailed(null);
-    setScanErrors([]);
+      void setFocus(HERO_PLAY_FOCUS_KEY).finally(clear);
+    } else clear();
   }, []);
   /** What the equipment could do that is switched off — see qualityNotice.ts. */
   const [upgrades, setUpgrades] = useState<Upgrade[]>([]);

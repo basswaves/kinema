@@ -29,29 +29,8 @@ export function usePanels({
   const [showStats, setShowStats] = useState(false);
   const [showChapters, setShowChapters] = useState(false);
   const [stats, setStats] = useState<StatGroup[]>([]);
-
-  const openTracks = useCallback(() => {
-    setShowChapters(false);
-    setShowTracks(true);
-  }, []);
-  /** The chapter list (ChapterPanel), one panel at a time with the tracks. */
-  const openChapters = useCallback(() => {
-    setShowTracks(false);
-    setShowChapters(true);
-  }, []);
-  const closeChapters = useCallback(() => {
-    if (osdFocusRef.current) void setFocus(PLAYER_CHAPTERS_KEY);
-    setShowChapters(false);
-  }, [osdFocusRef]);
-  /**
-   * Opened from Audio & subtitles — the way in without a keyboard's `i`: the
-   * ring goes into the panel and comes back to that button after.
-   */
-  const statsFromTracks = useRef(false);
-  const openStats = useCallback(() => {
-    statsFromTracks.current = false;
-    setShowStats(true);
-  }, []);
+  /** Each panel's opens so far, so a close still waiting on the ring never shuts a newer open. */
+  const opened = useRef({ tracks: 0, stats: 0, chapters: 0 });
 
   /**
    * Close a panel with the focus ring landing on the button that opened it.
@@ -60,22 +39,58 @@ export function usePanels({
    * ring inside lets the spatial library restore focus by itself 300 ms after
    * the unmount — to the shell's preferred child, Pause — which overrode
    * anything set in the meantime (docs/GOTCHAS.md, "focus parked on an
-   * unmounted component"). With the ring already outside, there is nothing to
-   * restore.
+   * unmounted component"). And first means *done*: setFocus is asynchronous,
+   * and a panel gone before it finishes still counts as holding the ring.
    */
-  const closeTracks = useCallback(() => {
-    if (osdFocusRef.current) void setFocus(PLAYER_TRACKS_KEY);
+  const closeOnto = useCallback(
+    (panel: keyof typeof opened.current, key: string, hide: () => void) => {
+      if (!osdFocusRef.current) return hide();
+      const at = opened.current[panel];
+      void setFocus(key).finally(() => {
+        if (opened.current[panel] === at) hide();
+      });
+    },
+    [osdFocusRef]
+  );
+
+  const openTracks = useCallback(() => {
+    opened.current.tracks++;
+    setShowChapters(false);
+    setShowTracks(true);
+  }, []);
+  /** The chapter list (ChapterPanel), one panel at a time with the tracks. */
+  const openChapters = useCallback(() => {
+    opened.current.chapters++;
     setShowTracks(false);
-  }, [osdFocusRef]);
+    setShowChapters(true);
+  }, []);
+  const closeChapters = useCallback(() => {
+    closeOnto('chapters', PLAYER_CHAPTERS_KEY, () => setShowChapters(false));
+  }, [closeOnto]);
+  /**
+   * Opened from Audio & subtitles — the way in without a keyboard's `i`: the
+   * ring goes into the panel and comes back to that button after.
+   */
+  const statsFromTracks = useRef(false);
+  const openStats = useCallback(() => {
+    opened.current.stats++;
+    statsFromTracks.current = false;
+    setShowStats(true);
+  }, []);
+
+  const closeTracks = useCallback(() => {
+    closeOnto('tracks', PLAYER_TRACKS_KEY, () => setShowTracks(false));
+  }, [closeOnto]);
   // The stats panel has no button on the bar (owner, UX pass): closing it
   // hands the ring back to Audio & subtitles when it was opened from there,
   // else to Play.
   const closeStats = useCallback(() => {
-    if (osdFocusRef.current) void setFocus(statsFromTracks.current ? PLAYER_TRACKS_KEY : PLAYER_PLAY_KEY);
-    setShowStats(false);
-  }, [osdFocusRef]);
+    const key = statsFromTracks.current ? PLAYER_TRACKS_KEY : PLAYER_PLAY_KEY;
+    closeOnto('stats', key, () => setShowStats(false));
+  }, [closeOnto]);
   const openStatsFromTracks = useCallback(() => {
     closeTracks();
+    opened.current.stats++;
     statsFromTracks.current = true;
     setShowStats(true);
   }, [closeTracks]);

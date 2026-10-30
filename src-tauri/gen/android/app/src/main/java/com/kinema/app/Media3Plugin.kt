@@ -15,10 +15,12 @@ import android.os.Looper
 import android.util.Log
 import android.util.Pair
 import android.view.Display
+import android.view.Gravity
 import android.view.SurfaceView
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebView
+import android.widget.FrameLayout
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
@@ -27,6 +29,7 @@ import androidx.media3.common.Timeline
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.text.CueGroup
 import androidx.media3.common.Tracks
+import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.Renderer
@@ -202,6 +205,8 @@ private const val LAST_SOUND = "last_sound"
 class Media3Plugin(private val activity: Activity) : Plugin(activity) {
   private var webView: WebView? = null
   private var surface: SurfaceView? = null
+  /** The black, screen-sized frame the surface sits in, its rest the bars (`fitPicture`). */
+  private var pictureFrame: FrameLayout? = null
   /**
    * The subtitles, between the film and the page: Media3's own layer
    * (owner, 2026-10-05), drawn the way mpv draws them on the desktop.
@@ -364,9 +369,21 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
     val view = webView ?: throw IllegalStateException("the page is not there yet")
     val parent = view.parent as ViewGroup
     val s = SurfaceView(activity)
+    // The surface sits in a black frame the size of the screen and is sized
+    // to the film's own shape inside it (`fitPicture`), so the rest is bars.
+    val frame = FrameLayout(activity)
+    frame.setBackgroundColor(Color.BLACK)
+    frame.addView(s, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER))
+    // The screen's size can change under a playing film: a mode switch, a
+    // turned phone.
+    frame.addOnLayoutChangeListener { _, l, t, r, b, wasL, wasT, wasR, wasB ->
+      // After this layout pass: a size set during one waits a frame anyway.
+      if (r - l != wasR - wasL || b - t != wasB - wasT) frame.post { fitPicture() }
+    }
     // Beneath the page: the first child of the page's own parent.
-    parent.addView(s, 0, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+    parent.addView(frame, 0, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
     surface = s
+    pictureFrame = frame
     val subs = SubtitleView(activity)
     // mpv's look on the desktop: white letters with a black outline, no box,
     // 38 of 720 lines high and 22 above the bottom edge (mpv's defaults).
@@ -386,12 +403,33 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
       buildPlayer(s)
     } catch (e: Exception) {
       // The next open would add a second pair beneath the page.
-      parent.removeView(s)
+      parent.removeView(frame)
       parent.removeView(subs)
       surface = null
+      pictureFrame = null
       subtitleView = null
       throw e
     }
+  }
+
+  /**
+   * The surface sized to the film's shape inside its frame (PictureShape.kt):
+   * when Media3 learns the picture's size, and when the screen's size
+   * changes. Until the size is known it fills the frame.
+   */
+  private fun fitPicture() {
+    val frame = pictureFrame ?: return
+    val s = surface ?: return
+    val v = player?.videoSize ?: VideoSize.UNKNOWN
+    val fit = PictureShape.fit(frame.width, frame.height, v.width, v.height, v.pixelWidthHeightRatio)
+    val w = fit?.get(0) ?: ViewGroup.LayoutParams.MATCH_PARENT
+    val h = fit?.get(1) ?: ViewGroup.LayoutParams.MATCH_PARENT
+    val lp = s.layoutParams as FrameLayout.LayoutParams
+    if (lp.width == w && lp.height == h) return
+    lp.width = w
+    lp.height = h
+    s.layoutParams = lp
+    Log.i("Kinema", "media3: picture ${v.width}x${v.height} (pixels ${v.pixelWidthHeightRatio}) on ${frame.width}x${frame.height} -> ${w}x${h}")
   }
 
   /** The subtitle layer shows or not; the chosen track stays chosen either way. */
@@ -590,6 +628,10 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
           val pictures = cueGroup.cues.count { it.bitmap != null }
           Log.d("Kinema", "media3: cues at ${player?.currentPosition} ms: ${cueGroup.cues.size} (pictures $pictures)")
         }
+      }
+
+      override fun onVideoSizeChanged(videoSize: VideoSize) {
+        fitPicture()
       }
 
       override fun onRenderedFirstFrame() {
@@ -981,7 +1023,8 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
       videoFormat = null
       timingFile++
       main.removeCallbacks(timingTimeout)
-      surface?.let { (it.parent as? ViewGroup)?.removeView(it) }
+      pictureFrame?.let { (it.parent as? ViewGroup)?.removeView(it) }
+      pictureFrame = null
       surface = null
       subtitleView?.let { (it.parent as? ViewGroup)?.removeView(it) }
       subtitleView = null
@@ -1394,6 +1437,19 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
             put("sampleRate", f.sampleRate.takeIf { it != Format.NO_VALUE } ?: JSONObject.NULL)
             put("way", if (untouched) "untouched" else "decoded")
             put("decoder", audioDecoder ?: JSONObject.NULL)
+          })
+        }
+        // The picture as drawn against the film's size, for a self-test to
+        // hold its shape to (T30): the surface and the frame around it.
+        p.videoSize.takeIf { it.width > 0 }?.let { v ->
+          out.put("picture", JSObject().apply {
+            put("videoWidth", v.width)
+            put("videoHeight", v.height)
+            put("pixelRatio", v.pixelWidthHeightRatio.toDouble())
+            put("surfaceWidth", surface?.width ?: JSONObject.NULL)
+            put("surfaceHeight", surface?.height ?: JSONObject.NULL)
+            put("frameWidth", pictureFrame?.width ?: JSONObject.NULL)
+            put("frameHeight", pictureFrame?.height ?: JSONObject.NULL)
           })
         }
         out.put("bufferedSeconds", p.totalBufferedDuration / 1000.0)

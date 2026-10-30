@@ -172,6 +172,19 @@ export interface Facts {
   };
   bufferedSeconds?: number;
   /**
+   * The picture as drawn: the film's size against the surface it is drawn
+   * on and the screen-sized frame around it, the rest being bars (T30).
+   */
+  picture?: {
+    videoWidth: number;
+    videoHeight: number;
+    pixelRatio: number;
+    surfaceWidth: number | null;
+    surfaceHeight: number | null;
+    frameWidth: number | null;
+    frameHeight: number | null;
+  };
+  /**
    * What the plugin itself holds (threads, listeners, players, memory), for
    * the self-test's leak runs; its names are the plugin's own.
    */

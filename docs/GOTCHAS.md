@@ -1330,6 +1330,17 @@ a fresh library as if it were the result. **Do:** set state with
 use the `localStorage` switches (`kinemaMockReview`, `kinemaMockUpdate`,
 `kinemaMockEmpty`) for anything that has to survive a reload.
 
+### A local picture path in the mock throws the whole screen
+
+`Art` turns a `*_path` into an address with `convertFileSrc`, which Tauri's
+`mockIPC` does not provide: the first mock value with a path (a poster beside
+a file, round 6 T20) drew "Something went wrong" and the flow failed on a
+missing dialog, with nothing in the test output saying why. Every fixture had
+null paths until then, so nothing had needed it. Fixed with
+`mockConvertFileSrc('windows')` beside `mockIPC`. **Do:** when a mock flow
+fails on a missing element, print the page's console errors
+(`page.on('console', …)`) before guessing; the error boundary hides them.
+
 ### Playwright empties `test-results/` at the start of every run
 
 Any `npx playwright test`, with either config, deletes the whole

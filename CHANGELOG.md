@@ -24,8 +24,22 @@ makes no stability promises.
   Playback): quiet text at full strength, the player's panels on solid black,
   a thicker outline round what is highlighted. Audio tracks now say "Audio
   description" in the player's panel.
+- **Still watching?** After three episodes in a row that played on by
+  themselves, with no key, mouse or remote pressed, Kinema asks before
+  starting the next one. The one that finished counts as watched; the next is
+  left alone. Settings → Playback turns it off.
+- **Start time in the details panel** (`I`): how long the file took from being
+  opened to its first picture, as the player measured it — "not measured"
+  where it could not, never a guess. Also in the log.
+- **Waiting for data is said** (desktop): when a film stops because the
+  share, stream or drive cannot keep up, a note says what it is waiting for
+  and how far the refill is. A start or a seek never shows it.
 
 ### Changed
+
+- A show's chosen version now carries to the next and previous episode
+  (buttons, `n`/`p`, Up next); before, those took whichever file of the
+  episode the library listed first.
 
 - A few small grey labels (counts, notes in the player's panels and the
   details panel) are a little brighter, to meet the WCAG contrast minimum.

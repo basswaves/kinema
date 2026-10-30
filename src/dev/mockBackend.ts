@@ -1505,8 +1505,14 @@ const handlers: Record<string, Handler> = {
   list_media_files: () => [],
 
   // metadata
+  // `kinemaMockNoMatch=1` with `kinemaMockEmpty`: the first scan finds the
+  // files and names none of them (INBOX #10).
   list_titles: () =>
-    later(EMPTY && !emptyLibrary.scanned ? [] : [...titles, ...extraTitles].map(withWatchState)),
+    later(
+      EMPTY && (!emptyLibrary.scanned || flag('kinemaMockNoMatch') === '1')
+        ? []
+        : [...titles, ...extraTitles].map(withWatchState)
+    ),
   get_title_detail: (a) => titleDetail(num(a, 'titleId')),
   file_facts: (a) => mockFileFacts(num(a, 'fileId')),
   season_facts: (a) =>

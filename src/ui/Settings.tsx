@@ -203,7 +203,10 @@ const TMDB_KEY_INPUT_KEY = 'settings-tmdb-key';
 const FFMPEG_INPUT_KEY = 'settings-ffmpeg';
 
 /** Where Home's notices can open Settings: the review queue, the TMDB key or ffmpeg. */
-export type SettingsTarget = 'review' | 'tmdb-key' | 'ffmpeg' | 'picture' | 'videos';
+export type SettingsTarget = 'review' | 'tmdb-key' | 'ffmpeg' | 'picture' | 'videos' | 'folders';
+
+/** Add movies folder, where Home's "Add another folder" lands. */
+const ADD_MOVIES_KEY = 'settings:add-movies';
 
 /** Add Videos folder, where the Library page's button lands. */
 const ADD_VIDEOS_KEY = 'settings:add-videos';
@@ -288,7 +291,9 @@ export default function Settings({
           ? FFMPEG_INPUT_KEY
           : openSection === 'videos'
             ? ADD_VIDEOS_KEY
-            : `settings-nav:${section}`,
+            : openSection === 'folders'
+              ? ADD_MOVIES_KEY
+              : `settings-nav:${section}`,
     // Not while a search match is being landed on: the list would take the
     // ring first, and a press in between would act on the list.
     landing === null
@@ -835,6 +840,7 @@ export default function Settings({
 
                   <div className="settings-row">
                     <FocusButton
+                      focusKey={ADD_MOVIES_KEY}
                       keepInView="nearest"
                       className="btn-secondary"
                       onSelect={() => void pickFolder('movies')}

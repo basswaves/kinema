@@ -860,6 +860,11 @@ export default function Browse() {
             onRemoveResumable={(item) => void removeResumable(item)}
             onFirstScan={firstScan}
             hasVideos={roots.some((r) => r.kind === 'videos' && r.file_count > 0)}
+            folders={{
+              count: roots.length,
+              files: roots.reduce((sum, r) => sum + r.file_count, 0),
+            }}
+            onAddFolder={() => openView({ name: 'settings', section: 'folders' })}
             onOpenPlaylist={(id) => openView({ name: 'playlist', id })}
             setupOpen={setupOpen}
             onSetupClosed={closeSetup}

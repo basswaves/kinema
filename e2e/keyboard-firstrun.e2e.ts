@@ -482,3 +482,36 @@ test('a setup page whose question comes late still starts on it, unless the remo
   await page.waitForTimeout(500);
   expect(await focused(page)).toBe('Finish');
 });
+
+test('first run: a folder whose files all go unnamed ends on what was found, never Welcome again', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('kinemaMockEmpty', '1');
+    localStorage.setItem('kinemaMockNoMatch', '1');
+    localStorage.setItem('kinemaMockReview', 'items');
+  });
+  await firstRunToSetupPage(page, 'windows', 'Picture and sound');
+  // Through every page to Finish, by remote.
+  for (let i = 0; i < 8 && (await page.locator('.setup-pages').count()) > 0; i++) {
+    for (let j = 0; j < 4 && !/^(Next|Finish)$/.test((await focused(page)) ?? ''); j++) {
+      await press(page, 'ArrowUp');
+    }
+    await press(page, 'Enter');
+    await page.waitForTimeout(300);
+  }
+  await expect(page.locator('.setup-pages')).toHaveCount(0);
+
+  // Not the Welcome page and its setup again (INBOX #10): what was found.
+  await expect(page.locator('.nothing-named h1')).toContainText('could not name them');
+  await expect(page.locator('.first-run h1', { hasText: 'Welcome' })).toHaveCount(0);
+  await expect.poll(() => focused(page)).toBe('Review them');
+  await press(page, 'ArrowRight');
+  await expect.poll(() => focused(page)).toBe('Add another folder');
+
+  // Review them opens the queue, on its own button.
+  await press(page, 'ArrowLeft');
+  await press(page, 'Enter');
+  await expect(page.locator('.settings-section h2').first()).toHaveText('Folders');
+  await expect.poll(() => focused(page)).toMatch(/review/i);
+});

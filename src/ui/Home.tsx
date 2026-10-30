@@ -19,6 +19,7 @@ import type { ScanTrouble } from './scanTrouble';
 import type { Upgrade } from './qualityNotice';
 import { useClaimFocus } from './focus';
 import { useFocusGroup } from './focusGroups';
+import { count } from './format';
 import type { ContinueItem } from '../player/api';
 import { parseGenres, type Title } from './api';
 import { pickHero } from './hero';
@@ -43,6 +44,10 @@ interface Props {
   onFirstScan: () => void;
   /** A Videos folder with something in it: a library, if not of titles. */
   hasVideos?: boolean;
+  /** The folders added, and the files the scans found in them (all kinds). */
+  folders?: { count: number; files: number };
+  /** Settings → Library, on its Add movies folder. */
+  onAddFolder?: () => void;
   /** A playlist's tile on its rail (PlaylistsPages.tsx). */
   onOpenPlaylist: (id: number) => void;
   /** The setup pages are up, in front of everything else here. */
@@ -88,6 +93,7 @@ export const HERO_PLAY_FOCUS_KEY = 'hero-play';
  */
 export default function Home(props: Props) {
   const { titles, loaded, hasVideos = false, setupOpen, onSetupClosed, onFirstScan } = props;
+  const { folders = { count: 0, files: 0 }, reviewCount, onReview, onAddFolder } = props;
   const scan = useScanStatus();
 
   // Until finished or left, however soon the first scan fills the library
@@ -116,10 +122,84 @@ export default function Home(props: Props) {
         </section>
       );
     }
+    // Folders added and scanned, and nothing in them named: what was found and
+    // the two ways on. Welcome again here was a loop — setup, a scan that
+    // names nothing, Welcome, setup again (INBOX #10) — until a folder that
+    // matched by itself was added.
+    if (folders.count > 0) {
+      return (
+        <NothingNamed
+          files={folders.files}
+          reviewCount={reviewCount}
+          onReview={onReview}
+          onAddFolder={onAddFolder}
+        />
+      );
+    }
     return <FirstRun onScan={onFirstScan} />;
   }
 
   return <HomeRows {...props} />;
+}
+
+const NOTHING_NAMED_FOCUS_KEY = 'nothing-named';
+
+/** A library with folders and no title in it yet. */
+function NothingNamed({
+  files,
+  reviewCount,
+  onReview,
+  onAddFolder,
+}: {
+  files: number;
+  reviewCount: number;
+  onReview: () => void;
+  onAddFolder?: () => void;
+}) {
+  const { ref, focusKey } = useFocusGroup('panel', { focusKey: NOTHING_NAMED_FOCUS_KEY });
+  useClaimFocus(NOTHING_NAMED_FOCUS_KEY, true, true);
+  return (
+    <FocusContext.Provider value={focusKey}>
+      <section className="first-run first-scan nothing-named" ref={ref}>
+        {files > 0 ? (
+          <>
+            <h1>
+              Kinema found {count(files, 'file')} but could not name {files === 1 ? 'it' : 'them'}
+            </h1>
+            <p className="muted">
+              Rather than guess, Kinema leaves a file it is not sure of for you to name. A wrong
+              title is worse than none. Look through them and pick the right film or show, or add
+              a folder whose files are named after what they are.
+            </p>
+          </>
+        ) : (
+          <>
+            <h1>Kinema found no videos in your folders</h1>
+            <p className="muted">
+              The folders added hold no films or shows Kinema can play. Add the folder you keep
+              them in.
+            </p>
+          </>
+        )}
+        <div className="settings-row">
+          {reviewCount > 0 && (
+            <FocusButton className="btn-primary" keepInView="nearest" onSelect={onReview}>
+              Review them
+            </FocusButton>
+          )}
+          {onAddFolder && (
+            <FocusButton
+              className={reviewCount > 0 ? 'btn-secondary' : 'btn-primary'}
+              keepInView="nearest"
+              onSelect={onAddFolder}
+            >
+              Add another folder
+            </FocusButton>
+          )}
+        </div>
+      </section>
+    </FocusContext.Provider>
+  );
 }
 
 function HomeRows({

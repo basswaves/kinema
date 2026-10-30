@@ -164,6 +164,17 @@ export function describeLevel(level: SoundLevel): string {
   return level.dialogue ? `Dialogue lifted, ${levelling}` : `Sound as mixed, ${levelling}`;
 }
 
+/**
+ * Whether a track listed for passthrough was refused and decoded after all:
+ * the device said no, and mpv fell back to PCM (`audio-out-params/format` is
+ * not `spdif-*` once the sound is open). Then it is Kinema's sound again,
+ * and the level applies; null while the sound is not open yet.
+ */
+export async function decodedAfterAll(): Promise<boolean | null> {
+  const format = await readProperty<string>('audio-out-params/format', 'string');
+  return format ? !format.startsWith('spdif-') : null;
+}
+
 /** What is on mpv now, for the details panel. */
 let applied: { af: string; level: SoundLevel; notApplied: NotApplied } = {
   af: '',
@@ -179,10 +190,11 @@ export const appliedLevel = () => applied;
  */
 export async function applyLevel(
   level: SoundLevel,
-  track: Pick<Track, 'codec' | 'layout'> | null
+  track: Pick<Track, 'codec' | 'layout'> | null,
+  decoded = false
 ): Promise<NotApplied> {
   if (!hasMpv()) return null;
-  const spdif = (await readProperty<string>('audio-spdif', 'string')) ?? '';
+  const spdif = decoded ? '' : ((await readProperty<string>('audio-spdif', 'string')) ?? '');
   const notApplied: NotApplied = passesThrough(track?.codec, spdif) ? 'passthrough' : null;
   const af = notApplied ? '' : filterFor(level, track?.layout);
   if (af !== applied.af) {

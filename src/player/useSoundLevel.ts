@@ -4,12 +4,16 @@ import { hasMpv, type Track } from './engine';
 import {
   applyLevel,
   canLiftDialogue,
+  decodedAfterAll,
   describeLevel,
   readLevel,
   saveLevel,
   type NotApplied,
   type SoundLevel,
 } from './soundLevel';
+
+/** Long enough for mpv to have opened the sound, or given up on passthrough. */
+const PASSTHROUGH_CHECK_MS = 3000;
 
 /**
  * The player's side of levelling and the dialogue lift (soundLevel.ts): this
@@ -50,13 +54,26 @@ export function useSoundLevel({
   useEffect(() => {
     if (!level || aid === null || !hasMpv()) return;
     let live = true;
+    let check = 0;
     void applyLevel(level, { codec, layout })
       .then((n) => {
-        if (live) setNotApplied(n);
+        if (!live) return;
+        setNotApplied(n);
+        // Listed for passthrough is not passed through: a device that says
+        // no gets decoded sound, and then the level is Kinema's to apply.
+        if (n === 'passthrough') {
+          check = window.setTimeout(() => {
+            void decodedAfterAll().then(async (decoded) => {
+              if (!live || !decoded) return;
+              setNotApplied(await applyLevel(level, { codec, layout }, true));
+            });
+          }, PASSTHROUGH_CHECK_MS);
+        }
       })
       .catch((e) => console.warn('audio: levelling not applied', e));
     return () => {
       live = false;
+      window.clearTimeout(check);
     };
   }, [level, aid, codec, layout]);
 

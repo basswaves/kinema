@@ -70,19 +70,22 @@ function gap(aFrom: number, aTo: number, bFrom: number, bTo: number): number {
  *    word is not. A quarter in from the edge, not the edge itself, which can
  *    sit a pixel inside the neighbour in one engine and outside in another;
  *    and a neighbour whose edge is within a few pixels of that point does
- *    not count as under it, for the same reason.
+ *    not count as under it, for the same reason. Where this one lines up with
+ *    the row's right end and not its left (a button set to the right), the
+ *    same from the right edge: there it is the right edges that stay put.
  * 3. The one more squarely ahead (the larger overlap), a near tie counting
  *    as a tie; then the nearer sideways; then the first in reading order.
  */
 type Cost = [number, number, number, number, number];
 
-function cost(from: Box, other: Box, dir: Direction): Cost {
+function cost(from: Box, other: Box, dir: Direction, fromEnd = false): Cost {
   const f = spans(from, dir);
   const o = spans(other, dir);
   const along = gap(f.from, f.to, o.from, o.to);
   const across = gap(f.crossFrom, f.crossTo, o.crossFrom, o.crossTo);
   const overlap = Math.max(0, Math.min(f.crossTo, o.crossTo) - Math.max(f.crossFrom, o.crossFrom));
-  const start = f.crossFrom + (f.crossTo - f.crossFrom) / 4;
+  const quarter = (f.crossTo - f.crossFrom) / 4;
+  const start = fromEnd ? f.crossTo - quarter : f.crossFrom + quarter;
   const underStart = o.crossFrom <= start - EDGE_PX && o.crossTo >= start + EDGE_PX ? 0 : 1;
   return [along, underStart, -overlap, across, o.crossFrom];
 }
@@ -104,11 +107,33 @@ function better(a: Cost, b: Cost): boolean {
   return a[4] < b[4];
 }
 
+/**
+ * Whether `from` lines up with the right end of the nearest row that way and
+ * not with its left: then "under its start" is measured from the right.
+ * Only for Up and Down; sideways moves have no such row.
+ */
+function alignedToEnd(from: Box, candidates: Box[], dir: Direction): boolean {
+  if (!vertical(dir) || candidates.length === 0) return false;
+  const f = spans(from, dir);
+  const along = (c: Box) => {
+    const o = spans(c, dir);
+    return gap(f.from, f.to, o.from, o.to);
+  };
+  const nearest = Math.min(...candidates.map(along));
+  const row = candidates.filter((c) => along(c) - nearest <= ROW_PX);
+  const rowFrom = Math.min(...row.map((c) => c.left));
+  const rowTo = Math.max(...row.map((c) => c.right));
+  // Set to the right: its right end on the row's, its left end inside the row
+  // (one wider than the row, like a track across a panel, starts from the left).
+  return Math.abs(f.crossTo - rowTo) <= EDGE_PX && f.crossFrom > rowFrom + EDGE_PX;
+}
+
 function cheapest(from: Box, candidates: Box[], dir: Direction): Box | null {
   let best: Box | null = null;
   let bestCost: Cost = [Infinity, Infinity, Infinity, Infinity, Infinity];
+  const fromEnd = alignedToEnd(from, candidates, dir);
   for (const c of candidates) {
-    const k = cost(from, c, dir);
+    const k = cost(from, c, dir, fromEnd);
     if (better(k, bestCost)) {
       best = c;
       bestCost = k;

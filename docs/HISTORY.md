@@ -3944,6 +3944,35 @@ flows split the same day: keyboard.e2e.ts (92 KB) became six files by area
 and kb.ts, so a session reads the part it changes and two sessions rarely
 edit one file.
 
+## A choice row lands on the chosen choice (2026-10-30)
+
+The first nightly runs of the navigation map failed on Linux WebKit, ten
+moves on four Settings pages, the same every night and the same in WSL. The
+cause was the font: Kinema asks for Segoe UI, which Linux does not have, so
+its own font draws every word wider, and Up or Down onto a row of choices
+went to whichever was "under the start" of the control left — a point a
+few pixels from a choice's edge, inside it on Linux and outside on Windows.
+The rule written for "neighbours only" (above) had already moved from
+overlap to the start edge for exactly this reason; it still fell between
+two choices where a short choice sat over a long one.
+
+The owner chose, from two: entering a row of choices lands on the chosen one
+(the ✓), as Home's rails and a series' seasons land on theirs. The
+alternative, keeping "nearest" and recording Linux's answers as its own,
+was turned down: the two systems would go on landing differently, and any
+change of wording could move them again. `ChoiceRow` is now a row group
+(focusGroups.ts) whose `current` is the chosen value, or the first choice
+while a question is unanswered (the first run's devices, where nothing is
+pre-chosen). Left from the first choice still goes to the list of sections,
+and leaving the row Up or Down is measured from the choice the ring is on,
+not the whole row, so Down from the last device goes to what is under it.
+
+The one move left was not a choice row: "Add without a match", set to the
+right under Search | Ignore these, measured its start from the left edge,
+which landed on Search's edge. Where a control lines up with the next row's
+right end and starts inside it, the start is now measured from the right
+(navGeometry.ts). It changed no move in Edge.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

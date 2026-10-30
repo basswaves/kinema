@@ -21,7 +21,8 @@
  *   NAV-MAP 2026-10-11: Right from the last button is nothing, not a jump to
  *   whatever is nearest a row lower); Up and Down leave it. Arriving from
  *   anywhere lands on its `current` item (Play, the active season, the open
- *   section), never on the nearest one and never on the one last left.
+ *   section, a setting's chosen choice), never on the nearest one and never
+ *   on the one last left.
  * - **panel** — an area laid out in rows of its own: a Settings section, the
  *   player's controls. Left and Right go only to a control beside it in the
  *   same row, otherwise nothing; Up and Down to the nearest control that way
@@ -108,6 +109,14 @@ export function resolveInGroup(
     if (!box) continue;
     if (s.focusKey === from) fromBox = box;
     else boxes.push(box);
+  }
+  // A row marked so (ChoiceRow) is left from the control the ring is on, not
+  // from the whole row: Down from its last choice goes to what is under that.
+  const fromNode = siblings.find((s) => s.focusKey === from)?.node as HTMLElement | undefined;
+  const ring = document.querySelector('.focused');
+  if (fromBox && fromNode?.dataset.leaveFromRing !== undefined && ring && fromNode.contains(ring)) {
+    const r = ring.getBoundingClientRect();
+    fromBox = { key: from, left: r.left, top: r.top, right: r.right, bottom: r.bottom };
   }
   if (!fromBox) return null;
   const sideways = direction === 'left' || direction === 'right';

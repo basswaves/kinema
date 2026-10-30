@@ -101,6 +101,25 @@ describe('pickNext between rows of choices', () => {
   });
 });
 
+describe('pickNext under a row aligned to the right', () => {
+  // Settings → a video to review: "Add without a match" right-aligned under
+  // Search | Ignore these. Measured from the left, the point fell on Search's
+  // edge in one engine and inside it in the other.
+  it('measures from the edge the two line up on, in both engines', () => {
+    const edge = [box('search', 1298.6, 662, 97.7), box('ignore', 1407.9, 662, 136.4)];
+    const webkit = [box('search', 1276.8, 662, 107.0), box('ignore', 1395.4, 662, 148.8)];
+    expect(pickNext(box('add', 1347.0, 809, 197.3), edge, 'up')).toBe('ignore');
+    expect(pickNext(box('add', 1323.3, 837, 221.0), webkit, 'up')).toBe('ignore');
+  });
+
+  // The player's track panel: a track across the panel, over the sound delay's
+  // −10 ms | +10 ms set in from the left. Wider than the row: from the left.
+  it('measures from the left for one wider than the row', () => {
+    const row = [box('earlier', 60, 300, 100), box('later', 260, 300, 100)];
+    expect(pickNext(box('track', 0, 200, 360), row, 'down')).toBe('earlier');
+  });
+});
+
 describe('pickNext with a near tie', () => {
   // Settings → Playback: "On a TV" over Full | Light, overlapping each by a
   // few pixels' difference that the two browser engines draw differently.

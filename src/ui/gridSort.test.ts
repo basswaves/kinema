@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Title } from './api';
-import { arrangeGrid, parseGridSetting } from './gridSort';
+import { arrangeGrid, formatGridSetting, parseGridSetting } from './gridSort';
 
 const title = (id: number, name: string, fields: Partial<Title> = {}): Title => ({
   id,
@@ -55,8 +55,24 @@ describe('arrangeGrid', () => {
   });
 
   it('reads back what was remembered, and defaults sensibly', () => {
-    expect(parseGridSetting('rating:unwatched')).toEqual({ sort: 'rating', unwatched: true });
-    expect(parseGridSetting(null)).toEqual({ sort: 'added', unwatched: false });
-    expect(parseGridSetting('nonsense')).toEqual({ sort: 'added', unwatched: false });
+    expect(parseGridSetting('rating:unwatched')).toEqual({ sort: 'rating', unwatched: true, reversed: false });
+    expect(parseGridSetting(null)).toEqual({ sort: 'added', unwatched: false, reversed: false });
+    expect(parseGridSetting('nonsense')).toEqual({ sort: 'added', unwatched: false, reversed: false });
+  });
+});
+
+describe('a reversed order', () => {
+  it('flips each sort', () => {
+    expect(names(arrangeGrid(shelf, 'az', false, true))).toEqual(['The Matrix', 'Brazil', 'Amélie']);
+    expect(names(arrangeGrid(shelf, 'year', false, true))).toEqual(['Brazil', 'The Matrix', 'Amélie']);
+    expect(names(arrangeGrid(shelf, 'added', false, true))).toEqual(['The Matrix', 'Brazil', 'Amélie']);
+  });
+
+  it('is remembered, and an older value reads as the natural direction', () => {
+    const now = { sort: 'rating' as const, unwatched: true, reversed: true };
+    expect(formatGridSetting(now)).toBe('rating:unwatched:reversed');
+    expect(parseGridSetting('rating:unwatched:reversed')).toEqual(now);
+    expect(parseGridSetting('az:all')).toEqual({ sort: 'az', unwatched: false, reversed: false });
+    expect(formatGridSetting({ sort: 'az', unwatched: false, reversed: false })).toBe('az:all');
   });
 });

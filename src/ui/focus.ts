@@ -77,6 +77,8 @@ const SECOND_LOOK_MS = 450;
  * which reads as the page jumping.
  */
 let pendingReturn: string | null = null;
+/** Where Back last put the ring: a page's own landing claim leaves it there. */
+let returnedTo: string | null = null;
 let returnTimer = 0;
 
 /** How long to wait for the control before settling for the landing spot. */
@@ -87,7 +89,7 @@ export function hasPendingReturn(): boolean {
   return pendingReturn !== null;
 }
 
-export function returnFocusTo(focusKey: string | null): void {
+export function returnFocusTo(focusKey: string | null, scrollTop?: number): void {
   window.clearInterval(returnTimer);
   pendingReturn = focusKey;
   if (!focusKey) return;
@@ -97,6 +99,12 @@ export function returnFocusTo(focusKey: string | null): void {
     if (doesFocusableExist(focusKey)) {
       window.clearInterval(returnTimer);
       pendingReturn = null;
+      returnedTo = focusKey;
+      // The page was rebuilt at the top; put it back where it was before the
+      // ring goes to the card, so the card is already on screen and nothing
+      // has to scroll to find it.
+      const page = document.querySelector('.browse');
+      if (page && scrollTop !== undefined) page.scrollTop = scrollTop;
       void setFocus(focusKey);
     } else if (Date.now() - started > RETURN_WAIT_MS) {
       // Gone for good — the card was removed, the episode is no longer in the
@@ -180,6 +188,7 @@ export function useClaimFocus(focusKey: string, ready: boolean, page = false): v
     landingSpots.push(focusKey);
     const shouldClaim = () =>
       !pendingReturn &&
+      !(returnedTo && focusWithin(returnedTo)) &&
       (focusIsDead() || (page && inputs === arrivedAt && !focusWithin(focusKey)));
     if (shouldClaim()) void setFocus(focusKey);
 

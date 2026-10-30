@@ -73,7 +73,14 @@ import FoldersPage, { type FolderSpot } from './FoldersPage';
 import { launchRequest, listenForVideos, targetFor, type OpenRequest } from '../library/opened';
 import { keepSame } from './keepSame';
 import { searchTitles, type SearchHit } from './search';
-import { arrangeGrid, GRID_SORTS, gridSettingKey, parseGridSetting, type GridSort } from './gridSort';
+import {
+  arrangeGrid,
+  formatGridSetting,
+  GRID_SORTS,
+  gridSettingKey,
+  parseGridSetting,
+  type GridArrangement,
+} from './gridSort';
 import OnScreenKeyboard from './OnScreenKeyboard';
 import { useTypingFocus } from './typing';
 import { isTvMode, useTvMode } from './tv';
@@ -206,7 +213,8 @@ export default function Browse() {
 
   /** Open a view on top of this one; Back returns here, to `from`. */
   const openView = useCallback((next: View, from: string | null = getCurrentFocusKey()) => {
-    setStack((s) => open(s, next, from));
+    const scrollTop = document.querySelector('.browse')?.scrollTop;
+    setStack((s) => open(s, next, from, scrollTop));
   }, []);
 
   /**
@@ -226,7 +234,7 @@ export default function Browse() {
     setStack(next);
     // Home entered from the top bar has nothing remembered; the ring would
     // otherwise stay up on the nav button that was pressed to leave it.
-    returnFocusTo(next[next.length - 1].returnFocus ?? HERO_PLAY_FOCUS_KEY);
+    returnFocusTo(next[next.length - 1].returnFocus ?? HERO_PLAY_FOCUS_KEY, next[next.length - 1].scrollTop);
   }, [stack]);
   /** The Close / Sleep / Shut down dialog, TV mode only (LeaveDialog.tsx). */
   const [leaving, setLeaving] = useState(false);
@@ -1154,9 +1162,10 @@ function GridView({
     saveLastFocusedChild: true,
   });
 
-  const [arrangement, setArrangement] = useState<{ sort: GridSort; unwatched: boolean }>({
+  const [arrangement, setArrangement] = useState<GridArrangement>({
     sort: 'added',
     unwatched: false,
+    reversed: false,
   });
   useEffect(() => {
     let live = true;
@@ -1167,15 +1176,12 @@ function GridView({
       live = false;
     };
   }, [heading]);
-  const arrange = (next: { sort: GridSort; unwatched: boolean }) => {
+  const arrange = (next: GridArrangement) => {
     setArrangement(next);
-    void setSetting(
-      gridSettingKey(heading),
-      `${next.sort}:${next.unwatched ? 'unwatched' : 'all'}`
-    ).catch((e) => console.warn('grid: could not remember the order', e));
+    void setSetting(gridSettingKey(heading), formatGridSetting(next)).catch((e) => console.warn('grid: could not remember the order', e));
   };
   const shown = useMemo(
-    () => arrangeGrid(titles, arrangement.sort, arrangement.unwatched),
+    () => arrangeGrid(titles, arrangement.sort, arrangement.unwatched, arrangement.reversed),
     [titles, arrangement]
   );
   const entries = useMemo(() => shown.map((title) => ({ title })), [shown]);
@@ -1223,9 +1229,21 @@ function GridView({
               focusKey={`grid-sort:${s.value}`}
               className={`choice ${arrangement.sort === s.value ? 'chosen' : ''}`}
               keepInView="page-top"
-              onSelect={() => arrange({ ...arrangement, sort: s.value })}
+              label={
+                arrangement.sort === s.value
+                  ? `${s.label}, ${arrangement.reversed ? 'reversed' : 'normal'} order. Press again to flip.`
+                  : undefined
+              }
+              onSelect={() =>
+                arrange({
+                  ...arrangement,
+                  sort: s.value,
+                  reversed: arrangement.sort === s.value ? !arrangement.reversed : false,
+                })
+              }
             >
               {s.label}
+              {arrangement.sort === s.value && (arrangement.reversed ? ' ↑' : ' ↓')}
             </FocusButton>
           ))}
           <FocusButton

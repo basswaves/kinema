@@ -14,16 +14,23 @@ export interface Entry<V> {
   view: V;
   /** The focus key held on this view when it was left, if any. */
   returnFocus: string | null;
+  /** How far the page was scrolled when this view was left, so Back puts it there too. */
+  scrollTop?: number;
 }
 
 /**
  * Open a view on top of the current one (a detail page, a grid, the player),
  * remembering what was focused on the view being left.
  */
-export function open<V>(stack: Entry<V>[], view: V, focused: string | null): Entry<V>[] {
+export function open<V>(
+  stack: Entry<V>[],
+  view: V,
+  focused: string | null,
+  scrollTop?: number
+): Entry<V>[] {
   const top = stack[stack.length - 1];
   const below = stack.slice(0, -1);
-  return [...below, { ...top, returnFocus: focused }, { view, returnFocus: null }];
+  return [...below, { ...top, returnFocus: focused, scrollTop }, { view, returnFocus: null }];
 }
 
 /**

@@ -11,6 +11,7 @@ import {
 } from '@noriginmedia/norigin-spatial-navigation';
 import { memo, useEffect, useRef } from 'react';
 import Art from './Art';
+import DrawnPoster from './DrawnPoster';
 import type { Title } from './api';
 import { posterState, sizedPoster } from './poster';
 import { keepOnScreen, recoverFocusSoon } from './focus';
@@ -93,7 +94,7 @@ export default memo(function Card({ title, onSelect, focusKey: key, note, goesWh
             local={title.poster_path}
             remote={sizedPoster(title.poster_url, 'w500')}
             lazy
-            fallback={<div className="card-art-empty">{title.title}</div>}
+            fallback={<DrawnPoster title={title.title} year={title.year} />}
           />
           {state.badge && <span className="card-badge">{state.badge}</span>}
           {listed && <span className="card-listed" aria-label="On My list" title="On My list" />}

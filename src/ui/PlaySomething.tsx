@@ -15,6 +15,7 @@ import {
 import { useFocusGroup } from './focusGroups';
 import FocusButton from './FocusButton';
 import Art from './Art';
+import DrawnPoster from './DrawnPoster';
 import { sizedPoster } from './poster';
 import type { Title } from './api';
 import { episodeRefName, firstUnwatchedEpisode, type ContinueItem } from '../player/api';
@@ -123,7 +124,7 @@ export default function PlaySomething({ pool, resumable, onPlay, onClose }: Prop
                 <Art
                   local={choice.poster_path}
                   remote={sizedPoster(choice.poster_url, 'w500')}
-                  fallback={<div className="card-art-empty">{choice.title}</div>}
+                  fallback={<DrawnPoster title={choice.title} year={choice.year} />}
                 />
               </div>
               <div className="something-name">

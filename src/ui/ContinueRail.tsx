@@ -10,6 +10,7 @@ import { videoName } from '../library/videos';
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { useEffect } from 'react';
 import Art from './Art';
+import DrawnPoster from './DrawnPoster';
 import FocusButton from './FocusButton';
 import RailTrack from './RailTrack';
 import type { ContinueItem } from '../player/api';
@@ -166,7 +167,7 @@ function ContinueCardBody({
           local={item.image_path}
           remote={item.image_url}
           lazy
-          fallback={<div className="continue-art-empty" />}
+          fallback={<DrawnPoster title={item.title} wide />}
         />
         <div className="continue-play">▶</div>
         {/* Drawn only where there is progress to draw. An empty bar under a

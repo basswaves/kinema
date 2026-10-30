@@ -15,6 +15,8 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { openLink } from './links';
 import Art from './Art';
+import DrawnPoster from './DrawnPoster';
+import { drawnStyle } from './drawnColour';
 import { sizedPoster } from './poster';
 import FocusButton from './FocusButton';
 import FocusInput from './FocusInput';
@@ -554,6 +556,7 @@ export default function TitleDetailView({ title, onPlayFile, onBack, onFindMatch
           className="detail-backdrop"
           local={shown.backdrop_path}
           remote={shown.backdrop_url}
+          fallback={<div className="detail-backdrop drawn-backdrop" style={drawnStyle(shown.title, shown.year)} />}
         />
         <div className="detail-scrim" />
 
@@ -572,6 +575,7 @@ export default function TitleDetailView({ title, onPlayFile, onBack, onFindMatch
               className="detail-poster"
               local={shown.poster_path}
               remote={sizedPoster(shown.poster_url, 'w780')}
+              fallback={<DrawnPoster className="detail-poster" title={shown.title} year={shown.year} />}
             />
             <div className="detail-info">
               <h1>{name}</h1>

@@ -721,15 +721,65 @@ html {
   object-fit: cover;
 }
 
-.card-art-empty {
+/* A poster drawn for a title with no picture (DrawnPoster.tsx): its own
+   colour, the name and year in Kinema's lettering, a thin inner frame. */
+.drawn-poster {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
+  /* At the top: the foot is the badges' (episodes, watched, progress). */
+  justify-content: flex-start;
+  gap: 0.25rem;
+  width: 100%;
   height: 100%;
-  padding: 0.625rem;
+  padding: 0.85rem 0.7rem;
+  overflow: hidden;
+  background: var(--drawn);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+  color: #fff;
+  text-align: left;
+}
+
+.drawn-poster-title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.drawn-poster-year {
   font-size: 0.75rem;
-  text-align: center;
-  opacity: 0.5;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.drawn-poster.wide {
+  justify-content: center;
+  padding: 0.6rem 0.9rem;
+}
+
+.drawn-poster.wide .drawn-poster-title {
+  -webkit-line-clamp: 2;
+  font-size: 0.85rem;
+}
+
+.drawn-poster.detail-poster {
+  height: auto;
+  aspect-ratio: 2 / 3;
+  padding: 1.1rem 1rem;
+}
+
+.drawn-poster.detail-poster .drawn-poster-title {
+  font-size: 1.35rem;
+}
+
+/* A backdrop with only the title's colour to show: a quiet wash under the scrim. */
+.drawn-backdrop {
+  background: var(--drawn);
+  opacity: 0.45;
 }
 
 .card-badge {

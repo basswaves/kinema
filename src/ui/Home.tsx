@@ -8,6 +8,7 @@
 import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { useMemo, useState } from 'react';
 import Art from './Art';
+import { drawnStyle } from './drawnColour';
 import Rail from './Rail';
 import ContinueRail from './ContinueRail';
 import { PlaylistsRail } from './PlaylistsPages';
@@ -356,6 +357,7 @@ function Hero({
           className="hero-backdrop"
           local={title.backdrop_path}
           remote={title.backdrop_url}
+          fallback={<div className="hero-backdrop drawn-backdrop" style={drawnStyle(title.title, title.year)} />}
         />
         <div className="hero-scrim" />
         <div className="hero-content">

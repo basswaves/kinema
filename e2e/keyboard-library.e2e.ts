@@ -201,6 +201,9 @@ test('Wrong title? on the title page: the queue’s search, by remote; Back clos
   page,
 }) => {
   await page.addInitScript(() => localStorage.setItem('kinemaMockVersions', '1'));
+  // A window narrow enough that the row under the title wraps on every
+  // engine: Right still reaches the button on the second line.
+  await page.setViewportSize({ width: 1000, height: 720 });
   await open(page, 'windows');
   for (let i = 0; i < 6 && !(await focused(page))?.startsWith('Example Film'); i++) {
     await press(page, 'ArrowDown');

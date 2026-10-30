@@ -1116,6 +1116,17 @@ on the first video, so the groups decide the move and not which tile is a
 pixel nearer. A list group alone was not enough: leaving a list upwards uses
 the list's whole box and skipped the heading's own Play all.
 
+### A row that wraps hides its second line from a remote
+
+A `row` group answers only Left and Right, measured; Up and Down leave it. The
+title page's buttons wrap when the window (or another engine's font) is too
+narrow, and nothing lies to the right of the first line's last button, so the
+buttons on the second line could not be reached at all. Edge at 1280 × 720 fit
+them on one line; WebKit on Linux did not, and only CI saw it. **Do:** Right
+from a row's last measured neighbour goes on in reading order, Left back
+(`resolveInGroup`), and a flow that walks a row tests it in a window narrow
+enough to wrap on every engine.
+
 ---
 
 ## Frontend
@@ -1835,7 +1846,7 @@ a fallback prop went to another `<Art>`. No error; the commit was simply a
 different file (caught only by `git diff HEAD`). Use `-U3` hunks and plain
 `git apply --cached`, write and read the patch as **bytes** (Python's text
 mode on Windows turns every `
-` into `
+` into `
 ` in the index), and check
 `git diff` afterwards shows only the other feature's lines.
 

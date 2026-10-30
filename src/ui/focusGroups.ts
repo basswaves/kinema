@@ -126,7 +126,21 @@ export function resolveInGroup(
   const level = sideways && (kind === 'panel' || (kind === 'menu' && !wraps(wrap, direction)));
   const pool = level ? boxes.filter((b) => b.top < f.bottom && b.bottom > f.top) : boxes;
   const key = pickNext(fromBox, pool, direction, kind === 'menu' && wraps(wrap, direction));
-  return key === null ? null : (siblings.find((s) => s.focusKey === key) ?? null);
+  if (key !== null) return siblings.find((s) => s.focusKey === key) ?? null;
+  // A row too wide for the window wraps onto a second line, and nothing is
+  // further right of its line's last button: Right goes on in reading order
+  // (Left back), as text does, or the wrapped buttons are out of a remote's
+  // reach. Up and Down still leave the row.
+  if (kind !== 'row' || !sideways) return null;
+  const order = siblings
+    .filter((s) => s.focusKey === from || boxes.some((b) => b.key === s.focusKey))
+    .sort((a, b) =>
+      (a.node as Node).compareDocumentPosition(b.node as Node) & Node.DOCUMENT_POSITION_FOLLOWING
+        ? -1
+        : 1
+    );
+  const at = order.findIndex((s) => s.focusKey === from);
+  return order[direction === 'right' ? at + 1 : at - 1] ?? null;
 }
 
 /**

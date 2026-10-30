@@ -95,6 +95,15 @@
       "state": "trakt"
     },
     {
+      "id": "own_server",
+      "name": "Your own Jellyfin, Emby or Plex server",
+      "hosts": [],
+      "sends": "The key or token you type, to the address you type, asking for your watched films and episodes and their ids. The server is yours; nothing goes anywhere else, and the key is not kept.",
+      "when": "Only when you press Bring it in.",
+      "stop": "Do not press Bring it in, in Settings, Keep track of what I watch.",
+      "section": "tracking"
+    },
+    {
       "id": "winget",
       "name": "winget (installing ffmpeg)",
       "hosts": [],

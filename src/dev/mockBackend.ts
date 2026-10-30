@@ -1134,6 +1134,17 @@ const SKIPTRO = flag('kinemaMockSkiptro') === '1';
  * setup pages for watch history and subtitles have nothing to press.
  */
 const NO_ACCOUNT_APPS = flag('kinemaMockNoAccountApps') === '1';
+
+/** What a stand-in import of watched history reports (import_watched.rs). */
+const IMPORT_REPORT = {
+  read: 3,
+  watched: 1,
+  resume: 1,
+  kept: 0,
+  not_in_library: ['Some Film Not Here (1999)'],
+  unclear: [],
+  queued: 0,
+};
 /**
  * `kinemaMockSlowFfmpeg=1`: the ffmpeg check takes three seconds, as on a
  * computer busy with something else — longer than a setup page waits for its
@@ -2058,6 +2069,9 @@ const handlers: Record<string, Handler> = {
     { name: 'library-v13-1790000000.db', kind: 'before_upgrade', made_at: 1790000000, bytes: 327680 },
   ],
   restore_backup: () => null,
+  kodi_database: () => null,
+  import_watched_file: () => IMPORT_REPORT,
+  import_watched_server: () => IMPORT_REPORT,
   selftest_plan: () => null,
 
   // OpenSubtitles (opensubtitles.rs): a stand-in that finds English and

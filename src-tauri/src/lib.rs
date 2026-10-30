@@ -27,6 +27,7 @@ mod library;
 mod lifecycle;
 mod local_title;
 mod metadata;
+mod import_watched;
 mod my_list;
 mod versions;
 #[cfg(target_os = "linux")]
@@ -473,6 +474,9 @@ pub fn run() {
             playlists::set_playlist_current,
             playlists::playlist_step,
             playlists::set_playlist_mode,
+            import_watched::kodi_database,
+            import_watched::import_watched_file,
+            import_watched::import_watched_server,
             my_list::my_list,
             my_list::set_in_my_list,
             versions::title_versions,

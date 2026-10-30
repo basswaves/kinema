@@ -2649,6 +2649,13 @@ button.cast-member {
 /* Inline answers to "is this path right", beside the field that asks. Not the
    banner at the top of the page: this screen is many screens long, and an
    answer about a field you are looking at has to be next to it. */
+.import-unmatched {
+  margin: 0.25rem 0 0;
+  padding-left: 1.25rem;
+  font-size: 0.875rem;
+  opacity: 0.8;
+}
+
 .settings-ok,
 .settings-warn {
   font-size: 0.8125rem;

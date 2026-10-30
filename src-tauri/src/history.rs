@@ -334,6 +334,102 @@ pub fn restore(conn: &Connection, file_ids: &[i64]) -> rusqlite::Result<usize> {
     Ok(restored)
 }
 
+/// A film or episode as another player or another Kinema remembered it, by
+/// the ids watch_history keeps (import_watched.rs, moving.rs).
+#[derive(Debug, Clone, PartialEq)]
+pub struct Carried {
+    pub kind: String,
+    pub provider: String,
+    pub provider_id: String,
+    pub imdb_id: Option<String>,
+    pub tmdb_id: Option<String>,
+    pub season: Option<i64>,
+    pub episode: Option<i64>,
+    pub label: String,
+    pub position_secs: f64,
+    pub duration_secs: Option<f64>,
+    pub completed: bool,
+    pub updated_at: i64,
+}
+
+/// What [`merge`] did with one carried item.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Merged {
+    /// Became watched here: the caller decides whether a service hears of it.
+    Watched,
+    /// A resume point taken.
+    Resume,
+    /// Already watched here, or an older resume point: nothing changed.
+    Kept,
+}
+
+/// Take a carried item into the history, and into every copy of it in the
+/// library. **Never queues anything for SIMKL or Trakt** — whether an
+/// imported watch is sent is the caller's rule, not the history's.
+///
+/// Never un-watches: something watched here stays watched. A carried watch
+/// wins over a resume point here; a carried resume point only over an older
+/// one. A row that changes is dated after what it replaces, so every copy
+/// takes it (`restore` takes only newer history).
+pub fn merge(conn: &Connection, c: &Carried) -> rusqlite::Result<Merged> {
+    let blank = |s: &Option<String>| s.clone().filter(|v| !v.trim().is_empty());
+    let item = Item {
+        kind: c.kind.clone(),
+        provider: c.provider.clone(),
+        provider_id: c.provider_id.clone(),
+        imdb_id: blank(&c.imdb_id),
+        tmdb_id: blank(&c.tmdb_id),
+        season: c.season,
+        episode: c.episode,
+        label: c.label.clone(),
+    };
+    let existing = find(conn, &item)?;
+    let outcome = match existing {
+        Some((_, s)) if s.completed => return Ok(Merged::Kept),
+        _ if c.completed => Merged::Watched,
+        Some((_, s)) if c.updated_at <= s.updated_at || c.position_secs <= 0.0 => {
+            return Ok(Merged::Kept)
+        }
+        None if c.position_secs <= 0.0 => return Ok(Merged::Kept),
+        _ => Merged::Resume,
+    };
+    // A watched item's position is a re-watch's resume point (schema 27).
+    let position = c.position_secs;
+    let at = match existing {
+        Some((_, s)) => c.updated_at.max(s.updated_at + 1),
+        None => c.updated_at,
+    };
+    match existing {
+        Some((id, _)) => {
+            conn.execute(
+                "UPDATE watch_history
+                    SET position_secs = ?2, completed = ?3, updated_at = ?4,
+                        duration_secs = COALESCE(?5, duration_secs),
+                        imdb_id = COALESCE(imdb_id, ?6), tmdb_id = COALESCE(tmdb_id, ?7)
+                  WHERE id = ?1",
+                params![id, position, c.completed as i64, at, c.duration_secs, item.imdb_id, item.tmdb_id],
+            )?;
+        }
+        None => {
+            conn.execute(
+                "INSERT INTO watch_history
+                    (kind, provider, provider_id, imdb_id, tmdb_id, season, episode, label,
+                     position_secs, duration_secs, completed, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+                params![
+                    item.kind, item.provider, item.provider_id, item.imdb_id, item.tmdb_id,
+                    item.season, item.episode, item.label, position, c.duration_secs,
+                    c.completed as i64, at
+                ],
+            )?;
+        }
+    }
+    // Every copy in the library; file ids start at 1, so 0 excludes none.
+    let copies = copies_of(conn, 0, std::slice::from_ref(&item))?;
+    restore(conn, &copies)?;
+    Ok(outcome)
+}
+
 /// The file's bytes changed size — a partial download that has grown. Whatever
 /// was marked watched against the short version was never real, so the
 /// episode forgets it too. The position is kept, as the scanner keeps it.

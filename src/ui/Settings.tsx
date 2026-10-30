@@ -38,6 +38,7 @@ import { FFMPEG_DOWNLOAD_URL, FFMPEG_INSTALL_WORDS, ffmpegFoundWords, useFfmpegI
 import { count, formatBytes } from './format';
 import FocusInput from './FocusInput';
 import BackupSection from './BackupSection';
+import ImportWatchedSection from './ImportWatchedSection';
 import VideoPlayerSection from './VideoPlayerSection';
 import AccountSection, { AccountAppFields } from './AccountSection';
 import {
@@ -1477,6 +1478,7 @@ export default function Settings({
                 </section>
                 <AccountSection service="simkl" />
                 <AccountSection service="trakt" />
+                <ImportWatchedSection />
               </>
             )}
 

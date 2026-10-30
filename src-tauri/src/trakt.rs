@@ -54,7 +54,7 @@ pub const CLIENT_ID_KEY: &str = "trakt_client_id";
 pub const CLIENT_SECRET_KEY: &str = "trakt_client_secret";
 
 /// Set at connect: the history is still to be compared with Trakt's and sent.
-const HISTORY_DUE_KEY: &str = "trakt_history_due";
+pub(crate) const HISTORY_DUE_KEY: &str = "trakt_history_due";
 
 const API: &str = "https://api.trakt.tv";
 /// What the QR code opens, per Trakt's documentation: its own activation page.

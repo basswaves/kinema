@@ -467,7 +467,14 @@
     "settings-tracking": {
       "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "Connect SIMKL" },
       "Connect SIMKL": { "U": "Settings", "D": "Connect Trakt", "L": "Keep track of what I watch", "R": "·" },
-      "Connect Trakt": { "U": "Connect SIMKL", "D": "·", "L": "Keep track of what I watch", "R": "·" }
+      "Connect Trakt": { "U": "Connect SIMKL", "D": "Choose Kodi’s database or a Trakt export…", "L": "Keep track of what I watch", "R": "·" },
+      "Choose Kodi’s database or a Trakt export…": { "U": "Connect Trakt", "D": "✓Jellyfin", "L": "Keep track of what I watch", "R": "·" },
+      "✓Jellyfin": { "U": "Choose Kodi’s database or a Trakt export…", "D": "http://192.168.1.10:8096", "L": "Keep track of what I watch", "R": "Emby" },
+      "Emby": { "U": "Choose Kodi’s database or a Trakt export…", "D": "http://192.168.1.10:8096", "L": "✓Jellyfin", "R": "Plex" },
+      "Plex": { "U": "Choose Kodi’s database or a Trakt export…", "D": "http://192.168.1.10:8096", "L": "Emby", "R": "·" },
+      "http://192.168.1.10:8096": { "U": "✓Jellyfin", "D": "API key", "L": "Keep track of what I watch", "R": "·" },
+      "API key": { "U": "http://192.168.1.10:8096", "D": "User name", "L": "Keep track of what I watch", "R": "·" },
+      "User name": { "U": "API key", "D": "·", "L": "Keep track of what I watch", "R": "·" }
     },
     "settings-ratings": {
       "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "Get a free TMDB key ↗" },
@@ -936,7 +943,14 @@
     "settings-tracking": {
       "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "Connect SIMKL" },
       "Connect SIMKL": { "U": "Settings", "D": "Connect Trakt", "L": "Keep track of what I watch", "R": "·" },
-      "Connect Trakt": { "U": "Connect SIMKL", "D": "·", "L": "Keep track of what I watch", "R": "·" }
+      "Connect Trakt": { "U": "Connect SIMKL", "D": "Choose Kodi’s database or a Trakt export…", "L": "Keep track of what I watch", "R": "·" },
+      "Choose Kodi’s database or a Trakt export…": { "U": "Connect Trakt", "D": "✓Jellyfin", "L": "Keep track of what I watch", "R": "·" },
+      "✓Jellyfin": { "U": "Choose Kodi’s database or a Trakt export…", "D": "http://192.168.1.10:8096", "L": "Keep track of what I watch", "R": "Emby" },
+      "Emby": { "U": "Choose Kodi’s database or a Trakt export…", "D": "http://192.168.1.10:8096", "L": "✓Jellyfin", "R": "Plex" },
+      "Plex": { "U": "Choose Kodi’s database or a Trakt export…", "D": "http://192.168.1.10:8096", "L": "Emby", "R": "·" },
+      "http://192.168.1.10:8096": { "U": "✓Jellyfin", "D": "API key", "L": "Keep track of what I watch", "R": "·" },
+      "API key": { "U": "http://192.168.1.10:8096", "D": "User name", "L": "Keep track of what I watch", "R": "·" },
+      "User name": { "U": "API key", "D": "·", "L": "Keep track of what I watch", "R": "·" }
     },
     "settings-ratings": {
       "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "Get a free TMDB key ↗" },
@@ -1317,7 +1331,13 @@
     "settings-tracking": {
       "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "Connect SIMKL" },
       "Connect SIMKL": { "U": "Settings", "D": "Connect Trakt", "L": "Keep track of what I watch", "R": "·" },
-      "Connect Trakt": { "U": "Connect SIMKL", "D": "·", "L": "Keep track of what I watch", "R": "·" }
+      "Connect Trakt": { "U": "Connect SIMKL", "D": "✓Jellyfin", "L": "Keep track of what I watch", "R": "·" },
+      "✓Jellyfin": { "U": "Connect Trakt", "D": "http://192.168.1.10:8096", "L": "Keep track of what I watch", "R": "Emby" },
+      "Emby": { "U": "Connect Trakt", "D": "http://192.168.1.10:8096", "L": "✓Jellyfin", "R": "Plex" },
+      "Plex": { "U": "Connect Trakt", "D": "http://192.168.1.10:8096", "L": "Emby", "R": "·" },
+      "http://192.168.1.10:8096": { "U": "✓Jellyfin", "D": "API key", "L": "Keep track of what I watch", "R": "·" },
+      "API key": { "U": "http://192.168.1.10:8096", "D": "User name", "L": "Keep track of what I watch", "R": "·" },
+      "User name": { "U": "API key", "D": "·", "L": "Keep track of what I watch", "R": "·" }
     },
     "settings-ratings": {
       "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "Get a free TMDB key ↗" },

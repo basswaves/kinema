@@ -17,6 +17,7 @@ const NOT_CONTACTED: Record<string, string> = {
   'asset.localhost': 'the app’s own files',
   'ipc.localhost': 'the app talking to itself',
   '127.0.0.1': 'the player streaming from Kinema on this device',
+  '192.168.1.10': 'an example address in the own-server field, never contacted',
   'schema.tauri.app': 'the config file’s schema, read by editors',
   'www.w3.org': 'the SVG namespace',
   'com.kinema.app': 'the app’s own identifier, not a host',

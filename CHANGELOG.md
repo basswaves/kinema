@@ -9,6 +9,14 @@ makes no stability promises.
 
 ### Added
 
+- **Bring in what you watched elsewhere** (Settings → Keep track of what I
+  watch): Kodi's database (found by itself when Kodi is installed), your
+  own Jellyfin, Emby or Plex server (read once; the key is not kept), or a
+  Trakt export file. Watched films and episodes and resume points are
+  matched by IMDb or TMDB number only — anything else is listed and left
+  alone. Nothing here is un-watched, and an older resume point never
+  replaces a newer one. What becomes watched goes to SIMKL or Trakt once, as
+  your history did when you connected; Trakt is asked what it has first.
 - **More on a title's page.** "Ends at 22:47" beside the runtime (from where
   Play would resume); who directed and wrote a film, or created a show;
   whether a show has ended or when its next season or episode airs; the

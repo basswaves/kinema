@@ -271,6 +271,11 @@ export const SETTINGS_INDEX: SettingEntry[] = [
     label: 'Continue where you stopped on another device',
     about: 'Trakt resume position sync',
   },
+  {
+    section: 'tracking',
+    label: 'Bring in what you watched elsewhere',
+    about: 'import watched history resume points Kodi Jellyfin Emby Plex Trakt export',
+  },
 
   // Posters & ratings
   {

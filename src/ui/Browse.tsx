@@ -1229,11 +1229,7 @@ function GridView({
               focusKey={`grid-sort:${s.value}`}
               className={`choice ${arrangement.sort === s.value ? 'chosen' : ''}`}
               keepInView="page-top"
-              label={
-                arrangement.sort === s.value
-                  ? `${s.label}, ${arrangement.reversed ? 'reversed' : 'normal'} order. Press again to flip.`
-                  : undefined
-              }
+              title={arrangement.sort === s.value ? 'Press again to flip the order' : undefined}
               onSelect={() =>
                 arrange({
                   ...arrangement,

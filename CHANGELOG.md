@@ -9,6 +9,13 @@ makes no stability promises.
 
 ### Added
 
+- **Mark a whole show watched in one press** (or not watched again), beside
+  My list on a show's page. SIMKL and Trakt are told as one batch.
+- **A grid's order can be flipped.** Pressing the order already chosen
+  reverses it, with an arrow beside the name (↓ / ↑); remembered per grid.
+- **Back stays in view on a title's page** while the episodes scroll, and
+  never covers the one the ring is on.
+
 - **Volume levelling and a dialogue lift** (desktop). Levelling brings quiet
   scenes up and loud ones down, in three steps; the dialogue lift raises the
   centre channel of a surround track, where the speech is, and lowers the
@@ -37,6 +44,10 @@ makes no stability promises.
 
 ### Changed
 
+- Back from a title returns to the same place in the grid: the card and how
+  far the page was scrolled.
+- The developer tools' library table scrolls sideways in a narrow window
+  instead of being cut off.
 - A show's chosen version now carries to the next and previous episode
   (buttons, `n`/`p`, Up next); before, those took whichever file of the
   episode the library listed first.

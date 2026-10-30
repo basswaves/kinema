@@ -1133,10 +1133,13 @@ A `row` group answers only Left and Right, measured; Up and Down leave it. The
 title page's buttons wrap when the window (or another engine's font) is too
 narrow, and nothing lies to the right of the first line's last button, so the
 buttons on the second line could not be reached at all. Edge at 1280 × 720 fit
-them on one line; WebKit on Linux did not, and only CI saw it. **Do:** Right
-from a row's last measured neighbour goes on in reading order, Left back
-(`resolveInGroup`), and a flow that walks a row tests it in a window narrow
-enough to wrap on every engine.
+them on one line; WebKit on Linux did not, and only CI saw it. Measuring every
+button, not only those on the line, was no better: Right from the second line
+went back up to the first, and the walk changed with where the line broke.
+**Do:** Left and Right keep to the line, then go on in reading order
+(`resolveInGroup`); a flow that walks a row walks all of it both ways, once
+anything loaded late (the versions) is in it, in a window narrow enough to
+wrap on every engine.
 
 ---
 

@@ -262,13 +262,20 @@ test('a held key is a hold however the remote sends it', async ({ page }) => {
    * clock in one call: Playwright's round trips between events are as long as
    * the machine is busy, and the app tells a hold from taps by the gap.
    */
-  const sendKeys = (steps: [type: 'keydown' | 'keyup', delayAfter: number][]) =>
-    page.evaluate(async (list) => {
+  const sendKeys = async (steps: [type: 'keydown' | 'keyup', delayAfter: number][]) => {
+    const took = await page.evaluate(async (list) => {
+      const t0 = performance.now();
       for (const [type, delayAfter] of list) {
         window.dispatchEvent(new KeyboardEvent(type, { key: 'ArrowRight', bubbles: true }));
         await new Promise((r) => setTimeout(r, delayAfter));
       }
+      return performance.now() - t0;
     }, steps);
+    // A hold seeks by how long it lasted: on a starved page the same keys
+    // take longer, and the bound on how far it goes grows with them.
+    const nominal = steps.reduce((sum, [, d]) => sum + d, 0);
+    return Math.max(1, took / nominal);
+  };
   const position = async () => (await mpv(page)).position;
 
   // Android's WebView: one press, and while it is held a press every 50 ms
@@ -279,7 +286,7 @@ test('a held key is a hold however the remote sends it', async ({ page }) => {
   await pause(page, 600, "the player hears of the new position on the fake mpv's next tick");
   let before = await seeks();
   let from = await position();
-  await sendKeys([
+  const slack1 = await sendKeys([
     ['keydown', 450], // a remote's first press, then its repeats
     ...Array.from({ length: 20 }, (): ['keydown', number] => ['keydown', 50]),
     ['keyup', 0],
@@ -288,7 +295,7 @@ test('a held key is a hold however the remote sends it', async ({ page }) => {
   await pause(page, 800, 'time on purpose: no second seek may follow');
   expect(await seeks()).toBe(before + 1);
   expect(await position()).toBeGreaterThan(from + 25);
-  expect(await position()).toBeLessThan(from + 80);
+  expect(await position()).toBeLessThan(from + 80 * slack1);
 
   // A remote that sends a press and a release for every step of a hold,
   // about every 110 ms: the same hold, one seek, as far.
@@ -296,14 +303,14 @@ test('a held key is a hold however the remote sends it', async ({ page }) => {
   await pause(page, 600, "the player hears of the new position on the fake mpv's next tick");
   before = await seeks();
   from = await position();
-  await sendKeys(
+  const slack2 = await sendKeys(
     Array.from({ length: 18 }, (): ['keydown' | 'keyup', number][] => [['keydown', 20], ['keyup', 60]]).flat()
   );
   await expect.poll(seeks).toBe(before + 1);
   await pause(page, 800, 'time on purpose: no second seek may follow');
   expect(await seeks()).toBe(before + 1);
   expect(await position()).toBeGreaterThan(from + 25);
-  expect(await position()).toBeLessThan(from + 80);
+  expect(await position()).toBeLessThan(from + 80 * slack2);
 });
 
 test('watching keys: seeking, pausing, volume, stats and the transport row', async ({ page }) => {

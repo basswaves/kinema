@@ -23,6 +23,10 @@ export default defineConfig({
   // Not `.spec.ts`: vitest would pick those up and fail on them.
   testMatch: '**/*.e2e.ts',
   timeout: 60_000,
+  // What a check waits for is a state, and a starved runner reaches it late,
+  // not never: 5 s ended two flows in two ×5 runs (round 7, F5) with the app
+  // right. A wrong app still fails, a little later.
+  expect: { timeout: 15_000 },
   // No retries, here or on CI, and a pass that needed one is a failure: a flake
   // must never hide behind a second try (round 7, F5). `failOnFlakyTests`
   // is the second lock should someone add `retries` later.

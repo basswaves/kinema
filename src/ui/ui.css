@@ -3694,6 +3694,52 @@ kbd {
   box-shadow: 0 1.5rem 4rem rgba(0, 0, 0, 0.6);
 }
 
+/* A YouTube trailer in Kinema (TrailerOverlay.tsx): the frame at 16:9 as
+   large as the window allows, the keys and two buttons under it. */
+.trailer-backdrop {
+  z-index: 61;
+  padding: 1.5rem;
+  background: rgba(0, 0, 0, 0.92);
+}
+
+.trailer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  width: min(100%, calc((100vh - 7rem) * 16 / 9));
+}
+
+.trailer-screen {
+  aspect-ratio: 16 / 9;
+  border-radius: 0.5rem;
+  outline: 2px solid transparent;
+  outline-offset: 3px;
+  overflow: hidden;
+  background: #000;
+}
+
+.trailer-screen.focused {
+  outline-color: #fff;
+}
+
+.trailer-screen iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.trailer-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.trailer-keys {
+  flex: 1;
+  margin: 0;
+}
+
 /* A web address shown instead of opened (LinkCard.tsx). */
 .link-card-body {
   display: flex;

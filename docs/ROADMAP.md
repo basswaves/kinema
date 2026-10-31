@@ -170,8 +170,9 @@ reasons in full.
   the display, which Kinema can see; settings describe equipment, not taste.
 - **Anything that stops working by itself if left alone** — for example YouTube
   trailers in the app through a downloader or with ads blocked. (YouTube's own
-  player in the app, with its ads, is planned.) Trailers on your disk play in
-  Kinema; others open in the browser.
+  player, with its ads, plays them in the app on Windows and in the YouTube app
+  on Android; on Linux, and whenever YouTube refuses, they open in the
+  browser.) Trailers on your disk play in Kinema first.
 - **Bundled third-party programs.** ffmpeg and Skiptro can be used if you have
   installed them; Kinema never ships or downloads them.
 - **Looking up a whole library in TheIntroDB at once.** It is asked about one

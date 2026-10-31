@@ -5,6 +5,8 @@ import ErrorBoundary from './ui/ErrorBoundary';
 import FolderBrowser from './ui/FolderBrowser';
 import LinkCard from './ui/LinkCard';
 import { useShownLink } from './ui/links';
+import TrailerOverlay from './ui/TrailerOverlay';
+import { useShownTrailer } from './ui/trailer';
 import { useFolderRequest } from './library/folders';
 import Shortcuts from './ui/Shortcuts';
 import { setShortcutsOpen, useShortcutsOpen } from './ui/shortcutsState';
@@ -24,6 +26,7 @@ export default function App() {
   const folderRequest = useFolderRequest();
   // A web address the system could not open, shown instead (links.ts).
   const shownLink = useShownLink();
+  const shownTrailer = useShownTrailer();
 
   /**
    * Show the window once there is something to show.
@@ -117,6 +120,7 @@ export default function App() {
     <ErrorBoundary>
       <Browse />
       {folderRequest && <FolderBrowser request={folderRequest} />}
+      {shownTrailer && <TrailerOverlay trailer={shownTrailer} />}
       {shownLink && <LinkCard link={shownLink} />}
       {showShortcuts && <Shortcuts onClose={() => setShortcutsOpen(false)} />}
     </ErrorBoundary>

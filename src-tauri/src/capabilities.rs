@@ -73,6 +73,10 @@ pub struct Capabilities {
     /// and passes it on as one (src/backButton.ts). A desktop has none, and
     /// asking for it there was refused, with a warning in every log.
     pub back_button: bool,
+    /// The system opens a video in an app of its own when handed its id
+    /// (Android: `vnd.youtube:` goes to the YouTube app). A trailer goes
+    /// there first; elsewhere it plays in Kinema's overlay or the browser.
+    pub video_apps: bool,
     /// How much memory the computer has, in bytes; 0 where it could not be
     /// read. The player sizes its read-ahead from it (src/player/mpvOptions.ts,
     /// `cacheOptions`), so a machine with little is not asked for more than it
@@ -141,6 +145,7 @@ fn work_out() -> Capabilities {
         shares_files: cfg!(target_os = "android"),
         network_shares: cfg!(target_os = "android"),
         back_button: cfg!(mobile),
+        video_apps: cfg!(target_os = "android"),
         memory_bytes: memory_bytes(),
         sleep: crate::power::can_sleep(),
         shut_down: crate::power::can_shut_down(),
@@ -211,7 +216,7 @@ mod tests {
         assert!(c.windowed && c.folder_picker && !c.system_output && c.runs_programs);
         assert!(c.installs_ffmpeg);
         assert!(!c.screen_keyboard && c.opens_folders && !c.shares_files && !c.network_shares);
-        assert!(!c.back_button);
+        assert!(!c.back_button && !c.video_apps);
         // The rendering path the whole of docs/DESIGN.md is written about.
         assert_eq!(
             c.mpv_video,
@@ -258,6 +263,7 @@ MemTotal:       16384 kB
         assert_eq!((c.opens_folders, c.shares_files), (cfg!(desktop), cfg!(target_os = "android")));
         assert_eq!(c.network_shares, cfg!(target_os = "android"));
         assert_eq!(c.back_button, cfg!(mobile));
+        assert_eq!(c.video_apps, cfg!(target_os = "android"));
         // Wherever logind says this session may (power.rs); never elsewhere.
         assert_eq!((c.sleep, c.shut_down), (crate::power::can_sleep(), crate::power::can_shut_down()));
         if !linux {

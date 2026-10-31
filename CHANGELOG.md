@@ -9,6 +9,13 @@ makes no stability promises.
 
 ### Added
 
+- **Trailers play in Kinema.** A title with no trailer file beside it plays
+  its YouTube trailer in an overlay on Windows — YouTube's own player, ads
+  and all — with OK to pause, the arrows to skip ten seconds and Back to
+  close; the mouse has YouTube's controls, Open on YouTube and Close. On
+  Android the trailer goes to the YouTube app. On Linux, and whenever YouTube
+  will not play a trailer there, it opens in the browser as before. A trailer
+  file still plays first. Settings → Privacy says what YouTube gets.
 - **Move to a new computer** (Settings → Advanced): one file with what a
   scan cannot find again — watch history and resume points, matches and
   "not a film" decisions made by hand, playlists, My list, chosen versions

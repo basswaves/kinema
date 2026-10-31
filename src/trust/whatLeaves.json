@@ -113,6 +113,14 @@
       "only": "installs_ffmpeg"
     },
     {
+      "id": "youtube",
+      "name": "YouTube (trailers)",
+      "hosts": ["www.youtube-nocookie.com"],
+      "sends": "The trailer's YouTube number, and Kinema's own page address (http://tauri.localhost) as the page it plays for, which YouTube requires. YouTube's player then runs as on any website: once a trailer plays, YouTube stores data on this device and may show an ad. Kinema does not block ads. On Android the YouTube app gets the number instead.",
+      "when": "Only when you press Trailer on a title with no trailer file beside it. A trailer file always plays first, and nothing goes to YouTube for it.",
+      "stop": "Do not press Trailer, or put the trailer file beside the film. Where YouTube refuses, the trailer opens in your browser instead."
+    },
+    {
       "id": "github",
       "name": "GitHub (new versions)",
       "hosts": ["api.github.com"],

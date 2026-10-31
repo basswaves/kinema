@@ -588,7 +588,9 @@ reasoning is in [docs/DESIGN.md](docs/DESIGN.md) and [docs/HISTORY.md](docs/HIST
   resolver and an in-app embed with an ad blocker were all rejected on exactly
   this ground. YouTube's own embedded player, ads and all, is accepted
   (2026-10-18) because it fails safe: when YouTube refuses to play, the
-  trailer opens in the browser, as it always has. A read-only metadata service behind a stable API, used on its
+  trailer opens in the browser, as it always has. Kinema drives it by
+  messages to its frame and never loads YouTube's script into its own page;
+  ads are never blocked. A read-only metadata service behind a stable API, used on its
   own terms — TMDB, TVmaze, TheIntroDB, IntroDB, Wikidata, IMDb's published
   ratings file — passes it. Keeping dependencies current when Kinema itself is
   updated (Android's player library and build tools, a patched library in

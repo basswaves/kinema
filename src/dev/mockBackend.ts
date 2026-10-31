@@ -271,8 +271,12 @@ const titles: StoredTitle[] = [
     backdrop_path: null,
     logo_url: null,
     logo_path: null,
-    trailer_key: null,
-    trailer_site: null,
+    // `kinemaMockTrailer=1`: YouTube's own example video from its IFrame API
+    // guide, one that may be embedded, for the trailer overlay
+    // (TrailerOverlay.tsx, trailer.e2e.ts). Off by default, so the page's
+    // buttons stay as the other flows and the nav map know them.
+    trailer_key: flag('kinemaMockTrailer') === '1' ? 'M7lc1UVf-VE' : null,
+    trailer_site: flag('kinemaMockTrailer') === '1' ? 'YouTube' : null,
     rating: 8.1,
     file_count: 1,
     added_at: 1,
@@ -1917,6 +1921,7 @@ const handlers: Record<string, Handler> = {
         shares_files: true,
         network_shares: true,
         back_button: true,
+        video_apps: true,
         memory_bytes: 4 * 1024 ** 3,
         sleep: false,
         shut_down: false,
@@ -1944,6 +1949,7 @@ const handlers: Record<string, Handler> = {
       shares_files: false,
       network_shares: false,
       back_button: false,
+      video_apps: false,
       memory_bytes: 16 * 1024 ** 3,
       sleep: !NO_POWER,
       shut_down: !NO_POWER,

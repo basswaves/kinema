@@ -3572,6 +3572,18 @@ subscribers; a TV box often has no browser, so this also fixes a trailer that
 had nowhere to open. Local trailer files still come first. Ads are never
 blocked, and Settings says that YouTube stores data once a trailer plays.
 
+Built 2026-10-31. Two choices made while building it. Kinema talks to the embed
+by messages to its frame — the same messages YouTube's IFrame API script sends —
+rather than loading that script into Kinema's own page, where YouTube's code
+would run beside the library and the app's commands; the page's security policy
+allows the youtube-nocookie.com frame and nothing else of YouTube's. And Linux
+keeps the browser: there the page comes from a scheme of its own
+(`tauri://localhost`), not an http(s) address, so YouTube has no Referer it
+accepts (the "Error 153" rule). The overlay is offered wherever the page is
+served over http(s) (Windows' `http://tauri.localhost`), which is what the page
+itself can tell, not the system's name; an error there still lands in the
+browser.
+
 ## A longer plan, seen through newcomers' eyes (2026-10-21)
 
 The plan was reviewed by imagining two people finding Kinema through a web

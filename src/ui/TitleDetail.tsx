@@ -13,7 +13,8 @@ import {
   type FocusableComponent,
 } from '@noriginmedia/norigin-spatial-navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { openLink } from './links';
+import { pageCanEmbed, playTrailer } from './trailer';
+import { useCapabilities } from '../capabilities';
 import Art from './Art';
 import DrawnPoster from './DrawnPoster';
 import { drawnStyle } from './drawnColour';
@@ -216,6 +217,8 @@ export default function TitleDetailView({
   const [error, setError] = useState<string | null>(null);
   const [season, setSeason] = useState<number | null>(null);
   const [trailerPath, setTrailerPath] = useState<string | null>(null);
+  /** A YouTube trailer plays in Kinema (or the YouTube app), not the browser. */
+  const trailerInApp = useCapabilities()?.video_apps === true || pageCanEmbed();
   /** For a series: the episode the Play button will actually start. */
   const [nextUp, setNextUp] = useState<EpisodeRef | null>(null);
   /** For a series: whether that has been asked yet — see the landing below. */
@@ -875,20 +878,16 @@ export default function TitleDetailView({
                   </FocusButton>
                 )}
 
-                {/* Falls back to the browser rather than an in-app embed:
-                    whatever ad blocking the user already runs applies there,
-                    and this app ships nothing to maintain. */}
+                {/* YouTube's own player: the YouTube app on Android, the
+                    embed in Kinema's overlay on Windows, the browser elsewhere
+                    and whenever YouTube refuses (trailer.ts). */}
                 {!trailerPath && shown.trailer_key && (
                   <FocusButton
                     className="btn-secondary"
                     keepInView="page-top"
-                    onSelect={() =>
-                      void openLink(
-                        `https://www.youtube.com/watch?v=${shown.trailer_key as string}`
-                      )
-                    }
+                    onSelect={() => void playTrailer(shown.trailer_key as string, title.title)}
                   >
-                    Trailer · opens in your browser ↗
+                    {trailerInApp ? '▶ Trailer' : 'Trailer · opens in your browser ↗'}
                   </FocusButton>
                 )}
 

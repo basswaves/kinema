@@ -54,6 +54,9 @@ export interface Capabilities {
   /** The system has its own Back button the page never sees as a key
    * (Android's): it is listened for and passed on (backButton.ts). */
   back_button: boolean;
+  /** Handed a video's id, the system opens it in an app of its own (Android's
+   * YouTube app): a trailer goes there first (ui/trailer.ts). */
+  video_apps: boolean;
   /** The computer's memory in bytes; 0 when it could not be read. The mpv
    * read-ahead is sized from it (player/mpvOptions.ts `cacheOptions`). */
   memory_bytes: number;

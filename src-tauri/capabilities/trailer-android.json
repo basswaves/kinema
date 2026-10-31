@@ -1,0 +1,15 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "trailer-android",
+  "description": "A trailer's YouTube id handed to the YouTube app (`vnd.youtube:`, ui/trailer.ts); without one the opener refuses and the browser gets the page",
+  "windows": [
+    "main"
+  ],
+  "platforms": ["android"],
+  "permissions": [
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [{ "url": "vnd.youtube:*" }]
+    }
+  ]
+}

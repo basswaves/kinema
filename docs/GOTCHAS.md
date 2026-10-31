@@ -1864,6 +1864,20 @@ The installer (2026-10-17) is built from `tauri.installer.conf.json`, which maps
 the DLLs to sit beside the exe, and it was tested by *playing a file* — an
 installer that starts the app proves nothing. Keep it that way.
 
+### Running a newer setup by hand uninstalls instead of updating
+
+The NSIS "already installed" page pre-selects "uninstall before installing"
+and runs the old uninstaller without `/UPDATE`: Tauri unpins and deletes the
+shortcuts and our `--uninstall-cleanup` drops the default-player entries. The
+page cannot be told to pass `/UPDATE`, and `hooks.nsh` is read before the
+template's variables, defines and plugins exist (no `$UpdateMode`, `${VERSION}`
+or `nsis_tauri_utils::` there). So `hooks.nsh` has a `MUI_CUSTOMFUNCTION_GUIINIT`
+function that, for a newer setup started without `/P` or `/UPDATE`, starts the
+setup again with `/P /UPDATE /R` and quits. `.onGUIInit` is MUI's: defining it
+yourself fails. Proof: `scripts/sandbox-installer-update.ps1` (previous release
+→ new setup with defaults). A real taskbar pin cannot be made by script, so
+the Sandbox run uses a copied shortcut for it.
+
 ### A clean Windows lacks `VCRUNTIME140.dll`, and error 126 blames the wrong file
 
 The plugin's prebuilt `libmpv-wrapper.dll` needs Microsoft's Visual C++ runtime

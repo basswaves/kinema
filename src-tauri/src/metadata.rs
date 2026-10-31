@@ -903,6 +903,21 @@ fn adopt(conn: &rusqlite::Connection, id: i64, provider: &str, provider_id: &str
           WHERE provider = ?1 AND provider_id = ?2",
         params![old_provider, old_id, provider, provider_id, tmdb],
     )?;
+    // watch_history has no unique key, so OR IGNORE kept nothing apart: an
+    // episode both providers had a row for is now two rows under one id.
+    // The most recently touched stays.
+    tx.execute(
+        "DELETE FROM watch_history
+          WHERE provider = ?1 AND provider_id = ?2
+            AND id NOT IN (
+                SELECT id FROM (
+                    SELECT id, ROW_NUMBER() OVER (
+                               PARTITION BY kind, season, episode
+                               ORDER BY updated_at DESC, id DESC) AS n
+                      FROM watch_history WHERE provider = ?1 AND provider_id = ?2)
+                 WHERE n = 1)",
+        params![provider, provider_id],
+    )?;
     tx.execute(
         "UPDATE OR IGNORE my_list
             SET provider = ?3, provider_id = ?4, tmdb_id = COALESCE(tmdb_id, ?5)
@@ -1252,6 +1267,32 @@ mod tests {
             .unwrap();
         assert_eq!((title_id, position), (5, 600.0));
         assert!(!adopt(&conn, 6, "tmdb", "900").unwrap(), "row 7 has a file of its own");
+    }
+
+    /// Both providers kept a row for S01E01 (and one only for S01E02): after
+    /// the re-key there is one row per episode, the newest of each.
+    #[test]
+    fn rekeying_leaves_one_history_row_per_episode() {
+        let conn = library("adopt-twice");
+        conn.execute_batch(
+            "INSERT INTO titles (id, kind, provider, provider_id, title, fetched_at)
+                 VALUES (8, 'series', 'tvmaze', '88', 'Twice Show', 0);
+             INSERT INTO watch_history (kind, provider, provider_id, season, episode,
+                     position_secs, duration_secs, completed, updated_at)
+                 VALUES ('series', 'tvmaze', '88', 1, 1, 0, 1200, 1, 10),
+                        ('series', 'tvmaze', '88', 1, 2, 300, 1200, 0, 10),
+                        ('series', 'tmdb', '2000', 1, 1, 600, 1200, 0, 20);",
+        )
+        .unwrap();
+        assert!(adopt(&conn, 8, "tmdb", "2000").unwrap());
+        let rows: Vec<(i64, i64, f64)> = conn
+            .prepare("SELECT season * 100 + episode, completed, position_secs FROM watch_history ORDER BY 1")
+            .unwrap()
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        assert_eq!(rows, vec![(101, 0, 600.0), (102, 0, 300.0)]);
     }
 
     /// Never-asked fallback titles come first; one asked this month waits; a

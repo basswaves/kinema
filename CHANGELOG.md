@@ -87,6 +87,15 @@ makes no stability promises.
   share, stream or drive cannot keep up, a note says what it is waiting for
   and how far the refill is. A start or a seek never shows it.
 
+### Fixed
+
+- **Updating Kinema on Windows by running the new setup keeps your taskbar
+  pin, shortcuts and "offer as a video player" setting.** The setup used to
+  offer "uninstall before installing" first, which removed them. A newer setup
+  now updates in place; Uninstall still removes everything.
+- **Moving a show from a fallback source to TMDB no longer leaves two watch
+  history rows for one episode** (the newest stays).
+
 ### Changed
 
 - Back from a title returns to the same place in the grid: the card and how

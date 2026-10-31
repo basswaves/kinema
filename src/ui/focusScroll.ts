@@ -123,7 +123,11 @@ export function glide(el: HTMLElement, axis: 'x' | 'y', to: number, duration: nu
   if (Math.abs(target - from) < 1) return;
   const s: Spring = { axis, pos: from, vel: 0, to: target, omega, last: performance.now(), frame: 0 };
   const step = (now: number) => {
-    const dt = Math.min(0.05, Math.max(0, (now - s.last) / 1000));
+    // The time that really passed, however long: the solution below is exact
+    // for any step. Capped at 50 ms (the first version), a starved page — a
+    // busy machine, a weak box — moved 50 ms of the way per frame, and a
+    // 220 ms scroll took seconds (focusScroll.test.ts; the WebKit CI flake).
+    const dt = Math.max(0, (now - s.last) / 1000);
     s.last = now;
     // The exact solution for a critically damped spring over dt.
     const x0 = s.pos - s.to;

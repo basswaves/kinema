@@ -439,8 +439,9 @@
       "Go to Skipping intros, for IntroDB": { "U": "Go to Skipping intros, for TheIntroDB", "D": "Go to Language & subtitles, for OpenSubtitles", "L": "Privacy", "R": "·" },
       "Go to Language & subtitles, for OpenSubtitles": { "U": "Go to Skipping intros, for IntroDB", "D": "Go to Keep track of what I watch, for SIMKL", "L": "Privacy", "R": "·" },
       "Go to Keep track of what I watch, for SIMKL": { "U": "Go to Language & subtitles, for OpenSubtitles", "D": "Go to Keep track of what I watch, for Trakt", "L": "Privacy", "R": "·" },
-      "Go to Keep track of what I watch, for Trakt": { "U": "Go to Keep track of what I watch, for SIMKL", "D": "Go to Advanced, for GitHub (new versions)", "L": "Privacy", "R": "·" },
-      "Go to Advanced, for GitHub (new versions)": { "U": "Go to Keep track of what I watch, for Trakt", "D": "·", "L": "Privacy", "R": "·" }
+      "Go to Keep track of what I watch, for Trakt": { "U": "Go to Keep track of what I watch, for SIMKL", "D": "Go to Keep track of what I watch, for Your own Jellyfin, Emby or Plex server", "L": "Privacy", "R": "·" },
+      "Go to Keep track of what I watch, for Your own Jellyfin, Emby or Plex server": { "U": "Go to Keep track of what I watch, for Trakt", "D": "Go to Advanced, for GitHub (new versions)", "L": "Privacy", "R": "·" },
+      "Go to Advanced, for GitHub (new versions)": { "U": "Go to Keep track of what I watch, for Your own Jellyfin, Emby or Plex server", "D": "·", "L": "Privacy", "R": "·" }
     },
     "settings-subtitles": {
       "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "✓As the file sets it" },
@@ -917,8 +918,9 @@
       "Go to Skipping intros, for IntroDB": { "U": "Go to Skipping intros, for TheIntroDB", "D": "Go to Language & subtitles, for OpenSubtitles", "L": "Privacy", "R": "·" },
       "Go to Language & subtitles, for OpenSubtitles": { "U": "Go to Skipping intros, for IntroDB", "D": "Go to Keep track of what I watch, for SIMKL", "L": "Privacy", "R": "·" },
       "Go to Keep track of what I watch, for SIMKL": { "U": "Go to Language & subtitles, for OpenSubtitles", "D": "Go to Keep track of what I watch, for Trakt", "L": "Privacy", "R": "·" },
-      "Go to Keep track of what I watch, for Trakt": { "U": "Go to Keep track of what I watch, for SIMKL", "D": "Go to Advanced, for GitHub (new versions)", "L": "Privacy", "R": "·" },
-      "Go to Advanced, for GitHub (new versions)": { "U": "Go to Keep track of what I watch, for Trakt", "D": "·", "L": "Privacy", "R": "·" }
+      "Go to Keep track of what I watch, for Trakt": { "U": "Go to Keep track of what I watch, for SIMKL", "D": "Go to Keep track of what I watch, for Your own Jellyfin, Emby or Plex server", "L": "Privacy", "R": "·" },
+      "Go to Keep track of what I watch, for Your own Jellyfin, Emby or Plex server": { "U": "Go to Keep track of what I watch, for Trakt", "D": "Go to Advanced, for GitHub (new versions)", "L": "Privacy", "R": "·" },
+      "Go to Advanced, for GitHub (new versions)": { "U": "Go to Keep track of what I watch, for Your own Jellyfin, Emby or Plex server", "D": "·", "L": "Privacy", "R": "·" }
     },
     "settings-subtitles": {
       "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "✓As the file sets it" },
@@ -1356,8 +1358,9 @@
       "Go to Skipping intros, for IntroDB": { "U": "Go to Skipping intros, for TheIntroDB", "D": "Go to Language & subtitles, for OpenSubtitles", "L": "Privacy", "R": "·" },
       "Go to Language & subtitles, for OpenSubtitles": { "U": "Go to Skipping intros, for IntroDB", "D": "Go to Keep track of what I watch, for SIMKL", "L": "Privacy", "R": "·" },
       "Go to Keep track of what I watch, for SIMKL": { "U": "Go to Language & subtitles, for OpenSubtitles", "D": "Go to Keep track of what I watch, for Trakt", "L": "Privacy", "R": "·" },
-      "Go to Keep track of what I watch, for Trakt": { "U": "Go to Keep track of what I watch, for SIMKL", "D": "Go to Advanced, for GitHub (new versions)", "L": "Privacy", "R": "·" },
-      "Go to Advanced, for GitHub (new versions)": { "U": "Go to Keep track of what I watch, for Trakt", "D": "·", "L": "Privacy", "R": "·" }
+      "Go to Keep track of what I watch, for Trakt": { "U": "Go to Keep track of what I watch, for SIMKL", "D": "Go to Keep track of what I watch, for Your own Jellyfin, Emby or Plex server", "L": "Privacy", "R": "·" },
+      "Go to Keep track of what I watch, for Your own Jellyfin, Emby or Plex server": { "U": "Go to Keep track of what I watch, for Trakt", "D": "Go to Advanced, for GitHub (new versions)", "L": "Privacy", "R": "·" },
+      "Go to Advanced, for GitHub (new versions)": { "U": "Go to Keep track of what I watch, for Your own Jellyfin, Emby or Plex server", "D": "·", "L": "Privacy", "R": "·" }
     }
   }
 }

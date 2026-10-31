@@ -24,10 +24,11 @@
  */
 import { isLightLook } from './lightLook';
 
-/** How long a move takes to settle, for every scroll the ring causes. */
-export const MOTION_MS = 320;
+/** How long a move takes to settle, for every scroll the ring causes
+ *  (320 ms felt "a little too glidy" to the owner, 2026-10-31). */
+export const MOTION_MS = 220;
 /** The quickest settle, under a held key: quicker reads as a jump. */
-const MIN_MOTION_MS = 140;
+const MIN_MOTION_MS = 110;
 /** Where a key move puts the area holding the ring: this share of the way down the page. */
 const KEYLINE = 1 / 3;
 /** The least gap between the top bar and that area, in rem. */
@@ -131,7 +132,9 @@ export function glide(el: HTMLElement, axis: 'x' | 'y', to: number, duration: nu
     const x = (x0 + c * dt) * decay;
     s.vel = (s.vel - s.omega * c * dt) * decay;
     s.pos = s.to + x;
-    if (Math.abs(x) < 0.5 && Math.abs(s.vel) < 20) {
+    // Within two pixels and slowing: there. Creeping the last pixel for a
+    // tenth of a second read as the page still drifting.
+    if (Math.abs(x) < 2 && Math.abs(s.vel) < 60) {
       place(el, axis, s.to);
       springs.delete(el);
       return;

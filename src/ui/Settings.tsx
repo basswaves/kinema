@@ -39,6 +39,7 @@ import { count, formatBytes } from './format';
 import FocusInput from './FocusInput';
 import BackupSection from './BackupSection';
 import ImportWatchedSection from './ImportWatchedSection';
+import MoveSection from './MoveSection';
 import VideoPlayerSection from './VideoPlayerSection';
 import AccountSection, { AccountAppFields } from './AccountSection';
 import {
@@ -1686,6 +1687,7 @@ export default function Settings({
                   </p>
                 </section>
 
+                <MoveSection />
                 <BackupSection />
 
                 <section className="settings-section">

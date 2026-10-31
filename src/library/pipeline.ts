@@ -54,6 +54,7 @@ import {
 } from '../metadata/match';
 import { syncBuiltinKey } from '../metadata/builtinKey';
 import { refreshTomatometer } from '../metadata/scores';
+import { applyMovedMatches } from '../metadata/moving';
 
 /** Batched so a large library reports progress and never builds one huge IPC payload. */
 const PARSE_BATCH = 500;
@@ -358,6 +359,9 @@ export async function runScanPipeline(): Promise<ScanOutcome> {
     await yieldToPlayback();
     const upgraded = await upgradeFallbackTitles();
     errors.push(...upgraded.errors);
+    // Matches made by hand on another computer (Move to a new computer),
+    // for files this scan found. Usually nothing.
+    await applyMovedMatches().catch((e: unknown) => errors.push(String(e)));
     // After matching and details, so every IMDb id the library has is known.
     // Usually nothing: the file is fetched weekly at most.
     await yieldToPlayback();

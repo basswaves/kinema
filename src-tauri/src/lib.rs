@@ -28,6 +28,7 @@ mod lifecycle;
 mod local_title;
 mod metadata;
 mod import_watched;
+mod moving;
 mod my_list;
 mod versions;
 #[cfg(target_os = "linux")]
@@ -477,6 +478,10 @@ pub fn run() {
             import_watched::kodi_database,
             import_watched::import_watched_file,
             import_watched::import_watched_server,
+            moving::export_move,
+            moving::import_move,
+            moving::moved_matches_ready,
+            moving::moved_match_done,
             my_list::my_list,
             my_list::set_in_my_list,
             versions::title_versions,

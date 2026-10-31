@@ -318,6 +318,12 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   },
   {
     section: 'advanced',
+    label: 'Move to a new computer',
+    about: 'export import library file watch history settings playlists transfer migrate',
+    when: (can) => can.folder_picker,
+  },
+  {
+    section: 'advanced',
     label: 'Safety copies',
     about: 'backup restore copy of the library',
   },

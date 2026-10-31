@@ -9,6 +9,14 @@ makes no stability promises.
 
 ### Added
 
+- **Move to a new computer** (Settings → Advanced): one file with what a
+  scan cannot find again — watch history and resume points, matches and
+  "not a film" decisions made by hand, playlists, My list, chosen versions
+  and posters, and the settings that describe you. No sign-in, key or
+  password goes in it, nor this computer's screens, sound devices or paths.
+  Taking it in never un-watches and keeps a newer resume point; it sends
+  nothing to SIMKL or Trakt — sign in again, and nothing goes twice. A match
+  made by hand waits for its file until a scan finds it.
 - **Bring in what you watched elsewhere** (Settings → Keep track of what I
   watch): Kodi's database (found by itself when Kodi is installed), your
   own Jellyfin, Emby or Plex server (read once; the key is not kept), or a

@@ -18,6 +18,7 @@ const desktop = {
   system_output: false,
   runs_programs: true,
   opens_folders: true,
+  folder_picker: true,
 } as Capabilities;
 
 describe('Settings search', () => {

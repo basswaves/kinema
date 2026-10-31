@@ -1462,6 +1462,39 @@ a thousand test files, 2026-10-10) and the dev server watched them. All three
 now skip `.claude/` (`eslint.config.js`, `vite.config.ts`); a new tool that
 walks the project needs the same line.
 
+### A fixed wait in a test is a bet on the machine (round 7, F5)
+
+`waitForTimeout(500)` after a press "worked" until a runner was starved,
+then the check ran before the page had answered (or, for "nothing happens",
+long before the thing that should not happen could). 60 of them sat in `e2e/`.
+**Do:** wait for a state — `expect.poll` on the focus key, `drawn(page)`
+(two frames) after a press you will not poll for, `settled(page)` for a scroll,
+`quiet()` in the nav checker (counts frames, not milliseconds). The few real
+time checks and the input pacing go through `pause(page, ms, why)` in
+`e2e/kb.ts`, the one place eslint allows `waitForTimeout`. `open()` waits
+30 s for the page: expect's 5 s ended a starved startup as a failure.
+
+### Screenshot baselines are per engine and per OS
+
+`toHaveScreenshot` names a picture `name-<look>-<engine>-<platform>.png`:
+Edge on Windows, WebKit on Windows and WebKit on Linux are three sets (fonts
+differ; one set would fail on the others). A new engine or OS with no
+baseline writes one and **passes** the first time — so a missing set is not
+a green check. Linux's come from Ubuntu 24.04 (CI's image; WSL's distro is
+the same): `scriptswsl.ps1 'npx playwright test e2e/screens.e2e.ts
+--update-snapshots'`, then copy the `*-linux.png` back. The Look is seeded
+by `kinemaMockLook` in localStorage: the mock's settings are in memory, so
+setting it after load is lost on a reload.
+
+### A model-based nav map saves no time, only certainty (round 7, F5)
+
+`navmap.nav.ts` asks the engine's pure rule (`__nav.model`) for where each
+arrow goes and presses only where the ring moves (to see where it lands on
+screen); a press that disagrees with the model is flagged `model-differs`.
+Edge, full map: 3 m 57 s with the model, 3 m 53 s pressing everything
+(`NAV_MODEL=0`) — the time is the screens' set-up and the held-key tests, not
+the presses. Do not expect a speed-up from here.
+
 ### A self-test's screenshots are of whatever window is in front
 
 `selftest.ps1` photographs the primary screen, not Kinema's window. Started

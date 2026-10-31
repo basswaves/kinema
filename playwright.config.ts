@@ -23,7 +23,12 @@ export default defineConfig({
   // Not `.spec.ts`: vitest would pick those up and fail on them.
   testMatch: '**/*.e2e.ts',
   timeout: 60_000,
+  // No retries, here or on CI, and a pass that needed one is a failure: a flake
+  // must never hide behind a second try (round 7, F5). `failOnFlakyTests`
+  // is the second lock should someone add `retries` later.
   retries: 0,
+  failOnFlakyTests: true,
+  forbidOnly: !!process.env.CI,
   // Every flow in its own page, several at once. The fake mpv keeps its clock
   // in each page, so flows cannot disturb each other; what they share is the
   // processor, and the checks time things in seconds. Measured 2026-10-29 on

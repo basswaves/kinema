@@ -663,7 +663,13 @@ function traktResumeSync(): number {
 }
 const prefs = new Map<number, TitlePrefs>();
 const dismissed = new Map<number, number>();
+// `kinemaMockLook` ('full' | 'light'): the Look setting from the start, for the
+// screenshot flows (e2e/screens.e2e.ts), which compare both looks.
 const settings = new Map<string, string>([['tmdb_api_key', 'fixture']]);
+{
+  const look = typeof localStorage !== 'undefined' ? localStorage.getItem('kinemaMockLook') : null;
+  if (look) settings.set('look', look);
+}
 let clock = 1000;
 
 const fileById = (id: number) => files.find((f) => f.id === id) ?? null;

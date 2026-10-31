@@ -249,10 +249,31 @@ already on Windows). Once, `npx playwright install webkit`; then:
 npm run test:ui
 ```
 
-The tests are in `e2e/`. They press keys the way a remote does — and wait as
-a person would, since two presses 25 ms apart are one (GOTCHAS), and a prompt
-is read before it is answered. `e2e/player.e2e.ts` covers everything a sofa
+The tests are in `e2e/`. They press keys the way a remote does and wait for a
+**state** — the focus key, an element, a drawn frame — never a fixed time:
+`waitForTimeout` is banned by lint outside `pause(page, ms, why)` in
+`e2e/kb.ts`, which is for input pacing and checks that measure time on
+purpose, and says why. There are no retries, here or on CI, and a test that
+passes only on a second try fails the run. `window.__nav` (dev:mock only)
+answers from the engine itself: `focusKey(page)`, `focusTree(page)`. `e2e/player.e2e.ts` covers everything a sofa
 does in the player; a change there should leave all of it passing.
+
+**Screenshots.** `e2e/screens.e2e.ts` compares seven key screens (Home, a film
+page, a show page, Settings, search, the player's Audio & subtitles, the first
+run) with pictures kept in `e2e/screens.e2e.ts-snapshots/`, in the Full and
+the Light look, per engine and per operating system (fonts differ). A shifted
+row, a missing poster or a wrong colour fails; anti-aliasing does not. When a
+screen is changed on purpose, look at what the failed run saved
+(`test-results/`: expected, actual, diff), then rewrite the pictures and
+review them in the diff before committing:
+
+```bash
+npx playwright test e2e/screens.e2e.ts --update-snapshots
+```
+
+Linux's pictures come from Linux: `scriptswsl.ps1 'npx playwright test
+e2e/screens.e2e.ts --update-snapshots'`, or the `playwright-results`
+artifact of a failed CI run (its `-actual.png` files, renamed).
 
 The navigation checker presses every arrow from every control on every
 screen, at TV size, as Windows, Linux and Android, and writes where each one

@@ -27,6 +27,7 @@ export default defineConfig({
   globalSetup: './e2e/navmapSetup.ts',
   timeout: 40 * 60_000,
   retries: 0,
+  failOnFlakyTests: true,
   // Each system's walk is split into parts that share the screens out (see
   // navmap.nav.ts), every screen in its own page. As in playwright.config.ts:
   // one worker per core, 5 on CI's 4-core runner (8 on 4 cores started to

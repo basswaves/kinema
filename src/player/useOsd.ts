@@ -2,13 +2,10 @@
  * The on-screen controls: whether they are showing, and whether they hold the
  * arrow keys ("OSD focus") — the switch between the arrows seeking and the
  * arrows moving the focus ring (docs/GOTCHAS.md, "Two live key handlers
- * cannot share the arrow keys").
+ * cannot share the arrow keys"). The player's screen on the focus engine
+ * answers the keys exactly while this is on (Player.tsx, `FocusScreen keys`).
  */
-import {
-  pause as pauseSpatial,
-  resume as resumeSpatial,
-  setFocus,
-} from '@noriginmedia/norigin-spatial-navigation';
+import { navFocus } from '../ui/focusStore';
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { PLAYER_PLAY_KEY } from './focusKeys';
 import type { Session } from './session';
@@ -29,11 +26,11 @@ export function useOsd({
    * Whether the OSD holds focus.
    *
    * This is the switch that decides which of the two live keyboard handlers
-   * owns the arrow keys. Off (the default) the spatial system is paused and
-   * arrows seek, exactly as a desktop player behaves. On, the spatial system is
-   * resumed and arrows move between controls. Exactly one is ever active, which
-   * is the whole point: `preventDefault` cannot stop the other listener, so
-   * overlapping them would fire both.
+   * owns the arrow keys. Off (the default) the focus engine leaves them alone
+   * and arrows seek, exactly as a desktop player behaves. On, the engine
+   * answers and arrows move between controls. Exactly one is ever active,
+   * which is the whole point: `preventDefault` cannot stop the other
+   * listener, so overlapping them would fire both.
    */
   const [osdFocus, setOsdFocus] = useState(false);
 
@@ -52,27 +49,19 @@ export function useOsd({
     hideTimer.current = window.setTimeout(() => setOsdVisible(false), OSD_HIDE_MS);
   }, [sessionRef]);
 
-  /**
-   * Hand the arrow keys to the OSD.
-   *
-   * `resume()` before `setFocus`: the spatial system ignores navigation while
-   * paused, and aiming focus at a control it is not currently listening for
-   * would leave the ring nowhere.
-   */
+  /** Hand the arrow keys to the OSD, with the ring on Play/Pause (or in a panel that is open). */
   const enterOsdFocus = useCallback(() => {
     osdFocusRef.current = true;
     setOsdFocus(true);
-    resumeSpatial();
     setOsdVisible(true);
     window.clearTimeout(hideTimer.current);
-    void setFocus(PLAYER_PLAY_KEY);
+    navFocus(PLAYER_PLAY_KEY);
   }, []);
 
   /** Give them back to seeking, and let the OSD start timing out again. */
   const leaveOsdFocus = useCallback(() => {
     osdFocusRef.current = false;
     setOsdFocus(false);
-    pauseSpatial();
     showOsd();
   }, [showOsd]);
 
@@ -81,16 +70,6 @@ export function useOsd({
    * nothing is playing, so there is nothing for them to cover.
    */
   const revealOsd = useCallback(() => setOsdVisible(true), []);
-
-  /**
-   * Arrows mean "seek" until asked otherwise, so the spatial system starts
-   * paused — and is resumed on the way out, or the browsing UI underneath would
-   * be left unable to navigate after the player closes.
-   */
-  useEffect(() => {
-    pauseSpatial();
-    return () => resumeSpatial();
-  }, []);
 
   /**
    * Paused, the controls stay up — the position and the way back to playing
@@ -110,7 +89,6 @@ export function useOsd({
   return {
     osdVisible,
     osdFocus,
-    osdFocusRef,
     showOsd,
     enterOsdFocus,
     leaveOsdFocus,

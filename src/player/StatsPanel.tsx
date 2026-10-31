@@ -2,29 +2,37 @@
  * "Stats for nerds": what the pipeline is actually doing, as the engine says
  * it (mpv's properties, or Media3's own facts).
  */
-import { FocusContext, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
-import { useEffect } from 'react';
 import FocusButton from '../ui/FocusButton';
-import { useFocusGroup } from '../ui/focusGroups';
+import { FocusProvider } from '../ui/FocusGroup';
+import { ALL_ARROWS, useFocusGroup, useFocusLeaf } from '../ui/focusGroups';
 import type { StatGroup } from './stats';
 
-/** Its close button, where the ring goes when a remote opened it (usePanels.ts). */
+/** Its close button, where the ring lands when it opens from Audio & subtitles. */
 export const STATS_CLOSE_KEY = 'player-stats-close';
 
 export default function StatsPanel({
   stats,
+  dialog,
   onClose,
 }: {
   stats: StatGroup[];
+  /** Opened from Audio & subtitles: the ring goes in. On `i` it stays where it was. */
+  dialog: boolean;
   onClose: () => void;
 }) {
   // A closed menu, like Audio & subtitles: Down from a group reaches the next
   // group, never the player's controls. Left open to them, the next group and
   // Pause were both "below", and while the panel was still scrolling the last
   // group into view Pause could be the nearer one (CI's WebKit, 2026-10-16).
-  const { ref, focusKey } = useFocusGroup<HTMLElement>('menu');
+  // On `i` it is beside the film, not a dialog, and arrows from the
+  // controls pass it by.
+  const { ref, focusKey } = useFocusGroup<HTMLElement>('menu', {
+    current: STATS_CLOSE_KEY,
+    modal: dialog,
+    passOver: dialog ? undefined : ALL_ARROWS,
+  });
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <aside className="stats-panel" ref={ref}>
         <div className="stats-head">
           <span>Stats for nerds</span>
@@ -37,7 +45,7 @@ export default function StatsPanel({
           <Group key={group.heading} group={group} />
         ))}
       </aside>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }
 
@@ -45,17 +53,16 @@ export default function StatsPanel({
  * One group, a stop for a remote's ring. The panel is taller than a TV's
  * screen leaves it (the old box showed it cut off after Frames, 2026-10-05),
  * and with only the close button to land on a remote could not scroll to the
- * rest — so Down goes group by group, each brought into view. Nothing happens
- * on OK: it is there to be read. A mouse scrolls the panel as before.
+ * rest — so Down goes group by group, each brought into view (the player's
+ * `nearest` scroll, focusScroll.ts). Nothing happens on OK: it is there to be
+ * read. A mouse scrolls the panel as before.
  */
 function Group({ group }: { group: StatGroup }) {
-  const { ref, focused } = useFocusable<object, HTMLElement>();
-  useEffect(() => {
-    if (focused) ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }, [focused, ref]);
+  const { ref, focused, navProps } = useFocusLeaf<HTMLElement>({});
   return (
     <section
       ref={ref}
+      {...navProps}
       className={`stats-group ${group.wideLabels ? 'wide-labels' : ''} ${focused ? 'focused' : ''}`}
     >
       <h3>{group.heading}</h3>

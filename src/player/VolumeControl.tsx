@@ -11,8 +11,8 @@
  * While the sound goes to a receiver untouched, the level here would do
  * nothing, so it says the receiver has the volume rather than pretending.
  */
-import { useFocusable } from '@noriginmedia/norigin-spatial-navigation';
-import type { PointerEvent } from 'react';
+import { useRef, type PointerEvent } from 'react';
+import { useNavLeaf } from '../ui/focusStore';
 import { VolumeIcon } from './icons';
 import { VOLUME_STEP } from './volume';
 
@@ -43,15 +43,17 @@ export default function VolumeControl({
   onSet,
   onToggleMute,
 }: Props) {
-  const { ref, focused } = useFocusable<object, HTMLDivElement>({
-    focusKey: PLAYER_VOLUME_KEY,
-    onEnterPress: () => {
+  const ref = useRef<HTMLDivElement>(null);
+  const { focused, props } = useNavLeaf(PLAYER_VOLUME_KEY, ref, {
+    on: true,
+    onSelect: () => {
       if (!receiver) onToggleMute();
     },
-    onArrowPress: (direction) => {
-      if (direction !== 'up' && direction !== 'down') return true;
-      if (!receiver) onChange(direction === 'up' ? VOLUME_STEP : -VOLUME_STEP);
-      return false;
+    // Up and Down are the level; Left and Right go on along the row.
+    onArrow: (arrow) => {
+      if (arrow !== 'up' && arrow !== 'down') return false;
+      if (!receiver) onChange(arrow === 'up' ? VOLUME_STEP : -VOLUME_STEP);
+      return true;
     },
   });
 
@@ -64,6 +66,7 @@ export default function VolumeControl({
   return (
     <div
       ref={ref}
+      {...props}
       className={`volume-control ${focused ? 'focused' : ''} ${receiver ? 'receiver' : ''}`}
       role="button"
       aria-label={name}

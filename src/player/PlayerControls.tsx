@@ -5,6 +5,7 @@
  */
 import { memo } from 'react';
 import FocusButton from '../ui/FocusButton';
+import FocusGroup from '../ui/FocusGroup';
 import { formatTime } from '../ui/format';
 import { setShortcutsOpen } from '../ui/shortcutsState';
 import type { Steps } from './useNeighbours';
@@ -142,7 +143,9 @@ function PlayerControls({
           name for a screen reader and a tooltip for the mouse. Stats is not
           here any more — it is a diagnostic, on `i` and in the key list, not
           something to walk past on the way to the subtitles. */}
-      <div className="player-buttons">
+      {/* One row on the focus engine: Left and Right along it, Up to the bar,
+          arriving on Play/Pause. */}
+      <FocusGroup kind="row" className="player-buttons" current={PLAYER_PLAY_KEY}>
         <div className="player-group player-group-left">
           <FocusButton
             className="icon-button"
@@ -240,7 +243,7 @@ function PlayerControls({
             </FocusButton>
           )}
         </div>
-      </div>
+      </FocusGroup>
     </div>
   );
 }

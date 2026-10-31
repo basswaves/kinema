@@ -55,7 +55,7 @@ import {
   type NavNode,
   type NavTree,
 } from './focusModel';
-import { lineUp, motionFor, MOTION_MS, readBack, readOn, reveal, toTop } from './focusScroll';
+import { lineUp, motionFor, MOTION_MS, nearest, readBack, readOn, reveal, toTop } from './focusScroll';
 
 /** The tree's top: a column holding the top bar and the screen. */
 export const ROOT = 'nav-root';
@@ -72,12 +72,20 @@ interface Entry {
   disabled: boolean;
   select?: () => void;
   highlight?: () => void;
+  /** A control that keeps some arrows to itself (the seek bar, the volume): true when it took this one. */
+  arrow?: (arrow: Arrow, event: KeyboardEvent) => boolean;
 }
 
 interface Screen {
   id: number;
   /** The input count when it arrived: a page takes the ring until the person acts. */
   arrivedAt: number;
+  /**
+   * Whether it answers the keys now. The player's does only while its
+   * controls hold the ring: otherwise the arrows seek, by the player's own
+   * handler, and exactly one of the two answers each press.
+   */
+  keys: boolean;
 }
 
 const entries = new Map<string, Entry>();
@@ -182,7 +190,7 @@ function active(): boolean {
 
 /** Whether this engine answers the keys now. */
 function answering(): boolean {
-  return active() && layers === 0;
+  return active() && layers === 0 && screens[screens.length - 1].keys;
 }
 
 /** The dialog holding the ring now, if one is open and holds anything. */
@@ -201,9 +209,9 @@ function allowed(key: string): boolean {
 
 let spatialPaused = false;
 
-/** The spatial library is paused exactly while this engine answers. */
+/** The spatial library is paused exactly while this engine has the keys (answering, or a screen holding them back). */
 function syncEngines(): void {
-  const want = answering();
+  const want = active() && layers === 0;
   if (want && !spatialPaused) pauseSpatial();
   if (!want && spatialPaused) resumeSpatial();
   spatialPaused = want;
@@ -235,6 +243,12 @@ function scrollFor(key: string, how: How, sinceLast: number): void {
   const leaf = entries.get(key)?.node;
   if (!leaf || how === 'pointer') return;
   const duration = how === 'key' ? motionFor(sinceLast) : how === 'tab' ? MOTION_MS : 0;
+  // The player's panels are lists drawn over the film, not a page: only
+  // what has gone out of sight is brought back (focusScroll.ts, `nearest`).
+  if (leaf.closest('[data-scroll="nearest"]')) {
+    nearest(leaf, duration);
+    return;
+  }
   if (pageTopArea(key)) {
     if (how === 'key' || how === 'tab') toTop(leaf, duration);
     return;
@@ -370,7 +384,12 @@ function settle(): void {
 function add(entry: Entry): void {
   if (entries.has(entry.key)) console.warn(`focus: ${entry.key} registered twice`);
   entries.set(entry.key, entry);
-  if (entry.modal) modals.push({ key: entry.key, opener: focused });
+  // A dialog opened as another closed (Playback details from Audio &
+  // subtitles): the ring goes back to where the closed one came from.
+  if (entry.modal) {
+    const opener = focused !== null && !entries.has(focused) && returnFromModal ? returnFromModal : focused;
+    modals.push({ key: entry.key, opener });
+  }
   let set = childSets.get(entry.parent);
   if (!set) childSets.set(entry.parent, (set = new Set()));
   set.add(entry.key);
@@ -424,6 +443,7 @@ function onKeyDown(event: KeyboardEvent): void {
   if (arrow) {
     // Also keeps the browser from scrolling the page by itself.
     event.preventDefault();
+    if (entries.get(at)?.arrow?.(arrow, event)) return;
     const node = entries.get(at)?.node;
     const duration = motionFor(performance.now() - lastKeyMoveAt);
     // Up first reads back what Down read on (focusScroll.ts).
@@ -520,8 +540,11 @@ export function navHas(key: string): boolean {
 /** Put the ring on `key` (an area: by its rules). False when it is not here. */
 export function navFocus(key: string, how: 'program' | 'pointer' = 'program'): boolean {
   generation++;
-  const leaf = entries.has(key) ? enter(tree, key, memory) : null;
+  let leaf = entries.has(key) ? enter(tree, key, memory) : null;
   if (!leaf) return false;
+  // Never behind an open dialog: into it, by its rules.
+  const modal = topModal();
+  if (modal && !within(tree, leaf, modal)) leaf = enter(tree, modal, memory) ?? leaf;
   setFocused(leaf, how);
   return true;
 }
@@ -567,13 +590,27 @@ export function newScreenId(): number {
 }
 
 /** A screen on this engine has arrived. */
-export function screenArrived(id: number): void {
+export function screenArrived(id: number, keys = true): void {
   install();
   tookOverAt = performance.now();
-  screens.push({ id, arrivedAt: inputs });
+  screens.push({ id, arrivedAt: inputs, keys });
   syncEngines();
   notifyEngine();
   scheduleSettle();
+}
+
+/**
+ * A screen takes the keys (the player's controls brought up) or gives them
+ * back (to its own handler: the arrows seek). The ring stays where it was;
+ * taking them, the DOM focus follows it.
+ */
+export function screenKeys(id: number, keys: boolean): void {
+  const screen = screens.find((s) => s.id === id);
+  if (!screen || screen.keys === keys) return;
+  screen.keys = keys;
+  if (keys) tookOverAt = performance.now();
+  const node = focused ? entries.get(focused)?.node : null;
+  if (answering() && node?.isConnected) node.focus({ preventScroll: true });
 }
 
 /** …and gone. */
@@ -724,6 +761,8 @@ interface LeafOptions {
   disabled?: boolean;
   onSelect?: () => void;
   onHighlight?: () => void;
+  /** Arrows it keeps to itself: return true for one it took (the seek bar's Left and Right). */
+  onArrow?: (arrow: Arrow, event: KeyboardEvent) => boolean;
 }
 
 /**
@@ -733,12 +772,12 @@ interface LeafOptions {
 export function useNavLeaf(
   key: string,
   ref: RefObject<HTMLElement | null>,
-  { on, disabled = false, onSelect, onHighlight }: LeafOptions
+  { on, disabled = false, onSelect, onHighlight, onArrow }: LeafOptions
 ): { focused: boolean; props: Record<string, unknown> } {
   const parent = useContext(ParentContext);
-  const callbacks = useRef({ onSelect, onHighlight });
+  const callbacks = useRef({ onSelect, onHighlight, onArrow });
   useLayoutEffect(() => {
-    callbacks.current = { onSelect, onHighlight };
+    callbacks.current = { onSelect, onHighlight, onArrow };
   });
 
   useLayoutEffect(() => {
@@ -750,6 +789,7 @@ export function useNavLeaf(
       disabled,
       select: () => callbacks.current.onSelect?.(),
       highlight: () => callbacks.current.onHighlight?.(),
+      arrow: (arrow, event) => callbacks.current.onArrow?.(arrow, event) ?? false,
     });
     return () => remove(key);
     // `disabled` is followed below without registering again.

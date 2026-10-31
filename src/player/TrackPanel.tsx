@@ -1,12 +1,13 @@
 /**
  * The audio and subtitle panel in the player.
  */
-import { FocusContext, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 import { useState } from 'react';
 import { PlaylistChoices } from '../ui/PlaylistPicker';
 import type { NewItem } from '../library/playlists';
 import { useFocusGroup } from '../ui/focusGroups';
 import FocusButton from '../ui/FocusButton';
+import FocusGroup, { FocusProvider } from '../ui/FocusGroup';
+import { navFocus } from '../ui/focusStore';
 import type { Track } from './engine';
 import { describeTracks, isPictureSubtitle, secondChoices, trackLanguage } from './tracks';
 import { languageBadge, languageName } from './language';
@@ -54,7 +55,7 @@ function TrackText({ track, line }: { track: Track; line: string | undefined }) 
 /** How many of the others to list; a remote scrolls a short list. */
 const MAX_OFFERS = 8;
 
-/** Focus is aimed at the panel the moment it opens — see Player. */
+/** The panel: a dialog on the focus engine, so the ring goes in as it opens. */
 export const TRACK_PANEL_KEY = 'player-track-panel';
 const ADD_KEY = 'player-track-panel:playlist';
 const SECOND_KEY = 'player-track-panel:second';
@@ -73,6 +74,8 @@ const SECOND_KEY = 'player-track-panel:second';
  * mixed audio and subtitle languages it is the control reached most often, and
  * until now a remote could not reach it at all.
  */
+const levelKey = (id: string) => `player-track-panel:level:${id}`;
+
 /**
  * Levelling in four steps and the dialogue lift, for this title. Not offered
  * for a track that goes to the receiver untouched, and said why: Kinema
@@ -99,11 +102,12 @@ function LevelRows({
   }
   return (
     <>
-      <div className="track-delay track-level">
+      <FocusGroup kind="row" className="track-delay track-level" current={levelKey(level.levelling)}>
         <span className="track-delay-label">Levelling</span>
         {LEVELLINGS.map((l) => (
           <FocusButton
             key={l.id}
+            focusKey={levelKey(l.id)}
             className={`track-option ${level.levelling === l.id ? 'active' : ''}`}
             keepInView="nearest"
             label={`Levelling: ${l.label}`}
@@ -112,7 +116,7 @@ function LevelRows({
             {l.label}
           </FocusButton>
         ))}
-      </div>
+      </FocusGroup>
       {canLift && (
         <div className="track-delay track-level">
           <span className="track-delay-label">Dialogue</span>
@@ -225,13 +229,13 @@ export default function TrackPanel({
   // A choice closes the list and gives the ring back to its button, as Add to
   // a playlist does: left open, a stray OK picked again (round 5, D).
   const pickSecond = (track: Track | null) => {
-    void setFocus(SECOND_KEY);
+    navFocus(SECOND_KEY);
     setSecondOpen(false);
     onSecond?.(track);
   };
 
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <aside className="track-panel" ref={ref}>
         <div className="track-panel-head">
           <span>Audio</span>
@@ -250,7 +254,7 @@ export default function TrackPanel({
         ))}
         {delay && (
           <>
-            <div className="track-delay">
+            <FocusGroup kind="row" className="track-delay">
               <span className="track-delay-label">Sound delay: {delayLabel(delay.ms)}</span>
               <FocusButton
                 className="track-option"
@@ -276,7 +280,7 @@ export default function TrackPanel({
               >
                 0
               </FocusButton>
-            </div>
+            </FocusGroup>
             <p className="track-note">
               For this sound device: later if the sound comes before the lips, earlier if after.
             </p>
@@ -385,7 +389,7 @@ export default function TrackPanel({
         <p className="track-note">Remembered for this show.</p>
         {timing && subTracks.length > 0 && (
           <>
-            <div className="track-delay">
+            <FocusGroup kind="row" className="track-delay">
               <span className="track-delay-label">Timing: {subDelayLabel(timing.ms)}</span>
               {[-SUB_BIG_STEP_MS, -SUB_STEP_MS, SUB_STEP_MS, SUB_BIG_STEP_MS].map((step) => (
                 <FocusButton
@@ -407,7 +411,7 @@ export default function TrackPanel({
               >
                 0
               </FocusButton>
-            </div>
+            </FocusGroup>
             <p className="track-note">
               For this file: earlier if the words come after they are said, later if before.
             </p>
@@ -463,7 +467,7 @@ export default function TrackPanel({
             typing={false}
             buttonClass="track-option track-playlist"
             onDone={(message) => {
-              void setFocus(ADD_KEY);
+              navFocus(ADD_KEY);
               setAdding(false);
               setAdded(message);
             }}
@@ -471,6 +475,6 @@ export default function TrackPanel({
         )}
         {added && <p className="track-note">{added}</p>}
       </aside>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }

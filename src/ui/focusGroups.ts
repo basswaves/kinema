@@ -76,6 +76,8 @@ interface Options {
   pageTop?: boolean;
   /** Kinema's engine: arrows that pass over this group from outside (focusModel.ts). */
   passOver?: Direction[];
+  /** Kinema's engine: a menu that is not a dialog (the details panel on `i`, beside the film). */
+  modal?: boolean;
 }
 
 /** The area of Kinema's engine a group of `kind` is (focusModel.ts). */
@@ -224,7 +226,7 @@ export function resolveInGroup(
  */
 export function useFocusGroup<E extends HTMLElement = HTMLDivElement>(
   kind: GroupKind,
-  { focusKey, current, focusable = true, wrap = 'vertical', stopAt, axis = 'y', pageTop, passOver }: Options = {}
+  { focusKey, current, focusable = true, wrap = 'vertical', stopAt, axis = 'y', pageTop, passOver, modal }: Options = {}
 ): UseFocusableResult<E> {
   const stops = stopAt ?? (kind === 'row' ? ROW_STOPS : NO_STOPS);
   const resolve = useCallback(
@@ -235,7 +237,7 @@ export function useFocusGroup<E extends HTMLElement = HTMLDivElement>(
 
   // On Kinema's engine a menu is a dialog: it holds the ring while it is
   // open, and gives it back to the control that opened it (focusStore.ts).
-  const area = { ...areaFor(kind, current, wrap, axis), passOver, disabled: !focusable, pageTop, modal: kind === 'menu' };
+  const area = { ...areaFor(kind, current, wrap, axis), passOver, disabled: !focusable, pageTop, modal: modal ?? kind === 'menu' };
   const result = useNavGroup<E>(area, {
     focusKey,
     focusable,

@@ -3,13 +3,14 @@
  *
  * It was a bare range input — absent from the focus tree, so a remote could
  * only ever move in ten-second steps. On the bar, Left/Right steer the same
- * accelerating seek as in watching mode, through the spatial library's own
- * arrow callbacks: returning `false` keeps the press from also moving the
- * ring, so exactly one handler acts on it. Up and Down still leave the bar.
+ * accelerating seek as in watching mode: the focus engine hands them to the
+ * bar (`onArrow`) and moves no ring, so exactly one handler acts on each
+ * press. Up and Down still leave the bar — Down onto Play/Pause, the button
+ * row's own landing (PlayerControls).
  */
-import { setFocus, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
-import type { ReactNode } from 'react';
-import { PLAYER_PLAY_KEY, PLAYER_SEEK_KEY } from './focusKeys';
+import { useEffect, useRef, type ReactNode } from 'react';
+import { useNavLeaf } from '../ui/focusStore';
+import { PLAYER_SEEK_KEY } from './focusKeys';
 
 export default function SeekBar({
   progress,
@@ -24,29 +25,30 @@ export default function SeekBar({
   onEnter: () => void;
   children: ReactNode;
 }) {
-  const { ref, focused } = useFocusable<object, HTMLDivElement>({
-    focusKey: PLAYER_SEEK_KEY,
-    onEnterPress: onEnter,
-    onArrowPress: (direction, _props, details) => {
-      // Down lands on Play/Pause, the control under the middle of the bar.
-      // Left to the spatial library it went to whatever sat nearest the bar's
-      // left end, which was the key list.
-      if (direction === 'down') {
-        void setFocus(PLAYER_PLAY_KEY);
-        return false;
-      }
-      if (direction !== 'left' && direction !== 'right') return true;
-      onScrub(direction === 'left' ? -1 : 1, (details.pressedKeys[direction] ?? 1) > 1);
-      return false;
-    },
-    onArrowRelease: (direction) => {
-      if (direction === 'left' || direction === 'right') onRelease();
+  const ref = useRef<HTMLDivElement>(null);
+  const { focused, props } = useNavLeaf(PLAYER_SEEK_KEY, ref, {
+    on: true,
+    onSelect: onEnter,
+    onArrow: (arrow, event) => {
+      if (arrow !== 'left' && arrow !== 'right') return false;
+      onScrub(arrow === 'left' ? -1 : 1, event.repeat);
+      return true;
     },
   });
+  // Letting go of the key sends the seek after a hold (useScrub).
+  useEffect(() => {
+    if (!focused) return;
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') onRelease();
+    };
+    window.addEventListener('keyup', onKeyUp);
+    return () => window.removeEventListener('keyup', onKeyUp);
+  }, [focused, onRelease]);
 
   return (
     <div
       ref={ref}
+      {...props}
       className={`player-seek-wrap ${focused ? 'focused' : ''}`}
       role="slider"
       aria-label="Position"

@@ -382,6 +382,24 @@ export function readBack(leaf: HTMLElement, duration: number): boolean {
 }
 
 /**
+ * Inside a list drawn over the film (the player's panels, marked
+ * `data-scroll="nearest"`): the list moves only when the ring has gone out
+ * of its sight, and then just far enough to show it — the film behind is
+ * what is being watched, and a list that re-centred at every press would
+ * pull the eye away from it.
+ */
+export function nearest(leaf: HTMLElement, duration: number): void {
+  const page = pageOf(leaf);
+  if (!page) return;
+  const gap = LINE_GAP_REM * remPx();
+  const top = contentTop(leaf, page);
+  const bottom = top + leaf.offsetHeight;
+  const at = settled(page, 'y');
+  if (top - gap < at) glide(page, 'y', Math.max(0, top - gap), duration);
+  else if (bottom + gap > at + page.clientHeight) glide(page, 'y', bottom + gap - page.clientHeight, duration);
+}
+
+/**
  * For a ring put somewhere by the app (a landing, a return): nothing moves if
  * it is on screen clear of the bar; otherwise the rule, at once.
  */

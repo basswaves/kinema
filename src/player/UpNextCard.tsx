@@ -8,6 +8,7 @@
  * episodes rolled on untouched, and nothing comes until someone answers.
  */
 import FocusButton from '../ui/FocusButton';
+import FocusGroup from '../ui/FocusGroup';
 import { episodeRefName, type EpisodeRef } from './api';
 
 export default function UpNextCard({
@@ -30,7 +31,7 @@ export default function UpNextCard({
       <div className="up-next-body">
         <div className="up-next-label">{asking ? 'Still watching?' : 'Up next'}</div>
         <div className="up-next-title">{episodeRefName(episode)}</div>
-        <div className="up-next-actions">
+        <FocusGroup kind="row" className="up-next-actions">
           <FocusButton className="btn-primary" onSelect={onPlay}>
             {countdown !== null ? `▶ Play now (${countdown})` : '▶ Play next'}
           </FocusButton>
@@ -43,7 +44,7 @@ export default function UpNextCard({
               Keep watching
             </FocusButton>
           )}
-        </div>
+        </FocusGroup>
       </div>
     </div>
   );

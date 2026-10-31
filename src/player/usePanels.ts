@@ -1,103 +1,51 @@
 /**
  * The player's panels: Audio & subtitles (the track panel), the stats panel
  * (on `i`, a remote's Info key, or from Audio & subtitles) and the chapter
- * list, with the focus ring following each in and back out.
+ * list. Each is a dialog on the focus engine (focusStore.ts): the ring goes
+ * in as it opens and back to the button that opened it as it closes, in the
+ * same press — no setFocus to wait on, no restore 300 ms later to race. The
+ * stats panel on `i` is the exception: it is for watching numbers move beside
+ * the film, so it takes no ring; opened from Audio & subtitles, it does.
  */
-import { setFocus } from '@noriginmedia/norigin-spatial-navigation';
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import { PLAYER_CHAPTERS_KEY, PLAYER_PLAY_KEY, PLAYER_TRACKS_KEY } from './focusKeys';
+import { useCallback, useEffect, useState } from 'react';
 import { hasMpv } from './engine';
 import { readPlaybackStats, type StatGroup } from './stats';
 import { readMedia3Stats } from './statsMedia3';
-import { TRACK_PANEL_KEY } from './TrackPanel';
-import { STATS_CLOSE_KEY } from './StatsPanel';
-import { CHAPTER_PANEL_KEY } from './ChapterPanel';
 
 /** Stats refresh. Fast enough to watch a drop counter, slow enough to be free. */
 const STATS_REFRESH_MS = 1000;
 
-export function usePanels({
-  osdFocus,
-  osdFocusRef,
-}: {
-  /** Whether the controls hold the arrow keys (useOsd). */
-  osdFocus: boolean;
-  /** The same, for callbacks that must not be rebuilt on it. */
-  osdFocusRef: RefObject<boolean>;
-}) {
+export function usePanels() {
   const [showTracks, setShowTracks] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [showChapters, setShowChapters] = useState(false);
   const [stats, setStats] = useState<StatGroup[]>([]);
-  /** Each panel's opens so far, so a close still waiting on the ring never shuts a newer open. */
-  const opened = useRef({ tracks: 0, stats: 0, chapters: 0 });
-
-  /**
-   * Close a panel with the focus ring landing on the button that opened it.
-   *
-   * Focus moves **first**, while the panel is still there. Closing it with the
-   * ring inside lets the spatial library restore focus by itself 300 ms after
-   * the unmount — to the shell's preferred child, Pause — which overrode
-   * anything set in the meantime (docs/GOTCHAS.md, "focus parked on an
-   * unmounted component"). And first means *done*: setFocus is asynchronous,
-   * and a panel gone before it finishes still counts as holding the ring.
-   */
-  const closeOnto = useCallback(
-    (panel: keyof typeof opened.current, key: string, hide: () => void) => {
-      if (!osdFocusRef.current) return hide();
-      const at = opened.current[panel];
-      void setFocus(key).finally(() => {
-        if (opened.current[panel] === at) hide();
-      });
-    },
-    [osdFocusRef]
-  );
+  /** Opened from Audio & subtitles: a dialog, with the ring in it until it closes. */
+  const [statsFromTracks, setStatsFromTracks] = useState(false);
 
   const openTracks = useCallback(() => {
-    opened.current.tracks++;
     setShowChapters(false);
     setShowTracks(true);
   }, []);
+  const closeTracks = useCallback(() => setShowTracks(false), []);
   /** The chapter list (ChapterPanel), one panel at a time with the tracks. */
   const openChapters = useCallback(() => {
-    opened.current.chapters++;
     setShowTracks(false);
     setShowChapters(true);
   }, []);
-  const closeChapters = useCallback(() => {
-    closeOnto('chapters', PLAYER_CHAPTERS_KEY, () => setShowChapters(false));
-  }, [closeOnto]);
-  /**
-   * Opened from Audio & subtitles — the way in without a keyboard's `i`: the
-   * ring goes into the panel and comes back to that button after.
-   */
-  const statsFromTracks = useRef(false);
+  const closeChapters = useCallback(() => setShowChapters(false), []);
   const openStats = useCallback(() => {
-    opened.current.stats++;
-    statsFromTracks.current = false;
+    setStatsFromTracks(false);
     setShowStats(true);
   }, []);
-
-  const closeTracks = useCallback(() => {
-    closeOnto('tracks', PLAYER_TRACKS_KEY, () => setShowTracks(false));
-  }, [closeOnto]);
-  // The stats panel has no button on the bar (owner, UX pass): closing it
-  // hands the ring back to Audio & subtitles when it was opened from there,
-  // else to Play.
-  const closeStats = useCallback(() => {
-    const key = statsFromTracks.current ? PLAYER_TRACKS_KEY : PLAYER_PLAY_KEY;
-    closeOnto('stats', key, () => setShowStats(false));
-  }, [closeOnto]);
+  const closeStats = useCallback(() => setShowStats(false), []);
+  // The way in without a keyboard's `i`: the ring goes into the panel, and
+  // back to Audio & subtitles after (the closed panel's own button).
   const openStatsFromTracks = useCallback(() => {
-    closeTracks();
-    opened.current.stats++;
-    statsFromTracks.current = true;
+    setShowTracks(false);
+    setStatsFromTracks(true);
     setShowStats(true);
-  }, [closeTracks]);
-  // Into the panel, so Back or OK closes it.
-  useEffect(() => {
-    if (osdFocus && showStats && statsFromTracks.current) void setFocus(STATS_CLOSE_KEY);
-  }, [showStats, osdFocus]);
+  }, []);
 
   /**
    * Poll the pipeline while the stats panel is open, and only then.
@@ -129,27 +77,12 @@ export function usePanels({
     };
   }, [showStats]);
 
-  /**
-   * Follow the track panel with the focus ring when it opens.
-   *
-   * Opening a panel and leaving focus on the button that opened it means the
-   * first thing a remote has to do is work out which direction the new panel is
-   * in. Only once the OSD holds focus — with a mouse, nothing should move on
-   * its own. Closing is `closeTracks`, which has to act *before* the panel goes.
-   */
-  useEffect(() => {
-    if (osdFocus && showTracks) void setFocus(TRACK_PANEL_KEY);
-  }, [showTracks, osdFocus]);
-  // The chapter list lands on the chapter playing (its group's `current`).
-  useEffect(() => {
-    if (osdFocus && showChapters) void setFocus(CHAPTER_PANEL_KEY);
-  }, [showChapters, osdFocus]);
-
   return {
     showTracks,
     openTracks,
     closeTracks,
     showStats,
+    statsFromTracks,
     openStats,
     openStatsFromTracks,
     closeStats,

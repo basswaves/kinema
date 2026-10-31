@@ -823,3 +823,99 @@ describe('tiles that wrap (playlists, Videos)', () => {
     expect(move(tree, 't0', 'up', none)).toBe('nav:settings');
   });
 });
+
+describe('the player (round 7, F4; the nav map’s player and player-tracks)', () => {
+  const ALL: Arrow[] = ['up', 'down', 'left', 'right'];
+  const bar = row(['help', 'back10', 'play', 'fwd10', 'tracks', 'volume'], { current: 'play' });
+  /** The player's column, with what comes and goes in it. */
+  function player(extra: { startOver?: boolean; upNext?: boolean; skip?: boolean; panel?: A } = {}) {
+    return build(
+      column([
+        [
+          'shell',
+          column(
+            [
+              'back',
+              ...(extra.startOver ? ['start-over'] : []),
+              ...(extra.upNext ? ([['up-next', row(['play-next', 'keep-watching'])]] as A['children']) : []),
+              ...(extra.skip ? ['skip'] : []),
+              ...(extra.panel ? ([['panel', extra.panel]] as A['children']) : []),
+              'seek',
+              ['buttons', bar],
+            ],
+            { current: 'play', hold: ALL }
+          ),
+        ],
+      ])
+    );
+  }
+  const tree = player();
+
+  it('the controls: Back over the bar, the bar over the row, Left and Right along the row', () => {
+    expect(move(tree, 'back', 'down', none)).toBe('seek');
+    expect(move(tree, 'seek', 'up', none)).toBe('back');
+    expect(move(tree, 'seek', 'down', none)).toBe('play');
+    expect(move(tree, 'play', 'left', none)).toBe('back10');
+    expect(move(tree, 'play', 'right', none)).toBe('fwd10');
+    expect(move(tree, 'back10', 'left', none)).toBe('help');
+    expect(move(tree, 'fwd10', 'right', none)).toBe('tracks');
+    expect(move(tree, 'tracks', 'right', none)).toBe('volume');
+    for (const button of ['help', 'back10', 'play', 'fwd10', 'tracks', 'volume']) {
+      expect(move(tree, button, 'up', none)).toBe('seek');
+    }
+  });
+
+  it('nothing leaves the player: Back’s Up, Left and Right, the row’s ends and Down stay put', () => {
+    for (const arrow of ['up', 'left', 'right'] as Arrow[]) expect(move(tree, 'back', arrow, none)).toBeNull();
+    expect(move(tree, 'help', 'left', none)).toBeNull();
+    expect(move(tree, 'volume', 'right', none)).toBeNull();
+    expect(move(tree, 'play', 'down', none)).toBeNull();
+  });
+
+  it('arriving lands on Play/Pause, from anywhere', () => {
+    expect(enter(tree, 'shell', none)).toBe('play');
+    expect(enter(tree, 'buttons', none)).toBe('play');
+  });
+
+  it('Up next, Skip and Start over sit between Back and the bar, top to bottom', () => {
+    const t = player({ startOver: true, upNext: true, skip: true });
+    expect(walk(t, 'play', ['up', 'up'])).toBe('skip');
+    expect(move(t, 'skip', 'up', none)).toBe('play-next');
+    expect(move(t, 'play-next', 'right', none)).toBe('keep-watching');
+    expect(move(t, 'keep-watching', 'up', none)).toBe('start-over');
+    expect(move(t, 'start-over', 'up', none)).toBe('back');
+    expect(move(t, 'back', 'down', none)).toBe('start-over');
+  });
+
+  it('a prompt gone from under the ring: its neighbour takes it', () => {
+    expect(recover(tree, [{ area: 'shell', index: 1 }], none)).toBe('seek');
+  });
+
+  it('a panel is a menu: the ring stays in it and Up from the top goes round; its button rows go along', () => {
+    const panel: A = {
+      area: { kind: 'menu' },
+      children: ['close', 'audio-1', 'audio-2', ['delay', row(['earlier', 'later', 'zero'])], ['level', row(['off', 'little', 'more'], { current: 'more' })], 'details'],
+    };
+    const t = player({ panel });
+    expect(enter(t, 'panel', none)).toBe('close');
+    expect(move(t, 'close', 'up', none)).toBe('details');
+    expect(move(t, 'details', 'down', none)).toBe('close');
+    expect(move(t, 'audio-2', 'down', none)).toBe('earlier');
+    expect(move(t, 'earlier', 'right', none)).toBe('later');
+    expect(move(t, 'zero', 'right', none)).toBeNull();
+    // A choice row lands on the one chosen.
+    expect(move(t, 'later', 'down', none)).toBe('more');
+    expect(move(t, 'audio-1', 'right', none)).toBeNull();
+  });
+
+  it('the chapter list lands on the chapter playing', () => {
+    const t = player({ panel: { area: { kind: 'menu', current: 'ch-2' }, children: ['close', 'ch-0', 'ch-1', 'ch-2'] } });
+    expect(enter(t, 'panel', none)).toBe('ch-2');
+  });
+
+  it('the details panel on `i` is passed by: Up from the bar goes on to Back', () => {
+    const t = player({ panel: { area: { kind: 'menu', passOver: ALL }, children: ['stats-close', 'g1', 'g2'] } });
+    expect(move(t, 'seek', 'up', none)).toBe('back');
+    expect(move(t, 'back', 'down', none)).toBe('seek');
+  });
+});

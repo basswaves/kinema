@@ -4,14 +4,14 @@
  * chapters to choose between — the bar has no button otherwise. Pictures of
  * each scene come with the seek preview, later.
  */
-import { FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import FocusButton from '../ui/FocusButton';
+import { FocusProvider } from '../ui/FocusGroup';
 import { useFocusGroup } from '../ui/focusGroups';
 import { formatTime } from '../ui/format';
 import type { Chapter } from './engine';
 import { chapterAt, chapterName } from './chapters';
 
-/** Focus is aimed at the panel the moment it opens (usePanels). */
+/** The panel: a dialog on the focus engine, which lands on the chapter playing. */
 export const CHAPTER_PANEL_KEY = 'player-chapter-panel';
 const chapterKey = (index: number) => `player-chapter-${index}`;
 
@@ -39,7 +39,7 @@ export default function ChapterPanel({
   });
 
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <aside className="track-panel chapter-panel" ref={ref} aria-label="Chapters">
         <div className="track-panel-head">
           <span>Chapters</span>
@@ -58,6 +58,6 @@ export default function ChapterPanel({
           </FocusButton>
         ))}
       </aside>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }

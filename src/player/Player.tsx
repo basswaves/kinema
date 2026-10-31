@@ -26,19 +26,15 @@
  * because a transparent window with no frame up shows the desktop.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type WheelEvent } from 'react';
-import {
-  doesFocusableExist,
-  FocusContext,
-  getCurrentFocusKey,
-  setFocus,
-} from '@noriginmedia/norigin-spatial-navigation';
 import FocusButton from '../ui/FocusButton';
+import { FocusScreen, NavParent } from '../ui/focusEngine';
+import { useLanding, useNavArea } from '../ui/focusStore';
+import type { Arrow } from '../ui/focusModel';
 import { endsAtLabel } from '../ui/format';
 import { useTvMode } from '../ui/tv';
 import { episodeRefName, type EpisodeRef, type PlaybackTarget } from './api';
 import { hasMpv, isPaused, seekBy, seekTo, setPaused, type Chapter } from './engine';
 import { PLAYER_PLAY_KEY, PLAYER_SHELL_KEY } from './focusKeys';
-import { ALL_ARROWS, useFocusGroup } from '../ui/focusGroups';
 import PlayerControls from './PlayerControls';
 import ResumeToast from './ResumeToast';
 import SkipButton from './SkipButton';
@@ -75,6 +71,14 @@ interface Props {
   onPlayTarget: (target: PlaybackTarget) => void;
 }
 
+const SHELL = { kind: 'column', current: PLAYER_PLAY_KEY, hold: ['up', 'down', 'left', 'right'] as Arrow[] } as const;
+
+/** The ring arrives on Play/Pause (useLanding needs to be inside the screen). */
+function Landing() {
+  useLanding(PLAYER_PLAY_KEY);
+  return null;
+}
+
 /** How long a notice about the sound stays on screen. */
 const AUDIO_NOTICE_MS = 12000;
 
@@ -108,17 +112,14 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     chooseSecond,
   } = useTracks({ target, fail });
 
-  // Every control in the player hangs off this container, so the OSD has one
-  // place to aim focus at and one place to remember where it was. A panel
-  // that holds every arrow (NAV-MAP, agreed 2026-10-11): Up or Left from Back
-  // used to send focus out of the player to nothing at all; now a press with
-  // nothing that way stays put, and Left/Right stay in their row.
-  const { ref: shellRef, focusKey: shellFocusKey } = useFocusGroup('panel', {
-    focusKey: PLAYER_SHELL_KEY,
-    current: PLAYER_PLAY_KEY,
-    stopAt: ALL_ARROWS,
-  });
-  const { osdVisible, osdFocus, osdFocusRef, showOsd, enterOsdFocus, leaveOsdFocus, revealOsd } =
+  // Every control in the player hangs off this column, top to bottom: Back,
+  // Start over, the Up next card, the Skip prompt, the seek bar, the row of
+  // buttons. It holds every arrow (NAV-MAP, agreed 2026-10-11): Up or Left
+  // from Back used to send focus out of the player to nothing at all; now a
+  // press with nothing that way stays put, and Left/Right stay in their row.
+  const shellRef = useRef<HTMLDivElement>(null);
+  useNavArea(PLAYER_SHELL_KEY, shellRef, { on: true, spec: SHELL });
+  const { osdVisible, osdFocus, showOsd, enterOsdFocus, leaveOsdFocus, revealOsd } =
     useOsd({ sessionRef, paused });
 
   const {
@@ -126,6 +127,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     openTracks,
     closeTracks,
     showStats,
+    statsFromTracks,
     openStats,
     openStatsFromTracks,
     closeStats,
@@ -133,7 +135,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     showChapters,
     openChapters,
     closeChapters,
-  } = usePanels({ osdFocus, osdFocusRef });
+  } = usePanels();
   const { delayMs, changeDelay } = useAudioDelay(setNotice);
   const { subDelayMs, changeTiming } = useSubDelay(setNotice);
   const sound = useSoundLevel({ target, tracks, aid, say: setNotice });
@@ -214,9 +216,6 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       next: episode(neighbours.next) ?? file(folder.next),
     };
   }, [neighbours, folder, playNeighbour, onPlayTarget]);
-  const hasPrev = steps.prev !== null;
-  const hasNext = steps.next !== null;
-
   const skipPrompt = skipPromptFor(active, {
     autoSkip,
     upNextShown: upNext !== null,
@@ -411,35 +410,9 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     leaveOsdFocus,
   });
 
-  /**
-   * Catch the ring when a control disappears from under it.
-   *
-   * Several of these controls come and go on their own: the Skip prompt goes
-   * when the intro ends or is skipped, Up next is dismissed, the previous/next buttons are
-   * absent at the ends of a run and are cleared on every file change. Focus left
-   * on any of them points at a component that no longer exists — no ring
-   * anywhere and no arrow press doing anything, which is indistinguishable from
-   * a hang (docs/GOTCHAS.md).
-   *
-   * Keyed on whether each thing is present rather than on the values, because
-   * `skipPrompt` is rebuilt on every position tick and would fire this once a
-   * second. The liveness test is the same one the browsing views use.
-   */
-  const hasSkipPrompt = skipPrompt !== null;
-  const hasUpNext = upNext !== null;
-  useEffect(() => {
-    if (!osdFocus) return;
-    if (doesFocusableExist(getCurrentFocusKey())) return;
-    void setFocus(PLAYER_SHELL_KEY);
-  }, [
-    osdFocus,
-    hasSkipPrompt,
-    hasUpNext,
-    showStats,
-    showTracks,
-    hasPrev,
-    hasNext,
-  ]);
+  // A control that goes from under the ring (the Skip prompt when the intro
+  // ends, Up next dismissed, previous/next at the ends of a run) hands it to
+  // its neighbour by itself: the focus engine's recovery (focusStore.ts).
 
   const endsAt = endsAtLabel(timePos, duration, now);
   const controlsShown = osdVisible || showTracks || osdFocus;
@@ -447,9 +420,12 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
   const audioTracks = tracks.filter((t) => t.type === 'audio');
 
   return (
-    <FocusContext.Provider value={shellFocusKey}>
+    <FocusScreen keys={osdFocus}>
+    <Landing />
+    <NavParent value={PLAYER_SHELL_KEY}>
     <div
       ref={shellRef}
+      data-scroll="nearest"
       className={`player ${osdFocus ? 'osd-focused' : ''} ${
         controlsShown ? '' : 'osd-hidden'
       }`}
@@ -476,9 +452,21 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     >
       {!session.frameShown && <div className="player-cover" aria-hidden="true" />}
 
+      <div className="player-top">
+        <FocusButton className="back-button" label="Back" title="Back" onSelect={() => void exit()}>
+          ← Back
+        </FocusButton>
+        <span className="player-label">
+          {target.label}
+          {target.episodeName && <span className="player-episode"> · {target.episodeName}</span>}
+        </span>
+        {endsAt && <span className="player-ends">Ends at {endsAt}</span>}
+      </div>
+
       {/* Floating under the top bar, one above the other: in the player's
           own column they took the top slot and pushed Back and the title
-          down to the middle of the screen. */}
+          down to the middle of the screen. After Back in the markup, as
+          they are on screen: Down from Back reaches Start over. */}
       <div className="player-messages">
         {error && <div className="player-error">{error}</div>}
         {notice && <div className="player-notice">{notice}</div>}
@@ -497,17 +485,6 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
             onStartOver={startOver}
           />
         )}
-      </div>
-
-      <div className="player-top">
-        <FocusButton className="back-button" label="Back" title="Back" onSelect={() => void exit()}>
-          ← Back
-        </FocusButton>
-        <span className="player-label">
-          {target.label}
-          {target.episodeName && <span className="player-episode"> · {target.episodeName}</span>}
-        </span>
-        {endsAt && <span className="player-ends">Ends at {endsAt}</span>}
       </div>
 
       {upNext && (
@@ -532,7 +509,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       {/* Deliberately outside the OSD: the panel is for watching numbers move
           while the video plays, so hiding it with the idle timer would defeat
           the one thing it is for. */}
-      {showStats && <StatsPanel stats={stats} onClose={closeStats} />}
+      {showStats && <StatsPanel stats={stats} dialog={statsFromTracks} onClose={closeStats} />}
 
       {showChapters && (
         <ChapterPanel
@@ -598,6 +575,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         onFullscreen={onFullscreen}
       />
     </div>
-    </FocusContext.Provider>
+    </NavParent>
+    </FocusScreen>
   );
 }

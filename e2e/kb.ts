@@ -11,9 +11,20 @@ function onKinemaEngine(page: Page): Promise<boolean> {
   );
 }
 
+/**
+ * The one place a fixed wait lives (eslint bans `waitForTimeout` elsewhere in
+ * e2e/). Only for input pacing or for a check that measures time on purpose;
+ * `why` says which. Everything else waits for a state: `expect.poll`,
+ * `drawn`, `settled`, the focus key.
+ */
+export async function pause(page: Page, ms: number, why: string): Promise<void> {
+  void why;
+  await page.waitForTimeout(ms);
+}
+
 /** A press done: at once on Kinema's own engine, spaced on the spatial library's. */
 export async function afterPress(page: Page): Promise<void> {
-  if (!(await onKinemaEngine(page))) await page.waitForTimeout(150);
+  if (!(await onKinemaEngine(page))) await pause(page, 150, 'input pacing: no screen answers yet, so presses are spaced');
 }
 
 /**
@@ -44,6 +55,33 @@ export async function press(page: Page, key: string, times = 1): Promise<void> {
     await page.keyboard.press(key);
     await afterPress(page);
   }
+}
+
+/**
+ * Asking the engine directly (the `__nav` probe, src/dev/navProbe.ts,
+ * dev:mock only — never in a release build): which focus key holds the ring,
+ * and the screen's tree. Flows assert on these instead of reading DOM classes
+ * after a delay.
+ */
+export function focusKey(page: Page): Promise<string | null> {
+  return page.evaluate(() => (window as unknown as { __nav: { current(): string | null } }).__nav.current());
+}
+
+/** The ring is on the control with this focus key: waits for it, never a time. */
+export async function expectFocusKey(page: Page, key: string): Promise<void> {
+  await expect.poll(() => focusKey(page)).toBe(key);
+}
+
+export interface TreeNode {
+  key: string;
+  parent: string;
+  kind: string;
+  disabled: boolean;
+}
+
+/** Every node the screen has registered, in registration order. */
+export function focusTree(page: Page): Promise<TreeNode[]> {
+  return page.evaluate(() => (window as unknown as { __nav: { tree(): TreeNode[] } }).__nav.tree());
 }
 
 /** The text of the control the focus ring is on. */
@@ -91,7 +129,8 @@ export async function open(page: Page, system: 'windows' | 'linux'): Promise<voi
     else localStorage.removeItem('kinemaMockSystem');
   }, system);
   await page.goto('/');
-  await expect.poll(() => focused(page)).toContain('Play');
+  // The page, not a guess at how long it takes: a starved runner needs more than expect's 5 s.
+  await expect.poll(() => focused(page), { timeout: 30_000 }).toContain('Play');
 }
 
 /**
@@ -128,7 +167,7 @@ export async function firstRunToSetupPage(
       await press(page, 'ArrowUp');
     }
     await press(page, 'Enter');
-    await page.waitForTimeout(300);
+    await drawn(page);
   }
   await expect(page.locator('.setup-pages h1')).toHaveText(title);
 }

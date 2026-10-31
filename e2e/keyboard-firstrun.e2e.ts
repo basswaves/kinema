@@ -5,7 +5,7 @@
  * (CONTRIBUTING, "Two failure modes"). Shared helpers: kb.ts.
  */
 import { expect, test } from '@playwright/test';
-import { press, focused, open, firstRunToSetupPage } from './kb';
+import { press, focused, open, firstRunToSetupPage, drawn, pause, settled } from './kb';
 
 test('Settings → Playback: Look is Auto, Full or Light, by remote, and Light drops the blur', async ({
   page,
@@ -420,7 +420,7 @@ for (const system of ['android', 'windows'] as const) {
 
     // Long after the page's wait for a question has run out, the ring is on
     // the way on.
-    await page.waitForTimeout(4000);
+    await pause(page, 4000, 'time on purpose: long after the wait for a question has run out');
     expect(await focused(page)).toBe('Next');
 
     // Down reads the page to its end, and Up comes back to Next.
@@ -431,7 +431,7 @@ for (const system of ['android', 'windows'] as const) {
       });
     for (let i = 0; i < 10 && !(await atBottom()); i++) {
       await press(page, 'ArrowDown');
-      await page.waitForTimeout(400);
+      await settled(page);
     }
     expect(await atBottom()).toBe(true);
     expect(await focused(page)).toBe('Next');
@@ -442,7 +442,7 @@ for (const system of ['android', 'windows'] as const) {
       });
     for (let i = 0; i < 10 && !(await inView()); i++) {
       await press(page, 'ArrowUp');
-      await page.waitForTimeout(400);
+      await settled(page);
     }
     expect(await inView()).toBe(true);
     expect(await focused(page)).toBe('Next');
@@ -479,7 +479,7 @@ test('a setup page whose question comes late still starts on it, unless the remo
   await expect.poll(() => focused(page), { timeout: 2500 }).toBe('Finish');
   await press(page, 'ArrowDown');
   await expect(page.locator('.setup-page')).toContainText('ffmpeg is not installed');
-  await page.waitForTimeout(500);
+  await drawn(page);
   expect(await focused(page)).toBe('Finish');
 });
 
@@ -501,7 +501,7 @@ test('first run: a folder whose files all go unnamed ends on what was found, nev
       await press(page, 'ArrowUp');
     }
     await press(page, 'Enter');
-    await page.waitForTimeout(300);
+    await drawn(page);
   }
   await expect(page.locator('.setup-pages')).toHaveCount(0);
 

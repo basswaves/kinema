@@ -28,6 +28,7 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { drawn, pause } from './kb';
 import { approve } from './navmapExpected';
 import { writeReports } from './navmapReport';
 import { PARTS_DIR } from './navmapSetup';
@@ -181,7 +182,7 @@ const rawLeaves = (page: Page) => page.evaluate<RawLeaf[]>('window.__navw.screen
 async function press(page: Page, key: string, times = 1): Promise<void> {
   for (let i = 0; i < times; i++) {
     await page.keyboard.press(key);
-    await page.waitForTimeout(160);
+    await drawn(page);
   }
 }
 
@@ -205,7 +206,7 @@ async function openFromTopBar(page: Page, name: string): Promise<boolean> {
   await pressUntil(page, 'ArrowLeft', (c) => c.label === 'Home', 8);
   if (!(await pressUntil(page, 'ArrowRight', (c) => c.label === name, 8))) return false;
   await press(page, 'Enter');
-  await page.waitForTimeout(900);
+  await quiet(page);
   return true;
 }
 
@@ -264,18 +265,26 @@ async function boot(
   return page;
 }
 
-/** Until the set of controls has stopped changing for 700 ms (notices and rails arrive late). */
+/**
+ * Until the set of controls has stopped changing for 6 drawn frames in a row
+ * and no scroll is gliding (notices and rails arrive late). Counted in frames,
+ * not milliseconds, so a starved machine waits as long as it needs to; the
+ * 15 s is only a way out.
+ */
 async function quiet(page: Page): Promise<void> {
   let last = '';
-  let since = Date.now();
+  let same = 0;
   const t0 = Date.now();
-  while (Date.now() - t0 < 8000) {
+  while (Date.now() - t0 < 15_000) {
+    await drawn(page);
+    const still = await page.evaluate(() => (window as unknown as { __nav: { still(): boolean } }).__nav.still()).catch(() => false);
     const now = (await rawLeaves(page)).map((l) => l.key).join(',');
-    if (now !== last) {
+    if (now === last && still) {
+      if (++same >= 6) return;
+    } else {
       last = now;
-      since = Date.now();
-    } else if (Date.now() - since > 700) return;
-    await page.waitForTimeout(150);
+      same = 0;
+    }
   }
 }
 
@@ -365,6 +374,9 @@ function flagsFor(
   return flags;
 }
 
+/** Moves from the engine's pure rule, a press only where the ring moves (to see where it lands). */
+const MODEL = process.env.NAV_MODEL !== '0';
+
 async function walk(
   page: Page,
   id: string,
@@ -438,6 +450,28 @@ async function walk(
         continue;
       }
       for (const dir of DIRS) {
+        // The engine's own rule first (NAV_MODEL=0 presses everything, as before).
+        let expected: string | null = null;
+        if (MODEL) {
+          const m = await page.evaluate<{ to: string | null; handled: boolean }>(
+            `window.__nav.model(${JSON.stringify(from.key)}, ${JSON.stringify(dir)})`
+          );
+          if (!m.handled) {
+            // No move: nothing to look at on screen, the answer is the model's.
+            if (m.to === null || m.to === from.key) {
+              result.moves.push({
+                from: from.key,
+                dir: dir as Dir,
+                to: from.key,
+                toLabel: from.label,
+                toHeading: from.heading,
+                flags: ['no-move'],
+              });
+              continue;
+            }
+            expected = m.to;
+          }
+        }
         await page.keyboard.press(dir);
         const after = await page.evaluate<{ cur: string; d: Described | null }>('window.__navw.after()');
         const to = table.get(after.cur);
@@ -455,6 +489,8 @@ async function walk(
           toHeading: to?.heading ?? '',
           flags: flagsFor(from, after.d, after.cur, table),
         };
+        // The model and the real press must agree; the press only adds where it lands on screen.
+        if (expected !== null && expected !== after.cur) move.flags.push('model-differs');
         if (move.flags.some((f) => f === 'under-top-bar' || f === 'off-screen') && after.d) {
           move.after = {
             top: Math.round(after.d.rect.top),
@@ -499,11 +535,11 @@ async function hold(page: Page, name: string, key: string): Promise<LagResult> {
   while (Date.now() - t0 < 1500) {
     await page.keyboard.down(key);
     presses++;
-    await page.waitForTimeout(33);
+    await pause(page, 33, 'input pacing: a held key repeats about every 33 ms');
   }
   await page.keyboard.up(key);
   const up = await page.evaluate<number>('window.__navw.now()');
-  await page.waitForTimeout(1500);
+  await pause(page, 1500, 'time on purpose: how long the ring lags after the key is let go');
   const s = await page.evaluate<{ max: number; last: number }>('window.__navw.stopSampler()');
   return {
     name,
@@ -538,7 +574,7 @@ async function toMovieDetail(page: Page): Promise<boolean> {
   await page.waitForFunction("window.__nav.leaves().some((l) => l.key === 'detail-play')", undefined, {
     timeout: 8000,
   });
-  await page.waitForTimeout(600);
+  await quiet(page);
   return true;
 }
 
@@ -554,7 +590,7 @@ async function toSection(page: Page, id: string): Promise<boolean> {
     if (!(await pressUntil(page, 'ArrowDown', (c) => c.label === SECTIONS.find((s) => s[0] === id)?.[1], 8)))
       return false;
     await press(page, 'Enter');
-    await page.waitForTimeout(700);
+    await quiet(page);
   }
   await quiet(page);
   return true;
@@ -800,7 +836,7 @@ async function walkSystem(ctx: Ctx): Promise<void> {
     await press(p, 'ArrowRight');
     if (!(await pressUntil(p, 'ArrowDown', (c) => /^Review/.test(c.label), 12))) return null;
     await press(p, 'Enter');
-    await p.waitForTimeout(900);
+    await drawn(p);
     await quiet(p);
     const out: ScreenResult[] = [];
     out.push(
@@ -814,7 +850,7 @@ async function walkSystem(ctx: Ctx): Promise<void> {
     await press(p, 'ArrowDown');
     if (!base.has((await current(p)).key) && (await current(p)).key !== 'settings-review-button') {
       await press(p, 'Enter');
-      await p.waitForTimeout(800);
+      await drawn(p);
       await quiet(p);
       out.push(
         await w(p, 'settings-review-item', 'Needs attention: one item opened', {
@@ -842,7 +878,7 @@ async function walkSystem(ctx: Ctx): Promise<void> {
     if (!(await toMovieDetail(p))) return false;
     await press(p, 'Enter');
     await p.waitForFunction("window.__nav.leaves().some((l) => l.key === 'player-play')", undefined, { timeout: 10_000 });
-    await p.waitForTimeout(700);
+    await quiet(p);
     return true;
   };
   // While watching, the spatial library is paused: the controls (and the
@@ -864,7 +900,7 @@ async function walkSystem(ctx: Ctx): Promise<void> {
         beforeLeaf: async (pg) => {
           if ((await pg.locator('.player.osd-hidden').count()) > 0) {
             await pg.keyboard.press('ArrowDown');
-            await pg.waitForTimeout(200);
+            await drawn(pg);
             raised++;
           }
         },
@@ -888,7 +924,7 @@ async function walkSystem(ctx: Ctx): Promise<void> {
       how = { how: 'probe', note: 'Right from the controls never reached the Audio & subtitles button; stood on it with the probe.' };
     }
     await press(p, 'Enter');
-    await p.waitForTimeout(900);
+    await quiet(p);
     const panel = (await rawLeaves(p)).filter((l) => !before.has(l.key));
     if (panel.length === 0) return skip('player-tracks', 'The Audio & subtitles panel', 'OK on the button did not open a panel.');
     return w(p, 'player-tracks', 'The Audio & subtitles panel', how, { only: (l) => !before.has(l.key) });
@@ -912,12 +948,12 @@ async function walkSystem(ctx: Ctx): Promise<void> {
       if (!android) {
         await pressUntil(p, 'ArrowDown', isLabel('A TV, from the sofa'), 4);
         await press(p, 'Enter');
-        await p.waitForTimeout(600);
+        await drawn(p);
         await press(p, 'ArrowDown');
       }
       await pressUntil(p, 'ArrowDown', isLabel('Add movies folder'), 4);
       await press(p, 'Enter');
-      await p.waitForTimeout(700);
+      await drawn(p);
       if (android) {
         await quiet(p);
         out.push(
@@ -926,7 +962,7 @@ async function walkSystem(ctx: Ctx): Promise<void> {
         await press(p, 'Enter');
         await press(p, 'ArrowUp');
         await press(p, 'Enter');
-        await p.waitForTimeout(700);
+        await drawn(p);
       }
       await quiet(p);
       out.push(
@@ -941,7 +977,7 @@ async function walkSystem(ctx: Ctx): Promise<void> {
         await p.waitForSelector('.setup-pages h1', { timeout: 6000 }).catch(() => null);
         if ((await p.locator('.setup-pages h1').count()) === 0) break;
         const title = ((await p.locator('.setup-pages h1').first().textContent()) ?? `page ${i + 1}`).trim();
-        await p.waitForTimeout(1200);
+        await drawn(p);
         await quiet(p);
         out.push(
           await w(p, `setup-${i + 1}`, `Setup page ${i + 1}: ${title}`, KB)
@@ -952,7 +988,7 @@ async function walkSystem(ctx: Ctx): Promise<void> {
           await p.evaluate(`window.__navw.focusAndSettle(${JSON.stringify(next.key)})`);
         }
         await press(p, 'Enter');
-        await p.waitForTimeout(500);
+        await drawn(p);
       }
       return out;
     }

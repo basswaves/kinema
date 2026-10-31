@@ -500,6 +500,16 @@ export function navFocused(): string | null {
   return active() ? focused : null;
 }
 
+/**
+ * Where an arrow from `key` would go, by the engine's pure rule, without
+ * moving anything — for the navigation checker (navProbe.ts). `handled`: the
+ * control answers that arrow itself (a seek bar), so only a real press tells.
+ */
+export function navModelMove(key: string, arrow: Arrow): { to: string | null; handled: boolean } {
+  if (entries.get(key)?.arrow) return { to: null, handled: true };
+  return { to: move(tree, key, arrow, memory), handled: false };
+}
+
 /** Whether `key` is registered here and can hold the ring. */
 export function navHas(key: string): boolean {
   return entries.has(key) && enter(tree, key, memory) !== null;

@@ -5,7 +5,7 @@
  * (CONTRIBUTING, "Two failure modes"). Shared helpers: kb.ts.
  */
 import { expect, test } from '@playwright/test';
-import { press, focused, open, androidSettings } from './kb';
+import { press, focused, open, androidSettings, drawn } from './kb';
 
 test('Settings → Privacy lists what leaves the computer, and goes to the switch that stops it', async ({
   page,
@@ -80,7 +80,7 @@ for (const system of ['windows', 'android'] as const) {
     }, system);
     await page.goto('/');
     await expect.poll(() => focused(page)).toContain('Play');
-    await page.waitForTimeout(300);
+    await drawn(page);
     const asked = await page.evaluate(
       () => (window as unknown as { __kinemaMock: { backListeners: string[] } }).__kinemaMock.backListeners
     );
@@ -405,7 +405,7 @@ for (const system of ['android', 'windows'] as const) {
 
     const note = page.locator('.heavy-file-note');
     if (system === 'windows') {
-      await page.waitForTimeout(500);
+      await drawn(page);
       await expect(note).toHaveCount(0);
       return;
     }

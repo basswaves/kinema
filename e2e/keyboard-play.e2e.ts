@@ -5,7 +5,7 @@
  * (CONTRIBUTING, "Two failure modes"). Shared helpers: kb.ts.
  */
 import { expect, test } from '@playwright/test';
-import { press, focused, type FakeMpv, mpv, onFixtureDay, open } from './kb';
+import { press, focused, type FakeMpv, mpv, onFixtureDay, open, drawn, pause } from './kb';
 
 test('an episode plays, pauses and rolls on to the next', async ({ page }) => {
   await onFixtureDay(page);
@@ -33,7 +33,7 @@ test('an episode plays, pauses and rolls on to the next', async ({ page }) => {
   // A person reads the card first. Pressed in the same instant it appears,
   // OK can land before the player has started listening for the card (one
   // run in 24 did, in WebKit).
-  await page.waitForTimeout(500);
+  await pause(page, 500, 'a person reads the card first; OK in its first instant can beat the listener (1 in 24, WebKit)');
   await press(page, 'Enter');
   await expect.poll(async () => (await mpv(page)).path).toContain('S01E02');
 });
@@ -118,7 +118,7 @@ test('Linux: straight to the receiver takes its card for the film and gives it b
   // time (a prompt, full screen, the player), so it is pressed until out.
   for (let i = 0; i < 5 && (await page.locator('.player').count()) > 0; i++) {
     await press(page, 'Escape');
-    await page.waitForTimeout(300);
+    await drawn(page);
   }
   await expect(page.locator('.player')).toHaveCount(0);
   await expect.poll(reserved).toContain('released');

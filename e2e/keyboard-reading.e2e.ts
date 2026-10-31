@@ -204,17 +204,17 @@ test('reading on and back never leaves the ring half under the top bar', async (
     });
   for (let i = 0; i < 6 && !(await atEnd()); i++) {
     await press(page, 'ArrowDown');
-    await page.waitForTimeout(500);
+    await settled(page);
     expect(await halfHidden()).toBe(false);
   }
   await press(page, 'ArrowDown');
-  await page.waitForTimeout(500);
+  await settled(page);
   expect(await halfHidden()).toBe(false);
   expect(await focused(page)).toBe('Check again');
   // Back up the section to its first item: each one clear of the bar.
   for (let i = 0; i < 5; i++) {
     await press(page, 'ArrowUp');
-    await page.waitForTimeout(500);
+    await settled(page);
     expect(await halfHidden()).toBe(false);
   }
 });
@@ -327,7 +327,7 @@ test('on a slow computer every quick Up still moves the ring', async ({ page }) 
   await press(page, 'ArrowRight');
   for (let i = 0; i < 20 && (await focused(page)) !== 'Check again'; i++) await press(page, 'ArrowDown');
   await expect.poll(() => focused(page)).toBe('Check again');
-  await page.waitForTimeout(600);
+  await settled(page);
 
   // Several controls here say "Off", so each is told apart by a mark of its own.
   const ring = () =>

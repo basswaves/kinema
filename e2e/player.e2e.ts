@@ -9,6 +9,7 @@
  * here touches the mouse (CONTRIBUTING, "Two failure modes").
  */
 import { expect, test, type Page } from '@playwright/test';
+import { pause } from './kb';
 
 /**
  * Presses as a person taps: further apart than a held key's steps
@@ -18,7 +19,7 @@ import { expect, test, type Page } from '@playwright/test';
 async function press(page: Page, key: string, times = 1): Promise<void> {
   for (let i = 0; i < times; i++) {
     await page.keyboard.press(key);
-    await page.waitForTimeout(150);
+    await pause(page, 150, 'input pacing (F4: longer than one held-key step)');
   }
 }
 
@@ -31,7 +32,7 @@ async function remoteKey(page: Page, key: string): Promise<void> {
   await page.evaluate((k) => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true }));
   }, key);
-  await page.waitForTimeout(150);
+  await pause(page, 150, 'input pacing, as press()');
 }
 
 /** The control the focus ring is on: its spoken name, else its text. */
@@ -138,7 +139,7 @@ const osdFocused = (page: Page) => page.locator('.player.osd-focused');
  * not know about the prompt yet and pauses instead (one run in two, in
  * WebKit) — the same as the keyboard flows (keyboard-*.e2e.ts).
  */
-const readIt = (page: Page) => page.waitForTimeout(500);
+const readIt = (page: Page) => pause(page, 500, 'a person reads a prompt before answering it');
 
 test('the controls by remote: the ring, the seek bar, Back, and handing the arrows back', async ({
   page,
@@ -200,7 +201,7 @@ test('a run of quick skips is one seek, and a held key seeks when let go', async
     );
   await playheadTo(page, 100);
   // The player hears of the new position on the fake mpv's next tick.
-  await page.waitForTimeout(600);
+  await pause(page, 600, "the player hears of the new position on the fake mpv's next tick");
 
   // Six taps, as quick as a person taps — a press and a release each. One
   // seek, after they stop, to where all six lead.
@@ -226,7 +227,7 @@ test('a run of quick skips is one seek, and a held key seeks when let go', async
   before = await seeks();
   await page.keyboard.down('ArrowLeft');
   for (let i = 0; i < 10; i++) {
-    await page.waitForTimeout(40);
+    await pause(page, 40, 'input pacing: a held-key repeat');
     await page.keyboard.down('ArrowLeft');
   }
   await page.keyboard.up('ArrowLeft');
@@ -236,14 +237,14 @@ test('a run of quick skips is one seek, and a held key seeks when let go', async
   await press(page, 'ArrowDown');
   await press(page, 'ArrowUp');
   await expect.poll(() => focused(page)).toBe('Position');
-  await page.waitForTimeout(700);
+  await pause(page, 700, "the player hears of the new position on the fake mpv's next tick");
   before = await seeks();
   for (let i = 0; i < 5; i++) {
     await page.keyboard.press('ArrowLeft');
-    await page.waitForTimeout(250);
+    await pause(page, 250, 'input pacing: taps apart');
   }
   await expect.poll(seeks).toBe(before + 1);
-  await page.waitForTimeout(800);
+  await pause(page, 800, 'time on purpose: no second seek may follow');
   expect(await seeks()).toBe(before + 1);
 });
 
@@ -256,11 +257,18 @@ test('a held key is a hold however the remote sends it', async ({ page }) => {
           (c) => c.name === 'seek'
         ).length
     );
-  const key = (type: 'keydown' | 'keyup', key: string) =>
-    page.evaluate(
-      ([type, key]) => window.dispatchEvent(new KeyboardEvent(type, { key, bubbles: true })),
-      [type, key] as const
-    );
+  /**
+   * A remote's key events at the gaps it sends them, timed by the page's own
+   * clock in one call: Playwright's round trips between events are as long as
+   * the machine is busy, and the app tells a hold from taps by the gap.
+   */
+  const sendKeys = (steps: [type: 'keydown' | 'keyup', delayAfter: number][]) =>
+    page.evaluate(async (list) => {
+      for (const [type, delayAfter] of list) {
+        window.dispatchEvent(new KeyboardEvent(type, { key: 'ArrowRight', bubbles: true }));
+        await new Promise((r) => setTimeout(r, delayAfter));
+      }
+    }, steps);
   const position = async () => (await mpv(page)).position;
 
   // Android's WebView: one press, and while it is held a press every 50 ms
@@ -268,18 +276,16 @@ test('a held key is a hold however the remote sends it', async ({ page }) => {
   // on a box). A second and a half held is about forty seconds on, as
   // anywhere else, not the end of the episode.
   await playheadTo(page, 100);
-  await page.waitForTimeout(600);
+  await pause(page, 600, "the player hears of the new position on the fake mpv's next tick");
   let before = await seeks();
   let from = await position();
-  await key('keydown', 'ArrowRight');
-  await page.waitForTimeout(450);
-  for (let i = 0; i < 20; i++) {
-    await key('keydown', 'ArrowRight');
-    await page.waitForTimeout(50);
-  }
-  await key('keyup', 'ArrowRight');
+  await sendKeys([
+    ['keydown', 450], // a remote's first press, then its repeats
+    ...Array.from({ length: 20 }, (): ['keydown', number] => ['keydown', 50]),
+    ['keyup', 0],
+  ]);
   await expect.poll(seeks).toBe(before + 1);
-  await page.waitForTimeout(800);
+  await pause(page, 800, 'time on purpose: no second seek may follow');
   expect(await seeks()).toBe(before + 1);
   expect(await position()).toBeGreaterThan(from + 25);
   expect(await position()).toBeLessThan(from + 80);
@@ -287,17 +293,14 @@ test('a held key is a hold however the remote sends it', async ({ page }) => {
   // A remote that sends a press and a release for every step of a hold,
   // about every 110 ms: the same hold, one seek, as far.
   await playheadTo(page, 100);
-  await page.waitForTimeout(600);
+  await pause(page, 600, "the player hears of the new position on the fake mpv's next tick");
   before = await seeks();
   from = await position();
-  for (let i = 0; i < 18; i++) {
-    await key('keydown', 'ArrowRight');
-    await page.waitForTimeout(20);
-    await key('keyup', 'ArrowRight');
-    await page.waitForTimeout(60);
-  }
+  await sendKeys(
+    Array.from({ length: 18 }, (): ['keydown' | 'keyup', number][] => [['keydown', 20], ['keyup', 60]]).flat()
+  );
   await expect.poll(seeks).toBe(before + 1);
-  await page.waitForTimeout(800);
+  await pause(page, 800, 'time on purpose: no second seek may follow');
   expect(await seeks()).toBe(before + 1);
   expect(await position()).toBeGreaterThan(from + 25);
   expect(await position()).toBeLessThan(from + 80);
@@ -320,7 +323,7 @@ test('watching keys: seeking, pausing, volume, stats and the transport row', asy
   await expect(osdFocused(page)).toBeAttached();
   await expect.poll(() => focused(page)).toBe('Play');
   // Paused, the controls stay up.
-  await page.waitForTimeout(4000);
+  await pause(page, 4000, 'time on purpose: paused, the controls must stay up past the hide delay');
   await expect(page.locator('.player.osd-hidden')).toHaveCount(0);
   await press(page, 'Enter');
   await expect.poll(async () => (await mpv(page)).paused).toBe(false);
@@ -442,7 +445,7 @@ test('the credits: Up next is offered, Keep watching declines it, the end counts
   await press(page, 'Enter');
   await expect(card).toHaveCount(0);
   // Declined for the rest of this file: no credits prompt in its place.
-  await page.waitForTimeout(1500);
+  await pause(page, 1500, 'time on purpose: no credits prompt may come back');
   await expect(page.locator('.skip-button')).toHaveCount(0);
   await expect(card).toHaveCount(0);
   // And the ring is still somewhere, not on the button that went.
@@ -507,7 +510,7 @@ test('automatic skipping takes the intro once, by itself', async ({ page }) => {
   await expect(page.locator('.skip-button')).toHaveCount(0);
   // Once only: back into the intro, and it plays.
   await playheadTo(page, 20);
-  await page.waitForTimeout(2000);
+  await pause(page, 2000, 'time on purpose: the intro plays on, no second skip');
   const position = (await mpv(page)).position;
   expect(position).toBeGreaterThan(20);
   expect(position).toBeLessThan(45);
@@ -917,9 +920,9 @@ test('waiting for data is said only when it lasts, and in words for what it wait
 
   // A short refill, as after a seek: nothing said.
   await wait(60);
-  await page.waitForTimeout(800);
+  await pause(page, 800, 'time on purpose: a short refill says nothing');
   await wait(null);
-  await page.waitForTimeout(1200);
+  await pause(page, 1200, 'time on purpose: a short refill says nothing');
   await expect(note).toHaveCount(0);
 
   // A real wait: said, with how far the refill is, and gone when it plays on.
@@ -955,7 +958,7 @@ test('Still watching? after three episodes rolled on untouched, answered by remo
   await expect(card).toContainText('Still watching?');
   await expect(card).toContainText('Back to library');
   await expect(card).not.toContainText('Play now');
-  await page.waitForTimeout(3000);
+  await pause(page, 3000, 'time on purpose: the card asks and counts nothing down');
   expect((await mpv(page)).path).toContain('S01E04');
   // The one that finished counts as watched; the next one is untouched.
   await expect

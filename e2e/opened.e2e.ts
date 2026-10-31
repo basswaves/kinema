@@ -4,12 +4,13 @@
  * runs, and files dropped on the window. Keyboard only, as everywhere.
  */
 import { expect, test, type Page } from '@playwright/test';
+import { pause } from './kb';
 
 /** Presses far enough apart that the app sees two (docs/GOTCHAS.md). */
 async function press(page: Page, key: string, times = 1): Promise<void> {
   for (let i = 0; i < times; i++) {
     await page.keyboard.press(key);
-    await page.waitForTimeout(150);
+    await pause(page, 150, 'input pacing, as press()');
   }
 }
 
@@ -33,7 +34,7 @@ async function playheadTo(page: Page, seconds: number): Promise<void> {
   }, seconds);
   await expect.poll(async () => (await mpv(page)).position).toBeGreaterThanOrEqual(seconds);
   // The player hears of the new position on the fake mpv's next tick.
-  await page.waitForTimeout(700);
+  await pause(page, 700, "the player hears of the new position on the fake mpv's next tick");
 }
 
 const powerActions = (page: Page) =>

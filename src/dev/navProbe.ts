@@ -6,7 +6,7 @@
  * moves focus only when the checker asks (`setFocus`), and it never touches
  * the pointer.
  */
-import { navAnswering, navFocus, navFocused, navHas, navSnapshot } from '../ui/focusStore';
+import { navAnswering, navFocus, navFocused, navHas, navModelMove, navSnapshot } from '../ui/focusStore';
 import { gliding } from '../ui/focusScroll';
 
 interface Registered {
@@ -207,6 +207,12 @@ export function installNavProbe(): void {
     answering: () => navAnswering(),
     /** No scroll the ring caused is still gliding. */
     still: () => !gliding(),
+    /** The screen's tree as the engine holds it: key, parent, kind, whether it can hold the ring. */
+    tree: () =>
+      navSnapshot().nodes.map((n) => ({ key: n.key, parent: n.parent, kind: n.area?.kind ?? 'control', disabled: n.disabled })),
+    /** Where an arrow from `key` goes by the engine's pure rule (no press, nothing moves). */
+    model: (key: string, dir: string) =>
+      navModelMove(key, ({ ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' } as const)[dir as 'ArrowUp']),
     leaves,
     headingFor,
     describe,

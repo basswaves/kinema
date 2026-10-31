@@ -35,5 +35,22 @@ export default tseslint.config(
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
     },
+  },
+  // A fixed wait is a guess about timing, and the guess fails on a slow
+  // machine. The tests wait for a state (expect.poll, drawn, settled, the
+  // focus key); input pacing and checks that measure time on purpose go
+  // through `pause(page, ms, why)` in e2e/kb.ts, the one place it is allowed.
+  {
+    files: ['e2e/**/*.ts'],
+    ignores: ['e2e/kb.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "CallExpression[callee.property.name='waitForTimeout']",
+          message: 'No fixed waits: wait for a state, or use pause(page, ms, why) from e2e/kb.ts for input pacing.',
+        },
+      ],
+    },
   }
 );

@@ -8,6 +8,7 @@
  * Keyboard only, as player.e2e.ts.
  */
 import { expect, test, type Page } from '@playwright/test';
+import { pause } from './kb';
 
 /**
  * Presses as a person taps: further apart than a held key's steps
@@ -17,7 +18,7 @@ import { expect, test, type Page } from '@playwright/test';
 async function press(page: Page, key: string, times = 1): Promise<void> {
   for (let i = 0; i < times; i++) {
     await page.keyboard.press(key);
-    await page.waitForTimeout(150);
+    await pause(page, 150, 'input pacing: the Android player drops presses closer than its throttle');
   }
 }
 
@@ -29,7 +30,7 @@ async function infoKey(page: Page): Promise<void> {
   await page.evaluate(() =>
     document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Info', bubbles: true }))
   );
-  await page.waitForTimeout(150);
+  await pause(page, 150, 'input pacing, as press()');
 }
 
 /** The control the focus ring is on: its spoken name, else its text. */
@@ -128,7 +129,7 @@ test('Android: a film plays through Media3 — the screen matched, seeking, paus
 
   // Playing with sound: nothing claims otherwise once the desktop's own check
   // for a sound output would have run (Media3 falls back by itself).
-  await page.waitForTimeout(2500);
+  await pause(page, 2500, 'time on purpose: long enough for the desktop sound-output check to have run');
   expect(complaints).toEqual([]);
 
   // Right and Left seek.

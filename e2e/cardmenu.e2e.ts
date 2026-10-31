@@ -4,7 +4,7 @@
  * Against `dev:mock`; see kb.ts.
  */
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { drawn, focused, press } from './kb';
+import { drawn, focused, pause, press } from './kb';
 
 async function open(page: Page): Promise<void> {
   await page.addInitScript(() => localStorage.removeItem('kinemaMockSystem'));
@@ -54,7 +54,7 @@ test('OK held opens the menu, its release chooses nothing, and an item acts', as
   // once let one repeat through to the menu's Play).
   await page.keyboard.down('Enter');
   for (let i = 0; i < 14; i++) {
-    await page.waitForTimeout(60);
+    await pause(page, 60, 'input pacing: a held key repeats every ~60 ms');
     await page.keyboard.down('Enter');
   }
   await expect(menu(page)).toBeVisible();

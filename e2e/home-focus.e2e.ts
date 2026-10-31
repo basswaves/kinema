@@ -150,10 +150,13 @@ test('every key scroll goes one way and starts gently: no shove, no bounce back'
   const path = async (key: string) => {
     await page.evaluate(() => {
       const b = document.querySelector('.browse')!;
-      const w = window as unknown as { __path: number[]; __times: number[]; __done: boolean };
+      const w = window as unknown as { __path: number[]; __times: number[]; __done: boolean; __at: number };
       w.__path = [b.scrollTop];
       w.__times = [performance.now()];
       w.__done = false;
+      // When the press arrived: the scroll's own clock starts there.
+      w.__at = NaN;
+      window.addEventListener('keydown', (e) => (w.__at = e.timeStamp), { capture: true, once: true });
       const t0 = performance.now();
       const f = () => {
         w.__path.push(b.scrollTop);
@@ -167,27 +170,31 @@ test('every key scroll goes one way and starts gently: no shove, no bounce back'
     await settled(page);
     await expect.poll(() => page.evaluate(() => (window as unknown as { __done: boolean }).__done)).toBe(true);
     return page.evaluate(() => {
-      const w = window as unknown as { __path: number[]; __times: number[] };
-      return { p: w.__path, times: w.__times };
+      const w = window as unknown as { __path: number[]; __times: number[]; __at: number };
+      return { p: w.__path, times: w.__times, at: w.__at };
     });
   };
   for (const key of ['ArrowDown', 'ArrowDown', 'ArrowDown', 'ArrowDown', 'ArrowUp', 'ArrowUp']) {
-    const { p, times } = await path(key);
+    const { p, times, at } = await path(key);
     const steps = p.slice(1).map((v, i) => v - p[i]).filter((d) => Math.abs(d) > 0.5);
     if (steps.length === 0) continue;
     const dir = Math.sign(steps[0]);
     expect(steps.every((d) => Math.sign(d) === dir), `${key}: ${p.map(Math.round).join(' ')}`).toBe(true);
-    // Gentle: spread over several frames, never most of the way at once —
-    // unless the browser itself skipped frames (a busy machine), which the
-    // time between samples shows.
+    // Gentle by the clock, not by frames: at every sample, no further than
+    // the spring's own curve allows for the time since the press, at its
+    // quickest settle (focusScroll.ts, 110 ms). A shove — most of the way in
+    // the first moments — fails; a busy machine that drew few frames does
+    // not, since a scroll that keeps to the clock is simply seen later.
     const total = Math.abs(p[p.length - 1] - p[0]);
-    // Frames further apart than three at 60 Hz while it moved: the page was
-    // starved, and a scroll that keeps to the clock lands in fewer of them.
-    const moving = p.findIndex((v, i) => i > 0 && Math.abs(v - p[i - 1]) > 0.5);
-    const gaps = times.slice(1, moving + 3).map((t, i) => t - times[i]);
-    if (gaps.some((g) => g > 50)) continue;
-    expect(steps.length, `${key}: ${p.map(Math.round).join(' ')}`).toBeGreaterThan(3);
-    expect(Math.abs(steps[0]), `${key} first step of ${total}`).toBeLessThan(total * 0.6 + 2);
+    const omega = 4.7 / 0.11;
+    const curve = (ms: number) => 1 - (1 + (omega * ms) / 1000) * Math.exp((-omega * ms) / 1000);
+    for (let i = 1; i < p.length; i++) {
+      const done = Math.abs(p[i] - p[0]) / total;
+      const ms = Math.max(0, times[i] - at);
+      expect(done, `${key}: ${Math.round(done * 100)} % at ${Math.round(ms)} ms (${p.map(Math.round).join(' ')})`).toBeLessThanOrEqual(
+        curve(ms) + 0.1
+      );
+    }
   }
 });
 

@@ -215,6 +215,9 @@ test('add without a match by mouse, rename it, and send it back', async ({ page 
   await expect(page.locator('.detail-meta')).toContainText('2021');
 
   await page.getByRole('button', { name: 'Rename' }).click();
+  // The form puts the ring in the Name box a frame after it opens; typing
+  // before that lands the Year's text there (seen on a loaded CI runner).
+  await expect(page.getByPlaceholder('Name')).toBeFocused();
   await page.getByPlaceholder('Year').fill('20x1');
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByText('20x1 does not look like a year.')).toBeVisible();

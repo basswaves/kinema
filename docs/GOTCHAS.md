@@ -1178,6 +1178,18 @@ wrap on every engine.
 
 ---
 
+### The spatial library calls `preventDefault` on every key, even while paused
+
+Kinema's own focus engine (focusStore.ts, round 7) first ignored a key whose
+`defaultPrevented` was set, so that a control keeping a key to itself could
+claim it. Every arrow on Home then did nothing, with no error: the spatial
+library's window listener, registered first, calls `preventDefault` (and
+`stopPropagation`, which cannot stop another listener on the same `window`)
+on every key in its map **before** it checks whether it is paused. **Do:** a
+control that keeps a key stops its *propagation* (a card's OK held in the
+capture phase, a text box's Left in React); the engine listens in the bubble
+phase on `window` and never reads `defaultPrevented`.
+
 ## Frontend
 
 ### A condition inside `try` switches the react-hooks rules off for the whole component

@@ -5,7 +5,7 @@
  * list — an empty genre produces no rail at all, so a small library looks
  * deliberate instead of full of empty shelves.
  */
-import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
+import { FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { useMemo, useState } from 'react';
 import Art from './Art';
 import { drawnStyle } from './drawnColour';
@@ -19,7 +19,10 @@ import HomeNotices from './HomeNotices';
 import type { ScanTrouble } from './scanTrouble';
 import type { Upgrade } from './qualityNotice';
 import { useClaimFocus } from './focus';
-import { useFocusGroup } from './focusGroups';
+import { FocusScreen } from './focusEngine';
+import { useLanding } from './focusStore';
+import { FocusProvider } from './FocusGroup';
+import { useFocusGroup, useNavGroup } from './focusGroups';
 import { count } from './format';
 import type { ContinueItem } from '../player/api';
 import { parseGenres, type Title } from './api';
@@ -149,7 +152,13 @@ export default function Home(props: Props) {
     return <FirstRun onScan={onFirstScan} />;
   }
 
-  return <HomeRows {...props} />;
+  // Home itself is on Kinema's own engine (focusEngine.tsx, round 7); the
+  // pages that stand in for it above are still on the spatial library.
+  return (
+    <FocusScreen>
+      <HomeRows {...props} />
+    </FocusScreen>
+  );
 }
 
 const NOTHING_NAMED_FOCUS_KEY = 'nothing-named';
@@ -248,7 +257,11 @@ function HomeRows({
   onFfmpeg,
   onDismissFfmpeg,
 }: Props) {
-  const { ref, focusKey } = useFocusable({ trackChildren: true, saveLastFocusedChild: true });
+  // The page: the hero, the notices and the rails one above the other.
+  const { ref, focusKey } = useNavGroup(
+    { kind: 'column' },
+    { trackChildren: true, saveLastFocusedChild: true }
+  );
 
   // The moment Home opened, fixed for its life: the hero is the day's pick,
   // not something that changes under the remote while you browse.
@@ -308,12 +321,11 @@ function HomeRows({
       .slice(0, 8);
   }, [titles]);
 
-  // A page (focus.ts): Play, even from the top bar the library's own restore
-  // parked the ring on while the titles loaded.
-  useClaimFocus(HERO_PLAY_FOCUS_KEY, Boolean(hero) && !setupOpen, true);
+  // Where Home lands: Play, until the person does something.
+  useLanding(hero && !setupOpen ? HERO_PLAY_FOCUS_KEY : null);
 
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <div className="home" ref={ref}>
         {hero && (
           <Hero title={hero} onPlay={onPlay} onSelect={onSelect} onPlaySomething={onPlaySomething} />
@@ -385,7 +397,7 @@ function HomeRows({
           />
         ))}
       </div>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }
 
@@ -405,7 +417,7 @@ function Hero({
   const { ref, focusKey } = useFocusGroup<HTMLElement>('row', { current: HERO_PLAY_FOCUS_KEY });
 
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <header className="hero" ref={ref}>
         <Art
           className="hero-backdrop"
@@ -467,6 +479,6 @@ function Hero({
           </div>
         </div>
       </header>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }

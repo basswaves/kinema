@@ -3,13 +3,7 @@
  * Against `dev:mock`; see kb.ts and keyboard-*.e2e.ts for the conventions.
  */
 import { expect, test, type Page } from '@playwright/test';
-
-async function press(page: Page, key: string, times = 1): Promise<void> {
-  for (let i = 0; i < times; i++) {
-    await page.keyboard.press(key);
-    await page.waitForTimeout(150);
-  }
-}
+import { afterPress, press } from './kb';
 
 function focused(page: Page): Promise<string | undefined> {
   return page.evaluate(() => document.querySelector('.focused')?.textContent?.trim());
@@ -35,7 +29,7 @@ async function until(page: Page, key: string, text: string, max = 12): Promise<v
     // flows run side by side) a press can land after a fixed pause, and the
     // next press then steps past the control.
     await expect.poll(() => focused(page), { timeout: 1500 }).not.toBe(before).catch(() => {});
-    await page.waitForTimeout(150);
+    await afterPress(page);
   }
   expect(await focused(page)).toContain(text);
 }

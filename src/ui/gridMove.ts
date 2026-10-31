@@ -1,6 +1,7 @@
 /**
  * Where an arrow press goes inside a grid of cards, worked out from the index
- * alone.
+ * alone — for grids still on the spatial library (search). Kinema's own
+ * engine moves its grids by the same arithmetic (focusModel.ts, `gridStep`).
  *
  * The spatial library's own answer is to measure every sibling and sort them
  * by distance, which costs more the longer the list: a shelf of a thousand
@@ -15,29 +16,15 @@
  * never did; whether the press then goes anywhere is the spatial library's
  * question one level up.
  */
+import { gridStep, type Arrow } from './focusModel';
+
+const ARROWS = new Set(['up', 'down', 'left', 'right']);
+
 export function gridMove(
   direction: string,
   index: number,
   count: number,
   columns: number
 ): number | null {
-  if (index < 0 || index >= count || columns < 1) return null;
-  const column = index % columns;
-  switch (direction) {
-    case 'left':
-      return column > 0 ? index - 1 : null;
-    case 'right':
-      return column < columns - 1 && index + 1 < count ? index + 1 : null;
-    case 'up':
-      return index >= columns ? index - columns : null;
-    case 'down': {
-      if (index + columns < count) return index + columns;
-      // The last row is short and this column is past its end: the nearest
-      // card below is its last one. Already on the last row: nowhere.
-      const lastRow = Math.floor((count - 1) / columns);
-      return Math.floor(index / columns) < lastRow ? count - 1 : null;
-    }
-    default:
-      return null;
-  }
+  return ARROWS.has(direction) ? gridStep(direction as Arrow, index, count, columns) : null;
 }

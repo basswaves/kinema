@@ -347,6 +347,38 @@ the focus key it was left on; Back pops one and puts focus back on that control
 (`returnFocusTo`). Top-bar destinations start again from Home. This only works
 for controls with stable focus keys — see GOTCHAS.
 
+**Kinema moves the ring by the screen's structure, not by distance**
+(round 7, 2026-10-31; `focusModel.ts`, `focusStore.ts`, `focusScroll.ts`,
+`focusEngine.tsx`). A screen is a tree of areas in document order — **row**
+(Left/Right along it, arriving lands on its current item), **column** (Up/
+Down), **grid** (by index, `columns` read from the CSS), **menu** (holds every
+arrow, goes round) — and an arrow press is a pure function of that tree, the
+control holding the ring, the key and what each area remembers (a rail comes
+back to its last card). The press is answered by the nearest area, walking up
+from the control, whose axis it is; one no area answers goes nowhere, which is
+the owner's "neighbours only" by construction. Nothing is measured, so a
+button added, a row wrapping or a font that renders differently on Linux
+cannot change where an arrow goes, and the rules are unit tests
+(`focusModel.test.ts`) instead of timed browser runs. The store is
+synchronous and Kinema's own: the control holding the ring has the DOM focus
+too (roving tabindex, Tab and Shift+Tab from area to area), a pointer moving
+over a control moves the ring there, and nothing moves the ring by itself but
+recovery when its control goes (the card sliding into its place, else the
+screen's landing spot), decided once the change is committed. **One scroll
+rule**: a key move puts the area holding the ring (a rail, the hero, a grid's
+row) at a fixed line below the sticky bars (`data-sticky-top`, read from the
+page), with its heading when both fit; in a rail the card sits where the
+first one does; the page never scrolls above its top, so going up to the
+first areas brings it back there. One glide length and easing for all of it,
+shortened under a held key so the page keeps up, instant with the system's
+reduce-motion or the light look; the wheel and touchpad stay native, and a
+pointer never scrolls the page. Home, its rails and the Movies / TV shows
+grids are on it (`FocusScreen`); the other screens are still on the spatial
+library below until they move over (round 7, F2–F4). While a screen on the
+new engine is up the library is paused, and a dialog still on the library
+(`NoriginLayer`) takes the keys back while it is open — one handler per
+press, decided by what is mounted.
+
 **Screens are built from a few kinds of focus group** (`focusGroups.ts`,
 2026-10-10). Inside a screen, "where does this arrow go" used to be answered by
 distance between buttons, which is right between big areas and wrong inside

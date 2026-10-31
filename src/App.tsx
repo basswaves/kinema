@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import Browse from './ui/Browse';
 import ErrorBoundary from './ui/ErrorBoundary';
+import { NoriginLayer } from './ui/focusEngine';
 import FolderBrowser from './ui/FolderBrowser';
 import LinkCard from './ui/LinkCard';
 import { useShownLink } from './ui/links';
@@ -119,10 +120,28 @@ export default function App() {
   return (
     <ErrorBoundary>
       <Browse />
-      {folderRequest && <FolderBrowser request={folderRequest} />}
-      {shownTrailer && <TrailerOverlay trailer={shownTrailer} />}
-      {shownLink && <LinkCard link={shownLink} />}
-      {showShortcuts && <Shortcuts onClose={() => setShortcutsOpen(false)} />}
+      {/* Over any screen, and still on the spatial library: each takes the
+          keys from Kinema's own engine while it is open (focusEngine.tsx). */}
+      {folderRequest && (
+        <NoriginLayer>
+          <FolderBrowser request={folderRequest} />
+        </NoriginLayer>
+      )}
+      {shownTrailer && (
+        <NoriginLayer>
+          <TrailerOverlay trailer={shownTrailer} />
+        </NoriginLayer>
+      )}
+      {shownLink && (
+        <NoriginLayer>
+          <LinkCard link={shownLink} />
+        </NoriginLayer>
+      )}
+      {showShortcuts && (
+        <NoriginLayer>
+          <Shortcuts onClose={() => setShortcutsOpen(false)} />
+        </NoriginLayer>
+      )}
     </ErrorBoundary>
   );
 }

@@ -36,15 +36,23 @@
  * navigation"): each group's children must be declared in components of their
  * own so they register inside the group's provider, and a group with nothing
  * focusable in it must say so with `focusable: false`.
+ *
+ * Round 7: on a screen moved to Kinema's own engine (focusEngine.tsx) the
+ * same group registers there instead, as the area of the same kind
+ * (focusModel.ts), and is moved by structure, not distance. Which of the two
+ * a group is on is decided by the screen it is drawn in (`useOnKinema`).
  */
 import {
   useFocusable,
   type Direction,
   type FocusableComponent,
+  type UseFocusableConfig,
   type UseFocusableResult,
 } from '@noriginmedia/norigin-spatial-navigation';
 import { useCallback, useEffect } from 'react';
 import { pickNext, type Box } from './navGeometry';
+import { useFocusWithin, useNavArea, useNavLeaf, useOnKinema } from './focusStore';
+import type { AreaSpec } from './focusModel';
 
 export type GroupKind = 'menu' | 'row' | 'panel' | 'list';
 
@@ -62,6 +70,65 @@ interface Options {
   /** Rows and panels: the arrows that stop at the group's edge instead of
    *  leaving it. A row holds Left and Right by default, a panel nothing. */
   stopAt?: Direction[];
+  /** Kinema's engine: a list's axis (a rail is `x`); `y` unless said. */
+  axis?: 'x' | 'y';
+  /** Kinema's engine: the page goes to its top when the ring is here (the top bar). */
+  pageTop?: boolean;
+}
+
+/** The area of Kinema's engine a group of `kind` is (focusModel.ts). */
+function areaFor(kind: GroupKind, current: string | undefined, wrap: Wrap, axis: 'x' | 'y'): AreaSpec {
+  if (kind === 'row') return { kind: 'row', current };
+  if (kind === 'menu') return { kind: 'menu', current, wrap };
+  if (kind === 'list') {
+    return axis === 'x'
+      ? { kind: 'row', current, remember: true }
+      : { kind: 'column', current, remember: true };
+  }
+  return { kind: 'column', current };
+}
+
+/**
+ * A group on either engine: the spatial library's `config`, or Kinema's
+ * `area` — whichever the screen it is drawn in is on. Use like
+ * `useFocusable`, with `FocusProvider` (FocusGroup.tsx) for its children.
+ */
+export function useNavGroup<E extends HTMLElement = HTMLDivElement>(
+  area: AreaSpec & { disabled?: boolean; pageTop?: boolean },
+  config: UseFocusableConfig = {}
+): UseFocusableResult<E> {
+  const kinema = useOnKinema();
+  const result = useFocusable<object, E>({
+    ...config,
+    focusable: (config.focusable ?? true) && !kinema,
+  });
+  const { disabled, pageTop, ...spec } = area;
+  useNavArea(result.focusKey, result.ref, { on: kinema, spec, disabled, pageTop });
+  const within = useFocusWithin(result.focusKey, kinema);
+  return kinema ? { ...result, hasFocusedChild: within } : result;
+}
+
+/**
+ * A control on either engine (cards, Continue's cards; FocusButton has its
+ * own): `focused` from whichever holds it, and `navProps` for its element.
+ */
+export function useFocusLeaf<E extends HTMLElement = HTMLDivElement>(
+  config: UseFocusableConfig & { onSelect?: () => void; disabled?: boolean }
+): UseFocusableResult<E> & { kinema: boolean; navProps: Record<string, unknown> } {
+  const kinema = useOnKinema();
+  const { onSelect, disabled = false, ...rest } = config;
+  const result = useFocusable<object, E>({
+    ...rest,
+    focusable: !disabled && !kinema,
+    onEnterPress: onSelect,
+  });
+  const leaf = useNavLeaf(result.focusKey, result.ref, { on: kinema, disabled, onSelect });
+  return {
+    ...result,
+    focused: kinema ? leaf.focused : result.focused,
+    kinema,
+    navProps: leaf.props,
+  };
 }
 
 const ROW_STOPS: Direction[] = ['left', 'right'];
@@ -155,7 +222,7 @@ export function resolveInGroup(
  */
 export function useFocusGroup<E extends HTMLElement = HTMLDivElement>(
   kind: GroupKind,
-  { focusKey, current, focusable = true, wrap = 'vertical', stopAt }: Options = {}
+  { focusKey, current, focusable = true, wrap = 'vertical', stopAt, axis = 'y', pageTop }: Options = {}
 ): UseFocusableResult<E> {
   const stops = stopAt ?? (kind === 'row' ? ROW_STOPS : NO_STOPS);
   const resolve = useCallback(
@@ -164,7 +231,8 @@ export function useFocusGroup<E extends HTMLElement = HTMLDivElement>(
     [kind, wrap]
   );
 
-  const result = useFocusable<object, E>({
+  const area = { ...areaFor(kind, current, wrap, axis), disabled: !focusable, pageTop };
+  const result = useNavGroup<E>(area, {
     focusKey,
     focusable,
     trackChildren: true,

@@ -81,6 +81,14 @@ html {
   font-size: min(1.2083vw, 2.1481vh);
 }
 
+/* Kinema's own focus engine gives the control holding the ring the DOM focus
+   too (focusStore.ts), for a screen reader and the web's keys. The ring is
+   Kinema's own (`.focused`); the browser's outline beside it would be a
+   second one. Zero specificity, so every `.focused` outline still wins. */
+:where([data-nav-key]):focus {
+  outline: none;
+}
+
 .browse {
   position: absolute;
   inset: 0;

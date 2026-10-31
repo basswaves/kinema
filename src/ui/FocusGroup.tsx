@@ -8,8 +8,22 @@
  */
 import { FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import type { ReactNode } from 'react';
+import { NavParent } from './focusEngine';
 import { useFocusGroup, type GroupKind, type Wrap } from './focusGroups';
 import type { Direction } from './navGeometry';
+
+/**
+ * A group's children, on whichever engine: the spatial library's provider
+ * and Kinema's (focusEngine.tsx) under the one key. In place of
+ * `<FocusContext.Provider value={focusKey}>`.
+ */
+export function FocusProvider({ value, children }: { value: string; children: ReactNode }) {
+  return (
+    <FocusContext.Provider value={value}>
+      <NavParent value={value}>{children}</NavParent>
+    </FocusContext.Provider>
+  );
+}
 
 interface Props {
   kind: GroupKind;
@@ -18,6 +32,7 @@ interface Props {
   focusable?: boolean;
   wrap?: Wrap;
   stopAt?: Direction[];
+  axis?: 'x' | 'y';
   className?: string;
   role?: string;
   'aria-label'?: string;
@@ -34,10 +49,10 @@ export default function FocusGroup({
 }: Props) {
   const { ref, focusKey } = useFocusGroup(kind, options);
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <div ref={ref} className={className} role={role} aria-label={ariaLabel}>
         {children}
       </div>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }

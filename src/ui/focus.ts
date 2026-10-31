@@ -14,6 +14,7 @@
  */
 import { useEffect, useState } from 'react';
 import { isLightLook } from './lightLook';
+import { navExpectReturn, navFocused, noteSpatialClaim } from './focusStore';
 import {
   doesFocusableExist,
   getCurrentFocusKey,
@@ -92,6 +93,12 @@ export function hasPendingReturn(): boolean {
 export function returnFocusTo(focusKey: string | null, scrollTop?: number): void {
   window.clearInterval(returnTimer);
   pendingReturn = focusKey;
+  // Whichever engine the screen coming back is on takes it; Kinema's own
+  // (focusEngine.tsx) does as the screen is drawn, and stops this one.
+  navExpectReturn(focusKey, scrollTop, () => {
+    window.clearInterval(returnTimer);
+    pendingReturn = null;
+  });
   if (!focusKey) return;
 
   const started = Date.now();
@@ -99,6 +106,8 @@ export function returnFocusTo(focusKey: string | null, scrollTop?: number): void
     if (doesFocusableExist(focusKey)) {
       window.clearInterval(returnTimer);
       pendingReturn = null;
+      navExpectReturn(null);
+      noteSpatialClaim();
       returnedTo = focusKey;
       // The page was rebuilt at the top; put it back where it was before the
       // ring goes to the card, so the card is already on screen and nothing
@@ -111,6 +120,7 @@ export function returnFocusTo(focusKey: string | null, scrollTop?: number): void
       // list. Fall back to the view's own landing spot.
       window.clearInterval(returnTimer);
       pendingReturn = null;
+      navExpectReturn(null);
       if (!focusIsDead()) return;
       const spot = [...landingSpots].reverse().find((key) => doesFocusableExist(key));
       if (spot) void setFocus(spot);
@@ -134,6 +144,16 @@ function countInputs(): void {
   for (const type of ['keydown', 'pointerdown', 'pointermove', 'wheel']) {
     window.addEventListener(type, count, { capture: true, passive: true });
   }
+}
+
+/**
+ * The control holding the ring, on whichever engine: Kinema's own while a
+ * screen on it is up (also under a dialog still on the spatial library, so
+ * Back from a page that dialog opened comes back to the card), else the
+ * spatial library's.
+ */
+export function currentFocusKey(): string | null {
+  return navFocused() ?? getCurrentFocusKey();
 }
 
 /** The focus key a drawn control was registered under, for landing on it by what it shows. */
@@ -190,7 +210,13 @@ export function useClaimFocus(focusKey: string, ready: boolean, page = false): v
       !pendingReturn &&
       !(returnedTo && focusWithin(returnedTo)) &&
       (focusIsDead() || (page && inputs === arrivedAt && !focusWithin(focusKey)));
-    if (shouldClaim()) void setFocus(focusKey);
+    if (shouldClaim()) {
+      // A whole page taking the ring on arrival wins over the top bar's ring
+      // handed back by Kinema's own engine (focusStore.ts); a claim only
+      // because nothing held it does not.
+      if (page) noteSpatialClaim();
+      void setFocus(focusKey);
+    }
 
     const second = window.setTimeout(() => {
       if (shouldClaim() && doesFocusableExist(focusKey)) void setFocus(focusKey);

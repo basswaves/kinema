@@ -8,10 +8,11 @@
  * on the page, several times over once the genre rails repeat the same titles.
  * Nobody scrolls a rail of five hundred anyway; that is what the grid is for.
  */
-import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { memo } from 'react';
 import Card from './Card';
 import FocusButton from './FocusButton';
+import { FocusProvider } from './FocusGroup';
+import { useNavGroup } from './focusGroups';
 import RailTrack from './RailTrack';
 import type { Title } from './api';
 
@@ -32,21 +33,21 @@ interface Props {
 }
 
 export default memo(function Rail({ heading, titles, onSelect, onSeeAll, listRail, openLabel }: Props) {
-  // Not a place to move to while empty — see ContinueRail.tsx.
-  const { ref, focusKey } = useFocusable({
-    trackChildren: true,
-    saveLastFocusedChild: true,
-    focusable: titles.length > 0,
-  });
+  // Not a place to move to while empty — see ContinueRail.tsx. A row that
+  // comes back to the card last on (NAV-MAP, agreed 2026-10-11).
+  const { ref, focusKey } = useNavGroup(
+    { kind: 'row', remember: true, disabled: titles.length === 0 },
+    { trackChildren: true, saveLastFocusedChild: true, focusable: titles.length > 0 }
+  );
 
   // Empty, still its element, unseen: the focus area measures it once, at
   // mount ("Component added without a node reference" otherwise). Same shape
   // as below, so React keeps the one element when there is something to show.
   if (titles.length === 0) {
     return (
-      <FocusContext.Provider value={focusKey}>
+      <FocusProvider value={focusKey}>
         <section className="rail" ref={ref} style={{ display: 'none' }} />
-      </FocusContext.Provider>
+      </FocusProvider>
     );
   }
 
@@ -54,8 +55,8 @@ export default memo(function Rail({ heading, titles, onSelect, onSeeAll, listRai
   const hasMore = Boolean(onSeeAll) && (titles.length > shown.length || Boolean(openLabel));
 
   return (
-    <FocusContext.Provider value={focusKey}>
-      <section className="rail" ref={ref}>
+    <FocusProvider value={focusKey}>
+      <section className="rail" ref={ref} aria-label={heading}>
         <h2 className="rail-heading">
           {/* The heading opens the whole shelf, as See all does, for a mouse
               that cannot reach the end of the row (GitHub #12). Out of the
@@ -102,6 +103,6 @@ export default memo(function Rail({ heading, titles, onSelect, onSeeAll, listRai
           )}
         </RailTrack>
       </section>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 });

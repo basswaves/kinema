@@ -4050,6 +4050,38 @@ also caught the one match the raw scores would have moved (GOTCHAS).
 Running time as a tie-break was left for later; OpenSubtitles' file hash was
 turned down (crowd-tagged, never for own rips, a request per file).
 
+## Moving by structure: away from the spatial library (2026-10-31, round 7)
+
+Round 6 came back red from CI five times, every time in the keyboard and
+mouse flows on WebKit; four were real faults in the app (rows that wrapped,
+the sticky Back's room, light-look posters), one a test racing it. The
+"Spatial navigation" section of GOTCHAS had grown to 29 entries, more than
+libmpv, Tauri or Android, and nearly every one was a workaround for the same
+three things: the library (norigin-spatial-navigation) answered each arrow by
+measuring every control's position and taking the nearest, so anything that
+moved a control a few pixels changed where arrows went on screens nobody
+touched, and Linux's fonts moved them; it kept a focus of its own beside
+React's and updated it later (300 ms after an unmount), which Kinema then
+corrected with timers that raced on a slow machine; and each page scrolled by
+rules of its own. The owner chose to replace the navigation core rather than
+go on fixing entries (notes FOCUS-REWORK.md), with no new features until it
+is done.
+
+The replacement is the model the TV platforms use: a screen declares its
+structure — rows, columns, grids, menus, in document order — and an arrow is a
+pure function of that tree (`focusModel.ts`), so nothing on screen can change
+an answer and every rule is a unit test. The owner's rules from TV-FEEL and
+the navigation map (neighbours only, a row lands on its current item, a list
+remembers, a menu holds focus, Back returns) are the engine itself, not
+per-screen fixes. The store is synchronous and Kinema's own; the one scroll
+rule puts the area holding the ring at a fixed line below the top bar, read
+from the page. Screens move over one at a time behind the component names
+they already use (`FocusButton`, `FocusGroup`); Home, its rails and the
+Movies / TV shows grids went first, as the go / no-go proof, and both engines
+run side by side until the last screen has moved — the library paused while a
+screen on the new one is up, a dialog still on the library taking the keys
+back while it is open.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

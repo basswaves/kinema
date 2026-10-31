@@ -3,18 +3,15 @@
  * component serves mouse and D-pad without a separate TV variant — building
  * two card components would guarantee they drift apart.
  */
-import {
-  useFocusable,
-  FocusContext,
-  getCurrentFocusKey,
-  navigateByDirection,
-} from '@noriginmedia/norigin-spatial-navigation';
-import { memo, useEffect, useRef } from 'react';
+import { getCurrentFocusKey, navigateByDirection } from '@noriginmedia/norigin-spatial-navigation';
+import { memo, useEffect } from 'react';
+import { FocusProvider } from './FocusGroup';
+import { useFocusLeaf } from './focusGroups';
 import Art from './Art';
 import DrawnPoster from './DrawnPoster';
 import type { Title } from './api';
 import { posterState, sizedPoster } from './poster';
-import { keepOnScreen, recoverFocusSoon } from './focus';
+import { currentFocusKey, keepOnScreen, recoverFocusSoon } from './focus';
 import { isMyListKey, toggleMyList, useOnMyList } from '../library/myList';
 import { HOLD_MS, NO_RELEASE_MS, isMenuKey, openCardMenu } from './cardMenuStore';
 
@@ -39,22 +36,22 @@ interface Props {
  * same data (keepSame.ts) and `onSelect` is one function for the whole shell.
  */
 export default memo(function Card({ title, onSelect, focusKey: key, note, goesWhenUnlisted }: Props) {
-  const { ref, focused, focusKey } = useFocusable({
+  const { ref, focused, focusKey, kinema, navProps } = useFocusLeaf({
     focusKey: key,
-    onEnterPress: () => onSelect(title),
+    onSelect: () => onSelect(title),
     extraProps: { titleId: title.id },
   });
 
-  const element = useRef<HTMLDivElement | null>(null);
   const state = posterState(title);
   const listed = useOnMyList(title.id);
 
-  // Keep the focused card on screen when navigating by remote.
+  // Keep the focused card on screen when navigating by remote (Kinema's own
+  // engine has its one rule for that, focusScroll.ts).
   useEffect(() => {
-    if (focused) {
-      keepOnScreen(element.current);
+    if (focused && !kinema) {
+      keepOnScreen(ref.current);
     }
-  }, [focused]);
+  }, [focused, kinema, ref]);
 
   // L puts the focused card on My list or takes it off. Only the focused
   // card listens, so one press is one card. A remote has no letters: the
@@ -64,7 +61,9 @@ export default memo(function Card({ title, onSelect, focusKey: key, note, goesWh
     const onKeyDown = (e: KeyboardEvent) => {
       if (!isMyListKey(e)) return;
       e.preventDefault();
-      if (goesWhenUnlisted && listed) {
+      // On Kinema's engine the ring goes to the card sliding into its place
+      // by itself when this one goes (focusModel.ts, `recover`).
+      if (goesWhenUnlisted && listed && !kinema) {
         // The ring moves on to the card beside it first, while this one is
         // still there to measure from; the last card takes the rail with it.
         const here = getCurrentFocusKey();
@@ -76,7 +75,7 @@ export default memo(function Card({ title, onSelect, focusKey: key, note, goesWh
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [focused, title.id, goesWhenUnlisted, listed]);
+  }, [focused, title.id, goesWhenUnlisted, listed, kinema]);
 
   // OK chooses on its release, so that OK held can be the card's menu
   // (cardMenuStore.ts); the Menu key opens it at once. Ahead of the spatial
@@ -127,21 +126,19 @@ export default memo(function Card({ title, onSelect, focusKey: key, note, goesWh
   }, [focused, title, focusKey, onSelect]);
 
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <div
-        ref={(node) => {
-          ref.current = node;
-          element.current = node;
-        }}
+        ref={ref}
         className={`card ${focused ? 'focused' : ''}`}
         onClick={() => onSelect(title)}
         onContextMenu={(e) => {
           e.preventDefault();
           // A pointer's menu gives the ring back where it was (cardMenuStore.ts).
-          openCardMenu(title, getCurrentFocusKey(), 'pointer');
+          openCardMenu(title, currentFocusKey(), 'pointer');
         }}
         role="button"
         tabIndex={0}
+        {...navProps}
       >
         <div className="card-art">
           <Art
@@ -161,7 +158,7 @@ export default memo(function Card({ title, onSelect, focusKey: key, note, goesWh
             title="More"
             onClick={(e) => {
               e.stopPropagation();
-              openCardMenu(title, getCurrentFocusKey(), 'pointer');
+              openCardMenu(title, currentFocusKey(), 'pointer');
             }}
           >
             ⋯
@@ -185,6 +182,6 @@ export default memo(function Card({ title, onSelect, focusKey: key, note, goesWh
         </div>
         {note && <div className="card-note">{note}</div>}
       </div>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 });

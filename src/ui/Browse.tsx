@@ -30,12 +30,14 @@ import {
   installReadOn,
   installScrollPace,
   recoverFocusSoon,
+  currentFocusKey,
   returnFocusTo,
-  useClaimFocus,
 } from './focus';
 import { back, current, navigate, open, replace, type Entry } from './history';
-import { useFocusGroup } from './focusGroups';
-import FocusGroup from './FocusGroup';
+import { useFocusGroup, useNavGroup } from './focusGroups';
+import { FocusScreen, NoriginLayer } from './focusEngine';
+import { navFocus, navFocused, noteSpatialClaim, useLanding } from './focusStore';
+import FocusGroup, { FocusProvider } from './FocusGroup';
 import { setShortcutsOpen } from './shortcutsState';
 import Player from '../player/Player';
 import {
@@ -219,7 +221,7 @@ export default function Browse() {
   const [closing, setClosing] = useState(false);
 
   /** Open a view on top of this one; Back returns here, to `from`. */
-  const openView = useCallback((next: View, from: string | null = getCurrentFocusKey()) => {
+  const openView = useCallback((next: View, from: string | null = currentFocusKey()) => {
     const scrollTop = document.querySelector('.browse')?.scrollTop;
     setStack((s) => open(s, next, from, scrollTop));
   }, []);
@@ -267,7 +269,10 @@ export default function Browse() {
       setScanFailed(null);
       setScanErrors([]);
     };
-    if (getCurrentFocusKey() === SCAN_OK_KEY && doesFocusableExist(HERO_PLAY_FOCUS_KEY)) {
+    // On Kinema's engine (Home's) the move is made at once, so the notice
+    // can go straight after.
+    if (navFocused() === SCAN_OK_KEY && navFocus(HERO_PLAY_FOCUS_KEY)) clear();
+    else if (getCurrentFocusKey() === SCAN_OK_KEY && doesFocusableExist(HERO_PLAY_FOCUS_KEY)) {
       void setFocus(HERO_PLAY_FOCUS_KEY).finally(clear);
     } else clear();
   }, []);
@@ -792,7 +797,11 @@ export default function Browse() {
   useEffect(() => {
     // Arriving from the top bar puts you in the box; coming Back from a result
     // puts you on that result instead, which returnFocusTo is already doing.
-    if (view.name === 'search' && !hasPendingReturn()) setFocus('search-input');
+    if (view.name === 'search' && !hasPendingReturn()) {
+      // A page's own landing: the top bar's ring is not handed back over it.
+      noteSpatialClaim();
+      setFocus('search-input');
+    }
   }, [view.name]);
 
   // The library's background work gives way while a film is open (playback.ts).
@@ -987,6 +996,9 @@ export default function Browse() {
         )}
 
         {view.name === 'grid' && (
+          // On Kinema's own engine (focusEngine.tsx, round 7). Each shelf a
+          // screen of its own: from Movies to TV shows lands again.
+          <FocusScreen key={view.heading}>
           <GridView
             heading={view.heading}
             titles={gridTitles}
@@ -1000,6 +1012,7 @@ export default function Browse() {
               view.kind ? () => openView({ name: 'collection', id: null, kind: view.kind }) : undefined
             }
           />
+          </FocusScreen>
         )}
 
         {view.name === 'collection' && (
@@ -1076,7 +1089,13 @@ export default function Browse() {
           />
         )}
 
-        {leaving && <LeaveDialog onClose={() => setLeaving(false)} />}
+        {/* Dialogs still on the spatial library: they take the keys from
+            Kinema's own engine while open (focusEngine.tsx). */}
+        {leaving && (
+          <NoriginLayer>
+            <LeaveDialog onClose={() => setLeaving(false)} />
+          </NoriginLayer>
+        )}
         {/* The menu on cards (cardMenuStore.ts), over whichever screen the card is on. */}
         <CardMenuHost
           onPlay={(title) => void playTitle(title)}
@@ -1085,12 +1104,14 @@ export default function Browse() {
         />
 
         {something && (
-          <PlaySomething
-            pool={something}
-            resumable={resumable}
-            onPlay={(title) => void playTitle(title)}
-            onClose={() => setSomething(null)}
-          />
+          <NoriginLayer>
+            <PlaySomething
+              pool={something}
+              resumable={resumable}
+              onPlay={(title) => void playTitle(title)}
+              onClose={() => setSomething(null)}
+            />
+          </NoriginLayer>
         )}
       </FocusContext.Provider>
     </div>
@@ -1123,6 +1144,8 @@ function TopNav({
   const { ref, focusKey } = useFocusGroup<HTMLElement>('row', {
     focusKey: NAV_FOCUS_KEY,
     current: navKey(active),
+    // The top of the page: the ring here brings the page back to it.
+    pageTop: true,
   });
 
   // A scan is the only long-running thing the app does on its own, so it says
@@ -1131,8 +1154,9 @@ function TopNav({
   const scan = useScanStatus();
 
   return (
-    <FocusContext.Provider value={focusKey}>
-      <nav className="top-nav" ref={ref}>
+    <FocusProvider value={focusKey}>
+      {/* `data-sticky-top`: what the one scroll rule keeps clear (focusScroll.ts). */}
+      <nav className="top-nav" ref={ref} data-sticky-top="">
         <span className="brand">Kinema</span>
         {NAV_ITEMS.map(([name, label]) => (
           <FocusButton
@@ -1170,7 +1194,7 @@ function TopNav({
         </FocusButton>
         {scan && <span className="nav-count">{scanStageWords(scan.stage)}</span>}
       </nav>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }
 
@@ -1204,11 +1228,11 @@ function GridView({
   /** A whole shelf's: a smart collection made from it (CollectionPage.tsx). */
   onNewCollection?: () => void;
 }) {
-  const { ref, focusKey } = useFocusable({
-    focusKey: GRID_FOCUS_KEY,
-    trackChildren: true,
-    saveLastFocusedChild: true,
-  });
+  // The page: its heading row, the order row and the cards, one above the other.
+  const { ref, focusKey } = useNavGroup(
+    { kind: 'column' },
+    { focusKey: GRID_FOCUS_KEY, trackChildren: true, saveLastFocusedChild: true }
+  );
 
   const [arrangement, setArrangement] = useState<GridArrangement>({
     sort: 'added',
@@ -1236,12 +1260,12 @@ function GridView({
 
   // Land on the first title, not on Back or the sort buttons above it.
   const first = shown[0] ? `grid:${shown[0].id}` : GRID_FOCUS_KEY;
-  useClaimFocus(first, titles.length > 0 || shown.length === 0, true);
+  useLanding(titles.length > 0 || shown.length === 0 ? first : null);
 
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <div className="search" ref={ref}>
-        <div className="grid-head">
+        <FocusGroup kind="row" className="grid-head">
           {showBack && (
             <FocusButton className="back-button" keepInView="page-top" onSelect={onBack}>
               ← Back
@@ -1271,7 +1295,7 @@ function GridView({
               New collection
             </FocusButton>
           )}
-        </div>
+        </FocusGroup>
         {/* A row landing on the order in use (NAV-MAP, agreed 2026-10-11):
             Up from the first row of films is the order you chose. */}
         <FocusGroup
@@ -1315,7 +1339,7 @@ function GridView({
         )}
         <CardGrid name="grid" entries={entries} onSelect={onSelect} fromAboveFirst />
       </div>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }
 

@@ -15,7 +15,8 @@ import { useCallback, useEffect, useState } from 'react';
 import Art from './Art';
 import ConfirmButton from './ConfirmButton';
 import FocusButton from './FocusButton';
-import FocusGroup from './FocusGroup';
+import FocusGroup, { FocusProvider } from './FocusGroup';
+import { useNavGroup } from './focusGroups';
 import FocusInput from './FocusInput';
 import { useClaimFocus } from './focus';
 import { count } from './format';
@@ -474,23 +475,22 @@ export function PlaylistsRail({ onOpen }: { onOpen: (id: number) => void }) {
       live = false;
     };
   }, []);
-  const { ref, focusKey } = useFocusable({
-    trackChildren: true,
-    saveLastFocusedChild: true,
-    focusable: lists.length > 0,
-  });
+  const { ref, focusKey } = useNavGroup(
+    { kind: 'row', remember: true, disabled: lists.length === 0 },
+    { trackChildren: true, saveLastFocusedChild: true, focusable: lists.length > 0 }
+  );
 
   // Empty (or still loading), still its element, unseen: as Rail.tsx says.
   if (lists.length === 0) {
     return (
-      <FocusContext.Provider value={focusKey}>
+      <FocusProvider value={focusKey}>
         <section className="rail" ref={ref} style={{ display: 'none' }} />
-      </FocusContext.Provider>
+      </FocusProvider>
     );
   }
   return (
-    <FocusContext.Provider value={focusKey}>
-      <section className="rail" ref={ref}>
+    <FocusProvider value={focusKey}>
+      <section className="rail" ref={ref} aria-label="Playlists">
         <h2 className="rail-heading">Playlists</h2>
         <RailTrack>
           {lists.map((list) => (
@@ -498,6 +498,6 @@ export function PlaylistsRail({ onOpen }: { onOpen: (id: number) => void }) {
           ))}
         </RailTrack>
       </section>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }

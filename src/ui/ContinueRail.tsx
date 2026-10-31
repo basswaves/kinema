@@ -7,8 +7,9 @@
  * fresh show.
  */
 import { videoName } from '../library/videos';
-import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { useEffect } from 'react';
+import { FocusProvider } from './FocusGroup';
+import { useFocusLeaf, useNavGroup } from './focusGroups';
 import Art from './Art';
 import DrawnPoster from './DrawnPoster';
 import FocusButton from './FocusButton';
@@ -38,25 +39,24 @@ export default function ContinueRail({ items, onResume, onRemove }: Props) {
   // left. With the scan's notice pushing Home down, Up from Play chose it over
   // the top bar, and the ring vanished until the focus watchdog put it back
   // (2026-10-09).
-  const { ref, focusKey } = useFocusable({
-    trackChildren: true,
-    saveLastFocusedChild: true,
-    focusable: items.length > 0,
-  });
+  const { ref, focusKey } = useNavGroup(
+    { kind: 'row', remember: true, disabled: items.length === 0 },
+    { trackChildren: true, saveLastFocusedChild: true, focusable: items.length > 0 }
+  );
 
   // Empty, still its element, unseen: the focus area measures it once, at
   // mount ("Component added without a node reference" otherwise). Same shape
   // as below, so React keeps the one element when there is something to show.
   if (items.length === 0) {
     return (
-      <FocusContext.Provider value={focusKey}>
+      <FocusProvider value={focusKey}>
         <section className="rail" ref={ref} style={{ display: 'none' }} />
-      </FocusContext.Provider>
+      </FocusProvider>
     );
   }
 
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <section className="rail" ref={ref}>
         <h2 className="rail-heading">Continue watching</h2>
         <RailTrack>
@@ -70,7 +70,7 @@ export default function ContinueRail({ items, onResume, onRemove }: Props) {
           ))}
         </RailTrack>
       </section>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }
 
@@ -101,19 +101,21 @@ function ContinueCard({
   // card, never on the Remove button beneath it because that was the last
   // thing touched there. Remembering it made Down from the hero go straight
   // to Remove — one press from taking the show off Home by accident.
-  const { ref, focusKey, hasFocusedChild } = useFocusable({
-    trackChildren: true,
-  });
+  const body = item.kind === 'video' ? `continue:v${item.file_id}` : `continue:${item.title_id}`;
+  const { ref, focusKey, hasFocusedChild } = useNavGroup(
+    { kind: 'column', current: body },
+    { trackChildren: true }
+  );
 
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <div className={`continue-card ${hasFocusedChild ? 'card-active' : ''}`} ref={ref}>
         <ContinueCardBody item={item} onResume={onResume} />
         <FocusButton className="continue-remove" onSelect={() => onRemove(item)}>
           ✕ Remove
         </FocusButton>
       </div>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }
 
@@ -126,17 +128,17 @@ function ContinueCardBody({
 }) {
   // Keyed by title, not file: after watching, the card for this show comes
   // back holding the next episode, and Back should land on it.
-  const { ref, focused } = useFocusable<object, HTMLDivElement>({
+  const { ref, focused, kinema, navProps } = useFocusLeaf<HTMLDivElement>({
     // A video's card (videos.rs) has no title; its file is its key.
     focusKey: item.kind === 'video' ? `continue:v${item.file_id}` : `continue:${item.title_id}`,
-    onEnterPress: () => onResume(item),
+    onSelect: () => onResume(item),
   });
 
   useEffect(() => {
-    if (focused) {
+    if (focused && !kinema) {
       keepOnScreen(ref.current);
     }
-  }, [focused, ref]);
+  }, [focused, ref, kinema]);
 
   const percent = item.duration_secs
     ? Math.min(100, (item.position_secs / item.duration_secs) * 100)
@@ -161,6 +163,7 @@ function ContinueCardBody({
       onClick={() => onResume(item)}
       role="button"
       tabIndex={0}
+      {...navProps}
     >
       <div className="continue-art">
         <Art

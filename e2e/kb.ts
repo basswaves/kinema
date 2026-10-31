@@ -4,11 +4,35 @@
  */
 import { expect, type Page } from '@playwright/test';
 
-/** Presses far enough apart that the app sees two (docs/GOTCHAS.md). */
+/** Whether Kinema's own focus engine answers the keys now (focusStore.ts). */
+function onKinemaEngine(page: Page): Promise<boolean> {
+  return page.evaluate(
+    () => (window as unknown as { __nav?: { answering?: () => boolean } }).__nav?.answering?.() ?? false
+  );
+}
+
+/** A press done: at once on Kinema's own engine, spaced on the spatial library's. */
+export async function afterPress(page: Page): Promise<void> {
+  if (!(await onKinemaEngine(page))) await page.waitForTimeout(150);
+}
+
+/** The page has stopped moving: no scroll the ring caused is still gliding. */
+export async function settled(page: Page): Promise<void> {
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { __nav?: { still?: () => boolean } }).__nav?.still?.() ?? true))
+    .toBe(true);
+}
+
+/**
+ * Key presses. On a screen on Kinema's own engine a press is answered before
+ * it returns, so the next can follow at once; a screen still on the spatial
+ * library drops presses closer than its throttle (docs/GOTCHAS.md), so they
+ * are spaced there until it moves over (round 7).
+ */
 export async function press(page: Page, key: string, times = 1): Promise<void> {
   for (let i = 0; i < times; i++) {
     await page.keyboard.press(key);
-    await page.waitForTimeout(150);
+    await afterPress(page);
   }
 }
 

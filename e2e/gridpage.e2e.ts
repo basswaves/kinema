@@ -3,7 +3,7 @@
  * Against `dev:mock`; see kb.ts and keyboard-*.e2e.ts for the conventions.
  */
 import { expect, test, type Page } from '@playwright/test';
-import { focused, press } from './kb';
+import { focused, press, settled } from './kb';
 
 /** The mock library plus sixty bare films, so the Movies grid scrolls. */
 async function open(page: Page, extra = '60'): Promise<void> {
@@ -64,7 +64,7 @@ test('Back from a title lands on the same card, scroll and all', async ({ page }
   await expect(page.locator('.search .card').first()).toBeVisible();
   await press(page, 'ArrowDown', 6);
   // The last press may still be scrolling smoothly: read once it has settled.
-  await page.waitForTimeout(800);
+  await settled(page);
   const before = await focused(page);
   const scrollBefore = await page.evaluate(() => document.querySelector('.browse')?.scrollTop ?? 0);
   expect(scrollBefore).toBeGreaterThan(100);
@@ -72,7 +72,7 @@ test('Back from a title lands on the same card, scroll and all', async ({ page }
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   await press(page, 'Escape');
   await expect.poll(() => focused(page)).toBe(before);
-  await page.waitForTimeout(1500);
+  await settled(page);
   const scrollAfter = await page.evaluate(() => document.querySelector('.browse')?.scrollTop ?? 0);
   expect(Math.abs(scrollAfter - scrollBefore)).toBeLessThan(120);
   // The card is where it was: on screen, not scrolled out of sight.

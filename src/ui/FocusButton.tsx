@@ -10,6 +10,7 @@
 import { useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import { useEffect, useLayoutEffect, type ReactNode } from 'react';
 import { keepOnScreen, noteWidth, scrollPageToTop } from './focus';
+import { useNavLeaf, useOnKinema } from './focusStore';
 
 export type KeepInView = 'nearest' | 'page-top';
 
@@ -21,7 +22,9 @@ interface Props {
   /** Stable key, for directing focus here explicitly. */
   focusKey?: string;
   /**
-   * What should happen to the scroll position when focus lands here.
+   * What should happen to the scroll position when focus lands here — on a
+   * screen still on the spatial library. Kinema's own engine has one rule
+   * for every control (focusScroll.ts) and ignores this.
    *
    * `nearest` reveals the button if it is off screen and does nothing if it is
    * not. `page-top` is for controls in the top row, where being merely visible
@@ -56,12 +59,16 @@ export default function FocusButton({
   label,
   onHighlight,
 }: Props) {
-  const { ref, focused } = useFocusable<object, HTMLButtonElement>({
+  // On whichever engine the screen it is drawn in is (focusEngine.tsx).
+  const kinema = useOnKinema();
+  const { ref, focused: spatialFocused, focusKey: key } = useFocusable<object, HTMLButtonElement>({
     focusKey,
-    focusable: !disabled,
+    focusable: !disabled && !kinema,
     onEnterPress: onSelect,
     onFocus: onHighlight,
   });
+  const leaf = useNavLeaf(key, ref, { on: kinema, disabled, onSelect, onHighlight });
+  const focused = kinema ? leaf.focused : spatialFocused;
 
   // Its label can change while it is highlighted (a version picked), so the
   // width is read again on each render that holds the ring.
@@ -70,10 +77,10 @@ export default function FocusButton({
   });
 
   useEffect(() => {
-    if (!focused || !keepInView) return;
+    if (!focused || !keepInView || kinema) return;
     if (keepInView === 'page-top') scrollPageToTop(ref.current);
     else keepOnScreen(ref.current);
-  }, [focused, keepInView, ref]);
+  }, [focused, keepInView, ref, kinema]);
 
   return (
     <button
@@ -85,8 +92,10 @@ export default function FocusButton({
       onClick={onSelect}
       onMouseEnter={(e) => {
         noteWidth(e.currentTarget);
-        onHighlight?.();
+        // On Kinema's engine the pointer moves the ring, which says so itself.
+        if (!kinema) onHighlight?.();
       }}
+      {...leaf.props}
     >
       {children}
     </button>

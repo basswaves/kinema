@@ -23,10 +23,17 @@ test('Windows: Home installs ffmpeg with one press, and the notice goes', async 
   await expect(notice).toContainText('about 110 MB');
   await expect(notice).toContainText('stays installed if Kinema is ever removed');
 
+  // Each step of the mock's install shows for 400 ms: watched every frame
+  // from before the press, so a step is never missed between two looks.
+  const sawDownloading = page.waitForFunction(
+    () => Array.from(document.querySelectorAll('.home-notice')).some((n) => n.textContent?.includes('Downloading ffmpeg')),
+    undefined,
+    { polling: 'raf' }
+  );
   await press(page, 'Enter');
   // While it runs the button stays under the ring, and says so.
   await expect.poll(() => focused(page)).toBe('Installing…');
-  await expect(notice).toContainText('Downloading ffmpeg');
+  await sawDownloading;
   // Done: the notice is gone, and the ring went somewhere, not nowhere.
   await expect(page.locator('body')).not.toContainText('need ffmpeg', { timeout: 10_000 });
   await expect.poll(() => focused(page)).toBeTruthy();
@@ -55,9 +62,10 @@ test('Windows: a failed install says why, with Try again and the download page',
   await expect(notice).toContainText('The download failed', { timeout: 10_000 });
   await expect(notice.locator('.ffmpeg-install-tail')).toContainText('Installer failed');
   await expect.poll(() => focused(page)).toBe('Try again');
-  // The download page is reachable by remote from Try again.
+  // The download page is reachable by remote from Try again: beside it, in
+  // the notice's text, so Left (the notice is a row; round 7).
   for (let i = 0; i < 3 && (await focused(page)) !== 'Open the ffmpeg download page ↗'; i++) {
-    await press(page, 'ArrowDown');
+    await press(page, 'ArrowLeft');
   }
   await expect.poll(() => focused(page)).toBe('Open the ffmpeg download page ↗');
 });

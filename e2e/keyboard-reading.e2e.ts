@@ -5,7 +5,7 @@
  * (CONTRIBUTING, "Two failure modes"). Shared helpers: kb.ts.
  */
 import { expect, test, type Page } from '@playwright/test';
-import { press, focused, open, androidSettings } from './kb';
+import { press, focused, open, androidSettings, settled } from './kb';
 
 test('the equipment notice: Choose when never asked, Use it too for only these', async ({ page }) => {
   await open(page, 'windows');
@@ -236,13 +236,13 @@ test("a rail's title stays clear of the top bar, going down and coming back up",
   // title was left under the bar.
   for (let i = 0; i < 6; i++) {
     await press(page, 'ArrowDown');
-    await page.waitForTimeout(500);
+    await settled(page);
     seen.push(await headingClear());
   }
   const goingUp: (boolean | null)[] = [];
   for (let i = 0; i < 2; i++) {
     await press(page, 'ArrowUp');
-    await page.waitForTimeout(500);
+    await settled(page);
     goingUp.push(await headingClear());
   }
   // Every stop on a rail had its title in view (null: not on a rail), and

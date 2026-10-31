@@ -16,14 +16,11 @@
  * (Up from the first row) returns null and goes on to the view's own search,
  * which treats the whole grid as one block.
  */
-import {
-  FocusContext,
-  useFocusable,
-  type Direction,
-  type FocusableComponent,
-} from '@noriginmedia/norigin-spatial-navigation';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { type Direction, type FocusableComponent } from '@noriginmedia/norigin-spatial-navigation';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Card from './Card';
+import { FocusProvider } from './FocusGroup';
+import { useNavGroup } from './focusGroups';
 import { gridMove } from './gridMove';
 import type { Title } from './api';
 
@@ -44,6 +41,8 @@ export default function CardGrid({ name, entries, onSelect, fromAboveFirst = fal
 
   /** How many cards fit across, read when the grid is resized, not per press. */
   const columns = useRef(1);
+  /** The same, for Kinema's engine, which reads it from the area (focusModel.ts). */
+  const [across, setAcross] = useState(1);
 
   const resolve = useCallback(
     (direction: Direction, from: string, siblings: FocusableComponent[]) => {
@@ -55,7 +54,16 @@ export default function CardGrid({ name, entries, onSelect, fromAboveFirst = fal
     [positions, keys]
   );
 
-  const { ref, focusKey } = useFocusable<object, HTMLDivElement>({
+  const { ref, focusKey } = useNavGroup<HTMLDivElement>(
+    {
+      kind: 'grid',
+      columns: across,
+      // From above, the first card (NAV-MAP); Back finds its card by key.
+      current: keys[0],
+      remember: !fromAboveFirst,
+      disabled: entries.length === 0,
+    },
+    {
     focusKey: `${name}-cards`,
     // Back from a film's page finds its card by key (`grid:7`), not by
     // remembering, so the shelf can afford to forget.
@@ -67,7 +75,8 @@ export default function CardGrid({ name, entries, onSelect, fromAboveFirst = fal
     preferredChildFocusKey: keys[0],
     nextFocusResolver: resolve,
     measureChildrenLayout: false,
-  });
+    }
+  );
 
   useEffect(() => {
     const grid = ref.current;
@@ -75,6 +84,7 @@ export default function CardGrid({ name, entries, onSelect, fromAboveFirst = fal
     const read = () => {
       const tracks = getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean);
       columns.current = Math.max(1, tracks.length);
+      setAcross(columns.current);
     };
     read();
     const watch = new ResizeObserver(read);
@@ -83,7 +93,7 @@ export default function CardGrid({ name, entries, onSelect, fromAboveFirst = fal
   }, [ref]);
 
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <div className="search-grid" ref={ref}>
         {entries.map(({ title, why }) => (
           <Card
@@ -95,6 +105,6 @@ export default function CardGrid({ name, entries, onSelect, fromAboveFirst = fal
           />
         ))}
       </div>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }

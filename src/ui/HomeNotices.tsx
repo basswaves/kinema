@@ -17,9 +17,9 @@
  * Quiet on purpose: one line each, in the flow of the page, reached with one
  * press of Down from the hero — never a dialog in front of what you came for.
  */
-import { FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { useCapabilities } from '../capabilities';
-import { useFocusGroup } from './focusGroups';
+import FocusGroup, { FocusProvider } from './FocusGroup';
+import { useNavGroup } from './focusGroups';
 import FocusButton from './FocusButton';
 import { FfmpegInstallButton, FfmpegInstallStatus } from './FfmpegInstall';
 import { FFMPEG_INSTALL_WORDS } from './ffmpegInstallState';
@@ -81,18 +81,26 @@ export default function HomeNotices({
           : 'notice-ffmpeg';
   // Windows installs ffmpeg from the notice itself (FfmpegInstall.tsx).
   const installs = Boolean(useCapabilities()?.installs_ffmpeg);
-  const { ref, focusKey } = useFocusGroup<HTMLElement>('list', {
-    current: first,
-    focusable: !empty,
-  });
+  // On Kinema's engine a column of rows, one per notice: Left and Right
+  // inside a notice, Up and Down between them (NAV-MAP), Down from the hero
+  // the top one and Up from the rails the bottom one, as they stand.
+  const { ref, focusKey } = useNavGroup<HTMLElement>(
+    { kind: 'column', disabled: empty },
+    {
+      trackChildren: true,
+      saveLastFocusedChild: true,
+      preferredChildFocusKey: first,
+      focusable: !empty,
+    }
+  );
   // Empty, still its element, unseen: the focus area measures it once, at
   // mount ("Component added without a node reference" otherwise). Same shape
   // as below, so React keeps the one element when there is something to show.
   if (empty) {
     return (
-      <FocusContext.Provider value={focusKey}>
+      <FocusProvider value={focusKey}>
         <section className="home-notices" ref={ref} style={{ display: 'none' }} />
-      </FocusContext.Provider>
+      </FocusProvider>
     );
   }
   // Only additions to an "only these" list can be done here in a press; a
@@ -100,13 +108,13 @@ export default function HomeNotices({
   const onlyAdds = upgrades.every((u) => u.action === 'add');
 
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <section className="home-notices" ref={ref}>
         {/* The startup scan's line, here on Home rather than above the page,
             so a remote can put it away: OK, as the other notices are left
             (owner, 2026-10-11). Amber, like the line it replaces elsewhere. */}
         {scanTrouble && (
-          <div className="home-notice home-notice-scan">
+          <FocusGroup kind="row" className="home-notice home-notice-scan">
             <span className="home-notice-icon" aria-hidden="true">
               !
             </span>
@@ -122,11 +130,11 @@ export default function HomeNotices({
             >
               OK
             </FocusButton>
-          </div>
+          </FocusGroup>
         )}
 
         {keyRejected && (
-          <div className="home-notice">
+          <FocusGroup kind="row" className="home-notice">
             <span className="home-notice-icon" aria-hidden="true">
               !
             </span>
@@ -146,11 +154,11 @@ export default function HomeNotices({
             >
               Add a key
             </FocusButton>
-          </div>
+          </FocusGroup>
         )}
 
         {reviewCount > 0 && (
-          <div className="home-notice">
+          <FocusGroup kind="row" className="home-notice">
             <span className="home-notice-icon" aria-hidden="true">
               ?
             </span>
@@ -175,11 +183,11 @@ export default function HomeNotices({
             >
               Review
             </FocusButton>
-          </div>
+          </FocusGroup>
         )}
 
         {upgrades.length > 0 && (
-          <div className="home-notice">
+          <FocusGroup kind="row" className="home-notice">
             <span className="home-notice-icon" aria-hidden="true">
               ★
             </span>
@@ -218,11 +226,11 @@ export default function HomeNotices({
                 Not now
               </FocusButton>
             </div>
-          </div>
+          </FocusGroup>
         )}
 
         {ffmpegMissing && (
-          <div className="home-notice">
+          <FocusGroup kind="row" className="home-notice">
             <span className="home-notice-icon" aria-hidden="true">
               +
             </span>
@@ -260,9 +268,9 @@ export default function HomeNotices({
                 Not now
               </FocusButton>
             </div>
-          </div>
+          </FocusGroup>
         )}
       </section>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }

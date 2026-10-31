@@ -17,6 +17,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import FocusButton from './FocusButton';
 import { useFocusGroup } from './focusGroups';
 import { focusInPlace } from './focus';
+import { NoriginLayer } from './focusEngine';
 import { PlaylistDialog } from './PlaylistPicker';
 import { closeCardMenu, useCardMenu, type CardMenuRequest } from './cardMenuStore';
 import { getTitleDetail, type Title } from './api';
@@ -50,24 +51,31 @@ export default function CardMenuHost(props: Props) {
 
   return (
     <>
+      {/* Still on the spatial library: over a screen on Kinema's own engine
+          it takes the keys while open, and the ring comes back to the card
+          when it closes (focusEngine.tsx). */}
       {request && (
-        <CardMenu
-          key={`${request.title.id}:${request.returnTo ?? ''}`}
-          request={request}
-          {...props}
-          onPlaylist={(items, what) => setPlaylist({ items, what })}
-          onNote={setNote}
-        />
+        <NoriginLayer>
+          <CardMenu
+            key={`${request.title.id}:${request.returnTo ?? ''}`}
+            request={request}
+            {...props}
+            onPlaylist={(items, what) => setPlaylist({ items, what })}
+            onNote={setNote}
+          />
+        </NoriginLayer>
       )}
       {playlist && (
-        <PlaylistDialog
-          items={playlist.items}
-          what={playlist.what}
-          onClose={(message) => {
-            setPlaylist(null);
-            setNote(message);
-          }}
-        />
+        <NoriginLayer>
+          <PlaylistDialog
+            items={playlist.items}
+            what={playlist.what}
+            onClose={(message) => {
+              setPlaylist(null);
+              setNote(message);
+            }}
+          />
+        </NoriginLayer>
       )}
       {note && (
         <p className="card-menu-note" role="status">

@@ -96,6 +96,10 @@ makes no stability promises.
 
 ### Fixed
 
+- **Posters in the light look** (Auto on a weaker device, or chosen in
+  Settings). Since 0.14.0 the cards' posters, Continue Watching's pictures, a
+  title page's poster and the Skip button shrank to a sliver there. Closing a
+  card's menu opened by mouse no longer scrolls the page.
 - **Updating Kinema on Windows by running the new setup keeps your taskbar
   pin, shortcuts and "offer as a video player" setting.** The setup used to
   offer "uninstall before installing" first, which removed them. A newer setup

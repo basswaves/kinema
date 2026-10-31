@@ -17,6 +17,11 @@ export interface CardMenuRequest {
   returnTo: string | null;
   /** Opened by OK held: the same OK is still down and must not choose. */
   held: boolean;
+  /**
+   * Opened by a pointer: closing gives the ring back without moving the page
+   * under the pointer (the ring's keep-on-screen would scroll it).
+   */
+  pointer: boolean;
 }
 
 let request: CardMenuRequest | null = null;
@@ -27,8 +32,12 @@ function publish(next: CardMenuRequest | null) {
   for (const listener of listeners) listener();
 }
 
-export function openCardMenu(title: Title, returnTo: string | null, held = false) {
-  publish({ title, returnTo, held });
+export function openCardMenu(
+  title: Title,
+  returnTo: string | null,
+  how: 'key' | 'held' | 'pointer' = 'key'
+) {
+  publish({ title, returnTo, held: how === 'held', pointer: how === 'pointer' });
 }
 
 export function closeCardMenu() {

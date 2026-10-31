@@ -16,6 +16,7 @@ import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import FocusButton from './FocusButton';
 import { useFocusGroup } from './focusGroups';
+import { focusInPlace } from './focus';
 import { PlaylistDialog } from './PlaylistPicker';
 import { closeCardMenu, useCardMenu, type CardMenuRequest } from './cardMenuStore';
 import { getTitleDetail, type Title } from './api';
@@ -99,11 +100,16 @@ function CardMenu({
     void setFocus(FIRST_KEY);
   }, []);
 
+  const pointer = request.pointer;
   const close = useCallback(() => {
-    // Back first, while the menu is still there (docs/GOTCHAS.md, as LeaveDialog.tsx).
-    if (returnTo) void setFocus(returnTo);
+    // Back first, while the menu is still there (docs/GOTCHAS.md, as LeaveDialog.tsx);
+    // for a pointer without moving the page under it (focus.ts).
+    if (returnTo) {
+      if (pointer) focusInPlace(returnTo);
+      else void setFocus(returnTo);
+    }
     closeCardMenu();
-  }, [returnTo]);
+  }, [returnTo, pointer]);
 
   // Opened by OK held: that OK is still down, and its repeats (and its
   // release) must not choose the first item. Taken once the key came up, or

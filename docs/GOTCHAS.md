@@ -1121,6 +1121,17 @@ the ring on the next screen's first button before the spatial library saw
 the same keydown, which then pressed that button too. **Do:** FocusInput
 stops the event when its `onEnter` takes it.
 
+### A rule inserted into a selector list takes the whole list
+
+A new rule (the My list ribbon, `.card-listed { position: absolute; width:
+1rem; … }`) was put after a light-look list ending in a comma —
+`.card-art, .continue-art, .detail-poster, .skip-button,` — so the list
+became its selectors. In the light look every poster took the ribbon's place
+and size, from 0.14.0 for a week, with no error; it surfaced only when a new
+control on the poster was clicked on a loaded CI runner, where Auto picks the
+light look. **Do:** insert a rule only at a blank line after a `}`; a test
+that matters in both looks sets `data-look` itself (e2e/cardmenu.e2e.ts).
+
 ### OK held: every repeat must stop at the card, even after it opened the menu
 
 The card menu opens on OK held (Card.tsx). Once the card had decided "menu",

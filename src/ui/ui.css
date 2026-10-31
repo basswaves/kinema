@@ -4122,12 +4122,6 @@ kbd {
   transform: none;
 }
 
-/* Shadows under pictures and panels: a blurred shadow is repainted with the
-   thing above it. Panels keep a thin edge so they still stand off the page. */
-:root[data-look='light'] .card-art,
-:root[data-look='light'] .continue-art,
-:root[data-look='light'] .detail-poster,
-:root[data-look='light'] .skip-button,
 /* On My list: a ribbon at the card's top left, clear of the watched tick on
    the right and the badge. Drawn, not a glyph: no font decides its shape. */
 .card-listed {
@@ -4183,6 +4177,12 @@ kbd {
   box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.6);
 }
 
+/* Shadows under pictures and panels: a blurred shadow is repainted with the
+   thing above it. Panels keep a thin edge so they still stand off the page. */
+:root[data-look='light'] .card-art,
+:root[data-look='light'] .continue-art,
+:root[data-look='light'] .detail-poster,
+:root[data-look='light'] .skip-button,
 :root[data-look='light'] .card-watched {
   box-shadow: none;
 }

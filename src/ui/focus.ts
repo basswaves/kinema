@@ -340,7 +340,37 @@ export function scrollPageToTop(
   node: HTMLElement | null,
   behavior: ScrollBehavior = scrollBehavior()
 ): void {
+  if (stillPage(node)) return;
   scrollParent(node)?.scrollTo({ top: 0, behavior });
+}
+
+/** The control the ring is going back to without moving the page (`focusInPlace`). */
+let inPlace: HTMLElement | null = null;
+
+/** Whether `node` is arriving by `focusInPlace`: its keep-on-screen is skipped, once. */
+function stillPage(node: HTMLElement | null): boolean {
+  if (!node || node !== inPlace) return false;
+  inPlace = null;
+  return true;
+}
+
+/**
+ * Put the ring back on `focusKey` and leave the page where it is — after a
+ * menu a pointer opened (CardMenu.tsx): the ring's own keep-on-screen would
+ * scroll the page under the pointer, to the top for a Play on Home.
+ */
+export function focusInPlace(focusKey: string): void {
+  const components = (
+    SpatialNavigation as unknown as { focusableComponents?: Record<string, { node?: HTMLElement }> }
+  ).focusableComponents;
+  const node = components?.[focusKey]?.node ?? null;
+  inPlace = node;
+  setFocus(focusKey);
+  // A control that draws no keep-on-screen (already focused) must not keep
+  // the mark for a later arrival.
+  window.setTimeout(() => {
+    if (inPlace === node) inPlace = null;
+  }, 1000);
 }
 
 /** The page scroller found for a node's parent, so the walk is done once. */
@@ -461,7 +491,7 @@ function headingOf(node: HTMLElement, page: HTMLElement): HTMLElement | null {
  * alone, as before.
  */
 export function keepOnScreen(node: HTMLElement | null, inline: 'center' | 'nearest' = 'center'): void {
-  if (!node) return;
+  if (!node || stillPage(node)) return;
   const behavior = scrollBehavior();
   node.scrollIntoView({ behavior, block: 'nearest', inline });
   const page = pageScroller(node);

@@ -88,7 +88,7 @@ export default memo(function Card({ title, onSelect, focusKey: key, note, goesWh
     const settle = (menu: boolean) => {
       window.clearTimeout(fallback);
       downAt = 0;
-      if (menu) openCardMenu(title, focusKey, true);
+      if (menu) openCardMenu(title, focusKey, 'held');
       else onSelect(title);
     };
     const onKeyDown = (e: KeyboardEvent) => {
@@ -137,7 +137,8 @@ export default memo(function Card({ title, onSelect, focusKey: key, note, goesWh
         onClick={() => onSelect(title)}
         onContextMenu={(e) => {
           e.preventDefault();
-          openCardMenu(title, focusKey);
+          // A pointer's menu gives the ring back where it was (cardMenuStore.ts).
+          openCardMenu(title, getCurrentFocusKey(), 'pointer');
         }}
         role="button"
         tabIndex={0}
@@ -160,7 +161,7 @@ export default memo(function Card({ title, onSelect, focusKey: key, note, goesWh
             title="More"
             onClick={(e) => {
               e.stopPropagation();
-              openCardMenu(title, focusKey);
+              openCardMenu(title, getCurrentFocusKey(), 'pointer');
             }}
           >
             ⋯

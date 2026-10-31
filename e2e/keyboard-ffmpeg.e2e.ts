@@ -87,11 +87,14 @@ test('Windows: Settings installs ffmpeg, and its status turns green', async ({ p
   if (await page.evaluate(() => Boolean(document.querySelector('.settings-nav .focused')))) {
     await press(page, 'ArrowRight');
   }
+  // The section says what it found before the ring goes down it: the button
+  // is the install one only once ffmpeg has been looked for.
+  const section = page.locator('.settings-content');
+  await expect(section).toContainText('Could not find ffmpeg');
   for (let i = 0; i < 12 && (await focused(page)) !== 'Install ffmpeg'; i++) {
     await press(page, 'ArrowDown');
   }
   await expect.poll(() => focused(page)).toBe('Install ffmpeg');
-  const section = page.locator('.settings-content');
   await expect(section).toContainText('Could not find ffmpeg');
   await expect(section).toContainText('about 110 MB');
 

@@ -1212,6 +1212,34 @@ focus engine. **Do:** advance an animation by the time that really passed;
 the spring is solved exactly for any step, so a long one just lands. Test it
 with frames handed out by hand (focusScroll.test.ts), not by waiting.
 
+### A control's place in the engine's tree is where its hook runs, not where its element is drawn (round 7, F3)
+
+A component that calls `useFocusLeaf` / `useNavLeaf` and renders its own
+`FocusGroup` registers its control under the group's *parent*, because the
+hook ran above the group's provider. In the DOM the control sits inside the
+group; in the tree it is a sibling before it. Down from it then skipped the
+whole group (Needs attention: Enter opened a row, Down went past its panel).
+**Do:** put the control in a component of its own, rendered inside the group.
+
+### A claim must outrank a recovery, and a screen swap must remount the screen (round 7, F3)
+
+When the control the person pressed is replaced (Connect becomes Disconnect, a
+question is answered) the engine has already recovered the ring to a
+neighbour by the time the successor says it wants it, so "claim only if
+nothing live holds the ring" never fires. `useClaim` (focusStore.ts) also
+takes it when the ring was put there by recovery with nothing pressed since.
+And two `FocusScreen`s that are the same element type in the same place are
+one screen to React: Home's first run, setup pages and rows need `key`s, or
+the second never "arrives" and its landing is not fresh.
+
+### A tall area scrolls by its top; the ring still has to be on screen (round 7, F3)
+
+Settings' scroll anchor is the whole layout (a row above the section's
+column), taller than the window: lining it up put the layout's top under the
+bar and a control far down stayed below the fold. `lineUp` now also clamps so
+the ring itself is in sight. And typing room (`placeForTyping`) must stop a
+glide the ring started (`stopGlide`), or the spring pulls the page back.
+
 ## Frontend
 
 ### A condition inside `try` switches the react-hooks rules off for the whole component

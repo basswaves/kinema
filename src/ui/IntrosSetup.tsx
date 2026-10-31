@@ -26,6 +26,7 @@ import { getSetting, setSetting } from '../metadata/api';
 import { useCapabilities } from '../capabilities';
 import ChoiceRow from './ChoiceRow';
 import FocusButton from './FocusButton';
+import FocusGroup from './FocusGroup';
 import { userError } from './errors';
 
 /** Read by the player: 'auto' skips, anything else shows a button. */
@@ -148,15 +149,15 @@ export default function IntrosSetup() {
               Using <code>{skiptroPath}</code>.
             </p>
           ) : (
-            <div className="settings-row">
+            <FocusGroup kind="row" className="settings-row">
               <FocusButton
                 className="btn-secondary"
-                keepInView="nearest"
+               
                 onSelect={() => void chooseSkiptro()}
               >
                 Choose Skiptro
               </FocusButton>
-            </div>
+            </FocusGroup>
           )}
         </div>
       )}

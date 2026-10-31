@@ -150,6 +150,14 @@ export function glide(el: HTMLElement, axis: 'x' | 'y', to: number, duration: nu
   springs.set(el, s);
 }
 
+/** Take the page back from a scroll in motion, where it is (typing room moves it itself). */
+export function stopGlide(el: HTMLElement): void {
+  const running = springs.get(el);
+  if (!running) return;
+  cancelAnimationFrame(running.frame);
+  springs.delete(el);
+}
+
 /** Whether a scroll the ring caused is still moving (for the browser flows). */
 export function gliding(): boolean {
   return springs.size > 0;
@@ -265,7 +273,13 @@ export function lineUp(anchor: HTMLElement, leaf: HTMLElement, duration: number)
     // bottom would not fit above the window's bottom.
     const keyline = Math.max(highest, page.clientHeight * KEYLINE);
     const line = Math.max(highest, Math.min(keyline, room - (leafBottom - from)));
-    glide(page, 'y', from - line, duration);
+    // The ring itself is always in sight, whatever the area holding it: a
+    // section taller than the window (Settings) lines up by its top, and a
+    // control far down it would stay below the fold. Its top clear of the
+    // bar wins where both cannot be.
+    const leafTop = contentTop(leaf, page);
+    const to = Math.min(Math.max(from - line, leafBottom - room), leafTop - highest);
+    glide(page, 'y', to, duration);
   }
   alongTrack(leaf, page, duration);
 }

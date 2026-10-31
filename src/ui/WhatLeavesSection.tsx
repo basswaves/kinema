@@ -10,6 +10,7 @@
 import { useEffect, useState } from 'react';
 import page from '../trust/whatLeaves.json';
 import FocusButton from './FocusButton';
+import FocusGroup from './FocusGroup';
 import { getSetting } from '../metadata/api';
 import { accountApi } from '../metadata/tracking';
 import { subtitleStatus } from '../player/onlineSubtitles';
@@ -113,7 +114,7 @@ export default function WhatLeavesSection({
             </dl>
             {s.hosts.length > 0 && <p className="muted what-leaves-hosts">{s.hosts.join(' · ')}</p>}
             {s.section && sectionNames[s.section] && (
-              <div className="settings-row">
+              <FocusGroup kind="row" className="settings-row">
                 <FocusButton
                   keepInView="nearest"
                   className="btn-secondary"
@@ -122,7 +123,7 @@ export default function WhatLeavesSection({
                 >
                   Go to {sectionNames[s.section]}
                 </FocusButton>
-              </div>
+              </FocusGroup>
             )}
           </li>
         ))}

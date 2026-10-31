@@ -18,6 +18,7 @@ import { userError } from './errors';
 import { useCallback, useEffect, useState } from 'react';
 import ChoiceRow from './ChoiceRow';
 import FocusButton from './FocusButton';
+import FocusGroup from './FocusGroup';
 import DeviceChoice from './DeviceChoice';
 import { soundOptions } from './deviceOptions';
 import { savePolicy, type DevicePolicy } from '../player/devicePolicy';
@@ -145,7 +146,7 @@ function SoundDelayRow({
       <div className="choice-label">
         Sound delay{here.device ? ` for ${here.device.name}` : ''}
       </div>
-      <div className="choice-options">
+      <FocusGroup kind="row" className="choice-options">
         <FocusButton
           className="choice"
           keepInView="nearest"
@@ -166,7 +167,7 @@ function SoundDelayRow({
         <FocusButton className="choice" keepInView="nearest" onSelect={() => change(0)}>
           No delay
         </FocusButton>
-      </div>
+      </FocusGroup>
       <p className="choice-note">
         {describeDelay(here.ms)}. A receiver or TV that works on the sound or the picture can put
         them out of step by the same amount on every film: later if the sound comes before the

@@ -278,9 +278,7 @@ test('Android: OK on a text box puts it in the upper screen, clear of the keyboa
   await androidSettings(page, 'Language & subtitles');
   await downToTextBox(page);
   await press(page, 'Shift+Enter');
-  await page.waitForTimeout(200);
-  const spot = await typingSpotOk(page);
-  expect(spot.ok, spot.why).toBe(true);
+  await expect.poll(async () => (await typingSpotOk(page)).ok).toBe(true);
   // Moving on gives back any room added under the page.
   await press(page, 'ArrowDown');
   await expect(page.locator('.browse')).not.toHaveAttribute('style', /padding-bottom/);
@@ -301,9 +299,7 @@ test('the visible area shrinking while typing moves the box up out of the way', 
   // A keyboard on screen takes the lower half, as Windows' touch keyboard
   // does to a window.
   await page.setViewportSize({ width: 1280, height: 360 });
-  await page.waitForTimeout(300);
-  const spot = await typingSpotOk(page);
-  expect(spot.ok, spot.why).toBe(true);
+  await expect.poll(async () => (await typingSpotOk(page)).ok).toBe(true);
 });
 
 test('on a slow computer every quick Up still moves the ring', async ({ page }) => {

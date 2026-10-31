@@ -9,25 +9,24 @@
  * Æ, Ø and Å are on it because titles here are named in them; they cost one
  * row, and without them a Norwegian title could not be typed at all.
  */
-import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import FocusButton from './FocusButton';
+import FocusGroup, { FocusProvider } from './FocusGroup';
+import { useNavGroup } from './focusGroups';
 
 const ROWS = ['abcdefghijklm', 'nopqrstuvwxyz', '1234567890æøå'];
+const ACROSS = ROWS[0].length;
 
 interface Props {
   value: string;
   onChange: (value: string) => void;
 }
 
-export default function OnScreenKeyboard({ value, onChange }: Props) {
-  // Up from the results comes back to the last key used (NAV-MAP, agreed
-  // 2026-10-11): the results are only reached through the keys, so there
-  // always is one.
-  const { ref, focusKey } = useFocusable({ trackChildren: true, saveLastFocusedChild: true });
-
+/** The letters as one grid, the same count across on every row. */
+function Letters({ value, onChange }: Props) {
+  const { ref, focusKey } = useNavGroup({ kind: 'grid', columns: ACROSS, remember: true });
   return (
-    <FocusContext.Provider value={focusKey}>
-      <div className="osk" ref={ref} aria-label="On-screen keyboard">
+    <FocusProvider value={focusKey}>
+      <div className="osk-letters" ref={ref}>
         {ROWS.map((row) => (
           <div className="osk-row" key={row}>
             {[...row].map((ch) => (
@@ -35,7 +34,6 @@ export default function OnScreenKeyboard({ value, onChange }: Props) {
                 key={ch}
                 focusKey={`osk:${ch}`}
                 className="osk-key"
-                keepInView="nearest"
                 onSelect={() => onChange(value + ch)}
               >
                 {ch}
@@ -43,11 +41,25 @@ export default function OnScreenKeyboard({ value, onChange }: Props) {
             ))}
           </div>
         ))}
-        <div className="osk-row">
+      </div>
+    </FocusProvider>
+  );
+}
+
+export default function OnScreenKeyboard({ value, onChange }: Props) {
+  // Up from the results comes back to the last key used (NAV-MAP, agreed
+  // 2026-10-11): the results are only reached through the keys, so there
+  // always is one.
+  const { ref, focusKey } = useNavGroup({ kind: 'column', remember: true });
+
+  return (
+    <FocusProvider value={focusKey}>
+      <div className="osk" ref={ref} aria-label="On-screen keyboard">
+        <Letters value={value} onChange={onChange} />
+        <FocusGroup kind="row" className="osk-row">
           <FocusButton
             focusKey="osk:space"
             className="osk-key osk-wide"
-            keepInView="nearest"
             onSelect={() => onChange(`${value} `)}
           >
             Space
@@ -55,22 +67,16 @@ export default function OnScreenKeyboard({ value, onChange }: Props) {
           <FocusButton
             focusKey="osk:delete"
             className="osk-key osk-wide"
-            keepInView="nearest"
             label="Delete a letter"
             onSelect={() => onChange(value.slice(0, -1))}
           >
             ⌫ Delete
           </FocusButton>
-          <FocusButton
-            focusKey="osk:clear"
-            className="osk-key osk-wide"
-            keepInView="nearest"
-            onSelect={() => onChange('')}
-          >
+          <FocusButton focusKey="osk:clear" className="osk-key osk-wide" onSelect={() => onChange('')}>
             Clear
           </FocusButton>
-        </div>
+        </FocusGroup>
       </div>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }

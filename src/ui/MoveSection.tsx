@@ -7,6 +7,7 @@
 import { useState } from 'react';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import FocusButton from './FocusButton';
+import FocusGroup from './FocusGroup';
 import { userError } from './errors';
 import { useCapabilities } from '../capabilities';
 import { applyMovedMatches, exportMove, importMove, moveWords } from '../metadata/moving';
@@ -63,14 +64,14 @@ export default function MoveSection() {
         and a newer resume point there is kept. Sign in to SIMKL or Trakt again; what was sent from
         here is not sent twice.
       </p>
-      <div className="settings-row">
+      <FocusGroup kind="row" className="settings-row">
         <FocusButton keepInView="nearest" className="btn-secondary" disabled={busy} onSelect={exportIt}>
           Save the library to a file…
         </FocusButton>
         <FocusButton keepInView="nearest" className="btn-secondary" disabled={busy} onSelect={importIt}>
           Take a library in…
         </FocusButton>
-      </div>
+      </FocusGroup>
       {error && <p className="settings-warn">{error}</p>}
       {note && <p className="settings-ok">{note}</p>}
     </section>

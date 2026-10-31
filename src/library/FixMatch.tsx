@@ -16,13 +16,13 @@
 import { count } from '../ui/format';
 import { describeFailure } from '../metadata/reach';
 import { userError, withoutQueries } from '../ui/errors';
-import { setFocus, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import FocusButton from '../ui/FocusButton';
 import FocusInput from '../ui/FocusInput';
 import FocusGroup from '../ui/FocusGroup';
-import { useOnKinema } from '../ui/focusStore';
-import { keepOnScreen } from '../ui/focus';
+import { useFocusLeaf } from '../ui/focusGroups';
+import { navFocus } from '../ui/focusStore';
+import { lineUp, MOTION_MS } from '../ui/focusScroll';
 import { openLink } from '../ui/links';
 import { addWithoutMatch, findLocalPictures, listNeedsReview } from '../metadata/api';
 import { readLocalName, shelfOf } from './localTitle';
@@ -73,7 +73,7 @@ function GuideLink() {
   return (
     <FocusButton
       className="fixmatch-guide"
-      keepInView="nearest"
+     
       onSelect={() => void openLink(FILE_NAMES_GUIDE)}
     >
       How Kinema reads file names ↗
@@ -124,15 +124,15 @@ export default function FixMatch({ onChanged }: Props) {
   );
 
   /**
-   * Set when a group was dealt with: its row goes, and the ring with it, to
-   * wherever the focus library falls back to — a control far up the page.
-   * By remote the next group is what comes next, so the ring goes there.
+   * Set when a group was dealt with: its row goes, and the ring with it. By
+   * remote the next group is what comes next, so the ring goes there, as the
+   * list is drawn.
    */
   const refocus = useRef(false);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!refocus.current) return;
     refocus.current = false;
-    if (pending.length > 0) setFocus(rowKey(pending[0]));
+    if (pending.length > 0) navFocus(rowKey(pending[0]));
   }, [pending]);
 
   const run = useCallback(
@@ -172,7 +172,7 @@ export default function FixMatch({ onChanged }: Props) {
   }
 
   return (
-    <section className="fixmatch">
+    <FocusGroup kind="panel" className="fixmatch">
       <header className="fixmatch-head">
         <h2>Needs attention</h2>
         <span className="muted">
@@ -237,7 +237,7 @@ export default function FixMatch({ onChanged }: Props) {
 
       {ignored.length > 0 && (
         <div className="fixmatch-ignored">
-          <FocusButton keepInView="nearest" onSelect={() => setShowIgnored((v) => !v)}>
+          <FocusButton onSelect={() => setShowIgnored((v) => !v)}>
             {showIgnored ? 'Hide' : 'Show'} ignored ({ignored.length})
           </FocusButton>
           {showIgnored &&
@@ -251,7 +251,7 @@ export default function FixMatch({ onChanged }: Props) {
                   </div>
                 </div>
                 <FocusButton
-                  keepInView="nearest"
+                 
                   disabled={busy}
                   onSelect={() =>
                     void run(async () => {
@@ -269,7 +269,65 @@ export default function FixMatch({ onChanged }: Props) {
 
       {/* Last, so Down from the Review button still lands on the first group. */}
       <GuideLink />
-    </section>
+    </FocusGroup>
+  );
+}
+
+/**
+ * The summary is the row's own control: it expands the group. Focusable in
+ * its own right rather than as a button, because it carries the title and the
+ * refusal reason and needs to read as a row, not a control strip. A component
+ * of its own, so it registers inside the row's area, before the panel.
+ */
+function RowSummary({
+  group,
+  open,
+  onToggle,
+  advice,
+  reason,
+}: {
+  group: FileGroup;
+  open: boolean;
+  onToggle: () => void;
+  advice: string;
+  reason: string;
+}) {
+  const {
+    ref: summaryRef,
+    focused: summaryFocused,
+    navProps,
+  } = useFocusLeaf<HTMLDivElement>({ focusKey: rowKey(group), onSelect: onToggle });
+
+  // Opened by remote, what opened is below the row and was left off screen
+  // (TV-FEEL N8): the opened row goes where the one scroll rule puts an area
+  // (focusScroll.ts), once it is drawn.
+  useLayoutEffect(() => {
+    const summary = summaryRef.current;
+    const row = summary?.parentElement;
+    if (open && summary && row) lineUp(row, summary, MOTION_MS);
+  }, [open, summaryRef]);
+
+  return (
+    <div
+      ref={summaryRef}
+      className={`fixmatch-summary ${summaryFocused ? 'focused' : ''}`}
+      onClick={onToggle}
+      role="button"
+      {...navProps}
+      tabIndex={0}
+    >
+      <div className="fixmatch-title">
+        {group.title}
+        {group.year ? ` (${group.year})` : ''}
+        <span className="muted">
+          {' '}
+          · {group.files.length} file{group.files.length === 1 ? '' : 's'} ·{' '}
+          {group.isSeries ? 'series' : 'movie'}
+        </span>
+      </div>
+      <div className="fixmatch-advice">{advice}</div>
+      <div className="fixmatch-reason">{plainReason(reason)}</div>
+    </div>
   );
 }
 
@@ -370,51 +428,15 @@ function GroupRow({
     : adviceFor(reason);
 
 
-  // The summary is the row's own control: it expands the group. Focusable in
-  // its own right rather than as a button, because it carries the title and the
-  // refusal reason and needs to read as a row, not a control strip.
-  const { ref: summaryRef, focused: summaryFocused } = useFocusable<object, HTMLDivElement>({
-    focusKey: rowKey(group),
-    onEnterPress: onToggle,
-  });
-
-  useEffect(() => {
-    if (summaryFocused) {
-      summaryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-  }, [summaryFocused, summaryRef]);
-
-  // Opened by remote, what opened is below the row and was left off screen
-  // (TV-FEEL N8): bring the opened row on screen, from its title down as far
-  // as fits, once it has been drawn.
-  const rowRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const frame = requestAnimationFrame(() => keepOnScreen(rowRef.current, 'nearest'));
-    return () => cancelAnimationFrame(frame);
-  }, [open]);
-
   return (
-    <div ref={rowRef} className={`fixmatch-row ${open ? 'open' : ''}`}>
-      <div
-        ref={summaryRef}
-        className={`fixmatch-summary ${summaryFocused ? 'focused' : ''}`}
-        onClick={onToggle}
-        role="button"
-        tabIndex={0}
-      >
-        <div className="fixmatch-title">
-          {group.title}
-          {group.year ? ` (${group.year})` : ''}
-          <span className="muted">
-            {' '}
-            · {group.files.length} file{group.files.length === 1 ? '' : 's'} ·{' '}
-            {group.isSeries ? 'series' : 'movie'}
-          </span>
-        </div>
-        <div className="fixmatch-advice">{advice}</div>
-        <div className="fixmatch-reason">{plainReason(reason)}</div>
-      </div>
+    <FocusGroup kind="panel" className={`fixmatch-row ${open ? 'open' : ''}`}>
+      <RowSummary
+        group={group}
+        open={open}
+        onToggle={onToggle}
+        advice={advice}
+        reason={reason}
+      />
 
       {open && (
         <div className="fixmatch-panel">
@@ -435,7 +457,7 @@ function GroupRow({
             linkLabel={`Link ${group.files.length} file${group.files.length === 1 ? '' : 's'}`}
             onLink={onLink}
             extra={
-              <FocusButton keepInView="nearest" disabled={busy} onSelect={onIgnore}>
+              <FocusButton disabled={busy} onSelect={onIgnore}>
                 Ignore these
               </FocusButton>
             }
@@ -450,7 +472,7 @@ function GroupRow({
               Not in any database? Keep it under its own name, with no picture or description.
               Find a match stays on its page.
             </p>
-            <div className="fixmatch-search">
+            <FocusGroup kind="row" className="fixmatch-search">
               <FocusInput
                 className="fixmatch-input"
                 value={localName}
@@ -465,15 +487,15 @@ function GroupRow({
                 onEnter={keep}
                 placeholder="Year"
               />
-              <FocusButton keepInView="nearest" disabled={busy} onSelect={keep}>
+              <FocusButton disabled={busy} onSelect={keep}>
                 Add without a match
               </FocusButton>
-            </div>
+            </FocusGroup>
             {localError && <div className="fixmatch-error">{localError}</div>}
           </div>
         </div>
       )}
-    </div>
+    </FocusGroup>
   );
 }
 
@@ -483,18 +505,12 @@ function GroupRow({
  * attention and the title page's "Wrong title?" (WrongTitle.tsx), so both
  * follow the same rule: nothing is linked but the entry a person picks.
  */
-/**
- * The search box and its buttons. On Kinema's engine (Wrong title?, a menu)
- * a row: Right from the box is Movie / TV series, Down the results. Needs
- * attention is still on the spatial library (round 7, F3).
- */
+/** The search box and its buttons: Right from the box is Movie / TV series, Down the results. */
 function SearchRow({ children }: { children: ReactNode }) {
-  return useOnKinema() ? (
+  return (
     <FocusGroup kind="row" className="fixmatch-search">
       {children}
     </FocusGroup>
-  ) : (
-    <div className="fixmatch-search">{children}</div>
   );
 }
 
@@ -567,12 +583,12 @@ export function MatchSearch({
         {/* A button showing its state rather than a checkbox: a checkbox is
             a poor target for a remote, and this screen has to work from
             one. */}
-        <FocusButton keepInView="nearest" onSelect={onToggleSeries}>
+        <FocusButton onSelect={onToggleSeries}>
           {isSeries ? 'TV series' : 'Movie'}
         </FocusButton>
         <FocusButton
           className="primary"
-          keepInView="nearest"
+         
           disabled={searching || !query.trim()}
           onSelect={() => void search()}
         >
@@ -599,7 +615,7 @@ export function MatchSearch({
               {used.isSeries ? 'TV series' : 'movie'}
             </span>
           </div>
-          <div className="fixmatch-results">
+          <FocusGroup kind="panel" className="fixmatch-results">
             {results.map((candidate) => (
               <div key={candidate.providerId} className="fixmatch-candidate">
                 {candidate.posterUrl ? (
@@ -618,7 +634,7 @@ export function MatchSearch({
                 </div>
                 <FocusButton
                   className="primary"
-                  keepInView="nearest"
+                 
                   disabled={busy}
                   onSelect={() => onLink(used.provider, candidate, used.isSeries)}
                 >
@@ -626,7 +642,7 @@ export function MatchSearch({
                 </FocusButton>
               </div>
             ))}
-          </div>
+          </FocusGroup>
         </>
       )}
     </>

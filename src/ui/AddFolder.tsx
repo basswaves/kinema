@@ -7,10 +7,11 @@
  * folder" tile on the Library page (the folder the system's window gave),
  * so the two ask the same questions in the same words.
  */
-import { setFocus } from '@noriginmedia/norigin-spatial-navigation';
-import { useEffect, useState } from 'react';
+import { useLayoutEffect, useState } from 'react';
 import FocusButton from './FocusButton';
+import FocusGroup from './FocusGroup';
 import FocusInput from './FocusInput';
+import { focusTo } from './focus';
 import MergeOffer from './MergeOffer';
 import { userError } from './errors';
 import { KIND_WORDS } from './format';
@@ -46,10 +47,13 @@ export default function AddFolder({
   const [at, setAt] = useState<Step>({ step: 'kind' });
   const [error, setError] = useState<string | null>(null);
 
-  // The ring onto the first answer the moment the question appears.
-  useEffect(() => {
-    void setFocus('folders-kind:movies');
-  }, []);
+  // The ring onto the first answer the moment a question appears, as it is
+  // drawn: the controls are registered by then (focusStore.ts).
+  const step = at.step;
+  useLayoutEffect(() => {
+    if (step === 'kind') focusTo('folders-kind:movies');
+    else if (step === 'name') focusTo(NAME_KEY);
+  }, [step]);
 
   const add = async (kind: LibraryKind, name?: string) => {
     setError(null);
@@ -81,7 +85,7 @@ export default function AddFolder({
       {at.step === 'kind' && (
         <div className="folders-add" role="group" aria-label="Add as">
           <p>Add {path} to the library as:</p>
-          <div className="settings-row">
+          <FocusGroup kind="row" className="settings-row">
             {(['movies', 'tv'] as const).map((kind) => (
               <FocusButton
                 key={kind}
@@ -97,7 +101,6 @@ export default function AddFolder({
               className="btn-secondary"
               onSelect={() => {
                 setAt({ step: 'name', name: suggested || lastPart(path) });
-                window.setTimeout(() => void setFocus(NAME_KEY), 0);
               }}
             >
               Videos
@@ -105,7 +108,7 @@ export default function AddFolder({
             <FocusButton className="btn-secondary" onSelect={onCancel}>
               Cancel
             </FocusButton>
-          </div>
+          </FocusGroup>
           <p className="muted">
             Movies and TV shows are matched by their names; Videos are kept as they are, for home
             videos, concerts and the rest.
@@ -116,7 +119,7 @@ export default function AddFolder({
       {at.step === 'name' && (
         <div className="folders-add">
           <p>A name for it on the Library page:</p>
-          <div className="settings-row">
+          <FocusGroup kind="row" className="settings-row">
             <FocusInput
               focusKey={NAME_KEY}
               className="settings-input"
@@ -134,7 +137,7 @@ export default function AddFolder({
             <FocusButton className="btn-secondary" onSelect={onCancel}>
               Cancel
             </FocusButton>
-          </div>
+          </FocusGroup>
         </div>
       )}
 

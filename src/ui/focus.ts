@@ -15,6 +15,7 @@
 import { useEffect, useState } from 'react';
 import { isLightLook } from './lightLook';
 import { navExpectReturn, navFocus, navFocused, noteSpatialClaim } from './focusStore';
+import { stopGlide } from './focusScroll';
 import {
   doesFocusableExist,
   getCurrentFocusKey,
@@ -163,6 +164,9 @@ export function focusTo(focusKey: string): void {
 
 /** The focus key a drawn control was registered under, for landing on it by what it shows. */
 export function focusKeyOf(node: Element): string | null {
+  // Kinema's own engine marks each control with its key.
+  const own = node.getAttribute('data-nav-key');
+  if (own) return own;
   const components = (
     SpatialNavigation as unknown as { focusableComponents?: Record<string, { node?: HTMLElement }> }
   ).focusableComponents;
@@ -585,6 +589,8 @@ export function placeForTyping(node: HTMLElement | null): void {
   const visual = window.visualViewport;
   const visibleTop = visual?.offsetTop ?? 0;
   const visibleHeight = visual?.height ?? window.innerHeight;
+  // A glide the ring caused would pull the page on from under this move.
+  stopGlide(page);
   const view = page.getBoundingClientRect();
   const clear = Math.max(view.top, visibleTop) + topBarPx();
   const box = node.getBoundingClientRect();

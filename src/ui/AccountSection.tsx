@@ -14,9 +14,10 @@ import { openLink } from './links';
 import ChoiceRow from './ChoiceRow';
 import ConfirmButton from './ConfirmButton';
 import FocusButton from './FocusButton';
+import FocusGroup from './FocusGroup';
 import FocusInput from './FocusInput';
 import { getSetting, setSetting } from '../metadata/api';
-import { useClaimFocus } from './focus';
+import { useClaim } from './focusStore';
 import { userError } from './errors';
 import {
   accountApi,
@@ -209,9 +210,9 @@ export default function AccountSection({ service }: { service: Service }) {
   };
 
   const connected = status?.connected ?? false;
-  useClaimFocus(cancelKey, code !== null);
-  useClaimFocus(disconnectKey, connected && code === null);
-  useClaimFocus(connectKey, Boolean(status?.available) && !connected && code === null);
+  useClaim(cancelKey, code !== null);
+  useClaim(disconnectKey, connected && code === null);
+  useClaim(connectKey, Boolean(status?.available) && !connected && code === null);
 
   if (!status) return null;
   const qr = qrSource(code?.qr_svg ?? null);
@@ -264,9 +265,9 @@ export default function AccountSection({ service }: { service: Service }) {
               more.
             </p>
             {note && <p className="settings-hint">{note}</p>}
-            <div className="settings-row">
+            <FocusGroup kind="row" className="settings-row">
               <FocusButton
-                keepInView="nearest"
+               
                 className="btn-secondary"
                 onSelect={() =>
                   void openLink(code.verification_uri_complete)
@@ -275,14 +276,14 @@ export default function AccountSection({ service }: { service: Service }) {
                 Open in the browser ↗
               </FocusButton>
               <FocusButton
-                keepInView="nearest"
+               
                 className="btn-secondary"
                 focusKey={cancelKey}
                 onSelect={cancel}
               >
                 Cancel
               </FocusButton>
-            </div>
+            </FocusGroup>
           </div>
         </div>
       )}
@@ -306,9 +307,9 @@ export default function AccountSection({ service }: { service: Service }) {
           {service === 'trakt' && (
             <ResumeAcrossDevices on={resumeOn} setOn={setResumeOn} onError={setError} />
           )}
-          <div className="settings-row">
+          <FocusGroup kind="row" className="settings-row">
             <ConfirmButton
-              keepInView="nearest"
+             
               className="btn-secondary"
               confirmLabel={`Disconnect ${text.name}`}
               onConfirm={() => void disconnect()}
@@ -317,7 +318,7 @@ export default function AccountSection({ service }: { service: Service }) {
             >
               Disconnect
             </ConfirmButton>
-          </div>
+          </FocusGroup>
         </>
       )}
 
@@ -330,9 +331,9 @@ export default function AccountSection({ service }: { service: Service }) {
             </p>
           )}
           {note && <p className="settings-hint">{note}</p>}
-          <div className="settings-row">
+          <FocusGroup kind="row" className="settings-row">
             <FocusButton
-              keepInView="nearest"
+             
               className="btn-primary"
               focusKey={connectKey}
               onSelect={() => void connect()}
@@ -340,7 +341,7 @@ export default function AccountSection({ service }: { service: Service }) {
             >
               {status.needs_reconnect ? `Connect ${text.name} again` : `Connect ${text.name}`}
             </FocusButton>
-          </div>
+          </FocusGroup>
           <p className="settings-hint">
             You approve on {text.name}&rsquo;s own page, on your phone or here; Kinema never sees
             your password. Everything you have already watched in Kinema is sent once when you

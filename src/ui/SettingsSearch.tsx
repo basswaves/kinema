@@ -9,7 +9,7 @@
  * Kinema's own letters up above them, as Search does, and on a system with
  * its own keyboard (Android) OK opens that instead.
  */
-import { setFocus } from '@noriginmedia/norigin-spatial-navigation';
+import { focusTo } from './focus';
 import { useMemo } from 'react';
 import { useCapabilities } from '../capabilities';
 import FocusButton from './FocusButton';
@@ -43,7 +43,7 @@ export function SearchBox({
           // Typing left too: a box clicked into holds the caret without the
           // ring, and would take the next Enter back to itself.
           if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-          void setFocus(FIRST_RESULT_KEY);
+          focusTo(FIRST_RESULT_KEY);
         }}
         placeholder="Search settings"
       />
@@ -86,7 +86,7 @@ export function SearchResults({
             <li key={`${i}:${m.entry.section}:${m.entry.label}`}>
               <FocusButton
                 focusKey={`settings-search:${i}`}
-                keepInView="nearest"
+               
                 className="settings-search-result"
                 onSelect={() => onPick(m.entry)}
               >

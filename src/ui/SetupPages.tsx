@@ -18,23 +18,19 @@
  * Library → Run setup again brings them back at any time.
  */
 import { scanWords } from '../library/scanWords';
-import {
-  useFocusable,
-  FocusContext,
-  setFocus,
-  updateAllLayouts,
-} from '@noriginmedia/norigin-spatial-navigation';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
 import { useCapabilities } from '../capabilities';
 import { useScanStatus } from '../library/pipeline';
 import FocusButton from './FocusButton';
+import FocusGroup, { FocusProvider } from './FocusGroup';
 import PictureSoundSetup from './PictureSoundSetup';
 import IntrosSetup from './IntrosSetup';
 import AccountSection from './AccountSection';
 import { OpenSubtitlesSection } from './SubtitlesSettings';
 import ExtrasSetup from './ExtrasSetup';
-import { scrollPageToTop, useClaimFocus } from './focus';
-import { useFocusGroup } from './focusGroups';
+import { scrollPageToTop } from './focus';
+import { ALL_ARROWS, useNavGroup } from './focusGroups';
+import { navRearrive, useLanding } from './focusStore';
 
 /** 'open' while the pages are up, 'done' once finished or left. */
 export const SETUP_PAGES_KEY = 'setup_pages';
@@ -42,13 +38,6 @@ export const SETUP_PAGES_KEY = 'setup_pages';
 const SETUP_FOCUS_KEY = 'setup-pages';
 const PAGE_FOCUS_KEY = 'setup-page';
 const FORWARD_FOCUS_KEY = 'setup-forward';
-/** The longest a new page's first question is waited for. */
-const LANDING_WAIT_MS = 2000;
-/** …and, with the ring on Next meanwhile, the longest it is still moved to. */
-const LATE_WAIT_MS = 15000;
-/** How soon after giving focus the ring is looked for, and how many times. */
-const RING_CHECK_MS = 100;
-const RING_CHECKS = 20;
 /** What a remote can press on a page (`FocusButton`, `FocusInput`). */
 const CONTROL = ':is(button:not(:disabled), input)';
 
@@ -66,13 +55,10 @@ interface Props {
 export default function SetupPages({ onClose }: Props) {
   // A page of its own (NAV-MAP, agreed 2026-10-11): Up from Next or Finish
   // later is nothing, not the top bar.
-  const { ref, focusKey } = useFocusable({
-    focusKey: SETUP_FOCUS_KEY,
-    trackChildren: true,
-    saveLastFocusedChild: false,
-    preferredChildFocusKey: PAGE_FOCUS_KEY,
-    isFocusBoundary: true,
-  });
+  const { ref, focusKey } = useNavGroup(
+    { kind: 'column', current: PAGE_FOCUS_KEY, hold: ALL_ARROWS },
+    { focusKey: SETUP_FOCUS_KEY }
+  );
   const can = useCapabilities();
   const scan = useScanStatus();
 
@@ -138,103 +124,26 @@ export default function SetupPages({ onClose }: Props) {
     if (can && pages.length === 0) onClose();
   }, [can, pages.length, onClose]);
 
-  useClaimFocus(SETUP_FOCUS_KEY, Boolean(page));
-
-  /**
-   * A new page starts at its first question, never on the button pressed to
-   * get there: OK held a moment too long would otherwise skip the next page
-   * unread.
-   *
-   * Some pages ask the system something before their questions exist (is
-   * ffmpeg there?), and focus given before then lands on whatever happened to
-   * be there first. So it waits, briefly, for the new page to have a control;
-   * a page that has none by then (see PageBody) starts on Next. A question
-   * that comes later still — a busy computer answered the ffmpeg check after
-   * the wait — gets the ring then, unless a key was pressed meanwhile: the
-   * person has started on the page, and the ring stays theirs.
-   *
-   * Then the page goes to its top and every control is measured again before
-   * focus is given. "First" is the control nearest the top-left corner by
-   * the positions the spatial library last measured, and those can date from
-   * before the page moved: the first page opens with the welcome page's
-   * scroll, and on CI's Linux WebKit the ring landed a row down.
-   */
-  const landing = useRef(0);
-  const landOn = useCallback((id: string) => {
-    const started = Date.now();
-    const attempt = ++landing.current;
-    // A key pressed since the page opened, not one held from the page before.
-    let pressed = false;
-    const onKey = (e: KeyboardEvent) => {
-      if (!e.repeat) pressed = true;
-    };
-    window.addEventListener('keydown', onKey, true);
-    const focusOn = (root: HTMLElement | null, key: string) => {
-      scrollPageToTop(root, 'auto');
-      give(key, RING_CHECKS);
-    };
-    // On a busy computer a control can be on the page a moment before the
-    // focus system knows it, and focus given then lands on the page itself,
-    // which draws no ring — nothing showed until a key was pressed (the first
-    // run's Extras page, under load). So the ring is looked for, and focus
-    // given again while there is none.
-    const give = (key: string, checks: number) => {
-      void Promise.resolve(updateAllLayouts()).then(() => {
-        if (attempt !== landing.current) return;
-        void setFocus(key);
-        window.setTimeout(() => {
-          const shown = document.querySelector('.focused');
-          if (attempt === landing.current && !shown && checks > 0) give(key, checks - 1);
-        }, RING_CHECK_MS);
-      });
-    };
-    const late = () => {
-      const root = document.querySelector<HTMLElement>(`.setup-page[data-page="${id}"]`);
-      const over = attempt !== landing.current || pressed || !root;
-      if (over || Date.now() - started > LATE_WAIT_MS) {
-        window.removeEventListener('keydown', onKey, true);
-        return;
-      }
-      if (!root.querySelector(CONTROL)) {
-        window.setTimeout(late, 200);
-        return;
-      }
-      window.removeEventListener('keydown', onKey, true);
-      focusOn(root, PAGE_FOCUS_KEY);
-    };
-    const land = () => {
-      if (attempt !== landing.current) {
-        window.removeEventListener('keydown', onKey, true);
-        return;
-      }
-      const root = document.querySelector<HTMLElement>(`.setup-page[data-page="${id}"]`);
-      const ready = root?.querySelector(CONTROL);
-      if (!ready && Date.now() - started <= LANDING_WAIT_MS) {
-        window.setTimeout(land, 50);
-        return;
-      }
-      // Named outright rather than left to the containers: the page body
-      // learns it has questions a moment after they appear.
-      focusOn(root ?? null, ready ? PAGE_FOCUS_KEY : FORWARD_FOCUS_KEY);
-      if (ready) window.removeEventListener('keydown', onKey, true);
-      else window.setTimeout(late, 200);
-    };
-    window.setTimeout(land, 0);
-  }, []);
-
-  // The first page, once there is one.
-  const firstId = pages[0]?.id;
-  useEffect(() => {
-    if (firstId) landOn(firstId);
-  }, [firstId, landOn]);
+  // A new page starts at its first question, never on the button pressed to
+  // get there; a page with none starts on Next, and takes the ring to its
+  // first question when one comes later (a busy computer answered the ffmpeg
+  // check late) — unless a key was pressed meanwhile: then the ring is the
+  // person's. The page goes to its top as it opens.
+  const [hasQuestions, setHasQuestions] = useState(false);
+  useLanding(page ? (hasQuestions ? PAGE_FOCUS_KEY : FORWARD_FOCUS_KEY) : null);
+  const pageId = page?.id;
+  useLayoutEffect(() => {
+    if (pageId) scrollPageToTop(document.querySelector<HTMLElement>('.setup-pages'), 'auto');
+  }, [pageId]);
 
   const go = useCallback(
     (next: number) => {
+      // The pressed key opened this page: the landing is the page's again.
+      navRearrive();
+      setHasQuestions(false);
       setIndex(next);
-      const id = pages[next]?.id;
-      if (id) landOn(id);
     },
-    [landOn, pages]
+    []
   );
 
   const forward = useCallback(() => {
@@ -266,14 +175,14 @@ export default function SetupPages({ onClose }: Props) {
   // reference"). The same shape as below, so React keeps the one element.
   if (!page) {
     return (
-      <FocusContext.Provider value={focusKey}>
+      <FocusProvider value={focusKey}>
         <div className="first-run setup-pages" ref={ref} />
-      </FocusContext.Provider>
+      </FocusProvider>
     );
   }
 
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <div className="first-run setup-pages" ref={ref}>
         <div className="setup-progress muted">
           <span>
@@ -293,23 +202,23 @@ export default function SetupPages({ onClose }: Props) {
             Always Next, never Skip (owner, 2026-10-05): every answer is saved
             as it is given, so the way on only goes on, and accepting what is
             shown is what it does — "Skip" read as "don't do this". */}
-        <div className="settings-row setup-nav">
+        <FocusGroup kind="row" className="settings-row setup-nav">
           <FocusButton
             className="btn-primary"
             focusKey={FORWARD_FOCUS_KEY}
-            keepInView="nearest"
+           
             onSelect={forward}
           >
             {last ? 'Finish' : 'Next'}
           </FocusButton>
           {!last && (
-            <FocusButton className="btn-secondary" keepInView="nearest" onSelect={onClose}>
+            <FocusButton className="btn-secondary" onSelect={onClose}>
               Finish later
             </FocusButton>
           )}
-        </div>
+        </FocusGroup>
 
-        <PageBody key={page.id} id={page.id}>
+        <PageBody key={page.id} id={page.id} onQuestions={setHasQuestions}>
           {page.body}
         </PageBody>
 
@@ -320,7 +229,7 @@ export default function SetupPages({ onClose }: Props) {
           </p>
         )}
       </div>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }
 
@@ -335,14 +244,23 @@ export default function SetupPages({ onClose }: Props) {
  * was left with nothing to act from — and every recovery chose this
  * container again. Out of the way, the page's own landing goes to Next.
  */
-function PageBody({ id, children }: { id: string; children: ReactNode }) {
+function PageBody({
+  id,
+  onQuestions,
+  children,
+}: {
+  id: string;
+  onQuestions: (has: boolean) => void;
+  children: ReactNode;
+}) {
   const [hasControls, setHasControls] = useState(false);
   // A panel: Up from an answer is the answer above it (Next only from the
   // first), never a jump past the others to Next (NAV-MAP, 2026-10-11).
-  const { ref, focusKey } = useFocusGroup<HTMLElement>('panel', {
-    focusKey: PAGE_FOCUS_KEY,
-    focusable: hasControls,
-  });
+  const { ref, focusKey } = useNavGroup<HTMLElement>(
+    { kind: 'column', disabled: !hasControls },
+    { focusKey: PAGE_FOCUS_KEY, focusable: hasControls }
+  );
+  useLayoutEffect(() => onQuestions(hasControls), [hasControls, onQuestions]);
 
   useEffect(() => {
     const root = ref.current;
@@ -360,10 +278,10 @@ function PageBody({ id, children }: { id: string; children: ReactNode }) {
   }, [ref]);
 
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <section className="first-run-step setup-page" data-page={id} ref={ref}>
         {children}
       </section>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }

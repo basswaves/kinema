@@ -25,7 +25,6 @@ import FocusButton from './FocusButton';
 import Settings, { type SettingsTarget } from './Settings';
 import { SETUP_PAGES_KEY } from './SetupPages';
 import {
-  hasPendingReturn,
   installFocusWatchdog,
   installReadOn,
   installScrollPace,
@@ -36,8 +35,10 @@ import {
 import { back, current, navigate, open, replace, type Entry } from './history';
 import { useFocusGroup, useNavGroup } from './focusGroups';
 import { FocusScreen, NoriginLayer } from './focusEngine';
-import { navFocus, navFocused, noteSpatialClaim, useLanding } from './focusStore';
+import { navFocus, navFocused, useLanding } from './focusStore';
 import FocusGroup, { FocusProvider } from './FocusGroup';
+import FocusInput from './FocusInput';
+import TileGrid from './TileGrid';
 import { setShortcutsOpen } from './shortcutsState';
 import Player from '../player/Player';
 import {
@@ -84,7 +85,6 @@ import {
   type GridArrangement,
 } from './gridSort';
 import OnScreenKeyboard from './OnScreenKeyboard';
-import { useTypingFocus } from './typing';
 import { isTvMode, useTvMode } from './tv';
 import LeaveDialog from './LeaveDialog';
 import CardMenuHost from './CardMenu';
@@ -794,16 +794,6 @@ export default function Browse() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [view.name, goBack, stack.length]);
 
-  useEffect(() => {
-    // Arriving from the top bar puts you in the box; coming Back from a result
-    // puts you on that result instead, which returnFocusTo is already doing.
-    if (view.name === 'search' && !hasPendingReturn()) {
-      // A page's own landing: the top bar's ring is not handed back over it.
-      noteSpatialClaim();
-      setFocus('search-input');
-    }
-  }, [view.name]);
-
   // The library's background work gives way while a film is open (playback.ts).
   const inPlayer = view.name === 'player';
   useEffect(() => {
@@ -943,6 +933,7 @@ export default function Browse() {
         )}
 
         {view.name === 'library' && (
+          <FocusScreen>
           <LibraryPage
             roots={roots}
             onOpen={(root) => openView({ name: 'videos', root })}
@@ -951,6 +942,7 @@ export default function Browse() {
             onSettings={() => openView({ name: 'settings', section: 'videos' })}
             onLibraryChanged={() => void load()}
           />
+          </FocusScreen>
         )}
 
         {view.name === 'folders' && (
@@ -973,18 +965,25 @@ export default function Browse() {
         )}
 
         {view.name === 'playlists' && (
-          <PlaylistsPage onOpen={(id) => openView({ name: 'playlist', id })} onBack={goBack} />
+          <FocusScreen>
+            <PlaylistsPage onOpen={(id) => openView({ name: 'playlist', id })} onBack={goBack} />
+          </FocusScreen>
         )}
 
         {view.name === 'playlist' && (
-          <PlaylistPage id={view.id} onPlay={(target) => void startPlayback(target)} onBack={goBack} />
+          <FocusScreen key={`playlist:${view.id}`}>
+            <PlaylistPage id={view.id} onPlay={(target) => void startPlayback(target)} onBack={goBack} />
+          </FocusScreen>
         )}
 
         {view.name === 'videos' && (
-          <VideosPage root={view.root} onPlay={(target) => void startPlayback(target)} onBack={goBack} />
+          <FocusScreen key={`videos:${view.root.id}`}>
+            <VideosPage root={view.root} onPlay={(target) => void startPlayback(target)} onBack={goBack} />
+          </FocusScreen>
         )}
 
         {view.name === 'search' && (
+          <FocusScreen>
           <SearchView
             query={query}
             onQueryChange={setQuery}
@@ -993,6 +992,7 @@ export default function Browse() {
             onSelect={openDetail}
             onPlayVideo={(video) => void startPlayback(videoTarget(video))}
           />
+          </FocusScreen>
         )}
 
         {view.name === 'grid' && (
@@ -1032,6 +1032,7 @@ export default function Browse() {
         )}
 
         {view.name === 'settings' && (
+          <FocusScreen>
           <Settings
             openSection={view.section}
             onRunSetup={() => {
@@ -1039,6 +1040,7 @@ export default function Browse() {
               setStack(navigate<View>({ name: 'home' }, { name: 'home' }, true));
             }}
           />
+          </FocusScreen>
         )}
 
         {view.name === 'person' && (
@@ -1372,17 +1374,22 @@ function SearchView({
   onSelect: (title: Title) => void;
   onPlayVideo: (video: VideoItem) => void;
 }) {
-  const { ref, focusKey } = useFocusable({
-    focusKey: 'search-view',
-    trackChildren: true,
-    saveLastFocusedChild: true,
-  });
+  const { ref, focusKey } = useNavGroup({ kind: 'column' }, { focusKey: 'search-view' });
   const tv = useTvMode();
+  // Arriving from the top bar puts you in the box; coming Back from a result
+  // puts you on that result instead (a pending return wins).
+  useLanding('search-input');
 
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <div className="search" ref={ref}>
-        <SearchInput value={query} onChange={onQueryChange} />
+        <FocusInput
+          focusKey="search-input"
+          className="search-input"
+          value={query}
+          onChange={onQueryChange}
+          placeholder="Search your library…"
+        />
         {/* The TV layout gets letters a remote can reach; a desk has a keyboard. */}
         {tv && <OnScreenKeyboard value={query} onChange={onQueryChange} />}
         <p className="muted search-hint">Titles, actors, genres or a year.</p>
@@ -1390,53 +1397,17 @@ function SearchView({
         {videos.length > 0 && (
           <>
             <h3 className="search-videos-heading">Videos</h3>
-            <div className="videos-tiles">
+            <TileGrid className="videos-tiles" count={videos.length}>
               {videos.map((video) => (
                 <VideoTile key={video.id} video={video} onPlay={() => onPlayVideo(video)} />
               ))}
-            </div>
+            </TileGrid>
           </>
         )}
         {results.length === 0 && videos.length === 0 && (
           <p className="muted center">No matches.</p>
         )}
       </div>
-    </FocusContext.Provider>
-  );
-}
-
-/**
- * The search box, as a focusable.
- *
- * It has to be registered with the spatial system for two reasons. Focus has to
- * be able to *leave* it downwards into the results, which cannot happen if the
- * system does not know it exists — and `setFocus('search-input')` above is
- * addressed to this key, so without it that call has no target and silently
- * does nothing.
- *
- * Spatial focus and DOM focus are separate: the first decides where the remote
- * is, the second decides where the characters go. Both are needed here.
- */
-function SearchInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const { ref, focused } = useFocusable<object, HTMLInputElement>({
-    focusKey: 'search-input',
-  });
-
-  // And let go when the remote moves on: a box that kept the caret after the
-  // ring had gone down to the keyboard showed two things selected at once.
-  // Where the system has a keyboard of its own, OK here opens it (typing.ts).
-  const enterKey = useTypingFocus(ref, focused);
-
-  return (
-    <input
-      ref={ref}
-      className={`search-input ${focused ? 'focused' : ''}`}
-      placeholder="Search your library…"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') enterKey(e);
-      }}
-    />
+    </FocusProvider>
   );
 }

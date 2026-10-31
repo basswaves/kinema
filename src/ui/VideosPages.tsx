@@ -16,16 +16,17 @@
  * a time once the page is up; until then, and wherever none can be taken (on
  * Android always), a plain picture.
  */
-import { FocusContext, setFocus, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import AddFolder from './AddFolder';
 import FocusButton from './FocusButton';
 import Art from './Art';
 import MediaBadges from './MediaBadges';
-import FocusGroup from './FocusGroup';
+import FocusGroup, { FocusProvider } from './FocusGroup';
 import { PlaylistDialog } from './PlaylistPicker';
 import type { NewItem } from '../library/playlists';
-import { useClaimFocus } from './focus';
+import TileGrid from './TileGrid';
+import { navFocus, useLanding } from './focusStore';
+import { useNavGroup } from './focusGroups';
 import { userError } from './errors';
 import { count } from './format';
 import { useTvMode } from './tv';
@@ -63,13 +64,9 @@ export function LibraryPage({
   onSettings: () => void;
   onLibraryChanged: () => void;
 }) {
-  const { ref, focusKey } = useFocusable({
-    focusKey: LIBRARY_FOCUS_KEY,
-    trackChildren: true,
-    saveLastFocusedChild: true,
-  });
+  const { ref, focusKey } = useNavGroup({ kind: 'column' }, { focusKey: LIBRARY_FOCUS_KEY });
   const folders = videosRoots(roots);
-  useClaimFocus(folders[0] ? `library:${folders[0].id}` : 'library:folders', true, true);
+  useLanding(folders[0] ? `library:${folders[0].id}` : 'library:folders');
 
   const tv = useTvMode();
   /** The folder the system's window gave, while its questions are asked. */
@@ -85,15 +82,19 @@ export function LibraryPage({
       .catch((e: unknown) => setError(userError(e)));
   };
 
-  const cancel = () => {
-    setPicked(null);
-    void setFocus('library:folders');
-  };
+  // Back on the folder tile when the questions go away, as the page is
+  // drawn without them (the tile is registered by then).
+  const asking = picked !== null;
+  const wasAsking = useRef(false);
+  useLayoutEffect(() => {
+    if (wasAsking.current && !asking) navFocus('library:folders');
+    wasAsking.current = asking;
+  }, [asking]);
+  const cancel = () => setPicked(null);
 
   const added = (name: string) => {
     setPicked(null);
     setNote(`Added ${name} to the library. Scanning it now.`);
-    void setFocus('library:folders');
     onLibraryChanged();
     void runScanPipeline()
       .then((outcome) => {
@@ -124,17 +125,16 @@ export function LibraryPage({
       }
       e.preventDefault();
       setPicked(null);
-      void setFocus('library:folders');
     };
     window.addEventListener('keydown', onKeyDown, true);
     return () => window.removeEventListener('keydown', onKeyDown, true);
   }, [picked]);
 
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <div className="search library-page" ref={ref}>
         <h2 className="grid-heading">Library</h2>
-        <div className="library-tiles">
+        <TileGrid className="library-tiles" count={folders.length + 2}>
           {folders.map((root) => (
             <FocusButton
               key={root.id}
@@ -177,7 +177,7 @@ export function LibraryPage({
               <span className="library-tile-meta">Movies, TV shows or videos</span>
             </FocusButton>
           )}
-        </div>
+        </TileGrid>
         {picked && <AddFolder key={picked} path={picked} onAdded={added} onCancel={cancel} />}
         {note && <p className="settings-note">{note}</p>}
         {error && <p className="leave-error">{error}</p>}
@@ -187,13 +187,13 @@ export function LibraryPage({
             Settings → Library, and it appears here.
           </p>
         )}
-        <div className="settings-row">
+        <FocusGroup kind="row" className="settings-row">
           <FocusButton focusKey="library:settings" className="btn-secondary" onSelect={onSettings}>
             {folders.length === 0 ? 'Add a Videos folder' : 'Library folders'}
           </FocusButton>
-        </div>
+        </FocusGroup>
       </div>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }
 
@@ -206,11 +206,7 @@ export function VideosPage({
   onPlay: (target: PlaybackTarget) => void;
   onBack: () => void;
 }) {
-  const { ref, focusKey } = useFocusable({
-    focusKey: VIDEOS_FOCUS_KEY,
-    trackChildren: true,
-    saveLastFocusedChild: true,
-  });
+  const { ref, focusKey } = useNavGroup({ kind: 'column' }, { focusKey: VIDEOS_FOCUS_KEY });
   const [videos, setVideos] = useState<VideoItem[] | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   /** The files that had no frame when the list arrived, in page order. */
@@ -256,24 +252,19 @@ export function VideosPage({
   /** The video in hand — focused or under the pointer — whose badges show. */
   const [shown, setShown] = useState<VideoItem | null>(null);
   const first = groups[0]?.items[0];
-  useClaimFocus(first ? `video:${first.id}` : 'videos:back', videos !== null, true);
+  useLanding(videos !== null && first ? `video:${first.id}` : 'videos:back');
 
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <div className="search videos-page" ref={ref}>
-        <div className="grid-head">
-          <FocusButton
-            focusKey="videos:back"
-            className="back-button"
-            keepInView="page-top"
-            onSelect={onBack}
-          >
+        <FocusGroup kind="row" className="grid-head">
+          <FocusButton focusKey="videos:back" className="back-button" onSelect={onBack}>
             ← Back
           </FocusButton>
           <h2 className="grid-heading">
             {root.name ?? root.path} <span className="muted">{videos?.length ?? ''}</span>
           </h2>
-        </div>
+        </FocusGroup>
         {failed && <p className="muted">{failed}</p>}
         {added && <p className="muted videos-added">{added}</p>}
         {adding && (
@@ -324,11 +315,7 @@ export function VideosPage({
                 + Playlist
               </FocusButton>
             </FocusGroup>
-            <FocusGroup
-              kind="list"
-              current={group.items[0] ? `video:${group.items[0].id}` : undefined}
-              className="videos-tiles"
-            >
+            <TileGrid className="videos-tiles" count={group.items.length}>
               {group.items.map((video) => (
                 <VideoTile
                   key={video.id}
@@ -337,7 +324,7 @@ export function VideosPage({
                   onHighlight={() => setShown(video)}
                 />
               ))}
-            </FocusGroup>
+            </TileGrid>
           </section>
         ))}
         {shown && (
@@ -349,7 +336,7 @@ export function VideosPage({
           </div>
         )}
       </div>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }
 

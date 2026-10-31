@@ -293,6 +293,9 @@ let settleQueued = false;
  * After a change to the tree has been committed: a return waiting for its
  * control, a page taking the ring on arrival, or the ring's control gone.
  */
+/** The count of presses and pointer moves when the ring last had to be recovered. */
+let recoveredAt = -1;
+
 function scheduleSettle(): void {
   if (settleQueued) return;
   settleQueued = true;
@@ -356,7 +359,10 @@ function settle(): void {
   // landing spot is the answer.
   const path = focusPath.filter((p) => p.area !== ROOT);
   const replacement = (focused !== null && recover(tree, path, memory)) || landingLeaf();
-  if (replacement) setFocused(replacement, 'program');
+  if (replacement) {
+    recoveredAt = inputs;
+    setFocused(replacement, 'program');
+  }
 }
 
 // ---- registering ----------------------------------------------------------
@@ -521,6 +527,15 @@ export function navFocus(key: string, how: 'program' | 'pointer' = 'program'): b
 }
 
 /**
+ * A press just opened a new page of the same screen (the setup pages' Next):
+ * its landing is the page's again, as on arrival, until the next press.
+ */
+export function navRearrive(): void {
+  const screen = screens[screens.length - 1];
+  if (screen) screen.arrivedAt = inputs;
+}
+
+/**
  * Back is returning to `key`, with the page at `scrollTop`: taken by the
  * next screen of this engine when the control is there. `onTaken` tells the
  * other engine to stand down.
@@ -660,6 +675,22 @@ export function useLanding(key: string | null): void {
     landings.set(id, key);
     scheduleSettle();
   }, [id, key]);
+}
+
+/**
+ * Takes the ring for `key` once `ready`, only if the control the person had
+ * it on has gone (a Connect button that became Disconnect, a question
+ * answered): a control still here keeps it — unless the ring was put there by
+ * recovery, with nothing pressed since, which this successor outranks. As the
+ * change is drawn, so the ring never sits on nothing for a frame.
+ */
+export function useClaim(key: string, ready: boolean): void {
+  const id = useContext(ScreenContext);
+  useLayoutEffect(() => {
+    if (!ready || id === null) return;
+    if (focused !== null && entries.has(focused) && recoveredAt !== inputs) return;
+    navFocus(key);
+  }, [key, ready, id]);
 }
 
 function useKeyState(key: string, on: boolean, inside = false): boolean {

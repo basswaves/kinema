@@ -11,6 +11,7 @@
 import { useEffect, useState } from 'react';
 import ConfirmButton from './ConfirmButton';
 import FocusButton from './FocusButton';
+import FocusGroup from './FocusGroup';
 import { userError } from './errors';
 import { offerAsPlayer, openDefaultApps, playerOffer, removeAsPlayer } from './api';
 
@@ -47,7 +48,7 @@ export default function VideoPlayerSection({ linux }: { linux: boolean }) {
       </p>
       {offered === null && !error ? null : linux ? (
         <>
-          <div className="settings-row">
+          <FocusGroup kind="row" className="settings-row">
             {offered ? (
               <ConfirmButton
                 keepInView="nearest"
@@ -66,7 +67,7 @@ export default function VideoPlayerSection({ linux }: { linux: boolean }) {
                 Add Kinema to the app menu
               </FocusButton>
             )}
-          </div>
+          </FocusGroup>
           <p className="settings-hint">
             {offered
               ? 'Kinema is in the app menu and in Open with for video files, from this folder. '
@@ -76,7 +77,7 @@ export default function VideoPlayerSection({ linux }: { linux: boolean }) {
         </>
       ) : offered ? (
         <>
-          <div className="settings-row">
+          <FocusGroup kind="row" className="settings-row">
             <FocusButton
               keepInView="nearest"
               className="btn-secondary"
@@ -92,7 +93,7 @@ export default function VideoPlayerSection({ linux }: { linux: boolean }) {
             >
               Remove
             </ConfirmButton>
-          </div>
+          </FocusGroup>
           <p className="settings-hint">
             Kinema is in Open with for video files, and in Windows&rsquo; Default apps, where you
             choose which kinds of video it opens. Remove takes it out of both again.
@@ -100,7 +101,7 @@ export default function VideoPlayerSection({ linux }: { linux: boolean }) {
         </>
       ) : (
         <>
-          <div className="settings-row">
+          <FocusGroup kind="row" className="settings-row">
             <FocusButton
               keepInView="nearest"
               className="btn-secondary"
@@ -108,7 +109,7 @@ export default function VideoPlayerSection({ linux }: { linux: boolean }) {
             >
               Offer Kinema as a video player
             </FocusButton>
-          </div>
+          </FocusGroup>
           <p className="settings-hint">
             Puts Kinema in Open with for video files and opens Windows&rsquo; Default apps, where
             you choose which kinds of video Kinema opens. Windows does not let a program choose

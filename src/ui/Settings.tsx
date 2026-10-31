@@ -20,8 +20,7 @@ import LanguageSection from './LanguageSection';
 import ChoiceRow from './ChoiceRow';
 import { getVersion } from '@tauri-apps/api/app';
 import { availableUpdate, UPDATE_CHECK_KEY, type Release } from './updates';
-import { useFocusable, FocusContext, setFocus } from '@noriginmedia/norigin-spatial-navigation';
-import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import {
@@ -56,9 +55,11 @@ import { makeReport as packReport, openReportForm, REPORT_WORDS, reportSaved, sh
 import SoundSection from './SoundSection';
 import ScreenSection from './ScreenSection';
 import { capabilitiesNow, useCapabilities, type Capabilities } from '../capabilities';
-import { useClaimFocus } from './focus';
+import { focusTo } from './focus';
 import { lastPart } from '../library/videos';
-import { useFocusGroup } from './focusGroups';
+import { useNavGroup } from './focusGroups';
+import { useLanding } from './focusStore';
+import FocusGroup, { FocusProvider } from './FocusGroup';
 import { setTvMode, useTvMode } from './tv';
 import { setLook, useLook, type LookSetting } from './lightLook';
 import { highContrast, setContrast } from './contrast';
@@ -229,11 +230,10 @@ export default function Settings({
   /** Back to Home, with the setup pages up (SetupPages.tsx). */
   onRunSetup: () => void;
 }) {
-  const { ref, focusKey } = useFocusable({
-    focusKey: SETTINGS_FOCUS_KEY,
-    trackChildren: true,
-    saveLastFocusedChild: true,
-  });
+  const { ref, focusKey } = useNavGroup(
+    { kind: 'column', remember: true },
+    { focusKey: SETTINGS_FOCUS_KEY }
+  );
 
   const [section, setSection] = useState<SectionId>(
     openSection === 'ffmpeg'
@@ -277,18 +277,24 @@ export default function Settings({
     },
     [chooseSection]
   );
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!goneTo) return;
     // A section whose controls are still loading (Accounts asks each service
     // first) has nothing to land on yet: its entry in the list, then.
     const ready = document.querySelector('.settings-content button, .settings-content input');
-    setFocus(ready ? 'settings-content' : `settings-nav:${goneTo.id}`);
+    focusTo(ready ? 'settings-content' : `settings-nav:${goneTo.id}`);
   }, [goneTo]);
 
   // Land on the open section in the list — or, from Home's notice, straight
   // on the review queue.
-  useClaimFocus(
-    openSection === 'review'
+  useLanding(
+    // Not while a search match is being landed on: the list would take the
+    // ring first, and a press in between would act on the list.
+    // Opened from the top bar the ring stays on its tab, and Down goes in; a
+    // page opened to a named place takes it there.
+    landing !== null || !openSection
+      ? null
+      : openSection === 'review'
       ? REVIEW_BUTTON_KEY
       : openSection === 'tmdb-key'
         ? TMDB_KEY_INPUT_KEY
@@ -298,10 +304,7 @@ export default function Settings({
             ? ADD_VIDEOS_KEY
             : openSection === 'folders'
               ? ADD_MOVIES_KEY
-              : `settings-nav:${section}`,
-    // Not while a search match is being landed on: the list would take the
-    // ring first, and a press in between would act on the list.
-    landing === null
+              : `settings-nav:${section}`
   );
 
   const [roots, setRoots] = useState<LibraryRoot[]>([]);
@@ -396,9 +399,11 @@ export default function Settings({
   const openSearch = useCallback(() => {
     if (!tvMode) return;
     setSearchOpen(true);
-    // Onto the letters, once they are drawn.
-    window.setTimeout(() => void setFocus('osk:a'), 50);
   }, [tvMode]);
+  // Onto the letters as they are drawn.
+  useLayoutEffect(() => {
+    if (searchOpen && tvMode) focusTo('osk:a');
+  }, [searchOpen, tvMode]);
   const look = useLook();
   const [contrast, setContrastState] = useState(highContrast);
   const can = useCapabilities();
@@ -758,7 +763,7 @@ export default function Settings({
   const tvRoots = roots.filter((r) => r.kind === 'tv');
 
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <div className="settings" ref={ref}>
         <h1 className="settings-title">Settings</h1>
 
@@ -773,7 +778,7 @@ export default function Settings({
           </div>
         )}
 
-        <div className="settings-layout">
+        <FocusGroup kind="list" axis="x" current="settings-nav" className="settings-layout">
           {/* The sections, as a list down the side. OK opens one; Right goes
               into it and Left comes back. One section at a time, where there
               used to be one page of eight sections and two thousand words. */}
@@ -786,7 +791,7 @@ export default function Settings({
             search={<SearchBox query={query} onChange={setQuery} onOpen={openSearch} />}
           />
 
-          <SectionContent>
+          <SectionContent landing={shown === 'library' ? ADD_MOVIES_KEY : undefined}>
             {shown === 'search' && (
               <SearchResults query={query} onChange={setQuery} letters={tvMode} onPick={pick} />
             )}
@@ -813,7 +818,7 @@ export default function Settings({
                           </span>
                           <span className="muted">{count(root.file_count, 'file')}</span>
                           <ConfirmButton
-                            keepInView="nearest"
+                           
                             className="settings-remove"
                             confirmLabel="Remove it"
                             onConfirm={() =>
@@ -846,17 +851,17 @@ export default function Settings({
                     />
                   )}
 
-                  <div className="settings-row">
+                  <FocusGroup kind="row" className="settings-row">
                     <FocusButton
                       focusKey={ADD_MOVIES_KEY}
-                      keepInView="nearest"
+                     
                       className="btn-secondary"
                       onSelect={() => void pickFolder('movies')}
                     >
                       Add movies folder
                     </FocusButton>
                     <FocusButton
-                      keepInView="nearest"
+                     
                       className="btn-secondary"
                       onSelect={() => void pickFolder('tv')}
                     >
@@ -864,7 +869,7 @@ export default function Settings({
                     </FocusButton>
                     <FocusButton
                       focusKey={ADD_VIDEOS_KEY}
-                      keepInView="nearest"
+                     
                       className="btn-secondary"
                       onSelect={() => void pickFolder('videos')}
                     >
@@ -875,7 +880,7 @@ export default function Settings({
                         button, not a second one: a Stop that vanishes when
                         detection ends takes the remote's focus with it. */}
                     <FocusButton
-                      keepInView="nearest"
+                     
                       className="btn-primary"
                       onSelect={() =>
                         void (scan?.stage === 'detecting' ? stopDetection() : scanNow())
@@ -887,7 +892,7 @@ export default function Settings({
                           ? scanStageWords(scan.stage)
                           : 'Scan now'}
                     </FocusButton>
-                  </div>
+                  </FocusGroup>
 
                   {scan && (
                     <p className="settings-progress">
@@ -928,7 +933,7 @@ export default function Settings({
                           <span className="root-path">{login.server}</span>
                           <span className="muted">{login.user}</span>
                           <ConfirmButton
-                            keepInView="nearest"
+                           
                             className="settings-remove"
                             confirmLabel="Forget it"
                             onConfirm={() =>
@@ -955,7 +960,7 @@ export default function Settings({
                   </p>
                   <FocusButton
                     focusKey={REVIEW_BUTTON_KEY}
-                    keepInView="nearest"
+                   
                     className={needsReview > 0 ? 'btn-primary' : 'btn-secondary'}
                     onSelect={() => setPanel((p) => (p === 'review' ? 'none' : 'review'))}
                   >
@@ -985,7 +990,7 @@ export default function Settings({
                     receiver can do, and more. Every page can be skipped, and nothing changes
                     unless you choose it.
                   </p>
-                  <FocusButton keepInView="nearest" className="btn-secondary" onSelect={onRunSetup}>
+                  <FocusButton className="btn-secondary" onSelect={onRunSetup}>
                     Run setup again
                   </FocusButton>
                 </section>
@@ -1219,19 +1224,19 @@ export default function Settings({
                           nothing to install. */}
                       {offerFfmpegInstall && <> {FFMPEG_INSTALL_WORDS}</>}
                     </p>
-                    <div className="settings-row">
+                    <FocusGroup kind="row" className="settings-row">
                       {offerFfmpegInstall ? (
                         <FfmpegInstallButton focusKey="settings-ffmpeg-install" />
                       ) : (
                         <FocusButton
-                          keepInView="nearest"
+                         
                           className="btn-secondary"
                           onSelect={() => void openLink(FFMPEG_DOWNLOAD_URL)}
                         >
                           Open the ffmpeg download page ↗
                         </FocusButton>
                       )}
-                    </div>
+                    </FocusGroup>
                     <FfmpegInstallStatus />
                     </>
                   )}
@@ -1286,16 +1291,16 @@ export default function Settings({
                       credits). Where it and the built-in detection disagree about an intro, Skiptro
                       wins. If you have not heard of it, you can leave this alone.
                     </p>
-                    <div className="settings-row">
+                    <FocusGroup kind="row" className="settings-row">
                       <FocusButton
-                        keepInView="nearest"
+                       
                         className="btn-secondary"
                         onSelect={() => void openLink(SKIPTRO_URL)}
                       >
                         Open the Skiptro page ↗
                       </FocusButton>
                       <FocusButton
-                        keepInView="nearest"
+                       
                         className="btn-secondary"
                         onSelect={() =>
                           void (async () => {
@@ -1316,7 +1321,7 @@ export default function Settings({
                       >
                         {skiptroPath ? 'Change Skiptro location' : 'Choose Skiptro'}
                       </FocusButton>
-                    </div>
+                    </FocusGroup>
                     <p className="settings-hint">
                       {skiptroPath ? (
                         <>
@@ -1404,9 +1409,9 @@ export default function Settings({
                         {/* While detection runs, this same button stops it: a Stop
                             that appeared in its place would take the remote's
                             focus with it when detection ended. */}
-                        <div className="settings-row">
+                        <FocusGroup kind="row" className="settings-row">
                           <FocusButton
-                            keepInView="nearest"
+                           
                             className="btn-secondary"
                             disabled={detecting === null && scan?.stage === 'detecting'}
                             onSelect={() =>
@@ -1415,7 +1420,7 @@ export default function Settings({
                           >
                             {detecting !== null ? 'Stop detecting' : 'Detect now'}
                           </FocusButton>
-                        </div>
+                        </FocusGroup>
                         <ul className="detect-folders">
                           {tvRoots.map((root) => {
                             const waiting = backlog[root.id] ?? 0;
@@ -1499,16 +1504,16 @@ export default function Settings({
                         : 'Kinema looks up movies and TV shows on TMDB with a key of its own, ' +
                           'so there is nothing to set up. You can use your own free key instead.'}
                   </p>
-                  <div className="settings-row">
+                  <FocusGroup kind="row" className="settings-row">
                     <FocusButton
-                      keepInView="nearest"
+                     
                       className="btn-secondary"
                       onSelect={() => void openLink(TMDB_KEY_URL)}
                     >
                       Get a free TMDB key ↗
                     </FocusButton>
                     {keysSaved && <span className="muted">Saved.</span>}
-                  </div>
+                  </FocusGroup>
                   <label className="settings-field">
                     <span>
                       {BUILTIN_TMDB_KEY ? 'Your own TMDB key ' : 'TMDB key '}
@@ -1603,7 +1608,7 @@ export default function Settings({
                     <div className="settings-update">
                       <strong>Kinema {update.version} is available.</strong>
                       <FocusButton
-                        keepInView="nearest"
+                       
                         className="btn-primary"
                         onSelect={() =>
                           void openLink(update.url)
@@ -1636,7 +1641,7 @@ export default function Settings({
                     Clearing them is safe: they download again.
                   </p>
                   <FocusButton
-                    keepInView="nearest"
+                   
                     className="btn-secondary"
                     onSelect={() =>
                       void (async () => {
@@ -1662,9 +1667,9 @@ export default function Settings({
                     trusts them over its own guess, which makes one the quickest fix for a movie
                     it keeps getting wrong. It can also write them for other apps to read.
                   </p>
-                  <div className="settings-row">
+                  <FocusGroup kind="row" className="settings-row">
                     <FocusButton
-                      keepInView="nearest"
+                     
                       className="btn-secondary"
                       disabled={writingNfo}
                       onSelect={() => void exportNfo(false)}
@@ -1672,7 +1677,7 @@ export default function Settings({
                       {writingNfo ? 'Writing…' : 'Write the missing ones'}
                     </FocusButton>
                     <ConfirmButton
-                      keepInView="nearest"
+                     
                       className="btn-secondary"
                       disabled={writingNfo}
                       confirmLabel="Yes, replace them all"
@@ -1680,7 +1685,7 @@ export default function Settings({
                     >
                       Replace every one
                     </ConfirmButton>
-                  </div>
+                  </FocusGroup>
                   <p className="settings-hint">
                     Writing leaves existing .nfo files alone unless you choose Replace every one,
                     and skips folders it cannot write to.
@@ -1706,9 +1711,9 @@ export default function Settings({
                       </>
                     )}
                   </p>
-                  <div className="settings-row">
+                  <FocusGroup kind="row" className="settings-row">
                     <FocusButton
-                      keepInView="nearest"
+                     
                       className="btn-secondary"
                       onSelect={() => setPanel((p) => (p === 'developer' ? 'none' : 'developer'))}
                     >
@@ -1716,7 +1721,7 @@ export default function Settings({
                     </FocusButton>
                     {can?.opens_folders && (
                       <FocusButton
-                        keepInView="nearest"
+                       
                         className="btn-secondary"
                         onSelect={() => void makeReport()}
                       >
@@ -1725,7 +1730,7 @@ export default function Settings({
                     )}
                     {can?.opens_folders && (
                       <FocusButton
-                        keepInView="nearest"
+                       
                         className="btn-secondary"
                         onSelect={() => void openLogFolder().catch((e) => setError(userError(e)))}
                       >
@@ -1736,18 +1741,18 @@ export default function Settings({
                         share sheet sends it (capability `shares_files`). */}
                     {!can?.opens_folders && can?.shares_files && (
                       <FocusButton
-                        keepInView="nearest"
+                       
                         className="btn-secondary"
                         onSelect={() => void shareLog().catch((e) => setError(userError(e)))}
                       >
                         Share the log
                       </FocusButton>
                     )}
-                  </div>
+                  </FocusGroup>
                   {can?.opens_folders && report && (
-                    <div className="settings-row">
+                    <FocusGroup kind="row" className="settings-row">
                       <FocusButton
-                        keepInView="nearest"
+                       
                         className="btn-secondary"
                         onSelect={() => void openReportForm().catch((e) => setError(userError(e)))}
                       >
@@ -1755,7 +1760,7 @@ export default function Settings({
                       </FocusButton>
                       {report.path && (
                         <FocusButton
-                          keepInView="nearest"
+                         
                           className="btn-secondary"
                           onSelect={() =>
                             void showReport(report.path as string).catch((e) => setError(userError(e)))
@@ -1764,7 +1769,7 @@ export default function Settings({
                           Show the file
                         </FocusButton>
                       )}
-                    </div>
+                    </FocusGroup>
                   )}
                   {can?.opens_folders && (
                     <p className={report?.failed ? 'settings-warn' : report ? 'settings-ok' : 'settings-hint'}>
@@ -1784,9 +1789,9 @@ export default function Settings({
               </>
             )}
           </SectionContent>
-        </div>
+        </FocusGroup>
       </div>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }
 
@@ -1801,19 +1806,22 @@ export default function Settings({
  * found first; past the first item Up goes on to the bar at the top, as it
  * did. Right from the list comes back to where one was in the section.
  */
-function SectionContent({ children }: { children: ReactNode }) {
-  // A panel: Right goes only to a control beside it in the same row, Up and
-  // Down to the nearest row (the owner's "neighbours only", NAV-MAP
-  // 2026-10-11) — Right from Scan now went round to Remove, Right from "On a
-  // TV" to a setting a row lower. Left from the left edge still reaches the
-  // list, and Up from the top row the bar.
-  const { ref, focusKey } = useFocusGroup('panel', { focusKey: 'settings-content' });
+function SectionContent({ landing, children }: { landing?: string; children: ReactNode }) {
+  // A column of the section's controls and rows (round 7): Up and Down go
+  // from one to the next in the order they are drawn, Right only along a row
+  // (the owner's "neighbours only", NAV-MAP 2026-10-11). Left from the left
+  // edge reaches the list, and Up from the top row the bar. Coming back from
+  // the list lands on the control it left.
+  const { ref, focusKey } = useNavGroup(
+    { kind: 'column', remember: true, current: landing },
+    { focusKey: 'settings-content' }
+  );
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <div className="settings-content" ref={ref}>
         {children}
       </div>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }
 
@@ -1841,15 +1849,13 @@ function SectionList({
   /** The search box, at the top of the list: Up from the first section. */
   search: ReactNode;
 }) {
-  const { ref, focusKey } = useFocusable({
-    focusKey: 'settings-nav',
-    trackChildren: true,
-    saveLastFocusedChild: false,
-    preferredChildFocusKey: `settings-nav:${section}`,
-  });
+  const { ref, focusKey } = useNavGroup(
+    { kind: 'column', current: `settings-nav:${section}`, pageTop: true },
+    { focusKey: 'settings-nav' }
+  );
 
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <nav className="settings-nav" aria-label="Settings sections" ref={ref}>
         {search}
         {SECTIONS.map(([id, label]) => (
@@ -1857,7 +1863,7 @@ function SectionList({
             key={id}
             focusKey={`settings-nav:${id}`}
             className={section === id && !searching ? 'active' : ''}
-            keepInView="page-top"
+           
             onSelect={() => onChoose(id)}
           >
             {label}
@@ -1866,7 +1872,7 @@ function SectionList({
           </FocusButton>
         ))}
       </nav>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }
 
@@ -1886,13 +1892,16 @@ function VideosName({
   onAdd: () => void;
   onCancel: () => void;
 }) {
-  useClaimFocus(VIDEOS_NAME_KEY, true);
+  // Into the box as it appears.
+  useLayoutEffect(() => {
+    focusTo(VIDEOS_NAME_KEY);
+  }, []);
   return (
     <div className="settings-videos-name">
       <p className="settings-intro">
         A name for <span className="root-path">{folder.path}</span> on the Library page:
       </p>
-      <div className="settings-row">
+      <FocusGroup kind="row" className="settings-row">
         <FocusInput
           focusKey={VIDEOS_NAME_KEY}
           className="settings-input"
@@ -1901,13 +1910,13 @@ function VideosName({
           onEnter={onAdd}
           placeholder="Home videos"
         />
-        <FocusButton keepInView="nearest" className="btn-primary" onSelect={onAdd}>
+        <FocusButton className="btn-primary" onSelect={onAdd}>
           Add
         </FocusButton>
-        <FocusButton keepInView="nearest" className="btn-secondary" onSelect={onCancel}>
+        <FocusButton className="btn-secondary" onSelect={onCancel}>
           Cancel
         </FocusButton>
-      </div>
+      </FocusGroup>
     </div>
   );
 }

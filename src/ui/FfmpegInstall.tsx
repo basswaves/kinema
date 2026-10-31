@@ -16,6 +16,7 @@
  */
 import { useEffect, useState } from 'react';
 import FocusButton from './FocusButton';
+import FocusGroup from './FocusGroup';
 import { openLink } from './links';
 import { useCapabilities } from '../capabilities';
 import { ffmpegLacks } from '../library/api';
@@ -108,7 +109,7 @@ export function FfmpegInstallStatus() {
       )}
       {/* The way it was always added still works, and a failure that keeps
           failing must not leave Try again as the only way on. */}
-      <div className="settings-row">
+      <FocusGroup kind="row" className="settings-row">
         <FocusButton
           className="btn-secondary"
           keepInView="nearest"
@@ -116,7 +117,7 @@ export function FfmpegInstallStatus() {
         >
           Open the ffmpeg download page ↗
         </FocusButton>
-      </div>
+      </FocusGroup>
     </div>
   );
 }

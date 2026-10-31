@@ -3,14 +3,12 @@
  * what the open section shows rather than by a key of its own, so a setting
  * needs nothing added to be found.
  */
-import { setFocus } from '@noriginmedia/norigin-spatial-navigation';
 import { useEffect } from 'react';
-import { focusKeyOf } from './focus';
+import { focusKeyOf, focusTo } from './focus';
 import type { SettingEntry } from './settingsIndex';
 
 /** How long a section that asks something first (an account's state) is waited for. */
 const LAND_WAIT_MS = 2500;
-const LAND_POLL_MS = 100;
 
 /** Lower case and single spaces, for comparing what the screen shows. */
 function squash(text: string): string {
@@ -59,27 +57,36 @@ export function controlFor(root: Element, text: string): Element | null {
 export function useLandOn(target: { entry: SettingEntry } | null, onLanded: () => void): void {
   useEffect(() => {
     if (!target) return;
-    const started = Date.now();
     const text = target.entry.find ?? target.entry.label;
+    const content = document.querySelector('.settings-content');
+    // Tried as the section is drawn and again at every change in it, until the
+    // control is there; the one timer is only the give-up.
+    const watch = new MutationObserver(() => land(false));
+    let giveUp = 0;
     const stop = () => {
-      window.clearInterval(timer);
+      watch.disconnect();
+      window.clearTimeout(giveUp);
       window.removeEventListener('keydown', stop, true);
       window.removeEventListener('pointerdown', stop, true);
       onLanded();
     };
-    window.addEventListener('keydown', stop, true);
-    window.addEventListener('pointerdown', stop, true);
-    const timer = window.setInterval(() => {
+    function land(last: boolean): void {
       const root = document.querySelector('.settings-content');
       const control = root && controlFor(root, text);
       const key = control && focusKeyOf(control);
-      if (key) void setFocus(key);
-      else if (Date.now() - started < LAND_WAIT_MS) return;
-      else void setFocus('settings-content');
+      if (key) focusTo(key);
+      else if (last) focusTo('settings-content');
+      else return;
       stop();
-    }, LAND_POLL_MS);
+    }
+    window.addEventListener('keydown', stop, true);
+    window.addEventListener('pointerdown', stop, true);
+    if (content) watch.observe(content, { childList: true, subtree: true });
+    giveUp = window.setTimeout(() => land(true), LAND_WAIT_MS);
+    land(false);
     return () => {
-      window.clearInterval(timer);
+      watch.disconnect();
+      window.clearTimeout(giveUp);
       window.removeEventListener('keydown', stop, true);
       window.removeEventListener('pointerdown', stop, true);
     };

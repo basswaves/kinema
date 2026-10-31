@@ -9,6 +9,7 @@
 import { useEffect, useState } from 'react';
 import ConfirmButton from './ConfirmButton';
 import FocusButton from './FocusButton';
+import FocusGroup from './FocusGroup';
 import { formatBytes } from './format';
 import { userError } from './errors';
 import { useCapabilities } from '../capabilities';
@@ -57,7 +58,7 @@ export default function BackupSection() {
           library has something in it.</p>
       )}
       {copies?.map((copy) => (
-        <div className="settings-row backup-row" key={copy.name}>
+        <FocusGroup kind="row" className="settings-row backup-row" key={copy.name}>
           <span>
             {KIND[copy.kind] ?? copy.kind} · {day(copy.made_at)} · {formatBytes(copy.bytes)}
           </span>
@@ -69,11 +70,11 @@ export default function BackupSection() {
           >
             Restore
           </ConfirmButton>
-        </div>
+        </FocusGroup>
       ))}
       {/* Nothing to show a folder in on a TV box (capability `opens_folders`). */}
       {can?.opens_folders && (
-        <div className="settings-row">
+        <FocusGroup kind="row" className="settings-row">
           <FocusButton
             keepInView="nearest"
             className="btn-secondary"
@@ -81,7 +82,7 @@ export default function BackupSection() {
           >
             Open the folder of copies
           </FocusButton>
-        </div>
+        </FocusGroup>
       )}
     </section>
   );

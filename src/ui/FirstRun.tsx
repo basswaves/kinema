@@ -32,16 +32,16 @@
  */
 import { userError } from './errors';
 import { scanStageWords } from '../library/scanWords';
-import { FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { openLink } from './links';
 import FocusButton from './FocusButton';
+import FocusGroup, { FocusProvider } from './FocusGroup';
 import FocusInput from './FocusInput';
 import ChoiceRow from './ChoiceRow';
 import { setTvMode, TV_MODE_KEY } from './tv';
 import { useCapabilities } from '../capabilities';
-import { useClaimFocus } from './focus';
-import { ALL_ARROWS, useFocusGroup } from './focusGroups';
+import { ALL_ARROWS, useNavGroup } from './focusGroups';
+import { useLanding } from './focusStore';
 import {
   addLibraryRoot,
   listLibraryRoots,
@@ -76,11 +76,11 @@ export default function FirstRun({ onScan }: Props) {
   // A page of its own (NAV-MAP, agreed 2026-10-11): Up from the first
   // question is nothing, not the top bar, and Right with nothing beside it is
   // nothing, not "Add TV folder" a section higher.
-  const { ref, focusKey } = useFocusGroup('panel', {
-    focusKey: FIRST_RUN_FOCUS_KEY,
-    stopAt: ALL_ARROWS,
-  });
-  useClaimFocus(FIRST_RUN_FOCUS_KEY, true);
+  const { ref, focusKey } = useNavGroup(
+    { kind: 'column', hold: ALL_ARROWS },
+    { focusKey: FIRST_RUN_FOCUS_KEY }
+  );
+  useLanding(FIRST_RUN_FOCUS_KEY);
 
   const [roots, setRoots] = useState<LibraryRoot[]>([]);
   const [tmdbKey, setTmdbKey] = useState('');
@@ -184,7 +184,7 @@ export default function FirstRun({ onScan }: Props) {
   }, []);
 
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <div className="first-run" ref={ref}>
         <h1>Welcome to Kinema</h1>
         <p className="first-run-lede">
@@ -228,24 +228,24 @@ export default function FirstRun({ onScan }: Props) {
               : 'Pick the folder you keep them in. A local drive or a network share both work.'}{' '}
             Nothing is moved, renamed or written to; the files are only read.
           </p>
-          <div className="settings-row">
+          <FocusGroup kind="row" className="settings-row">
             {/* Kept on screen: without the seat question above them, these
                 are where the first run starts, near the foot of a TV. */}
             <FocusButton
-              keepInView="nearest"
+             
               className="btn-primary"
               onSelect={() => void pickFolder('movies')}
             >
               Add movies folder
             </FocusButton>
             <FocusButton
-              keepInView="nearest"
+             
               className="btn-primary"
               onSelect={() => void pickFolder('tv')}
             >
               Add TV folder
             </FocusButton>
-          </div>
+          </FocusGroup>
           {mergeOffer && (
             <MergeOffer
               offer={mergeOffer}
@@ -284,15 +284,15 @@ export default function FirstRun({ onScan }: Props) {
               Everything is identified without it, but only a key from TMDB brings posters,
               backdrops and artwork for movies. It is free, and takes about two minutes to get.
             </p>
-            <div className="settings-row">
+            <FocusGroup kind="row" className="settings-row">
               <FocusButton
-                keepInView="nearest"
+               
                 className="btn-secondary"
                 onSelect={() => void openLink(TMDB_KEY_URL)}
               >
                 Get a free key ↗
               </FocusButton>
-            </div>
+            </FocusGroup>
             <label className="settings-field">
               <span>Paste it here</span>
               <FocusInput
@@ -307,23 +307,23 @@ export default function FirstRun({ onScan }: Props) {
                 placeholder="TMDB API key"
               />
             </label>
-            <div className="settings-row">
+            <FocusGroup kind="row" className="settings-row">
               <FocusButton
-                keepInView="nearest"
+               
                 className="btn-secondary"
                 onSelect={() => void saveKey()}
               >
                 Save key
               </FocusButton>
               {savedKey && <span className="muted">Saved.</span>}
-            </div>
+            </FocusGroup>
           </section>
         )}
 
         <section className="first-run-step">
-          <div className="settings-row">
+          <FocusGroup kind="row" className="settings-row">
             <FocusButton
-              keepInView="nearest"
+             
               className="btn-primary"
               disabled={!hasRoots || scan !== null}
               onSelect={() => void scanNow()}
@@ -335,9 +335,9 @@ export default function FirstRun({ onScan }: Props) {
                 ? 'This can take a few minutes the first time. A few more questions meanwhile, each one skippable.'
                 : 'Add a folder above first.'}
             </span>
-          </div>
+          </FocusGroup>
         </section>
       </div>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }

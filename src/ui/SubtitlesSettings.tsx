@@ -17,9 +17,10 @@ import { useCallback, useEffect, useState } from 'react';
 import ChoiceRow from './ChoiceRow';
 import ConfirmButton from './ConfirmButton';
 import FocusButton from './FocusButton';
+import FocusGroup from './FocusGroup';
 import FocusInput from './FocusInput';
 import { userError } from './errors';
-import { useClaimFocus } from './focus';
+import { useClaim } from './focusStore';
 import { getSetting, setSetting } from '../metadata/api';
 import { useCapabilities } from '../capabilities';
 import { DESCRIPTION_KEY, FORCED_KEY, SDH_KEY } from '../player/trackChoice';
@@ -250,8 +251,8 @@ export function OpenSubtitlesSection() {
   // The form and the Sign out button replace each other under the focus
   // ring; focus follows to whichever is there now.
   const signedIn = Boolean(status?.available && status.user);
-  useClaimFocus(SIGN_OUT_KEY, signedIn);
-  useClaimFocus(SIGN_IN_KEY, Boolean(status?.available) && !signedIn);
+  useClaim(SIGN_OUT_KEY, signedIn);
+  useClaim(SIGN_IN_KEY, Boolean(status?.available) && !signedIn);
 
   if (!status) return null;
   const allowance =
@@ -280,9 +281,9 @@ export function OpenSubtitlesSection() {
           <p className="settings-hint">
             Signed in as <strong>{status.user}</strong>. {allowance}
           </p>
-          <div className="settings-row">
+          <FocusGroup kind="row" className="settings-row">
             <ConfirmButton
-              keepInView="nearest"
+             
               className="btn-secondary"
               confirmLabel="Sign out of OpenSubtitles"
               onConfirm={() => void signOut()}
@@ -291,7 +292,7 @@ export function OpenSubtitlesSection() {
             >
               Sign out
             </ConfirmButton>
-          </div>
+          </FocusGroup>
         </>
       )}
 
@@ -318,9 +319,9 @@ export function OpenSubtitlesSection() {
               placeholder="Your OpenSubtitles password"
             />
           </label>
-          <div className="settings-row">
+          <FocusGroup kind="row" className="settings-row">
             <FocusButton
-              keepInView="nearest"
+             
               className="btn-primary"
               focusKey={SIGN_IN_KEY}
               onSelect={() => void signIn()}
@@ -328,7 +329,7 @@ export function OpenSubtitlesSection() {
             >
               Sign in
             </FocusButton>
-          </div>
+          </FocusGroup>
           <p className="settings-hint">
             OpenSubtitles has no way to approve Kinema from a phone, so the password is typed
             here.{' '}

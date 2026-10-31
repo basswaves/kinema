@@ -9,16 +9,16 @@
  * Play, Up, Down and Remove. Played from here, previous/next and Up next
  * follow the playlist (useNeighbours.ts).
  */
-import { FocusContext, setFocus, useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import { open, save } from '@tauri-apps/plugin-dialog';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import Art from './Art';
 import ConfirmButton from './ConfirmButton';
 import FocusButton from './FocusButton';
 import FocusGroup, { FocusProvider } from './FocusGroup';
 import { useNavGroup } from './focusGroups';
 import FocusInput from './FocusInput';
-import { useClaimFocus } from './focus';
+import TileGrid from './TileGrid';
+import { navFocus, useLanding } from './focusStore';
 import { count } from './format';
 import { userError } from './errors';
 import RailTrack from './RailTrack';
@@ -87,11 +87,7 @@ export function PlaylistsPage({
   onOpen: (id: number) => void;
   onBack: () => void;
 }) {
-  const { ref, focusKey } = useFocusable({
-    focusKey: PLAYLISTS_FOCUS_KEY,
-    trackChildren: true,
-    saveLastFocusedChild: true,
-  });
+  const { ref, focusKey } = useNavGroup({ kind: 'column' }, { focusKey: PLAYLISTS_FOCUS_KEY });
   const can = useCapabilities();
   const [lists, setLists] = useState<PlaylistSummary[] | null>(null);
   const [naming, setNaming] = useState<string | null>(null);
@@ -105,11 +101,11 @@ export function PlaylistsPage({
   useEffect(load, [load]);
 
   const first = lists?.[0];
-  useClaimFocus(first ? playlistTileKey(first.id) : NEW_KEY, lists !== null, true);
+  useLanding(first ? playlistTileKey(first.id) : NEW_KEY);
   // Into the field as it opens, not on every letter typed into it.
   const namingOpen = naming !== null;
-  useEffect(() => {
-    if (namingOpen) void setFocus(NEW_NAME_KEY);
+  useLayoutEffect(() => {
+    if (namingOpen) navFocus(NEW_NAME_KEY);
   }, [namingOpen]);
 
   const make = (name: string) => {
@@ -134,15 +130,15 @@ export function PlaylistsPage({
   };
 
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <div className="search playlists-page" ref={ref}>
-        <div className="grid-head">
-          <FocusButton className="back-button" keepInView="page-top" onSelect={onBack}>
+        <FocusGroup kind="row" className="grid-head">
+          <FocusButton className="back-button" onSelect={onBack}>
             ← Back
           </FocusButton>
           <h2 className="grid-heading">Playlists</h2>
-        </div>
-        <div className="videos-tiles">
+        </FocusGroup>
+        <TileGrid className="videos-tiles" count={lists?.length ?? 0}>
           {lists?.map((list) => (
             <PlaylistTile
               key={list.id}
@@ -151,14 +147,14 @@ export function PlaylistsPage({
               onSelect={() => onOpen(list.id)}
             />
           ))}
-        </div>
+        </TileGrid>
         {lists !== null && lists.length === 0 && (
           <p className="muted library-empty">
             No playlists yet. Make one here, or press + Playlist on a film, a show or a group of
             videos; in the player, Audio &amp; subtitles has Add to a playlist.
           </p>
         )}
-        <div className="settings-row">
+        <FocusGroup kind="row" className="settings-row">
           {naming === null ? (
             <FocusButton focusKey={NEW_KEY} className="btn-secondary" onSelect={() => setNaming('')}>
               + New playlist
@@ -183,10 +179,10 @@ export function PlaylistsPage({
               Import .m3u…
             </FocusButton>
           )}
-        </div>
+        </FocusGroup>
         {note && <p className="muted">{note}</p>}
       </div>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }
 
@@ -199,11 +195,7 @@ export function PlaylistPage({
   onPlay: (target: PlaybackTarget) => void;
   onBack: () => void;
 }) {
-  const { ref, focusKey } = useFocusable({
-    focusKey: PLAYLIST_FOCUS_KEY,
-    trackChildren: true,
-    saveLastFocusedChild: true,
-  });
+  const { ref, focusKey } = useNavGroup({ kind: 'column' }, { focusKey: PLAYLIST_FOCUS_KEY });
   const can = useCapabilities();
   const [list, setList] = useState<PlaylistSummary | null>(null);
   const [entries, setEntries] = useState<PlaylistEntry[] | null>(null);
@@ -225,17 +217,21 @@ export function PlaylistPage({
   }, [load]);
 
   const start = entries && list ? startEntry(entries, list.current_item) : null;
-  useClaimFocus(start ? PLAY_KEY : 'playlist:back', entries !== null, true);
+  useLanding(entries === null ? 'playlist:back' : start ? PLAY_KEY : 'playlist:back');
   const renamingOpen = renaming !== null;
-  useEffect(() => {
-    if (renamingOpen) void setFocus(RENAME_INPUT_KEY);
+  // Into the field as the form opens, back on Rename as it closes: both as the
+  // change is drawn, when the field and the button are registered.
+  const wasRenaming = useRef(false);
+  useLayoutEffect(() => {
+    if (renamingOpen) navFocus(RENAME_INPUT_KEY);
+    else if (wasRenaming.current) navFocus(RENAME_KEY);
+    wasRenaming.current = renamingOpen;
   }, [renamingOpen]);
 
   const saveName = () => {
     if (renaming === null) return;
     renamePlaylist(id, renaming)
       .then(() => {
-        void setFocus(RENAME_KEY);
         setRenaming(null);
         void load();
       })
@@ -271,28 +267,32 @@ export function PlaylistPage({
 
   // After Up, Down or Remove the ring stays on the same kind of control, on
   // the row it moved to (or the row that took the removed one's place).
-  const change = (action: Promise<void>, landOn: string | null) => {
-    action
-      .then(load)
-      .then(() => {
-        if (landOn) void setFocus(landOn);
-      })
-      .catch((e) => setNote(userError(e)));
+  const landOn = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    // The row's control as the moved list is drawn; a removed last one has no
+    // row to land on, and the ring recovers to the row before it.
+    const key = landOn.current;
+    landOn.current = null;
+    if (key) navFocus(key);
+  }, [entries]);
+  const change = (action: Promise<void>, land: string | null) => {
+    landOn.current = land;
+    action.then(load).catch((e) => setNote(userError(e)));
   };
 
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <div className="search playlist-page" ref={ref}>
-        <div className="grid-head">
-          <FocusButton focusKey="playlist:back" className="back-button" keepInView="page-top" onSelect={onBack}>
+        <FocusGroup kind="row" className="grid-head">
+          <FocusButton focusKey="playlist:back" className="back-button" onSelect={onBack}>
             ← Back
           </FocusButton>
           <h2 className="grid-heading">
             {list?.name ?? ''} <span className="muted">{entries?.length ?? ''}</span>
           </h2>
-        </div>
+        </FocusGroup>
 
-        <FocusGroup kind="row" className="detail-actions playlist-actions">
+        <FocusGroup kind="row" className="detail-actions playlist-actions" current={PLAY_KEY}>
           {renaming !== null ? (
             <>
               <FocusInput
@@ -306,13 +306,7 @@ export function PlaylistPage({
               <FocusButton className="btn-primary" onSelect={saveName}>
                 Save
               </FocusButton>
-              <FocusButton
-                className="btn-secondary"
-                onSelect={() => {
-                  void setFocus(RENAME_KEY);
-                  setRenaming(null);
-                }}
-              >
+              <FocusButton className="btn-secondary" onSelect={() => setRenaming(null)}>
                 Cancel
               </FocusButton>
             </>
@@ -365,7 +359,7 @@ export function PlaylistPage({
             playlist in the player&apos;s Audio &amp; subtitles.
           </p>
         )}
-        <div className="playlist-items">
+        <FocusGroup kind="list" className="playlist-items">
           {entries?.map((entry, index) => (
             <PlaylistRow
               key={entry.item_id}
@@ -375,16 +369,13 @@ export function PlaylistPage({
               onMove={(up) => change(movePlaylistItem(entry.item_id, up), rowKey(entry.item_id, up ? 'up' : 'down'))}
               onRemove={() => {
                 const after = entries[index + 1] ?? entries[index - 1];
-                // The last one: the ring goes to Back first, while the row it
-                // is on still exists (docs/GOTCHAS.md).
-                if (!after) void setFocus('playlist:back');
                 change(removePlaylistItem(entry.item_id), after ? rowKey(after.item_id, 'remove') : null);
               }}
             />
           ))}
-        </div>
+        </FocusGroup>
       </div>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }
 
@@ -424,7 +415,7 @@ function PlaylistRow({
         focusKey={rowKey(entry.item_id, 'play')}
         label={entryLabel(entry)}
         className="playlist-row-play"
-        keepInView="nearest"
+       
         disabled={entry.missing}
         onSelect={onPlay}
       >
@@ -445,13 +436,13 @@ function PlaylistRow({
           {note && <span className="muted playlist-row-note">{note}</span>}
         </span>
       </FocusButton>
-      <FocusButton focusKey={rowKey(entry.item_id, 'up')} className="btn-secondary" keepInView="nearest" onSelect={() => onMove(true)}>
+      <FocusButton focusKey={rowKey(entry.item_id, 'up')} className="btn-secondary" onSelect={() => onMove(true)}>
         ↑
       </FocusButton>
-      <FocusButton focusKey={rowKey(entry.item_id, 'down')} className="btn-secondary" keepInView="nearest" onSelect={() => onMove(false)}>
+      <FocusButton focusKey={rowKey(entry.item_id, 'down')} className="btn-secondary" onSelect={() => onMove(false)}>
         ↓
       </FocusButton>
-      <FocusButton focusKey={rowKey(entry.item_id, 'remove')} className="btn-secondary" keepInView="nearest" onSelect={onRemove}>
+      <FocusButton focusKey={rowKey(entry.item_id, 'remove')} className="btn-secondary" onSelect={onRemove}>
         Remove
       </FocusButton>
     </FocusGroup>

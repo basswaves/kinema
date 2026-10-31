@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import ChoiceRow from './ChoiceRow';
 import FocusButton from './FocusButton';
+import FocusGroup from './FocusGroup';
 import FocusInput from './FocusInput';
 import { userError } from './errors';
 import { useCapabilities } from '../capabilities';
@@ -96,7 +97,7 @@ export default function ImportWatchedSection() {
       </p>
 
       {can?.folder_picker && (
-        <div className="settings-row">
+        <FocusGroup kind="row" className="settings-row">
           {kodi && (
             <FocusButton
               keepInView="nearest"
@@ -115,7 +116,7 @@ export default function ImportWatchedSection() {
           >
             Choose Kodi’s database or a Trakt export…
           </FocusButton>
-        </div>
+        </FocusGroup>
       )}
 
       <ChoiceRow
@@ -161,7 +162,7 @@ export default function ImportWatchedSection() {
           />
         </label>
       )}
-      <div className="settings-row">
+      <FocusGroup kind="row" className="settings-row">
         <FocusButton
           keepInView="nearest"
           className="btn-primary"
@@ -170,7 +171,7 @@ export default function ImportWatchedSection() {
         >
           {busy ? 'Reading…' : 'Bring it in'}
         </FocusButton>
-      </div>
+      </FocusGroup>
 
       {error && <p className="settings-warn">{error}</p>}
       {report && <p className="settings-ok import-report">{reportWords(report)}</p>}

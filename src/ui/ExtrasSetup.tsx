@@ -27,6 +27,7 @@ import { FFMPEG_PATH_KEY, ffmpegStatus, type FfmpegStatus } from '../library/api
 import { getSetting, setSetting } from '../metadata/api';
 import { useCapabilities } from '../capabilities';
 import FocusButton from './FocusButton';
+import FocusGroup from './FocusGroup';
 import FocusInput from './FocusInput';
 import { userError } from './errors';
 
@@ -138,12 +139,12 @@ export default function ExtrasSetup() {
                 ? `${FFMPEG_INSTALL_WORDS} Or install it yourself, now or later: the next scan, which runs every time Kinema starts, then does everything that was skipped.`
                 : 'Kinema does not include it: install it yourself, now or later. The next scan, which runs every time Kinema starts, then does everything that was skipped.'}
             </p>
-            <div className="settings-row">
+            <FocusGroup kind="row" className="settings-row">
               <FfmpegInstallButton
                 focusKey="setup-ffmpeg-install"
                 className={can?.installs_ffmpeg ? 'btn-primary' : 'btn-secondary'}
               />
-            </div>
+            </FocusGroup>
             <FfmpegInstallStatus />
           </>
         )}
@@ -178,15 +179,15 @@ export default function ExtrasSetup() {
           identify movies. A free key allows 1,000 lookups a day and Kinema uses at most 500, so a
           large library fills in over a few days.
         </p>
-        <div className="settings-row">
+        <FocusGroup kind="row" className="settings-row">
           <FocusButton
             className="btn-secondary"
-            keepInView="nearest"
+           
             onSelect={() => void openLink(OMDB_KEY_URL)}
           >
             Get a free key ↗
           </FocusButton>
-        </div>
+        </FocusGroup>
         <label className="settings-field">
           <span>Paste it here</span>
           <FocusInput

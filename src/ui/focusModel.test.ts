@@ -577,3 +577,249 @@ describe('passing over an area', () => {
     expect(enter(tree, 'b', none)).toBe('b1');
   });
 });
+
+// ---- Settings, first run, Needs attention, playlists, search (round 7, F3) ----
+
+/** The top bar, then a page. */
+function screen(page: A) {
+  return build(
+    column([
+      ['top', row(['nav:home', 'nav:settings'], { current: 'nav:settings' })],
+      ['page', page],
+    ])
+  );
+}
+
+describe('Settings (NAV-MAP settings-*)', () => {
+  const tree = screen(
+    column([
+      [
+        'layout',
+        row(
+          [
+            ['nav', column(['search-box', 'nav:library', 'nav:playback', 'nav:advanced'], { current: 'nav:library' })],
+            [
+              'content',
+              column(
+                [
+                  'remove',
+                  ['folders', row(['add-movies', 'add-tv', 'scan'])],
+                  'review',
+                  ['choice', row(['ch-a', 'ch-b', 'ch-c'], { current: 'ch-b' })],
+                  'field',
+                  ['pair', row(['pair-a', 'pair-b'])],
+                ],
+                { remember: true, current: 'add-movies' }
+              ),
+            ],
+          ],
+          { remember: true, current: 'nav' }
+        ),
+      ],
+    ])
+  );
+
+  it('Down from the top bar is the open section; Up from the first section is the search box, then the bar', () => {
+    expect(move(tree, 'nav:settings', 'down', none)).toBe('nav:library');
+    expect(move(tree, 'nav:library', 'up', none)).toBe('search-box');
+    expect(move(tree, 'search-box', 'up', none)).toBe('nav:settings');
+  });
+
+  it('Right from the list is the section’s landing, Left from the left edge the open section', () => {
+    expect(move(tree, 'nav:library', 'right', none)).toBe('add-movies');
+    expect(move(tree, 'nav:advanced', 'right', none)).toBe('add-movies');
+    expect(move(tree, 'add-movies', 'left', none)).toBe('nav:library');
+    expect(move(tree, 'review', 'left', none)).toBe('nav:library');
+  });
+
+  it('Right comes back to the control left, and Down walks every control in the order drawn', () => {
+    expect(walk(tree, 'field', ['left', 'right'])).toBe('field');
+    const seen = ['remove'];
+    let at = 'remove';
+    for (let i = 0; i < 12; i++) {
+      const next = move(tree, at, 'down', none);
+      if (!next) break;
+      seen.push((at = next));
+    }
+    expect(seen).toEqual(['remove', 'add-movies', 'review', 'ch-b', 'field', 'pair-a']);
+  });
+
+  it('a row of choices lands on the chosen one, holds Right at its end, Left from its start is the list', () => {
+    expect(move(tree, 'review', 'down', none)).toBe('ch-b');
+    expect(move(tree, 'field', 'up', none)).toBe('ch-b');
+    expect(move(tree, 'ch-c', 'right', none)).toBeNull();
+    expect(move(tree, 'ch-a', 'left', none)).toBe('nav:library');
+    expect(walk(tree, 'ch-b', ['left', 'left', 'right'])).toBe('ch-b');
+  });
+
+  it('Right goes only along a row: from Scan now it is nothing, not Remove a row up', () => {
+    expect(move(tree, 'scan', 'right', none)).toBeNull();
+    expect(move(tree, 'pair-b', 'right', none)).toBeNull();
+    expect(move(tree, 'pair-a', 'down', none)).toBeNull();
+  });
+});
+
+describe('the on-screen keyboard (search)', () => {
+  const tree = screen(
+    column([
+      ['box', row(['search-input'])],
+      [
+        'osk',
+        column(
+          [
+            ['letters', { area: { kind: 'grid', columns: 4, remember: true }, children: 'abcdefghijkl'.split('') }],
+            ['extra', row(['space', 'delete', 'clear'])],
+          ],
+          { remember: true }
+        ),
+      ],
+      ['results', { area: { kind: 'grid', columns: 3 }, children: ['r0', 'r1', 'r2', 'r3'] }],
+    ])
+  );
+
+  it('letters move by index, four across; Down from the last row is Space, Up from it the last letter held', () => {
+    expect(move(tree, 'a', 'right', none)).toBe('b');
+    expect(move(tree, 'a', 'down', none)).toBe('e');
+    expect(move(tree, 'd', 'right', none)).toBeNull();
+    expect(move(tree, 'i', 'down', none)).toBe('space');
+    expect(walk(tree, 'k', ['down', 'up'])).toBe('k');
+  });
+
+  it('Down from the box is the keys, Down past them the results', () => {
+    expect(move(tree, 'search-input', 'down', none)).toBe('a');
+    expect(move(tree, 'clear', 'down', none)).toBe('r0');
+    expect(move(tree, 'r0', 'up', none)).toBe('space');
+  });
+});
+
+describe('a page of its own: first run, the setup pages', () => {
+  const pageTree = (questions: boolean) =>
+    build(
+      column([
+        [
+          'setup',
+          column(
+            [
+              ['next', row(['forward', 'later'], { current: 'forward' })],
+              ['body', { area: { kind: 'column' }, disabled: !questions, children: ['q1', 'q2'] }],
+            ],
+            { current: 'body', hold: ['up', 'down', 'left', 'right'] }
+          ),
+        ],
+      ])
+    );
+
+  it('lands on the first question; a page with none starts on Next', () => {
+    expect(enter(pageTree(true), 'setup', none)).toBe('q1');
+    expect(enter(pageTree(false), 'setup', none)).toBe('forward');
+  });
+
+  it('Up from the first question is Next, and nothing leaves the page by an arrow', () => {
+    const tree = pageTree(true);
+    expect(move(tree, 'q1', 'up', none)).toBe('forward');
+    expect(move(tree, 'forward', 'up', none)).toBeNull();
+    expect(move(tree, 'q2', 'down', none)).toBeNull();
+    expect(move(tree, 'later', 'right', none)).toBeNull();
+    expect(move(tree, 'q1', 'left', none)).toBeNull();
+  });
+});
+
+describe('Needs attention (groups opened in place)', () => {
+  const tree = screen(
+    column([
+      [
+        'queue',
+        column([
+          'review-button',
+          [
+            'g1',
+            column([
+              'g1-summary',
+              ['g1-search', row(['g1-input', 'g1-kind', 'g1-go', 'g1-ignore'])],
+              ['g1-results', column(['g1-link-0', 'g1-link-1'])],
+              ['g1-local', row(['g1-name', 'g1-year', 'g1-keep'])],
+            ]),
+          ],
+          ['g2', column(['g2-summary'])],
+          'guide',
+        ]),
+      ],
+    ])
+  );
+
+  it('Down from a group’s summary goes into its panel in the order drawn, then on to the next group', () => {
+    const order: string[] = [];
+    let at = 'g1-summary';
+    for (let i = 0; i < 8; i++) {
+      const next = move(tree, at, 'down', none);
+      if (!next) break;
+      order.push((at = next));
+    }
+    expect(order).toEqual(['g1-input', 'g1-link-0', 'g1-link-1', 'g1-name', 'g2-summary', 'guide']);
+  });
+
+  it('along the search row, and Up from its first box is the summary', () => {
+    expect(walk(tree, 'g1-input', ['right', 'right', 'right'])).toBe('g1-ignore');
+    expect(move(tree, 'g1-ignore', 'right', none)).toBeNull();
+    expect(move(tree, 'g1-input', 'up', none)).toBe('g1-summary');
+    expect(move(tree, 'g1-name', 'up', none)).toBe('g1-link-1');
+  });
+
+  it('a group dealt with: the ring goes to the next group’s summary', () => {
+    const gone = screen(column([['queue', column(['review-button', ['g2', column(['g2-summary'])], 'guide'])]]));
+    expect(recover(gone, [{ area: 'queue', index: 1 }], none)).toBe('g2-summary');
+  });
+});
+
+describe('a playlist page', () => {
+  const tree = screen(
+    column([
+      ['head', row(['playlist:back'])],
+      ['actions', row(['play', 'shuffle', 'repeat', 'rename', 'delete'], { current: 'play' })],
+      [
+        'items',
+        column(
+          [
+            ['row1', row(['i1:play', 'i1:up', 'i1:down', 'i1:remove'])],
+            ['row2', row(['i2:play', 'i2:up', 'i2:down', 'i2:remove'])],
+          ],
+          { remember: true }
+        ),
+      ],
+    ])
+  );
+
+  it('Back, then Play, then the first item: Down lands on each area’s own landing', () => {
+    expect(move(tree, 'playlist:back', 'down', none)).toBe('play');
+    expect(move(tree, 'shuffle', 'down', none)).toBe('i1:play');
+    expect(move(tree, 'i1:play', 'up', none)).toBe('play');
+  });
+
+  it('Down from an item’s buttons is the next row, on its own landing', () => {
+    expect(walk(tree, 'i1:up', ['down'])).toBe('i2:play');
+  });
+
+  it('Remove on the last item: the ring goes to the item before it', () => {
+    const left = screen(
+      column([['head', row(['playlist:back'])], ['items', column([['row1', row(['i1:play', 'i1:remove'])]], { remember: true })]])
+    );
+    expect(recover(left, [{ area: 'items', index: 1 }], none)).toBe('i1:play');
+  });
+});
+
+describe('tiles that wrap (playlists, Videos)', () => {
+  const tree = screen(
+    column([
+      ['tiles', { area: { kind: 'grid', columns: 3, remember: true }, children: ['t0', 't1', 't2', 't3', 't4'] }],
+      ['new', row(['new-button'])],
+    ])
+  );
+
+  it('three across: Down is the tile below, or the last one from a column the last line does not reach', () => {
+    expect(move(tree, 't0', 'down', none)).toBe('t3');
+    expect(move(tree, 't2', 'down', none)).toBe('t4');
+    expect(move(tree, 't4', 'down', none)).toBe('new-button');
+    expect(move(tree, 't2', 'right', none)).toBeNull();
+    expect(move(tree, 't0', 'up', none)).toBe('nav:settings');
+  });
+});

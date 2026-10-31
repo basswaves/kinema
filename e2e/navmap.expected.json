@@ -62,6 +62,16 @@
       "Example Saga": { "U": "Recently added ↓", "D": "·", "L": "Example Show", "R": "·" }
     },
     "search": {
+      "0": { "U": "w", "D": "Space", "L": "9", "R": "æ" },
+      "1": { "U": "n", "D": "Space", "L": "·", "R": "2" },
+      "2": { "U": "o", "D": "Space", "L": "1", "R": "3" },
+      "3": { "U": "p", "D": "Space", "L": "2", "R": "4" },
+      "4": { "U": "q", "D": "Space", "L": "3", "R": "5" },
+      "5": { "U": "r", "D": "Space", "L": "4", "R": "6" },
+      "6": { "U": "s", "D": "Space", "L": "5", "R": "7" },
+      "7": { "U": "t", "D": "Space", "L": "6", "R": "8" },
+      "8": { "U": "u", "D": "Space", "L": "7", "R": "9" },
+      "9": { "U": "v", "D": "Space", "L": "8", "R": "0" },
       "Search your library…": { "U": "Search", "D": "a", "L": "·", "R": "·" },
       "a": { "U": "Search your library…", "D": "n", "L": "·", "R": "b" },
       "b": { "U": "Search your library…", "D": "o", "L": "a", "R": "c" },
@@ -89,12 +99,15 @@
       "x": { "U": "k", "D": "æ", "L": "w", "R": "y" },
       "y": { "U": "l", "D": "ø", "L": "x", "R": "z" },
       "z": { "U": "m", "D": "å", "L": "y", "R": "·" },
-      "Space": { "U": "1", "D": "Example Show", "L": "·", "R": "Delete a letter" },
-      "Delete a letter": { "U": "3", "D": "Example Show", "L": "Space", "R": "Clear" },
-      "Clear": { "U": "7", "D": "Example Show", "L": "Delete a letter", "R": "8" },
-      "Example Show": { "U": "8", "D": "·", "L": "·", "R": "Example Film" },
-      "Example Film": { "U": "8", "D": "·", "L": "Example Show", "R": "Example Saga" },
-      "Example Saga": { "U": "8", "D": "·", "L": "Example Film", "R": "·" }
+      "æ": { "U": "x", "D": "Space", "L": "0", "R": "ø" },
+      "ø": { "U": "y", "D": "Space", "L": "æ", "R": "å" },
+      "å": { "U": "z", "D": "Space", "L": "ø", "R": "·" },
+      "Space": { "U": "å", "D": "Example Show", "L": "·", "R": "Delete a letter" },
+      "Delete a letter": { "U": "å", "D": "Example Show", "L": "Space", "R": "Clear" },
+      "Clear": { "U": "å", "D": "Example Show", "L": "Delete a letter", "R": "·" },
+      "Example Show": { "U": "Space", "D": "·", "L": "·", "R": "Example Film" },
+      "Example Film": { "U": "Space", "D": "·", "L": "Example Show", "R": "Example Saga" },
+      "Example Saga": { "U": "Space", "D": "·", "L": "Example Film", "R": "·" }
     },
     "detail-movie": {
       "← Back": { "U": "Home", "D": "▶ Play", "L": "·", "R": "·" },
@@ -165,7 +178,7 @@
       "Playback": { "U": "Library #2", "D": "Picture & sound", "L": "·", "R": "Add movies folder" },
       "Remove #1": { "U": "Settings", "D": "Remove #2", "L": "Library #2", "R": "·" },
       "Picture & sound": { "U": "Playback", "D": "Language & subtitles", "L": "·", "R": "Add movies folder" },
-      "Remove #2": { "U": "Remove #1", "D": "Scan now", "L": "Library #2", "R": "·" },
+      "Remove #2": { "U": "Remove #1", "D": "Add movies folder", "L": "Library #2", "R": "·" },
       "Language & subtitles": { "U": "Picture & sound", "D": "Skipping intros", "L": "·", "R": "Add movies folder" },
       "Add movies folder": { "U": "Remove #2", "D": "Nothing to review", "L": "Library #2", "R": "Add TV folder" },
       "Add TV folder": { "U": "Remove #2", "D": "Nothing to review", "L": "Add movies folder", "R": "Add Videos folder" },
@@ -209,15 +222,15 @@
       "Every device that can": { "U": "✓Off #2", "D": "✓Windows default", "L": "✓Off #3", "R": "Only these #3" },
       "Only these #3": { "U": "✓Off #2", "D": "✓Windows default", "L": "Every device that can", "R": "·" },
       "✓Windows default": { "U": "✓Off #3", "D": "Sound 10 ms earlier", "L": "Picture & sound", "R": "Mock AV receiver (HDMI)" },
-      "Mock AV receiver (HDMI)": { "U": "✓Off #3", "D": "Sound 10 ms later", "L": "✓Windows default", "R": "Mock onboard speakers" },
-      "Mock onboard speakers": { "U": "✓Off #3", "D": "No delay", "L": "Mock AV receiver (HDMI)", "R": "·" },
+      "Mock AV receiver (HDMI)": { "U": "✓Off #3", "D": "Sound 10 ms earlier", "L": "✓Windows default", "R": "Mock onboard speakers" },
+      "Mock onboard speakers": { "U": "✓Off #3", "D": "Sound 10 ms earlier", "L": "Mock AV receiver (HDMI)", "R": "·" },
       "Sound 10 ms earlier": { "U": "✓Windows default", "D": "✓Off #4", "L": "Picture & sound", "R": "Sound 10 ms later" },
       "Sound 10 ms later": { "U": "✓Windows default", "D": "✓Off #4", "L": "Sound 10 ms earlier", "R": "No delay" },
       "No delay": { "U": "✓Windows default", "D": "✓Off #4", "L": "Sound 10 ms later", "R": "·" },
       "✓Off #4": { "U": "Sound 10 ms earlier", "D": "✓Off #5", "L": "Picture & sound", "R": "A little" },
       "A little": { "U": "Sound 10 ms earlier", "D": "✓Off #5", "L": "✓Off #4", "R": "More" },
-      "More": { "U": "Sound 10 ms later", "D": "✓Off #5", "L": "A little", "R": "Most" },
-      "Most": { "U": "Sound 10 ms later", "D": "✓Off #5", "L": "More", "R": "·" },
+      "More": { "U": "Sound 10 ms earlier", "D": "✓Off #5", "L": "A little", "R": "Most" },
+      "Most": { "U": "Sound 10 ms earlier", "D": "✓Off #5", "L": "More", "R": "·" },
       "✓Off #5": { "U": "✓Off #4", "D": "Check again", "L": "Picture & sound", "R": "On" },
       "On": { "U": "✓Off #4", "D": "Check again", "L": "✓Off #5", "R": "·" },
       "Check again": { "U": "✓Off #5", "D": "·", "L": "Picture & sound", "R": "·" }
@@ -250,10 +263,10 @@
       "Off": { "U": "Settings", "D": "Clear artwork cache", "L": "✓On", "R": "·" },
       "Clear artwork cache": { "U": "✓On", "D": "Write the missing ones", "L": "Advanced", "R": "·" },
       "Write the missing ones": { "U": "Clear artwork cache", "D": "Save the library to a file…", "L": "Advanced", "R": "Replace every one" },
-      "Replace every one": { "U": "Clear artwork cache", "D": "Take a library in…", "L": "Write the missing ones", "R": "·" },
+      "Replace every one": { "U": "Clear artwork cache", "D": "Save the library to a file…", "L": "Write the missing ones", "R": "·" },
       "Save the library to a file…": { "U": "Write the missing ones", "D": "Restore #1", "L": "Advanced", "R": "Take a library in…" },
-      "Take a library in…": { "U": "Replace every one", "D": "Restore #1", "L": "Save the library to a file…", "R": "·" },
-      "Restore #1": { "U": "Take a library in…", "D": "Restore #2", "L": "Advanced", "R": "·" },
+      "Take a library in…": { "U": "Write the missing ones", "D": "Restore #1", "L": "Save the library to a file…", "R": "·" },
+      "Restore #1": { "U": "Save the library to a file…", "D": "Restore #2", "L": "Advanced", "R": "·" },
       "Restore #2": { "U": "Restore #1", "D": "Open the folder of copies", "L": "Advanced", "R": "·" },
       "Open the folder of copies": { "U": "Restore #2", "D": "Show developer tools", "L": "Advanced", "R": "·" },
       "Show developer tools": { "U": "Open the folder of copies", "D": "From simkl.com/settings/developer", "L": "Advanced", "R": "Send a report" },
@@ -270,12 +283,12 @@
     },
     "settings-review-item": {
       "Search for the right title…": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Name", "L": "Library #2", "R": "Movie" },
-      "Movie": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Year", "L": "Search for the right title…", "R": "Search #2" },
-      "Search #2": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Year", "L": "Movie", "R": "Ignore these" },
-      "Ignore these": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Add without a match", "L": "Search #2", "R": "·" },
+      "Movie": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Name", "L": "Search for the right title…", "R": "Search #2" },
+      "Search #2": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Name", "L": "Movie", "R": "Ignore these" },
+      "Ignore these": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Name", "L": "Search #2", "R": "·" },
       "Name": { "U": "Search for the right title…", "D": "Sample Series · 2 files · seriesKinema could not i", "L": "Library #2", "R": "Year" },
       "Year": { "U": "Search for the right title…", "D": "Sample Series · 2 files · seriesKinema could not i", "L": "Name", "R": "Add without a match" },
-      "Add without a match": { "U": "Ignore these", "D": "Sample Series · 2 files · seriesKinema could not i", "L": "Year", "R": "·" }
+      "Add without a match": { "U": "Search for the right title…", "D": "Sample Series · 2 files · seriesKinema could not i", "L": "Year", "R": "·" }
     },
     "leave": {
       "Close Kinema": { "U": "Cancel", "D": "Put the PC to sleep", "L": "·", "R": "·" },
@@ -325,10 +338,10 @@
     },
     "first-run": {
       "✓A TV, from the sofa": { "U": "·", "D": "Add movies folder", "L": "·", "R": "A desk" },
-      "A desk": { "U": "·", "D": "Add TV folder", "L": "✓A TV, from the sofa", "R": "·" },
+      "A desk": { "U": "·", "D": "Add movies folder", "L": "✓A TV, from the sofa", "R": "·" },
       "Add movies folder": { "U": "✓A TV, from the sofa", "D": "Remove C:\\fixture", "L": "·", "R": "Add TV folder" },
       "Add TV folder": { "U": "✓A TV, from the sofa", "D": "Remove C:\\fixture", "L": "Add movies folder", "R": "·" },
-      "Remove C:\\fixture": { "U": "Add TV folder", "D": "Get a free key ↗", "L": "·", "R": "·" },
+      "Remove C:\\fixture": { "U": "Add movies folder", "D": "Get a free key ↗", "L": "·", "R": "·" },
       "Get a free key ↗": { "U": "Remove C:\\fixture", "D": "TMDB API key", "L": "·", "R": "·" },
       "TMDB API key": { "U": "Get a free key ↗", "D": "Save key", "L": "·", "R": "·" },
       "Save key": { "U": "TMDB API key", "D": "Scan my library", "L": "·", "R": "·" },
@@ -371,7 +384,7 @@
       "Home videos": { "U": "Library", "D": "Library folders", "L": "·", "R": "Playlists" },
       "Playlists": { "U": "Library", "D": "Library folders", "L": "Home videos", "R": "Folders" },
       "Folders": { "U": "Library", "D": "Library folders", "L": "Playlists", "R": "·" },
-      "Library folders": { "U": "Home videos", "D": "·", "L": "·", "R": "Playlists" }
+      "Library folders": { "U": "Folders", "D": "·", "L": "·", "R": "·" }
     },
     "videos": {
       "← Back": { "U": "Library", "D": "▶ Play all #1", "L": "·", "R": "·" },
@@ -402,7 +415,7 @@
       "Garden.movPlay": { "U": "Birthday.mp4Play", "D": "·", "L": "·", "R": "·" }
     },
     "playlists": {
-      "← Back": { "U": "Library", "D": "Evening", "L": "·", "R": "Import .m3u…" },
+      "← Back": { "U": "Library", "D": "Evening", "L": "·", "R": "·" },
       "Evening": { "U": "← Back", "D": "+ New playlist", "L": "·", "R": "·" },
       "+ New playlist": { "U": "Evening", "D": "·", "L": "·", "R": "Import .m3u…" },
       "Import .m3u…": { "U": "Evening", "D": "·", "L": "+ New playlist", "R": "·" }
@@ -556,6 +569,16 @@
       "Example Saga": { "U": "Recently added ↓", "D": "·", "L": "Example Show", "R": "·" }
     },
     "search": {
+      "0": { "U": "w", "D": "Space", "L": "9", "R": "æ" },
+      "1": { "U": "n", "D": "Space", "L": "·", "R": "2" },
+      "2": { "U": "o", "D": "Space", "L": "1", "R": "3" },
+      "3": { "U": "p", "D": "Space", "L": "2", "R": "4" },
+      "4": { "U": "q", "D": "Space", "L": "3", "R": "5" },
+      "5": { "U": "r", "D": "Space", "L": "4", "R": "6" },
+      "6": { "U": "s", "D": "Space", "L": "5", "R": "7" },
+      "7": { "U": "t", "D": "Space", "L": "6", "R": "8" },
+      "8": { "U": "u", "D": "Space", "L": "7", "R": "9" },
+      "9": { "U": "v", "D": "Space", "L": "8", "R": "0" },
       "Search your library…": { "U": "Search", "D": "a", "L": "·", "R": "·" },
       "a": { "U": "Search your library…", "D": "n", "L": "·", "R": "b" },
       "b": { "U": "Search your library…", "D": "o", "L": "a", "R": "c" },
@@ -583,12 +606,15 @@
       "x": { "U": "k", "D": "æ", "L": "w", "R": "y" },
       "y": { "U": "l", "D": "ø", "L": "x", "R": "z" },
       "z": { "U": "m", "D": "å", "L": "y", "R": "·" },
-      "Space": { "U": "1", "D": "Example Show", "L": "·", "R": "Delete a letter" },
-      "Delete a letter": { "U": "3", "D": "Example Show", "L": "Space", "R": "Clear" },
-      "Clear": { "U": "7", "D": "Example Show", "L": "Delete a letter", "R": "8" },
-      "Example Show": { "U": "8", "D": "·", "L": "·", "R": "Example Film" },
-      "Example Film": { "U": "8", "D": "·", "L": "Example Show", "R": "Example Saga" },
-      "Example Saga": { "U": "8", "D": "·", "L": "Example Film", "R": "·" }
+      "æ": { "U": "x", "D": "Space", "L": "0", "R": "ø" },
+      "ø": { "U": "y", "D": "Space", "L": "æ", "R": "å" },
+      "å": { "U": "z", "D": "Space", "L": "ø", "R": "·" },
+      "Space": { "U": "å", "D": "Example Show", "L": "·", "R": "Delete a letter" },
+      "Delete a letter": { "U": "å", "D": "Example Show", "L": "Space", "R": "Clear" },
+      "Clear": { "U": "å", "D": "Example Show", "L": "Delete a letter", "R": "·" },
+      "Example Show": { "U": "Space", "D": "·", "L": "·", "R": "Example Film" },
+      "Example Film": { "U": "Space", "D": "·", "L": "Example Show", "R": "Example Saga" },
+      "Example Saga": { "U": "Space", "D": "·", "L": "Example Film", "R": "·" }
     },
     "detail-movie": {
       "← Back": { "U": "Home", "D": "▶ Play", "L": "·", "R": "·" },
@@ -659,7 +685,7 @@
       "Playback": { "U": "Library #2", "D": "Picture & sound", "L": "·", "R": "Add movies folder" },
       "Remove #1": { "U": "Settings", "D": "Remove #2", "L": "Library #2", "R": "·" },
       "Picture & sound": { "U": "Playback", "D": "Language & subtitles", "L": "·", "R": "Add movies folder" },
-      "Remove #2": { "U": "Remove #1", "D": "Scan now", "L": "Library #2", "R": "·" },
+      "Remove #2": { "U": "Remove #1", "D": "Add movies folder", "L": "Library #2", "R": "·" },
       "Language & subtitles": { "U": "Picture & sound", "D": "Skipping intros", "L": "·", "R": "Add movies folder" },
       "Add movies folder": { "U": "Remove #2", "D": "Nothing to review", "L": "Library #2", "R": "Add TV folder" },
       "Add TV folder": { "U": "Remove #2", "D": "Nothing to review", "L": "Add movies folder", "R": "Add Videos folder" },
@@ -694,15 +720,15 @@
       "Every device that can": { "U": "Settings", "D": "✓Linux default", "L": "✓Off #1", "R": "Only these" },
       "Only these": { "U": "Settings", "D": "✓Linux default", "L": "Every device that can", "R": "·" },
       "✓Linux default": { "U": "✓Off #1", "D": "Sound 10 ms earlier", "L": "Picture & sound", "R": "Mock AV receiver (HDMI)" },
-      "Mock AV receiver (HDMI)": { "U": "✓Off #1", "D": "Sound 10 ms later", "L": "✓Linux default", "R": "Mock onboard speakers" },
-      "Mock onboard speakers": { "U": "✓Off #1", "D": "No delay", "L": "Mock AV receiver (HDMI)", "R": "·" },
+      "Mock AV receiver (HDMI)": { "U": "✓Off #1", "D": "Sound 10 ms earlier", "L": "✓Linux default", "R": "Mock onboard speakers" },
+      "Mock onboard speakers": { "U": "✓Off #1", "D": "Sound 10 ms earlier", "L": "Mock AV receiver (HDMI)", "R": "·" },
       "Sound 10 ms earlier": { "U": "✓Linux default", "D": "✓Off #2", "L": "Picture & sound", "R": "Sound 10 ms later" },
       "Sound 10 ms later": { "U": "✓Linux default", "D": "✓Off #2", "L": "Sound 10 ms earlier", "R": "No delay" },
       "No delay": { "U": "✓Linux default", "D": "✓Off #2", "L": "Sound 10 ms later", "R": "·" },
       "✓Off #2": { "U": "Sound 10 ms earlier", "D": "✓Off #3", "L": "Picture & sound", "R": "A little" },
       "A little": { "U": "Sound 10 ms earlier", "D": "✓Off #3", "L": "✓Off #2", "R": "More" },
-      "More": { "U": "Sound 10 ms later", "D": "✓Off #3", "L": "A little", "R": "Most" },
-      "Most": { "U": "Sound 10 ms later", "D": "✓Off #3", "L": "More", "R": "·" },
+      "More": { "U": "Sound 10 ms earlier", "D": "✓Off #3", "L": "A little", "R": "Most" },
+      "Most": { "U": "Sound 10 ms earlier", "D": "✓Off #3", "L": "More", "R": "·" },
       "✓Off #3": { "U": "✓Off #2", "D": "Check again", "L": "Picture & sound", "R": "On" },
       "On": { "U": "✓Off #2", "D": "Check again", "L": "✓Off #3", "R": "·" },
       "Check again": { "U": "✓Off #3", "D": "·", "L": "Picture & sound", "R": "·" }
@@ -735,10 +761,10 @@
       "Off": { "U": "Settings", "D": "Clear artwork cache", "L": "✓On", "R": "·" },
       "Clear artwork cache": { "U": "✓On", "D": "Write the missing ones", "L": "Advanced", "R": "·" },
       "Write the missing ones": { "U": "Clear artwork cache", "D": "Save the library to a file…", "L": "Advanced", "R": "Replace every one" },
-      "Replace every one": { "U": "Clear artwork cache", "D": "Take a library in…", "L": "Write the missing ones", "R": "·" },
+      "Replace every one": { "U": "Clear artwork cache", "D": "Save the library to a file…", "L": "Write the missing ones", "R": "·" },
       "Save the library to a file…": { "U": "Write the missing ones", "D": "Restore #1", "L": "Advanced", "R": "Take a library in…" },
-      "Take a library in…": { "U": "Replace every one", "D": "Restore #1", "L": "Save the library to a file…", "R": "·" },
-      "Restore #1": { "U": "Take a library in…", "D": "Restore #2", "L": "Advanced", "R": "·" },
+      "Take a library in…": { "U": "Write the missing ones", "D": "Restore #1", "L": "Save the library to a file…", "R": "·" },
+      "Restore #1": { "U": "Save the library to a file…", "D": "Restore #2", "L": "Advanced", "R": "·" },
       "Restore #2": { "U": "Restore #1", "D": "Open the folder of copies", "L": "Advanced", "R": "·" },
       "Open the folder of copies": { "U": "Restore #2", "D": "Show developer tools", "L": "Advanced", "R": "·" },
       "Show developer tools": { "U": "Open the folder of copies", "D": "From simkl.com/settings/developer", "L": "Advanced", "R": "Send a report" },
@@ -755,12 +781,12 @@
     },
     "settings-review-item": {
       "Search for the right title…": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Name", "L": "Library #2", "R": "Movie" },
-      "Movie": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Year", "L": "Search for the right title…", "R": "Search #2" },
-      "Search #2": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Year", "L": "Movie", "R": "Ignore these" },
-      "Ignore these": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Add without a match", "L": "Search #2", "R": "·" },
+      "Movie": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Name", "L": "Search for the right title…", "R": "Search #2" },
+      "Search #2": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Name", "L": "Movie", "R": "Ignore these" },
+      "Ignore these": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Name", "L": "Search #2", "R": "·" },
       "Name": { "U": "Search for the right title…", "D": "Sample Series · 2 files · seriesKinema could not i", "L": "Library #2", "R": "Year" },
       "Year": { "U": "Search for the right title…", "D": "Sample Series · 2 files · seriesKinema could not i", "L": "Name", "R": "Add without a match" },
-      "Add without a match": { "U": "Ignore these", "D": "Sample Series · 2 files · seriesKinema could not i", "L": "Year", "R": "·" }
+      "Add without a match": { "U": "Search for the right title…", "D": "Sample Series · 2 files · seriesKinema could not i", "L": "Year", "R": "·" }
     },
     "leave": {
       "Close Kinema": { "U": "Cancel", "D": "Put the PC to sleep", "L": "·", "R": "·" },
@@ -810,10 +836,10 @@
     },
     "first-run": {
       "✓A TV, from the sofa": { "U": "·", "D": "Add movies folder", "L": "·", "R": "A desk" },
-      "A desk": { "U": "·", "D": "Add TV folder", "L": "✓A TV, from the sofa", "R": "·" },
+      "A desk": { "U": "·", "D": "Add movies folder", "L": "✓A TV, from the sofa", "R": "·" },
       "Add movies folder": { "U": "✓A TV, from the sofa", "D": "Remove C:\\fixture", "L": "·", "R": "Add TV folder" },
       "Add TV folder": { "U": "✓A TV, from the sofa", "D": "Remove C:\\fixture", "L": "Add movies folder", "R": "·" },
-      "Remove C:\\fixture": { "U": "Add TV folder", "D": "Get a free key ↗", "L": "·", "R": "·" },
+      "Remove C:\\fixture": { "U": "Add movies folder", "D": "Get a free key ↗", "L": "·", "R": "·" },
       "Get a free key ↗": { "U": "Remove C:\\fixture", "D": "TMDB API key", "L": "·", "R": "·" },
       "TMDB API key": { "U": "Get a free key ↗", "D": "Save key", "L": "·", "R": "·" },
       "Save key": { "U": "TMDB API key", "D": "Scan my library", "L": "·", "R": "·" },
@@ -850,7 +876,7 @@
       "Home videos": { "U": "Library", "D": "Library folders", "L": "·", "R": "Playlists" },
       "Playlists": { "U": "Library", "D": "Library folders", "L": "Home videos", "R": "Folders" },
       "Folders": { "U": "Library", "D": "Library folders", "L": "Playlists", "R": "·" },
-      "Library folders": { "U": "Home videos", "D": "·", "L": "·", "R": "Playlists" }
+      "Library folders": { "U": "Folders", "D": "·", "L": "·", "R": "·" }
     },
     "videos": {
       "← Back": { "U": "Library", "D": "▶ Play all #1", "L": "·", "R": "·" },
@@ -881,7 +907,7 @@
       "Garden.movPlay": { "U": "Birthday.mp4Play", "D": "·", "L": "·", "R": "·" }
     },
     "playlists": {
-      "← Back": { "U": "Library", "D": "Evening", "L": "·", "R": "Import .m3u…" },
+      "← Back": { "U": "Library", "D": "Evening", "L": "·", "R": "·" },
       "Evening": { "U": "← Back", "D": "+ New playlist", "L": "·", "R": "·" },
       "+ New playlist": { "U": "Evening", "D": "·", "L": "·", "R": "Import .m3u…" },
       "Import .m3u…": { "U": "Evening", "D": "·", "L": "+ New playlist", "R": "·" }
@@ -1031,6 +1057,16 @@
       "Example Saga": { "U": "Recently added ↓", "D": "·", "L": "Example Show", "R": "·" }
     },
     "search": {
+      "0": { "U": "w", "D": "Space", "L": "9", "R": "æ" },
+      "1": { "U": "n", "D": "Space", "L": "·", "R": "2" },
+      "2": { "U": "o", "D": "Space", "L": "1", "R": "3" },
+      "3": { "U": "p", "D": "Space", "L": "2", "R": "4" },
+      "4": { "U": "q", "D": "Space", "L": "3", "R": "5" },
+      "5": { "U": "r", "D": "Space", "L": "4", "R": "6" },
+      "6": { "U": "s", "D": "Space", "L": "5", "R": "7" },
+      "7": { "U": "t", "D": "Space", "L": "6", "R": "8" },
+      "8": { "U": "u", "D": "Space", "L": "7", "R": "9" },
+      "9": { "U": "v", "D": "Space", "L": "8", "R": "0" },
       "Search your library…": { "U": "Search", "D": "a", "L": "·", "R": "·" },
       "a": { "U": "Search your library…", "D": "n", "L": "·", "R": "b" },
       "b": { "U": "Search your library…", "D": "o", "L": "a", "R": "c" },
@@ -1058,12 +1094,15 @@
       "x": { "U": "k", "D": "æ", "L": "w", "R": "y" },
       "y": { "U": "l", "D": "ø", "L": "x", "R": "z" },
       "z": { "U": "m", "D": "å", "L": "y", "R": "·" },
-      "Space": { "U": "1", "D": "Example Show", "L": "·", "R": "Delete a letter" },
-      "Delete a letter": { "U": "3", "D": "Example Show", "L": "Space", "R": "Clear" },
-      "Clear": { "U": "7", "D": "Example Show", "L": "Delete a letter", "R": "8" },
-      "Example Show": { "U": "8", "D": "·", "L": "·", "R": "Example Film" },
-      "Example Film": { "U": "8", "D": "·", "L": "Example Show", "R": "Example Saga" },
-      "Example Saga": { "U": "8", "D": "·", "L": "Example Film", "R": "·" }
+      "æ": { "U": "x", "D": "Space", "L": "0", "R": "ø" },
+      "ø": { "U": "y", "D": "Space", "L": "æ", "R": "å" },
+      "å": { "U": "z", "D": "Space", "L": "ø", "R": "·" },
+      "Space": { "U": "å", "D": "Example Show", "L": "·", "R": "Delete a letter" },
+      "Delete a letter": { "U": "å", "D": "Example Show", "L": "Space", "R": "Clear" },
+      "Clear": { "U": "å", "D": "Example Show", "L": "Delete a letter", "R": "·" },
+      "Example Show": { "U": "Space", "D": "·", "L": "·", "R": "Example Film" },
+      "Example Film": { "U": "Space", "D": "·", "L": "Example Show", "R": "Example Saga" },
+      "Example Saga": { "U": "Space", "D": "·", "L": "Example Film", "R": "·" }
     },
     "detail-movie": {
       "← Back": { "U": "Home", "D": "▶ Play", "L": "·", "R": "·" },
@@ -1134,7 +1173,7 @@
       "Playback": { "U": "Library #2", "D": "Picture & sound", "L": "·", "R": "Add movies folder" },
       "Remove #1": { "U": "Settings", "D": "Remove #2", "L": "Library #2", "R": "·" },
       "Picture & sound": { "U": "Playback", "D": "Language & subtitles", "L": "·", "R": "Add movies folder" },
-      "Remove #2": { "U": "Remove #1", "D": "Scan now", "L": "Library #2", "R": "·" },
+      "Remove #2": { "U": "Remove #1", "D": "Add movies folder", "L": "Library #2", "R": "·" },
       "Language & subtitles": { "U": "Picture & sound", "D": "Skipping intros", "L": "·", "R": "Add movies folder" },
       "Add movies folder": { "U": "Remove #2", "D": "Nothing to review", "L": "Library #2", "R": "Add TV folder" },
       "Add TV folder": { "U": "Remove #2", "D": "Nothing to review", "L": "Add movies folder", "R": "Add Videos folder" },
@@ -1187,8 +1226,8 @@
       "Clear artwork cache": { "U": "✓On", "D": "Write the missing ones", "L": "Advanced", "R": "·" },
       "Write the missing ones": { "U": "Clear artwork cache", "D": "Restore #1", "L": "Advanced", "R": "Replace every one" },
       "Replace every one": { "U": "Clear artwork cache", "D": "Restore #1", "L": "Write the missing ones", "R": "·" },
-      "Restore #1": { "U": "Replace every one", "D": "Restore #2", "L": "Advanced", "R": "·" },
-      "Restore #2": { "U": "Restore #1", "D": "Share the log", "L": "Advanced", "R": "·" },
+      "Restore #1": { "U": "Write the missing ones", "D": "Restore #2", "L": "Advanced", "R": "·" },
+      "Restore #2": { "U": "Restore #1", "D": "Show developer tools", "L": "Advanced", "R": "·" },
       "Show developer tools": { "U": "Restore #2", "D": "From simkl.com/settings/developer", "L": "Advanced", "R": "Share the log" },
       "Share the log": { "U": "Restore #2", "D": "From simkl.com/settings/developer", "L": "Show developer tools", "R": "·" },
       "From simkl.com/settings/developer": { "U": "Show developer tools", "D": "From app.trakt.tv/settings/apps", "L": "Advanced", "R": "·" },
@@ -1202,12 +1241,12 @@
     },
     "settings-review-item": {
       "Search for the right title…": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Name", "L": "Library #2", "R": "Movie" },
-      "Movie": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Year", "L": "Search for the right title…", "R": "Search #2" },
-      "Search #2": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Year", "L": "Movie", "R": "Ignore these" },
-      "Ignore these": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Add without a match", "L": "Search #2", "R": "·" },
+      "Movie": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Name", "L": "Search for the right title…", "R": "Search #2" },
+      "Search #2": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Name", "L": "Movie", "R": "Ignore these" },
+      "Ignore these": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Name", "L": "Search #2", "R": "·" },
       "Name": { "U": "Search for the right title…", "D": "Sample Series · 2 files · seriesKinema could not i", "L": "Library #2", "R": "Year" },
       "Year": { "U": "Search for the right title…", "D": "Sample Series · 2 files · seriesKinema could not i", "L": "Name", "R": "Add without a match" },
-      "Add without a match": { "U": "Ignore these", "D": "Sample Series · 2 files · seriesKinema could not i", "L": "Year", "R": "·" }
+      "Add without a match": { "U": "Search for the right title…", "D": "Sample Series · 2 files · seriesKinema could not i", "L": "Year", "R": "·" }
     },
     "leave": {
       "Close Kinema": { "U": "Cancel", "D": "Cancel", "L": "·", "R": "·" },
@@ -1237,15 +1276,11 @@
       "Add to a playlist ›": { "U": "Playback details ›", "D": "close", "L": "·", "R": "·" }
     },
     "first-run-folders": {
+      "KinemaHomeMoviesTV showsLibrarySearchSettings?Welc": { "U": "·", "D": "·", "L": "·", "R": "·" },
       "Cancel": { "U": "·", "D": "USB driveUSB drive or card", "L": "·", "R": "·" },
-      "Add movies folder": { "U": "·", "D": "Get a free key ↗", "L": "·", "R": "Add TV folder" },
-      "Add TV folder": { "U": "·", "D": "Get a free key ↗", "L": "Add movies folder", "R": "·" },
       "USB driveUSB drive or card": { "U": "Cancel", "D": "Internal shared storageThis device", "L": "·", "R": "·" },
       "Internal shared storageThis device": { "U": "USB driveUSB drive or card", "D": "Network drivesA NAS, or a folder shared by a compu", "L": "·", "R": "·" },
       "Network drivesA NAS, or a folder shared by a compu": { "U": "Internal shared storageThis device", "D": "Allow all files", "L": "·", "R": "·" },
-      "Get a free key ↗": { "U": "Add movies folder", "D": "TMDB API key", "L": "·", "R": "·" },
-      "TMDB API key": { "U": "Get a free key ↗", "D": "Save key", "L": "·", "R": "·" },
-      "Save key": { "U": "TMDB API key", "D": "·", "L": "·", "R": "·" },
       "Allow all files": { "U": "Network drivesA NAS, or a folder shared by a compu", "D": "·", "L": "·", "R": "·" }
     },
     "first-run": {
@@ -1259,7 +1294,7 @@
       "Home videos": { "U": "Library", "D": "Library folders", "L": "·", "R": "Playlists" },
       "Playlists": { "U": "Library", "D": "Library folders", "L": "Home videos", "R": "Folders" },
       "Folders": { "U": "Library", "D": "Library folders", "L": "Playlists", "R": "·" },
-      "Library folders": { "U": "Home videos", "D": "·", "L": "·", "R": "Playlists" }
+      "Library folders": { "U": "Folders", "D": "·", "L": "·", "R": "·" }
     },
     "videos": {
       "← Back": { "U": "Library", "D": "▶ Play all #1", "L": "·", "R": "·" },

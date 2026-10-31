@@ -7,9 +7,10 @@
  * they are. Inline rather than a dialog, so the remote stays inside the page's
  * focus tree, and the focus starts on the button that does it.
  */
-import { useEffect } from 'react';
-import { setFocus } from '@noriginmedia/norigin-spatial-navigation';
+import { useLayoutEffect } from 'react';
+import { focusTo } from './focus';
 import FocusButton from './FocusButton';
+import FocusGroup from './FocusGroup';
 import { count } from './format';
 import type { LibraryKind, LibraryRoot } from '../library/api';
 
@@ -30,8 +31,8 @@ interface Props {
 export default function MergeOffer({ offer, onMerge, onCancel }: Props) {
   // The ring is on the button that opened the folder browser when this appears,
   // so it is moved here, to the button that merges.
-  useEffect(() => {
-    void setFocus('merge-offer-yes');
+  useLayoutEffect(() => {
+    focusTo('merge-offer-yes');
   }, []);
   return (
     <div className="settings-update merge-offer" role="group" aria-label="Merge library folders">
@@ -47,7 +48,7 @@ export default function MergeOffer({ offer, onMerge, onCancel }: Props) {
         ))}
       </ul>
       <p>Merge them into it? Their films and shows, matches and what you have watched are kept.</p>
-      <div className="settings-row">
+      <FocusGroup kind="row" className="settings-row">
         <FocusButton
           focusKey="merge-offer-yes"
           keepInView="nearest"
@@ -59,7 +60,7 @@ export default function MergeOffer({ offer, onMerge, onCancel }: Props) {
         <FocusButton keepInView="nearest" className="btn-secondary" onSelect={onCancel}>
           Not now
         </FocusButton>
-      </div>
+      </FocusGroup>
     </div>
   );
 }

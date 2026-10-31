@@ -16,9 +16,9 @@
  * how wide the words are drawn, which differs with the system's font — Linux
  * and Windows went to different choices from the same place.
  */
-import { FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { useId, type ReactNode } from 'react';
 import FocusButton from './FocusButton';
+import { FocusProvider } from './FocusGroup';
 import { useFocusGroup } from './focusGroups';
 
 export interface Choice<V extends string> {
@@ -77,7 +77,7 @@ function ChoiceOptions<V extends string>({
     stopAt: ['right'],
   });
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <div
         className="choice-options"
         role="radiogroup"
@@ -91,7 +91,7 @@ function ChoiceOptions<V extends string>({
             key={choice.value}
             focusKey={keyOf(choice.value)}
             className={`choice ${choice.value === value ? 'chosen' : ''}`}
-            keepInView="nearest"
+           
             onSelect={() => onChange(choice.value)}
           >
             {choice.value === value && <span className="choice-tick">✓</span>}
@@ -99,6 +99,6 @@ function ChoiceOptions<V extends string>({
           </FocusButton>
         ))}
       </div>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }

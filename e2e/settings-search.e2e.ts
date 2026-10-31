@@ -4,13 +4,7 @@
  * ring on that very setting.
  */
 import { expect, test, type Page } from '@playwright/test';
-
-async function press(page: Page, key: string, times = 1): Promise<void> {
-  for (let i = 0; i < times; i++) {
-    await page.keyboard.press(key);
-    await page.waitForTimeout(150);
-  }
-}
+import { press } from './kb';
 
 function focused(page: Page): Promise<string | undefined> {
   return page.evaluate(() => {

@@ -5,7 +5,6 @@
  * list — an empty genre produces no rail at all, so a small library looks
  * deliberate instead of full of empty shelves.
  */
-import { FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { useMemo, useState } from 'react';
 import Art from './Art';
 import { drawnStyle } from './drawnColour';
@@ -18,10 +17,9 @@ import SetupPages from './SetupPages';
 import HomeNotices from './HomeNotices';
 import type { ScanTrouble } from './scanTrouble';
 import type { Upgrade } from './qualityNotice';
-import { useClaimFocus } from './focus';
 import { FocusScreen } from './focusEngine';
 import { useLanding } from './focusStore';
-import { FocusProvider } from './FocusGroup';
+import FocusGroup, { FocusProvider } from './FocusGroup';
 import { useFocusGroup, useNavGroup } from './focusGroups';
 import { count } from './format';
 import type { ContinueItem } from '../player/api';
@@ -111,7 +109,13 @@ export default function Home(props: Props) {
 
   // Until finished or left, however soon the first scan fills the library
   // behind them: titles arriving must not take the questions away mid-answer.
-  if (setupOpen) return <SetupPages onClose={onSetupClosed} />;
+  if (setupOpen) {
+    return (
+      <FocusScreen key="setup">
+        <SetupPages onClose={onSetupClosed} />
+      </FocusScreen>
+    );
+  }
 
   // An empty library is a first run far more often than it is a mistake, so it
   // gets the setup panel rather than a sentence pointing at Settings. It also
@@ -141,21 +145,27 @@ export default function Home(props: Props) {
     // matched by itself was added.
     if (folders.count > 0) {
       return (
-        <NothingNamed
-          files={folders.files}
-          reviewCount={reviewCount}
-          onReview={onReview}
-          onAddFolder={onAddFolder}
-        />
+        <FocusScreen key="nothing-named">
+          <NothingNamed
+            files={folders.files}
+            reviewCount={reviewCount}
+            onReview={onReview}
+            onAddFolder={onAddFolder}
+          />
+        </FocusScreen>
       );
     }
-    return <FirstRun onScan={onFirstScan} />;
+    return (
+      <FocusScreen key="first-run">
+        <FirstRun onScan={onFirstScan} />
+      </FocusScreen>
+    );
   }
 
-  // Home itself is on Kinema's own engine (focusEngine.tsx, round 7); the
-  // pages that stand in for it above are still on the spatial library.
+  // Home itself and the pages that stand in for it above are on Kinema's own
+  // engine (focusEngine.tsx, round 7).
   return (
-    <FocusScreen>
+    <FocusScreen key="home">
       <HomeRows {...props} />
     </FocusScreen>
   );
@@ -176,14 +186,13 @@ function NothingNamed({
   onReview: () => void;
   onAddFolder?: () => void;
 }) {
-  const { ref, focusKey } = useFocusGroup('panel', { focusKey: NOTHING_NAMED_FOCUS_KEY });
-  useClaimFocus(NOTHING_NAMED_FOCUS_KEY, true, true);
+  const { ref, focusKey } = useNavGroup({ kind: 'column' }, { focusKey: NOTHING_NAMED_FOCUS_KEY });
   // The count of files to review comes after Home is up: the ring, already on
   // Add another folder, moves to Review them when it appears, unless a key was
   // pressed meanwhile.
-  useClaimFocus(NOTHING_NAMED_REVIEW_KEY, reviewCount > 0, true);
+  useLanding(reviewCount > 0 ? NOTHING_NAMED_REVIEW_KEY : NOTHING_NAMED_FOCUS_KEY);
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <section className="first-run first-scan nothing-named" ref={ref}>
         {files > 0 ? (
           <>
@@ -205,7 +214,7 @@ function NothingNamed({
             </p>
           </>
         )}
-        <div className="settings-row">
+        <FocusGroup kind="row" className="settings-row">
           {reviewCount > 0 && (
             <FocusButton
               focusKey={NOTHING_NAMED_REVIEW_KEY}
@@ -225,9 +234,9 @@ function NothingNamed({
               Add another folder
             </FocusButton>
           )}
-        </div>
+        </FocusGroup>
       </section>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }
 

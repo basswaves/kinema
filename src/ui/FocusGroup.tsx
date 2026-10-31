@@ -33,6 +33,8 @@ interface Props {
   wrap?: Wrap;
   stopAt?: Direction[];
   axis?: 'x' | 'y';
+  pageTop?: boolean;
+  passOver?: Direction[];
   className?: string;
   role?: string;
   'aria-label'?: string;

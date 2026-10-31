@@ -7,13 +7,13 @@
  * library without it, no 1950s without a film from then — so every press
  * shows something, and nothing here can promise what no file holds.
  */
-import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { useMemo, useState } from 'react';
 import CardGrid from './CardGrid';
 import ConfirmButton from './ConfirmButton';
 import FocusButton from './FocusButton';
-import FocusGroup from './FocusGroup';
-import { useClaimFocus } from './focus';
+import FocusGroup, { FocusProvider } from './FocusGroup';
+import { useNavGroup } from './focusGroups';
+import { useLanding } from './focusStore';
 import { parseGenres, type Title } from './api';
 import {
   deleteCollection,
@@ -46,11 +46,9 @@ interface Props {
 }
 
 export default function CollectionPage({ titles, id, kind, onSelect, onBack, onSaved }: Props) {
-  const { ref, focusKey } = useFocusable({
-    focusKey: COLLECTION_FOCUS_KEY,
-    trackChildren: true,
-    saveLastFocusedChild: true,
-  });
+  // A column on Kinema's own engine (round 7): the heading row, the rows
+  // of choices, then the titles.
+  const { ref, focusKey } = useNavGroup({ kind: 'column' }, { focusKey: COLLECTION_FOCUS_KEY });
   const traits = useTitleTraits(titles);
   const saved = useSavedCollections();
   const kept = id ? saved.find((c) => c.id === id) : undefined;
@@ -89,7 +87,7 @@ export default function CollectionPage({ titles, id, kind, onSelect, onBack, onS
 
   // Land on the first choice: a page opened to be chosen in.
   const first = present.traits[0] ? `collection-trait:${present.traits[0]}` : 'collection-unwatched';
-  useClaimFocus(first, true, true);
+  useLanding(first);
 
   // A kept collection deleted from another place, or not read yet.
   if (id && !kept) {
@@ -105,7 +103,6 @@ export default function CollectionPage({ titles, id, kind, onSelect, onBack, onS
       key={key}
       focusKey={key}
       className={`choice ${chosen ? 'chosen' : ''}`}
-      keepInView="nearest"
       onSelect={onSelect}
     >
       {chosen ? '✓ ' : ''}
@@ -114,10 +111,10 @@ export default function CollectionPage({ titles, id, kind, onSelect, onBack, onS
   );
 
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <div className="search collection-page" ref={ref}>
-        <div className="grid-head">
-          <FocusButton className="back-button" keepInView="page-top" onSelect={onBack}>
+        <FocusGroup kind="row" className="grid-head">
+          <FocusButton className="back-button" onSelect={onBack}>
             ← Back
           </FocusButton>
           <h2 className="grid-heading">
@@ -127,7 +124,6 @@ export default function CollectionPage({ titles, id, kind, onSelect, onBack, onS
             <FocusButton
               focusKey="collection-save"
               className="btn-primary"
-              keepInView="page-top"
               disabled={ruleIsEmpty(rule)}
               onSelect={() => onSaved(saveCollection(rule))}
             >
@@ -138,7 +134,6 @@ export default function CollectionPage({ titles, id, kind, onSelect, onBack, onS
             <ConfirmButton
               focusKey="collection-delete"
               className="btn-secondary"
-              keepInView="page-top"
               confirmLabel="Delete this collection"
               onConfirm={() => {
                 deleteCollection(id);
@@ -148,7 +143,7 @@ export default function CollectionPage({ titles, id, kind, onSelect, onBack, onS
               Delete
             </ConfirmButton>
           )}
-        </div>
+        </FocusGroup>
         {!id && (
           <p className="muted collection-hint">
             {ruleIsEmpty(rule) ? 'Choose what the titles have in common.' : ruleName(rule)}
@@ -199,6 +194,6 @@ export default function CollectionPage({ titles, id, kind, onSelect, onBack, onS
         {shown.length === 0 && <p className="muted">Nothing in the library fits all of these.</p>}
         <CardGrid name="grid" entries={entries} onSelect={onSelect} fromAboveFirst />
       </div>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }

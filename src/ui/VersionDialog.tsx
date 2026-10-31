@@ -3,16 +3,13 @@
  * episode in Kinema's words, the one Play means marked. Choosing one makes it
  * Play's, remembered for the title.
  *
- * A menu like Play something: focus never leaves it, Back closes it and the
- * ring goes back to the Version button.
+ * A menu like Play something: the ring starts on the version Play means and
+ * never leaves it, Back closes it and the ring goes back to the Version
+ * button — a dialog on Kinema's engine does both by itself (focusStore.ts).
  */
-import { useCallback, useEffect, useRef } from 'react';
-import {
-  FocusContext,
-  getCurrentFocusKey,
-  setFocus,
-} from '@noriginmedia/norigin-spatial-navigation';
+import { useEffect } from 'react';
 import { useFocusGroup } from './focusGroups';
+import { FocusProvider } from './FocusGroup';
 import FocusButton from './FocusButton';
 import type { Version } from '../library/versions';
 
@@ -27,20 +24,8 @@ interface Props {
 }
 
 export default function VersionDialog({ what, versions, current, onChoose, onClose }: Props) {
-  const { ref, focusKey } = useFocusGroup('menu');
-
-  const returnTo = useRef<string | null>(null);
-  useEffect(() => {
-    returnTo.current = getCurrentFocusKey();
-    void setFocus(versionKey(current));
-    // Only on opening: the ring starts on the version Play means.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const close = useCallback(() => {
-    if (returnTo.current) void setFocus(returnTo.current);
-    onClose();
-  }, [onClose]);
+  const { ref, focusKey } = useFocusGroup('menu', { current: versionKey(current) });
+  const close = onClose;
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -55,7 +40,7 @@ export default function VersionDialog({ what, versions, current, onChoose, onClo
   }, [close]);
 
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <div className="leave-backdrop" onClick={close}>
         <div
           className="leave versions"
@@ -84,6 +69,6 @@ export default function VersionDialog({ what, versions, current, onChoose, onClo
           </div>
         </div>
       </div>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }

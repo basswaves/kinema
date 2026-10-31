@@ -4,12 +4,13 @@
  * TMDB's person id, never by name. On a desktop, a link to their IMDb page;
  * a TV with no window has no browser to open it in.
  */
-import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
 import { useEffect, useMemo, useState } from 'react';
 import Art from './Art';
 import CardGrid from './CardGrid';
 import FocusButton from './FocusButton';
-import { useClaimFocus } from './focus';
+import FocusGroup, { FocusProvider } from './FocusGroup';
+import { useNavGroup } from './focusGroups';
+import { useLanding } from './focusStore';
 import { openLink } from './links';
 import { alwaysTv } from './tv';
 import type { Title } from './api';
@@ -28,11 +29,8 @@ interface Props {
 }
 
 export default function PersonPage({ personId, name, titles, onSelect, onBack }: Props) {
-  const { ref, focusKey } = useFocusable({
-    focusKey: PERSON_FOCUS_KEY,
-    trackChildren: true,
-    saveLastFocusedChild: true,
-  });
+  // A column on Kinema's own engine (round 7): Back, IMDb, then the grid.
+  const { ref, focusKey } = useNavGroup({ kind: 'column' }, { focusKey: PERSON_FOCUS_KEY });
   const [person, setPerson] = useState<Person | null>(null);
   const [asked, setAsked] = useState(false);
 
@@ -54,23 +52,17 @@ export default function PersonPage({ personId, name, titles, onSelect, onBack }:
     });
   }, [person, titles]);
 
-  // Lands on the first title once they are known, else on Back.
-  const first = entries[0] ? `grid:${entries[0].title.id}` : PERSON_BACK_KEY;
-  useClaimFocus(first, person !== null || asked, true);
+  // Back while the person is read, then the first title once they are known.
+  useLanding(entries[0] ? `grid:${entries[0].title.id}` : PERSON_BACK_KEY);
 
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <div className="search person-page" ref={ref}>
-        <div className="grid-head">
-          <FocusButton
-            focusKey={PERSON_BACK_KEY}
-            className="back-button"
-            keepInView="page-top"
-            onSelect={onBack}
-          >
+        <FocusGroup kind="row" className="grid-head">
+          <FocusButton focusKey={PERSON_BACK_KEY} className="back-button" onSelect={onBack}>
             ← Back
           </FocusButton>
-        </div>
+        </FocusGroup>
         <div className="person-head">
           <div className="person-photo">
             <Art
@@ -85,7 +77,6 @@ export default function PersonPage({ personId, name, titles, onSelect, onBack }:
             {person?.imdb_id && !alwaysTv() && (
               <FocusButton
                 className="btn-secondary"
-                keepInView="page-top"
                 onSelect={() => void openLink(`https://www.imdb.com/name/${person.imdb_id as string}/`)}
               >
                 IMDb · opens in your browser ↗
@@ -101,6 +92,6 @@ export default function PersonPage({ personId, name, titles, onSelect, onBack }:
         )}
         <CardGrid name="grid" entries={entries} onSelect={onSelect} fromAboveFirst />
       </div>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }

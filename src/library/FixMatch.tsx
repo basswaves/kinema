@@ -20,6 +20,8 @@ import { setFocus, useFocusable } from '@noriginmedia/norigin-spatial-navigation
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import FocusButton from '../ui/FocusButton';
 import FocusInput from '../ui/FocusInput';
+import FocusGroup from '../ui/FocusGroup';
+import { useOnKinema } from '../ui/focusStore';
 import { keepOnScreen } from '../ui/focus';
 import { openLink } from '../ui/links';
 import { addWithoutMatch, findLocalPictures, listNeedsReview } from '../metadata/api';
@@ -481,6 +483,21 @@ function GroupRow({
  * attention and the title page's "Wrong title?" (WrongTitle.tsx), so both
  * follow the same rule: nothing is linked but the entry a person picks.
  */
+/**
+ * The search box and its buttons. On Kinema's engine (Wrong title?, a menu)
+ * a row: Right from the box is Movie / TV series, Down the results. Needs
+ * attention is still on the spatial library (round 7, F3).
+ */
+function SearchRow({ children }: { children: ReactNode }) {
+  return useOnKinema() ? (
+    <FocusGroup kind="row" className="fixmatch-search">
+      {children}
+    </FocusGroup>
+  ) : (
+    <div className="fixmatch-search">{children}</div>
+  );
+}
+
 export function MatchSearch({
   initialQuery,
   isSeries,
@@ -538,7 +555,7 @@ export function MatchSearch({
 
   return (
     <>
-      <div className="fixmatch-search">
+      <SearchRow>
         <FocusInput
           focusKey={inputFocusKey}
           className="fixmatch-input"
@@ -562,7 +579,7 @@ export function MatchSearch({
           {searching ? 'Searching…' : 'Search'}
         </FocusButton>
         {extra}
-      </div>
+      </SearchRow>
 
       {searchError && <div className="fixmatch-error">{searchError}</div>}
 

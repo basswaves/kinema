@@ -4082,6 +4082,24 @@ run side by side until the last screen has moved — the library paused while a
 screen on the new one is up, a dialog still on the library taking the keys
 back while it is open.
 
+**F2 (2026-10-31): the title page and what opens from it.** First CI: the
+one flake in F1's own flow was not a race but a scroll that took seconds on a
+starved page — the spring moved at most 50 ms of its way per frame, so a
+machine giving a frame every few hundred milliseconds stretched every scroll
+(on a weak box too). It now takes the time that passed; the spring is solved
+exactly for any step. Then a title's page (Back, the buttons, seasons,
+episodes, collection, cast, file details), the actor and collection pages,
+the card menu and the dialogs opened from a title's page (Version, Poster,
+Wrong title?, playlists) moved over. Their per-page rules became the engine's:
+the order of the page's areas, kept by a hand-written resolver, is now just
+the column; "Down from Play skips the one-season row" is an area that Down
+passes over; the sticky Back's room, a constant in step with the CSS, is read
+from the page like the top bar; and a dialog is a menu that holds the ring
+and gives it back to its button, so none of them saves and restores the ring
+by hand any more. "Down at the end reads on" moved into the engine, so every
+page on it has it. The navigation map of the three title pages came out
+unchanged on both engines.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

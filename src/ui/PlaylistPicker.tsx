@@ -9,11 +9,14 @@
  * letters) rule out typing: a new playlist there is named "Playlist 2" and
  * renamed on its page.
  */
-import { FocusContext, getCurrentFocusKey, setFocus } from '@noriginmedia/norigin-spatial-navigation';
+import { getCurrentFocusKey, setFocus } from '@noriginmedia/norigin-spatial-navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import FocusButton from './FocusButton';
 import FocusInput from './FocusInput';
 import { useFocusGroup } from './focusGroups';
+import { FocusProvider } from './FocusGroup';
+import { focusTo } from './focus';
+import { useOnKinema } from './focusStore';
 import { userError } from './errors';
 import {
   addedMessage,
@@ -64,11 +67,11 @@ export function PlaylistChoices({
   const first = lists?.[0];
   useEffect(() => {
     if (lists === null) return;
-    void setFocus(first ? pickKey(first.id) : PICK_NEW_KEY);
+    focusTo(first ? pickKey(first.id) : PICK_NEW_KEY);
   }, [lists, first]);
 
   useEffect(() => {
-    if (askName) void setFocus(NAME_KEY);
+    if (askName) focusTo(NAME_KEY);
   }, [askName]);
 
   const add = (id: number, name: string) => {
@@ -154,10 +157,11 @@ export function PlaylistDialog({
   onClose: (message: string | null) => void;
 }) {
   const { ref, focusKey } = useFocusGroup('menu');
-  const returnTo = useRef<string | null>(getCurrentFocusKey());
-
-  // Focus goes back first, while the dialog is still there (docs/GOTCHAS.md,
-  // as LeaveDialog.tsx).
+  // On Kinema's engine a dialog gives the ring back by itself (focusStore.ts);
+  // on the spatial library it goes back first, while the dialog is still
+  // there (docs/GOTCHAS.md, as LeaveDialog.tsx).
+  const kinema = useOnKinema();
+  const returnTo = useRef<string | null>(kinema ? null : getCurrentFocusKey());
   const close = useCallback(
     (message: string | null) => {
       if (returnTo.current) void setFocus(returnTo.current);
@@ -182,7 +186,7 @@ export function PlaylistDialog({
   }, [close]);
 
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <div className="leave-backdrop" onClick={() => close(null)}>
         <div
           className="leave playlist-dialog"
@@ -200,6 +204,6 @@ export function PlaylistDialog({
           </div>
         </div>
       </div>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }

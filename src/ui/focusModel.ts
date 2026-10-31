@@ -53,6 +53,13 @@ export interface AreaSpec {
   /** Arrows that stop at this area's edge instead of leaving it. A menu
    *  holds all four by itself. */
   hold?: readonly Arrow[];
+  /**
+   * Arrows that pass over this area on their way from outside, to the next
+   * area along: a series of one season, whose row holds only "Mark season
+   * watched", is passed by Down from Play and reached by Up from the first
+   * episode (NAV-MAP, agreed 2026-10-11).
+   */
+  passOver?: readonly Arrow[];
 }
 
 export interface NavNode {
@@ -134,6 +141,7 @@ export function enter(tree: NavTree, key: string, memory: Memory, from?: Arrow):
   if (!node || node.disabled) return null;
   if (!node.area) return key;
   const spec = node.area;
+  if (from && spec.passOver?.includes(from)) return null;
 
   if (spec.remember) {
     const last = memory.get(key);

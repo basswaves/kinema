@@ -6,13 +6,7 @@
  * with gaps, not like a shorter season.
  */
 import { userError } from './errors';
-import {
-  useFocusable,
-  FocusContext,
-  setFocus,
-  type FocusableComponent,
-} from '@noriginmedia/norigin-spatial-navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { pageCanEmbed, playTrailer } from './trailer';
 import { useCapabilities } from '../capabilities';
 import Art from './Art';
@@ -23,7 +17,9 @@ import FocusButton from './FocusButton';
 import FocusInput from './FocusInput';
 import { findMatchForLocal, renameLocalTitle } from '../metadata/api';
 import { readLocalName } from '../library/localTitle';
-import FocusGroup from './FocusGroup';
+import FocusGroup, { FocusProvider } from './FocusGroup';
+import { useFocusLeaf, useNavGroup } from './focusGroups';
+import { navFocus, useLanding } from './focusStore';
 import MediaBadges, { BadgeRows } from './MediaBadges';
 import HeavyFileNotice from './HeavyFileNotice';
 import VersionDialog from './VersionDialog';
@@ -34,7 +30,6 @@ import { chooseVersion, pickVersion, readVersions, type Version } from '../libra
 import { PlaylistDialog } from './PlaylistPicker';
 import type { NewItem } from '../library/playlists';
 import { useSeasonBadges } from './seasonBadges';
-import { keepOnScreen, useClaimFocus } from './focus';
 import {
   episodeLabel,
   firstUnwatchedEpisode,
@@ -90,17 +85,12 @@ interface Props {
 }
 
 /**
- * Stable keys, so focus can be aimed at this page and land somewhere useful.
- * The container is the target; it forwards to whichever of the two landing
- * spots actually exists on this title.
+ * Stable keys, so the ring can be aimed at this page and land somewhere useful.
  *
- * `DETAIL_FIRST_EPISODE_KEY` now names the episode **row**, which is itself a
- * container of two focusables rather than a leaf. That is fine — resolving a
- * preferred child recurses, so aiming at the page descends through the row to
- * its play area. It does mean the key must stay on a row that has a focusable
- * child: a row for an episode the library lacks would end the descent on
- * something that cannot be actioned, which is why `firstOwnedId` below picks a
- * playable one.
+ * `DETAIL_FIRST_EPISODE_KEY` names the episode **row**, an area of three
+ * controls: arriving lands on its play area. It must stay on a row the library
+ * holds — a missing episode has nothing to land on — which is why
+ * `firstOwnedId` below picks a playable one.
  */
 const DETAIL_FOCUS_KEY = 'detail-root';
 const DETAIL_PLAY_KEY = 'detail-play';
@@ -109,10 +99,16 @@ const DETAIL_VERSION_KEY = 'detail-version';
 const DETAIL_FIRST_EPISODE_KEY = 'detail-first-episode';
 
 /**
- * The page's four areas, top to bottom, each a focus group of its own
- * (focusGroups.ts): Back, the buttons under the title (a row landing on Play),
- * the season row (a row landing on the season shown, with "Mark season
- * watched" at its end), and the episode list.
+ * The page is a column of areas, top to bottom, on Kinema's own engine
+ * (focusModel.ts, round 7): Back, the buttons under the title (a row landing
+ * on Play), the season row (landing on the season shown, with "Mark season
+ * watched" at its end), the episode list (each episode a row of three), the
+ * collection, the cast and the file's details. Up and Down go from area to
+ * area in that order, never to whatever is nearest (NAV-MAP, agreed
+ * 2026-10-11): Down from Back is Play, Up from the first episode the season
+ * shown. With one season the row holds only "Mark season watched": Down from
+ * Play passes over it to the episodes, and Up from the first one reaches it.
+ * Left and Right leave no area.
  */
 const DETAIL_BACK_KEY = 'detail-back';
 const DETAIL_ACTIONS_KEY = 'detail-actions';
@@ -124,47 +120,10 @@ const DETAIL_EPISODES_KEY = 'detail-episodes';
 const DETAIL_COLLECTION_KEY = 'detail-collection';
 const DETAIL_CAST_KEY = 'detail-cast';
 const DETAIL_FILE_KEY = 'detail-file';
-const DETAIL_AREAS = [
-  DETAIL_BACK_KEY,
-  DETAIL_ACTIONS_KEY,
-  DETAIL_SEASONS_KEY,
-  DETAIL_EPISODES_KEY,
-  DETAIL_COLLECTION_KEY,
-  DETAIL_CAST_KEY,
-  DETAIL_FILE_KEY,
-];
-
 const seasonKey = (s: number) => `detail-season:${s}`;
 
-/**
- * Up and Down between the page's areas, in that fixed order rather than by
- * distance (NAV-MAP, agreed 2026-10-11): Down from Back is Play, never the
- * season nearest below it; Up from the first episode is the season shown,
- * never "Mark season watched" because it happens to sit closer. With one
- * season the row holds only "Mark season watched", and Down from Play goes
- * past it straight to the episodes — it is reached by Up from the first one.
- * Left and Right between areas are nothing (the page holds them).
- */
-function resolveDetailArea(
-  oneSeason: boolean,
-  direction: string,
-  from: string,
-  siblings: FocusableComponent[]
-): FocusableComponent | null {
-  if (direction !== 'up' && direction !== 'down') return null;
-  const present = DETAIL_AREAS.filter((k) => siblings.some((s) => s.focusKey === k));
-  const at = present.indexOf(from);
-  if (at < 0) return null;
-  let next = direction === 'down' ? at + 1 : at - 1;
-  if (direction === 'down' && oneSeason && from === DETAIL_ACTIONS_KEY && present[next] === DETAIL_SEASONS_KEY) {
-    next++;
-  }
-  // Up from Back leaves the page for the top bar, through the page's parent.
-  if (next < 0 || next >= present.length) return null;
-  return siblings.find((s) => s.focusKey === present[next]) ?? null;
-}
-
-const PAGE_STOPS: ('left' | 'right' | 'down')[] = ['left', 'right', 'down'];
+/** One season: Down from Play passes over its row (see above). */
+const PASS_DOWN: 'down'[] = ['down'];
 
 /** Stable while the detail loads, so the badges do not rebuild for nothing. */
 const NO_STUDIOS: Studio[] = [];
@@ -232,32 +191,21 @@ export default function TitleDetailView({
   // The old test was `detail?.movie_path`, which is set for a *series* as well
   // (it is the largest file), so the series branch was unreachable.
   const oneSeason = new Set(detail?.episodes.map((e) => e.season)).size <= 1;
-  const resolveArea = useCallback(
-    (direction: string, from: string, siblings: FocusableComponent[]) =>
-      resolveDetailArea(oneSeason, direction, from, siblings),
-    [oneSeason]
-  );
-  const { ref, focusKey } = useFocusable({
-    focusKey: DETAIL_FOCUS_KEY,
-    trackChildren: true,
-    saveLastFocusedChild: true,
-    preferredChildFocusKey:
-      title.kind === 'series' && !nextUp ? DETAIL_EPISODES_KEY : DETAIL_ACTIONS_KEY,
-    nextFocusResolver: resolveArea,
-    // Only Up leaves the page (from Back, to the top bar).
-    isFocusBoundary: true,
-    focusBoundaryDirections: PAGE_STOPS,
-  });
+  const { ref, focusKey } = useNavGroup({ kind: 'column' }, { focusKey: DETAIL_FOCUS_KEY });
 
-  // Waits for the load: claiming earlier would land on Back, the only control
-  // that exists before the episodes arrive, and then stay there. For a series
-  // it waits for the next episode too: Play only exists once that is known,
-  // and on a slow box it came after the episode list, so the page had already
-  // landed on the first episode (owner, 2026-10-09). A page: see useClaimFocus.
-  useClaimFocus(
-    DETAIL_FOCUS_KEY,
-    Boolean(detail) && (title.kind !== 'series' || nextUpAsked),
-    true
+  // Back until the page is read, then Play — again for as long as the person
+  // has not pressed anything (focusStore.ts `useLanding`). For a series it
+  // waits for the next episode too: Play only exists once that is known, and
+  // on a slow box it came after the episode list, so the page had already
+  // landed on the first episode (owner, 2026-10-09). A series with nothing to
+  // continue lands on its episodes.
+  const ready = Boolean(detail) && (title.kind !== 'series' || nextUpAsked);
+  useLanding(
+    !ready
+      ? DETAIL_BACK_KEY
+      : title.kind === 'series' && !nextUp
+        ? DETAIL_EPISODES_KEY
+        : DETAIL_ACTIONS_KEY
   );
 
   useEffect(() => {
@@ -604,18 +552,18 @@ export default function TitleDetailView({
   }, [name, year]);
   // Into the name field once it is drawn, the way a remote would expect.
   // Only when the form opens, not at every keystroke in it.
+  // Back on Rename when it closes. Both as the change is drawn: the field
+  // and the button are registered by then (focusStore.ts).
   const renamingOpen = renaming !== null;
-  useEffect(() => {
-    if (!renamingOpen) return;
-    // A frame later: the field has to be laid out before the focus library
-    // can measure it, and the Rename button it replaces has just gone.
-    const frame = requestAnimationFrame(() => setFocus(RENAME_INPUT_KEY));
-    return () => cancelAnimationFrame(frame);
+  const wasRenaming = useRef(false);
+  useLayoutEffect(() => {
+    if (renamingOpen) navFocus(RENAME_INPUT_KEY);
+    else if (wasRenaming.current) navFocus(RENAME_BUTTON_KEY);
+    wasRenaming.current = renamingOpen;
   }, [renamingOpen]);
   const endRename = useCallback(() => {
     setRenaming(null);
     setRenameError(null);
-    requestAnimationFrame(() => setFocus(RENAME_BUTTON_KEY));
   }, []);
   const saveRename = useCallback(async () => {
     if (!renaming) return;
@@ -655,7 +603,7 @@ export default function TitleDetailView({
   }, [title.id]);
 
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <div className="detail" ref={ref}>
         <Art
           className="detail-backdrop"
@@ -665,12 +613,10 @@ export default function TitleDetailView({
         />
         <div className="detail-scrim" />
 
-        <FocusButton
-          focusKey={DETAIL_BACK_KEY}
-          className="back-button"
-          keepInView="page-top"
-          onSelect={onBack}
-        >
+        {/* Sticky under the top bar while the page scrolls by (T25):
+            `stickyTop` marks it for the one scroll rule to keep the ring
+            clear of (focusScroll.ts), measured, never a constant. */}
+        <FocusButton focusKey={DETAIL_BACK_KEY} className="back-button" stickyTop onSelect={onBack}>
           ← Back
         </FocusButton>
 
@@ -747,6 +693,9 @@ export default function TitleDetailView({
                 kind="row"
                 focusKey={DETAIL_ACTIONS_KEY}
                 current={primary ? DETAIL_PLAY_KEY : DETAIL_LIST_KEY}
+                // The page as near its top as keeps the row in sight: the
+                // title, its picture and its overview with it.
+                pageTop
                 className="detail-actions"
               >
                 {renaming ? (
@@ -768,12 +717,11 @@ export default function TitleDetailView({
                     />
                     <FocusButton
                       className="btn-primary"
-                      keepInView="page-top"
                       onSelect={() => void saveRename()}
                     >
                       Save
                     </FocusButton>
-                    <FocusButton className="btn-secondary" keepInView="page-top" onSelect={endRename}>
+                    <FocusButton className="btn-secondary" onSelect={endRename}>
                       Cancel
                     </FocusButton>
                   </>
@@ -789,7 +737,6 @@ export default function TitleDetailView({
                   <FocusButton
                     focusKey={DETAIL_PLAY_KEY}
                     className="btn-primary"
-                    keepInView="page-top"
                     onSelect={() => onPlayFile(primary)}
                   >
                     {resumeAt !== null
@@ -802,7 +749,6 @@ export default function TitleDetailView({
                 {primary && (resumeAt !== null || resumeAtShare !== null) && (
                   <FocusButton
                     className="btn-secondary"
-                    keepInView="page-top"
                     onSelect={() => onPlayFile({ ...primary, fromStart: true })}
                   >
                     Play from start
@@ -814,7 +760,6 @@ export default function TitleDetailView({
                   <FocusButton
                     focusKey={DETAIL_VERSION_KEY}
                     className="btn-secondary"
-                    keepInView="page-top"
                     label={`Version: ${chosen.words}. Choose another`}
                     onSelect={() => setVersionsOpen(true)}
                   >
@@ -828,7 +773,6 @@ export default function TitleDetailView({
                 <FocusButton
                   focusKey={DETAIL_LIST_KEY}
                   className={`btn-secondary ${listed ? 'on-list' : ''}`}
-                  keepInView="page-top"
                   onSelect={() => void toggleMyList(title.id)}
                 >
                   {listed ? '✓ On My list' : '+ My list'}
@@ -841,7 +785,6 @@ export default function TitleDetailView({
                 {title.kind !== 'series' && primary?.fileId != null && (
                   <FocusButton
                     className={`btn-secondary ${detail?.movie_watched ? 'watched-on' : ''}`}
-                    keepInView="page-top"
                     onSelect={() =>
                       void toggleWatched(primary.fileId as number, !detail?.movie_watched)
                     }
@@ -853,7 +796,6 @@ export default function TitleDetailView({
                 {title.kind === 'series' && ownedCount > 0 && (
                   <FocusButton
                     className={`btn-secondary ${showWatched ? 'watched-on' : ''}`}
-                    keepInView="page-top"
                     onSelect={() => void markShow()}
                   >
                     {showWatched ? '✓ Show watched' : 'Mark show watched'}
@@ -865,7 +807,6 @@ export default function TitleDetailView({
                 {trailerPath && (
                   <FocusButton
                     className="btn-secondary"
-                    keepInView="page-top"
                     onSelect={() =>
                       // fileId and titleId are both null on purpose. A trailer
                       // is ephemeral: no resume point, no Continue Watching
@@ -884,7 +825,6 @@ export default function TitleDetailView({
                 {!trailerPath && shown.trailer_key && (
                   <FocusButton
                     className="btn-secondary"
-                    keepInView="page-top"
                     onSelect={() => void playTrailer(shown.trailer_key as string, title.title)}
                   >
                     {trailerInApp ? '▶ Trailer' : 'Trailer · opens in your browser ↗'}
@@ -897,7 +837,6 @@ export default function TitleDetailView({
                   <FocusButton
                     focusKey={RENAME_BUTTON_KEY}
                     className="btn-secondary"
-                    keepInView="page-top"
                     onSelect={startRename}
                   >
                     Rename
@@ -906,7 +845,6 @@ export default function TitleDetailView({
                 {isLocal && (
                   <FocusButton
                     className="btn-secondary"
-                    keepInView="page-top"
                     onSelect={() => void sendToFindMatch()}
                   >
                     Find a match
@@ -916,7 +854,6 @@ export default function TitleDetailView({
                 {playlistItems.length > 0 && (
                   <FocusButton
                     className="btn-secondary"
-                    keepInView="page-top"
                     onSelect={() =>
                       setPlaylistFor({
                         items: playlistItems,
@@ -940,7 +877,6 @@ export default function TitleDetailView({
                 {!isLocal && (
                   <FocusButton
                     className="btn-secondary"
-                    keepInView="page-top"
                     label="Poster: choose the picture this title shows"
                     onSelect={() => setPostersOpen(true)}
                   >
@@ -954,7 +890,6 @@ export default function TitleDetailView({
                 {!isLocal && onRelinked && (
                   <FocusButton
                     className="btn-secondary"
-                    keepInView="page-top"
                     onSelect={() => setWrongOpen(true)}
                   >
                     Wrong title?
@@ -989,15 +924,9 @@ export default function TitleDetailView({
                   versions={versions}
                   current={chosen.file_id}
                   onChoose={pickedVersion}
-                  onClose={() => {
-                    setVersionsOpen(false);
-                    // Back on the button once the page has drawn the new
-                    // choice: in the real app the row's own current (Play)
-                    // took the ring otherwise.
-                    requestAnimationFrame(() =>
-                      requestAnimationFrame(() => setFocus(DETAIL_VERSION_KEY))
-                    );
-                  }}
+                  // The ring goes back to the Version button by itself: a
+                  // dialog gives it back to what opened it (focusStore.ts).
+                  onClose={() => setVersionsOpen(false)}
                 />
               )}
               {playlistFor && (
@@ -1046,6 +975,7 @@ export default function TitleDetailView({
                 focusKey={DETAIL_SEASONS_KEY}
                 current={seasons.length > 1 && season !== null ? seasonKey(season) : undefined}
                 focusable={seasons.length > 1 || ownedInSeason.length > 1}
+                passOver={oneSeason ? PASS_DOWN : undefined}
                 className="season-bar"
               >
               {seasons.length > 1 && (
@@ -1055,7 +985,6 @@ export default function TitleDetailView({
                       key={s}
                       focusKey={seasonKey(s)}
                       className={season === s ? 'active' : ''}
-                      keepInView="nearest"
                       onSelect={() => {
                         seasonPicked.current = true;
                         setSeason(s);
@@ -1069,7 +998,6 @@ export default function TitleDetailView({
               {ownedInSeason.length > 1 && (
                 <FocusButton
                   className="season-watched"
-                  keepInView="nearest"
                   onSelect={() => void markSeason()}
                 >
                   {seasonWatched ? 'Mark season as not watched' : '✓ Mark season watched'}
@@ -1135,7 +1063,6 @@ export default function TitleDetailView({
                 {collectionNext && (
                   <FocusButton
                     className="btn-secondary detail-collection-play"
-                    keepInView="nearest"
                     onSelect={() => void playCollection(collectionNext)}
                   >
                     ▶ Play the series from {collectionNext.title}
@@ -1191,7 +1118,6 @@ export default function TitleDetailView({
                       key={key}
                       focusKey={`detail-cast:${person.person_id}`}
                       className="cast-member"
-                      keepInView="nearest"
                       label={person.character ? `${person.name}, ${person.character}` : person.name}
                       onSelect={() => onOpenPerson(person.person_id as string, person.name)}
                     >
@@ -1214,7 +1140,7 @@ export default function TitleDetailView({
           />
         </div>
       </div>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }
 
@@ -1244,16 +1170,11 @@ function EpisodeRow(props: EpisodeRowProps) {
 /**
  * A row the library actually holds.
  *
- * The row is a focus *container* with two children, not a single focusable:
- * left/right moves between playing the episode and marking it watched, up/down
- * still moves between rows. A focusable nested inside another focusable cannot
- * be reached geometrically — going right requires the candidate's left edge to
- * be past the current element's right edge, which nothing drawn *inside* it can
- * ever satisfy. Same shape as the overlay-nav problem in docs/GOTCHAS.md.
- *
- * Both children are declared in components of their own, because `useFocusable`
- * reads the focus context of the component it is called in: calling them here
- * would parent them to the episode list and leave this container childless.
+ * The row is an area of three controls, not one control: Left and Right move
+ * between playing the episode, marking it watched and adding it to a
+ * playlist; Up and Down move between rows. Its children are declared in
+ * components of their own, under the row's provider, so they register in the
+ * row and not in the episode list.
  */
 function PlayableEpisodeRow({
   episode,
@@ -1263,14 +1184,14 @@ function PlayableEpisodeRow({
   onAddToPlaylist,
   focusKey,
 }: EpisodeRowProps) {
-  const { ref, focusKey: rowKey, hasFocusedChild } = useFocusable({
-    focusKey,
-    trackChildren: true,
-    saveLastFocusedChild: true,
-  });
+  // A row of three, coming back to the one last held, as the list does.
+  const { ref, focusKey: rowKey, hasFocusedChild } = useNavGroup(
+    { kind: 'row', remember: true },
+    { focusKey }
+  );
 
   return (
-    <FocusContext.Provider value={rowKey}>
+    <FocusProvider value={rowKey}>
       <div
         ref={ref}
         className={`episode-row ${hasFocusedChild ? 'row-active' : ''} ${
@@ -1283,7 +1204,6 @@ function PlayableEpisodeRow({
             with the episodes themselves. The word appears with the ring. */}
         <FocusButton
           className={`watched-toggle ${episode.watched ? 'on' : ''}`}
-          keepInView="nearest"
           label={episode.watched ? 'Watched. Press to mark as not watched' : 'Mark watched'}
           title={episode.watched ? 'Watched. Press to mark as not watched' : 'Mark watched'}
           onSelect={onToggleWatched}
@@ -1297,7 +1217,6 @@ function PlayableEpisodeRow({
             as words on every row would look busy, and as quiet as the tick. */}
         <FocusButton
           className="episode-add"
-          keepInView="nearest"
           label="Add to a playlist"
           title="Add to a playlist"
           onSelect={onAddToPlaylist}
@@ -1305,7 +1224,7 @@ function PlayableEpisodeRow({
           +
         </FocusButton>
       </div>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }
 
@@ -1319,19 +1238,12 @@ function EpisodePlayArea({
   differences?: string[];
   onPlay: () => void;
 }) {
-  const { ref, focused } = useFocusable<object, HTMLDivElement>({
+  // A season runs off the bottom of the screen: the one scroll rule keeps
+  // the row holding the ring in sight (focusScroll.ts).
+  const { ref, focused, navProps } = useFocusLeaf<HTMLDivElement>({
     focusKey: `episode:${episode.id}`,
-    onEnterPress: onPlay,
+    onSelect: onPlay,
   });
-
-  // A season is the one list here long enough to run off the bottom of the
-  // screen, and more so at TV scale, where a third as many rows fit. Without
-  // this, arrowing down past the fold moves focus to a row you cannot see.
-  useEffect(() => {
-    if (focused) {
-      keepOnScreen(ref.current, 'nearest');
-    }
-  }, [focused, ref]);
 
   const percent = progressPercent(episode);
 
@@ -1340,6 +1252,7 @@ function EpisodePlayArea({
       ref={ref}
       className={`episode-main ${focused ? 'focused' : ''}`}
       onClick={onPlay}
+      {...navProps}
     >
       <div className="episode-still">
         <Art

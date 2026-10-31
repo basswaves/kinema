@@ -1015,7 +1015,10 @@ export default function Browse() {
           </FocusScreen>
         )}
 
+        {/* On Kinema's own engine (focusEngine.tsx, round 7, F2), each a
+            screen of its own: a page opened from another lands again. */}
         {view.name === 'collection' && (
+          <FocusScreen key={`collection:${view.id ?? 'new'}`}>
           <CollectionPage
             key={view.id ?? 'new'}
             titles={titles}
@@ -1025,6 +1028,7 @@ export default function Browse() {
             onBack={goBack}
             onSaved={(id) => setStack((s) => replace(s, { name: 'collection', id }))}
           />
+          </FocusScreen>
         )}
 
         {view.name === 'settings' && (
@@ -1038,6 +1042,7 @@ export default function Browse() {
         )}
 
         {view.name === 'person' && (
+          <FocusScreen key={`person:${view.id}`}>
           <PersonPage
             key={view.id}
             personId={view.id}
@@ -1046,9 +1051,11 @@ export default function Browse() {
             onSelect={openDetail}
             onBack={goBack}
           />
+          </FocusScreen>
         )}
 
         {view.name === 'detail' && (
+          <FocusScreen key={`detail:${view.title.id}`}>
           <TitleDetailView
             key={view.title.id}
             title={view.title}
@@ -1087,6 +1094,7 @@ export default function Browse() {
               })
             }
           />
+          </FocusScreen>
         )}
 
         {/* Dialogs still on the spatial library: they take the keys from

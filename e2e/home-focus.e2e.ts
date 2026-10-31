@@ -150,12 +150,14 @@ test('every key scroll goes one way and starts gently: no shove, no bounce back'
   const path = async (key: string) => {
     await page.evaluate(() => {
       const b = document.querySelector('.browse')!;
-      const w = window as unknown as { __path: number[]; __done: boolean };
+      const w = window as unknown as { __path: number[]; __times: number[]; __done: boolean };
       w.__path = [b.scrollTop];
+      w.__times = [performance.now()];
       w.__done = false;
       const t0 = performance.now();
       const f = () => {
         w.__path.push(b.scrollTop);
+        w.__times.push(performance.now());
         if (performance.now() - t0 < 700) requestAnimationFrame(f);
         else w.__done = true;
       };
@@ -164,10 +166,13 @@ test('every key scroll goes one way and starts gently: no shove, no bounce back'
     await press(page, key);
     await settled(page);
     await expect.poll(() => page.evaluate(() => (window as unknown as { __done: boolean }).__done)).toBe(true);
-    return page.evaluate(() => (window as unknown as { __path: number[] }).__path);
+    return page.evaluate(() => {
+      const w = window as unknown as { __path: number[]; __times: number[] };
+      return { p: w.__path, times: w.__times };
+    });
   };
   for (const key of ['ArrowDown', 'ArrowDown', 'ArrowDown', 'ArrowDown', 'ArrowUp', 'ArrowUp']) {
-    const p = await path(key);
+    const { p, times } = await path(key);
     const steps = p.slice(1).map((v, i) => v - p[i]).filter((d) => Math.abs(d) > 0.5);
     if (steps.length === 0) continue;
     const dir = Math.sign(steps[0]);
@@ -176,6 +181,11 @@ test('every key scroll goes one way and starts gently: no shove, no bounce back'
     // unless the browser itself skipped frames (a busy machine), which the
     // time between samples shows.
     const total = Math.abs(p[p.length - 1] - p[0]);
+    // Frames further apart than three at 60 Hz while it moved: the page was
+    // starved, and a scroll that keeps to the clock lands in fewer of them.
+    const moving = p.findIndex((v, i) => i > 0 && Math.abs(v - p[i - 1]) > 0.5);
+    const gaps = times.slice(1, moving + 3).map((t, i) => t - times[i]);
+    if (gaps.some((g) => g > 50)) continue;
     expect(steps.length, `${key}: ${p.map(Math.round).join(' ')}`).toBeGreaterThan(3);
     expect(Math.abs(steps[0]), `${key} first step of ${total}`).toBeLessThan(total * 0.6 + 2);
   }

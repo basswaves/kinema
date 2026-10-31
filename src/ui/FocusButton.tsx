@@ -46,6 +46,9 @@ interface Props {
   /** Called when the ring lands here or the pointer moves over it: what a
    *  page shows about the control in hand follows either. */
   onHighlight?: () => void;
+  /** It stays under the top bar as the page scrolls (a title page's Back):
+   *  the one scroll rule keeps the ring clear of it (focusScroll.ts). */
+  stickyTop?: boolean;
 }
 
 export default function FocusButton({
@@ -58,6 +61,7 @@ export default function FocusButton({
   title,
   label,
   onHighlight,
+  stickyTop = false,
 }: Props) {
   // On whichever engine the screen it is drawn in is (focusEngine.tsx).
   const kinema = useOnKinema();
@@ -89,6 +93,7 @@ export default function FocusButton({
       disabled={disabled}
       title={title}
       aria-label={label}
+      data-sticky-top={stickyTop ? '' : undefined}
       onClick={onSelect}
       onMouseEnter={(e) => {
         noteWidth(e.currentTarget);

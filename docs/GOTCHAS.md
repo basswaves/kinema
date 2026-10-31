@@ -1190,6 +1190,28 @@ control that keeps a key stops its *propagation* (a card's OK held in the
 capture phase, a text box's Left in React); the engine listens in the bubble
 phase on `window` and never reads `defaultPrevented`.
 
+### Enter in a text box that closes a dialog clicks the button the ring returns to
+
+Rename on a title page and "+ Playlist"'s name field reopened themselves
+after Save, on both engines, with no error: the field's Enter saved and
+closed the form or dialog, the ring and the DOM focus went back to the
+button that had opened it (all before the browser was done with the press),
+and the browser's `keypress` that follows every Enter keydown then landed on
+that button — which a browser activates on Enter — and pressed it again.
+`stopPropagation` does not stop it; it is the default action of the same
+key. **Do:** FocusInput's Enter calls `preventDefault` as well, which cancels
+the keypress.
+
+### A scroll animated per frame stretches on a starved page
+
+Kinema's scroll spring (focusScroll.ts) capped each frame's step at 50 ms.
+A busy CI machine — and a weak box — gave WebKit a frame every few hundred
+milliseconds, so every 220 ms scroll took seconds, the flows waiting for the
+page to settle ran out of their minute, and it looked like a flake in the
+focus engine. **Do:** advance an animation by the time that really passed;
+the spring is solved exactly for any step, so a long one just lands. Test it
+with frames handed out by hand (focusScroll.test.ts), not by waiting.
+
 ## Frontend
 
 ### A condition inside `try` switches the react-hooks rules off for the whole component

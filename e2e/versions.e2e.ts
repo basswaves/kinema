@@ -4,17 +4,7 @@
  * Against `dev:mock`; see kb.ts and keyboard-*.e2e.ts for the conventions.
  */
 import { expect, test, type Page } from '@playwright/test';
-
-async function press(page: Page, key: string, times = 1): Promise<void> {
-  for (let i = 0; i < times; i++) {
-    await page.keyboard.press(key);
-    await page.waitForTimeout(150);
-  }
-}
-
-function focused(page: Page): Promise<string | undefined> {
-  return page.evaluate(() => document.querySelector('.focused')?.textContent?.trim());
-}
+import { focused, press } from './kb';
 
 function playing(page: Page): Promise<string> {
   return page.evaluate(() => (window as unknown as { __fakeMpv: { path: string } }).__fakeMpv.path);
@@ -39,18 +29,13 @@ async function filmPage(page: Page): Promise<void> {
   await expect.poll(() => focused(page)).toBe('▶ Play');
 }
 
-/** Press `key` until the ring's text contains `text` (at most `max` presses). */
+/**
+ * Press `key` until the ring's text contains `text` (at most `max` presses).
+ * A title page is on Kinema's own engine: each press is answered before it
+ * returns, so there is nothing to wait for between them.
+ */
 async function until(page: Page, key: string, text: string, max = 8): Promise<void> {
-  for (let i = 0; i < max; i++) {
-    const before = (await focused(page)) ?? '';
-    if (before.includes(text)) break;
-    await page.keyboard.press(key);
-    // Wait for the ring to move before looking again: on a busy machine (the
-    // flows run side by side) a press can land after a fixed pause, and the
-    // next press then steps past the control.
-    await expect.poll(() => focused(page), { timeout: 1500 }).not.toBe(before).catch(() => {});
-    await page.waitForTimeout(150);
-  }
+  for (let i = 0; i < max && !((await focused(page)) ?? '').includes(text); i++) await press(page, key);
   expect(await focused(page)).toContain(text);
 }
 
@@ -78,11 +63,11 @@ test('Version by keyboard: the best fit first, another picked, Play uses it, rem
   await press(page, 'Enter');
   await expect.poll(() => playing(page)).toContain('1080p');
 
-  // Back to the page: the choice is kept.
-  await press(page, 'Escape');
-  await page.waitForTimeout(400);
-  if (await page.locator('.player').count()) await press(page, 'Escape');
-  await expect(page.locator('.detail')).toBeVisible();
+  // Back to the page (the player may first close its panel): the choice is kept.
+  await expect(async () => {
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.detail')).toBeVisible({ timeout: 1000 });
+  }).toPass();
   await expect(page.getByRole('button', { name: /^Version:/ })).toContainText('1080p');
 });
 

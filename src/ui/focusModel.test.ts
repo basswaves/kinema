@@ -356,3 +356,224 @@ describe('the scroll anchor', () => {
     expect(scrollAnchor(tree, 'nav:tv')).toBe('top');
   });
 });
+
+/** A title's page as TitleDetail.tsx builds it, under the top bar. */
+function titlePage(page: A['children']) {
+  return build(
+    column([
+      ['top', row(['nav:home', 'nav:movies', 'nav:tv'], { current: 'nav:home' })],
+      ['detail', column(page)],
+    ])
+  );
+}
+
+/** An episode list of `n`, each a row of three that comes back to the one held. */
+const episodes = (n: number): A =>
+  column(
+    Array.from({ length: n }, (_, i): [string, A] => [
+      `e${i + 1}-row`,
+      { area: { kind: 'row', remember: true }, children: [`e${i + 1}`, `w${i + 1}`, `a${i + 1}`] },
+    ]),
+    { remember: true, current: 'e1-row' }
+  );
+
+describe('a film’s page (NAV-MAP detail-movie)', () => {
+  const actions = ['play', 'list', 'watched', 'playlist', 'poster', 'wrong'];
+  const tree = titlePage(['back', ['actions', row(actions, { current: 'play' })], ['file', row(['file-details'])]]);
+
+  it('Down from Back is Play, Up from it the open section; Back holds Left and Right', () => {
+    expect(move(tree, 'back', 'down', none)).toBe('play');
+    expect(move(tree, 'back', 'up', none)).toBe('nav:home');
+    expect(move(tree, 'back', 'left', none)).toBeNull();
+    expect(move(tree, 'back', 'right', none)).toBeNull();
+  });
+
+  it('every button under the title: Up is Back, Down the file details, along the row by Left and Right', () => {
+    for (const b of actions) {
+      expect(move(tree, b, 'up', none)).toBe('back');
+      expect(move(tree, b, 'down', none)).toBe('file-details');
+    }
+    expect(walk(tree, 'play', Array<Arrow>(5).fill('right'))).toBe('wrong');
+    expect(move(tree, 'wrong', 'right', none)).toBeNull();
+    expect(move(tree, 'play', 'left', none)).toBeNull();
+  });
+
+  it('Up from the file details is Play, whichever button was last held (a row lands on its current)', () => {
+    expect(walk(tree, 'poster', ['down', 'up'])).toBe('play');
+    expect(move(tree, 'file-details', 'down', none)).toBeNull();
+  });
+});
+
+describe('a series’ page of one season (NAV-MAP detail-series)', () => {
+  const tree = titlePage([
+    'back',
+    ['actions', row(['play', 'list', 'show-watched', 'playlist', 'poster', 'wrong'], { current: 'play' })],
+    ['seasons', row(['season-watched'], { passOver: ['down'] })],
+    ['episodes', episodes(5)],
+    ['file', row(['file-details'])],
+  ]);
+
+  it('Down from Play passes over “Mark season watched” to the first episode; Up from it reaches it', () => {
+    expect(move(tree, 'play', 'down', none)).toBe('e1');
+    expect(move(tree, 'wrong', 'down', none)).toBe('e1');
+    expect(move(tree, 'e1', 'up', none)).toBe('season-watched');
+    expect(move(tree, 'w1', 'up', none)).toBe('season-watched');
+    expect(move(tree, 'season-watched', 'up', none)).toBe('play');
+    expect(move(tree, 'season-watched', 'down', none)).toBe('e1');
+  });
+
+  it('an episode is a row of three: play, watched, playlist', () => {
+    expect(walk(tree, 'e3', ['right', 'right'])).toBe('a3');
+    expect(move(tree, 'a3', 'right', none)).toBeNull();
+    expect(move(tree, 'e3', 'left', none)).toBeNull();
+  });
+
+  it('down the list lands on each episode, and back up on what was held in the row above', () => {
+    expect(walk(tree, 'e1', ['down', 'down', 'down', 'down'])).toBe('e5');
+    expect(walk(tree, 'e1', ['right', 'right', 'down'])).toBe('e2');
+    expect(walk(tree, 'e1', ['right', 'right', 'down', 'up'])).toBe('a1');
+  });
+
+  it('the last episode: Down is the file details, and Up comes back to it', () => {
+    expect(move(tree, 'e5', 'down', none)).toBe('file-details');
+    expect(walk(tree, 'e4', ['down', 'down', 'up'])).toBe('e5');
+    expect(walk(tree, 'e5', ['right', 'down', 'up'])).toBe('w5');
+  });
+
+  it('Up from an episode goes up area by area to the top bar', () => {
+    expect(walk(tree, 'e2', ['up', 'up', 'up', 'up', 'up'])).toBe('nav:home');
+  });
+});
+
+describe('a series’ page of several seasons (NAV-MAP detail-saga)', () => {
+  const tree = titlePage([
+    'back',
+    ['actions', row(['play', 'list', 'show-watched'], { current: 'play' })],
+    ['seasons', row(['s1', 's2', 'specials', 'season-watched'], { current: 's1' })],
+    ['episodes', episodes(2)],
+    ['file', row(['file-details'])],
+  ]);
+
+  it('Down from Play is the season shown; Up from any season is Play', () => {
+    expect(move(tree, 'play', 'down', none)).toBe('s1');
+    expect(move(tree, 'show-watched', 'down', none)).toBe('s1');
+    for (const s of ['s1', 's2', 'specials', 'season-watched']) expect(move(tree, s, 'up', none)).toBe('play');
+  });
+
+  it('Up from the first episode is the season shown, never the nearest button', () => {
+    expect(move(tree, 'e1', 'up', none)).toBe('s1');
+    expect(walk(tree, 's1', ['right', 'right', 'right', 'down', 'up'])).toBe('s1');
+    expect(move(tree, 'season-watched', 'left', none)).toBe('specials');
+    expect(move(tree, 'season-watched', 'down', none)).toBe('e1');
+  });
+});
+
+describe('an actor’s page and a collection', () => {
+  const cards = ['g0', 'g1', 'g2', 'g3', 'g4'];
+  const person = build(
+    column([
+      ['top', row(['nav:home', 'nav:movies'], { current: 'nav:home' })],
+      [
+        'person',
+        column([
+          ['head', row(['back'])],
+          'imdb',
+          ['grid', { area: { kind: 'grid', columns: 4, current: 'g0' }, children: cards }],
+        ]),
+      ],
+    ])
+  );
+
+  it('the actor: Up from the first row of titles is IMDb, then Back, then the top bar', () => {
+    expect(walk(person, 'g2', ['up'])).toBe('imdb');
+    expect(walk(person, 'g2', ['up', 'up'])).toBe('back');
+    expect(walk(person, 'g2', ['up', 'up', 'up'])).toBe('nav:home');
+    expect(move(person, 'back', 'down', none)).toBe('imdb');
+    expect(move(person, 'imdb', 'down', none)).toBe('g0');
+  });
+
+  const collection = build(
+    column([
+      ['top', row(['nav:home', 'nav:movies'], { current: 'nav:movies' })],
+      [
+        'collection',
+        column([
+          ['head', row(['back', 'save'])],
+          ['traits', row(['t:4k', 't:hdr', 't:atmos'])],
+          ['kind', row(['k:movie', 'k:series', 'unwatched', 'r6', 'r7', 'r8'])],
+          ['grid', { area: { kind: 'grid', columns: 4, current: 'g0' }, children: cards }],
+        ]),
+      ],
+    ])
+  );
+
+  it('a collection: rows of choices one above the other, each landing on its first', () => {
+    expect(move(collection, 'save', 'down', none)).toBe('t:4k');
+    expect(move(collection, 't:atmos', 'down', none)).toBe('k:movie');
+    expect(move(collection, 'r8', 'down', none)).toBe('g0');
+    expect(move(collection, 'g3', 'up', none)).toBe('k:movie');
+    expect(walk(collection, 'back', ['right'])).toBe('save');
+  });
+});
+
+describe('dialogs: the card menu, Wrong title?, the poster chooser', () => {
+  const menu = (children: A['children'], extra: Partial<AreaSpec> = {}): A => ({
+    area: { kind: 'menu', ...extra },
+    children,
+  });
+
+  it('the card menu holds every arrow and goes round top to bottom', () => {
+    const tree = build(
+      column([
+        ['page', column(['card'])],
+        ['m', menu(['play', 'watched', 'list', 'playlist', 'open'], { current: 'play' })],
+      ])
+    );
+    expect(enter(tree, 'm', none)).toBe('play');
+    expect(move(tree, 'open', 'down', none)).toBe('play');
+    expect(move(tree, 'play', 'up', none)).toBe('open');
+    for (const a of ['left', 'right'] as Arrow[]) expect(move(tree, 'list', a, none)).toBeNull();
+  });
+
+  it('Wrong title?: opens on the search box; its buttons a row, the results under it, the foot a row', () => {
+    const tree = build(
+      column([
+        ['page', column(['wrong-button'])],
+        [
+          'wrong',
+          menu(
+            [['search', row(['input', 'kind', 'search-button'])], 'this-1', 'this-2', ['foot', row(['unlink', 'cancel'])]],
+            { current: 'input' }
+          ),
+        ],
+      ])
+    );
+    expect(enter(tree, 'wrong', none)).toBe('input');
+    expect(move(tree, 'input', 'right', none)).toBe('kind');
+    expect(move(tree, 'search-button', 'down', none)).toBe('this-1');
+    expect(move(tree, 'this-2', 'down', none)).toBe('unlink');
+    expect(move(tree, 'unlink', 'right', none)).toBe('cancel');
+    expect(move(tree, 'cancel', 'up', none)).toBe('this-2');
+    expect(move(tree, 'cancel', 'down', none)).toBe('input');
+    expect(move(tree, 'input', 'left', none)).toBeNull();
+  });
+
+  it('the poster chooser: one row of posters landing on the one shown now, Cancel under it', () => {
+    const tree = build(
+      column([['posters', menu([['choices', row(['p0', 'p1', 'p2'], { current: 'p1' })], 'cancel'])]])
+    );
+    expect(enter(tree, 'posters', none)).toBe('p1');
+    expect(move(tree, 'p0', 'down', none)).toBe('cancel');
+    expect(move(tree, 'cancel', 'up', none)).toBe('p1');
+    expect(move(tree, 'p2', 'right', none)).toBeNull();
+  });
+});
+
+describe('passing over an area', () => {
+  it('only the arrows it names pass over it, and only on the way in', () => {
+    const tree = build(column([['a', row(['a1'])], ['b', row(['b1'], { passOver: ['down'] })], ['c', row(['c1'])]]));
+    expect(move(tree, 'a1', 'down', none)).toBe('c1');
+    expect(move(tree, 'c1', 'up', none)).toBe('b1');
+    expect(enter(tree, 'b', none)).toBe('b1');
+  });
+});

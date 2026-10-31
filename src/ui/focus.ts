@@ -14,7 +14,7 @@
  */
 import { useEffect, useState } from 'react';
 import { isLightLook } from './lightLook';
-import { navExpectReturn, navFocused, noteSpatialClaim } from './focusStore';
+import { navExpectReturn, navFocus, navFocused, noteSpatialClaim } from './focusStore';
 import {
   doesFocusableExist,
   getCurrentFocusKey,
@@ -154,6 +154,11 @@ function countInputs(): void {
  */
 export function currentFocusKey(): string | null {
   return navFocused() ?? getCurrentFocusKey();
+}
+
+/** Put the ring on `focusKey`, on whichever engine it is registered with. */
+export function focusTo(focusKey: string): void {
+  if (!navFocus(focusKey)) void setFocus(focusKey);
 }
 
 /** The focus key a drawn control was registered under, for landing on it by what it shows. */
@@ -433,8 +438,6 @@ function pageScroller(node: HTMLElement): HTMLElement | null {
  */
 const TOP_BAR_REM = 4.5;
 const TV_SAFE_TOP_REM = 1.25;
-/** What a title page's sticky Back adds under the bar (`.detail > .back-button` in ui.css). */
-const BACK_BAR_REM = 1.75;
 
 /**
  * The room the top bar takes, in pixels, at the current scale and layout.
@@ -446,11 +449,10 @@ const BACK_BAR_REM = 1.75;
 let topBar: { tv: string | undefined; px: number; rem: number } | null = null;
 let topBarWatched = false;
 
-function topBarPx(withBack = false): number {
+function topBarPx(): number {
   const root = document.documentElement;
   const tv = root.dataset.tv;
-  const back = withBack && document.querySelector('.detail > .back-button') ? BACK_BAR_REM : 0;
-  if (topBar && topBar.tv === tv) return topBar.px + back * topBar.rem;
+  if (topBar && topBar.tv === tv) return topBar.px;
   if (!topBarWatched) {
     topBarWatched = true;
     window.addEventListener('resize', () => {
@@ -460,7 +462,7 @@ function topBarPx(withBack = false): number {
   const rem = parseFloat(getComputedStyle(root).fontSize);
   const px = (TOP_BAR_REM + (tv === 'on' ? TV_SAFE_TOP_REM : 0)) * rem;
   topBar = { tv, px, rem };
-  return px + back * rem;
+  return px;
 }
 
 const HEADING = /^H[1-3]$/;
@@ -526,7 +528,7 @@ export function keepOnScreen(node: HTMLElement | null, inline: 'center' | 'neare
   const view = page.getBoundingClientRect();
   // A title page's sticky Back is under the bar too; reading on (below) keeps
   // to the bar alone, or a short window could not scroll its last rows in.
-  const bar = topBarPx(true);
+  const bar = topBarPx();
   // Measured from the content's top, so a scroll already under way does not
   // change the answer.
   const scroll = page.scrollTop;

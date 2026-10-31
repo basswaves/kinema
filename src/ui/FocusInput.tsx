@@ -9,6 +9,7 @@
 import { useFocusable } from '@noriginmedia/norigin-spatial-navigation';
 import { useEffect } from 'react';
 import { keepOnScreen } from './focus';
+import { useNavLeaf, useOnKinema } from './focusStore';
 import { useTypingFocus } from './typing';
 
 interface Props {
@@ -37,16 +38,24 @@ export default function FocusInput({
   onEnter,
   focusKey,
 }: Props) {
-  const { ref, focused } = useFocusable<object, HTMLInputElement>({ focusKey });
+  // On whichever engine the screen it is drawn in is (focusEngine.tsx).
+  const kinema = useOnKinema();
+  const { ref, focused: spatialFocused, focusKey: key } = useFocusable<object, HTMLInputElement>({
+    focusKey,
+    focusable: !kinema,
+  });
+  const leaf = useNavLeaf(key, ref, { on: kinema });
+  const focused = kinema ? leaf.focused : spatialFocused;
   // Typing focus, and the system's keyboard on OK where it has one.
   // It focuses with `preventScroll`, because a plain focus() jumps the page
   // to the input at once and the smooth scroll below then has nothing left
   // to do — the inputs lurched while every button around them glided.
   const enterKey = useTypingFocus(ref, focused);
 
+  // Kinema's own engine scrolls by its one rule (focusScroll.ts).
   useEffect(() => {
-    if (focused) keepOnScreen(ref.current, 'nearest');
-  }, [focused, ref]);
+    if (focused && !kinema) keepOnScreen(ref.current, 'nearest');
+  }, [focused, ref, kinema]);
 
   return (
     <input
@@ -79,10 +88,16 @@ export default function FocusInput({
         if (e.key !== 'Enter' || enterKey(e) || !onEnter) return;
         // The field's own: not also a press on whatever has the ring once
         // `onEnter` has moved it (a sign-in that answers at once and puts
-        // the ring on the first share, which this Enter then opened).
+        // the ring on the first share, which this Enter then opened). Its
+        // default too: the browser's keypress follows the keydown, and a
+        // dialog that closed on this Enter had by then given the ring and
+        // the DOM focus back to its button — which the keypress clicked,
+        // opening it again (Rename, + Playlist; round 7, F2).
+        e.preventDefault();
         e.stopPropagation();
         onEnter();
       }}
+      {...leaf.props}
     />
   );
 }

@@ -48,13 +48,14 @@ import {
   remembered,
   scrollAnchor,
   tabMove,
+  tabStops,
   within,
   type AreaSpec,
   type Arrow,
   type NavNode,
   type NavTree,
 } from './focusModel';
-import { lineUp, motionFor, MOTION_MS, reveal, toTop } from './focusScroll';
+import { lineUp, motionFor, MOTION_MS, readBack, readOn, reveal, toTop } from './focusScroll';
 
 /** The tree's top: a column holding the top bar and the screen. */
 export const ROOT = 'nav-root';
@@ -66,6 +67,8 @@ interface Entry {
   area?: AreaSpec;
   /** An area: scroll to the page's top when the ring is in it (the top bar). */
   pageTop?: boolean;
+  /** An area: a dialog over the screen, which holds the ring while it is here. */
+  modal?: boolean;
   disabled: boolean;
   select?: () => void;
   highlight?: () => void;
@@ -86,6 +89,14 @@ let generation = 0;
 
 const memory = new Map<string, string>();
 let focused: string | null = null;
+/**
+ * Dialogs open now (`modal` areas), oldest first, each with the control that
+ * held the ring when it opened: the ring stays inside the newest, and goes
+ * back to that control when it closes.
+ */
+const modals: { key: string; opener: string | null }[] = [];
+/** A dialog just closed: where the ring goes back to, once the change is committed. */
+let returnFromModal: string | null = null;
 /** Where the ring was, nearest area first, for recovery when its control goes. */
 let focusPath: { area: string; index: number }[] = [];
 const screens: Screen[] = [];
@@ -174,6 +185,20 @@ function answering(): boolean {
   return active() && layers === 0;
 }
 
+/** The dialog holding the ring now, if one is open and holds anything. */
+function topModal(): string | null {
+  for (let i = modals.length - 1; i >= 0; i--) {
+    if (entries.has(modals[i].key) && enter(tree, modals[i].key, memory)) return modals[i].key;
+  }
+  return null;
+}
+
+/** Whether `key` is where the ring may be: inside the open dialog, when there is one. */
+function allowed(key: string): boolean {
+  const modal = topModal();
+  return modal === null || within(tree, key, modal);
+}
+
 let spatialPaused = false;
 
 /** The spatial library is paused exactly while this engine answers. */
@@ -239,8 +264,11 @@ function setFocused(key: string, how: How): void {
   if (node) {
     node.tabIndex = 0;
     // The DOM focus follows, for a screen reader and the web's own keys,
-    // without the browser's scroll: the rule below is the only one.
-    if (answering() && how !== 'pointer' && document.activeElement !== node) {
+    // without the browser's scroll: the rule below is the only one. Not a
+    // text box: it takes the caret itself (typing.ts), after telling the
+    // system whether its keyboard should come up — a focus from here first
+    // would bring up Android's on arriving at a field.
+    if (answering() && how !== 'pointer' && document.activeElement !== node && node.tagName !== 'INPUT') {
       node.focus({ preventScroll: true });
     }
   }
@@ -253,6 +281,8 @@ function landingOf(screen: Screen | undefined): string | null {
 
 /** The current screen's landing control, if it is here; else the tree's first. */
 function landingLeaf(): string | null {
+  const modal = topModal();
+  if (modal) return enter(tree, modal, memory);
   const landing = landingOf(screens[screens.length - 1]);
   return (landing ? enter(tree, landing, memory) : null) ?? enter(tree, ROOT, memory);
 }
@@ -277,6 +307,27 @@ function settle(): void {
   generation++;
   const screen = screens[screens.length - 1];
   const fresh = screen.arrivedAt === inputs;
+
+  // A dialog open: the ring is in it (by its rules: a menu's current, else
+  // its first), whatever else is waiting.
+  const modal = topModal();
+  if (modal) {
+    if (focused === null || !entries.has(focused) || !within(tree, focused, modal)) {
+      const land = enter(tree, modal, memory);
+      if (land) setFocused(land, 'program');
+    }
+    return;
+  }
+  // A dialog closed: back to the control that opened it, if it is still here.
+  if (returnFromModal) {
+    const back = returnFromModal;
+    returnFromModal = null;
+    const liveInside = focused !== null && entries.has(focused) && enter(tree, focused, memory) === focused;
+    if (!liveInside && entries.has(back) && enter(tree, back, memory) === back) {
+      setFocused(back, 'program');
+      return;
+    }
+  }
 
   if (pending) {
     const { key, scrollTop, onTaken } = pending;
@@ -313,6 +364,7 @@ function settle(): void {
 function add(entry: Entry): void {
   if (entries.has(entry.key)) console.warn(`focus: ${entry.key} registered twice`);
   entries.set(entry.key, entry);
+  if (entry.modal) modals.push({ key: entry.key, opener: focused });
   let set = childSets.get(entry.parent);
   if (!set) childSets.set(entry.parent, (set = new Set()));
   set.add(entry.key);
@@ -325,6 +377,12 @@ function remove(key: string): void {
   if (!entry) return;
   entries.delete(key);
   childSets.get(entry.parent)?.delete(key);
+  const m = modals.findIndex((x) => x.key === key);
+  if (m >= 0) {
+    returnFromModal = modals[m].opener;
+    modals.splice(m, 1);
+    scheduleSettle();
+  }
   if (key === focused || pending) scheduleSettle();
 }
 
@@ -346,9 +404,10 @@ function onKeyDown(event: KeyboardEvent): void {
   const arrow = ARROWS[event.key];
   if (!arrow && event.key !== 'Enter' && event.key !== 'Tab') return;
   generation++;
-  const live = focused !== null && entries.has(focused);
+  const live = focused !== null && entries.has(focused) && allowed(focused);
   if (!live) {
-    // Nothing holds the ring: this press puts it on the landing spot.
+    // Nothing holds the ring (or it is outside the dialog open): this press
+    // puts it on the landing spot.
     const land = landingLeaf();
     if (!land) return;
     event.preventDefault();
@@ -359,12 +418,27 @@ function onKeyDown(event: KeyboardEvent): void {
   if (arrow) {
     // Also keeps the browser from scrolling the page by itself.
     event.preventDefault();
+    const node = entries.get(at)?.node;
+    const duration = motionFor(performance.now() - lastKeyMoveAt);
+    // Up first reads back what Down read on (focusScroll.ts).
+    if (arrow === 'up' && node && readBack(node, duration)) return;
     const next = move(tree, at, arrow, memory);
     if (next) setFocused(next, 'key');
+    // Down with nothing further down reads on — not on a held key, whose
+    // presses run past the end.
+    else if (arrow === 'down' && node && !event.repeat) readOn(node, duration);
     return;
   }
   if (event.key === 'Tab') {
-    const next = tabMove(tree, ROOT, at, event.shiftKey, memory);
+    // Inside a dialog, Tab goes round its own controls only: past its last
+    // stop to its first, never out to the page under it.
+    const modal = topModal();
+    let next = tabMove(tree, modal ?? ROOT, at, event.shiftKey, memory);
+    if (!next && modal) {
+      const stops = tabStops(tree, modal);
+      const stop = event.shiftKey ? stops[stops.length - 1] : stops[0];
+      next = stop ? enter(tree, stop, memory) : null;
+    }
     if (next) {
       event.preventDefault();
       setFocused(next, 'tab');
@@ -416,7 +490,7 @@ function install(): void {
   window.addEventListener('focusin', (e) => {
     if (!answering()) return;
     const key = (e.target as HTMLElement | null)?.dataset?.navKey;
-    if (key && key !== focused && entries.has(key)) setFocused(key, 'program');
+    if (key && key !== focused && entries.has(key) && allowed(key)) setFocused(key, 'program');
   });
 }
 
@@ -671,7 +745,9 @@ export function useNavLeaf(
       // ring — a pointer passing over a rail no longer changed where Up and
       // Down would land in it.
       onPointerDown: (e: { button: number }) => {
-        if (e.button === 0 && answering() && focused !== key && !disabled) setFocused(key, 'pointer');
+        if (e.button === 0 && answering() && focused !== key && !disabled && allowed(key)) {
+          setFocused(key, 'pointer');
+        }
       },
     },
   };
@@ -683,18 +759,20 @@ interface AreaOptions {
   /** Nothing to land on (an empty rail): passed over. */
   disabled?: boolean;
   pageTop?: boolean;
+  /** A dialog: holds the ring while it is here, and gives it back when it goes. */
+  modal?: boolean;
 }
 
 /** An area: registers `key` with its rules; its children use `NavParent value={key}`. */
 export function useNavArea(
   key: string,
   ref: RefObject<HTMLElement | null>,
-  { on, spec, disabled = false, pageTop = false }: AreaOptions
+  { on, spec, disabled = false, pageTop = false, modal = false }: AreaOptions
 ): void {
   const parent = useContext(ParentContext);
   useLayoutEffect(() => {
     if (!on) return;
-    add({ key, parent, node: ref.current, area: spec, disabled, pageTop });
+    add({ key, parent, node: ref.current, area: spec, disabled, pageTop, modal });
     return () => remove(key);
     // The rules are followed below without registering again.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -702,6 +780,7 @@ export function useNavArea(
 
   const { kind, current, remember, columns, axis, wrap } = spec;
   const hold = spec.hold?.join(',');
+  const passOver = spec.passOver?.join(',');
   useLayoutEffect(() => {
     const entry = on ? entries.get(key) : undefined;
     if (!entry) return;
@@ -713,10 +792,11 @@ export function useNavArea(
       axis,
       wrap,
       hold: hold ? (hold.split(',') as Arrow[]) : undefined,
+      passOver: passOver ? (passOver.split(',') as Arrow[]) : undefined,
     };
     entry.disabled = disabled;
     entry.pageTop = pageTop;
     entry.node = ref.current;
     scheduleSettle();
-  }, [on, key, ref, kind, current, remember, columns, axis, wrap, hold, disabled, pageTop]);
+  }, [on, key, ref, kind, current, remember, columns, axis, wrap, hold, passOver, disabled, pageTop]);
 }

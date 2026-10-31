@@ -377,12 +377,22 @@ Every scroll moves as one critically damped spring — a gentle start, no
 overshoot, a new target taken on at the speed it has, so a held key glides
 instead of stuttering — instant with the system's reduce-motion or the light
 look; the wheel and touchpad stay native, and a pointer never scrolls the
-page. Home, its rails and the Movies / TV shows
-grids are on it (`FocusScreen`); the other screens are still on the spatial
-library below until they move over (round 7, F2–F4). While a screen on the
-new engine is up the library is paused, and a dialog still on the library
-(`NoriginLayer`) takes the keys back while it is open — one handler per
-press, decided by what is mounted.
+page. Down with nothing further down reads on (a page that ends in text
+scrolls on by most of a screen) and Up reads back before the ring moves. A
+**dialog** is a menu that holds the ring while it is open — arrows and Tab go
+round inside it, a click outside it does not take the ring — and gives it
+back to the control that opened it when it closes (`modal` areas in
+focusStore.ts); a menu's `current` is where it opens. An area can let an
+arrow **pass over** it on the way in (a series of one season: Down from Play
+passes the row holding only "Mark season watched", Up from the first episode
+reaches it). Home, its rails, the Movies / TV shows grids (F1), a title's
+page with its seasons and episodes, the actor and collection pages, the card
+menu and the dialogs opened from a title's page (F2) are on it
+(`FocusScreen`); the other screens are still on the spatial library below
+until they move over (round 7, F3–F4). While a screen on the new engine is up
+the library is paused, and a dialog still on the library (`NoriginLayer`:
+Leave, Play something, the folder browser, a trailer) takes the keys back
+while it is open — one handler per press, decided by what is mounted.
 
 **Screens are built from a few kinds of focus group** (`focusGroups.ts`,
 2026-10-10). Inside a screen, "where does this arrow go" used to be answered by

@@ -16,6 +16,16 @@ export async function afterPress(page: Page): Promise<void> {
   if (!(await onKinemaEngine(page))) await page.waitForTimeout(150);
 }
 
+/**
+ * The page has answered everything sent so far and drawn the result: two
+ * frames. For checking that something did *not* happen, without a fixed wait.
+ */
+export async function drawn(page: Page): Promise<void> {
+  await page.evaluate(
+    () => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done())))
+  );
+}
+
 /** The page has stopped moving: no scroll the ring caused is still gliding. */
 export async function settled(page: Page): Promise<void> {
   await expect

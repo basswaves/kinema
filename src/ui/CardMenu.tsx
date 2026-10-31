@@ -11,13 +11,14 @@
  * A menu like the Version list: focus never leaves it, Back closes it and the
  * ring goes back to the card.
  */
-import { FocusContext, setFocus } from '@noriginmedia/norigin-spatial-navigation';
+import { setFocus } from '@noriginmedia/norigin-spatial-navigation';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import FocusButton from './FocusButton';
 import { useFocusGroup } from './focusGroups';
+import { FocusProvider } from './FocusGroup';
 import { focusInPlace } from './focus';
-import { NoriginLayer } from './focusEngine';
+import { navFocus, useOnKinema } from './focusStore';
 import { PlaylistDialog } from './PlaylistPicker';
 import { closeCardMenu, useCardMenu, type CardMenuRequest } from './cardMenuStore';
 import { getTitleDetail, type Title } from './api';
@@ -51,31 +52,27 @@ export default function CardMenuHost(props: Props) {
 
   return (
     <>
-      {/* Still on the spatial library: over a screen on Kinema's own engine
-          it takes the keys while open, and the ring comes back to the card
-          when it closes (focusEngine.tsx). */}
+      {/* On whichever engine the screen under it is (round 7, F2): over a
+          screen on Kinema's own a menu that holds the ring while open and
+          gives it back to the card when it closes (focusStore.ts). */}
       {request && (
-        <NoriginLayer>
-          <CardMenu
-            key={`${request.title.id}:${request.returnTo ?? ''}`}
-            request={request}
-            {...props}
-            onPlaylist={(items, what) => setPlaylist({ items, what })}
-            onNote={setNote}
-          />
-        </NoriginLayer>
+        <CardMenu
+          key={`${request.title.id}:${request.returnTo ?? ''}`}
+          request={request}
+          {...props}
+          onPlaylist={(items, what) => setPlaylist({ items, what })}
+          onNote={setNote}
+        />
       )}
       {playlist && (
-        <NoriginLayer>
-          <PlaylistDialog
-            items={playlist.items}
-            what={playlist.what}
-            onClose={(message) => {
-              setPlaylist(null);
-              setNote(message);
-            }}
-          />
-        </NoriginLayer>
+        <PlaylistDialog
+          items={playlist.items}
+          what={playlist.what}
+          onClose={(message) => {
+            setPlaylist(null);
+            setNote(message);
+          }}
+        />
       )}
       {note && (
         <p className="card-menu-note" role="status">
@@ -99,25 +96,32 @@ function CardMenu({
   onNote: (note: string) => void;
 }) {
   const { title, returnTo, held } = request;
-  const { ref, focusKey } = useFocusGroup('menu');
+  // Opens on its first item; on Kinema's engine a menu lands there by itself.
+  const kinema = useOnKinema();
+  const { ref, focusKey } = useFocusGroup('menu', { current: FIRST_KEY });
   const desktop = useCapabilities()?.runs_programs ?? false;
   const series = title.kind === 'series';
   const listed = isOnMyList(title.id);
 
   useEffect(() => {
-    void setFocus(FIRST_KEY);
+    if (!kinema) void setFocus(FIRST_KEY);
+    // Only on opening.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const pointer = request.pointer;
   const close = useCallback(() => {
-    // Back first, while the menu is still there (docs/GOTCHAS.md, as LeaveDialog.tsx);
-    // for a pointer without moving the page under it (focus.ts).
+    // Back to the card first, while the menu is still there (docs/GOTCHAS.md,
+    // as LeaveDialog.tsx); for a pointer without moving the page under it.
+    // On Kinema's engine the page moves only if the card is out of sight, and
+    // the card is named: a right-click opens the menu without taking the ring.
     if (returnTo) {
-      if (pointer) focusInPlace(returnTo);
+      if (kinema) navFocus(returnTo);
+      else if (pointer) focusInPlace(returnTo);
       else void setFocus(returnTo);
     }
     closeCardMenu();
-  }, [returnTo, pointer]);
+  }, [returnTo, pointer, kinema]);
 
   // Opened by OK held: that OK is still down, and its repeats (and its
   // release) must not choose the first item. Taken once the key came up, or
@@ -225,7 +229,7 @@ function CardMenu({
   }
 
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <div className="leave-backdrop" onClick={close} onContextMenu={(e) => e.preventDefault()}>
         <div
           className="leave card-menu"
@@ -249,6 +253,6 @@ function CardMenu({
           </div>
         </div>
       </div>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }

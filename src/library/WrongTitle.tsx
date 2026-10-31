@@ -8,17 +8,14 @@
  * either" is the developer tools' unlink — the files wait in Needs attention,
  * held, so the next scan's matcher cannot simply put the wrong title back.
  *
- * A menu like the Version list: focus never leaves it, Back closes it and the
- * ring goes back to the button that opened it.
+ * A menu like the Version list: it opens on the search box, the ring never
+ * leaves it, Back closes it and the ring goes back to the button that opened
+ * it (focusStore.ts does all three).
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  FocusContext,
-  getCurrentFocusKey,
-  setFocus,
-} from '@noriginmedia/norigin-spatial-navigation';
+import { useCallback, useEffect, useState } from 'react';
 import { useFocusGroup } from '../ui/focusGroups';
 import FocusButton from '../ui/FocusButton';
+import FocusGroup, { FocusProvider } from '../ui/FocusGroup';
 import { count } from '../ui/format';
 import { describeFailure } from '../metadata/reach';
 import { unlinkFiles } from '../metadata/api';
@@ -43,7 +40,7 @@ interface Props {
 }
 
 export default function WrongTitle({ titleId, name, year, isSeries: wasSeries, onClose, onDone }: Props) {
-  const { ref, focusKey } = useFocusGroup('menu');
+  const { ref, focusKey } = useFocusGroup('menu', { current: WRONG_TITLE_INPUT_KEY });
   const [isSeries, setIsSeries] = useState(wasSeries);
   const [fileIds, setFileIds] = useState<number[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -55,16 +52,7 @@ export default function WrongTitle({ titleId, name, year, isSeries: wasSeries, o
       .catch((e: unknown) => setError(String(e)));
   }, [titleId]);
 
-  const returnTo = useRef<string | null>(null);
-  useEffect(() => {
-    returnTo.current = getCurrentFocusKey();
-    void setFocus(WRONG_TITLE_INPUT_KEY);
-  }, []);
-
-  const close = useCallback(() => {
-    if (returnTo.current) void setFocus(returnTo.current);
-    onClose();
-  }, [onClose]);
+  const close = onClose;
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -124,7 +112,7 @@ export default function WrongTitle({ titleId, name, year, isSeries: wasSeries, o
 
   const files = fileIds?.length ?? 0;
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <div className="leave-backdrop" onClick={close}>
         <div
           className="leave wrong-title"
@@ -151,25 +139,24 @@ export default function WrongTitle({ titleId, name, year, isSeries: wasSeries, o
               inputFocusKey={WRONG_TITLE_INPUT_KEY}
             />
           </section>
-          <div className="settings-row wrong-title-foot">
+          <FocusGroup kind="row" className="settings-row wrong-title-foot">
             <FocusButton
               className="btn-secondary"
-              keepInView="nearest"
               disabled={busy || !files}
               onSelect={unlink}
             >
               Unlink, decide later
             </FocusButton>
-            <FocusButton className="btn-secondary" keepInView="nearest" onSelect={close}>
+            <FocusButton className="btn-secondary" onSelect={close}>
               Cancel
             </FocusButton>
-          </div>
+          </FocusGroup>
           <p className="muted wrong-title-note">
             Unlink takes the title off these files; they wait under Settings → Library → Needs
             attention, and the next scan does not put it back.
           </p>
         </div>
       </div>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }

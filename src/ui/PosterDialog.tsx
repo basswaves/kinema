@@ -4,19 +4,15 @@
  * the person's, kept by the title's ids over every refresh (metadata.rs
  * `poster_choice`); nothing is written beside the files.
  *
- * A menu like the Version list: focus stays in it, Back closes it and the
- * ring goes back to the button that opened it. The posters are one row that
+ * A menu like the Version list: the ring stays in it, Back closes it and the
+ * ring goes back to the button that opened it (focusStore.ts does both). The posters are one row that
  * scrolls, never a wrapped grid a remote could not reach the second line of.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  FocusContext,
-  getCurrentFocusKey,
-  setFocus,
-} from '@noriginmedia/norigin-spatial-navigation';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useFocusGroup } from './focusGroups';
+import { navFocus } from './focusStore';
 import FocusButton from './FocusButton';
-import FocusGroup from './FocusGroup';
+import FocusGroup, { FocusProvider } from './FocusGroup';
 import Art from './Art';
 import { sizedPoster } from './poster';
 import { posterChoices, type PosterChoice, type PosterChoices } from '../library/posters';
@@ -35,11 +31,6 @@ export default function PosterDialog({ titleId, name, onChosen, onClose }: Props
   const [found, setFound] = useState<PosterChoices | null>(null);
   const choices = found?.choices ?? null;
 
-  const returnTo = useRef<string | null>(null);
-  useEffect(() => {
-    returnTo.current = getCurrentFocusKey();
-  }, []);
-
   useEffect(() => {
     let cancelled = false;
     void posterChoices(titleId, (next) => !cancelled && setFound(next)).catch((e) =>
@@ -50,18 +41,16 @@ export default function PosterDialog({ titleId, name, onChosen, onClose }: Props
     };
   }, [titleId]);
 
-  // Onto the poster shown now, once the list is drawn.
+  // Onto the poster shown now, once the list is drawn (it comes after
+  // Cancel, which holds the ring meanwhile) — once.
   const current = choices ? Math.max(0, choices.findIndex((c) => c.current)) : -1;
-  useEffect(() => {
-    if (current < 0) return;
-    const frame = requestAnimationFrame(() => void setFocus(choiceKey(current)));
-    return () => cancelAnimationFrame(frame);
+  const landed = useRef(false);
+  useLayoutEffect(() => {
+    if (current < 0 || landed.current) return;
+    landed.current = navFocus(choiceKey(current));
   }, [current]);
 
-  const close = useCallback(() => {
-    if (returnTo.current) void setFocus(returnTo.current);
-    onClose();
-  }, [onClose]);
+  const close = onClose;
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -89,7 +78,7 @@ export default function PosterDialog({ titleId, name, onChosen, onClose }: Props
   );
 
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <div className="leave-backdrop" onClick={close}>
         <div
           className="leave posters"
@@ -135,6 +124,6 @@ export default function PosterDialog({ titleId, name, onChosen, onClose }: Props
           </FocusButton>
         </div>
       </div>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }

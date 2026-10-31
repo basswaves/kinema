@@ -74,6 +74,8 @@ interface Options {
   axis?: 'x' | 'y';
   /** Kinema's engine: the page goes to its top when the ring is here (the top bar). */
   pageTop?: boolean;
+  /** Kinema's engine: arrows that pass over this group from outside (focusModel.ts). */
+  passOver?: Direction[];
 }
 
 /** The area of Kinema's engine a group of `kind` is (focusModel.ts). */
@@ -94,7 +96,7 @@ function areaFor(kind: GroupKind, current: string | undefined, wrap: Wrap, axis:
  * `useFocusable`, with `FocusProvider` (FocusGroup.tsx) for its children.
  */
 export function useNavGroup<E extends HTMLElement = HTMLDivElement>(
-  area: AreaSpec & { disabled?: boolean; pageTop?: boolean },
+  area: AreaSpec & { disabled?: boolean; pageTop?: boolean; modal?: boolean },
   config: UseFocusableConfig = {}
 ): UseFocusableResult<E> {
   const kinema = useOnKinema();
@@ -102,8 +104,8 @@ export function useNavGroup<E extends HTMLElement = HTMLDivElement>(
     ...config,
     focusable: (config.focusable ?? true) && !kinema,
   });
-  const { disabled, pageTop, ...spec } = area;
-  useNavArea(result.focusKey, result.ref, { on: kinema, spec, disabled, pageTop });
+  const { disabled, pageTop, modal, ...spec } = area;
+  useNavArea(result.focusKey, result.ref, { on: kinema, spec, disabled, pageTop, modal });
   const within = useFocusWithin(result.focusKey, kinema);
   return kinema ? { ...result, hasFocusedChild: within } : result;
 }
@@ -222,7 +224,7 @@ export function resolveInGroup(
  */
 export function useFocusGroup<E extends HTMLElement = HTMLDivElement>(
   kind: GroupKind,
-  { focusKey, current, focusable = true, wrap = 'vertical', stopAt, axis = 'y', pageTop }: Options = {}
+  { focusKey, current, focusable = true, wrap = 'vertical', stopAt, axis = 'y', pageTop, passOver }: Options = {}
 ): UseFocusableResult<E> {
   const stops = stopAt ?? (kind === 'row' ? ROW_STOPS : NO_STOPS);
   const resolve = useCallback(
@@ -231,7 +233,9 @@ export function useFocusGroup<E extends HTMLElement = HTMLDivElement>(
     [kind, wrap]
   );
 
-  const area = { ...areaFor(kind, current, wrap, axis), disabled: !focusable, pageTop };
+  // On Kinema's engine a menu is a dialog: it holds the ring while it is
+  // open, and gives it back to the control that opened it (focusStore.ts).
+  const area = { ...areaFor(kind, current, wrap, axis), passOver, disabled: !focusable, pageTop, modal: kind === 'menu' };
   const result = useNavGroup<E>(area, {
     focusKey,
     focusable,

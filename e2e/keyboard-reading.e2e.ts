@@ -5,7 +5,7 @@
  * (CONTRIBUTING, "Two failure modes"). Shared helpers: kb.ts.
  */
 import { expect, test, type Page } from '@playwright/test';
-import { press, focused, open, androidSettings, settled } from './kb';
+import { press, focused, open, androidSettings, settled, drawn } from './kb';
 
 test('the equipment notice: Choose when never asked, Use it too for only these', async ({ page }) => {
   await open(page, 'windows');
@@ -113,8 +113,10 @@ test("a series' page lands on Play even when the next episode is slow to find", 
   await press(page, 'Enter');
   await expect(page.locator('.detail')).toBeVisible();
   await expect.poll(() => focused(page)).toMatch(/^▶ (Play|Resume) S\d\dE\d\d/);
-  await page.waitForTimeout(800);
-  await expect.poll(() => focused(page)).toMatch(/^▶ (Play|Resume) S\d\dE\d\d/);
+  // Play is there only once the slow next episode is known: nothing is left
+  // to arrive, and the ring stays.
+  await drawn(page);
+  expect(await focused(page)).toMatch(/^▶ (Play|Resume) S\d\dE\d\d/);
 });
 
 // White lettering on a solid plate went one white block; it is cut out now.
@@ -139,15 +141,15 @@ test('Down with nothing further down reads on, and Up reads back', async ({ page
   await press(page, 'Enter');
   await expect.poll(() => focused(page)).toBe('▶ Play');
   await page.setViewportSize({ width: 1280, height: 300 });
-  await page.waitForTimeout(400);
+  await drawn(page);
   const details = '▾ File details';
   for (let i = 0; i < 6 && !(await focused(page))?.includes('File details'); i++) {
     await press(page, 'ArrowDown');
-    await page.waitForTimeout(200);
   }
   await press(page, 'Enter');
   await expect.poll(() => focused(page)).toBe(details);
-  await page.waitForTimeout(400);
+  await expect(page.locator('.file-info-row').first()).toBeVisible();
+  await settled(page);
   const lastRow = page.locator('.file-info-row').last();
   const rowShown = () =>
     lastRow.evaluate((el) => el.getBoundingClientRect().bottom <= window.innerHeight);
@@ -155,7 +157,7 @@ test('Down with nothing further down reads on, and Up reads back', async ({ page
 
   for (let i = 0; i < 6 && !(await rowShown()); i++) {
     await press(page, 'ArrowDown');
-    await page.waitForTimeout(400);
+    await settled(page);
   }
   expect(await rowShown()).toBe(true);
   expect(await focused(page)).toBe(details);
@@ -168,7 +170,7 @@ test('Down with nothing further down reads on, and Up reads back', async ({ page
     });
   for (let i = 0; i < 6 && !(await inView()); i++) {
     await press(page, 'ArrowUp');
-    await page.waitForTimeout(400);
+    await settled(page);
   }
   expect(await inView()).toBe(true);
   expect(await focused(page)).toBe(details);

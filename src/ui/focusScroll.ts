@@ -293,10 +293,78 @@ function alongTrack(leaf: HTMLElement, page: HTMLElement | null, duration: numbe
   else if (start - peek < at) glide(track, 'x', start - peek, duration);
 }
 
-/** To the page's top: the top bar's own buttons. */
+/**
+ * To the page's top: the top bar's own buttons, a title page's Back and the
+ * buttons under its title — as near the top as keeps the ring above the
+ * window's bottom (a long overview on a small window).
+ */
 export function toTop(leaf: HTMLElement, duration: number): void {
   const page = pageOf(leaf);
-  if (page) glide(page, 'y', 0, duration);
+  if (!page) return;
+  // A sticky bar (the top bar, a title page's Back) is where it is drawn,
+  // not where it sits on the page: for it, the very top.
+  const room = page.clientHeight - BOTTOM_GAP_REM * remPx();
+  const bottom = leaf.closest('[data-sticky-top]') ? 0 : contentTop(leaf, page) + leaf.offsetHeight;
+  glide(page, 'y', Math.max(0, bottom - room), duration);
+  alongTrack(leaf, page, duration);
+}
+
+/** How far one press reads on, as a share of the visible page. */
+const READ_STEP = 0.6;
+/** The control reading on scrolled away from, while it still holds the ring. */
+let leftBehind: HTMLElement | null = null;
+
+/**
+ * Down with nothing further down reads on (owner, 2026-10-04: "you can't see
+ * everything"): a page that ends in text below its last control — a long
+ * description, the file's details — scrolls on by most of a screen, as a TV
+ * app does with text. It stops where the control is still clear of the bar,
+ * or takes it off the screen entirely when it is near the top already (the
+ * owner, 2026-10-05: never half under the see-through bar). False when there
+ * is nothing more to read.
+ */
+export function readOn(leaf: HTMLElement, duration: number): boolean {
+  const page = pageOf(leaf);
+  if (!page) return false;
+  const at = settled(page, 'y');
+  const remaining = page.scrollHeight - page.clientHeight - at;
+  const step = page.clientHeight * READ_STEP;
+  const bar = barBottom(page);
+  const top = contentTop(leaf, page) - at;
+  let by = Math.min(step, remaining);
+  if (top - by < bar && top - by + leaf.offsetHeight > 0) {
+    // A full step would leave it half under the bar: stop with it just
+    // clear, unless that is hardly a step — then past it altogether, where
+    // the page goes that far.
+    const keep = Math.max(0, top - bar);
+    const past = top + leaf.offsetHeight;
+    by = keep >= step / 3 || past > remaining ? keep : past;
+  }
+  if (by < 1) return false;
+  leftBehind = leaf;
+  glide(page, 'y', at + by, duration);
+  return true;
+}
+
+/**
+ * Up while the control reading on left behind is above the bar: the page
+ * scrolls back until it is clear, before the ring moves anywhere. Only then —
+ * a control the ring has just moved to is above the bar too until the page
+ * has scrolled to it. False when there was nothing to read back.
+ */
+export function readBack(leaf: HTMLElement, duration: number): boolean {
+  if (leaf !== leftBehind) {
+    leftBehind = null;
+    return false;
+  }
+  const page = pageOf(leaf);
+  if (!page) return false;
+  const at = settled(page, 'y');
+  const bar = barBottom(page);
+  const top = contentTop(leaf, page) - at;
+  if (top >= bar - 1 || at <= 0) return false;
+  glide(page, 'y', at - Math.min(page.clientHeight * READ_STEP, bar - top), duration);
+  return true;
 }
 
 /**

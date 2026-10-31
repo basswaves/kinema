@@ -1046,8 +1046,10 @@ html {
 }
 
 /* On a title's page Back stays under the top bar while the episodes scroll by
-   (T25). What it covers is accounted for twice: the extra scroll-margin here
-   and BACK_BAR_REM in focus.ts, so a focused episode is never left under it. */
+   (T25). It is marked `data-sticky-top`, and the one scroll rule reads how far
+   down it reaches from the page (focusScroll.ts `barBottom`), so a focused
+   episode is never left under it; the scroll-margin below is for the browser's
+   own scrolling (Tab from outside, a link). */
 .detail > .back-button {
   position: sticky;
   top: calc(3.25rem + var(--safe-top));

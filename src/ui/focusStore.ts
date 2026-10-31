@@ -665,8 +665,13 @@ export function useNavLeaf(
     props: {
       'data-nav-key': key,
       tabIndex: -1,
-      onPointerMove: () => {
-        if (pointerMoved && answering() && focused !== key && !disabled) setFocused(key, 'pointer');
+      // A click puts the ring where it pointed; hovering does not move it
+      // (the owner, 2026-10-31): the pointer's own highlight is the CSS
+      // `:hover`, and the keys go on from where they or a click left the
+      // ring — a pointer passing over a rail no longer changed where Up and
+      // Down would land in it.
+      onPointerDown: (e: { button: number }) => {
+        if (e.button === 0 && answering() && focused !== key && !disabled) setFocused(key, 'pointer');
       },
     },
   };

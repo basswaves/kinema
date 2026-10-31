@@ -1,9 +1,10 @@
 /**
  * The one scroll rule (round 7, notes FOCUS-REWORK.md): a keyboard or remote
  * move scrolls the page so the area holding the ring — a rail, the hero, a
- * notice, a grid's row — sits at a fixed line just below the top bar, with
- * its heading when the two fit together; inside a rail the card holding the
- * ring sits where the rail's first card does. Going up to the first areas
+ * notice, a grid's row — sits a third of the way down the page (the owner's
+ * choice, 2026-10-31, as the streaming apps keep their focused row), with its
+ * heading when the two fit, never under the top bar; inside a rail the row
+ * moves only when the ring nears its edge. Going up to the first areas
  * brings the page back to its top, because the page never scrolls above it.
  *
  * Before this, each page scrolled by rules of its own (`keepOnScreen`, read
@@ -12,28 +13,27 @@
  * third. The top bar's height is read from the page (`data-sticky-top`), never
  * a number to keep in step with ui.css.
  *
- * Only moves made by a key scroll. A pointer that moves the ring leaves the
- * page where it is, and the wheel and touchpad scroll natively: a turn of the
- * wheel or a touch stops a glide under way.
+ * Only moves made by a key scroll. A click leaves the page where it is, and
+ * the wheel and touchpad scroll natively: a turn of the wheel or a touch
+ * stops a scroll in motion.
  *
- * Every glide has one length and one easing. Under a held key each press
- * shortens it to the time since the last one, so the page keeps up with the
- * ring instead of starting a new glide behind it at every repeat; the
- * system's "reduce motion" and the light look (lightLook.ts) make it instant.
+ * Every scroll moves as one spring (`glide`). Under a held key it settles
+ * quicker and takes each new target on at the speed it has, so the page keeps
+ * up with the ring; the system's "reduce motion" and the light look
+ * (lightLook.ts) make it instant.
  */
 import { isLightLook } from './lightLook';
 
-/** One glide's length, for every scroll the ring causes. */
-export const MOTION_MS = 200;
-/** The shortest glide under a held key: shorter is a jump. */
-const MIN_MOTION_MS = 50;
-/** The gap between the top bar and the area lined up below it, in rem. */
+/** How long a move takes to settle, for every scroll the ring causes. */
+export const MOTION_MS = 320;
+/** The quickest settle, under a held key: quicker reads as a jump. */
+const MIN_MOTION_MS = 140;
+/** Where a key move puts the area holding the ring: this share of the way down the page. */
+const KEYLINE = 1 / 3;
+/** The least gap between the top bar and that area, in rem. */
 const LINE_GAP_REM = 0.75;
-
-/** Decelerating: quick off the mark, gentle into place. */
-function ease(t: number): number {
-  return 1 - (1 - t) ** 3;
-}
+/** The least room left under the ring at the bottom of the window, in rem. */
+const BOTTOM_GAP_REM = 1.5;
 
 function reducedMotion(): boolean {
   if (isLightLook()) return true;
@@ -44,26 +44,36 @@ function reducedMotion(): boolean {
   }
 }
 
-interface Glide {
+/**
+ * A scroll in motion, as a critically damped spring: it starts gently, never
+ * goes past its target, and a new target taken while moving keeps the speed
+ * it has. An eased glide of fixed length (the first version) did most of its
+ * travel in its first frames and braked hard, which read as a shove and a
+ * bounce back (the owner's recording, 2026-10-31); restarted at every press of
+ * a held key, it also stuttered.
+ */
+interface Spring {
   axis: 'x' | 'y';
-  from: number;
+  pos: number;
+  vel: number;
   to: number;
-  start: number;
-  duration: number;
+  /** Stiffness, per second: settled in about 4.7 / omega seconds. */
+  omega: number;
+  last: number;
   frame: number;
 }
 
-const glides = new Map<HTMLElement, Glide>();
+const springs = new Map<HTMLElement, Spring>();
 let stopperInstalled = false;
 
-/** A wheel, a touch or a pointer press takes the page back from a glide. */
+/** A wheel, a touch or a pointer press takes the page back from a scroll in motion. */
 function installStopper(): void {
   if (stopperInstalled) return;
   stopperInstalled = true;
   const stop = () => {
-    for (const [el, glide] of glides) {
-      cancelAnimationFrame(glide.frame);
-      glides.delete(el);
+    for (const [el, spring] of springs) {
+      cancelAnimationFrame(spring.frame);
+      springs.delete(el);
     }
   };
   for (const type of ['wheel', 'touchstart', 'pointerdown']) {
@@ -81,48 +91,70 @@ function place(el: HTMLElement, axis: 'x' | 'y', at: number): void {
 }
 
 /**
- * Scroll `el` along `axis` to `to` over `duration` (0: at once). A glide
- * already under way there is taken over from where it is, not restarted.
+ * Scroll `el` along `axis` to `to`, settling in about `duration` ms (0: at
+ * once). A scroll already moving there takes the new target on at the speed
+ * it has.
  */
 export function glide(el: HTMLElement, axis: 'x' | 'y', to: number, duration: number): void {
   installStopper();
   const max = axis === 'y' ? el.scrollHeight - el.clientHeight : el.scrollWidth - el.clientWidth;
   const target = Math.max(0, Math.min(Math.round(to), Math.max(0, max)));
-  const running = glides.get(el);
-  if (running && running.axis === axis && running.to === target) return;
-  if (running) {
-    cancelAnimationFrame(running.frame);
-    glides.delete(el);
-  }
-  const from = position(el, axis);
-  if (Math.abs(target - from) < 1) return;
+  const running = springs.get(el);
   if (duration <= 0 || reducedMotion()) {
+    if (running) {
+      cancelAnimationFrame(running.frame);
+      springs.delete(el);
+    }
     place(el, axis, target);
     return;
   }
-  const g: Glide = { axis, from, to: target, start: performance.now(), duration, frame: 0 };
+  const omega = 4.7 / (duration / 1000);
+  if (running && running.axis === axis) {
+    running.to = target;
+    running.omega = omega;
+    return;
+  }
+  if (running) {
+    cancelAnimationFrame(running.frame);
+    springs.delete(el);
+  }
+  const from = position(el, axis);
+  if (Math.abs(target - from) < 1) return;
+  const s: Spring = { axis, pos: from, vel: 0, to: target, omega, last: performance.now(), frame: 0 };
   const step = (now: number) => {
-    const t = Math.min(1, (now - g.start) / g.duration);
-    place(el, axis, g.from + (g.to - g.from) * ease(t));
-    if (t < 1) g.frame = requestAnimationFrame(step);
-    else glides.delete(el);
+    const dt = Math.min(0.05, Math.max(0, (now - s.last) / 1000));
+    s.last = now;
+    // The exact solution for a critically damped spring over dt.
+    const x0 = s.pos - s.to;
+    const decay = Math.exp(-s.omega * dt);
+    const c = s.vel + s.omega * x0;
+    const x = (x0 + c * dt) * decay;
+    s.vel = (s.vel - s.omega * c * dt) * decay;
+    s.pos = s.to + x;
+    if (Math.abs(x) < 0.5 && Math.abs(s.vel) < 20) {
+      place(el, axis, s.to);
+      springs.delete(el);
+      return;
+    }
+    place(el, axis, s.pos);
+    s.frame = requestAnimationFrame(step);
   };
-  g.frame = requestAnimationFrame(step);
-  glides.set(el, g);
+  s.frame = requestAnimationFrame(step);
+  springs.set(el, s);
 }
 
-/** Whether a glide the ring caused is still under way (for the browser flows). */
+/** Whether a scroll the ring caused is still moving (for the browser flows). */
 export function gliding(): boolean {
-  return glides.size > 0;
+  return springs.size > 0;
 }
 
-/** Where a running glide on `el` ends, or where it is when none runs. */
+/** Where a scroll in motion on `el` is going, or where it is when none moves. */
 function settled(el: HTMLElement, axis: 'x' | 'y'): number {
-  const g = glides.get(el);
-  return g && g.axis === axis ? g.to : position(el, axis);
+  const s = springs.get(el);
+  return s && s.axis === axis ? s.to : position(el, axis);
 }
 
-/** The length of a glide for a key move `sinceLast` ms after the previous one. */
+/** How quickly a key move `sinceLast` ms after the previous one settles. */
 export function motionFor(sinceLast: number): number {
   return Math.max(MIN_MOTION_MS, Math.min(MOTION_MS, sinceLast));
 }
@@ -203,27 +235,40 @@ function remPx(): number {
 }
 
 /**
- * The rule, for a key move: `anchor` (scrollAnchor in focusModel.ts) at the
- * line below the bar, `leaf` where the rail's first card is.
+ * The rule, for a key move: `anchor` (scrollAnchor in focusModel.ts) a third
+ * of the way down the page — higher when the area is too tall for that, never
+ * under the bar — and `leaf` kept in its rail with the next card in sight.
  */
 export function lineUp(anchor: HTMLElement, leaf: HTMLElement, duration: number): void {
   const page = pageOf(leaf);
   if (page) {
-    const line = barBottom(page) + LINE_GAP_REM * remPx();
+    const rem = remPx();
+    const bar = barBottom(page);
     const top = contentTop(anchor, page);
+    const leafBottom = contentTop(leaf, page) + leaf.offsetHeight;
+    const room = page.clientHeight - BOTTOM_GAP_REM * rem;
+    const highest = bar + LINE_GAP_REM * rem;
     const heading = headingBefore(anchor, page);
     let from = top;
     if (heading) {
       const headTop = contentTop(heading, page);
-      const leafBottom = contentTop(leaf, page) + leaf.offsetHeight;
-      if (headTop < top && leafBottom - headTop + line <= page.clientHeight) from = headTop;
+      if (headTop < top && leafBottom - headTop + highest <= room) from = headTop;
     }
+    // A third of the way down; higher when what is from there to the ring's
+    // bottom would not fit above the window's bottom.
+    const keyline = Math.max(highest, page.clientHeight * KEYLINE);
+    const line = Math.max(highest, Math.min(keyline, room - (leafBottom - from)));
     glide(page, 'y', from - line, duration);
   }
   alongTrack(leaf, page, duration);
 }
 
-/** Inside a rail: the card holding the ring where the first card sits. */
+/**
+ * Inside a rail: the row moves only when the card holding the ring comes near
+ * its edge, and then by as little as keeps the next card half in sight.
+ * Moving it a card at every press (the first version) shifted the whole row
+ * each time.
+ */
 function alongTrack(leaf: HTMLElement, page: HTMLElement | null, duration: number): void {
   const track = trackOf(leaf, page);
   if (!track) return;
@@ -231,7 +276,14 @@ function alongTrack(leaf: HTMLElement, page: HTMLElement | null, duration: numbe
   while (item.parentElement && item.parentElement !== track) item = item.parentElement;
   const first = track.firstElementChild as HTMLElement | null;
   if (!first || item.parentElement !== track) return;
-  glide(track, 'x', item.offsetLeft - first.offsetLeft, duration);
+  const style = getComputedStyle(track);
+  const span = track.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+  const start = item.offsetLeft - first.offsetLeft;
+  const end = start + item.offsetWidth;
+  const peek = item.offsetWidth / 2;
+  const at = settled(track, 'x');
+  if (end + peek > at + span) glide(track, 'x', end + peek - span, duration);
+  else if (start - peek < at) glide(track, 'x', start - peek, duration);
 }
 
 /** To the page's top: the top bar's own buttons. */

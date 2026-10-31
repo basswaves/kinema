@@ -2,9 +2,10 @@
  * Home and the shelves on Kinema's own focus engine (round 7, focusStore.ts):
  * what a browser has to show and the unit tests of the moves
  * (focusModel.test.ts) cannot — the ring is always on screen, never under the
- * top bar, one ring only and the DOM focus with it; Tab moves by area; a
- * pointer moves the ring without moving the page; a held key keeps up. Waits
- * for states only, never a fixed time.
+ * top bar, one ring only and the DOM focus with it; Tab moves by area;
+ * hovering highlights without moving the ring and a click moves it without
+ * moving the page; every scroll goes one way and starts gently; a held key
+ * keeps up. Waits for states only, never a fixed time.
  */
 import { expect, test, type Page } from '@playwright/test';
 import { focused, open, press, settled } from './kb';
@@ -121,21 +122,60 @@ test('Tab and Shift+Tab go from area to area, as on a web page', async ({ page }
   expect((await ring(page)).key).toBe('nav:home');
 });
 
-test('a pointer moves the ring where it points and leaves the page where it is', async ({ page }) => {
+test('hovering highlights without moving the ring; a click moves it, and neither moves the page', async ({ page }) => {
   await open(page, 'windows');
   const card = page.locator('.rail .card').first();
   await card.scrollIntoViewIfNeeded();
-  const before = (await ring(page)).scroll;
+  const before = await ring(page);
   const box = (await card.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 3);
   await page.mouse.move(box.x + box.width / 2 + 2, box.y + box.height / 3);
+  // The keys still go on from where they left the ring.
+  expect((await ring(page)).key).toBe(before.key);
+  await page.mouse.down();
   await expect(card).toHaveClass(/focused/);
+  await page.mouse.up();
   await settled(page);
-  expect((await ring(page)).scroll).toBe(before);
-  expect((await ring(page)).rings).toBe(1);
-  // The keys go on from where the pointer left the ring.
-  await press(page, 'ArrowRight');
-  expect((await ring(page)).key).not.toBe(await card.getAttribute('data-nav-key'));
+  const after = await ring(page);
+  expect(after.rings).toBe(1);
+});
+
+test('every key scroll goes one way and starts gently: no shove, no bounce back', async ({ page }) => {
+  await open(page, 'windows');
+  // Auto may choose the light look on a busy machine, where moves are instant.
+  await page.evaluate(async () => {
+    const path = '/src/ui/lightLook.ts';
+    (await import(/* @vite-ignore */ path)).setLook('full');
+  });
+  const path = async (key: string) => {
+    await page.evaluate(() => {
+      const b = document.querySelector('.browse')!;
+      const w = window as unknown as { __path: number[]; __done: boolean };
+      w.__path = [b.scrollTop];
+      w.__done = false;
+      const t0 = performance.now();
+      const f = () => {
+        w.__path.push(b.scrollTop);
+        if (performance.now() - t0 < 700) requestAnimationFrame(f);
+        else w.__done = true;
+      };
+      requestAnimationFrame(f);
+    });
+    await press(page, key);
+    await settled(page);
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __done: boolean }).__done)).toBe(true);
+    return page.evaluate(() => (window as unknown as { __path: number[] }).__path);
+  };
+  for (const key of ['ArrowDown', 'ArrowDown', 'ArrowDown', 'ArrowDown', 'ArrowUp', 'ArrowUp']) {
+    const p = await path(key);
+    const steps = p.slice(1).map((v, i) => v - p[i]).filter((d) => Math.abs(d) > 0.5);
+    if (steps.length === 0) continue;
+    const dir = Math.sign(steps[0]);
+    expect(steps.every((d) => Math.sign(d) === dir), `${key}: ${p.map(Math.round).join(' ')}`).toBe(true);
+    const total = Math.abs(p[p.length - 1] - p[0]);
+    // The first frame covers a small part of the way, not most of it.
+    expect(Math.abs(steps[0]), `${key} first step of ${total}`).toBeLessThan(total * 0.25 + 2);
+  }
 });
 
 test('the Movies shelf: the ring on screen down the grid and back to the order row', async ({ page }) => {

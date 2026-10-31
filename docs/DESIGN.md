@@ -361,18 +361,23 @@ button added, a row wrapping or a font that renders differently on Linux
 cannot change where an arrow goes, and the rules are unit tests
 (`focusModel.test.ts`) instead of timed browser runs. The store is
 synchronous and Kinema's own: the control holding the ring has the DOM focus
-too (roving tabindex, Tab and Shift+Tab from area to area), a pointer moving
-over a control moves the ring there, and nothing moves the ring by itself but
-recovery when its control goes (the card sliding into its place, else the
-screen's landing spot), decided once the change is committed. **One scroll
-rule**: a key move puts the area holding the ring (a rail, the hero, a grid's
-row) at a fixed line below the sticky bars (`data-sticky-top`, read from the
-page), with its heading when both fit; in a rail the card sits where the
-first one does; the page never scrolls above its top, so going up to the
-first areas brings it back there. One glide length and easing for all of it,
-shortened under a held key so the page keeps up, instant with the system's
-reduce-motion or the light look; the wheel and touchpad stay native, and a
-pointer never scrolls the page. Home, its rails and the Movies / TV shows
+too (roving tabindex, Tab and Shift+Tab from area to area), a click moves
+the ring where it pointed while hovering only highlights (CSS `:hover`; a
+pointer passing over a rail must not change where the keys land in it), and
+nothing moves the ring by itself but recovery when its control goes (the
+card sliding into its place, else the screen's landing spot), decided once
+the change is committed. **One scroll rule**: a key move puts the area
+holding the ring (a rail, the hero, a grid's row) a third of the way down
+the page, as the streaming apps keep their focused row, higher when it is
+too tall for that and never under the sticky bars (`data-sticky-top`, read
+from the page), with its heading when both fit; a rail moves only when the
+ring nears its edge, keeping the next card half in sight; the page never
+scrolls above its top, so going up to the first areas brings it back there.
+Every scroll moves as one critically damped spring — a gentle start, no
+overshoot, a new target taken on at the speed it has, so a held key glides
+instead of stuttering — instant with the system's reduce-motion or the light
+look; the wheel and touchpad stay native, and a pointer never scrolls the
+page. Home, its rails and the Movies / TV shows
 grids are on it (`FocusScreen`); the other screens are still on the spatial
 library below until they move over (round 7, F2–F4). While a screen on the
 new engine is up the library is paused, and a dialog still on the library

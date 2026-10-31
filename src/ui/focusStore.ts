@@ -46,7 +46,17 @@ import {
   type NavNode,
   type NavTree,
 } from './focusModel';
-import { lineUp, motionFor, MOTION_MS, nearest, readBack, readOn, reveal, toTop } from './focusScroll';
+import {
+  backToTop,
+  lineUp,
+  motionFor,
+  MOTION_MS,
+  nearest,
+  readBack,
+  readOn,
+  reveal,
+  toTop,
+} from './focusScroll';
 
 /** The tree's top: a column holding the top bar and the screen. */
 export const ROOT = 'nav-root';
@@ -422,6 +432,8 @@ function onKeyDown(event: KeyboardEvent): void {
     // Down with nothing further down reads on — not on a held key, whose
     // presses run past the end.
     else if (arrow === 'down' && node && !event.repeat) readOn(node, duration);
+    // Up with nowhere to go is the top: the page comes back up to it.
+    else if (arrow === 'up' && node) backToTop(node, duration);
     return;
   }
   if (event.key === 'Tab') {

@@ -498,7 +498,10 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
         />
       )}
 
-      {skipPrompt && (
+      {/* Out of the way while a panel is open: both sit in the same corner,
+          and the button covered the panel's last rows and the ring on them
+          (found on a box, round 7 F6). It is back when the panel closes. */}
+      {skipPrompt && !showTracks && !showChapters && (
         <SkipButton
           prompt={skipPrompt}
           nextIsEpisode={!neighbours.next?.target && !neighbours.next?.video}

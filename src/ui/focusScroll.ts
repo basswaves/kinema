@@ -323,6 +323,22 @@ export function toTop(leaf: HTMLElement, duration: number): void {
   alongTrack(leaf, page, duration);
 }
 
+/**
+ * Up with nowhere further up: the page goes back up to its top, as far as
+ * keeps the ring above the window's bottom — never down. Reading on left a
+ * page scrolled with its ring still in sight, and Up then did nothing at
+ * all, so the page stayed down for good (found on the box, round 7 F6).
+ */
+export function backToTop(leaf: HTMLElement, duration: number): void {
+  if (leaf.closest('[data-scroll="nearest"]')) return;
+  const page = pageOf(leaf);
+  if (!page) return;
+  const room = page.clientHeight - BOTTOM_GAP_REM * remPx();
+  const bottom = leaf.closest('[data-sticky-top]') ? 0 : contentTop(leaf, page) + leaf.offsetHeight;
+  const to = Math.max(0, bottom - room);
+  if (to < settled(page, 'y') - 0.5) glide(page, 'y', to, duration);
+}
+
 /** How far one press reads on, as a share of the visible page. */
 const READ_STEP = 0.6;
 /** The control reading on scrolled away from, while it still holds the ring. */

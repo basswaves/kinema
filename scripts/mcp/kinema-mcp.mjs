@@ -250,6 +250,8 @@ function status() {
 const KEYS = {
   Enter: [13, 'Enter', '\r'],
   Escape: [27, 'Escape'],
+  // A remote's Back: what backButton.ts passes Android's Back on as.
+  BrowserBack: [166, 'BrowserBack'],
   Backspace: [8, 'Backspace'],
   Tab: [9, 'Tab'],
   ' ': [32, 'Space', ' '],

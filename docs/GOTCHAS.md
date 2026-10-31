@@ -1082,6 +1082,25 @@ system believes is focused after the browsing UI unmounted beneath it, no
 control may show a ring outside that mode — `.player:not(.osd-focused) .focused`
 in `ui.css` enforces it.
 
+### Read-on with the ring still in sight leaves the page down for good
+
+Down with nothing below reads on (`readOn`), and Up reads back (`readBack`) —
+but only while the control left behind is under the top bar. On a short page
+(a setup page with nothing to press but Next) reading on moved the page 90 px
+and Next stayed in sight, so `readBack` had nothing to do, Up had nowhere to
+go, and nothing scrolled: the page never came back up. The suite's flow only
+checked the ring was in view, so it passed. **Do:** Up that moves nothing is
+the top — `backToTop` (focusScroll.ts) brings the page up as far as keeps the
+ring in sight; a flow checks `scrollTop` is 0, not just that the ring shows.
+
+### A corner button drawn over an open panel hides the ring
+
+Skip intro and Audio & subtitles both sit at the player's bottom right, and
+Skip has the higher `z-index`: with an intro on, the panel's last rows (and the
+ring on them) were under the button, and a tap there skipped. Nothing reports
+it — the ring's rect is on screen; only `elementFromPoint` on it tells. **Do:**
+Skip is not drawn while Audio & subtitles or Chapters is open (Player.tsx).
+
 ### Back can only return to a control with a stable key
 
 Back remembers the focus key held on each view when it was left

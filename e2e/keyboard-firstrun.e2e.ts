@@ -446,6 +446,12 @@ for (const system of ['android', 'windows'] as const) {
     }
     expect(await inView()).toBe(true);
     expect(await focused(page)).toBe('Next');
+    // Up with nowhere to go is the top: the page comes all the way back up
+    // (it stayed read-on with Next in sight, found on a box).
+    await press(page, 'ArrowUp');
+    await settled(page);
+    expect(await page.evaluate(() => document.querySelector('.browse')?.scrollTop)).toBe(0);
+    expect(await focused(page)).toBe('Next');
     await press(page, 'Enter');
     await expect(page.locator('.setup-pages h1')).toHaveText('Subtitles online');
   });

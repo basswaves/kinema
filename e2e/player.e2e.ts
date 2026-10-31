@@ -427,6 +427,24 @@ test('Skip intro, then the episodes either side, and resuming with Start over', 
   await expect.poll(async () => (await mpv(page)).path).toContain('S01E01');
 });
 
+test('Skip intro steps aside while Audio & subtitles is open, never over its rows', async ({ page }) => {
+  // Both sit in the same corner: the button covered the panel's last rows and
+  // the ring on them (found on a box).
+  await play(page, 'series');
+  await expect(page.locator('.skip-button')).toHaveText('Skip intro');
+  await press(page, 'ArrowDown');
+  for (let i = 0; i < 6 && (await focused(page)) !== 'Audio & subtitles'; i++) {
+    await press(page, 'ArrowRight');
+  }
+  await expect.poll(() => focused(page)).toBe('Audio & subtitles');
+  await press(page, 'Enter');
+  await expect(page.locator('.track-panel')).toBeVisible();
+  await expect(page.locator('.skip-button')).toHaveCount(0);
+  await press(page, 'Escape');
+  await expect(page.locator('.track-panel')).toHaveCount(0);
+  await expect(page.locator('.skip-button')).toHaveText('Skip intro');
+});
+
 test('the credits: Up next is offered, Keep watching declines it, the end counts down', async ({
   page,
 }) => {

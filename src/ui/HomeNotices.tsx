@@ -67,18 +67,7 @@ export default function HomeNotices({
 }: Props) {
   const empty =
     !scanTrouble && reviewCount === 0 && upgrades.length === 0 && !keyRejected && !ffmpegMissing;
-  // Not a place to move to while empty — see ContinueRail.tsx. Arriving
-  // the first time lands on the top notice's button, not on whichever is
-  // nearest the left edge.
-  const first = scanTrouble
-    ? SCAN_OK_KEY
-    : keyRejected
-      ? 'notice-tmdb-key'
-      : reviewCount > 0
-        ? 'notice-review'
-        : upgrades.length > 0
-          ? 'notice-apply'
-          : 'notice-ffmpeg';
+  // Not a place to move to while empty — see ContinueRail.tsx.
   // Windows installs ffmpeg from the notice itself (FfmpegInstall.tsx).
   const installs = Boolean(useCapabilities()?.installs_ffmpeg);
   // On Kinema's engine a column of rows, one per notice: Left and Right
@@ -86,12 +75,7 @@ export default function HomeNotices({
   // the top one and Up from the rails the bottom one, as they stand.
   const { ref, focusKey } = useNavGroup<HTMLElement>(
     { kind: 'column', disabled: empty },
-    {
-      trackChildren: true,
-      saveLastFocusedChild: true,
-      preferredChildFocusKey: first,
-      focusable: !empty,
-    }
+    { focusable: !empty }
   );
   // Empty, still its element, unseen: the focus area measures it once, at
   // mount ("Component added without a node reference" otherwise). Same shape
@@ -125,7 +109,6 @@ export default function HomeNotices({
             <FocusButton
               focusKey={SCAN_OK_KEY}
               className="btn-secondary"
-              keepInView="nearest"
               onSelect={onDismissScanTrouble}
             >
               OK
@@ -149,7 +132,6 @@ export default function HomeNotices({
             <FocusButton
               focusKey="notice-tmdb-key"
               className="btn-primary"
-              keepInView="nearest"
               onSelect={onAddKey}
             >
               Add a key
@@ -178,7 +160,6 @@ export default function HomeNotices({
             <FocusButton
               focusKey="notice-review"
               className="btn-primary"
-              keepInView="nearest"
               onSelect={onReview}
             >
               Review
@@ -212,7 +193,6 @@ export default function HomeNotices({
               <FocusButton
                 focusKey="notice-apply"
                 className="btn-primary"
-                keepInView="nearest"
                 onSelect={onlyAdds ? onApply : onChoose}
               >
                 {onlyAdds ? 'Use it too' : 'Choose'}
@@ -220,7 +200,6 @@ export default function HomeNotices({
               <FocusButton
                 focusKey="notice-dismiss"
                 className="btn-secondary"
-                keepInView="nearest"
                 onSelect={onDismiss}
               >
                 Not now
@@ -253,7 +232,6 @@ export default function HomeNotices({
                 <FocusButton
                   focusKey="notice-ffmpeg"
                   className="btn-primary"
-                  keepInView="nearest"
                   onSelect={onFfmpeg}
                 >
                   How to add it
@@ -262,7 +240,6 @@ export default function HomeNotices({
               <FocusButton
                 focusKey="notice-ffmpeg-dismiss"
                 className="btn-secondary"
-                keepInView="nearest"
                 onSelect={onDismissFfmpeg}
               >
                 Not now

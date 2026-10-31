@@ -8,12 +8,8 @@
  * (`capabilities.ts`). Back again, or Cancel, closes it and leaves Home as it
  * was, with the ring where it had been.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  FocusContext,
-  getCurrentFocusKey,
-  setFocus,
-} from '@noriginmedia/norigin-spatial-navigation';
+import { useCallback, useEffect, useState } from 'react';
+import { FocusProvider } from './FocusGroup';
 import { useFocusGroup } from './focusGroups';
 import FocusButton from './FocusButton';
 import { powerAction, type PowerAction } from './api';
@@ -27,29 +23,15 @@ interface Props {
 }
 
 export default function LeaveDialog({ onClose }: Props) {
-  // A boundary, so the arrows cannot wander onto Home behind the dialog.
-  // A menu (NAV-MAP, agreed 2026-10-11): focus never leaves it, and Up on
-  // Close Kinema goes round to Cancel and back.
-  const { ref, focusKey } = useFocusGroup('menu');
+  // A menu (NAV-MAP, agreed 2026-10-11): focus never leaves it, Up on Close
+  // Kinema goes round to Cancel and back, and closing it gives the ring
+  // back to where it was on Home (focusStore.ts).
+  const { ref, focusKey } = useFocusGroup('menu', { current: FIRST_KEY });
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const can = useCapabilities();
 
-  // Where the ring was on Home, to put it back on Cancel. Taken before the
-  // dialog claims focus, so it is Home's control and not one of these.
-  const returnTo = useRef<string | null>(null);
-  useEffect(() => {
-    returnTo.current = getCurrentFocusKey();
-    void setFocus(FIRST_KEY);
-  }, []);
-
-  // Focus moves back first, while the dialog still exists: unmounting with
-  // the ring inside lets the spatial library restore it somewhere of its own
-  // choosing 300 ms later (docs/GOTCHAS.md).
-  const cancel = useCallback(() => {
-    if (returnTo.current) void setFocus(returnTo.current);
-    onClose();
-  }, [onClose]);
+  const cancel = useCallback(() => onClose(), [onClose]);
 
   // Capture phase, like the key list in App.tsx: Browse's own Back handler
   // must never see the press that closes this.
@@ -85,7 +67,7 @@ export default function LeaveDialog({ onClose }: Props) {
   };
 
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <div className="leave-backdrop" onClick={cancel}>
         <div
           className="leave"
@@ -128,6 +110,6 @@ export default function LeaveDialog({ onClose }: Props) {
           <p className="muted">Press Back to return to Kinema.</p>
         </div>
       </div>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }

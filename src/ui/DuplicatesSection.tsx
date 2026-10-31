@@ -83,7 +83,7 @@ export default function DuplicatesSection() {
         file. Each is one title, with a Version choice beside Play that remembers what you pick.
         Kinema never deletes a file: to tidy up, remove the copies you do not want from the folder.
       </p>
-      <FocusButton keepInView="nearest" className="btn-secondary" onSelect={() => setOpen((o) => !o)}>
+      <FocusButton className="btn-secondary" onSelect={() => setOpen((o) => !o)}>
         {open ? 'Hide the list' : 'Show the list'}
       </FocusButton>
       {open && (

@@ -1,561 +1,40 @@
 /**
- * Focus recovery for the browsing views.
+ * The few helpers around the focus engine (focusStore.ts) that pages use by
+ * name: put the ring on a control, ask where it is, come back to it after
+ * Back, find a drawn control's key, and the room a text box needs while it
+ * is typed into.
  *
- * Every view here replaces the last one entirely — opening a detail page
- * unmounts every card on Home, and going back unmounts every episode row. The
- * spatial system keeps pointing at whatever was focused, so after each of those
- * transitions the current focus key names a component that no longer exists.
- *
- * With a mouse this is invisible: hovering re-establishes focus. With a remote
- * there is no such recovery, and focus parked on a dead key is indistinguishable
- * from a frozen app — no rings anywhere, and no arrow press does anything. Every
- * top-level view therefore claims focus when it arrives, if nothing live holds
- * it.
+ * Before round 7 this file was mostly timers: the spatial library it worked
+ * around kept a focus of its own, updated it later (300 ms after an unmount)
+ * and was corrected from here — a second look 450 ms after every claim, a
+ * watchdog for a ring left on nothing, a poll for two seconds for a control
+ * to come back to (docs/HISTORY.md, round 7). The engine answers each press
+ * in the same event, so none of that is left.
  */
-import { useEffect, useState } from 'react';
-import { isLightLook } from './lightLook';
-import { navExpectReturn, navFocus, navFocused, noteSpatialClaim } from './focusStore';
-import { stopGlide } from './focusScroll';
-import {
-  doesFocusableExist,
-  getCurrentFocusKey,
-  setFocus,
-  SpatialNavigation,
-  ROOT_FOCUS_KEY,
-} from '@noriginmedia/norigin-spatial-navigation';
+import { navExpectReturn, navFocus, navFocused } from './focusStore';
+import { barBottom, pageOf, stopGlide } from './focusScroll';
 
-/**
- * Whether nothing live holds focus, judged the way a viewer would: is a focus
- * ring showing anywhere?
- *
- * The key test alone is not enough, twice over. A plain "is it root" check
- * misses focus still pointing confidently at an unmounted card — hence
- * `doesFocusableExist`. And that misses the opposite case: a view that comes
- * back re-registers its controls under the *same* stable keys (`hero-play`),
- * so the dead key the spatial system was left holding suddenly "exists" again —
- * but the new component was never told it is focused, so no ring is drawn and
- * the view skips its claim. Coming back from the player landed exactly there.
- *
- * Every leaf focusable here (`FocusButton`, `FocusInput`, cards, episode rows)
- * renders a `focused` class when it holds focus, so "no element has it" is the
- * honest test that the remote has nothing on screen to act from.
- */
-function focusIsDead(): boolean {
-  const current = getCurrentFocusKey();
-  if (current === ROOT_FOCUS_KEY || !doesFocusableExist(current)) return true;
-  return document.querySelector('.focused') === null;
-}
-
-/**
- * Where focus should go for each claiming view that is mounted, newest last —
- * what the watchdog below falls back to.
- */
-const landingSpots: string[] = [];
-
-/**
- * How long after a claim to look again.
- *
- * The spatial library restores focus by itself when a focused component
- * unmounts, but it does so **300 ms later** (`AUTO_RESTORE_FOCUS_DELAY`), and
- * it restores to the component's *parent* — which, when a whole view is
- * replaced, has unmounted too. Its `setFocus` is also asynchronous, so a claim
- * started by a view that is about to disappear can finish after the next
- * view's claim. Either way the last word can go to a key that no longer
- * exists. At launch that is exactly what happened: the first-run panel shows
- * for the moment before titles arrive, claims focus, and is replaced by Home —
- * whose claim was then overwritten, leaving a remote's presses going nowhere.
- * Looking again once that window has passed catches it.
- */
-const SECOND_LOOK_MS = 450;
-
-/**
- * A control to put focus back on, once it exists — set when Back returns to a
- * view, naming whatever was focused there when it was left.
- *
- * The returning view has to mount and usually load before that control exists
- * (Home's rails, a detail page's episodes), so this waits for it rather than
- * trying once. While it waits, views do not make their own landing claim: a
- * claim that won would scroll Home to the hero and then back down to the card,
- * which reads as the page jumping.
- */
-let pendingReturn: string | null = null;
-/** Where Back last put the ring: a page's own landing claim leaves it there. */
-let returnedTo: string | null = null;
-let returnTimer = 0;
-
-/** How long to wait for the control before settling for the landing spot. */
-const RETURN_WAIT_MS = 2000;
-const RETURN_POLL_MS = 50;
-
-export function hasPendingReturn(): boolean {
-  return pendingReturn !== null;
-}
-
-export function returnFocusTo(focusKey: string | null, scrollTop?: number): void {
-  window.clearInterval(returnTimer);
-  pendingReturn = focusKey;
-  // Whichever engine the screen coming back is on takes it; Kinema's own
-  // (focusEngine.tsx) does as the screen is drawn, and stops this one.
-  navExpectReturn(focusKey, scrollTop, () => {
-    window.clearInterval(returnTimer);
-    pendingReturn = null;
-  });
-  if (!focusKey) return;
-
-  const started = Date.now();
-  returnTimer = window.setInterval(() => {
-    if (doesFocusableExist(focusKey)) {
-      window.clearInterval(returnTimer);
-      pendingReturn = null;
-      navExpectReturn(null);
-      noteSpatialClaim();
-      returnedTo = focusKey;
-      // The page was rebuilt at the top; put it back where it was before the
-      // ring goes to the card, so the card is already on screen and nothing
-      // has to scroll to find it.
-      const page = document.querySelector('.browse');
-      if (page && scrollTop !== undefined) page.scrollTop = scrollTop;
-      void setFocus(focusKey);
-    } else if (Date.now() - started > RETURN_WAIT_MS) {
-      // Gone for good — the card was removed, the episode is no longer in the
-      // list. Fall back to the view's own landing spot.
-      window.clearInterval(returnTimer);
-      pendingReturn = null;
-      navExpectReturn(null);
-      if (!focusIsDead()) return;
-      const spot = [...landingSpots].reverse().find((key) => doesFocusableExist(key));
-      if (spot) void setFocus(spot);
-    }
-  }, RETURN_POLL_MS);
-}
-
-/**
- * Presses, clicks and pointer moves so far — so a view can tell whether the
- * person has done anything since it arrived.
- */
-let inputs = 0;
-let inputCounting = false;
-
-function countInputs(): void {
-  if (inputCounting) return;
-  inputCounting = true;
-  const count = () => {
-    inputs++;
-  };
-  for (const type of ['keydown', 'pointerdown', 'pointermove', 'wheel']) {
-    window.addEventListener(type, count, { capture: true, passive: true });
-  }
-}
-
-/**
- * The control holding the ring, on whichever engine: Kinema's own while a
- * screen on it is up (also under a dialog still on the spatial library, so
- * Back from a page that dialog opened comes back to the card), else the
- * spatial library's.
- */
+/** The control holding the ring, or null. */
 export function currentFocusKey(): string | null {
-  return navFocused() ?? getCurrentFocusKey();
+  return navFocused();
 }
 
-/** Put the ring on `focusKey`, on whichever engine it is registered with. */
+/** Put the ring on `focusKey` (an area: by its rules). */
 export function focusTo(focusKey: string): void {
-  if (!navFocus(focusKey)) void setFocus(focusKey);
+  navFocus(focusKey);
+}
+
+/**
+ * Back is returning to `focusKey`, with the page at `scrollTop`: the screen
+ * coming back takes it as soon as the control is drawn, else its landing.
+ */
+export function returnFocusTo(focusKey: string | null, scrollTop?: number): void {
+  navExpectReturn(focusKey, scrollTop);
 }
 
 /** The focus key a drawn control was registered under, for landing on it by what it shows. */
 export function focusKeyOf(node: Element): string | null {
-  // Kinema's own engine marks each control with its key.
-  const own = node.getAttribute('data-nav-key');
-  if (own) return own;
-  const components = (
-    SpatialNavigation as unknown as { focusableComponents?: Record<string, { node?: HTMLElement }> }
-  ).focusableComponents;
-  for (const [key, c] of Object.entries(components ?? {})) if (c.node === node) return key;
-  return null;
-}
-
-/** Whether the ring is on `focusKey` or something inside it. */
-function focusWithin(focusKey: string): boolean {
-  const components = (
-    SpatialNavigation as unknown as { focusableComponents?: Record<string, { node?: HTMLElement }> }
-  ).focusableComponents;
-  const node = components?.[focusKey]?.node;
-  const ring = document.querySelector('.focused');
-  return Boolean(node && ring && node.contains(ring));
-}
-
-/**
- * Claim focus for `focusKey` once `ready`, unless something live already holds
- * it — and look again after the library's own delayed restore has had its
- * turn, since that can land on a dead key after this claim succeeded.
- *
- * Stands aside while Back is waiting to put focus back somewhere specific.
- *
- * Pointing this at a *container* is usually right — the spatial system then
- * descends to its last focused child, or its `preferredChildFocusKey`, which
- * keeps the choice of landing spot next to the markup that knows about it.
- *
- * `page`: this view replaces the whole screen, and takes focus when it is
- * ready even from a live control, as long as the person has not pressed,
- * clicked or moved anything since it arrived. A page that waits for its data
- * otherwise lost its landing: the button that opened it is gone, the spatial
- * library restores focus by itself 300 ms later to whatever it can find —
- * the top bar — and "something live holds it" then kept the page off its own
- * Play (a series on a slow box, 2026-10-09). Not for parts of a page: one
- * whose data arrives while the person is browsing the list beside it would
- * pull the ring out of their hands.
- */
-export function useClaimFocus(focusKey: string, ready: boolean, page = false): void {
-  // The count when the view arrived, before it was ready.
-  const [arrivedAt] = useState(() => {
-    countInputs();
-    return inputs;
-  });
-
-  useEffect(() => {
-    if (!ready) return;
-    landingSpots.push(focusKey);
-    const shouldClaim = () =>
-      !pendingReturn &&
-      !(returnedTo && focusWithin(returnedTo)) &&
-      (focusIsDead() || (page && inputs === arrivedAt && !focusWithin(focusKey)));
-    if (shouldClaim()) {
-      // A whole page taking the ring on arrival wins over the top bar's ring
-      // handed back by Kinema's own engine (focusStore.ts); a claim only
-      // because nothing held it does not.
-      if (page) noteSpatialClaim();
-      void setFocus(focusKey);
-    }
-
-    const second = window.setTimeout(() => {
-      if (shouldClaim() && doesFocusableExist(focusKey)) void setFocus(focusKey);
-    }, SECOND_LOOK_MS);
-
-    return () => {
-      window.clearTimeout(second);
-      const index = landingSpots.lastIndexOf(focusKey);
-      if (index >= 0) landingSpots.splice(index, 1);
-    };
-  }, [focusKey, ready, page, arrivedAt]);
-}
-
-/**
- * Put focus back on the current view's landing spot if the control holding it
- * has just gone away — after the library's own restore window, so it gets the
- * first chance.
- *
- * For actions that remove the very control they were pressed on: Remove in
- * Continue Watching takes its whole card with it, and the ring would otherwise
- * be nowhere until the next key press woke the watchdog.
- */
-export function recoverFocusSoon(): void {
-  window.setTimeout(() => {
-    if (!focusIsDead()) return;
-    const spot = [...landingSpots].reverse().find((key) => doesFocusableExist(key));
-    if (spot) void setFocus(spot);
-  }, SECOND_LOOK_MS);
-}
-
-const NAVIGATION_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter']);
-
-let watchdogInstalled = false;
-
-/**
- * The last line of defence against focus parked on nothing.
- *
- * Every entry about dead focus in GOTCHAS is a way for this state to arise,
- * and each was fixed where it was found. This catches the ones not found yet:
- * a navigation key pressed while no live component holds focus is spent on
- * putting focus on the current view's landing spot, instead of vanishing. The
- * first press after a glitch then shows a focus ring where the remote expects
- * one, which is what a TV app does, rather than doing nothing forever.
- *
- * Registered in the **capture** phase on `window`, which runs before the
- * spatial library's own listener there, so a press it spends on recovery is
- * not also acted on. It stands aside whenever the library is paused — the
- * player owns the arrows then.
- */
-export function installFocusWatchdog(): void {
-  if (watchdogInstalled) return;
-  watchdogInstalled = true;
-
-  window.addEventListener(
-    'keydown',
-    (event) => {
-      if (!NAVIGATION_KEYS.has(event.key)) return;
-      if ((SpatialNavigation as unknown as { paused?: boolean }).paused) return;
-      if (!focusIsDead()) return;
-
-      const spot = [...landingSpots].reverse().find((key) => doesFocusableExist(key));
-      if (!spot) return;
-
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      console.warn(`focus: recovered from a dead focus key onto ${spot}`);
-      void setFocus(spot);
-    },
-    true
-  );
-}
-
-const ARROW_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
-
-/** Presses closer than this are a key being held, or tapped as fast as one. */
-const QUICK_PRESS_MS = 150;
-/** How long a press still explains the scroll that follows it. */
-const PRESS_FRESH_MS = 300;
-
-let lastArrowAt = -Infinity;
-let arrowQuick = false;
-let scrollPaceInstalled = false;
-
-/**
- * Note how fast the arrow keys are coming, so the scrolling they cause can keep
- * up (`scrollBehavior`).
- *
- * Capture phase on `window` like the watchdog, and only looking: it changes
- * nothing about the press.
- */
-export function installScrollPace(): void {
-  if (scrollPaceInstalled) return;
-  scrollPaceInstalled = true;
-  window.addEventListener(
-    'keydown',
-    (event) => {
-      if (!ARROW_KEYS.has(event.key)) return;
-      const now = performance.now();
-      arrowQuick = event.repeat || now - lastArrowAt < QUICK_PRESS_MS;
-      lastArrowAt = now;
-    },
-    { capture: true, passive: true }
-  );
-}
-
-/**
- * How to scroll for the press that has just moved focus: smooth for a single
- * press, at once for one that follows another within a moment or is a held
- * key repeating.
- *
- * A smooth scroll takes a few hundred milliseconds, and every press under a
- * held key started a new one, so the page was always behind the ring and
- * landed only when the key was let go. An instant scroll also ends one still
- * running. Moves not made by a key — a mouse, a view claiming focus — are
- * smooth, as ever. The light look (lightLook.ts) never animates: on the
- * devices that get it a scroll that has to be drawn frame by frame is the
- * cost.
- */
-function scrollBehavior(): ScrollBehavior {
-  if (isLightLook()) return 'auto';
-  return arrowQuick && performance.now() - lastArrowAt < PRESS_FRESH_MS ? 'auto' : 'smooth';
-}
-
-/**
- * The scrolling ancestor a node actually lives in — `.browse` in practice,
- * found by looking rather than by hard-coding the selector, so this keeps
- * working if the shell moves.
- */
-function scrollParent(node: HTMLElement | null): HTMLElement | null {
-  for (let el = node?.parentElement ?? null; el; el = el.parentElement) {
-    const { overflowY } = getComputedStyle(el);
-    if (overflowY === 'auto' || overflowY === 'scroll') return el;
-  }
-  return null;
-}
-
-/**
- * Bring the page back to the top when focus lands on a control in the top row.
- *
- * `scrollIntoView({ block: 'nearest' })` is the right behaviour everywhere else,
- * but it is a no-op once the element is on screen — so arrowing back up from
- * the rails would leave the page where the rails had scrolled it, with the hero
- * cropped and the nav floating over half an image. The top row is the one place
- * where the correct scroll position is absolute rather than relative.
- */
-export function scrollPageToTop(
-  node: HTMLElement | null,
-  behavior: ScrollBehavior = scrollBehavior()
-): void {
-  if (stillPage(node)) return;
-  scrollParent(node)?.scrollTo({ top: 0, behavior });
-}
-
-/** The control the ring is going back to without moving the page (`focusInPlace`). */
-let inPlace: HTMLElement | null = null;
-
-/** Whether `node` is arriving by `focusInPlace`: its keep-on-screen is skipped, once. */
-function stillPage(node: HTMLElement | null): boolean {
-  if (!node || node !== inPlace) return false;
-  inPlace = null;
-  return true;
-}
-
-/**
- * Put the ring back on `focusKey` and leave the page where it is — after a
- * menu a pointer opened (CardMenu.tsx): the ring's own keep-on-screen would
- * scroll the page under the pointer, to the top for a Play on Home.
- */
-export function focusInPlace(focusKey: string): void {
-  const components = (
-    SpatialNavigation as unknown as { focusableComponents?: Record<string, { node?: HTMLElement }> }
-  ).focusableComponents;
-  const node = components?.[focusKey]?.node ?? null;
-  inPlace = node;
-  setFocus(focusKey);
-  // A control that draws no keep-on-screen (already focused) must not keep
-  // the mark for a later arrival.
-  window.setTimeout(() => {
-    if (inPlace === node) inPlace = null;
-  }, 1000);
-}
-
-/** The page scroller found for a node's parent, so the walk is done once. */
-const scrollers = new WeakMap<HTMLElement, HTMLElement>();
-
-/**
- * The ancestor that scrolls the page up and down. A rail's track counts as
- * scrollable to `scrollParent` (overflow on one axis makes the other `auto`),
- * but it never has anything to scroll vertically, so it is passed over here.
- */
-function pageScroller(node: HTMLElement): HTMLElement | null {
-  // Every press asked every ancestor for its computed style. The answer is
-  // the same for all the cards in a row or a grid, so it is kept by parent
-  // and trusted while the scroller is still there, still holds the node and
-  // still has something to scroll.
-  const parent = node.parentElement;
-  const known = parent ? scrollers.get(parent) : undefined;
-  if (known?.isConnected && known.contains(node) && known.scrollHeight > known.clientHeight + 1)
-    return known;
-  for (let el = parent; el; el = el.parentElement) {
-    const { overflowY } = getComputedStyle(el);
-    if ((overflowY === 'auto' || overflowY === 'scroll') && el.scrollHeight > el.clientHeight + 1) {
-      if (parent) scrollers.set(parent, el);
-      return el;
-    }
-  }
-  return null;
-}
-
-/**
- * Room left for the sticky top bar, in rem, when deciding what still fits —
- * the same 4.5rem as the `scroll-margin` on `.browse *` in ui.css, plus TV
- * mode's overscan inset.
- */
-const TOP_BAR_REM = 4.5;
-const TV_SAFE_TOP_REM = 1.25;
-
-/**
- * The room the top bar takes, in pixels, at the current scale and layout.
- *
- * Kept until the window is resized or TV mode is switched, the only things
- * that change the size of a rem: reading the root's font size on every press
- * made the browser settle its styles first.
- */
-let topBar: { tv: string | undefined; px: number; rem: number } | null = null;
-let topBarWatched = false;
-
-function topBarPx(): number {
-  const root = document.documentElement;
-  const tv = root.dataset.tv;
-  if (topBar && topBar.tv === tv) return topBar.px;
-  if (!topBarWatched) {
-    topBarWatched = true;
-    window.addEventListener('resize', () => {
-      topBar = null;
-    });
-  }
-  const rem = parseFloat(getComputedStyle(root).fontSize);
-  const px = (TOP_BAR_REM + (tv === 'on' ? TV_SAFE_TOP_REM : 0)) * rem;
-  topBar = { tv, px, rem };
-  return px;
-}
-
-const HEADING = /^H[1-3]$/;
-
-/**
- * A heading standing before a group: the element itself, or one held
- * directly by a header row beside it (the grid's Back button and title share
- * a `.grid-head`). Never one inside a `section` — that is another group, with
- * a heading of its own.
- */
-function headingIn(el: Element): HTMLElement | null {
-  if (HEADING.test(el.tagName)) return el as HTMLElement;
-  if (el.tagName === 'SECTION') return null;
-  let found: HTMLElement | null = null;
-  for (const child of el.children) if (HEADING.test(child.tagName)) found = child as HTMLElement;
-  return found;
-}
-
-/**
- * The heading of the group a control is in: the last `h1`–`h3` before the
- * branch holding the control, at the nearest level of the page that has one —
- * a rail's title before its track, a Settings section's heading at its top,
- * a grid's title in the header row above it. Read from the markup each time,
- * so a screen gets this by using headings, not by registering them.
- */
-function headingOf(node: HTMLElement, page: HTMLElement): HTMLElement | null {
-  for (let el = node.parentElement; el && el !== page; el = el.parentElement) {
-    let heading: HTMLElement | null = null;
-    for (const child of el.children) {
-      if (child.contains(node)) break;
-      heading = headingIn(child) ?? heading;
-    }
-    if (heading) return heading;
-  }
-  return null;
-}
-
-/**
- * Keep a control the remote just moved to on screen — and the heading of its
- * group with it.
- *
- * `scrollIntoView({ block: 'nearest' })` stops as soon as the control itself
- * is visible, so whatever sits under the last control on a page — a card's
- * title and year, the notes under the last setting — stayed below the edge,
- * and nothing a remote could press would ever scroll to it. So when
- * everything below the control fits on screen together with it, the page goes
- * all the way to the bottom instead.
- *
- * It also stopped with the control just clear of the top bar and the rail
- * title or section heading above it hidden underneath (owner, 2026-10-09:
- * "things you should see stay hidden under the top bar"). So when the
- * heading and the control fit on screen together, the page stops with the
- * heading clear instead; when they do not (a long section), the control
- * alone, as before.
- */
-export function keepOnScreen(node: HTMLElement | null, inline: 'center' | 'nearest' = 'center'): void {
-  if (!node || stillPage(node)) return;
-  const behavior = scrollBehavior();
-  node.scrollIntoView({ behavior, block: 'nearest', inline });
-  const page = pageScroller(node);
-  if (!page) return;
-  const box = node.getBoundingClientRect();
-  const view = page.getBoundingClientRect();
-  // A title page's sticky Back is under the bar too; reading on (below) keeps
-  // to the bar alone, or a short window could not scroll its last rows in.
-  const bar = topBarPx();
-  // Measured from the content's top, so a scroll already under way does not
-  // change the answer.
-  const scroll = page.scrollTop;
-  const top = scroll + box.top - view.top;
-  const bottom = scroll + box.bottom - view.top;
-
-  const heading = headingOf(node, page);
-  const headTop = heading ? scroll + heading.getBoundingClientRect().top - view.top : top;
-  const fits = bottom - headTop + bar <= page.clientHeight;
-  const from = fits ? Math.min(headTop, top) : top;
-
-  const below = page.scrollHeight - bottom;
-  if (below > 0 && below + (bottom - from) + bar < page.clientHeight) {
-    page.scrollTo({ top: page.scrollHeight, behavior });
-    return;
-  }
-  if (from >= top) return;
-  // Where `nearest` leaves the page: up to the control when it was above the
-  // view, down to it when below, unmoved when it was on screen.
-  let landing = scroll;
-  if (top < scroll + bar) landing = top - bar;
-  else if (bottom > scroll + page.clientHeight) landing = bottom - page.clientHeight;
-  if (from < landing + bar) page.scrollTo({ top: Math.max(0, from - bar), behavior });
+  return node.getAttribute('data-nav-key');
 }
 
 /**
@@ -571,6 +50,17 @@ const TYPING_SPOT = 0.08;
 /** Pages given extra room at the bottom so a box near the end can rise. */
 const typingRoom = new WeakMap<HTMLElement, string>();
 
+/** The page a text box scrolls in: the nearest ancestor that scrolls, or could. */
+function scrollParent(node: HTMLElement): HTMLElement | null {
+  const page = pageOf(node);
+  if (page) return page;
+  for (let el = node.parentElement; el; el = el.parentElement) {
+    const { overflowY } = getComputedStyle(el);
+    if (overflowY === 'auto' || overflowY === 'scroll') return el;
+  }
+  return null;
+}
+
 /**
  * Put a text box being typed into where a keyboard on screen cannot cover it
  * (TV-FEEL.md, N10): in the upper part of the visible area, measured from
@@ -584,7 +74,7 @@ const typingRoom = new WeakMap<HTMLElement, string>();
  */
 export function placeForTyping(node: HTMLElement | null): void {
   if (!node?.isConnected) return;
-  const page = pageScroller(node) ?? scrollParent(node);
+  const page = scrollParent(node);
   if (!page) return;
   const visual = window.visualViewport;
   const visibleTop = visual?.offsetTop ?? 0;
@@ -592,7 +82,8 @@ export function placeForTyping(node: HTMLElement | null): void {
   // A glide the ring caused would pull the page on from under this move.
   stopGlide(page);
   const view = page.getBoundingClientRect();
-  const clear = Math.max(view.top, visibleTop) + topBarPx();
+  // The bars over the page, read from it (focusScroll.ts), not a constant.
+  const clear = Math.max(view.top, visibleTop) + barBottom(page);
   const box = node.getBoundingClientRect();
   if (box.top >= clear && box.bottom <= visibleTop + visibleHeight * TYPING_ZONE) return;
 
@@ -610,101 +101,10 @@ export function placeForTyping(node: HTMLElement | null): void {
 
 /** Take back the room `placeForTyping` added under the page, if any. */
 export function releaseTypingRoom(node: HTMLElement | null): void {
-  const page = node && (pageScroller(node) ?? scrollParent(node));
+  const page = node && scrollParent(node);
   if (!page || !typingRoom.has(page)) return;
   page.style.paddingBottom = typingRoom.get(page) ?? '';
   typingRoom.delete(page);
-}
-
-/** How far one press reads on, as a share of the visible page. */
-const READ_STEP = 0.6;
-
-/**
- * Down with nothing further down reads on; Up reads back.
- *
- * Some pages end in text below their last control — the notes under the last
- * setting, a long description — and `keepOnScreen` can only bring that into
- * view when it fits on one screen together with the control. Longer than
- * that, a remote had no way to reach it (owner, 2026-10-04: "you can't see
- * everything"). So a Down press that the spatial library could not spend on a
- * move scrolls the page on by most of a screen, as a TV app does with text;
- * and while the control reading on left behind is above the top of the
- * screen, Up scrolls back before it moves anywhere.
- *
- * The focused control is never left half under the top bar, which is see-
- * through, so the ring showed through it (owner, 2026-10-05: keep it clear,
- * moving the page only when needed). Reading on stops where the control is
- * still clear of the bar, or takes it off the screen entirely when it is
- * already near the top; reading back ends with it clear, not part-way.
- *
- * Capture phase on `window`, like the watchdog: Up has to be answered before
- * the spatial library moves; Down is only judged once it has had its turn.
- */
-let readOnInstalled = false;
-/** The control reading on scrolled away from, until focus moves. */
-let leftBehind: HTMLElement | null = null;
-
-export function installReadOn(): void {
-  if (readOnInstalled) return;
-  readOnInstalled = true;
-
-  window.addEventListener(
-    'keydown',
-    (event) => {
-      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
-      if ((SpatialNavigation as unknown as { paused?: boolean }).paused) return;
-      const node = document.querySelector<HTMLElement>('.focused');
-      const page = node && pageScroller(node);
-      if (!node || !page) return;
-      const step = page.clientHeight * READ_STEP;
-      const pageTop = page.getBoundingClientRect().top;
-      const clear = pageTop + topBarPx();
-      if (leftBehind !== node) leftBehind = null;
-
-      if (event.key === 'ArrowUp') {
-        const box = node.getBoundingClientRect();
-        // Left above the bar by reading on, wholly or partly. Only then: a
-        // control the remote has just moved to is above it too until the page
-        // has scrolled to it, and on a slow computer a quick second Up was
-        // spent scrolling instead of moving on (the first run's setup pages,
-        // on CI).
-        const hidden = node === leftBehind && box.top < clear - 1;
-        if (hidden && page.scrollTop > 0) {
-          event.preventDefault();
-          event.stopImmediatePropagation();
-          page.scrollBy({ top: -Math.min(step, clear - box.top), behavior: scrollBehavior() });
-        }
-        return;
-      }
-
-      // Held down, the spatial library skips presses (it throttles them), and
-      // a skipped press would look like the end of the page.
-      if (event.repeat) return;
-      // After the spatial library's own listener: the same control still
-      // focused means there was nothing below it to move to.
-      window.setTimeout(() => {
-        if (document.querySelector('.focused') !== node) return;
-        const remaining = page.scrollHeight - page.clientHeight - page.scrollTop;
-        const box = node.getBoundingClientRect();
-        let by = Math.min(step, remaining);
-        const top = box.top - by;
-        if (top < clear && top + box.height > pageTop) {
-          // A full step would leave it half under the bar: stop with it just
-          // clear, unless that is hardly a step — then past it altogether,
-          // where the page goes that far. (Short of that, what stays out of
-          // sight is less than the bar's height, most of it the page's own
-          // bottom padding.)
-          const keep = Math.max(0, box.top - clear);
-          const past = box.bottom - pageTop;
-          by = keep >= step / 3 || past > remaining ? keep : past;
-        }
-        if (by < 1) return;
-        leftBehind = node;
-        page.scrollBy({ top: by, behavior: scrollBehavior() });
-      }, 0);
-    },
-    true
-  );
 }
 
 /**

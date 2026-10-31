@@ -20,12 +20,9 @@
  * play without it (owner, 2026-10-04).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  FocusContext,
-  getCurrentFocusKey,
-  setFocus,
-  useFocusable,
-} from '@noriginmedia/norigin-spatial-navigation';
+import FocusGroup, { FocusProvider } from './FocusGroup';
+import { ALL_ARROWS, useNavGroup } from './focusGroups';
+import { navFocus } from './focusStore';
 import FocusButton from './FocusButton';
 import NetworkPlaces, { type NetStep } from './NetworkPlaces';
 import { userError } from './errors';
@@ -58,8 +55,9 @@ const join = (spot: Spot) => [spot.place.path, ...spot.trail].join('/');
 const videos = (n: number) => (n === 1 ? '1 video' : `${n} videos`);
 
 export default function FolderBrowser({ request }: { request: FolderRequest }) {
-  // A boundary, so the arrows cannot wander onto the page behind.
-  const { ref, focusKey } = useFocusable({ isFocusBoundary: true, trackChildren: true });
+  // A dialog: the arrows cannot wander onto the page behind, and the ring
+  // goes back where it was on the way out (focusStore.ts).
+  const { ref, focusKey } = useNavGroup({ kind: 'column', hold: ALL_ARROWS, modal: true });
   const [access, setAccess] = useState<Access | null>(null);
   const [places, setPlaces] = useState<Place[] | null>(null);
   const [spot, setSpot] = useState<Spot | null>(null);
@@ -71,19 +69,7 @@ export default function FolderBrowser({ request }: { request: FolderRequest }) {
   /** Where the ring goes once the next level is shown. */
   const landOn = useRef<string | null>(null);
 
-  // Where the ring was before, to put it back on the way out.
-  const returnTo = useRef<string | null>(null);
-  useEffect(() => {
-    returnTo.current = getCurrentFocusKey();
-  }, []);
-
-  const finish = useCallback(
-    (path: string | null) => {
-      if (returnTo.current) void setFocus(returnTo.current);
-      request.answer(path);
-    },
-    [request]
-  );
+  const finish = useCallback((path: string | null) => request.answer(path), [request]);
 
   const loadPlaces = useCallback(async () => {
     setError(null);
@@ -163,12 +149,12 @@ export default function FolderBrowser({ request }: { request: FolderRequest }) {
             ? USE_KEY
             : RETRY_KEY;
     landOn.current = null;
-    void setFocus(target);
+    void navFocus(target);
   }, [items, spot]);
   // Refused: the ring on Ask again, the one thing to do.
   const refused = access?.read === 'prompt';
   useEffect(() => {
-    if (refused) void setFocus(RETRY_KEY);
+    if (refused) void navFocus(RETRY_KEY);
   }, [refused]);
 
   // Back from the network to the drives: the ring on Network drives.
@@ -176,7 +162,7 @@ export default function FolderBrowser({ request }: { request: FolderRequest }) {
   useEffect(() => {
     if (!net && !spot && places && backFromNet.current) {
       backFromNet.current = false;
-      void setFocus(itemKey(places.length));
+      void navFocus(itemKey(places.length));
     }
   }, [net, spot, places]);
 
@@ -227,8 +213,8 @@ export default function FolderBrowser({ request }: { request: FolderRequest }) {
       const now = await allowAllFiles();
       setAccess(now);
       // The button goes once it is granted; the ring goes to the drives
-      // rather than wherever the spatial library would put it.
-      if (now.allFiles === 'granted') void setFocus(itemKey(0));
+      // rather than to its neighbour.
+      if (now.allFiles === 'granted') void navFocus(itemKey(0));
     } catch (e) {
       setError(userError(e));
     }
@@ -246,7 +232,7 @@ export default function FolderBrowser({ request }: { request: FolderRequest }) {
       : null;
 
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <div
         className={`leave-backdrop ${typing ? 'typing' : ''}`.trim()}
         onClick={() => finish(null)}
@@ -266,7 +252,8 @@ export default function FolderBrowser({ request }: { request: FolderRequest }) {
                 : 'A USB drive, or this device’s own storage')}
           </p>
 
-          <div className="folder-actions">
+          {/* A row arriving on Use this folder: one press up from the list. */}
+          <FocusGroup kind="row" className="folder-actions" current={spot ? USE_KEY : undefined}>
             {spot && (
               <>
                 <FocusButton
@@ -293,7 +280,7 @@ export default function FolderBrowser({ request }: { request: FolderRequest }) {
             {listing && listing.videos > 0 && (
               <span className="muted">{videos(listing.videos)} here</span>
             )}
-          </div>
+          </FocusGroup>
 
           {error && <p className="leave-error">{error}</p>}
 
@@ -331,7 +318,6 @@ export default function FolderBrowser({ request }: { request: FolderRequest }) {
                   <li key={place.path}>
                     <FocusButton
                       focusKey={itemKey(i)}
-                      keepInView="nearest"
                       className="folder-item"
                       onSelect={() => go({ place, trail: [] })}
                     >
@@ -346,7 +332,6 @@ export default function FolderBrowser({ request }: { request: FolderRequest }) {
                   <li>
                     <FocusButton
                       focusKey={itemKey(places.length)}
-                      keepInView="nearest"
                       className="folder-item"
                       onSelect={() => setNet({ step: 'servers' })}
                     >
@@ -362,7 +347,6 @@ export default function FolderBrowser({ request }: { request: FolderRequest }) {
                   <FocusButton
                     focusKey={RETRY_KEY}
                     className="btn-secondary"
-                    keepInView="nearest"
                     onSelect={() => void loadPlaces()}
                   >
                     Look again
@@ -382,7 +366,6 @@ export default function FolderBrowser({ request }: { request: FolderRequest }) {
                   </p>
                   <FocusButton
                     className="btn-secondary"
-                    keepInView="nearest"
                     onSelect={() => void grantAllFiles()}
                   >
                     Allow all files
@@ -404,7 +387,6 @@ export default function FolderBrowser({ request }: { request: FolderRequest }) {
                 <li key={name}>
                   <FocusButton
                     focusKey={itemKey(i)}
-                    keepInView="nearest"
                     className="folder-item"
                     onSelect={() => go({ ...spot, trail: [...spot.trail, name] })}
                   >
@@ -425,6 +407,6 @@ export default function FolderBrowser({ request }: { request: FolderRequest }) {
           </p>
         </div>
       </div>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }

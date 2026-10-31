@@ -109,7 +109,6 @@ function LevelRows({
             key={l.id}
             focusKey={levelKey(l.id)}
             className={`track-option ${level.levelling === l.id ? 'active' : ''}`}
-            keepInView="nearest"
             label={`Levelling: ${l.label}`}
             onSelect={() => changeLevel({ ...level, levelling: l.id })}
           >
@@ -122,7 +121,6 @@ function LevelRows({
           <span className="track-delay-label">Dialogue</span>
           <FocusButton
             className={`track-option ${level.dialogue ? 'active' : ''}`}
-            keepInView="nearest"
             label={level.dialogue ? 'Dialogue lift: on' : 'Dialogue lift: off'}
             onSelect={() => changeLevel({ ...level, dialogue: !level.dialogue })}
           >
@@ -246,7 +244,6 @@ export default function TrackPanel({
           <FocusButton
             key={track.id}
             className={`track-option ${aid === track.id ? 'active' : ''}`}
-            keepInView="nearest"
             onSelect={() => onChoose('audio', track)}
           >
             <TrackText track={track} line={audioLines.get(track.id)} />
@@ -258,7 +255,6 @@ export default function TrackPanel({
               <span className="track-delay-label">Sound delay: {delayLabel(delay.ms)}</span>
               <FocusButton
                 className="track-option"
-                keepInView="nearest"
                 label={`Sound ${DELAY_STEP_MS} ms earlier`}
                 onSelect={() => delay.onChange(-DELAY_STEP_MS)}
               >
@@ -266,7 +262,6 @@ export default function TrackPanel({
               </FocusButton>
               <FocusButton
                 className="track-option"
-                keepInView="nearest"
                 label={`Sound ${DELAY_STEP_MS} ms later`}
                 onSelect={() => delay.onChange(DELAY_STEP_MS)}
               >
@@ -274,7 +269,6 @@ export default function TrackPanel({
               </FocusButton>
               <FocusButton
                 className="track-option"
-                keepInView="nearest"
                 label="No sound delay"
                 onSelect={() => delay.onChange(0, true)}
               >
@@ -293,7 +287,6 @@ export default function TrackPanel({
         </div>
         <FocusButton
           className={`track-option ${!subVisible ? 'active' : ''}`}
-          keepInView="nearest"
           onSelect={() => onChoose('sub', null)}
         >
           Off
@@ -302,7 +295,6 @@ export default function TrackPanel({
           <FocusButton
             key={track.id}
             className={`track-option ${subVisible && sid === track.id ? 'active' : ''}`}
-            keepInView="nearest"
             onSelect={() => onChoose('sub', track)}
           >
             <TrackText track={track} line={subLines.get(track.id)} />
@@ -312,7 +304,6 @@ export default function TrackPanel({
           <>
             <FocusButton
               className="track-option track-online"
-              keepInView="nearest"
               disabled={online.finding}
               onSelect={online.onFind}
             >
@@ -323,7 +314,6 @@ export default function TrackPanel({
             {online.canChangeLanguage && !online.finding && (
               <FocusButton
                 className="track-option"
-                keepInView="nearest"
                 onSelect={online.onChangeLanguage}
               >
                 Another language ›
@@ -339,7 +329,6 @@ export default function TrackPanel({
                   <FocusButton
                     key={offer.file_id}
                     className="track-option track-offer"
-                    keepInView="nearest"
                     disabled={online.finding}
                     onSelect={() => online.onOffer(offer)}
                   >
@@ -355,7 +344,6 @@ export default function TrackPanel({
             <FocusButton
               focusKey={SECOND_KEY}
               className="track-option"
-              keepInView="nearest"
               onSelect={() => setSecondOpen((open) => !open)}
             >
               {`Second subtitles, at the top: ${
@@ -366,7 +354,6 @@ export default function TrackPanel({
               <>
                 <FocusButton
                   className={`track-option track-second ${sid2 == null ? 'active' : ''}`}
-                  keepInView="nearest"
                   onSelect={() => pickSecond(null)}
                 >
                   None
@@ -375,7 +362,6 @@ export default function TrackPanel({
                   <FocusButton
                     key={track.id}
                     className={`track-option track-second ${sid2 === track.id ? 'active' : ''}`}
-                    keepInView="nearest"
                     onSelect={() => pickSecond(track)}
                   >
                     <TrackText track={track} line={subLines.get(track.id)} />
@@ -395,7 +381,6 @@ export default function TrackPanel({
                 <FocusButton
                   key={step}
                   className="track-option"
-                  keepInView="nearest"
                   label={`Subtitles ${Math.abs(step) / 1000} s ${step < 0 ? 'earlier' : 'later'}`}
                   onSelect={() => timing.onChange(step)}
                 >
@@ -405,7 +390,6 @@ export default function TrackPanel({
               ))}
               <FocusButton
                 className="track-option"
-                keepInView="nearest"
                 label="Subtitles at their own timing"
                 onSelect={() => timing.onChange(0, true)}
               >
@@ -424,14 +408,12 @@ export default function TrackPanel({
             </div>
             <FocusButton
               className="track-option"
-              keepInView="nearest"
               onSelect={() => onSubStyle({ ...subStyle, size: nextSize(subStyle.size) })}
             >
               Size: {sizeLabel(subStyle.size)}
             </FocusButton>
             <FocusButton
               className={`track-option ${subStyle.box ? 'active' : ''}`}
-              keepInView="nearest"
               onSelect={() => onSubStyle({ ...subStyle, box: !subStyle.box })}
             >
               Dark box behind: {subStyle.box ? 'On' : 'Off'}
@@ -443,7 +425,7 @@ export default function TrackPanel({
             </p>
           </>
         )}
-        <FocusButton className="track-option" keepInView="nearest" onSelect={onDetails}>
+        <FocusButton className="track-option" onSelect={onDetails}>
           Playback details ›
         </FocusButton>
         {/* The playlists open under the button rather than in place of the
@@ -455,7 +437,6 @@ export default function TrackPanel({
           <FocusButton
             focusKey={ADD_KEY}
             className="track-option"
-            keepInView="nearest"
             onSelect={() => setAdding((open) => !open)}
           >
             {adding ? 'Add to a playlist ⌄' : 'Add to a playlist ›'}

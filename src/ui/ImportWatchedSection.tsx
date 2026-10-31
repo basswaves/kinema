@@ -100,7 +100,6 @@ export default function ImportWatchedSection() {
         <FocusGroup kind="row" className="settings-row">
           {kodi && (
             <FocusButton
-              keepInView="nearest"
               className="btn-secondary"
               disabled={busy}
               onSelect={() => run(importWatchedFile(kodi))}
@@ -109,7 +108,6 @@ export default function ImportWatchedSection() {
             </FocusButton>
           )}
           <FocusButton
-            keepInView="nearest"
             className="btn-secondary"
             disabled={busy}
             onSelect={chooseFile}
@@ -164,7 +162,6 @@ export default function ImportWatchedSection() {
       )}
       <FocusGroup kind="row" className="settings-row">
         <FocusButton
-          keepInView="nearest"
           className="btn-primary"
           disabled={busy || !url.trim() || !key.trim()}
           onSelect={() => run(importWatchedServer(server, url, key, user))}

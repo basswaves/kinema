@@ -1,13 +1,9 @@
 /**
  * The components of Kinema's own focus engine (focusStore.ts has the store,
- * focusModel.ts the rules): a screen on it, the area a subtree belongs to,
- * and a dialog still on the spatial library over it.
+ * focusModel.ts the rules): a screen on it, and the area a subtree belongs to.
  */
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import {
-  EngineContext,
-  layerClosed,
-  layerOpened,
   newScreenId,
   ParentContext,
   ROOT,
@@ -41,23 +37,8 @@ export function FocusScreen({ children, keys = true }: { children: ReactNode; ke
     screenKeys(id, keys);
   }, [id, keys]);
   return (
-    <EngineContext.Provider value="kinema">
-      <ScreenContext.Provider value={id}>
-        <ParentContext.Provider value={ROOT}>{children}</ParentContext.Provider>
-      </ScreenContext.Provider>
-    </EngineContext.Provider>
+    <ScreenContext.Provider value={id}>
+      <ParentContext.Provider value={ROOT}>{children}</ParentContext.Provider>
+    </ScreenContext.Provider>
   );
-}
-
-/**
- * A dialog still on the spatial library, over a screen on this engine: it
- * takes the keys while it is open, and the ring here comes back when it
- * closes.
- */
-export function NoriginLayer({ children }: { children: ReactNode }) {
-  useLayoutEffect(() => {
-    layerOpened();
-    return layerClosed;
-  }, []);
-  return <EngineContext.Provider value="norigin">{children}</EngineContext.Provider>;
 }

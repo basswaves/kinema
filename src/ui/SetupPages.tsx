@@ -28,7 +28,6 @@ import IntrosSetup from './IntrosSetup';
 import AccountSection from './AccountSection';
 import { OpenSubtitlesSection } from './SubtitlesSettings';
 import ExtrasSetup from './ExtrasSetup';
-import { scrollPageToTop } from './focus';
 import { ALL_ARROWS, useNavGroup } from './focusGroups';
 import { navRearrive, useLanding } from './focusStore';
 
@@ -133,7 +132,12 @@ export default function SetupPages({ onClose }: Props) {
   useLanding(page ? (hasQuestions ? PAGE_FOCUS_KEY : FORWARD_FOCUS_KEY) : null);
   const pageId = page?.id;
   useLayoutEffect(() => {
-    if (pageId) scrollPageToTop(document.querySelector<HTMLElement>('.setup-pages'), 'auto');
+    if (!pageId) return;
+    // A new page starts at its top, at once.
+    for (let el = document.querySelector<HTMLElement>('.setup-pages'); el; el = el.parentElement) {
+      const { overflowY } = getComputedStyle(el);
+      if (overflowY === 'auto' || overflowY === 'scroll') el.scrollTop = 0;
+    }
   }, [pageId]);
 
   const go = useCallback(

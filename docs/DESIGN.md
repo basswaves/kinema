@@ -331,16 +331,22 @@ The next-up rule is *first episode not finished*, so one you are ten minutes
 into is offered rather than skipped past.
 
 **Exactly one keyboard handler owns the arrow keys at a time.** The player binds
-its own and the spatial navigation library binds another; `preventDefault` cannot
-stop the other listener. So the spatial system is paused while watching — OK
-pauses, Left/Right seek (accelerating while held, `scrub.ts`) — and resumed only
-once **Up or Down** brings the controls up, as on a streaming app. Without that
-split, one press both seeks and moves the focus ring. A focus ring never appears
-while watching, because the ring means "arrows move between these" and there it
-would be a lie. The seek bar, once the controls have the arrows, keeps Left/Right
-for itself through the library's own `onArrowPress` (returning `false`), so it is
-still one handler per press. The controls hand the arrows back after six idle
-seconds.
+its own and the focus engine binds another; `preventDefault` cannot stop the
+other listener. So the player's screen on the engine (`FocusScreen keys`)
+answers no keys while watching — OK pauses, Left/Right seek (accelerating while
+held, `scrub.ts`) — and takes them only once **Up or Down** brings the controls
+up, as on a streaming app. Without that split, one press both seeks and moves
+the focus ring. A focus ring never appears while watching, because the ring
+means "arrows move between these" and there it would be a lie. The seek bar
+and the volume, once the controls have the arrows, keep theirs through the
+engine (`onArrow`: Left/Right seek on the bar, Up/Down are the level), so it
+is still one handler per press. The controls hand the arrows back after six
+idle seconds. The player is one column — Back, Start over, the Up next card,
+the Skip prompt, the seek bar, the row of buttons arriving on Play/Pause — that
+holds every arrow; its panels (Audio & subtitles, chapters, details opened from
+Audio & subtitles) are dialogs, and they scroll only what went out of sight
+(`data-scroll="nearest"`), the film behind being what is watched. The details
+panel on `i` is beside the film, not a dialog: it takes no ring.
 
 **Back goes back.** `history.ts` keeps the screens you came through, each with
 the focus key it was left on; Back pops one and puts focus back on that control
@@ -385,51 +391,36 @@ back to the control that opened it when it closes (`modal` areas in
 focusStore.ts); a menu's `current` is where it opens. An area can let an
 arrow **pass over** it on the way in (a series of one season: Down from Play
 passes the row holding only "Mark season watched", Up from the first episode
-reaches it). Home, its rails, the Movies / TV shows grids (F1), a title's
-page with its seasons and episodes, the actor and collection pages, the card
-menu and the dialogs opened from a title's page (F2) are on it
-(`FocusScreen`); the other screens are still on the spatial library below
-until they move over (round 7, F3–F4). While a screen on the new engine is up
-the library is paused, and a dialog still on the library (`NoriginLayer`:
-Leave, Play something, the folder browser, a trailer) takes the keys back
-while it is open — one handler per press, decided by what is mounted.
+reaches it). Every screen is on it (`FocusScreen`), moved over one at a time
+in round 7 — Home and the grids (F1), title, actor and collection pages and
+their dialogs (F2), Settings, first run, search, playlists, Videos (F3), the
+player, the Folders page and the dialogs over any screen (F4) — and the
+spatial library it replaced (`norigin-spatial-navigation`), which answered
+every press by measuring the controls on screen, is gone, with the timers
+that corrected it (docs/HISTORY.md, "Round 7").
 
 **Screens are built from a few kinds of focus group** (`focusGroups.ts`,
-2026-10-10). Inside a screen, "where does this arrow go" used to be answered by
-distance between buttons, which is right between big areas and wrong inside
-them: Down from Back reached the nearest season instead of Play, focus walked
-out of the Audio & subtitles panel. So an area says what it is — a **menu**
-(focus cannot leave by arrows, Up/Down go round, Left/Right stay level: the
-track panel, the leave dialog), a **row** (Left/Right inside, stopping at
-its ends; arriving always lands on its current item: Play, the active
-season, the open section in the top bar), a **panel** (an area of rows: a
-Settings section, the player's controls, the first run — Left/Right only to
-a control beside it in the same row, Up/Down to the nearest row, never past
-one), or a **list / grid / rail** (arriving lands where you last were) — and
-distance only decides which area is next. The detail page orders its four
-areas (Back, the buttons, the season row, the episodes) explicitly instead.
-The geometry inside a group is `navGeometry.ts`, measured at the moment of
-the press: the nearest row that way first, then in it the control under the
-start of the one you came from (rows start at the same edge in every browser
-engine; a word's width does not), then the larger overlap. The navigation
-checker (`npm run test:nav`) presses every arrow from every control in the
+2026-10-10; the engine's areas since round 7). An area says what it is — a
+**menu** (a dialog: focus cannot leave by arrows, Up/Down go round), a **row**
+(Left/Right inside, stopping at its ends; arriving always lands on its current
+item: Play, the active season, the open section in the top bar), a **panel**
+(a column: a Settings section), or a **list / rail** (arriving lands where you
+last were). Before round 7 these were groups of the spatial library, with
+distance between buttons deciding inside them (`navGeometry.ts`, removed in
+F4). The navigation checker (`npm run test:nav`) presses every arrow from every control in the
 mock and compares each move with the agreed answer in
 `e2e/navmap.expected.json`, so a move nobody intended fails the run until
 someone approves it (`NAV_APPROVE=1`).
 
-**One rule for what is on screen, one for typing** (`focus.ts`). The focused
-control *and the heading of its group* — the rail's title, the section's
-heading, found from the markup — stop clear of the top bar when both fit;
-under a held key the page jumps with the ring instead of animating behind it.
-A text box being typed into is put in the upper part of the visible area
+**One rule for typing** (`focus.ts`; what is on screen is the one scroll rule
+above). A text box being typed into is put in the upper part of the visible area
 when OK opens the keyboard and whenever the visible area shrinks, so an
 on-screen keyboard cannot cover it; on a system that never says its keyboard
 is open (an Android 9 box), the OK press is the only moment it can be done.
 
 **Rails are capped, and the cap lives in one place.** Every card is a registered
-focusable and spatial navigation measures elements live at navigation time, so
-an uncapped genre rail on a large library is a real cost for something nobody
-scrolls. Thirty, then a **See all** grid — with the tile at the *end* of the row,
+control and a drawn poster, so an uncapped genre rail on a large library is a
+real cost for something nobody scrolls. Thirty, then a **See all** grid — with the tile at the *end* of the row,
 which is where you arrive having scrolled and keeps the rail one straight line
 for a D-pad.
 

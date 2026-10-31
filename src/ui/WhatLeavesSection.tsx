@@ -116,7 +116,6 @@ export default function WhatLeavesSection({
             {s.section && sectionNames[s.section] && (
               <FocusGroup kind="row" className="settings-row">
                 <FocusButton
-                  keepInView="nearest"
                   className="btn-secondary"
                   label={`Go to ${sectionNames[s.section]}, for ${s.name}`}
                   onSelect={() => onGo(s.section!)}

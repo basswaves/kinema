@@ -51,13 +51,12 @@ export default function MergeOffer({ offer, onMerge, onCancel }: Props) {
       <FocusGroup kind="row" className="settings-row">
         <FocusButton
           focusKey="merge-offer-yes"
-          keepInView="nearest"
           className="btn-primary"
           onSelect={onMerge}
         >
           Merge them
         </FocusButton>
-        <FocusButton keepInView="nearest" className="btn-secondary" onSelect={onCancel}>
+        <FocusButton className="btn-secondary" onSelect={onCancel}>
           Not now
         </FocusButton>
       </FocusGroup>

@@ -655,7 +655,15 @@ Every entry below is invisible with a mouse. Hovering re-establishes focus and
 clicking reaches anything, so the UI tests perfectly on a desk and is unusable
 from a sofa. **Test D-pad changes with the mouse physically untouched.**
 
-### A focus key that changes is never registered
+Entries marked **(before round 7)** describe the spatial library
+(`norigin-spatial-navigation`) that Kinema moved by until round 7 — removed in
+F4, 2026-10-31. They are kept as history: what it measured, when it updated
+itself later, and the timers that corrected it are all gone, and Kinema's own
+engine (focusStore.ts, focusModel.ts) gives each one's right answer by
+construction (focusModel.test.ts has the cases). The unmarked entries still
+apply.
+
+### A focus key that changes is never registered (before round 7)
 
 `useFocusable` registers a control with the spatial library **once**, when it
 first mounts, under whatever `focusKey` it had then. Later renders call
@@ -677,7 +685,7 @@ React kept the button — still registered as the 37th. `setFocus` on the first
 match then found nothing and the ring vanished. **Do:** when the focus key
 follows the place, put the place in the React `key` as well.
 
-### Focus cannot travel up into an overlay nav
+### Focus cannot travel up into an overlay nav (before round 7)
 
 Going up, the library requires a candidate whose **bottom** edge is above the
 current element's **top** edge:
@@ -704,7 +712,7 @@ view got a container of its own for that reason: without one, its grid cards
 were direct children of the shell and every vertical move inside the grid hit
 the resolver.
 
-### `useFocusable` reads the context of the component it is *called in*
+### `useFocusable` reads the context of the component it is *called in* (before round 7)
 
 Rendering a `FocusContext.Provider` does not put your own `useFocusable` inside
 it. The hook reads the context that was already in scope when the component
@@ -730,7 +738,7 @@ navigation just stops.
 `src/ui/Browse.tsx`), so the hook runs in a render scope that is genuinely
 inside the parent's provider.
 
-### Focus parked on an unmounted component is silent death
+### Focus parked on an unmounted component is silent death (before round 7)
 
 Each view replaces the last entirely — opening a detail page unmounts every card
 on Home. The spatial system keeps pointing at whatever was focused, so after the
@@ -765,7 +773,7 @@ the same way (`closeOnto` in `usePanels.ts`, which skips the close when the
 panel was opened again meanwhile). Found only by running the flow 30 times
 over 12 workers.
 
-### …and a claim that succeeds can still be overwritten
+### …and a claim that succeeds can still be overwritten (before round 7)
 
 `useClaimFocus` did all of the above and a remote was *still* dead after every
 launch — found by `npm run dev:mock`, with the mouse untouched. Two library
@@ -790,7 +798,7 @@ spends a navigation key pressed onto dead focus on putting focus back on the
 current view's landing spot. It logs `focus: recovered …` when it fires, so a
 new route into this state shows up in `app.log` instead of as a dead remote.
 
-### A page's claim takes the ring back after a return has finished
+### A page's claim takes the ring back after a return has finished (before round 7)
 
 Back from the player to the Folders page put the ring on the first file, not
 the film just played. No error: the return worked, and then the page's own
@@ -802,7 +810,7 @@ as it mounted (`hasPendingReturn` at mount). And key the claim per level, here
 a small `Landing` component with `key={level}`, so each folder gets its own
 count of "has the person pressed anything since arriving".
 
-### `scrollIntoView({ block: 'nearest' })` is a no-op once on screen
+### `scrollIntoView({ block: 'nearest' })` is a no-op once on screen (before round 7)
 
 Which is what you want almost everywhere, and wrong for the top row. Arrowing
 down through the rails scrolls the page; arrowing back up to the hero reveals
@@ -819,7 +827,7 @@ left to press. `keepOnScreen` in the same file goes to the very bottom when
 everything below the control fits on screen with it. Use it, not a bare
 `scrollIntoView`, for anything focusable in the browsing views.
 
-### A scroll between two presses sends focus backwards
+### A scroll between two presses sends focus backwards (before round 7)
 
 Holding Down in Settings bounced focus from a text field back up to a button
 above it, and at the bottom of the page flipped it sideways between the two
@@ -853,7 +861,7 @@ unbroken press. The first attempt at this fix set `throttle` alone and changed
 nothing in the mock, whose key repeat — like many remotes' — is a stream of
 separate down/up presses.
 
-### Focusing a container picks its "first" child by stale positions
+### Focusing a container picks its "first" child by stale positions (before round 7)
 
 `setFocus` on a container with no remembered child goes to the child nearest
 the top-left corner — by `|left| + |top|` of the positions norigin last
@@ -868,7 +876,7 @@ where it will be first, call `updateAllLayouts()`, and only then `setFocus`
 (`SetupPages.tsx`, `landOn`). And run a keyboard flow that lands this way in
 a short window (`page.setViewportSize`), where the scroll makes it fail.
 
-### A control drawn a moment after its neighbours is skipped by Up
+### A control drawn a moment after its neighbours is skipped by Up (before round 7)
 
 Found 2026-10-17 with Trakt's resume row in Settings → Keep track of what I watch. The row read
 its setting itself and appeared a few milliseconds after the Disconnect button
@@ -882,7 +890,7 @@ than letting one fetch its own data after the rest are on screen. A keyboard
 flow that moves onto such a control straight after it appears catches it;
 repeat it (`--repeat-each`) before calling it passing.
 
-### Focusing an empty container draws no ring anywhere
+### Focusing an empty container draws no ring anywhere (before round 7)
 
 `setFocus` on a container with no focusable children focuses the container
 itself. Containers render no `focused` class, so there is no ring, and every
@@ -903,7 +911,7 @@ while it has a control (`SetupPages.tsx`, `PageBody`), and a claim's `ready`
 is true only when its control will be drawn (`AccountSection`'s Connect
 needs `status.available`, not just a status).
 
-### A container that renders nothing is still a place to move to
+### A container that renders nothing is still a place to move to (before round 7)
 
 `useFocusable` registers the component whether or not its `ref` is ever
 attached. A rail that returns `null` when empty — Continue Watching with
@@ -916,7 +924,7 @@ empty rail over the top bar, and the ring vanished.
 (`ContinueRail`, `Rail`, `HomeNotices`). An early `return null` after
 `useFocusable` is the pattern to look for.
 
-### The library's own restore counts as "something live holds focus"
+### The library's own restore counts as "something live holds focus" (before round 7)
 
 A page that waits for its data before claiming focus — a series' page waits
 for the next episode, so Play exists — gives the library's
@@ -930,7 +938,7 @@ ready unless the person has pressed, clicked or moved anything since it
 arrived. Never for part of a page — data arriving while the person browses
 the list beside it would pull the ring out of their hands.
 
-### A press nothing answers goes to the parent — and from there anywhere
+### A press nothing answers goes to the parent — and from there anywhere (before round 7)
 
 When a group's resolver (or the library's own search) finds nothing that way,
 the press is handed to the group's parent, and on up. In the player that
@@ -941,7 +949,7 @@ does **not** mean "stay". **Do:** say which arrows a group holds with
 `useFocusGroup`); a held arrow with nothing that way leaves focus where it is.
 A row holds Left and Right, the player and a page of its own all four.
 
-### A panel that is not a closed group shares Down with the controls behind it
+### A panel that is not a closed group shares Down with the controls behind it (before round 7)
 
 The player's details panel ("Stats for nerds") failed a WebKit test about one
 run in twenty-five: Down from one group of facts to the next sometimes landed
@@ -956,7 +964,7 @@ with its own `FocusContext.Provider`, as Audio & subtitles is. Inside a menu
 the group's own resolver measures only the panel's children, at the moment of
 the press, so nothing behind it is a candidate whatever is scrolling.
 
-### A focus zoom can swallow the gap to the control below it
+### A focus zoom can swallow the gap to the control below it (before round 7)
 
 Continue Watching's **Remove** sits below its card precisely so Down reaches it
 — and Down never did. The card grows to 105% when focused, and the spatial
@@ -987,7 +995,7 @@ fixed amount: `scale(min(1.06, calc(1 + 0.75 / var(--w, 1))))`, where `--w`
 is its width in rem, set by `noteWidth` in `FocusButton` when the highlight
 arrives (CSS cannot read an element's own width).
 
-### A control overlaid on a card is unreachable, wherever you put it
+### A control overlaid on a card is unreachable, wherever you put it (before round 7)
 
 The corollary of "Focus cannot travel up into an overlay nav" and the focus
 zoom above, and the one that decides layout. Spatial movement is geometric, so a button drawn *inside* another focusable's rectangle
@@ -1002,7 +1010,7 @@ the corner for exactly this reason — and below rather than beside, because in 
 horizontal rail a sibling to the right doubles the presses needed to travel the
 rail, while one below is reached by Down and costs nothing.
 
-### Two focusables inside one row need a container, not adjacency
+### Two focusables inside one row need a container, not adjacency (before round 7)
 
 The same geometry that stops focus reaching an overlay nav stops it reaching a
 control drawn *inside* another focusable. Going right requires
@@ -1045,6 +1053,11 @@ and the spatial system's was registered first, so even `stopImmediatePropagation
 would be too late. Handling `ArrowLeft` in both places seeks *and* moves the
 focus ring on one press.
 
+**Since round 7 (F4):** the other handler is the focus engine's, and the
+switch is the player's screen taking no keys while watching (`FocusScreen
+keys={osdFocus}`, Player.tsx); the seek bar keeps Left/Right through the
+engine's `onArrow`. The rest of this entry is how it was done before.
+
 **Do:** make exactly one of them live at a time. `pause()` and `resume()`,
 exported from the spatial navigation package, are the switch — the player starts
 paused so arrows seek, and `resume()`s only once Up or Down brings the controls
@@ -1082,7 +1095,7 @@ same every time it renders, and unique on the page: cards are keyed by where
 they sit as well as what they show (`rail:<heading>:<id>`, `grid:<id>`,
 `search:<id>`), because one title appears in several rails at once.
 
-### Back restores the page's scroll, and a grid's landing claim must not undo it
+### Back restores the page's scroll, and a grid's landing claim must not undo it (before round 7)
 
 Back puts the ring on the remembered card, but the returning view is built at
 the top, so the page stayed there (or ended wherever the card's focus scroll
@@ -1095,7 +1108,7 @@ under parallel load:** Look `Auto` may switch to the light look mid-run
 (cards 38 px tall, the grid short, the page clamped to the top) — set
 `setLook('full')` first, or the flow fails in one engine only.
 
-### Every press measures every sibling of the focused control
+### Every press measures every sibling of the focused control (before round 7)
 
 Left to itself the library answers an arrow press by calling
 `getBoundingClientRect` on **each sibling** of the focused control and sorting
@@ -1152,7 +1165,7 @@ error, no log line. **Do:** Up at the top and Down at the bottom are no-ops, not
 disabled. Never disable a control that can hold the focus as a result of its
 own press.
 
-### Two buttons in a heading above a row of tiles: engines disagree which tile is nearer
+### Two buttons in a heading above a row of tiles: engines disagree which tile is nearer (before round 7)
 
 On a Videos folder's page, "+ Playlist" sat beside Play all, so the two buttons
 lay between two tiles. Down picked the second tile in Edge and the first in
@@ -1162,7 +1175,7 @@ on the first video, so the groups decide the move and not which tile is a
 pixel nearer. A list group alone was not enough: leaving a list upwards uses
 the list's whole box and skipped the heading's own Play all.
 
-### A row that wraps hides its second line from a remote
+### A row that wraps hides its second line from a remote (before round 7)
 
 A `row` group answers only Left and Right, measured; Up and Down leave it. The
 title page's buttons wrap when the window (or another engine's font) is too
@@ -1178,7 +1191,7 @@ wrap on every engine.
 
 ---
 
-### The spatial library calls `preventDefault` on every key, even while paused
+### The spatial library calls `preventDefault` on every key, even while paused (before round 7)
 
 Kinema's own focus engine (focusStore.ts, round 7) first ignored a key whose
 `defaultPrevented` was set, so that a control keeping a key to itself could
@@ -1239,6 +1252,24 @@ column), taller than the window: lining it up put the layout's top under the
 bar and a control far down stayed below the fold. `lineUp` now also clamps so
 the ring itself is in sight. And typing room (`placeForTyping`) must stop a
 glide the ring started (`stopGlide`), or the spring pulls the page back.
+
+### Buttons side by side in a dialog are a row, or Up lands on the last of them (round 7, F4)
+
+Moved onto the engine, the folder browser's Use this folder, Up a folder and
+Cancel were plain children of the dialog's column, so Up from the first folder
+went to the one just before it in the markup — Cancel, one OK from closing
+the browser. The spatial library had picked Use this folder because it was
+nearest. **Do:** controls side by side are a `FocusGroup kind="row"` with
+the one to arrive on as `current` (the password field and its Show button
+too: Right from the password's end is Show, Down is Connect).
+
+### A test that fills a field moves the ring to it (round 7, F4)
+
+Playwright's `fill` focuses the input. The engine follows the DOM focus
+(`focusin`, focusStore.ts), so the ring is on the field afterwards, not on the
+button it was on — the library ignored the DOM focus and left its ring where
+it was, and a test that pressed Up to get back to the field then left it.
+**Do:** after `fill`, expect the ring on the field.
 
 ## Frontend
 

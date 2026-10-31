@@ -19,9 +19,9 @@
  * keys as one line under it, since a keyboard plugged into a box works too.
  * Same keys, same handlers; only the names differ (OK, not Enter).
  */
-import { useFocusable, FocusContext } from '@noriginmedia/norigin-spatial-navigation';
+import { FocusProvider } from './FocusGroup';
+import { ALL_ARROWS, useNavGroup } from './focusGroups';
 import FocusButton from './FocusButton';
-import { useClaimFocus } from './focus';
 import { useCapabilities } from '../capabilities';
 
 const SHORTCUTS_FOCUS_KEY = 'shortcuts-close';
@@ -116,15 +116,20 @@ interface Props {
 }
 
 export default function Shortcuts({ onClose }: Props) {
-  const { ref, focusKey } = useFocusable({ trackChildren: true });
-  // The overlay covers whatever was focused underneath. Without claiming focus
-  // the ring stays on a control the user can no longer see, and the only way
-  // out is a key they came here because they did not know.
-  useClaimFocus(SHORTCUTS_FOCUS_KEY, true);
+  // A dialog: the overlay covers whatever was focused underneath, so the ring
+  // goes to Close (else it stays on a control the user can no longer see, and
+  // the only way out is a key they came here because they did not know), and
+  // back where it was on the way out (focusStore.ts).
+  const { ref, focusKey } = useNavGroup({
+    kind: 'column',
+    current: SHORTCUTS_FOCUS_KEY,
+    hold: ALL_ARROWS,
+    modal: true,
+  });
   const windowed = useCapabilities()?.windowed !== false;
 
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <div className="shortcuts-backdrop" onClick={onClose}>
         <div
           className="shortcuts"
@@ -162,6 +167,6 @@ export default function Shortcuts({ onClose }: Props) {
           </FocusButton>
         </div>
       </div>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }

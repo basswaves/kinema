@@ -1,9 +1,8 @@
 /**
- * A poster card. Focusable via the spatial navigation system so the same
- * component serves mouse and D-pad without a separate TV variant — building
- * two card components would guarantee they drift apart.
+ * A poster card. A control of the focus engine so the same component serves
+ * mouse and D-pad without a separate TV variant — building two card
+ * components would guarantee they drift apart.
  */
-import { getCurrentFocusKey, navigateByDirection } from '@noriginmedia/norigin-spatial-navigation';
 import { memo, useEffect } from 'react';
 import { FocusProvider } from './FocusGroup';
 import { useFocusLeaf } from './focusGroups';
@@ -11,7 +10,7 @@ import Art from './Art';
 import DrawnPoster from './DrawnPoster';
 import type { Title } from './api';
 import { posterState, sizedPoster } from './poster';
-import { currentFocusKey, keepOnScreen, recoverFocusSoon } from './focus';
+import { currentFocusKey } from './focus';
 import { isMyListKey, toggleMyList, useOnMyList } from '../library/myList';
 import { HOLD_MS, NO_RELEASE_MS, isMenuKey, openCardMenu } from './cardMenuStore';
 
@@ -25,8 +24,6 @@ interface Props {
   focusKey?: string;
   /** A line under the title saying why it is here — "with …" in search. */
   note?: string | null;
-  /** On My list's own rail: taking it off takes the card away too. */
-  goesWhenUnlisted?: boolean;
 }
 
 /**
@@ -35,23 +32,14 @@ interface Props {
  * title rows are the ones already on screen when a reload brought back the
  * same data (keepSame.ts) and `onSelect` is one function for the whole shell.
  */
-export default memo(function Card({ title, onSelect, focusKey: key, note, goesWhenUnlisted }: Props) {
-  const { ref, focused, focusKey, kinema, navProps } = useFocusLeaf({
+export default memo(function Card({ title, onSelect, focusKey: key, note }: Props) {
+  const { ref, focused, focusKey, navProps } = useFocusLeaf({
     focusKey: key,
     onSelect: () => onSelect(title),
-    extraProps: { titleId: title.id },
   });
 
   const state = posterState(title);
   const listed = useOnMyList(title.id);
-
-  // Keep the focused card on screen when navigating by remote (Kinema's own
-  // engine has its one rule for that, focusScroll.ts).
-  useEffect(() => {
-    if (focused && !kinema) {
-      keepOnScreen(ref.current);
-    }
-  }, [focused, kinema, ref]);
 
   // L puts the focused card on My list or takes it off. Only the focused
   // card listens, so one press is one card. A remote has no letters: the
@@ -61,25 +49,17 @@ export default memo(function Card({ title, onSelect, focusKey: key, note, goesWh
     const onKeyDown = (e: KeyboardEvent) => {
       if (!isMyListKey(e)) return;
       e.preventDefault();
-      // On Kinema's engine the ring goes to the card sliding into its place
-      // by itself when this one goes (focusModel.ts, `recover`).
-      if (goesWhenUnlisted && listed && !kinema) {
-        // The ring moves on to the card beside it first, while this one is
-        // still there to measure from; the last card takes the rail with it.
-        const here = getCurrentFocusKey();
-        navigateByDirection('right', {});
-        if (getCurrentFocusKey() === here) navigateByDirection('left', {});
-        if (getCurrentFocusKey() === here) recoverFocusSoon();
-      }
+      // Taken off My list's own rail, the card goes: the ring goes to the
+      // card sliding into its place by itself (focusModel.ts, `recover`).
       void toggleMyList(title.id);
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [focused, title.id, goesWhenUnlisted, listed, kinema]);
+  }, [focused, title.id]);
 
   // OK chooses on its release, so that OK held can be the card's menu
-  // (cardMenuStore.ts); the Menu key opens it at once. Ahead of the spatial
-  // library (capture phase), which would open the page on the key going down.
+  // (cardMenuStore.ts); the Menu key opens it at once. Ahead of the focus
+  // engine (capture phase), which would open the page on the key going down.
   useEffect(() => {
     if (!focused) return;
     let downAt = 0;

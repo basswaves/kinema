@@ -79,7 +79,7 @@ export default function EquipmentSection({ system }: { system: string }) {
         setting: if something looks wrong, the cause is in {system} or the cables, not in Kinema.
       </p>
       <div className="settings-toggle-row">
-        <FocusButton keepInView="nearest" className="btn-secondary" onSelect={() => void check()}>
+        <FocusButton className="btn-secondary" onSelect={() => void check()}>
           {checking ? 'Checking…' : 'Check again'}
         </FocusButton>
         <span className="muted">

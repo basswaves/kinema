@@ -4100,6 +4100,26 @@ by hand any more. "Down at the end reads on" moved into the engine, so every
 page on it has it. The navigation map of the three title pages came out
 unchanged on both engines.
 
+**F4 (2026-10-31): the player, and the library gone.** The player is the one
+screen with two keyboard handlers by design: watching, the arrows seek; with
+the controls up, they move the ring. Before, the switch was pausing and
+resuming the library, and every panel had to move the ring back to its
+button *before* it closed and wait for that to finish, or the library's own
+restore 300 ms later put it on Pause. Now the player's screen simply takes no
+keys while watching (`FocusScreen keys`); the seek bar and the volume keep
+their arrows through the engine (`onArrow`); and the panels are dialogs, so
+the ring goes in as one opens and back to its button as it closes, in the
+same press — the details panel opened from Audio & subtitles goes back to
+that button, the one on `i` takes no ring at all, as before. Its moves are
+the navigation map's, now as unit cases. With the player moved, the last
+dialogs (Leave, Play something, the folder browser, a trailer, a link, the
+key list) and the Folders page followed, and the library was removed:
+`focus.ts` went from 725 lines of second looks, a watchdog, a two-second
+poll for a control to come back to, a scroll pace and a read-on of its own to
+125 lines of helpers; 43 `setFocus` calls, the three rules that handed the
+keys between the two engines, `navGeometry.ts` (the measuring inside a
+group) and 86 per-button scroll hints went with it.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

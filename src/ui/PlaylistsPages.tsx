@@ -468,7 +468,7 @@ export function PlaylistsRail({ onOpen }: { onOpen: (id: number) => void }) {
   }, []);
   const { ref, focusKey } = useNavGroup(
     { kind: 'row', remember: true, disabled: lists.length === 0 },
-    { trackChildren: true, saveLastFocusedChild: true, focusable: lists.length > 0 }
+    { focusable: lists.length > 0 }
   );
 
   // Empty (or still loading), still its element, unseen: as Rail.tsx says.

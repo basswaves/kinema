@@ -9,7 +9,11 @@
  */
 import { expect, test, type Page } from '@playwright/test';
 
-/** Presses far enough apart that the app sees two (docs/GOTCHAS.md). */
+/**
+ * Presses as a person taps: further apart than a held key's steps
+ * (scrub.ts, `HOLD_GAP_MS`), so two Rights seek as two taps. Not a wait for
+ * the ring — the focus engine answers each press in the same event.
+ */
 async function press(page: Page, key: string, times = 1): Promise<void> {
   for (let i = 0; i < times; i++) {
     await page.keyboard.press(key);

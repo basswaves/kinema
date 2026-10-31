@@ -63,7 +63,6 @@ export default function BackupSection() {
             {KIND[copy.kind] ?? copy.kind} · {day(copy.made_at)} · {formatBytes(copy.bytes)}
           </span>
           <ConfirmButton
-            keepInView="nearest"
             className="btn-secondary"
             confirmLabel="Close Kinema and restore this copy"
             onConfirm={() => void restoreBackup(copy.name).catch((e) => setError(userError(e)))}
@@ -76,7 +75,6 @@ export default function BackupSection() {
       {can?.opens_folders && (
         <FocusGroup kind="row" className="settings-row">
           <FocusButton
-            keepInView="nearest"
             className="btn-secondary"
             onSelect={() => void openBackupFolder().catch((e) => setError(userError(e)))}
           >

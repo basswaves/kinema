@@ -26,18 +26,16 @@ interface Props {
   onSelect: (title: Title) => void;
   /** Omitted for rails that cannot meaningfully be expanded. */
   onSeeAll?: (heading: string, titles: Title[]) => void;
-  /** My list's rail: a card taken off the list leaves it (Card.tsx). */
-  listRail?: boolean;
   /** A kept collection's: its page is always one press away, short or not. */
   openLabel?: string;
 }
 
-export default memo(function Rail({ heading, titles, onSelect, onSeeAll, listRail, openLabel }: Props) {
+export default memo(function Rail({ heading, titles, onSelect, onSeeAll, openLabel }: Props) {
   // Not a place to move to while empty — see ContinueRail.tsx. A row that
   // comes back to the card last on (NAV-MAP, agreed 2026-10-11).
   const { ref, focusKey } = useNavGroup(
     { kind: 'row', remember: true, disabled: titles.length === 0 },
-    { trackChildren: true, saveLastFocusedChild: true, focusable: titles.length > 0 }
+    { focusable: titles.length > 0 }
   );
 
   // Empty, still its element, unseen: the focus area measures it once, at
@@ -83,7 +81,6 @@ export default memo(function Rail({ heading, titles, onSelect, onSeeAll, listRai
               title={title}
               onSelect={onSelect}
               focusKey={`rail:${heading}:${title.id}`}
-              goesWhenUnlisted={listRail}
             />
           ))}
           {/* At the end of the row rather than beside the heading: that is
@@ -94,7 +91,6 @@ export default memo(function Rail({ heading, titles, onSelect, onSeeAll, listRai
             <FocusButton
               focusKey={`rail:${heading}:see-all`}
               className="see-all-card"
-              keepInView="nearest"
               onSelect={() => onSeeAll?.(heading, titles)}
             >
               <span className="see-all-arrow">→</span>

@@ -43,7 +43,6 @@ export function FfmpegInstallButton({ focusKey, className = 'btn-primary' }: But
       <FocusButton
         focusKey={focusKey}
         className={noWinget ? className : 'btn-secondary'}
-        keepInView="nearest"
         onSelect={() => void openLink(FFMPEG_DOWNLOAD_URL)}
       >
         Open the ffmpeg download page ↗
@@ -57,7 +56,6 @@ export function FfmpegInstallButton({ focusKey, className = 'btn-primary' }: But
     <FocusButton
       focusKey={focusKey}
       className={className}
-      keepInView="nearest"
       onSelect={() => void startFfmpegInstall()}
     >
       {install.running ? 'Installing…' : failed ? 'Try again' : 'Install ffmpeg'}
@@ -112,7 +110,6 @@ export function FfmpegInstallStatus() {
       <FocusGroup kind="row" className="settings-row">
         <FocusButton
           className="btn-secondary"
-          keepInView="nearest"
           onSelect={() => void openLink(FFMPEG_DOWNLOAD_URL)}
         >
           Open the ffmpeg download page ↗

@@ -149,7 +149,6 @@ function SoundDelayRow({
       <FocusGroup kind="row" className="choice-options">
         <FocusButton
           className="choice"
-          keepInView="nearest"
           label={`Sound ${DELAY_STEP_MS} ms earlier`}
           onSelect={() => change(here.ms - DELAY_STEP_MS)}
         >
@@ -158,13 +157,12 @@ function SoundDelayRow({
         <span className="choice-value">{delayLabel(here.ms)}</span>
         <FocusButton
           className="choice"
-          keepInView="nearest"
           label={`Sound ${DELAY_STEP_MS} ms later`}
           onSelect={() => change(here.ms + DELAY_STEP_MS)}
         >
           +{DELAY_STEP_MS} ms
         </FocusButton>
-        <FocusButton className="choice" keepInView="nearest" onSelect={() => change(0)}>
+        <FocusButton className="choice" onSelect={() => change(0)}>
           No delay
         </FocusButton>
       </FocusGroup>

@@ -20,7 +20,7 @@
  *   the chosen order), else its first; a rail is a row that `remember`s.
  * - **column** — areas or controls one above the other: Up and Down move,
  *   Left and Right leave. A page is a column of rows.
- * - **grid** — cards in rows of `columns`, moved by index (gridMove.ts).
+ * - **grid** — cards in rows of `columns`, moved by index (`gridStep`).
  * - **menu** — a column (or a row, `axis: 'x'`) that holds every arrow and
  *   goes round where `wrap` says.
  *

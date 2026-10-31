@@ -11,14 +11,12 @@
  * A menu like the Version list: focus never leaves it, Back closes it and the
  * ring goes back to the card.
  */
-import { setFocus } from '@noriginmedia/norigin-spatial-navigation';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import FocusButton from './FocusButton';
 import { useFocusGroup } from './focusGroups';
 import { FocusProvider } from './FocusGroup';
-import { focusInPlace } from './focus';
-import { navFocus, useOnKinema } from './focusStore';
+import { navFocus } from './focusStore';
 import { PlaylistDialog } from './PlaylistPicker';
 import { closeCardMenu, useCardMenu, type CardMenuRequest } from './cardMenuStore';
 import { getTitleDetail, type Title } from './api';
@@ -96,32 +94,18 @@ function CardMenu({
   onNote: (note: string) => void;
 }) {
   const { title, returnTo, held } = request;
-  // Opens on its first item; on Kinema's engine a menu lands there by itself.
-  const kinema = useOnKinema();
+  // Opens on its first item: a menu lands there by itself.
   const { ref, focusKey } = useFocusGroup('menu', { current: FIRST_KEY });
   const desktop = useCapabilities()?.runs_programs ?? false;
   const series = title.kind === 'series';
   const listed = isOnMyList(title.id);
 
-  useEffect(() => {
-    if (!kinema) void setFocus(FIRST_KEY);
-    // Only on opening.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const pointer = request.pointer;
   const close = useCallback(() => {
-    // Back to the card first, while the menu is still there (docs/GOTCHAS.md,
-    // as LeaveDialog.tsx); for a pointer without moving the page under it.
-    // On Kinema's engine the page moves only if the card is out of sight, and
-    // the card is named: a right-click opens the menu without taking the ring.
-    if (returnTo) {
-      if (kinema) navFocus(returnTo);
-      else if (pointer) focusInPlace(returnTo);
-      else void setFocus(returnTo);
-    }
+    // Back to the card, which is named: a right-click opens the menu without
+    // taking the ring. The page moves only if the card is out of sight.
+    if (returnTo) navFocus(returnTo);
     closeCardMenu();
-  }, [returnTo, pointer, kinema]);
+  }, [returnTo]);
 
   // Opened by OK held: that OK is still down, and its repeats (and its
   // release) must not choose the first item. Taken once the key came up, or

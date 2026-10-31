@@ -31,7 +31,6 @@
     "app:build:test": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-app.ps1 -Test"
   },
   "dependencies": {
-    "@noriginmedia/norigin-spatial-navigation": "^3.3.0",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2.7.2",
     "@tauri-apps/plugin-http": "^2.5.9",

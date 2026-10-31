@@ -40,7 +40,6 @@ export default function FileInfo({ focusKey, fileId, what }: Props) {
       <FocusGroup kind="row" focusKey={focusKey}>
         <FocusButton
           className="btn-secondary"
-          keepInView="nearest"
           label={`${open ? 'Hide' : 'Show'} the ${what}'s file details`}
           onSelect={() => setOpen(!open)}
         >

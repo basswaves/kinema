@@ -50,7 +50,6 @@ export default function ChapterPanel({
             key={i}
             focusKey={chapterKey(i)}
             className={`track-option chapter-option ${i === current ? 'active' : ''}`}
-            keepInView="nearest"
             onSelect={() => onJump(chapter)}
           >
             <span className="chapter-time">{formatTime(chapter.time)}</span>

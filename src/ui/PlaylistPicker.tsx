@@ -9,14 +9,12 @@
  * letters) rule out typing: a new playlist there is named "Playlist 2" and
  * renamed on its page.
  */
-import { getCurrentFocusKey, setFocus } from '@noriginmedia/norigin-spatial-navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import FocusButton from './FocusButton';
 import FocusInput from './FocusInput';
 import { useFocusGroup } from './focusGroups';
 import { FocusProvider } from './FocusGroup';
 import { focusTo } from './focus';
-import { useOnKinema } from './focusStore';
 import { userError } from './errors';
 import {
   addedMessage,
@@ -108,7 +106,6 @@ export function PlaylistChoices({
           key={list.id}
           focusKey={pickKey(list.id)}
           className={buttonClass}
-          keepInView="nearest"
           disabled={busy}
           onSelect={() => add(list.id, list.name)}
         >
@@ -119,7 +116,6 @@ export function PlaylistChoices({
         <FocusButton
           focusKey={PICK_NEW_KEY}
           className={buttonClass}
-          keepInView="nearest"
           disabled={busy || lists === null}
           onSelect={() => (typing ? setAskName(true) : create(''))}
         >
@@ -135,7 +131,7 @@ export function PlaylistChoices({
             onEnter={() => create(naming)}
             placeholder={defaultName(lists ?? [])}
           />
-          <FocusButton className={buttonClass} keepInView="nearest" disabled={busy} onSelect={() => create(naming)}>
+          <FocusButton className={buttonClass} disabled={busy} onSelect={() => create(naming)}>
             Make it and add
           </FocusButton>
         </>
@@ -157,18 +153,8 @@ export function PlaylistDialog({
   onClose: (message: string | null) => void;
 }) {
   const { ref, focusKey } = useFocusGroup('menu');
-  // On Kinema's engine a dialog gives the ring back by itself (focusStore.ts);
-  // on the spatial library it goes back first, while the dialog is still
-  // there (docs/GOTCHAS.md, as LeaveDialog.tsx).
-  const kinema = useOnKinema();
-  const returnTo = useRef<string | null>(kinema ? null : getCurrentFocusKey());
-  const close = useCallback(
-    (message: string | null) => {
-      if (returnTo.current) void setFocus(returnTo.current);
-      onClose(message);
-    },
-    [onClose]
-  );
+  // A dialog gives the ring back by itself (focusStore.ts).
+  const close = useCallback((message: string | null) => onClose(message), [onClose]);
 
   // Capture phase, so the page's own Back never sees the press; Backspace in
   // the name field is typing.

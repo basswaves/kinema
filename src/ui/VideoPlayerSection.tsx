@@ -51,7 +51,6 @@ export default function VideoPlayerSection({ linux }: { linux: boolean }) {
           <FocusGroup kind="row" className="settings-row">
             {offered ? (
               <ConfirmButton
-                keepInView="nearest"
                 className="btn-secondary"
                 confirmLabel="Yes, take Kinema out"
                 onConfirm={() => run(removeAsPlayer)}
@@ -60,7 +59,6 @@ export default function VideoPlayerSection({ linux }: { linux: boolean }) {
               </ConfirmButton>
             ) : (
               <FocusButton
-                keepInView="nearest"
                 className="btn-secondary"
                 onSelect={() => run(offerAsPlayer)}
               >
@@ -79,14 +77,12 @@ export default function VideoPlayerSection({ linux }: { linux: boolean }) {
         <>
           <FocusGroup kind="row" className="settings-row">
             <FocusButton
-              keepInView="nearest"
               className="btn-secondary"
               onSelect={() => run(openDefaultApps)}
             >
               Choose what Kinema opens
             </FocusButton>
             <ConfirmButton
-              keepInView="nearest"
               className="btn-secondary"
               confirmLabel="Yes, remove Kinema"
               onConfirm={() => run(removeAsPlayer)}
@@ -103,7 +99,6 @@ export default function VideoPlayerSection({ linux }: { linux: boolean }) {
         <>
           <FocusGroup kind="row" className="settings-row">
             <FocusButton
-              keepInView="nearest"
               className="btn-secondary"
               onSelect={() => run(offerAsPlayer)}
             >

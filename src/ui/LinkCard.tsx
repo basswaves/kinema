@@ -3,35 +3,20 @@
  * address in words and as a QR code, to open on a phone. Close, Back or Esc
  * puts it away and the ring back where it was.
  */
-import { useCallback, useEffect, useRef } from 'react';
-import {
-  FocusContext,
-  getCurrentFocusKey,
-  setFocus,
-  useFocusable,
-} from '@noriginmedia/norigin-spatial-navigation';
+import { useCallback, useEffect } from 'react';
 import FocusButton from './FocusButton';
-import { useClaimFocus } from './focus';
+import { FocusProvider } from './FocusGroup';
+import { ALL_ARROWS, useNavGroup } from './focusGroups';
 import { closeLink, type ShownLink } from './links';
 
 const CLOSE_KEY = 'link-card-close';
 
 export default function LinkCard({ link }: { link: ShownLink }) {
-  const { ref, focusKey } = useFocusable({ isFocusBoundary: true, trackChildren: true });
+  // A dialog: the ring on Close (the card covers the button it came from),
+  // and back where it was on the way out (focusStore.ts).
+  const { ref, focusKey } = useNavGroup({ kind: 'column', current: CLOSE_KEY, hold: ALL_ARROWS, modal: true });
 
-  // Where the ring was before, to put it back on the way out.
-  // Then the ring to Close: the card covers the button it came from.
-  const returnTo = useRef<string | null>(null);
-  useEffect(() => {
-    returnTo.current = getCurrentFocusKey();
-    void setFocus(CLOSE_KEY);
-  }, []);
-  useClaimFocus(CLOSE_KEY, true);
-
-  const close = useCallback(() => {
-    if (returnTo.current) void setFocus(returnTo.current);
-    closeLink();
-  }, []);
+  const close = useCallback(() => closeLink(), []);
 
   // Capture phase, like the key list: the page behind must never see Back.
   useEffect(() => {
@@ -47,7 +32,7 @@ export default function LinkCard({ link }: { link: ShownLink }) {
   }, [close]);
 
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <div className="shortcuts-backdrop" onClick={close}>
         <div
           className="shortcuts link-card"
@@ -70,6 +55,6 @@ export default function LinkCard({ link }: { link: ShownLink }) {
           </FocusButton>
         </div>
       </div>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }

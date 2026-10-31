@@ -6,12 +6,8 @@
  * A menu like the leave dialog: focus never leaves it, Back closes it and the
  * ring goes back to where it was.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  FocusContext,
-  getCurrentFocusKey,
-  setFocus,
-} from '@noriginmedia/norigin-spatial-navigation';
+import { useCallback, useEffect, useState } from 'react';
+import { FocusProvider } from './FocusGroup';
 import { useFocusGroup } from './focusGroups';
 import FocusButton from './FocusButton';
 import Art from './Art';
@@ -38,7 +34,7 @@ function code(season: number | null, episode: number | null, name: string | null
 }
 
 export default function PlaySomething({ pool, resumable, onPlay, onClose }: Props) {
-  const { ref, focusKey } = useFocusGroup('menu');
+  const { ref, focusKey } = useFocusGroup('menu', { current: PLAY_KEY });
 
   const draw = useCallback(() => {
     const resuming = new Set(
@@ -81,18 +77,9 @@ export default function PlaySomething({ pool, resumable, onPlay, onClose }: Prop
       ? asked.next
       : null;
 
-  // Where the ring was, to put it back when the dialog closes without playing.
-  const returnTo = useRef<string | null>(null);
-  // Taken before the dialog claims focus; Another leaves the ring on Another.
-  useEffect(() => {
-    returnTo.current = getCurrentFocusKey();
-    void setFocus(PLAY_KEY);
-  }, []);
-
-  const cancel = useCallback(() => {
-    if (returnTo.current) void setFocus(returnTo.current);
-    onClose();
-  }, [onClose]);
+  // Closed without playing, the ring goes back where it was (a dialog does
+  // by itself, focusStore.ts); Another leaves the ring on Another.
+  const cancel = useCallback(() => onClose(), [onClose]);
 
   // Capture phase, as the leave dialog: Browse's Back must not see this press.
   useEffect(() => {
@@ -108,7 +95,7 @@ export default function PlaySomething({ pool, resumable, onPlay, onClose }: Prop
   }, [cancel]);
 
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <div className="leave-backdrop" onClick={cancel}>
         <div
           className="leave something"
@@ -170,6 +157,6 @@ export default function PlaySomething({ pool, resumable, onPlay, onClose }: Prop
           </div>
         </div>
       </div>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }

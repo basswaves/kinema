@@ -65,10 +65,10 @@ export default function MoveSection() {
         here is not sent twice.
       </p>
       <FocusGroup kind="row" className="settings-row">
-        <FocusButton keepInView="nearest" className="btn-secondary" disabled={busy} onSelect={exportIt}>
+        <FocusButton className="btn-secondary" disabled={busy} onSelect={exportIt}>
           Save the library to a file…
         </FocusButton>
-        <FocusButton keepInView="nearest" className="btn-secondary" disabled={busy} onSelect={importIt}>
+        <FocusButton className="btn-secondary" disabled={busy} onSelect={importIt}>
           Take a library in…
         </FocusButton>
       </FocusGroup>

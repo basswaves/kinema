@@ -1,58 +1,28 @@
 /**
  * The few kinds of focus group a screen is built from, each with fixed
- * behaviour (TV-FEEL.md, "Proposal").
+ * behaviour (TV-FEEL.md, "Proposal"), as areas of Kinema's focus engine
+ * (focusModel.ts has the rules, focusStore.ts the store):
  *
- * Left to the spatial library, every arrow press inside a screen is answered
- * by distance between controls. Between big areas that is right; inside one it
- * is wrong often enough to be felt on every screen: Down from Back reached the
- * nearest season instead of Play, Up from an episode reached "Mark season
- * watched", focus walked out of the Audio & subtitles panel. Rather than fix
- * each move by hand, an area says what it *is*, and distance then decides only
- * which area comes next:
- *
- * - **menu** — a panel, dialog or picker. Focus cannot leave it by arrows;
- *   Up on the top item goes round to the bottom one and back (`wrap`), and
- *   an arrow that does not go round stays level (Right from a track is
- *   nothing, not the close button above it). Back
- *   closing it stays with the component that owns it, which knows what
- *   closing means.
+ * - **menu** — a panel, dialog or picker: a dialog that holds the ring while
+ *   it is open and gives it back to the control that opened it. Up on the top
+ *   item goes round to the bottom one and back (`wrap`). Back closing it
+ *   stays with the component that owns it, which knows what closing means.
  * - **row** — the detail page's buttons, a season row, the top bar. Left and
  *   Right move inside it and stop at its ends (the owner's "neighbours only",
- *   NAV-MAP 2026-10-11: Right from the last button is nothing, not a jump to
- *   whatever is nearest a row lower); Up and Down leave it. Arriving from
- *   anywhere lands on its `current` item (Play, the active season, the open
- *   section, a setting's chosen choice), never on the nearest one and never
- *   on the one last left.
- * - **panel** — an area laid out in rows of its own: a Settings section, the
- *   player's controls. Left and Right go only to a control beside it in the
- *   same row, otherwise nothing; Up and Down to the nearest control that way
- *   (the owner's "neighbours only", 2026-10-11). Which arrows may leave it
- *   is `stopAt` (none held by default; the player holds all four).
- * - **list** — a list, grid or rail. Arriving lands on the item last focused
- *   there, or `current` the first time; inside, the library's own geometry
- *   (or a resolver of the caller's, like CardGrid's) as before.
+ *   NAV-MAP 2026-10-11); Up and Down leave it. Arriving from anywhere lands
+ *   on its `current` item (Play, the active season, the open section, a
+ *   setting's chosen choice).
+ * - **panel** — an area laid out top to bottom: a Settings section.
+ * - **list** — a list or rail (`axis: 'x'`). Arriving lands on the item last
+ *   focused there, or `current` the first time.
  *
- * The rules of the library still apply (docs/GOTCHAS.md, "Spatial
- * navigation"): each group's children must be declared in components of their
- * own so they register inside the group's provider, and a group with nothing
- * focusable in it must say so with `focusable: false`.
- *
- * Round 7: on a screen moved to Kinema's own engine (focusEngine.tsx) the
- * same group registers there instead, as the area of the same kind
- * (focusModel.ts), and is moved by structure, not distance. Which of the two
- * a group is on is decided by the screen it is drawn in (`useOnKinema`).
+ * Before round 7 these were groups of the spatial library, which answered
+ * every press by measuring the controls on screen (docs/GOTCHAS.md, "Spatial
+ * navigation", before round 7); the library is gone since F4.
  */
-import {
-  useFocusable,
-  type Direction,
-  type FocusableComponent,
-  type UseFocusableConfig,
-  type UseFocusableResult,
-} from '@noriginmedia/norigin-spatial-navigation';
-import { useCallback, useEffect } from 'react';
-import { pickNext, type Box } from './navGeometry';
-import { useFocusWithin, useNavArea, useNavLeaf, useOnKinema } from './focusStore';
-import type { AreaSpec } from './focusModel';
+import { useEffect, useId, useRef, type RefObject } from 'react';
+import { useFocusWithin, useNavArea, useNavLeaf } from './focusStore';
+import type { AreaSpec, Arrow } from './focusModel';
 
 export type GroupKind = 'menu' | 'row' | 'panel' | 'list';
 
@@ -67,20 +37,17 @@ interface Options {
   focusable?: boolean;
   /** Menus only: which arrows go round at the ends. Up/Down by default. */
   wrap?: Wrap;
-  /** Rows and panels: the arrows that stop at the group's edge instead of
-   *  leaving it. A row holds Left and Right by default, a panel nothing. */
-  stopAt?: Direction[];
-  /** Kinema's engine: a list's axis (a rail is `x`); `y` unless said. */
+  /** A list's axis (a rail is `x`); `y` unless said. */
   axis?: 'x' | 'y';
-  /** Kinema's engine: the page goes to its top when the ring is here (the top bar). */
+  /** The page goes to its top when the ring is here (the top bar). */
   pageTop?: boolean;
-  /** Kinema's engine: arrows that pass over this group from outside (focusModel.ts). */
-  passOver?: Direction[];
-  /** Kinema's engine: a menu that is not a dialog (the details panel on `i`, beside the film). */
+  /** Arrows that pass over this group from outside (focusModel.ts). */
+  passOver?: Arrow[];
+  /** A menu that is not a dialog (the details panel on `i`, beside the film). */
   modal?: boolean;
 }
 
-/** The area of Kinema's engine a group of `kind` is (focusModel.ts). */
+/** The area of the focus engine a group of `kind` is (focusModel.ts). */
 function areaFor(kind: GroupKind, current: string | undefined, wrap: Wrap, axis: 'x' | 'y'): AreaSpec {
   if (kind === 'row') return { kind: 'row', current };
   if (kind === 'menu') return { kind: 'menu', current, wrap };
@@ -92,167 +59,73 @@ function areaFor(kind: GroupKind, current: string | undefined, wrap: Wrap, axis:
   return { kind: 'column', current };
 }
 
+/** A focus key for a control or area: the one given, else one of its own for its whole life. */
+export function useNavKey(focusKey?: string): string {
+  const own = `nav${useId()}`;
+  return focusKey ?? own;
+}
+
 /**
- * A group on either engine: the spatial library's `config`, or Kinema's
- * `area` — whichever the screen it is drawn in is on. Use like
- * `useFocusable`, with `FocusProvider` (FocusGroup.tsx) for its children.
+ * An area: `ref` for its element, `focusKey` for `FocusProvider`
+ * (FocusGroup.tsx) around its children, and whether the ring is inside.
  */
 export function useNavGroup<E extends HTMLElement = HTMLDivElement>(
   area: AreaSpec & { disabled?: boolean; pageTop?: boolean; modal?: boolean },
-  config: UseFocusableConfig = {}
-): UseFocusableResult<E> {
-  const kinema = useOnKinema();
-  const result = useFocusable<object, E>({
-    ...config,
-    focusable: (config.focusable ?? true) && !kinema,
-  });
+  config: { focusKey?: string; focusable?: boolean } = {}
+): { ref: RefObject<E | null>; focusKey: string; hasFocusedChild: boolean } {
+  const ref = useRef<E>(null);
+  const focusKey = useNavKey(config.focusKey);
   const { disabled, pageTop, modal, ...spec } = area;
-  useNavArea(result.focusKey, result.ref, { on: kinema, spec, disabled, pageTop, modal });
-  const within = useFocusWithin(result.focusKey, kinema);
-  return kinema ? { ...result, hasFocusedChild: within } : result;
-}
-
-/**
- * A control on either engine (cards, Continue's cards; FocusButton has its
- * own): `focused` from whichever holds it, and `navProps` for its element.
- */
-export function useFocusLeaf<E extends HTMLElement = HTMLDivElement>(
-  config: UseFocusableConfig & { onSelect?: () => void; disabled?: boolean }
-): UseFocusableResult<E> & { kinema: boolean; navProps: Record<string, unknown> } {
-  const kinema = useOnKinema();
-  const { onSelect, disabled = false, ...rest } = config;
-  const result = useFocusable<object, E>({
-    ...rest,
-    focusable: !disabled && !kinema,
-    onEnterPress: onSelect,
+  useNavArea(focusKey, ref, {
+    on: true,
+    spec,
+    disabled: disabled || config.focusable === false,
+    pageTop,
+    modal,
   });
-  const leaf = useNavLeaf(result.focusKey, result.ref, { on: kinema, disabled, onSelect });
-  return {
-    ...result,
-    focused: kinema ? leaf.focused : result.focused,
-    kinema,
-    navProps: leaf.props,
-  };
-}
-
-const ROW_STOPS: Direction[] = ['left', 'right'];
-/** For a group nothing leaves by arrows: the player, a page of its own. */
-export const ALL_ARROWS: Direction[] = ['up', 'down', 'left', 'right'];
-const NO_STOPS: Direction[] = [];
-
-function boxOf(component: FocusableComponent): Box | null {
-  const node = component.node as HTMLElement | null | undefined;
-  if (!node?.isConnected) return null;
-  const r = node.getBoundingClientRect();
-  // Laid out but not drawn (display: none) — nowhere a ring could show.
-  if (r.width === 0 && r.height === 0) return null;
-  return { key: component.focusKey, left: r.left, top: r.top, right: r.right, bottom: r.bottom };
-}
-
-function wraps(wrap: Wrap, direction: Direction): boolean {
-  if (wrap === 'both') return true;
-  if (wrap === 'vertical') return direction === 'up' || direction === 'down';
-  if (wrap === 'horizontal') return direction === 'left' || direction === 'right';
-  return false;
+  const hasFocusedChild = useFocusWithin(focusKey, true);
+  return { ref, focusKey, hasFocusedChild };
 }
 
 /**
- * The next sibling inside a group, by its own rules: a row answers only Left
- * and Right, a menu answers everything and goes round where `wrap` says.
- * `null` sends the press on to the group's parent — or, for a menu, nowhere.
- *
- * Measured fresh with `getBoundingClientRect` at the moment of the press, not
- * from the library's cached positions, which a scroll between presses makes
- * wrong (GOTCHAS, "A scroll between two presses sends focus backwards").
+ * A control (cards, Continue's cards, a stats group; FocusButton has its
+ * own): whether it holds the ring, and `navProps` for its element.
  */
-export function resolveInGroup(
-  kind: GroupKind,
-  wrap: Wrap,
-  direction: Direction,
-  from: string,
-  siblings: FocusableComponent[]
-): FocusableComponent | null {
-  if (kind === 'row' && (direction === 'up' || direction === 'down')) return null;
-  const boxes: Box[] = [];
-  let fromBox: Box | null = null;
-  for (const s of siblings) {
-    const box = boxOf(s);
-    if (!box) continue;
-    if (s.focusKey === from) fromBox = box;
-    else boxes.push(box);
-  }
-  // A row marked so (ChoiceRow) is left from the control the ring is on, not
-  // from the whole row: Down from its last choice goes to what is under that.
-  const fromNode = siblings.find((s) => s.focusKey === from)?.node as HTMLElement | undefined;
-  const ring = document.querySelector('.focused');
-  if (fromBox && fromNode?.dataset.leaveFromRing !== undefined && ring && fromNode.contains(ring)) {
-    const r = ring.getBoundingClientRect();
-    fromBox = { key: from, left: r.left, top: r.top, right: r.right, bottom: r.bottom };
-  }
-  if (!fromBox) return null;
-  const sideways = direction === 'left' || direction === 'right';
-  const f = fromBox;
-  // Left and Right stay in the row: only controls level with this one. (A
-  // menu's track list is a column; Right from a track went up to "close". A
-  // row that wraps went back up to its first line from the second.)
-  const level =
-    sideways &&
-    (kind === 'panel' || kind === 'row' || (kind === 'menu' && !wraps(wrap, direction)));
-  const pool = level ? boxes.filter((b) => b.top < f.bottom && b.bottom > f.top) : boxes;
-  const key = pickNext(fromBox, pool, direction, kind === 'menu' && wraps(wrap, direction));
-  if (key !== null) return siblings.find((s) => s.focusKey === key) ?? null;
-  // A row too wide for the window wraps onto a second line. From the end of a
-  // line, Right goes on in reading order (Left back), as text does, or the
-  // wrapped buttons are out of a remote's reach. Up and Down still leave it.
-  if (kind !== 'row' || !sideways) return null;
-  const order = siblings
-    .filter((s) => s.focusKey === from || boxes.some((b) => b.key === s.focusKey))
-    .sort((a, b) =>
-      (a.node as Node).compareDocumentPosition(b.node as Node) & Node.DOCUMENT_POSITION_FOLLOWING
-        ? -1
-        : 1
-    );
-  const at = order.findIndex((s) => s.focusKey === from);
-  return order[direction === 'right' ? at + 1 : at - 1] ?? null;
+export function useFocusLeaf<E extends HTMLElement = HTMLDivElement>(config: {
+  focusKey?: string;
+  onSelect?: () => void;
+  disabled?: boolean;
+}): { ref: RefObject<E | null>; focusKey: string; focused: boolean; navProps: Record<string, unknown> } {
+  const ref = useRef<E>(null);
+  const focusKey = useNavKey(config.focusKey);
+  const leaf = useNavLeaf(focusKey, ref, { on: true, disabled: config.disabled, onSelect: config.onSelect });
+  return { ref, focusKey, focused: leaf.focused, navProps: leaf.props };
 }
 
+/** For a group nothing leaves by arrows: the player, a page of its own. */
+export const ALL_ARROWS: Arrow[] = ['up', 'down', 'left', 'right'];
+
 /**
- * Make a component a focus group of `kind`. Use like `useFocusable`: put
- * `ref` on the group's element and wrap its children in
- * `<FocusContext.Provider value={focusKey}>`.
+ * Make a component a focus group of `kind`: put `ref` on the group's element
+ * and wrap its children in `<FocusProvider value={focusKey}>`.
  *
- * The element is marked `data-focus-group` with its kind, which the on-screen
- * rule (focus.ts, `keepOnScreen`) and the navigation checker read.
+ * The element is marked `data-focus-group` with its kind, which the
+ * navigation checker reads.
  */
 export function useFocusGroup<E extends HTMLElement = HTMLDivElement>(
   kind: GroupKind,
-  { focusKey, current, focusable = true, wrap = 'vertical', stopAt, axis = 'y', pageTop, passOver, modal }: Options = {}
-): UseFocusableResult<E> {
-  const stops = stopAt ?? (kind === 'row' ? ROW_STOPS : NO_STOPS);
-  const resolve = useCallback(
-    (direction: Direction, from: string, siblings: FocusableComponent[]) =>
-      resolveInGroup(kind, wrap, direction, from, siblings),
-    [kind, wrap]
-  );
-
-  // On Kinema's engine a menu is a dialog: it holds the ring while it is
-  // open, and gives it back to the control that opened it (focusStore.ts).
-  const area = { ...areaFor(kind, current, wrap, axis), passOver, disabled: !focusable, pageTop, modal: modal ?? kind === 'menu' };
-  const result = useNavGroup<E>(area, {
-    focusKey,
-    focusable,
-    trackChildren: true,
-    // A row always lands on its current item; the others come back to where
-    // the person was.
-    saveLastFocusedChild: kind !== 'row',
-    preferredChildFocusKey: current,
-    // A menu holds every arrow; a row or a panel the ones in `stopAt`.
-    isFocusBoundary: kind === 'menu' || stops.length > 0,
-    focusBoundaryDirections: kind === 'menu' ? undefined : stops,
-    // A list keeps the library's own search (or the caller's resolver on a
-    // container inside it): replacing it would change every move on Home.
-    nextFocusResolver: kind === 'list' ? undefined : resolve,
-  });
+  { focusKey, current, focusable = true, wrap = 'vertical', axis = 'y', pageTop, passOver, modal }: Options = {}
+): { ref: RefObject<E | null>; focusKey: string; hasFocusedChild: boolean } {
+  // A menu is a dialog: it holds the ring while it is open, and gives it
+  // back to the control that opened it (focusStore.ts).
+  const area = {
+    ...areaFor(kind, current, wrap, axis),
+    passOver,
+    disabled: !focusable,
+    pageTop,
+    modal: modal ?? kind === 'menu',
+  };
+  const result = useNavGroup<E>(area, { focusKey });
 
   const { ref } = result;
   useEffect(() => {

@@ -6,10 +6,9 @@
  * only ever gets the second is unreachable from the couch, and one that only
  * gets the first shows a ring and swallows every keystroke.
  */
-import { useFocusable } from '@noriginmedia/norigin-spatial-navigation';
-import { useEffect } from 'react';
-import { keepOnScreen } from './focus';
-import { useNavLeaf, useOnKinema } from './focusStore';
+import { useRef } from 'react';
+import { useNavKey } from './focusGroups';
+import { useNavLeaf } from './focusStore';
 import { useTypingFocus } from './typing';
 
 interface Props {
@@ -19,10 +18,10 @@ interface Props {
   className?: string;
   type?: 'text' | 'password';
   /**
-   * Enter while typing. Handled on the DOM input rather than through
-   * `onEnterPress`, which the spatial system only delivers when the input holds
-   * *spatial* focus — reaching the field with a mouse would otherwise leave
-   * Enter doing nothing.
+   * Enter while typing. Handled on the DOM input rather than through the
+   * focus engine's OK, which it delivers only when the input holds the
+   * ring — reaching the field with a mouse would otherwise leave Enter doing
+   * nothing.
    */
   onEnter?: () => void;
   /** A stable key, for landing on this field from elsewhere. */
@@ -38,24 +37,15 @@ export default function FocusInput({
   onEnter,
   focusKey,
 }: Props) {
-  // On whichever engine the screen it is drawn in is (focusEngine.tsx).
-  const kinema = useOnKinema();
-  const { ref, focused: spatialFocused, focusKey: key } = useFocusable<object, HTMLInputElement>({
-    focusKey,
-    focusable: !kinema,
-  });
-  const leaf = useNavLeaf(key, ref, { on: kinema });
-  const focused = kinema ? leaf.focused : spatialFocused;
+  const ref = useRef<HTMLInputElement>(null);
+  const key = useNavKey(focusKey);
+  const leaf = useNavLeaf(key, ref, { on: true });
+  const focused = leaf.focused;
   // Typing focus, and the system's keyboard on OK where it has one.
   // It focuses with `preventScroll`, because a plain focus() jumps the page
   // to the input at once and the smooth scroll below then has nothing left
   // to do — the inputs lurched while every button around them glided.
   const enterKey = useTypingFocus(ref, focused);
-
-  // Kinema's own engine scrolls by its one rule (focusScroll.ts).
-  useEffect(() => {
-    if (focused && !kinema) keepOnScreen(ref.current, 'nearest');
-  }, [focused, ref, kinema]);
 
   return (
     <input

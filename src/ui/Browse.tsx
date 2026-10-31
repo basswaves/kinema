@@ -8,15 +8,6 @@
 import { describeError, userError } from './errors';
 import { scanStageWords } from '../library/scanWords';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  init as initSpatial,
-  doesFocusableExist,
-  getCurrentFocusKey,
-  setFocus,
-  useFocusable,
-  FocusContext,
-  type FocusableComponent,
-} from '@noriginmedia/norigin-spatial-navigation';
 import Home, { HERO_PLAY_FOCUS_KEY } from './Home';
 import { SCAN_OK_KEY } from './HomeNotices';
 import TitleDetailView from './TitleDetail';
@@ -24,17 +15,10 @@ import CardGrid from './CardGrid';
 import FocusButton from './FocusButton';
 import Settings, { type SettingsTarget } from './Settings';
 import { SETUP_PAGES_KEY } from './SetupPages';
-import {
-  installFocusWatchdog,
-  installReadOn,
-  installScrollPace,
-  recoverFocusSoon,
-  currentFocusKey,
-  returnFocusTo,
-} from './focus';
+import { currentFocusKey, returnFocusTo } from './focus';
 import { back, current, navigate, open, replace, type Entry } from './history';
 import { useFocusGroup, useNavGroup } from './focusGroups';
-import { FocusScreen, NoriginLayer } from './focusEngine';
+import { FocusScreen } from './focusEngine';
 import { navFocus, navFocused, useLanding } from './focusStore';
 import FocusGroup, { FocusProvider } from './FocusGroup';
 import FocusInput from './FocusInput';
@@ -96,31 +80,6 @@ import { registerSelfTestPlay, runSelfTest, selfTestPlan } from '../selftest';
 import { startEngine } from '../player/engine';
 import './ui.css';
 
-// Enable native-like arrow-key navigation. `useGetBoundingClientRect` makes
-// hit-testing accurate when rails scroll horizontally.
-//
-// `throttle` is not about speed. The library re-measures the focused control on
-// every press but reuses its neighbours' positions for 16 ms, and those
-// positions are viewport-relative — so under key repeat, while a scroll is
-// moving the page, one press compared fresh and stale positions and focus
-// jumped backwards or sideways. Presses at least 25 ms apart always find every
-// position stale, so all of them are measured at the same instant. A held key
-// on Windows repeats at most every ~33 ms, so nothing a person does is dropped.
-// `throttleKeypresses` because without it every key-up resets the throttle, and
-// a remote that repeats as separate presses rather than a held key is exactly
-// the case this is for. See GOTCHAS, "A scroll between two presses…".
-initSpatial({
-  debug: false,
-  visualDebug: false,
-  useGetBoundingClientRect: true,
-  throttle: 25,
-  throttleKeypresses: true,
-});
-installFocusWatchdog();
-// Before read-on, which scrolls on the strength of what this has noted.
-installScrollPace();
-installReadOn();
-
 /** The nav entries, in order. Detail and player are reached, not navigated to. */
 type NavTarget = 'home' | 'movies' | 'tv' | 'library' | 'search' | 'settings';
 
@@ -162,36 +121,6 @@ type View =
 
 const NAV_FOCUS_KEY = 'top-nav';
 const GRID_FOCUS_KEY = 'grid-view';
-
-/**
- * Move focus between the nav bar and the content beneath it.
- *
- * This one hop cannot be done geometrically, and the reason is worth writing
- * down. To go up, the spatial system requires a candidate whose **bottom** edge
- * is above the current element's **top** edge. The nav is an overlay: it is
- * drawn over the content, so its bottom edge is always *below* the content's
- * top edge — and the hero deliberately slides further under it still. There is
- * no arrangement of an overlay nav and the content it overlays that satisfies
- * that test, so no amount of adjusting the markup would have fixed this.
- *
- * `nextFocusResolver` is the library's escape hatch for exactly this: it is
- * consulted only once the geometric search inside the content has come up
- * empty, so pressing up from the third rail still reaches the second rail
- * normally. Only a press that has run out of content arrives here.
- */
-function resolveNavHop(
-  direction: string,
-  fromKey: string,
-  siblings: FocusableComponent[]
-): FocusableComponent | null {
-  const nav = siblings.find((s) => s.focusKey === NAV_FOCUS_KEY);
-  const content = siblings.find((s) => s.focusKey !== NAV_FOCUS_KEY);
-  if (!nav) return null;
-
-  if (direction === 'up') return fromKey === NAV_FOCUS_KEY ? null : nav;
-  if (direction === 'down') return fromKey === NAV_FOCUS_KEY ? (content ?? null) : null;
-  return null;
-}
 
 export default function Browse() {
   const [titles, setTitles] = useState<Title[]>([]);
@@ -259,22 +188,12 @@ export default function Browse() {
   const reviewCount = useReviewCount();
   const scanTrouble = scanFailed ?? describeScanTrouble(scanErrors, reviewCount > 0);
   const dismissScanTrouble = useCallback(() => {
-    // OK by remote takes its own notice away: the ring goes to Play first, so
-    // the library's own restore does not pick a neighbour by itself. A click
-    // with the ring elsewhere leaves it there. The notice goes only once the
-    // ring is there: setFocus is asynchronous, and OK unmounting while the
-    // library still holds it as focused starts that restore anyway, which
-    // then took the ring to the next notice's button.
-    const clear = () => {
-      setScanFailed(null);
-      setScanErrors([]);
-    };
-    // On Kinema's engine (Home's) the move is made at once, so the notice
-    // can go straight after.
-    if (navFocused() === SCAN_OK_KEY && navFocus(HERO_PLAY_FOCUS_KEY)) clear();
-    else if (getCurrentFocusKey() === SCAN_OK_KEY && doesFocusableExist(HERO_PLAY_FOCUS_KEY)) {
-      void setFocus(HERO_PLAY_FOCUS_KEY).finally(clear);
-    } else clear();
+    // OK by remote takes its own notice away, with the ring to Play rather
+    // than the next notice's button. A click with the ring elsewhere leaves
+    // it there.
+    if (navFocused() === SCAN_OK_KEY) navFocus(HERO_PLAY_FOCUS_KEY);
+    setScanFailed(null);
+    setScanErrors([]);
   }, []);
   /** What the equipment could do that is switched off — see qualityNotice.ts. */
   const [upgrades, setUpgrades] = useState<Upgrade[]>([]);
@@ -320,7 +239,7 @@ export default function Browse() {
   useEffect(
     () =>
       listenForVideos(({ target }: OpenRequest) => {
-        const from = getCurrentFocusKey();
+        const from = currentFocusKey();
         setStack((s) =>
           current(s).name === 'player'
             ? replace(s, { name: 'player', target })
@@ -373,18 +292,7 @@ export default function Browse() {
     return () => window.clearTimeout(id);
   }, [closing]);
 
-  // The shell owns the nav↔content rule, because it is the only component that
-  // is a parent of both. The nav and the search view get their containers in
-  // components of their own (below) rather than here — `useFocusable` reads the
-  // focus context of the component it is *called in*, so declaring them at this
-  // level would parent them to the root alongside the shell instead of beneath
-  // it, and the resolver would never see the nav at all.
-  const { ref: shellRef, focusKey: shellFocusKey } = useFocusable({
-    focusKey: 'browse-shell',
-    trackChildren: true,
-    saveLastFocusedChild: true,
-    nextFocusResolver: resolveNavHop,
-  });
+  const shellRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     try {
@@ -720,9 +628,9 @@ export default function Browse() {
       } catch (e) {
         setError(userError(e));
       }
+      // The Remove button that was pressed goes with its card: the ring goes
+      // to the card sliding into its place (focusModel.ts, `recover`).
       await load();
-      // The Remove button that was pressed has just gone with its card.
-      recoverFocusSoon();
     },
     [load]
   );
@@ -822,7 +730,6 @@ export default function Browse() {
 
   return (
     <div className="browse" ref={shellRef}>
-      <FocusContext.Provider value={shellFocusKey}>
         <TopNav
           active={
             view.name === 'grid' && view.kind
@@ -946,12 +853,13 @@ export default function Browse() {
         )}
 
         {view.name === 'folders' && (
+          <FocusScreen>
           <FoldersPage
             at={view.at}
             roots={roots}
             onMove={(at) => setStack((s) => replace(s, { name: 'folders', at }))}
             onPlay={(path) => {
-              const from = getCurrentFocusKey();
+              const from = currentFocusKey();
               // Only if still on Folders when the library has answered.
               void targetFor(path).then((target) =>
                 setStack((s) =>
@@ -962,6 +870,7 @@ export default function Browse() {
             onBack={goBack}
             onLibraryChanged={() => void load()}
           />
+          </FocusScreen>
         )}
 
         {view.name === 'playlists' && (
@@ -1099,13 +1008,7 @@ export default function Browse() {
           </FocusScreen>
         )}
 
-        {/* Dialogs still on the spatial library: they take the keys from
-            Kinema's own engine while open (focusEngine.tsx). */}
-        {leaving && (
-          <NoriginLayer>
-            <LeaveDialog onClose={() => setLeaving(false)} />
-          </NoriginLayer>
-        )}
+        {leaving && <LeaveDialog onClose={() => setLeaving(false)} />}
         {/* The menu on cards (cardMenuStore.ts), over whichever screen the card is on. */}
         <CardMenuHost
           onPlay={(title) => void playTitle(title)}
@@ -1114,16 +1017,13 @@ export default function Browse() {
         />
 
         {something && (
-          <NoriginLayer>
-            <PlaySomething
-              pool={something}
-              resumable={resumable}
-              onPlay={(title) => void playTitle(title)}
-              onClose={() => setSomething(null)}
-            />
-          </NoriginLayer>
+          <PlaySomething
+            pool={something}
+            resumable={resumable}
+            onPlay={(title) => void playTitle(title)}
+            onClose={() => setSomething(null)}
+          />
         )}
-      </FocusContext.Provider>
     </div>
   );
 }
@@ -1131,11 +1031,8 @@ export default function Browse() {
 const navKey = (name: string) => `nav:${name}`;
 
 /**
- * The nav bar, as its own component so that its container is created *inside*
- * the shell's focus context and is therefore parented to the shell. Declaring
- * this `useFocusable` up in `Browse` would read `Browse`'s own context — the
- * root — no matter which providers `Browse` renders, which is a quiet way to
- * end up with a focus tree that does not match the markup.
+ * The nav bar, as its own component: a row of its own at the top of the
+ * focus engine's tree, above whichever screen is up.
  */
 function TopNav({
   active,
@@ -1173,7 +1070,6 @@ function TopNav({
             key={name}
             focusKey={navKey(name)}
             className={active === name ? 'active' : ''}
-            keepInView="page-top"
             onSelect={() => onNavigate(name)}
           >
             {label}
@@ -1197,7 +1093,6 @@ function TopNav({
         <FocusButton
           className="nav-help"
           title="Keyboard and remote controls (?)"
-          keepInView="page-top"
           onSelect={() => setShortcutsOpen(true)}
         >
           ?
@@ -1241,7 +1136,7 @@ function GridView({
   // The page: its heading row, the order row and the cards, one above the other.
   const { ref, focusKey } = useNavGroup(
     { kind: 'column' },
-    { focusKey: GRID_FOCUS_KEY, trackChildren: true, saveLastFocusedChild: true }
+    { focusKey: GRID_FOCUS_KEY }
   );
 
   const [arrangement, setArrangement] = useState<GridArrangement>({
@@ -1277,7 +1172,7 @@ function GridView({
       <div className="search" ref={ref}>
         <FocusGroup kind="row" className="grid-head">
           {showBack && (
-            <FocusButton className="back-button" keepInView="page-top" onSelect={onBack}>
+            <FocusButton className="back-button" onSelect={onBack}>
               ← Back
             </FocusButton>
           )}
@@ -1289,7 +1184,6 @@ function GridView({
             <FocusButton
               focusKey="grid-play-something"
               className="btn-secondary grid-something"
-              keepInView="page-top"
               onSelect={onPlaySomething}
             >
               Play something
@@ -1299,7 +1193,6 @@ function GridView({
             <FocusButton
               focusKey="grid-new-collection"
               className="btn-secondary"
-              keepInView="page-top"
               onSelect={onNewCollection}
             >
               New collection
@@ -1320,7 +1213,6 @@ function GridView({
               key={s.value}
               focusKey={`grid-sort:${s.value}`}
               className={`choice ${arrangement.sort === s.value ? 'chosen' : ''}`}
-              keepInView="page-top"
               title={arrangement.sort === s.value ? 'Press again to flip the order' : undefined}
               onSelect={() =>
                 arrange({
@@ -1337,7 +1229,6 @@ function GridView({
           <FocusButton
             focusKey="grid-unwatched"
             className={`choice grid-filter ${arrangement.unwatched ? 'chosen' : ''}`}
-            keepInView="page-top"
             onSelect={() => arrange({ ...arrangement, unwatched: !arrangement.unwatched })}
           >
             {arrangement.unwatched ? '✓ ' : ''}Unwatched only

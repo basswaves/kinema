@@ -13,26 +13,17 @@
  * when the control holding it goes away, decided once the screen's change has
  * been committed (a microtask, not a timer).
  *
- * Screens move over one at a time. A screen on this engine is wrapped in
- * `FocusScreen`; while one is mounted it answers the keys and the spatial
- * library is paused, and the controls outside it that both kinds of screen
- * share (the top bar) register here. A dialog still built on the library
- * (`NoriginLayer`) takes the keys back while it is open; the ring here stays
- * where it was and shows again when it closes. So a press is answered by
- * exactly one of the two, decided by what is mounted.
+ * Every screen is wrapped in `FocusScreen`; while one is mounted it answers
+ * the keys (the player's only while its controls hold the ring), and the
+ * controls outside it (the top bar, the dialogs over any screen) register
+ * here too. Screens moved over from the spatial library one at a time
+ * (F1–F3); since F4 it is gone, with the three rules that handed the keys
+ * between the two (docs/HISTORY.md, round 7).
  *
  * Accessibility: the control holding the ring has the DOM focus too (without
  * the browser scrolling to it), is the one tab stop (roving tabindex), and Tab
  * and Shift+Tab go from area to area as on a web page (`tabMove`).
  */
-import {
-  doesFocusableExist,
-  getCurrentFocusKey as spatialFocusKey,
-  pause as pauseSpatial,
-  ROOT_FOCUS_KEY,
-  resume as resumeSpatial,
-  setFocus as setSpatialFocus,
-} from '@noriginmedia/norigin-spatial-navigation';
 import {
   createContext,
   useContext,
@@ -111,21 +102,11 @@ const screens: Screen[] = [];
 /** Per screen, where it lands (`useLanding`); set before the screen itself registers. */
 const landings = new Map<number, string | null>();
 let screenIds = 0;
-let layers = 0;
 let inputs = 0;
-let pending: { key: string; scrollTop?: number; onTaken?: () => void } | null = null;
+let pending: { key: string; scrollTop?: number } | null = null;
 let lastKeyMoveAt = -Infinity;
-/**
- * When this engine last took the keys over (a screen arrived, a dialog on the
- * spatial library closed). A press older than that was the other engine's:
- * its listener runs first, and the screen it opened is drawn between the two
- * listeners, so the Enter that opened Home from Settings also reached here
- * and pressed Home's Play.
- */
-let tookOverAt = -Infinity;
 
 const keyListeners = new Map<string, Set<() => void>>();
-const engineListeners = new Set<() => void>();
 
 /** Tell `key` and the areas holding it (`useFocusWithin`) that the ring moved. */
 function notify(key: string | null): void {
@@ -190,7 +171,7 @@ function active(): boolean {
 
 /** Whether this engine answers the keys now. */
 function answering(): boolean {
-  return active() && layers === 0 && screens[screens.length - 1].keys;
+  return active() && screens[screens.length - 1].keys;
 }
 
 /** The dialog holding the ring now, if one is open and holds anything. */
@@ -205,16 +186,6 @@ function topModal(): string | null {
 function allowed(key: string): boolean {
   const modal = topModal();
   return modal === null || within(tree, key, modal);
-}
-
-let spatialPaused = false;
-
-/** The spatial library is paused exactly while this engine has the keys (answering, or a screen holding them back). */
-function syncEngines(): void {
-  const want = active() && layers === 0;
-  if (want && !spatialPaused) pauseSpatial();
-  if (!want && spatialPaused) resumeSpatial();
-  spatialPaused = want;
 }
 
 // ---- focusing -------------------------------------------------------------
@@ -347,10 +318,9 @@ function settle(): void {
   }
 
   if (pending) {
-    const { key, scrollTop, onTaken } = pending;
+    const { key, scrollTop } = pending;
     if (entries.has(key) && enter(tree, key, memory) === key) {
       pending = null;
-      onTaken?.();
       const page = entries.get(key)?.node?.closest<HTMLElement>('.browse');
       if (page && scrollTop !== undefined) page.scrollTop = scrollTop;
       setFocused(key, 'return');
@@ -421,10 +391,9 @@ const ARROWS: Record<string, Arrow> = {
 };
 
 function onKeyDown(event: KeyboardEvent): void {
-  // Not `defaultPrevented`: the spatial library calls preventDefault on every
-  // arrow and Enter even while paused. A control keeping a key to itself
-  // stops its propagation instead, and the press never gets here.
-  if (!answering() || event.timeStamp <= tookOverAt) return;
+  // A control keeping a key to itself stops its propagation (a card's OK
+  // held, a text box's Left), and the press never gets here.
+  if (!answering()) return;
   if (event.altKey || event.ctrlKey || event.metaKey) return;
   const arrow = ARROWS[event.key];
   if (!arrow && event.key !== 'Enter' && event.key !== 'Tab') return;
@@ -491,9 +460,8 @@ let installed = false;
 function install(): void {
   if (installed) return;
   installed = true;
-  // Bubble phase on `window`, as the spatial library listened: a control
-  // that keeps a key to itself (a card's OK held, a text box's Left) stops
-  // it before it gets here.
+  // Bubble phase on `window`: a control that keeps a key to itself (a card's
+  // OK held, a text box's Left) stops it before it gets here.
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('keydown', countInput, { capture: true, passive: true });
   for (const type of ['pointerdown', 'wheel']) {
@@ -560,20 +528,22 @@ export function navRearrive(): void {
 
 /**
  * Back is returning to `key`, with the page at `scrollTop`: taken by the
- * next screen of this engine when the control is there. `onTaken` tells the
- * other engine to stand down.
+ * next screen when the control is there.
  */
-export function navExpectReturn(key: string | null, scrollTop?: number, onTaken?: () => void): void {
-  pending = key ? { key, scrollTop, onTaken } : null;
+export function navExpectReturn(key: string | null, scrollTop?: number): void {
+  pending = key ? { key, scrollTop } : null;
 }
 
 /** For the navigation checker (navProbe.ts): what is registered, and where the ring is. */
 export function navSnapshot(): {
   focused: string | null;
+  /** The dialog holding the ring, if one is open: nothing outside it can be reached. */
+  modal: string | null;
   nodes: { key: string; parent: string; area?: AreaSpec; node: HTMLElement | null; disabled: boolean }[];
 } {
   return {
     focused: active() ? focused : null,
+    modal: topModal(),
     nodes: [...entries.values()].map((e) => ({
       key: e.key,
       parent: e.parent,
@@ -592,10 +562,7 @@ export function newScreenId(): number {
 /** A screen on this engine has arrived. */
 export function screenArrived(id: number, keys = true): void {
   install();
-  tookOverAt = performance.now();
   screens.push({ id, arrivedAt: inputs, keys });
-  syncEngines();
-  notifyEngine();
   scheduleSettle();
 }
 
@@ -608,97 +575,28 @@ export function screenKeys(id: number, keys: boolean): void {
   const screen = screens.find((s) => s.id === id);
   if (!screen || screen.keys === keys) return;
   screen.keys = keys;
-  if (keys) tookOverAt = performance.now();
   const node = focused ? entries.get(focused)?.node : null;
   if (answering() && node?.isConnected) node.focus({ preventScroll: true });
 }
 
-/** …and gone. */
+/** …and gone. The ring leaves with the screen: the next one lands its own. */
 export function screenLeft(id: number): void {
   const index = screens.findIndex((s) => s.id === id);
   if (index >= 0) screens.splice(index, 1);
   landings.delete(id);
-  syncEngines();
-  notifyEngine();
   if (!active()) {
-    // The ring leaves with the screen. On a control both engines share (the
-    // top bar's Settings, pressed to get there) it stays put: handed to the
-    // spatial library once that control has registered there, after this
-    // commit — unless the page arriving has already taken it (a page claim,
-    // focus.ts), which wins as it did before.
     const before = focused;
-    const left = performance.now();
     focused = null;
     notify(before);
-    if (before && entries.has(before)) {
-      queueMicrotask(() => {
-        const claimed = spatialFocusKey();
-        const taken =
-          claimedSince(left) || (claimed && claimed !== ROOT_FOCUS_KEY && doesFocusableExist(claimed));
-        if (!active() && !taken && doesFocusableExist(before)) void setSpatialFocus(before);
-      });
-    }
   }
-}
-
-let lastSpatialClaim = -Infinity;
-
-/** A page on the spatial library has just put the ring somewhere (focus.ts). */
-export function noteSpatialClaim(): void {
-  lastSpatialClaim = performance.now();
-}
-
-function claimedSince(at: number): boolean {
-  return lastSpatialClaim >= at;
-}
-
-/** A dialog on the spatial library has opened over this engine (`NoriginLayer`). */
-export function layerOpened(): void {
-  layers++;
-  syncEngines();
-  notify(focused);
-}
-
-/** …and closed: the ring here shows again, with the DOM focus. */
-export function layerClosed(): void {
-  layers--;
-  tookOverAt = performance.now();
-  syncEngines();
-  notify(focused);
-  const node = focused ? entries.get(focused)?.node : null;
-  if (answering() && node?.isConnected) node.focus({ preventScroll: true });
-  scheduleSettle();
 }
 
 // ---- React ---------------------------------------------------------------
 
-type EngineChoice = 'auto' | 'kinema' | 'norigin';
-/** Which engine a subtree is on (focusEngine.tsx sets it). */
-export const EngineContext = createContext<EngineChoice>('auto');
 /** The area a subtree's controls belong to. */
 export const ParentContext = createContext<string>(ROOT);
 /** The screen a subtree is in. */
 export const ScreenContext = createContext<number | null>(null);
-
-function subscribeEngine(listener: () => void): () => void {
-  engineListeners.add(listener);
-  return () => engineListeners.delete(listener);
-}
-
-function notifyEngine(): void {
-  for (const listener of engineListeners) listener();
-}
-
-/**
- * Whether the component calling it is on this engine: inside a `FocusScreen`
- * yes, inside a `NoriginLayer` no, elsewhere (the top bar) whenever a screen
- * on this engine is up.
- */
-export function useOnKinema(): boolean {
-  const choice = useContext(EngineContext);
-  const up = useSyncExternalStore(subscribeEngine, active);
-  return choice === 'kinema' || (choice === 'auto' && up);
-}
 
 /**
  * Where the screen lands: on arrival, and again while the person has not
@@ -745,7 +643,6 @@ function useKeyState(key: string, on: boolean, inside = false): boolean {
       on &&
       focused !== null &&
       (inside ? within(tree, focused, key) : focused === key) &&
-      layers === 0 &&
       active()
   );
 }

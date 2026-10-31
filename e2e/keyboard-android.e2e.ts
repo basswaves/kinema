@@ -267,8 +267,8 @@ test('Android: a NAS that does not announce itself, typed, and its share named',
   await expect(browser.locator('.leave-error')).toContainText('Nothing answers as a network drive at nsa');
   await expect(browser.locator('.folder-where')).toHaveText('Network drives');
   // The form people copy an address in is forgiven.
+  // Filled in place, the ring follows the field (the DOM focus moved there).
   await field.fill('\\\\nas\\films');
-  await press(page, 'ArrowUp');
   await expect(field).toBeFocused();
   await press(page, 'Enter');
   await press(page, 'Enter');

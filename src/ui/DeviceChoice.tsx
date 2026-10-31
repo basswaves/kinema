@@ -75,7 +75,6 @@ export default function DeviceChoice({ label, allLabel, policy, devices, onChang
               <FocusButton
                 key={d.id}
                 className={`choice ${on ? 'chosen' : ''}`}
-                keepInView="nearest"
                 onSelect={() => toggle(d.id)}
               >
                 <span className="choice-tick">{on ? '✓' : '+'}</span>

@@ -1,27 +1,17 @@
 /**
  * The cards of a grid — a shelf from the top bar, a See-all, search results —
- * as one focus group that moves by index.
+ * as one focus area that moves by index (focusModel.ts, `gridStep`): a press
+ * costs the same at fifty titles and at a thousand, and nothing is measured
+ * but how many cards fit across, read when the grid is resized.
  *
- * Left to itself the spatial library answers every arrow press by measuring all
- * the cards beside the focused one and sorting them by distance, which is
- * fine for a rail of thirty and slow for a shelf of a thousand on a TV box.
- * Here `nextFocusResolver` takes over (gridMove.ts) and
- * `measureChildrenLayout: false` stops the measuring, so a press costs the
- * same at fifty titles and at a thousand.
- *
- * A group of its own, not the view's: the view's other controls (Back, the
- * order buttons, the search box) are not cards, and a resolver on their
- * container would replace the library's search for them too — see
- * docs/GOTCHAS.md, "Spatial navigation". A press that runs out of cards
- * (Up from the first row) returns null and goes on to the view's own search,
- * which treats the whole grid as one block.
+ * An area of its own, not the view's: the view's other controls (Back, the
+ * order buttons, the search box) are not cards. A press that runs out of
+ * cards (Up from the first row) goes on to the view around it.
  */
-import { type Direction, type FocusableComponent } from '@noriginmedia/norigin-spatial-navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Card from './Card';
 import { FocusProvider } from './FocusGroup';
 import { useNavGroup } from './focusGroups';
-import { gridMove } from './gridMove';
 import type { Title } from './api';
 
 interface Props {
@@ -37,22 +27,9 @@ interface Props {
 
 export default function CardGrid({ name, entries, onSelect, fromAboveFirst = false }: Props) {
   const keys = useMemo(() => entries.map(({ title }) => `${name}:${title.id}`), [entries, name]);
-  const positions = useMemo(() => new Map(keys.map((key, index) => [key, index])), [keys]);
 
   /** How many cards fit across, read when the grid is resized, not per press. */
-  const columns = useRef(1);
-  /** The same, for Kinema's engine, which reads it from the area (focusModel.ts). */
   const [across, setAcross] = useState(1);
-
-  const resolve = useCallback(
-    (direction: Direction, from: string, siblings: FocusableComponent[]) => {
-      const index = positions.get(from);
-      if (index === undefined) return null;
-      const to = gridMove(direction, index, keys.length, columns.current);
-      return to === null ? null : (siblings.find((s) => s.focusKey === keys[to]) ?? null);
-    },
-    [positions, keys]
-  );
 
   const { ref, focusKey } = useNavGroup<HTMLDivElement>(
     {
@@ -63,19 +40,9 @@ export default function CardGrid({ name, entries, onSelect, fromAboveFirst = fal
       remember: !fromAboveFirst,
       disabled: entries.length === 0,
     },
-    {
-    focusKey: `${name}-cards`,
     // Back from a film's page finds its card by key (`grid:7`), not by
     // remembering, so the shelf can afford to forget.
-    saveLastFocusedChild: !fromAboveFirst,
-    // A group with no cards is nowhere to move to — see Rail.tsx.
-    focusable: entries.length > 0,
-    // When the card last on is gone (a filter), the first one, not a search
-    // by position that would measure them all.
-    preferredChildFocusKey: keys[0],
-    nextFocusResolver: resolve,
-    measureChildrenLayout: false,
-    }
+    { focusKey: `${name}-cards` }
   );
 
   useEffect(() => {
@@ -83,8 +50,7 @@ export default function CardGrid({ name, entries, onSelect, fromAboveFirst = fal
     if (!grid) return;
     const read = () => {
       const tracks = getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean);
-      columns.current = Math.max(1, tracks.length);
-      setAcross(columns.current);
+      setAcross(Math.max(1, tracks.length));
     };
     read();
     const watch = new ResizeObserver(read);

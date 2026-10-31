@@ -16,12 +16,12 @@ const WATCH = `https://www.youtube.com/watch?v=${KEY}`;
 function stub(error: number | null): string {
   return `<!doctype html><body style="background:#123"><script>
 window.told = [];
-let started = false;
+window.started = false;
 const post = (m) => parent.postMessage(JSON.stringify({ ...m, channel: 'widget', id: 1 }), '*');
 addEventListener('message', (e) => {
   const m = JSON.parse(e.data);
-  if (m.event === 'listening' && !started) {
-    started = true;
+  if (m.event === 'listening' && !window.started) {
+    window.started = true;
     ${
       error === null
         ? `post({ event: 'onReady', info: null });
@@ -59,13 +59,14 @@ async function open(page: Page, error: number | null): Promise<void> {
 const opened = (page: Page) =>
   page.evaluate(() => (window as unknown as { __kinemaMock: { openedLinks: string[] } }).__kinemaMock.openedLinks);
 
-function player(page: Page): Frame {
+/** Async, so a frame not attached yet is a rejection a poll can wait out, not a throw. */
+async function player(page: Page): Promise<Frame> {
   const frame = page.frames().find((f) => f.url().startsWith('https://www.youtube-nocookie.com/embed/'));
   if (!frame) throw new Error('no embed frame');
   return frame;
 }
 
-const told = (page: Page) => player(page).evaluate(() => (window as unknown as { told: string[] }).told);
+const told = async (page: Page) => (await player(page)).evaluate(() => (window as unknown as { told: string[] }).told);
 
 test('a trailer plays in the overlay, answers the remote, and Back closes it', async ({ page }) => {
   await open(page, null);
@@ -75,7 +76,19 @@ test('a trailer plays in the overlay, answers the remote, and Back closes it', a
   await expect(page.locator('.trailer-screen')).toHaveClass(/focused/);
 
   // OK pauses and plays; the arrows seek ten seconds from where it is.
-  await expect.poll(() => told(page).catch(() => [])).toEqual([]);
+  // The frame drawn and its player started (it says it plays), told nothing
+  // yet: an OK before that would be a play, not a pause.
+  await expect
+    .poll(() =>
+      player(page)
+        .then((f) => f.evaluate(() => (window as unknown as { started: boolean }).started))
+        .catch(() => false)
+    )
+    .toBe(true);
+  expect(await told(page)).toEqual([]);
+  // Its messages cross from the frame's process: let the page take them in
+  // (the overlay learns it plays) before the OK below.
+  await page.evaluate(() => new Promise((r) => setTimeout(r, 100)));
   await press(page, 'Enter');
   await expect(page.locator('.trailer-keys')).toContainText('Paused');
   await press(page, 'Enter');

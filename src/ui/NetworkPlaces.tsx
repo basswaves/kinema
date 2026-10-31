@@ -13,9 +13,10 @@
  * puts the remote's ring on its first control.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { getCurrentFocusKey, setFocus } from '@noriginmedia/norigin-spatial-navigation';
+import { navFocus, navFocused } from './focusStore';
 import FocusButton from './FocusButton';
 import FocusInput from './FocusInput';
+import FocusGroup from './FocusGroup';
 import { rawError, userError } from './errors';
 import { carryKeyboard } from './typing';
 import {
@@ -88,13 +89,13 @@ function Servers({ onStep }: { onStep: (next: NetStep) => void }) {
   // them — never away from anything the person moved to.
   const ready = kept !== null;
   useEffect(() => {
-    if (ready) void setFocus(servers.length > 0 ? netKey(0) : TYPE_KEY);
+    if (ready) void navFocus(servers.length > 0 ? netKey(0) : TYPE_KEY);
     // Only on arriving: `servers` grows while the network answers.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready]);
   const anyFound = (found?.length ?? 0) > 0;
   useEffect(() => {
-    if (ready && anyFound && getCurrentFocusKey() === TYPE_KEY) void setFocus(netKey(0));
+    if (ready && anyFound && navFocused() === TYPE_KEY) void navFocus(netKey(0));
   }, [ready, anyFound]);
 
   return (
@@ -106,7 +107,6 @@ function Servers({ onStep }: { onStep: (next: NetStep) => void }) {
             <li key={server.host}>
               <FocusButton
                 focusKey={netKey(i)}
-                keepInView="nearest"
                 className="folder-item"
                 onSelect={() => onStep({ step: signedIn ? 'shares' : 'sign-in', server })}
               >
@@ -121,7 +121,6 @@ function Servers({ onStep }: { onStep: (next: NetStep) => void }) {
         <li>
           <FocusButton
             focusKey={TYPE_KEY}
-            keepInView="nearest"
             className="folder-item"
             onSelect={() => onStep({ step: 'address' })}
           >
@@ -153,7 +152,7 @@ function Address({ onStep }: { onStep: (next: NetStep) => void }) {
   const [address, setAddress] = useState('');
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => void setFocus('net-address'), []);
+  useEffect(() => void navFocus('net-address'), []);
   // Forgiving of the forms people copy: smb://nas/films, \\nas\films.
   const host = address
     .trim()
@@ -184,14 +183,13 @@ function Address({ onStep }: { onStep: (next: NetStep) => void }) {
           value={address}
           onChange={setAddress}
           placeholder="192.168.1.20"
-          onEnter={() => void setFocus('net-next')}
+          onEnter={() => void navFocus('net-next')}
         />
       </label>
       {error && <p className="leave-error">{error}</p>}
       <FocusButton
         focusKey="net-next"
         className="btn-primary"
-        keepInView="nearest"
         onSelect={() => void next()}
       >
         {checking ? 'Checking…' : 'Next'}
@@ -206,7 +204,7 @@ function SignIn({ server, onStep }: { server: Server; onStep: (next: NetStep) =>
   const [shown, setShown] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => void setFocus('net-user'), []);
+  useEffect(() => void navFocus('net-user'), []);
 
   const connect = async () => {
     if (busy) return;
@@ -236,35 +234,34 @@ function SignIn({ server, onStep }: { server: Server; onStep: (next: NetStep) =>
           onChange={setUser}
           onEnter={() => {
             carryKeyboard();
-            void setFocus('net-password');
+            void navFocus('net-password');
           }}
         />
       </label>
       <div className="settings-field">
         <span>Password</span>
-        <div className="folder-password">
+        {/* A row: Right from the password's end is Show, Down is Connect. */}
+        <FocusGroup kind="row" className="folder-password" current="net-password">
           <FocusInput
             focusKey="net-password"
             className="settings-input"
             type={shown ? 'text' : 'password'}
             value={password}
             onChange={setPassword}
-            onEnter={() => void setFocus('net-connect')}
+            onEnter={() => void navFocus('net-connect')}
           />
           <FocusButton
             className="btn-secondary"
-            keepInView="nearest"
             onSelect={() => setShown((s) => !s)}
           >
             {shown ? 'Hide' : 'Show'}
           </FocusButton>
-        </div>
+        </FocusGroup>
       </div>
       {error && <p className="leave-error">{error}</p>}
       <FocusButton
         focusKey="net-connect"
         className="btn-primary"
-        keepInView="nearest"
         onSelect={() => void connect()}
       >
         {busy ? 'Connecting…' : 'Connect'}
@@ -312,7 +309,7 @@ function Shares({
   }, [server, onStep, asked]);
 
   useEffect(() => {
-    if (shares) void setFocus(shares.length > 0 ? netKey(0) : error ? 'net-share' : 'net-again');
+    if (shares) void navFocus(shares.length > 0 ? netKey(0) : error ? 'net-share' : 'net-again');
   }, [shares, error]);
 
   const open = (share: string) =>
@@ -331,7 +328,6 @@ function Shares({
           <li key={share}>
             <FocusButton
               focusKey={netKey(i)}
-              keepInView="nearest"
               className="folder-item"
               onSelect={() => open(share)}
             >
@@ -361,7 +357,6 @@ function Shares({
           <FocusButton
             focusKey="net-again"
             className="btn-secondary"
-            keepInView="nearest"
             onSelect={() => {
               setShares(null);
               setError(null);
@@ -379,7 +374,7 @@ function Shares({
           className="settings-input"
           value={typed}
           onChange={setTyped}
-          onEnter={() => void setFocus('net-open')}
+          onEnter={() => void navFocus('net-open')}
         />
       </label>
       {typedPath && (

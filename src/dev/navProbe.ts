@@ -1,16 +1,11 @@
 /**
- * A read-only window into the spatial-navigation library, for the navigation
- * checker (`e2e/navmap.nav.ts`, `npm run test:nav`).
+ * A read-only window into the focus engine (focusStore.ts), for the
+ * navigation checker (`e2e/navmap.nav.ts`, `npm run test:nav`).
  *
- * Installed only by `dev:mock` (src/main.tsx), never in a real build. It reads
- * the library's registry the same way `focus.ts` does; it moves focus only
- * when the checker asks (`setFocus`), and it never touches the pointer.
+ * Installed only by `dev:mock` (src/main.tsx), never in a real build. It
+ * moves focus only when the checker asks (`setFocus`), and it never touches
+ * the pointer.
  */
-import {
-  getCurrentFocusKey,
-  setFocus,
-  SpatialNavigation,
-} from '@noriginmedia/norigin-spatial-navigation';
 import { navAnswering, navFocus, navFocused, navHas, navSnapshot } from '../ui/focusStore';
 import { gliding } from '../ui/focusScroll';
 
@@ -34,32 +29,22 @@ export interface NavLeaf {
   boundary: string | null;
 }
 
-/**
- * What is registered with whichever engine answers the keys now: Kinema's own
- * (focusStore.ts) on the screens moved to it, else the spatial library's —
- * in one shape, so the checker reads both alike.
- */
+/** What is registered with the engine, in the shape the checker reads. */
 function registry(): Record<string, Registered> {
-  if (navAnswering()) {
-    const { nodes } = navSnapshot();
-    const out: Record<string, Registered> = {};
-    for (const n of nodes) {
-      out[n.key] = {
-        focusKey: n.key,
-        parentFocusKey: n.parent,
-        node: n.node ?? undefined,
-        // A disabled control or an empty area is no place to land.
-        focusable: !n.disabled,
-        // A menu holds every arrow.
-        isFocusBoundary: n.area?.kind === 'menu',
-      };
-    }
-    return out;
+  const { nodes } = navSnapshot();
+  const out: Record<string, Registered> = {};
+  for (const n of nodes) {
+    out[n.key] = {
+      focusKey: n.key,
+      parentFocusKey: n.parent,
+      node: n.node ?? undefined,
+      // A disabled control or an empty area is no place to land.
+      focusable: !n.disabled,
+      // A menu holds every arrow; so does an area that says so (the player, a dialog).
+      isFocusBoundary: n.area?.kind === 'menu' || (n.area?.hold?.length ?? 0) === 4,
+    };
   }
-  return (
-    (SpatialNavigation as unknown as { focusableComponents?: Record<string, Registered> })
-      .focusableComponents ?? {}
-  );
+  return out;
 }
 
 /**
@@ -86,11 +71,12 @@ function leaves(): NavLeaf[] {
   const all = registry();
   const parentsInUse = new Set<string>();
   // Kinema's areas are never controls, even an empty one.
-  const areas = navAnswering() ? new Set(navSnapshot().nodes.filter((n) => n.area).map((n) => n.key)) : null;
+  const snapshot = navSnapshot();
+  const areas = new Set(snapshot.nodes.filter((n) => n.area).map((n) => n.key));
   for (const c of Object.values(all)) if (c.focusable) parentsInUse.add(c.parentFocusKey);
   const out: NavLeaf[] = [];
   for (const c of Object.values(all)) {
-    if (!c.focusable || parentsInUse.has(c.focusKey) || areas?.has(c.focusKey)) continue;
+    if (!c.focusable || parentsInUse.has(c.focusKey) || areas.has(c.focusKey)) continue;
     const node = c.node;
     if (!node || !node.isConnected) continue;
     const r = node.getBoundingClientRect();
@@ -104,6 +90,8 @@ function leaves(): NavLeaf[] {
       if (boundary === null && p.isFocusBoundary && holdsAll) boundary = p.focusKey;
       p = all[p.parentFocusKey];
     }
+    // Behind an open dialog: no press can reach it.
+    if (snapshot.modal && c.focusKey !== snapshot.modal && !parents.includes(snapshot.modal)) continue;
     out.push({
       key: c.focusKey,
       label: labelOf(c),
@@ -213,8 +201,8 @@ function box(key: string) {
 
 export function installNavProbe(): void {
   (window as unknown as { __nav: unknown }).__nav = {
-    setFocus: (key: string) => (navHas(key) ? navFocus(key) : setFocus(key)),
-    current: () => (navAnswering() ? navFocused() : getCurrentFocusKey()),
+    setFocus: (key: string) => navHas(key) && navFocus(key),
+    current: () => navFocused(),
     /** Kinema's own engine answers the keys: a press is done when it returns. */
     answering: () => navAnswering(),
     /** No scroll the ring caused is still gliding. */

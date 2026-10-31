@@ -100,7 +100,6 @@ export default function PosterDialog({ titleId, name, onChosen, onClose }: Props
                   key={choice.id}
                   focusKey={choiceKey(i)}
                   className={`poster-choice ${choice.current ? 'version-current' : ''}`}
-                  keepInView="nearest"
                   label={`${choice.words}${choice.current ? ', the one shown now' : ''}`}
                   onSelect={() => void choose(choice)}
                 >

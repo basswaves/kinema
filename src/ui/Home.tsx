@@ -219,7 +219,6 @@ function NothingNamed({
             <FocusButton
               focusKey={NOTHING_NAMED_REVIEW_KEY}
               className="btn-primary"
-              keepInView="nearest"
               onSelect={onReview}
             >
               Review them
@@ -228,7 +227,6 @@ function NothingNamed({
           {onAddFolder && (
             <FocusButton
               className={reviewCount > 0 ? 'btn-secondary' : 'btn-primary'}
-              keepInView="nearest"
               onSelect={onAddFolder}
             >
               Add another folder
@@ -268,8 +266,7 @@ function HomeRows({
 }: Props) {
   // The page: the hero, the notices and the rails one above the other.
   const { ref, focusKey } = useNavGroup(
-    { kind: 'column' },
-    { trackChildren: true, saveLastFocusedChild: true }
+    { kind: 'column' }
   );
 
   // The moment Home opened, fixed for its life: the hero is the day's pick,
@@ -360,7 +357,7 @@ function HomeRows({
             recently in the middle of is what you probably want. */}
         <ContinueRail items={resumable} onResume={onResume} onRemove={onRemoveResumable} />
         {/* Hidden while empty, as every rail is (Rail.tsx). */}
-        <Rail heading="My list" titles={myList} onSelect={onSelect} onSeeAll={onSeeAll} listRail />
+        <Rail heading="My list" titles={myList} onSelect={onSelect} onSeeAll={onSeeAll} />
         <PlaylistsRail onOpen={onOpenPlaylist} />
         {ownRails.map((c) => (
           <Rail
@@ -462,7 +459,6 @@ function Hero({
             <FocusButton
               focusKey={HERO_PLAY_FOCUS_KEY}
               className="btn-primary"
-              keepInView="page-top"
               onSelect={() => onPlay(title)}
             >
               ▶ Play
@@ -470,7 +466,6 @@ function Hero({
             <FocusButton
               focusKey="hero-info"
               className="btn-secondary"
-              keepInView="page-top"
               onSelect={() => onSelect(title)}
             >
               More info
@@ -480,7 +475,6 @@ function Hero({
             <FocusButton
               focusKey="hero-something"
               className="btn-secondary"
-              keepInView="page-top"
               onSelect={onPlaySomething}
             >
               Play something

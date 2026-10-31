@@ -7,7 +7,6 @@
  * fresh show.
  */
 import { videoName } from '../library/videos';
-import { useEffect } from 'react';
 import { FocusProvider } from './FocusGroup';
 import { useFocusLeaf, useNavGroup } from './focusGroups';
 import Art from './Art';
@@ -15,7 +14,6 @@ import DrawnPoster from './DrawnPoster';
 import FocusButton from './FocusButton';
 import RailTrack from './RailTrack';
 import type { ContinueItem } from '../player/api';
-import { keepOnScreen } from './focus';
 
 interface Props {
   items: ContinueItem[];
@@ -41,7 +39,7 @@ export default function ContinueRail({ items, onResume, onRemove }: Props) {
   // (2026-10-09).
   const { ref, focusKey } = useNavGroup(
     { kind: 'row', remember: true, disabled: items.length === 0 },
-    { trackChildren: true, saveLastFocusedChild: true, focusable: items.length > 0 }
+    { focusable: items.length > 0 }
   );
 
   // Empty, still its element, unseen: the focus area measures it once, at
@@ -97,14 +95,13 @@ function ContinueCard({
   onResume: (i: ContinueItem) => void;
   onRemove: (i: ContinueItem) => void;
 }) {
-  // No `saveLastFocusedChild`: arriving at a card should always land on the
+  // Not remembered: arriving at a card should always land on the
   // card, never on the Remove button beneath it because that was the last
   // thing touched there. Remembering it made Down from the hero go straight
   // to Remove — one press from taking the show off Home by accident.
   const body = item.kind === 'video' ? `continue:v${item.file_id}` : `continue:${item.title_id}`;
   const { ref, focusKey, hasFocusedChild } = useNavGroup(
-    { kind: 'column', current: body },
-    { trackChildren: true }
+    { kind: 'column', current: body }
   );
 
   return (
@@ -128,17 +125,11 @@ function ContinueCardBody({
 }) {
   // Keyed by title, not file: after watching, the card for this show comes
   // back holding the next episode, and Back should land on it.
-  const { ref, focused, kinema, navProps } = useFocusLeaf<HTMLDivElement>({
+  const { ref, focused, navProps } = useFocusLeaf<HTMLDivElement>({
     // A video's card (videos.rs) has no title; its file is its key.
     focusKey: item.kind === 'video' ? `continue:v${item.file_id}` : `continue:${item.title_id}`,
     onSelect: () => onResume(item),
   });
-
-  useEffect(() => {
-    if (focused && !kinema) {
-      keepOnScreen(ref.current);
-    }
-  }, [focused, ref, kinema]);
 
   const percent = item.duration_secs
     ? Math.min(100, (item.position_secs / item.duration_secs) * 100)

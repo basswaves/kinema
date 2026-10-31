@@ -16,7 +16,7 @@
  * the next person who walks past and presses OK on the remote.
  */
 import { useEffect, useState } from 'react';
-import FocusButton, { type KeepInView } from './FocusButton';
+import FocusButton from './FocusButton';
 
 /** How long the confirmation stays live before giving up. */
 const ARMED_MS = 6000;
@@ -28,13 +28,11 @@ interface Props {
   onConfirm: () => void;
   className?: string;
   disabled?: boolean;
-  /** Passed to each of the buttons this renders. */
-  keepInView?: KeepInView;
   /**
    * A key for directing focus here. It stays on whichever button comes first,
-   * armed or not: React keeps that one button through the change, and the
-   * spatial library registers a key only once, when a button first appears —
-   * a key that changed afterwards would leave it acting on the old press.
+   * armed or not: React keeps that one button through the change, and a
+   * control registers its key once, when it first appears — a key that
+   * changed afterwards would leave it acting on the old press.
    */
   focusKey?: string;
 }
@@ -45,7 +43,6 @@ export default function ConfirmButton({
   onConfirm,
   className = '',
   disabled = false,
-  keepInView,
   focusKey,
 }: Props) {
   const [armed, setArmed] = useState(false);
@@ -61,7 +58,6 @@ export default function ConfirmButton({
       <FocusButton
         className={className}
         disabled={disabled}
-        keepInView={keepInView}
         focusKey={focusKey}
         onSelect={() => setArmed(true)}
       >
@@ -75,7 +71,6 @@ export default function ConfirmButton({
       <FocusButton
         className="btn-danger"
         disabled={disabled}
-        keepInView={keepInView}
         focusKey={focusKey}
         onSelect={() => {
           setArmed(false);
@@ -86,7 +81,6 @@ export default function ConfirmButton({
       </FocusButton>
       <FocusButton
         className="btn-secondary"
-        keepInView={keepInView}
         onSelect={() => setArmed(false)}
       >
         Cancel

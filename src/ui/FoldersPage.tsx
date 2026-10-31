@@ -21,18 +21,14 @@
  * Where the browser is lives in the view itself (`at`), so Back from a film
  * comes back to its folder, with the ring on the film.
  */
-import {
-  FocusContext,
-  doesFocusableExist,
-  setFocus,
-  useFocusable,
-} from '@noriginmedia/norigin-spatial-navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import FocusButton from './FocusButton';
 import FocusInput from './FocusInput';
 import AddFolder from './AddFolder';
 import NetworkPlaces, { type NetStep } from './NetworkPlaces';
-import { hasPendingReturn, useClaimFocus } from './focus';
+import FocusGroup, { FocusProvider } from './FocusGroup';
+import { useNavGroup } from './focusGroups';
+import { navFocus, navHas, navRearrive, useLanding } from './focusStore';
 import { userError } from './errors';
 import { count, KIND_WORDS } from './format';
 import { useCapabilities } from '../capabilities';
@@ -110,11 +106,7 @@ export default function FoldersPage({
   onBack: () => void;
   onLibraryChanged: () => void;
 }) {
-  const { ref, focusKey } = useFocusable({
-    focusKey: PAGE_KEY,
-    trackChildren: true,
-    saveLastFocusedChild: true,
-  });
+  const { ref, focusKey } = useNavGroup({ kind: 'column', remember: true }, { focusKey: PAGE_KEY });
   const caps = useCapabilities();
   /** Android's way: its own drives and permission, and Kinema's network drives. */
   const android = caps?.folder_picker === false;
@@ -133,13 +125,6 @@ export default function FoldersPage({
   const [adding, setAdding] = useState(false);
   /** What the browser came back out of: the ring goes there, not to the top. */
   const [cameFrom, setCameFrom] = useState<string | null>(null);
-  /**
-   * Back from a film: the ring is on its way to it (returnFocusTo), and the
-   * page claims nothing until the person moves on — its second look would
-   * otherwise take the ring to the first file.
-   */
-  const [returning, setReturning] = useState(hasPendingReturn);
-
   const spot = at;
   const path = spot ? joinPath(spot.place.path, spot.trail) : null;
   /** The folder on screen now, for answers that arrive later. */
@@ -221,7 +206,6 @@ export default function FoldersPage({
   const go = useCallback(
     (next: FolderSpot | null, from: string | null = null) => {
       setCameFrom(from);
-      setReturning(false);
       setListing(null);
       setError(null);
       setNote(null);
@@ -278,8 +262,8 @@ export default function FoldersPage({
   );
 
   // The ring onto a level once it is drawn: what was come back out of, else
-  // the first entry — unless it is on its way back to a film just left
-  // (useClaimFocus waits for that).
+  // the first entry — unless it is on its way back to a film just left (the
+  // focus engine's pending return wins).
   const inFolder = spot !== null;
   const levelReady = !net && (inFolder ? listing !== null : starts !== null);
   const levelKeys = inFolder
@@ -301,7 +285,7 @@ export default function FoldersPage({
   const up = useCallback(() => {
     if (adding) {
       setAdding(false);
-      void setFocus(doesFocusableExist(ADD_KEY) ? ADD_KEY : UP_KEY);
+      navFocus(navHas(ADD_KEY) ? ADD_KEY : UP_KEY);
       return;
     }
     if (!spot) {
@@ -395,7 +379,6 @@ export default function FoldersPage({
             <li key={place.path}>
               <FocusButton
                 focusKey={placeKey(section, place.path)}
-                keepInView="nearest"
                 className="folder-item"
                 onSelect={() => go({ place, section, trail: [] })}
               >
@@ -409,16 +392,16 @@ export default function FoldersPage({
     );
 
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <div className="search folders-page" ref={ref}>
-        <Landing key={level} focusKey={landing ?? PAGE_KEY} ready={landing !== null && !returning} />
+        <Landing key={level} focusKey={landing} />
         <h2 className="grid-heading">Folders</h2>
         <p className="folder-where">
           {where ?? 'Any folder Kinema can read: play a video from it, or add it to the library.'}
         </p>
 
         {spot && (
-          <div className="folder-actions">
+          <FocusGroup kind="row" className="folder-actions" current={inLibrary ? UP_KEY : ADD_KEY}>
             {inLibrary ? (
               <span className="muted">
                 In the library: {inLibrary.name ?? lastPart(inLibrary.path)} (
@@ -439,7 +422,7 @@ export default function FoldersPage({
             {listing && listing.videos > 0 && (
               <span className="muted">{count(listing.videos, 'video')} here</span>
             )}
-          </div>
+          </FocusGroup>
         )}
 
         {adding && path && spot && (
@@ -492,7 +475,6 @@ export default function FoldersPage({
                     <li>
                       <FocusButton
                         focusKey="folders-network"
-                        keepInView="nearest"
                         className="folder-item"
                         onSelect={() => setNet({ step: 'servers' })}
                       >
@@ -504,7 +486,7 @@ export default function FoldersPage({
                 )
               ) : (
                 <>
-                  <div className="settings-row">
+                  <FocusGroup kind="row" className="settings-row" current={ADDRESS_KEY}>
                     <FocusInput
                       focusKey={ADDRESS_KEY}
                       className="settings-input"
@@ -520,7 +502,7 @@ export default function FoldersPage({
                     <FocusButton className="btn-secondary" onSelect={openAddress}>
                       Open
                     </FocusButton>
-                  </div>
+                  </FocusGroup>
                   {startList('Opened before', 'opened', addressStarts)}
                 </>
               )}
@@ -534,7 +516,6 @@ export default function FoldersPage({
               <li key={`d:${name}`}>
                 <FocusButton
                   focusKey={dirKey(name)}
-                  keepInView="nearest"
                   className="folder-item"
                   onSelect={() => go({ ...spot, trail: [...spot.trail, name] })}
                 >
@@ -547,7 +528,6 @@ export default function FoldersPage({
               <li key={`f:${name}`}>
                 <FocusButton
                   focusKey={fileKey(name)}
-                  keepInView="nearest"
                   className="folder-item folder-file"
                   onSelect={() => onPlay(joinPath(path ?? '', [name]))}
                 >
@@ -570,17 +550,18 @@ export default function FoldersPage({
               : 'Press Back to go back to the Library.'}
         </p>
       </div>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }
 
 /**
- * The ring onto a level once it is drawn, as a page takes it (useClaimFocus):
+ * The ring onto a level once it is drawn, as a page takes it (`useLanding`):
  * one per level, so a person who has pressed nothing since entering a folder
  * gets the ring there even after a slow share made them wait, and one who
  * has moved on keeps it where they put it.
  */
-function Landing({ focusKey, ready }: { focusKey: string; ready: boolean }) {
-  useClaimFocus(focusKey, ready, true);
+function Landing({ focusKey }: { focusKey: string | null }) {
+  useLayoutEffect(navRearrive, []);
+  useLanding(focusKey);
   return null;
 }

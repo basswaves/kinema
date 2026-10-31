@@ -74,7 +74,6 @@ function ChoiceOptions<V extends string>({
   const chosen = choices.some((c) => c.value === value) ? value : choices[0]?.value;
   const { ref, focusKey } = useFocusGroup('row', {
     current: chosen === undefined ? undefined : keyOf(chosen),
-    stopAt: ['right'],
   });
   return (
     <FocusProvider value={focusKey}>

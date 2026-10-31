@@ -11,15 +11,10 @@
  * itself still reaches YouTube's own controls.
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import {
-  FocusContext,
-  getCurrentFocusKey,
-  setFocus,
-  useFocusable,
-} from '@noriginmedia/norigin-spatial-navigation';
 import FocusButton from './FocusButton';
-import FocusGroup from './FocusGroup';
-import { useClaimFocus } from './focus';
+import FocusGroup, { FocusProvider } from './FocusGroup';
+import { ALL_ARROWS, useNavGroup } from './focusGroups';
+import { useNavLeaf } from './focusStore';
 import { openLink } from './links';
 import {
   closeTrailer,
@@ -40,7 +35,9 @@ const SEEK_S = 10;
 const PLAYING = 1;
 
 export default function TrailerOverlay({ trailer }: { trailer: ShownTrailer }) {
-  const { ref, focusKey } = useFocusable({ isFocusBoundary: true, trackChildren: true });
+  // A dialog: the ring on the picture as it opens, and back where it was on
+  // the way out (focusStore.ts).
+  const { ref, focusKey } = useNavGroup({ kind: 'column', current: SCREEN_KEY, hold: ALL_ARROWS, modal: true });
   const frame = useRef<HTMLIFrameElement>(null);
   const player = useRef({ state: -1, time: 0, ready: false });
   const [paused, setPaused] = useState(false);
@@ -65,18 +62,7 @@ export default function TrailerOverlay({ trailer }: { trailer: ShownTrailer }) {
     [send]
   );
 
-  // Where the ring was before, to put it back on the way out.
-  const returnTo = useRef<string | null>(null);
-  useEffect(() => {
-    returnTo.current = getCurrentFocusKey();
-    void setFocus(SCREEN_KEY);
-  }, []);
-  useClaimFocus(SCREEN_KEY, true);
-
-  const close = useCallback((why?: string) => {
-    if (returnTo.current) void setFocus(returnTo.current);
-    closeTrailer(why);
-  }, []);
+  const close = useCallback((why?: string) => closeTrailer(why), []);
 
   // What YouTube's frame says: ready, playing or paused, where it is, errors.
   useEffect(() => {
@@ -162,7 +148,7 @@ export default function TrailerOverlay({ trailer }: { trailer: ShownTrailer }) {
   const origin = window.location.origin;
 
   return (
-    <FocusContext.Provider value={focusKey}>
+    <FocusProvider value={focusKey}>
       <div className="shortcuts-backdrop trailer-backdrop" onClick={() => close()}>
         <div
           className="trailer"
@@ -195,14 +181,15 @@ export default function TrailerOverlay({ trailer }: { trailer: ShownTrailer }) {
           </FocusGroup>
         </div>
       </div>
-    </FocusContext.Provider>
+    </FocusProvider>
   );
 }
 
 /**
  * The picture, as one place the ring can be: OK and the arrows go to YouTube's
  * player from here, and Down leaves for the buttons. A component of its own so
- * it registers inside the overlay (docs/GOTCHAS.md, "Spatial navigation").
+ * it registers inside the overlay (docs/GOTCHAS.md, "A control's place in the
+ * engine's tree is where its hook runs").
  */
 function Screen({
   onToggle,
@@ -213,21 +200,20 @@ function Screen({
   onSeek: (by: number) => void;
   children: ReactNode;
 }) {
-  const { ref, focused } = useFocusable<object, HTMLDivElement>({
-    focusKey: SCREEN_KEY,
-    onEnterPress: onToggle,
-    onArrowPress: (direction) => {
-      if (direction === 'left' || direction === 'right') {
-        onSeek(direction === 'left' ? -SEEK_S : SEEK_S);
-        return false;
-      }
-      return direction === 'down';
+  const ref = useRef<HTMLDivElement>(null);
+  const { focused, props } = useNavLeaf(SCREEN_KEY, ref, {
+    on: true,
+    onSelect: onToggle,
+    // Left and Right seek, Up stays; Down leaves for the buttons.
+    onArrow: (arrow) => {
+      if (arrow === 'left' || arrow === 'right') onSeek(arrow === 'left' ? -SEEK_S : SEEK_S);
+      return arrow !== 'down';
     },
   });
   return (
     <div
       ref={ref}
-      tabIndex={-1}
+      {...props}
       className={`trailer-screen ${focused ? 'focused' : ''}`.trim()}
     >
       {children}

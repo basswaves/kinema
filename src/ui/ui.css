@@ -1402,8 +1402,15 @@ html {
   display: none;
 }
 
+/* A column from the top: pictures in one line, names below them however
+   many lines a name takes (a button centres its content by default, so a
+   long name pushed its picture up). */
 .cast-member {
   flex: 0 0 5.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
   width: 5.5rem;
   text-align: center;
 }
@@ -1420,8 +1427,15 @@ button.cast-member {
 }
 .cast-track {
   /* Room for the focus ring, which overflow would clip. */
-  padding-top: 0.25rem;
-  padding-left: 0.25rem;
+  padding: var(--ring-room);
+  margin-inline: calc(-1 * var(--ring-room));
+}
+
+/* The ring round the face. */
+.cast-member.focused .cast-photo {
+  outline: var(--focus-ring) solid #fff;
+  outline-offset: 3px;
+  overflow: hidden;
 }
 
 /* The poster list (PosterDialog.tsx): one row that scrolls sideways. */

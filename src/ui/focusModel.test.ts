@@ -404,6 +404,29 @@ describe('a film’s page (NAV-MAP detail-movie)', () => {
   });
 });
 
+describe('a film’s page with its cast (owner, 2026-11-01: faces were skipped)', () => {
+  // Every face is a control, one known by name only too: a cast row that
+  // left those out was passed over by the remote.
+  const tree = titlePage([
+    'back',
+    ['actions', row(['play', 'list', 'poster'], { current: 'play' })],
+    ['cast', row(['cast:501', 'cast:Sam', 'cast:503'])],
+    ['file', row(['file-details'])],
+  ]);
+
+  it('Down from the buttons is the first face, Down from any face the file details', () => {
+    expect(move(tree, 'list', 'down', none)).toBe('cast:501');
+    for (const face of ['cast:501', 'cast:Sam', 'cast:503']) expect(move(tree, face, 'down', none)).toBe('file-details');
+  });
+
+  it('along the faces by Left and Right, the one known by name included, and back up to Play', () => {
+    expect(walk(tree, 'cast:501', ['right', 'right'])).toBe('cast:503');
+    expect(move(tree, 'cast:503', 'right', none)).toBeNull();
+    expect(move(tree, 'cast:Sam', 'up', none)).toBe('play');
+    expect(move(tree, 'file-details', 'up', none)).toBe('cast:501');
+  });
+});
+
 describe('a series’ page of one season (NAV-MAP detail-series)', () => {
   const tree = titlePage([
     'back',

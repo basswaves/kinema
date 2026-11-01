@@ -8,7 +8,7 @@
  * `kinemaMockPeople` (a cast, a collection).
  */
 import { expect, test, type Page } from '@playwright/test';
-import { focused, press, settled } from './kb';
+import { focused, press, ringCovers, settled } from './kb';
 
 interface Ring {
   key: string | null;
@@ -157,6 +157,37 @@ test("an actor's page by keys, and Back to the cast member", async ({ page }) =>
   await expect(page.locator('.detail h1')).toHaveText('Example Part Two');
   await expect.poll(() => focused(page)).toMatch(/Pat Fixture/);
   expectSeen(await ring(page), 'back on the cast');
+});
+
+// Owner, 2026-11-01: the faces were skipped by the remote (a cast known only
+// by name was not focusable), drew no ring, and a long name or role pushed a
+// picture up out of line.
+test('the cast by keys: every face holds a ring, the pictures in one line, OK opens a page where there is one', async ({ page }) => {
+  await open(page);
+  await openTitle(page, 'TV shows', 'Example Show');
+  for (let i = 0; i < 14 && !(await ring(page)).key?.startsWith('detail-cast:'); i++) {
+    await step(page, 'ArrowDown', `Down ${i + 1}`);
+  }
+  expect((await ring(page)).key).toBe('detail-cast:501');
+  const faceRing = () =>
+    page.evaluate(() => {
+      const photo = document.querySelector('.cast-member.focused .cast-photo');
+      return photo ? getComputedStyle(photo).outlineStyle : 'none';
+    });
+  expect(await faceRing()).toBe('solid');
+  expect(await ringCovers(page)).toEqual([]);
+  // The one known by name only: reached, ringed, and OK leaves the page as it is.
+  expect((await step(page, 'ArrowRight', 'to the name-only face')).key).toBe('detail-cast:Sam Example');
+  expect(await faceRing()).toBe('solid');
+  expect(await page.locator('.cast-member.focused').getAttribute('aria-label')).toContain('no page to open');
+  await press(page, 'Enter');
+  await expect(page.locator('.detail h1')).toHaveText('Example Show');
+  // One line of pictures, whatever is written under them.
+  const tops = await page.locator('.cast-photo').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)));
+  expect(new Set(tops).size, `picture tops ${tops.join(', ')}`).toBe(1);
+  await step(page, 'ArrowLeft', 'back to Pat');
+  await press(page, 'Enter');
+  await expect(page.locator('.person-page h1')).toHaveText('Pat Fixture');
 });
 
 test('a dialog holds the ring: arrows and Tab stay in it, Back gives it to the button', async ({ page }) => {

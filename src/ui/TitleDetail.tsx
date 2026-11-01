@@ -1090,7 +1090,6 @@ export default function TitleDetailView({
               <FocusGroup
                 kind="row"
                 focusKey={DETAIL_CAST_KEY}
-                focusable={detail.cast.some((p) => p.person_id) && Boolean(onOpenPerson)}
                 className="cast-track"
               >
                 {detail.cast.map((person) => {
@@ -1112,21 +1111,22 @@ export default function TitleDetailView({
                       {person.character && <div className="cast-role">{person.character}</div>}
                     </>
                   );
-                  const key = `${person.name}-${person.character ?? ''}`;
-                  return person.person_id && onOpenPerson ? (
+                  // Every face can hold the ring, or a remote could never scroll
+                  // a long cast into view: a cast known only by name (a title
+                  // matched through Wikidata) was skipped on the box (owner,
+                  // 2026-11-01). Only one with TMDB's id has a page to open.
+                  const page = person.person_id && onOpenPerson ? person.person_id : null;
+                  const who = person.character ? `${person.name}, ${person.character}` : person.name;
+                  return (
                     <FocusButton
-                      key={key}
-                      focusKey={`detail-cast:${person.person_id}`}
+                      key={`${person.name}-${person.character ?? ''}`}
+                      focusKey={`detail-cast:${person.person_id ?? person.name}`}
                       className="cast-member"
-                      label={person.character ? `${person.name}, ${person.character}` : person.name}
-                      onSelect={() => onOpenPerson(person.person_id as string, person.name)}
+                      label={page ? who : `${who}, no page to open`}
+                      onSelect={() => page && onOpenPerson?.(page, person.name)}
                     >
                       {face}
                     </FocusButton>
-                  ) : (
-                    <div className="cast-member" key={key}>
-                      {face}
-                    </div>
                   );
                 })}
               </FocusGroup>

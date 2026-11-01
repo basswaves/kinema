@@ -1056,10 +1056,10 @@ if (PEOPLE) {
   }
 }
 
-/** The billed cast with TMDB's ids, per title: Pat Fixture is in three; Sam has none. */
+/** The billed cast with TMDB's ids, per title: Pat Fixture is in three; Sam has none (known by name only, as from Wikidata) and a long role, so the faces' line is tested. */
 const PEOPLE_CAST: Record<number, [string, string, string][]> = PEOPLE
   ? {
-      [SERIES_ID]: [['501', 'Pat Fixture', 'The host'], ['', 'Sam Example', 'A guest']],
+      [SERIES_ID]: [['501', 'Pat Fixture', 'The host'], ['', 'Sam Example', 'A guest who comes back in every season']],
       [PART_ONE_ID]: [['501', 'Pat Fixture', 'The hero'], ['503', 'Lee Mock', 'The rival']],
       [PART_TWO_ID]: [['501', 'Pat Fixture', 'The hero']],
     }

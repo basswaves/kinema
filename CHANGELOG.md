@@ -5,9 +5,30 @@ Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [semantic
 versioning](https://semver.org/), with the usual caveat that a `0.x` release
 makes no stability promises.
 
-## [Unreleased]
+## [0.15.0] — 2026-11-01
 
 ### Added
+
+- **Moving works the same everywhere.** Kinema now has its own way of moving
+  around: the remote's arrows, the keyboard and the mouse all take you to
+  the same place on every screen — Home and its shelves, the grids, title,
+  show and actor pages, Settings, first run, Needs attention, playlists,
+  search, every dialog and the player's controls and panels. The ring never
+  covers text, scrolling is one smooth glide that keeps the ring a third of
+  the way down, a held key keeps up, a page you go back to is where you left
+  it, and arrows inside a dialog no longer scroll the page behind it.
+- **Matching finds more.** Names with IDs in them, other names for the same
+  film, files in parts and near-ties are read better. A wrong match is still
+  worse than none: what is not sure still goes to Needs attention. On a
+  title's page, **Wrong title?** fixes a match right there. A picture named
+  like the film beside it is its poster, and a title with no picture gets a
+  drawn poster instead of a grey card.
+- **Subtitles.** Tracks end on their format and a separate file says its
+  language; timing can be moved earlier or later by hand and is kept for the
+  file; a fetched subtitle is read before the panel describes it; picture
+  subtitles say no box goes behind them.
+- **Android: films keep their shape**, with bars around them instead of
+  being stretched.
 
 - **Trailers play in Kinema.** A title with no trailer file beside it plays
   its YouTube trailer in an overlay on Windows — YouTube's own player, ads
@@ -96,6 +117,11 @@ makes no stability promises.
 
 ### Fixed
 
+- **First run no longer loops back to Welcome** when a folder's files go
+  unnamed; the ring ends on Review them when the count arrives late, and
+  **Bring it in** is always reachable.
+- **A file kept unmatched** no longer stops pictures from being measured,
+  and a background step that fails says so in plain words.
 - **Posters in the light look** (Auto on a weaker device, or chosen in
   Settings). Since 0.14.0 the cards' posters, Continue Watching's pictures, a
   title page's poster and the Skip button shrank to a sliver there. Closing a

@@ -187,6 +187,13 @@ export function pageOf(node: HTMLElement): HTMLElement | null {
   return null;
 }
 
+/** The page a read on or back may scroll: not one behind the dialog the ring is in. */
+function readablePage(node: HTMLElement): HTMLElement | null {
+  const page = pageOf(node);
+  const dialog = node.closest('[role="dialog"]');
+  return page && dialog && page.contains(dialog) ? null : page;
+}
+
 /** A rail: the nearest ancestor below the page that scrolls sideways. */
 function trackOf(node: HTMLElement, page: HTMLElement | null): HTMLElement | null {
   for (let el = node.parentElement; el && el !== page; el = el.parentElement) {
@@ -351,7 +358,7 @@ export function pageToTop(node: HTMLElement): void {
  */
 export function backToTop(leaf: HTMLElement, duration: number): void {
   if (leaf.closest('[data-scroll="nearest"]')) return;
-  const page = pageOf(leaf);
+  const page = readablePage(leaf);
   if (!page) return;
   const room = page.clientHeight - BOTTOM_GAP_REM * remPx();
   const bottom = leaf.closest('[data-sticky-top]') ? 0 : contentTop(leaf, page) + leaf.offsetHeight;
@@ -374,7 +381,7 @@ let leftBehind: HTMLElement | null = null;
  * is nothing more to read.
  */
 export function readOn(leaf: HTMLElement, duration: number): boolean {
-  const page = pageOf(leaf);
+  const page = readablePage(leaf);
   if (!page) return false;
   const at = settled(page, 'y');
   const remaining = page.scrollHeight - page.clientHeight - at;
@@ -409,7 +416,7 @@ export function readBack(leaf: HTMLElement, duration: number): boolean {
     leftBehind = null;
     return false;
   }
-  const page = pageOf(leaf);
+  const page = readablePage(leaf);
   if (!page) return false;
   const at = settled(page, 'y');
   const bar = barBottom(page);

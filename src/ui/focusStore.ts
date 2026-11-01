@@ -226,7 +226,10 @@ function scrollFor(key: string, how: How, sinceLast: number): void {
   const duration = how === 'key' ? motionFor(sinceLast) : how === 'tab' ? MOTION_MS : 0;
   // The player's panels are lists drawn over the film, not a page: only
   // what has gone out of sight is brought back (focusScroll.ts, `nearest`).
-  if (leaf.closest('[data-scroll="nearest"]')) {
+  // So is any dialog: drawn fixed over the page, the rule scrolled the page
+  // behind it at every arrow, and the ring went back to its button with the
+  // page still gliding, under the bar (round 7 F7, the Poster dialog).
+  if (leaf.closest('[data-scroll="nearest"], [role="dialog"]')) {
     nearest(leaf, duration);
     return;
   }

@@ -204,9 +204,15 @@ test('a dialog holds the ring: arrows and Tab stay in it, Back gives it to the b
       return Boolean(el && box?.contains(el) && box.contains(document.activeElement));
     });
   await expect.poll(inDialog).toBe(true);
+  // The page behind stays where it is: the rule scrolled it at every arrow,
+  // and the ring went back to its button under the bar (round 7 F7).
+  const behind = () => page.evaluate(() => document.querySelector('.browse')!.scrollTop);
+  const before = await behind();
   for (const key of ['ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight', 'ArrowDown', 'Tab', 'Tab', 'Shift+Tab']) {
     await press(page, key);
     expect(await inDialog(), `after ${key}`).toBe(true);
+    await settled(page);
+    expect(await behind(), `the page behind, after ${key}`).toBe(before);
   }
   await press(page, 'Escape');
   await expect(dialog).toHaveCount(0);

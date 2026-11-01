@@ -1313,6 +1313,16 @@ and the page did not move at all for the first rows. The F3 note above
 right after it: a control between them ends the search (`pressable`,
 focusScroll.ts).
 
+### The scroll rule scrolled the page behind a dialog (round 7, F7)
+
+A dialog is drawn fixed over the page, but the nearest scrolling ancestor of
+its controls is still the page, so every arrow inside the Poster dialog lined
+the page *behind* it up, and Back gave the ring to its button while that
+page was still gliding — under the bar, 2 runs in 30 on WebKit. Nothing
+visible moved, so nothing looked wrong. **Do:** a control in a dialog
+scrolls only what is out of sight (`nearest`), and read on / back never
+scrolls the page behind one (`readablePage`, focusScroll.ts).
+
 ### A control disabled until a form is filled cannot be reached by remote (round 7, F7)
 
 "Bring it in" was `disabled` until the address and key were typed. The

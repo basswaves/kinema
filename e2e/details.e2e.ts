@@ -106,10 +106,15 @@ test('a cast member opens their page, with every title of the library they are i
   await expect(page.locator('.detail h1')).toHaveText('Example Part Two');
 });
 
+// Reachable all the same, or a remote could not scroll a long cast into view
+// (owner, 2026-11-01); it says it has no page, and OK opens nothing.
 test('a cast member TMDB gave no id for is a name, not a way in', async ({ page }) => {
   await open(page);
   await openTitle(page, 'TV shows', 'Example Show');
   await expect(page.locator('.cast-member')).toHaveCount(2);
-  await expect(page.locator('button.cast-member')).toHaveCount(1);
-  await expect(page.locator('button.cast-member')).toContainText('Pat Fixture');
+  const sam = page.locator('button.cast-member', { hasText: 'Sam Example' });
+  await expect(sam).toHaveAttribute('aria-label', /no page to open/);
+  await sam.click();
+  await expect(page.locator('.detail h1')).toHaveText('Example Show');
+  await expect(page.locator('button.cast-member', { hasText: 'Pat Fixture' })).not.toHaveAttribute('aria-label', /no page/);
 });

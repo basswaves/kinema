@@ -355,6 +355,32 @@ describe('the scroll anchor', () => {
     expect(scrollAnchor(tree, 'c2-remove')).toBe('continue');
     expect(scrollAnchor(tree, 'nav:tv')).toBe('top');
   });
+
+  // Settings (owner, 2026-11-01): the list and the open section side by side.
+  // Each pane's row is lined up, as on any page, not the two panes as one.
+  const settings = build(
+    column([
+      ['top', row(['nav:home', 'nav:settings'])],
+      [
+        'layout',
+        row(
+          [
+            ['list', column(['s:library', 's:playback'])],
+            ['content', column([['r1', row(['a1', 'b1'])], ['r2', row(['a2', 'b2'])]])],
+          ],
+          { panes: true }
+        ),
+      ],
+    ])
+  );
+  it('inside side-by-side panes is the row in its pane', () => {
+    expect(scrollAnchor(settings, 'b2')).toBe('r2');
+    expect(scrollAnchor(settings, 's:playback')).toBe('s:playback');
+  });
+  it('without panes, a row of columns is lined up as one', () => {
+    const plain = build(column([['layout', row([['content', column([['r2', row(['a2', 'b2'])]])]])]]));
+    expect(scrollAnchor(plain, 'b2')).toBe('layout');
+  });
 });
 
 /** A title's page as TitleDetail.tsx builds it, under the top bar. */

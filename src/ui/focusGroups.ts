@@ -43,6 +43,8 @@ interface Options {
   pageTop?: boolean;
   /** Arrows that pass over this group from outside (focusModel.ts). */
   passOver?: Arrow[];
+  /** Its children are panes side by side, each scrolled by the rule (focusModel.ts). */
+  panes?: boolean;
   /** A menu that is not a dialog (the details panel on `i`, beside the film). */
   modal?: boolean;
 }
@@ -114,13 +116,14 @@ export const ALL_ARROWS: Arrow[] = ['up', 'down', 'left', 'right'];
  */
 export function useFocusGroup<E extends HTMLElement = HTMLDivElement>(
   kind: GroupKind,
-  { focusKey, current, focusable = true, wrap = 'vertical', axis = 'y', pageTop, passOver, modal }: Options = {}
+  { focusKey, current, focusable = true, wrap = 'vertical', axis = 'y', pageTop, passOver, panes, modal }: Options = {}
 ): { ref: RefObject<E | null>; focusKey: string; hasFocusedChild: boolean } {
   // A menu is a dialog: it holds the ring while it is open, and gives it
   // back to the control that opened it (focusStore.ts).
   const area = {
     ...areaFor(kind, current, wrap, axis),
     passOver,
+    panes,
     disabled: !focusable,
     pageTop,
     modal: modal ?? kind === 'menu',

@@ -14,12 +14,21 @@
  * The choices are a row (focusGroups.ts): Up or Down into it lands on the
  * chosen one (owner, 2026-10-30). Landing on the nearest choice depended on
  * how wide the words are drawn, which differs with the system's font — Linux
- * and Windows went to different choices from the same place.
+ * and Windows went to different choices from the same place. In Settings
+ * it lands on the leftmost instead (`LandLeftmost`; owner, 2026-11-01:
+ * entering a section, or going Up and Down its rows, reads like a list from
+ * the left); the setup pages keep the chosen one.
  */
-import { useId, type ReactNode } from 'react';
+import { createContext, useContext, useId, type ReactNode } from 'react';
 import FocusButton from './FocusButton';
 import { FocusProvider } from './FocusGroup';
 import { useFocusGroup } from './focusGroups';
+
+/** Inside it, a row of choices is arrived at on its leftmost choice, not the chosen one. */
+const Leftmost = createContext(false);
+export function LandLeftmost({ children }: { children: ReactNode }) {
+  return <Leftmost.Provider value={true}>{children}</Leftmost.Provider>;
+}
 
 export interface Choice<V extends string> {
   value: V;
@@ -71,7 +80,8 @@ function ChoiceOptions<V extends string>({
   const keyOf = (v: V) => `choice:${id}:${v}`;
   // A question not answered yet (the first run's devices) lands on its first
   // choice. Left from the first choice still goes back to the list of sections.
-  const chosen = choices.some((c) => c.value === value) ? value : choices[0]?.value;
+  const leftmost = useContext(Leftmost);
+  const chosen = !leftmost && choices.some((c) => c.value === value) ? value : choices[0]?.value;
   const { ref, focusKey } = useFocusGroup('row', {
     current: chosen === undefined ? undefined : keyOf(chosen),
   });

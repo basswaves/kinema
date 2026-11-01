@@ -231,18 +231,32 @@ function headingIn(el: Element): HTMLElement | null {
 /**
  * The heading standing before an area: the last `h1`–`h3` before its branch
  * at the nearest level that has one (a grid's title in the row above it).
- * A heading inside the area itself (a rail's) is already part of it.
+ * A heading inside the area itself (a rail's) is already part of it. Only
+ * one with nothing to press between it and the area: Settings' section
+ * title, five rows of choices up, held every row low on the page, where the
+ * rule puts it a third of the way down (owner, 2026-11-01).
  */
 function headingBefore(node: HTMLElement, page: HTMLElement): HTMLElement | null {
   for (let el = node.parentElement; el && el !== page; el = el.parentElement) {
     let heading: HTMLElement | null = null;
+    let between = false;
     for (const child of el.children) {
       if (child.contains(node)) break;
-      heading = headingIn(child) ?? heading;
+      const found = headingIn(child);
+      if (found) [heading, between] = [found, false];
+      else if (pressable(child)) [heading, between] = [null, true];
     }
     if (heading) return heading;
+    // Controls before it at this level: any heading further out is theirs.
+    if (between) return null;
   }
   return null;
+}
+
+const PRESSABLE = 'button, input, select, textarea, a[href]';
+
+function pressable(el: Element): boolean {
+  return el.matches(PRESSABLE) || el.querySelector(PRESSABLE) !== null;
 }
 
 function remPx(): number {
@@ -323,6 +337,12 @@ export function toTop(leaf: HTMLElement, duration: number): void {
   alongTrack(leaf, page, duration);
 }
 
+/** The page holding `node` back at its top, at once: a new section of Settings. */
+export function pageToTop(node: HTMLElement): void {
+  const page = pageOf(node);
+  if (page) glide(page, 'y', 0, 0);
+}
+
 /**
  * Up with nowhere further up: the page goes back up to its top, as far as
  * keeps the ring above the window's bottom — never down. Reading on left a
@@ -366,7 +386,9 @@ export function readOn(leaf: HTMLElement, duration: number): boolean {
     // A full step would leave it half under the bar: stop with it just
     // clear, unless that is hardly a step — then past it altogether, where
     // the page goes that far.
-    const keep = Math.max(0, top - bar);
+    // Whole pixels, down: the page scrolls by whole ones, and a rounding up
+    // left the ring a fraction under the bar.
+    const keep = Math.max(0, Math.floor(top - bar));
     const past = top + leaf.offsetHeight;
     by = keep >= step / 3 || past > remaining ? keep : past;
   }

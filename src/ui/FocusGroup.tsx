@@ -26,6 +26,7 @@ interface Props {
   axis?: 'x' | 'y';
   pageTop?: boolean;
   passOver?: Arrow[];
+  panes?: boolean;
   className?: string;
   role?: string;
   'aria-label'?: string;

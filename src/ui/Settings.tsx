@@ -18,7 +18,7 @@ import { userError } from './errors';
 import { scanTrouble } from './scanTrouble';
 import { scanStageWords, scanWords } from '../library/scanWords';
 import LanguageSection from './LanguageSection';
-import ChoiceRow from './ChoiceRow';
+import ChoiceRow, { LandLeftmost } from './ChoiceRow';
 import { getVersion } from '@tauri-apps/api/app';
 import { availableUpdate, UPDATE_CHECK_KEY, type Release } from './updates';
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
@@ -60,6 +60,7 @@ import { focusTo } from './focus';
 import { lastPart } from '../library/videos';
 import { useNavGroup } from './focusGroups';
 import { useLanding } from './focusStore';
+import { pageToTop } from './focusScroll';
 import FocusGroup, { FocusProvider } from './FocusGroup';
 import { setTvMode, useTvMode } from './tv';
 import { setLook, useLook, type LookSetting } from './lightLook';
@@ -249,6 +250,16 @@ export default function Settings({
             ? 'library'
             : lastSection
   );
+  // Another section opened starts at its top. Only then: Left to the list
+  // and back leaves the open section where it was read to (owner,
+  // 2026-11-01), and leaving Settings and coming back starts afresh anyway.
+  const opened = useRef(section);
+  useLayoutEffect(() => {
+    if (opened.current === section) return;
+    opened.current = section;
+    const content = ref.current?.querySelector<HTMLElement>('.settings-content');
+    if (content) pageToTop(content);
+  }, [section, ref]);
   /** What is typed in the search box; while there is, its matches show instead of a section. */
   const [query, setQuery] = useState('');
   /** OK on the empty box in the TV layout: the letters, before anything is typed. */
@@ -784,7 +795,7 @@ export default function Settings({
           </div>
         )}
 
-        <FocusGroup kind="list" axis="x" current="settings-nav" className="settings-layout">
+        <FocusGroup kind="list" axis="x" panes current="settings-nav" className="settings-layout">
           {/* The sections, as a list down the side. OK opens one; Right goes
               into it and Left comes back. One section at a time, where there
               used to be one page of eight sections and two thousand words. */}
@@ -1825,7 +1836,7 @@ function SectionContent({ landing, children }: { landing?: string; children: Rea
   return (
     <FocusProvider value={focusKey}>
       <div className="settings-content" ref={ref}>
-        {children}
+        <LandLeftmost>{children}</LandLeftmost>
       </div>
     </FocusProvider>
   );
@@ -1856,13 +1867,16 @@ function SectionList({
   search: ReactNode;
 }) {
   const { ref, focusKey } = useNavGroup(
-    { kind: 'column', current: `settings-nav:${section}`, pageTop: true },
+    { kind: 'column', current: `settings-nav:${section}` },
     { focusKey: 'settings-nav' }
   );
 
   return (
     <FocusProvider value={focusKey}>
-      <nav className="settings-nav" aria-label="Settings sections" ref={ref}>
+      {/* Sticky beside the section, so on screen as it is: going to it moves
+          the page only if the ring would be out of sight. It used to take the
+          page to its top, and Right then scrolled all the way back down. */}
+      <nav className="settings-nav" aria-label="Settings sections" ref={ref} data-scroll="nearest">
         {search}
         {SECTIONS.map(([id, label]) => (
           <FocusButton

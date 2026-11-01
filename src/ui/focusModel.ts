@@ -60,6 +60,13 @@ export interface AreaSpec {
    * episode (NAV-MAP, agreed 2026-10-11).
    */
   passOver?: readonly Arrow[];
+  /**
+   * Its children are panes side by side, each a column of its own (Settings'
+   * section list and the open section): the one scroll rule lines up the
+   * area holding the ring inside a pane, as on any page, not the panes as a
+   * whole (owner, 2026-11-01: Settings scrolled by a rule of its own).
+   */
+  panes?: boolean;
 }
 
 export interface NavNode {
@@ -306,7 +313,7 @@ export function scrollAnchor(tree: NavTree, focused: string): string {
       return index < Math.max(1, area.columns ?? 1) ? parent : child;
     }
     const vertical = area && (area.kind === 'column' || (area.kind === 'menu' && (area.axis ?? 'y') === 'y'));
-    if (!vertical) anchor = null;
+    if (!vertical && !area?.panes) anchor = null;
     else if (anchor === null) anchor = child;
     child = parent;
     parent = tree.get(parent)?.parent ?? null;

@@ -768,7 +768,7 @@ export function useNavArea(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [on, key, parent, ref]);
 
-  const { kind, current, remember, columns, axis, wrap } = spec;
+  const { kind, current, remember, columns, axis, wrap, panes } = spec;
   const hold = spec.hold?.join(',');
   const passOver = spec.passOver?.join(',');
   useLayoutEffect(() => {
@@ -783,10 +783,11 @@ export function useNavArea(
       wrap,
       hold: hold ? (hold.split(',') as Arrow[]) : undefined,
       passOver: passOver ? (passOver.split(',') as Arrow[]) : undefined,
+      panes,
     };
     entry.disabled = disabled;
     entry.pageTop = pageTop;
     entry.node = ref.current;
     scheduleSettle();
-  }, [on, key, ref, kind, current, remember, columns, axis, wrap, hold, passOver, disabled, pageTop]);
+  }, [on, key, ref, kind, current, remember, columns, axis, wrap, hold, passOver, panes, disabled, pageTop]);
 }

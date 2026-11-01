@@ -15,6 +15,12 @@ The order, roughly. Films and TV shows come first, because they are what
 Kinema is used for every evening; playing every file as accurately as the
 equipment allows is what Kinema is, so that work follows close behind.
 
+**Solid first.** 0.15.0 replaced the way Kinema moves between controls with
+its own system, so remote, keyboard and mouse go to the same place on every
+screen and every system, and rebuilt the tests behind it. Next is the same
+for **Android**: a round that only fixes what is broken on TV boxes (focus,
+the remote, what testers reported), nothing new.
+
 **Ready for newcomers.** A code-signed Windows download, so Windows no longer
 asks whether to run it — waiting on a free signing service for open-source
 projects. The rest of this step is done in 0.13.0: direct downloads from the
@@ -22,18 +28,16 @@ projects. The rest of this step is done in 0.13.0: direct downloads from the
 "what leaves your computer" page, Settings grouped by what you want and a
 search box in Settings.
 
-**Everyday films and TV.** Subtitle size and background; two subtitle
-languages at once, for language learners and mixed households; a delay
-setting per sound device, for receivers and TVs that hold the sound back; a
-chapter list in the player; audio description and other accessibility
-preferences; subtitle timing, by hand and automatic; pictures on the seek bar;
-volume levelling and a dialogue boost for decoded sound. For choosing: a
-**Play something** button; **smart collections** built from what Kinema
-measured in each file ("everything in Dolby Vision", "Atmos films I have not
-seen"); favourites and a watchlist; actor pages; a richer title page. For the
-library: two copies of one film shown as versions of it; importing what you
-have watched, and where you stopped, from Kodi, Jellyfin, Plex and Emby;
-and moving a whole library to a new computer.
+**Everyday films and TV.** Most of it is done in 0.14.0 and 0.15.0 (see the
+[changelog](../CHANGELOG.md)). Still to come: pictures on the seek bar;
+subtitle timing done automatically (by hand is in 0.15.0); volume levelling
+and the dialogue lift on Android; trailers playing inside Kinema on Linux
+too, which is being tried; the rest of the title page (more like this,
+extras); and bringing in what you watched from Jellyfin, Emby or Plex by
+signing in rather than with an API key. Then **keep everything on this
+computer**: one choice that stops every online lookup, with titles matched
+against a catalogue downloaded once, so nothing sent anywhere says what is
+in your library.
 
 **Plays anything, accurately.** Dolby Vision checked end to end on the
 desktop; 3D (below); more of the raw facts — what the TV and receiver said
@@ -52,7 +56,10 @@ out, films that exist on one disk only; a cinema evening, with a trailer from
 your own shelf before the feature; a watching diary; a shelf for the physical
 side of a collection — editions, and discs not yet ripped; Home Assistant,
 so the lights follow the film; and your phone as a keyboard, remote and second
-screen, with no app to install.
+screen, with no app to install. And **two-way Trakt and SIMKL sync**, so
+what you watch on another device shows as watched in Kinema too (today
+Kinema only sends; how often it syncs and which side wins when they disagree
+is being designed first).
 
 **Further out.** Music — a good player first (a library, bit-perfect and
 gapless playback, a window showing the signal path), the specialist parts
@@ -76,8 +83,8 @@ and Linux; Kinema as a video player on Windows — open a file from Explorer,
 or drop it on the window; and a film or show no database lists, kept under
 its own name from Needs attention.)
 
-**Android**, an early version (beta) since 0.10.0, moves on as reports come
-in. Its open items: the badges on a film's page, intro detection from the
+**Android**, an early version (beta) since 0.10.0, gets the fix round above
+next. Its other open items: the badges on a film's page, intro detection from the
 audio, Blu-ray folders, disc images and 4K UHD `.m2ts` files. See [Other platforms](#other-platforms).
 
 ---
@@ -172,7 +179,8 @@ reasons in full.
   trailers in the app through a downloader or with ads blocked. (YouTube's own
   player, with its ads, plays them in the app on Windows and in the YouTube app
   on Android; on Linux, and whenever YouTube refuses, they open in the
-  browser.) Trailers on your disk play in Kinema first.
+  browser — playing them inside Kinema on Linux too is being tried.)
+  Trailers on your disk play in Kinema first.
 - **Bundled third-party programs.** ffmpeg and Skiptro can be used if you have
   installed them; Kinema never ships or downloads them.
 - **Looking up a whole library in TheIntroDB at once.** It is asked about one
@@ -231,6 +239,11 @@ useful contribution there is.
   keyboard on a real device, a very large library, and a TV that reports HDR
   differently are all untested. A short "I tried it on my device" report, even
   if everything worked, is the most useful thing there is.
+
+- **Moving around with a remote, keyboard and mouse** since 0.15.0's new
+  system, on more TVs, remotes and screen sizes: a place where the highlight
+  goes somewhere odd, hides or makes the page jump is worth a report, with
+  the screen and the keys pressed.
 
 - **Linux on more desktops, distributions and graphics cards.** Kinema is
   built to work the same everywhere and fall back safely rather than tested

@@ -23,11 +23,28 @@ const UNREACHABLE = /^root unavailable, skipped: (.+)$/;
 const BUSY = /Wikimedia is busy/;
 const BUSY_LINE = 'Wikipedia was busy, so some films wait to be matched until the next scan';
 
+/**
+ * The scan's last stages (pipeline.ts runProbe, runAutoDetect, runMeasure)
+ * work on what is already in the library: one failing costs some badges or a
+ * Skip button, never a film. It used to be said as the database's own words
+ * ("measuring pictures: Invalid column type Null …", owner 2026-11-01), on
+ * every tab. Now one plain line each, on Home only; the raw words stay in
+ * app.log (Browse's "startup scan problems").
+ */
+const BACKGROUND: [RegExp, string][] = [
+  [/^reading files: /, 'Kinema could not read the details of some files this time'],
+  [/^intro detection: /, 'Kinema could not look for intros this time'],
+  [/^measuring pictures: /, 'Kinema could not measure the pictures’ shape this time'],
+];
+const BACKGROUND_NOTE = 'Your library is fine; it tries again on the next scan.';
+
 export interface ScanTrouble {
   /** The first problem, plus how many more there were. */
   text: string;
   /** What an unreachable folder means for the library; null for anything else. */
   note: string | null;
+  /** Only background stages failed: said once on Home, not on every tab. */
+  homeOnly?: true;
 }
 
 /**
@@ -39,8 +56,15 @@ export interface ScanTrouble {
 export function scanTrouble(errors: string[], waiting = true): ScanTrouble | null {
   const folders = errors.flatMap((e) => UNREACHABLE.exec(e)?.[1] ?? []);
   const busy = waiting && errors.some((e) => BUSY.test(e)) ? [BUSY_LINE] : [];
-  const others = errors.filter((e) => !UNREACHABLE.test(e) && !BUSY.test(e));
-  const lines = [...folders.map((path) => `Could not reach ${path}`), ...busy, ...others];
+  const backgroundOf = (e: string) => BACKGROUND.find(([raw]) => raw.test(e))?.[1];
+  const background = [...new Set(errors.flatMap((e) => backgroundOf(e) ?? []))];
+  const others = errors.filter((e) => !UNREACHABLE.test(e) && !BUSY.test(e) && !backgroundOf(e));
+  const lines = [
+    ...folders.map((path) => `Could not reach ${path}`),
+    ...busy,
+    ...others,
+    ...background,
+  ];
   if (lines.length === 0) return null;
   const text = lines.length === 1 ? lines[0] : `${lines[0]} · and ${lines.length - 1} more`;
   // The scanner leaves a missing folder's files as they were, so they stay on
@@ -48,9 +72,11 @@ export function scanTrouble(errors: string[], waiting = true): ScanTrouble | nul
   // an_unreachable_folder_hides_nothing, an_empty_folder_that_had_files_hides_nothing).
   const note =
     folders.length === 0
-      ? null
+      ? background.length === lines.length
+        ? BACKGROUND_NOTE
+        : null
       : folders.length === 1
         ? 'Anything in that folder can’t be played until it is back.'
         : 'Anything in those folders can’t be played until they are back.';
-  return { text, note };
+  return background.length === lines.length ? { text, note, homeOnly: true } : { text, note };
 }

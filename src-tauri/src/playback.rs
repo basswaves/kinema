@@ -485,6 +485,7 @@ fn last_watched_per_series(conn: &rusqlite::Connection) -> Result<Vec<(i64, i64,
                JOIN media_files m ON m.id = p.file_id
               WHERE p.completed = 1
                 AND m.missing = 0
+                AND m.title_id IS NOT NULL
                 AND m.parsed_season  IS NOT NULL
                 AND m.parsed_episode IS NOT NULL
               GROUP BY m.title_id",
@@ -844,7 +845,26 @@ pub fn set_title_prefs(
 #[cfg(test)]
 mod tests {
     use super::{decode_episode_key, dismiss, encode_episode_key, hide_dismissed, is_complete};
-    use super::{loose_progress, store_loose, store_progress, LOOSE_KEEP};
+    use super::{last_watched_per_series, loose_progress, store_loose, store_progress, LOOSE_KEEP};
+
+    /// An episode kept unmatched (no title) and watched to the end is no
+    /// show to continue: its empty title once failed the whole rail as
+    /// "Invalid column type Null" (2026-11-01).
+    #[test]
+    fn a_watched_episode_without_a_title_is_no_show_to_continue() {
+        let conn = loose_library();
+        conn.execute_batch(
+            "INSERT INTO library_roots (id, path, kind, added_at) VALUES (1, 'D:/TV', 'tv', 0);
+             INSERT INTO media_files (id, root_id, path, parent_dir, file_name, extension,
+                                      size_bytes, modified_at, first_seen_at, last_seen_at,
+                                      match_status, parsed_season, parsed_episode)
+             VALUES (1, 1, 'D:/TV/a.mkv', 'D:/TV', 'a.mkv', 'mkv', 1, 0, 0, 0,
+                     'unmatched', 1, 1);",
+        )
+        .unwrap();
+        store_progress(&conn, 1, 1400.0, Some(1500.0), true, 1).unwrap();
+        assert_eq!(last_watched_per_series(&conn).unwrap(), vec![]);
+    }
 
     /// A re-watch moves the position but keeps the ✓.
     #[test]

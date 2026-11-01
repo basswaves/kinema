@@ -761,7 +761,7 @@ export default function Browse() {
 
         {/* On Home with titles it is one of Home's notices, with an OK a
             remote can reach; elsewhere a line a click puts away. */}
-        {scanTrouble && !scanTroubleOnHome && (
+        {scanTrouble && !scanTroubleOnHome && !scanTrouble.homeOnly && (
           <div
             className="browse-notice"
             onClick={dismissScanTrouble}

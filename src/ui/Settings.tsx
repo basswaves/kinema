@@ -15,6 +15,7 @@
  * to be needed when no mouse is present.
  */
 import { userError } from './errors';
+import { scanTrouble } from './scanTrouble';
 import { scanStageWords, scanWords } from '../library/scanWords';
 import LanguageSection from './LanguageSection';
 import ChoiceRow from './ChoiceRow';
@@ -198,9 +199,11 @@ function notYet(can: Capabilities): string {
   )}: ${meaning.join(', and ')}.`;
 }
 
+/** The scan's problems in the words Home uses (scanTrouble.ts); raw ones are in app.log. */
 function problemLine(errors: string[]): string {
-  const shown = errors.slice(0, 3).join(' · ');
-  return errors.length > 3 ? `${shown} · and ${errors.length - 3} more` : shown;
+  const trouble = scanTrouble(errors);
+  if (!trouble) return '';
+  return trouble.note ? `${trouble.text}. ${trouble.note}` : trouble.text;
 }
 
 /** The Review button, where focus lands when Settings opens on the queue. */
@@ -666,7 +669,10 @@ export default function Settings({
     else {
       setNote(summaryLine(outcome.summary));
       if (outcome.summary.parseError) setError(`The file name reader failed: ${outcome.summary.parseError}`);
-      else if (outcome.summary.errors.length) setError(problemLine(outcome.summary.errors));
+      else if (outcome.summary.errors.length) {
+        console.warn('scan problems:', outcome.summary.errors);
+        setError(problemLine(outcome.summary.errors));
+      }
     }
     await refresh();
   }, [refresh]);

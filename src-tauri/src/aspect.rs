@@ -214,13 +214,16 @@ struct Candidate {
 
 /// What needs measuring: every film not yet measured, and for each season
 /// with no measured episode, its episodes in order — the first that can be
-/// measured speaks for the season.
+/// measured speaks for the season. A measured file with no title (kept
+/// unmatched, or a video) speaks for no season: its empty title once failed
+/// the whole stage as "Invalid column type Null" (2026-11-01).
 fn candidates(conn: &Connection) -> rusqlite::Result<Vec<Candidate>> {
     let mut done = conn.prepare(
         "SELECT DISTINCT m.title_id, m.parsed_season
            FROM media_files m
            JOIN media_probe p ON p.file_id = m.id
-          WHERE p.picture_version >= ?1 AND p.picture_aspect IS NOT NULL",
+          WHERE p.picture_version >= ?1 AND p.picture_aspect IS NOT NULL
+            AND m.title_id IS NOT NULL",
     )?;
     let measured: HashSet<(i64, i64)> = done
         .query_map(params![MEASURE_VERSION], |r| {
@@ -601,6 +604,20 @@ mod tests {
 
     /// An episode that could not be measured does not settle its season; the
     /// next one is tried.
+    /// A file kept unmatched (no title) that was measured once, as on the
+    /// owner's library: the stage goes on instead of failing on its title.
+    #[test]
+    fn a_measured_file_without_a_title_is_passed_over() {
+        let conn = library();
+        save(&conn, 1, Some(SCOPE)).unwrap();
+        conn.execute(
+            "UPDATE media_files SET title_id = NULL, match_status = 'unmatched' WHERE id = 1",
+            [],
+        )
+        .unwrap();
+        assert_eq!(candidate_ids(&conn), vec![2, 3, 4, 5, 6, 7]);
+    }
+
     #[test]
     fn an_unmeasurable_episode_passes_to_the_next() {
         let conn = library();

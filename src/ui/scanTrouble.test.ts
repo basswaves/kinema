@@ -51,4 +51,25 @@ describe('scanTrouble', () => {
       'Anything in those folders can’t be played until they are back.'
     );
   });
+
+  it('says a failed background stage in plain words, once, on Home only', () => {
+    const raw = 'measuring pictures: Invalid column type Null at index: 0, name: title_id';
+    expect(scanTrouble([raw])).toEqual({
+      text: 'Kinema could not measure the pictures’ shape this time',
+      note: 'Your library is fine; it tries again on the next scan.',
+      homeOnly: true,
+    });
+    expect(scanTrouble([raw, 'reading files: locked', raw])).toEqual({
+      text: 'Kinema could not measure the pictures’ shape this time · and 1 more',
+      note: 'Your library is fine; it tries again on the next scan.',
+      homeOnly: true,
+    });
+  });
+
+  it('puts anything else first, and on every tab, beside a background stage', () => {
+    expect(scanTrouble(['intro detection: x', tmdb])).toEqual({
+      text: `${tmdb} · and 1 more`,
+      note: null,
+    });
+  });
 });

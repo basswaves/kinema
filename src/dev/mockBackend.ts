@@ -1098,6 +1098,7 @@ function personOf(personId: string) {
  * Posters (posters.rs) for Example Part Two: TMDB's as fetched and a picture
  * beside its file; a choice is kept by title and put back after a refresh.
  */
+let mockHttpBodySent = false;
 const FETCHED_POSTER = 'https://image.tmdb.org/t/p/original/first.jpg';
 const LOCAL_POSTER = 'C:\\fixture\\Example Part Two (2014)\\poster.jpg';
 const posterChoice = new Map<number, string>();
@@ -2202,6 +2203,31 @@ const handlers: Record<string, Handler> = {
   'plugin:event|listen': (a) => listen(String(a.event), Number(a.handler)),
   // Android's Back button (backButton.ts): counted, so a check can see who
   // asked for it.
+  // TMDB's poster list for the Poster dialog (e2e/posters.e2e.ts), when
+  // kinemaMockPosters is set: eleven posters through the http plugin's calls.
+  // Without it TMDB is unreachable, as before.
+  'plugin:http|fetch': () => {
+    if (flag('kinemaMockPosters') !== '1') throw new Error('mock: no network');
+    return 1;
+  },
+  'plugin:http|fetch_send': () => {
+    mockHttpBodySent = false;
+    return { status: 200, statusText: 'OK', url: '', headers: [], rid: 2 };
+  },
+  'plugin:http|fetch_read_body': () => {
+    if (mockHttpBodySent) return new Uint8Array([1]).buffer;
+    mockHttpBodySent = true;
+    const body = JSON.stringify({
+      posters: Array.from({ length: 11 }, (_, i) => ({
+        file_path: `/p${i}.jpg`,
+        iso_639_1: i % 2 ? 'en' : null,
+        vote_average: 10 - i,
+      })),
+    });
+    return new Uint8Array([...new TextEncoder().encode(body), 0]).buffer;
+  },
+  'plugin:http|fetch_cancel': () => null,
+  'plugin:http|fetch_cancel_body': () => null,
   'plugin:app|version': () => '0.0.0-mock',
   'plugin:app|register_listener': (a) => {
     backListeners.push(String(a.event));

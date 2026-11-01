@@ -1438,20 +1438,25 @@ button.cast-member {
   overflow: hidden;
 }
 
-/* The poster list (PosterDialog.tsx): one row that scrolls sideways. */
+/* The poster list (PosterDialog.tsx): a grid that scrolls down, inside the
+   dialog. Padding is the ring's room (the ring would be clipped by the scroll). */
 .leave.posters {
   width: min(56rem, 92vw);
+  max-width: none;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
 }
 .poster-choices {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
   gap: 0.75rem;
-  overflow-x: auto;
-  padding: 0.5rem 0.25rem 0.75rem;
-  margin-bottom: 0.75rem;
-  scrollbar-width: none;
+  overflow-y: auto;
+  min-height: 0;
+  padding: var(--ring-room);
+  margin: 0 calc(-1 * var(--ring-room)) 0.75rem;
 }
 .poster-choice {
-  flex: 0 0 8.5rem;
   display: flex;
   flex-direction: column;
   gap: 0.375rem;
@@ -1463,6 +1468,15 @@ button.cast-member {
   font: inherit;
   font-size: 0.8125rem;
   cursor: pointer;
+}
+.poster-choice:hover,
+.poster-choice.focused {
+  background: rgba(255, 255, 255, 0.1);
+}
+/* The ring; the grid's padding is its room. */
+.poster-choice.focused {
+  outline: var(--focus-ring) solid #fff;
+  outline-offset: 3px;
 }
 .poster-choice-art {
   width: 100%;

@@ -129,6 +129,26 @@ for (const look of ['full', 'light'] as const) {
       await expect(page).toHaveScreenshot(`poster-ring-${look}.png`, SHOT);
     });
 
+    test('the Poster dialog, a grid of posters with the ring on one', async ({ page }) => {
+      await page.addInitScript(() => {
+        localStorage.setItem('kinemaMockPeople', '1');
+        localStorage.setItem('kinemaMockPosters', '1');
+      });
+      await start(page, look);
+      await expect.poll(() => focused(page), { timeout: 30_000 }).toContain('Play');
+      await page.getByRole('button', { name: 'Movies' }).first().click();
+      await page.locator('.search .card', { hasText: 'Example Part Two' }).click();
+      await expect(page.locator('.detail h1')).toHaveText('Example Part Two');
+      for (let i = 0; i < 10 && !/^Poster/.test((await focused(page)) ?? ''); i++) await press(page, 'ArrowRight');
+      await press(page, 'Enter');
+      await expect(page.locator('.poster-choice')).toHaveCount(13);
+      await press(page, 'ArrowRight');
+      await press(page, 'ArrowDown');
+      expect(await ringCovers(page)).toEqual([]);
+      await still(page);
+      await expect(page).toHaveScreenshot(`poster-grid-${look}.png`, SHOT);
+    });
+
     test('first run', async ({ page }) => {
       await start(page, look, () => localStorage.setItem('kinemaMockEmpty', '1'));
       await expect(page.locator('.first-run')).toBeVisible({ timeout: 30_000 });

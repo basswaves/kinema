@@ -5,14 +5,16 @@
  * `poster_choice`); nothing is written beside the files.
  *
  * A menu like the Version list: the ring stays in it, Back closes it and the
- * ring goes back to the button that opened it (focusStore.ts does both). The posters are one row that
- * scrolls, never a wrapped grid a remote could not reach the second line of.
+ * ring goes back to the button that opened it (focusStore.ts does both). The
+ * posters are a grid on the engine (TileGrid reads the columns that fit), the
+ * list inside the dialog scrolling down; arrows, mouse wheel and hover all work.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useFocusGroup } from './focusGroups';
 import { navFocus } from './focusStore';
 import FocusButton from './FocusButton';
-import FocusGroup, { FocusProvider } from './FocusGroup';
+import { FocusProvider } from './FocusGroup';
+import TileGrid from './TileGrid';
 import Art from './Art';
 import { sizedPoster } from './poster';
 import { posterChoices, type PosterChoice, type PosterChoices } from '../library/posters';
@@ -94,7 +96,7 @@ export default function PosterDialog({ titleId, name, onChosen, onClose }: Props
           {(found === null || found.asking) && <p className="muted">Asking TMDB for its posters…</p>}
           {found?.note && <p className="muted">{found.note}</p>}
           {choices && choices.length > 0 && (
-            <FocusGroup kind="row" className="poster-choices" current={choiceKey(current)}>
+            <TileGrid className="poster-choices" count={choices.length}>
               {choices.map((choice, i) => (
                 <FocusButton
                   key={choice.id}
@@ -116,7 +118,7 @@ export default function PosterDialog({ titleId, name, onChosen, onClose }: Props
                   </span>
                 </FocusButton>
               ))}
-            </FocusGroup>
+            </TileGrid>
           )}
           <FocusButton className="leave-choice" onSelect={close}>
             Cancel

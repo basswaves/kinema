@@ -13,7 +13,7 @@
  * make the pictures the same every run.
  */
 import { expect, test, type Page } from '@playwright/test';
-import { drawn, focused, press, settled } from './kb';
+import { drawn, firstRunToSetupPage, focused, press, ringCovers, settled } from './kb';
 
 type Look = 'full' | 'light';
 
@@ -96,6 +96,37 @@ for (const look of ['full', 'light'] as const) {
       await expect(page.locator('.track-panel')).toBeVisible();
       await still(page);
       await expect(page).toHaveScreenshot(`player-tracks-${look}.png`, SHOT);
+    });
+
+    // The ring with text right beside it (owner, 2026-11-01): a choice row
+    // with its caption below, and Cancel under the Poster dialog's line.
+    test('a setup page, the ring on a choice', async ({ page }) => {
+      await page.clock.setFixedTime(new Date('2026-06-01T12:00:00Z'));
+      await page.addInitScript((l) => {
+        localStorage.removeItem('kinemaMockSystem');
+        localStorage.setItem('kinemaMockLook', l);
+        localStorage.setItem('kinemaMockEmpty', '1');
+      }, look);
+      await firstRunToSetupPage(page, 'windows', 'Skipping intros');
+      await expect.poll(() => focused(page)).toBe('✓Show a Skip button');
+      expect(await ringCovers(page)).toEqual([]);
+      await still(page);
+      await expect(page).toHaveScreenshot(`setup-ring-${look}.png`, SHOT);
+    });
+
+    test('the Poster dialog, the ring on Cancel', async ({ page }) => {
+      await start(page, look);
+      await expect.poll(() => focused(page), { timeout: 30_000 }).toContain('Play');
+      await page.getByRole('button', { name: 'Movies' }).first().click();
+      await page.locator('.search .card', { hasText: 'Example Film' }).click();
+      await expect(page.locator('.detail h1')).toHaveText('Example Film');
+      for (let i = 0; i < 10 && !/^Poster/.test((await focused(page)) ?? ''); i++) await press(page, 'ArrowRight');
+      await press(page, 'Enter');
+      await expect(page.getByRole('dialog', { name: 'Poster' })).toBeVisible();
+      await expect.poll(() => focused(page)).toBe('Cancel');
+      expect(await ringCovers(page)).toEqual([]);
+      await still(page);
+      await expect(page).toHaveScreenshot(`poster-ring-${look}.png`, SHOT);
     });
 
     test('first run', async ({ page }) => {

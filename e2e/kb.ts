@@ -185,3 +185,52 @@ export async function androidSettings(page: Page, section: string): Promise<void
   await press(page, 'Enter');
   await press(page, 'ArrowRight');
 }
+
+/**
+ * Text the focus ring is drawn over: the ring is the focused control's box
+ * (growth included) plus its outline and offset, and any visible text not
+ * inside the control that it overlaps by more than a pixel is listed. Over a
+ * dialog only the dialog's own text counts; the page behind is dimmed.
+ * Owner, 2026-11-01: the ring covered a setup page's caption and the Poster
+ * dialog's line above Cancel. Empty means the ring covers nothing.
+ */
+export function ringCovers(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const focused = document.querySelector<HTMLElement>('.focused');
+    if (!focused) return [];
+    // The outline may be on a child (a card's picture).
+    const drawsRing = (e: Element) => {
+      const cs = getComputedStyle(e);
+      return cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0;
+    };
+    const ringEl = (drawsRing(focused) ? focused : Array.from(focused.querySelectorAll('*')).find(drawsRing)) as
+      | HTMLElement
+      | undefined;
+    if (!ringEl) return [];
+    const cs = getComputedStyle(ringEl);
+    const r = ringEl.getBoundingClientRect();
+    const scale = ringEl.offsetWidth ? r.width / ringEl.offsetWidth : 1;
+    const out = (Math.max(0, parseFloat(cs.outlineOffset)) + parseFloat(cs.outlineWidth)) * scale;
+    const ring = { l: r.left - out, t: r.top - out, r: r.right + out, b: r.bottom + out };
+    const layer = focused.closest('[role="dialog"]') ?? document.body;
+    const hits: string[] = [];
+    const walker = document.createTreeWalker(layer, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      const text = n.textContent?.trim();
+      const parent = n.parentElement;
+      if (!text || !parent || focused.contains(parent)) continue;
+      if (!parent.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue;
+      const range = document.createRange();
+      range.selectNodeContents(n);
+      for (const b of Array.from(range.getClientRects())) {
+        const w = Math.min(b.right, ring.r) - Math.max(b.left, ring.l);
+        const h = Math.min(b.bottom, ring.b) - Math.max(b.top, ring.t);
+        if (w > 1 && h > 1) {
+          hits.push(text.slice(0, 40));
+          break;
+        }
+      }
+    }
+    return hits;
+  });
+}

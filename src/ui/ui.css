@@ -42,6 +42,13 @@
   --safe-top: 0rem;
 
   --focus-ring: 3px;
+
+  /* What a ring takes outside its control: the outline, its 3px offset and
+     a focused button's growth. A row of controls keeps this much room above
+     and below, so the ring never covers the text next to it (owner,
+     2026-11-01: a setup page's caption, the Poster dialog's line). Checked
+     at every press by e2e/ring-room.e2e.ts. */
+  --ring-room: calc(var(--focus-ring) + 3px + 0.25rem);
 }
 
 /*
@@ -2090,6 +2097,7 @@ button.cast-member {
 
 .setup-nav {
   margin-bottom: 1.75rem;
+  padding-top: var(--ring-room);
 }
 
 .setup-later {
@@ -2373,7 +2381,7 @@ button.cast-member {
 }
 
 .settings-section .choice-note {
-  margin: 0.625rem 0 0;
+  margin: 0.25rem 0 0;
   font-size: 0.8125rem;
   line-height: 1.5;
   color: rgba(245, 245, 247, 0.72);
@@ -2433,7 +2441,7 @@ button.cast-member {
 }
 
 .choice-label {
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.25rem;
   font-size: 0.9375rem;
   font-weight: 600;
 }
@@ -2442,6 +2450,7 @@ button.cast-member {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+  padding-block: var(--ring-room);
 }
 
 .choice-options .choice {
@@ -3973,8 +3982,9 @@ kbd {
   font-size: 0.875rem;
 }
 
+/* Room below for the ring of a button right under the line (--ring-room). */
 .leave .muted {
-  margin: 1.25rem 0 0;
+  margin: 1.25rem 0 var(--ring-room);
   font-size: 0.8125rem;
 }
 

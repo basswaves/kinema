@@ -160,11 +160,24 @@ export default function ImportWatchedSection() {
           />
         </label>
       )}
+      {/* Always reachable: disabled until the fields were filled, a remote
+          passed over it and nothing said why (owner, 2026-11-01). Pressed
+          with one empty, it says which. */}
       <FocusGroup kind="row" className="settings-row">
         <FocusButton
           className="btn-primary"
-          disabled={busy || !url.trim() || !key.trim()}
-          onSelect={() => run(importWatchedServer(server, url, key, user))}
+          disabled={busy}
+          onSelect={() => {
+            const missing = !url.trim()
+              ? 'the server’s address'
+              : !key.trim()
+                ? server === 'plex'
+                  ? 'the Plex token'
+                  : 'the API key'
+                : null;
+            if (missing) setError(`Fill in ${missing} first.`);
+            else run(importWatchedServer(server, url, key, user));
+          }}
         >
           {busy ? 'Reading…' : 'Bring it in'}
         </FocusButton>

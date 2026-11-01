@@ -4120,6 +4120,37 @@ poll for a control to come back to, a scroll pace and a read-on of its own to
 keys between the two engines, `navGeometry.ts` (the measuring inside a
 group) and 86 per-button scroll hints went with it.
 
+**F7 (2026-11-01): the owner's own check.** After the box walk the owner
+looked at the box and Windows by hand; everything tried worked, and seven
+things were found. Three were their choices. Settings now scrolls by the
+rule every page has — the focused row a third of the way down — where it
+used to line up the whole section and only keep the ring in sight: the
+section list and the open section are *panes* side by side (`panes` on the
+area, focusModel.ts), each lined up on its own, and a heading leads its row
+only when nothing to press stands between them (Settings' title, five rows
+up, held every row low). In Settings, a row of choices is now arrived at on
+its **leftmost** choice, not the chosen one: the owner reads a section like
+a list from the left. This reverses, for Settings only, the 2026-10-30 rule
+above; the setup pages keep the chosen one, since there the ✓ is the
+question's current answer and the page is answered row by row. And Left to
+the section list no longer takes the page to its top (the list is sticky,
+so it is on screen as it is): Right comes back to the same control at the
+same place; a newly opened section starts at its top.
+
+The other four were faults. The ring covered the text beside it — a setup
+page's caption, the Poster dialog's line — because nothing kept room for
+it: the room is now one measure, `--ring-room` (outline, offset, growth),
+kept around rows of controls, and a check (`ringCovers`, e2e/kb.ts) walks
+screens by keys and lists any text the ring overlaps. The cast was passed
+over on the box: a cast known only by name (Wikidata) was drawn as plain
+boxes, nothing to land on; every face is a control now, and only one with
+TMDB's id opens a page. "Bring it in" could not be reached until both
+fields were filled (a disabled control is passed over); it is always there
+now and says which field is empty. And a file kept unmatched failed the
+whole measuring stage with the database's own words on every tab; the
+query skips files with no title, and a failed background stage is one
+plain line on Home.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

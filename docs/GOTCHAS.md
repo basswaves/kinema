@@ -461,6 +461,17 @@ there is a test that fails if the `-wal` is dropped from it.
 
 ---
 
+### A file with no title fails a whole query that reads `title_id` as a number (2026-11-01)
+
+Since round 6 a file can stay in the library with no title (kept unmatched,
+a video). `r.get::<_, i64>` on its `title_id` is "Invalid column type Null",
+and inside `query_map(...).collect()` one such row fails the whole query:
+measuring pictures stopped for the whole library, and the Continue rail's
+last-watched query would have the same way after an unmatched episode is
+watched to the end. Tests had no such row, so nothing failed. **Do:** a
+query over `media_files` that reads `title_id` as a number says
+`AND m.title_id IS NOT NULL`; a test library has one file with no title.
+
 ## Library and intro detection
 
 ### A graceful fallback with nothing to show for it is a silent bug
@@ -1289,6 +1300,43 @@ Playwright's `fill` focuses the input. The engine follows the DOM focus
 button it was on — the library ignored the DOM focus and left its ring where
 it was, and a test that pressed Up to get back to the field then left it.
 **Do:** after `fill`, expect the ring on the field.
+
+### A heading far above still led the row (round 7, F7)
+
+The one scroll rule lines an area up with the heading before it, when the
+two fit. `headingBefore` looked for the last heading before the area at any
+level up, so in a Settings section it found the section's title — or the
+page's "Settings" — five rows of choices away, and while they fitted on
+screen that heading went to the third, the focused row sat near the bottom,
+and the page did not move at all for the first rows. The F3 note above
+("keeps the ring in sight") was this. **Do:** a heading leads only the area
+right after it: a control between them ends the search (`pressable`,
+focusScroll.ts).
+
+### A control disabled until a form is filled cannot be reached by remote (round 7, F7)
+
+"Bring it in" was `disabled` until the address and key were typed. The
+engine passes over a disabled control (as it must), so with a remote it was
+not there at all, and nothing said why. **Do:** keep a form's button
+enabled; on press, say which field is empty. Disable only while it works.
+
+### A `<button>` centres its content vertically (round 7, F7)
+
+Cast faces in a flex row are stretched to the tallest, and a button lays its
+own content out centred, so a face whose name took two lines had its picture
+pushed up out of line with the rest. A `div` does not do this, which is why
+it showed only once the faces became buttons. **Do:** a button that is a
+picture over words is `display: flex; flex-direction: column;
+justify-content: flex-start`.
+
+### A ring needs room the layout does not give it (round 7, F7)
+
+An outline is drawn outside the box and takes no space, so a caption right
+under a row of choices, or a line right above a dialog's Cancel, was drawn
+under the ring (worst in TV mode: 4 px + 3 px offset + growth). Nothing
+failed; the text was just covered. **Do:** keep `--ring-room` (ui.css)
+above and below rows of controls; `ringCovers` (e2e/kb.ts) lists any text
+the ring overlaps, and e2e/ring-room.e2e.ts walks screens with it.
 
 ## Frontend
 

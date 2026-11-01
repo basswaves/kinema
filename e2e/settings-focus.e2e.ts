@@ -133,3 +133,21 @@ test('Left to the list keeps the section where it was; Right comes back to the s
   await settled(page);
   expect(await scrollTop(page)).toBe(0);
 });
+
+// Owner, 2026-11-01: "Bring it in" could not be reached until both fields
+// were filled (a disabled control is passed over). Reached by keys with the
+// fields empty, it says which one to fill.
+test('Bring it in is reached by keys with empty fields, and says which field to fill', async ({ page }) => {
+  await settings(page);
+  await onSection(page, 'Keep track of what I watch');
+  await press(page, 'ArrowRight');
+  for (let i = 0; i < 30 && (await focused(page)) !== 'Bring it in'; i++) await press(page, 'ArrowDown');
+  expect(await focused(page)).toBe('Bring it in');
+  await press(page, 'Enter');
+  await expect(page.locator('.settings-warn')).toHaveText('Fill in the server’s address first.');
+  await page.getByPlaceholder('http://192.168.1.10:8096').fill('http://192.168.1.10:8096');
+  for (let i = 0; i < 4 && (await focused(page)) !== 'Bring it in'; i++) await press(page, 'ArrowDown');
+  expect(await focused(page)).toBe('Bring it in');
+  await press(page, 'Enter');
+  await expect(page.locator('.settings-warn')).toHaveText('Fill in the API key first.');
+});

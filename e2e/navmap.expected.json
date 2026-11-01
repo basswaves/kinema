@@ -490,7 +490,8 @@
       "Plex": { "U": "Choose Kodi’s database or a Trakt export…", "D": "http://192.168.1.10:8096", "L": "Emby", "R": "·" },
       "http://192.168.1.10:8096": { "U": "✓Jellyfin", "D": "API key", "L": "Keep track of what I watch", "R": "·" },
       "API key": { "U": "http://192.168.1.10:8096", "D": "User name", "L": "Keep track of what I watch", "R": "·" },
-      "User name": { "U": "API key", "D": "·", "L": "Keep track of what I watch", "R": "·" }
+      "User name": { "U": "API key", "D": "Bring it in", "L": "Keep track of what I watch", "R": "·" },
+      "Bring it in": { "U": "User name", "D": "·", "L": "Keep track of what I watch", "R": "·" }
     },
     "settings-ratings": {
       "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "Get a free TMDB key ↗" },
@@ -982,7 +983,8 @@
       "Plex": { "U": "Choose Kodi’s database or a Trakt export…", "D": "http://192.168.1.10:8096", "L": "Emby", "R": "·" },
       "http://192.168.1.10:8096": { "U": "✓Jellyfin", "D": "API key", "L": "Keep track of what I watch", "R": "·" },
       "API key": { "U": "http://192.168.1.10:8096", "D": "User name", "L": "Keep track of what I watch", "R": "·" },
-      "User name": { "U": "API key", "D": "·", "L": "Keep track of what I watch", "R": "·" }
+      "User name": { "U": "API key", "D": "Bring it in", "L": "Keep track of what I watch", "R": "·" },
+      "Bring it in": { "U": "User name", "D": "·", "L": "Keep track of what I watch", "R": "·" }
     },
     "settings-ratings": {
       "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "Get a free TMDB key ↗" },
@@ -1377,7 +1379,8 @@
       "Plex": { "U": "Connect Trakt", "D": "http://192.168.1.10:8096", "L": "Emby", "R": "·" },
       "http://192.168.1.10:8096": { "U": "✓Jellyfin", "D": "API key", "L": "Keep track of what I watch", "R": "·" },
       "API key": { "U": "http://192.168.1.10:8096", "D": "User name", "L": "Keep track of what I watch", "R": "·" },
-      "User name": { "U": "API key", "D": "·", "L": "Keep track of what I watch", "R": "·" }
+      "User name": { "U": "API key", "D": "Bring it in", "L": "Keep track of what I watch", "R": "·" },
+      "Bring it in": { "U": "User name", "D": "·", "L": "Keep track of what I watch", "R": "·" }
     },
     "settings-ratings": {
       "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "Get a free TMDB key ↗" },

@@ -4573,6 +4573,24 @@ kbd {
   text-align: center;
 }
 
+/* Levelling: the label above, the four steps below it sharing the width, so
+   none is cut ("A little" was "Al…" beside the label). */
+.track-delay.track-level-steps {
+  flex-wrap: wrap;
+}
+
+.track-level-steps .track-delay-label {
+  flex: 1 0 100%;
+}
+
+.track-level-steps .track-option {
+  flex: 1 1 0;
+  min-width: 0;
+  padding-right: 0.25rem;
+  padding-left: 0.25rem;
+  text-overflow: clip;
+}
+
 /* An amount between its two step buttons (Settings → Sound delay). */
 .choice-value {
   min-width: 4.5rem;

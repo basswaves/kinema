@@ -745,6 +745,22 @@ test('levelling and the dialogue lift by remote, kept for the title', async ({ p
     .toMatch(/"levelling":"more","dialogue":true/);
 });
 
+test('the four levelling steps are read whole, in both contrasts', async ({ page }) => {
+  await play(page, 'series');
+  const panel = await openTrackPanel(page);
+  for (const high of [false, true]) {
+    await page.evaluate(async (on) => {
+      const path = '/src/ui/contrast.ts';
+      (await import(/* @vite-ignore */ path)).setContrast(on);
+    }, high);
+    const cut = await panel.locator('.track-level-steps .track-option').evaluateAll((els) =>
+      els.map((el) => ({ text: el.textContent, cut: el.scrollWidth > el.clientWidth }))
+    );
+    expect(cut.map((c) => c.text)).toEqual(['Off', 'A little', 'More', 'Most']);
+    expect(cut.filter((c) => c.cut), `cut labels, high contrast ${high}`).toEqual([]);
+  }
+});
+
 test('audio description and SDH subtitles when the person asks for them', async ({ page }) => {
   await play(page, 'series', async (p) => {
     await call(p, '/src/metadata/api.ts', 'setSetting', 'audio_description', 'on');

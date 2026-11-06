@@ -102,7 +102,7 @@ function LevelRows({
   }
   return (
     <>
-      <FocusGroup kind="row" className="track-delay track-level" current={levelKey(level.levelling)}>
+      <FocusGroup kind="row" className="track-delay track-level track-level-steps" current={levelKey(level.levelling)}>
         <span className="track-delay-label">Levelling</span>
         {LEVELLINGS.map((l) => (
           <FocusButton

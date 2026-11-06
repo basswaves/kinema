@@ -32,7 +32,8 @@ const SERVERS: { value: ServerKind; label: string }[] = [
 const SHOWN = 12;
 
 const KEY_HINT: Record<ServerKind, string> = {
-  jellyfin: 'An API key: Jellyfin’s Dashboard, API Keys, +.',
+  jellyfin:
+    'An API key made on the server, not a password: Jellyfin’s Dashboard, then API Keys, then +. Copy the whole key.',
   emby: 'An API key: Emby’s Settings, Advanced, API Keys, New API Key.',
   plex: 'Your Plex token: open any item’s Get Info, View XML, and copy what follows X-Plex-Token= in the address.',
 };

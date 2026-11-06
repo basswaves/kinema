@@ -559,16 +559,39 @@ pub fn parse_plex(items: &Value, shows: &HashMap<String, (Option<String>, Option
 
 // ---- reading a server, once ---------------------------------------------------------
 
-async fn get_json(url: &str, headers: &[(&str, &str)]) -> Result<Value, String> {
+/// What a server's 401 or 403 means, in words. 401: it does not know the key
+/// (mistyped, from the wrong place, or a server too new for the way it was
+/// sent); 403: it knows the key and will not let it read this.
+fn refusal(status: u16) -> String {
+    if status == 403 {
+        "The server knows the key but does not allow it to read this (403). Check that the user is allowed to see the library."
+            .into()
+    } else {
+        "The server does not accept the key (401). It has to be an API key made in the server's Dashboard (API Keys), not a password; check it was copied whole."
+            .into()
+    }
+}
+
+/// A Jellyfin or Emby key in both forms servers read: the `Authorization`
+/// header (the only form Jellyfin 12 and later accepts, also read by 10.10 and
+/// Emby) and `X-Emby-Token` (older servers).
+fn token_headers(key: &str) -> [(&'static str, String); 2] {
+    [
+        ("Authorization", format!("MediaBrowser Token=\"{key}\"")),
+        ("X-Emby-Token", key.to_string()),
+    ]
+}
+
+async fn get_json(url: &str, headers: &[(&str, String)]) -> Result<Value, String> {
     let client = tracking::http().ok_or("Kinema could not make a web request.")?;
     let mut req = client.get(url).header("Accept", "application/json");
     for (k, v) in headers {
-        req = req.header(*k, *v);
+        req = req.header(*k, v.as_str());
     }
     let resp = req.send().await.map_err(|e| format!("The server did not answer ({e})."))?;
     let status = resp.status().as_u16();
     if status == 401 || status == 403 {
-        return Err("The server refused the key.".into());
+        return Err(refusal(status));
     }
     if !(200..300).contains(&status) {
         return Err(format!("The server answered {status}."));
@@ -578,7 +601,7 @@ async fn get_json(url: &str, headers: &[(&str, &str)]) -> Result<Value, String> 
 }
 
 async fn read_jellyfin(base: &str, key: &str, user: &str) -> Result<Vec<Found>, String> {
-    let headers = [("X-Emby-Token", key)];
+    let headers = token_headers(key);
     let users = get_json(&format!("{base}/Users"), &headers).await?;
     let users = users.as_array().cloned().unwrap_or_default();
     let wanted = user.trim();
@@ -631,7 +654,7 @@ async fn read_jellyfin(base: &str, key: &str, user: &str) -> Result<Vec<Found>, 
 }
 
 async fn read_plex(base: &str, token: &str) -> Result<Vec<Found>, String> {
-    let headers = [("X-Plex-Token", token)];
+    let headers = [("X-Plex-Token", token.to_string())];
     let sections = get_json(&format!("{base}/library/sections"), &headers).await?;
     let mut out = Vec::new();
     for dir in sections["MediaContainer"]["Directory"].as_array().into_iter().flatten() {
@@ -934,5 +957,76 @@ mod tests {
         );
         assert_eq!(found[0].imdb_id.as_deref(), Some("tt0000100"));
         assert_eq!((found[1].tmdb_id.as_deref(), found[1].position_secs), (Some("200"), 600.0));
+    }
+
+    // ---- a fake Jellyfin: proves the headers go out, not that a real one takes them ----
+
+    /// How the fake answers: it wants one header form (or none, or says 403).
+    #[derive(Clone, Copy)]
+    enum Wants {
+        Authorization,
+        EmbyToken,
+        Forbidden,
+    }
+
+    /// A local server answering `/Users` and the item lists, for as many
+    /// requests as come; returns its address.
+    fn fake_jellyfin(wants: Wants) -> String {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = format!("http://{}", listener.local_addr().unwrap());
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { return };
+                let mut buf = [0u8; 4096];
+                let n = stream.read(&mut buf).unwrap_or(0);
+                let head = String::from_utf8_lossy(&buf[..n]).to_lowercase();
+                let line = head.lines().next().unwrap_or("").to_string();
+                let ok = match wants {
+                    Wants::Authorization => head.contains("authorization: mediabrowser token=\"the-key\""),
+                    Wants::EmbyToken => head.contains("x-emby-token: the-key"),
+                    Wants::Forbidden => false,
+                };
+                let (status, body) = if matches!(wants, Wants::Forbidden) {
+                    ("403 Forbidden", String::new())
+                } else if !ok {
+                    ("401 Unauthorized", String::new())
+                } else if line.contains("/users?") || line.contains("/users ") {
+                    ("200 OK", r#"[{"Name":"someone","Id":"u1"}]"#.to_string())
+                } else {
+                    ("200 OK", r#"{"Items":[],"TotalRecordCount":0}"#.to_string())
+                };
+                let reply = format!(
+                    "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                );
+                let _ = stream.write_all(reply.as_bytes());
+            }
+        });
+        addr
+    }
+
+    fn read(addr: &str) -> Result<Vec<Found>, String> {
+        tauri::async_runtime::block_on(read_jellyfin(addr, "the-key", ""))
+    }
+
+    #[test]
+    fn a_server_wanting_only_the_authorization_header_is_read() {
+        // Jellyfin 12 and later: the old token header is gone.
+        assert!(read(&fake_jellyfin(Wants::Authorization)).is_ok());
+    }
+
+    #[test]
+    fn a_server_wanting_only_the_old_header_is_read() {
+        assert!(read(&fake_jellyfin(Wants::EmbyToken)).is_ok());
+    }
+
+    #[test]
+    fn a_wrong_key_and_a_forbidden_one_are_told_apart() {
+        let wrong = tauri::async_runtime::block_on(read_jellyfin(&fake_jellyfin(Wants::Authorization), "other", ""));
+        let wrong = wrong.unwrap_err();
+        assert!(wrong.contains("401") && wrong.contains("API Keys"), "{wrong}");
+        let forbidden = read(&fake_jellyfin(Wants::Forbidden)).unwrap_err();
+        assert!(forbidden.contains("403") && !forbidden.contains("401"), "{forbidden}");
     }
 }

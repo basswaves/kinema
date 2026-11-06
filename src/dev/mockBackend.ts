@@ -1729,14 +1729,20 @@ const handlers: Record<string, Handler> = {
   // Smart collections (collections.rs), when kinemaMockTraits is set: two
   // titles with Atmos and 4K, one with Dolby Vision — so Home has the Atmos
   // and 4K rails and no Dolby Vision one (a rail needs two).
-  title_traits: () =>
-    flag('kinemaMockTraits') === '1'
-      ? [
-          { title_id: FILM_ID, traits: ['4k', 'atmos', 'dv', 'dv:7', 'hdr'] },
-          { title_id: SAGA_ID, traits: ['4k', 'atmos', 'hdr'] },
-          { title_id: SERIES_ID, traits: ['hdr10plus'] },
-        ]
-      : [],
+  // `kinemaMockTraitsMs`: the answer comes late, as the real one does over
+  // the bridge, so rails built from it appear after Home is first drawn.
+  title_traits: () => {
+    const rows =
+      flag('kinemaMockTraits') === '1'
+        ? [
+            { title_id: FILM_ID, traits: ['4k', 'atmos', 'dv', 'dv:7', 'hdr'] },
+            { title_id: SAGA_ID, traits: ['4k', 'atmos', 'hdr'] },
+            { title_id: SERIES_ID, traits: ['hdr10plus'] },
+          ]
+        : [];
+    const late = Number(flag('kinemaMockTraitsMs') ?? 0) || 0;
+    return late ? new Promise((resolve) => window.setTimeout(() => resolve(rows), late)) : rows;
+  },
   season_facts: (a) =>
     episodesOf(num(a, 'titleId'))
       .filter((f) => f.season === num(a, 'season'))

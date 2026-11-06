@@ -8,7 +8,7 @@
  * keeps up. Waits for states only, never a fixed time.
  */
 import { expect, test, type Page } from '@playwright/test';
-import { focused, open, press, settled } from './kb';
+import { focusKey, focused, open, press, settled } from './kb';
 
 interface Ring {
   key: string | null;
@@ -218,4 +218,39 @@ test('the Movies shelf: the ring on screen down the grid and back to the order r
   // The shelf's title in sight again.
   const heading = await page.locator('.grid-heading').boundingBox();
   expect(heading!.y).toBeGreaterThanOrEqual((await ring(page)).barBottom - 1);
+});
+
+test('Back from a title in a rail of Home far down lands on the same card and the same place, with rails arriving late (GitHub #16)', async ({ page }) => {
+  // Rails built from the traits arrive a moment after Home is drawn, above
+  // the one Back is returning to: the page grows under the restore.
+  await page.addInitScript(() => {
+    localStorage.setItem('kinemaMockTraits', '1');
+    localStorage.setItem('kinemaMockTraitsMs', '700');
+  });
+  await open(page, 'windows');
+  await expect(page.locator('.rail[aria-label="4K"]')).toBeVisible();
+  // The full look: the light one makes the page short.
+  await page.evaluate(async () => {
+    const path = '/src/ui/lightLook.ts';
+    (await import(/* @vite-ignore */ path)).setLook('full');
+  });
+  for (let i = 0; i < 30 && !(await ring(page)).key?.startsWith('rail:Movies:'); i++) {
+    await press(page, 'ArrowDown');
+    await settled(page);
+  }
+  await press(page, 'ArrowRight');
+  await settled(page);
+  const before = await ring(page);
+  expect(before.scroll, 'the page is far down').toBeGreaterThan(300);
+  await press(page, 'Enter');
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await press(page, 'Escape');
+  await expect.poll(() => focusKey(page)).toBe(before.key);
+  // The late rails are in again: the place must hold after them, not only before.
+  await expect(page.locator('.rail[aria-label="4K"]')).toBeVisible();
+  await settled(page);
+  const after = await ring(page);
+  expect(after.key, 'the same card').toBe(before.key);
+  expect(Math.abs(after.scroll - before.scroll), `scroll ${before.scroll} -> ${after.scroll}`).toBeLessThan(40);
+  expectSeen(after, 'after Back');
 });

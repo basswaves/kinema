@@ -114,6 +114,14 @@ const landings = new Map<number, string | null>();
 let screenIds = 0;
 let inputs = 0;
 let pending: { key: string; scrollTop?: number } | null = null;
+/**
+ * A Back return that has landed, until the person does anything. The page it
+ * returned to may still be growing (rails built from late answers appear
+ * above the card), so the screen is not "fresh" any more — its landing claim
+ * must not take the ring back — and the scroll is put again where Back left
+ * it once the page is tall enough (GitHub #16).
+ */
+let returned: { key: string; scrollTop?: number; at: number } | null = null;
 let lastKeyMoveAt = -Infinity;
 
 const keyListeners = new Map<string, Set<() => void>>();
@@ -330,10 +338,21 @@ function settle(): void {
     }
   }
 
+  if (returned && returned.at !== inputs) returned = null;
+  if (returned && focused === returned.key && returned.scrollTop !== undefined) {
+    const page = entries.get(returned.key)?.node?.closest<HTMLElement>('.browse');
+    if (page) {
+      const reach = Math.min(returned.scrollTop, page.scrollHeight - page.clientHeight);
+      if (Math.abs(page.scrollTop - reach) > 1) page.scrollTop = reach;
+    }
+  }
+
   if (pending) {
     const { key, scrollTop } = pending;
     if (entries.has(key) && enter(tree, key, memory) === key) {
       pending = null;
+      returned = { key, scrollTop, at: inputs };
+      screen.arrivedAt = -1;
       const page = entries.get(key)?.node?.closest<HTMLElement>('.browse');
       if (page && scrollTop !== undefined) page.scrollTop = scrollTop;
       setFocused(key, 'return');
@@ -468,6 +487,7 @@ let pointerMoved = false;
 function countInput(): void {
   inputs++;
   if (pending) pending = null;
+  returned = null;
 }
 
 let installed = false;

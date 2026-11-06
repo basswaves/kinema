@@ -4665,3 +4665,37 @@ kbd {
   border-color: #f5f5f7;
   backdrop-filter: none;
 }
+
+/* ---- the pointer was the last input (GitHub #15) -----------------------------
+ *
+ * focusStore.ts sets data-input to `pointer` on a real pointer move or press and
+ * to `key` on the next key. While it is `pointer`, the control the keys are on
+ * is not drawn as such (no ring, no zoom) unless the pointer is over it: the
+ * ring on one card and the pointer's zoom on another read as two selections.
+ * Where the keys land is unchanged, so the next arrow goes on from there and
+ * brings the ring back. A click puts the ring on what was clicked, which is
+ * under the pointer, so it still shows there. */
+:root[data-input='pointer'] .focused:not(:hover),
+:root[data-input='pointer'] .focused:not(:hover) * {
+  outline: none !important;
+  box-shadow: none;
+}
+
+:root[data-input='pointer'] :is(.card, .continue-body, .see-all-card, .btn-primary, .btn-secondary, .leave-choice, .folder-item).focused:not(:hover) {
+  transform: none;
+}
+
+/* The light look has no zoom to say what the pointer is over: a thin outline,
+   dimmer than the ring and with no transform, on the pictures and the shelf's
+   last card. */
+:root[data-look='light'] .card:hover .card-art,
+:root[data-look='light'] .continue-body:hover .continue-art,
+:root[data-look='light'] .see-all-card:hover {
+  outline: 2px solid rgba(255, 255, 255, 0.55);
+  outline-offset: 2px;
+}
+:root[data-look='light'] .card.focused:hover .card-art,
+:root[data-look='light'] .continue-body.focused:hover .continue-art,
+:root[data-look='light'] .see-all-card.focused:hover {
+  outline: var(--focus-ring) solid #fff;
+}

@@ -490,11 +490,24 @@ function countInput(): void {
   returned = null;
 }
 
+/**
+ * Which input was last: the page's `data-input` says it, so the ring and the
+ * zoom of the control the keys are on can be hidden while the pointer is the
+ * one in use (ui.css; GitHub #15). Where the keys land is untouched — only the
+ * drawing changes — and the next key shows the ring again.
+ */
+function lastInput(kind: 'key' | 'pointer'): void {
+  const root = document.documentElement;
+  if (root.dataset.input !== kind) root.dataset.input = kind;
+}
+
 let installed = false;
 
 function install(): void {
   if (installed) return;
   installed = true;
+  window.addEventListener('keydown', () => lastInput('key'), { capture: true, passive: true });
+  window.addEventListener('pointerdown', () => lastInput('pointer'), { capture: true, passive: true });
   // Bubble phase on `window`: a control that keeps a key to itself (a card's
   // OK held, a text box's Left) stops it before it gets here.
   window.addEventListener('keydown', onKeyDown);
@@ -509,7 +522,10 @@ function install(): void {
     (e) => {
       pointerMoved = e.screenX !== lastPointer.x || e.screenY !== lastPointer.y;
       lastPointer = { x: e.screenX, y: e.screenY };
-      if (pointerMoved) countInput();
+      if (pointerMoved) {
+        countInput();
+        lastInput('pointer');
+      }
     },
     { capture: true, passive: true }
   );

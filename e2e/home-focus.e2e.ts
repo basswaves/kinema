@@ -254,3 +254,68 @@ test('Back from a title in a rail of Home far down lands on the same card and th
   expect(Math.abs(after.scroll - before.scroll), `scroll ${before.scroll} -> ${after.scroll}`).toBeLessThan(40);
   expectSeen(after, 'after Back');
 });
+
+/** Whether the ring is drawn on the focused control (or its picture): an outline with a width. */
+function ringDrawn(page: Page): Promise<boolean> {
+  return page.evaluate(() => {
+    const el = document.querySelector<HTMLElement>('.focused');
+    if (!el) return false;
+    return [el, ...Array.from(el.querySelectorAll<HTMLElement>('*'))].some((e) => {
+      const cs = getComputedStyle(e);
+      return cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0;
+    });
+  });
+}
+
+test('the ring is hidden while the pointer was last used, and the next key brings it back from where it was (GitHub #15)', async ({ page }) => {
+  await open(page, 'windows');
+  await page.evaluate(async () => {
+    const path = '/src/ui/lightLook.ts';
+    (await import(/* @vite-ignore */ path)).setLook('full');
+  });
+  await press(page, 'ArrowDown');
+  await settled(page);
+  expect(await ringDrawn(page), 'the ring shows after a key').toBe(true);
+  const keyed = await focusKey(page);
+
+  // The pointer over another card: no ring on the one the keys are on.
+  const card = page.locator('.rail .card').nth(3);
+  await card.scrollIntoViewIfNeeded();
+  const box = (await card.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 3);
+  await page.mouse.move(box.x + box.width / 2 + 3, box.y + box.height / 3);
+  await expect(page.locator(':root')).toHaveAttribute('data-input', 'pointer');
+  expect(await focusKey(page), 'the keys stay where they were').toBe(keyed);
+  const hidden = await page.evaluate(() => {
+    const el = document.querySelector<HTMLElement>('.focused');
+    return el && !el.matches(':hover') ? [el, ...Array.from(el.querySelectorAll<HTMLElement>('*'))].every((e) => getComputedStyle(e).outlineStyle === 'none') : null;
+  });
+  expect(hidden, 'no ring on a control the pointer is not over').toBe(true);
+
+  // The next key: the ring is back, one step from where it was.
+  await press(page, 'ArrowRight');
+  await settled(page);
+  await expect(page.locator(':root')).toHaveAttribute('data-input', 'key');
+  expect(await ringDrawn(page), 'the ring is back after a key').toBe(true);
+  expect(await focusKey(page)).not.toBe(keyed);
+});
+
+test('the light look marks what the pointer is over with an outline and no zoom (GitHub #15)', async ({ page }) => {
+  await open(page, 'windows');
+  await page.evaluate(async () => {
+    const path = '/src/ui/lightLook.ts';
+    (await import(/* @vite-ignore */ path)).setLook('light');
+  });
+  const card = page.locator('.rail .card').nth(2);
+  await card.scrollIntoViewIfNeeded();
+  const box = (await card.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 3);
+  await page.mouse.move(box.x + box.width / 2 + 3, box.y + box.height / 3);
+  const mark = await card.evaluate((el) => {
+    const art = getComputedStyle(el.querySelector('.card-art')!);
+    return { outline: art.outlineStyle, width: parseFloat(art.outlineWidth), transform: getComputedStyle(el).transform };
+  });
+  expect(mark.outline).toBe('solid');
+  expect(mark.width).toBeGreaterThan(0);
+  expect(mark.transform).toBe('none');
+});

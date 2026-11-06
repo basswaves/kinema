@@ -1943,6 +1943,19 @@ button.cast-member {
   letter-spacing: -0.01em;
 }
 
+/* The box stays under the top bar while the results scroll by (as Back does on
+   a title's page, T25). Solid enough to read results passing under it, wide to
+   the page's edges, with room above and below for the ring. */
+.search-bar {
+  position: sticky;
+  top: calc(3.25rem + var(--safe-top));
+  z-index: 10;
+  margin: -0.5rem calc(-1 * var(--gutter));
+  padding: 0.5rem var(--gutter);
+  background: rgba(10, 10, 12, 0.94);
+  backdrop-filter: blur(8px);
+}
+
 .search-input {
   width: 100%;
   max-width: 35rem;

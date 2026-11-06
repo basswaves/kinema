@@ -83,3 +83,43 @@ for (const tv of [true, false]) {
     expect(await walk(page, keys)).toEqual([]);
   });
 }
+
+test('the search box stays under the top bar while results scroll, and the ring is never under it', async ({ page }) => {
+  // A short window, so a few results already scroll.
+  await page.setViewportSize({ width: 960, height: 320 });
+  await open(page, 'windows');
+  await page.evaluate(async () => {
+    const path = '/src/ui/lightLook.ts';
+    (await import(/* @vite-ignore */ path)).setLook('full');
+  });
+  await press(page, 'ArrowUp', 2);
+  for (let i = 0; i < 6 && (await focused(page)) !== 'Search'; i++) await press(page, 'ArrowRight');
+  await press(page, 'Enter');
+  const box = page.locator('.search-bar');
+  await expect(box).toBeVisible();
+  // A letter every title has, so the grid is long.
+  await page.keyboard.type('e');
+  await press(page, 'ArrowDown', 12);
+  await settled(page);
+  const geometry = () =>
+    page.evaluate(() => {
+      const page = document.querySelector('.browse')!;
+      const bar = document.querySelector('.search-bar')!.getBoundingClientRect();
+      const nav = document.querySelector('.top-nav')!.getBoundingClientRect();
+      const card = document.querySelector('.focused .card-art, .focused')!.getBoundingClientRect();
+      return { scroll: page.scrollTop, barTop: bar.top, barBottom: bar.bottom, navBottom: nav.bottom, cardTop: card.top };
+    });
+  let g = await geometry();
+  expect(g.scroll, 'the page scrolled').toBeGreaterThan(20);
+  expect(g.barTop, 'the box is still on screen, under the top bar').toBeGreaterThanOrEqual(g.navBottom - 30);
+  expect(g.barBottom, 'and visible').toBeGreaterThan(g.navBottom - 1);
+  for (let i = 0; i < 8; i++) {
+    await press(page, 'ArrowUp');
+    await settled(page);
+    g = await geometry();
+    if ((await focused(page)) === '') break;
+    const key = await page.evaluate(() => document.querySelector('.focused')?.getAttribute('data-nav-key'));
+    if (key === 'search-input') break;
+    expect(g.cardTop, `the ring on ${key} is clear of the box`).toBeGreaterThanOrEqual(g.barBottom - 1);
+  }
+});

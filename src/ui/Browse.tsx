@@ -1274,13 +1274,17 @@ function SearchView({
   return (
     <FocusProvider value={focusKey}>
       <div className="search" ref={ref}>
-        <FocusInput
-          focusKey="search-input"
-          className="search-input"
-          value={query}
-          onChange={onQueryChange}
-          placeholder="Search your library…"
-        />
+        {/* Stays under the top bar while the results scroll by; `data-sticky-top`
+            so the one scroll rule keeps the ring on a result clear of it. */}
+        <div className="search-bar" data-sticky-top="">
+          <FocusInput
+            focusKey="search-input"
+            className="search-input"
+            value={query}
+            onChange={onQueryChange}
+            placeholder="Search your library…"
+          />
+        </div>
         {/* The TV layout gets letters a remote can reach; a desk has a keyboard. */}
         {tv && <OnScreenKeyboard value={query} onChange={onQueryChange} />}
         <p className="muted search-hint">Titles, actors, genres or a year.</p>

@@ -387,6 +387,33 @@ follows it.
 
 ---
 
+### The page's process can end and nothing says so
+
+The whole interface runs in one process of the web engine. On a computer short
+of memory the kernel kills it (seen on 3.7 GB with 4000×6000 posters), and it can
+crash. Nothing in the page can notice, being gone; Tauri does not hear of it.
+Kinema went on running with the last picture on its window, as if frozen, for
+as long as anyone waited. **Do:** listen to each engine (`page_life.rs`):
+WebKitGTK's `web-process-terminated`, WebView2's `ProcessFailed`, Android's
+`onRenderProcessGone`. The kernel's kill reads as `Crashed`, not as a memory
+reason, so words to the person cannot claim the cause.
+
+- A reload brings up a page that knows nothing, over an mpv that never stopped:
+  the film's sound goes on, and `window.__mpvInit` is gone. `init` on a live
+  instance is harmless in plugin 0.3.2 (it returns), but loading the mouse
+  script again would double every click: ask `mpv_started` first. The new page
+  reads what mpv has open and reopens it there (`pageRecovery.ts`).
+- WebView2's *browser* process ending cannot be reloaded from: only a new Kinema.
+- Android: not answering `onRenderProcessGone` has the system kill the whole
+  app, and answering means that WebView may never be used again. Tauri cannot
+  replace it, so Kinema starts anew (`PageGone.kt`). `RustWebViewClient` is
+  written out by wry's build and final: the one way in is wry's
+  `WRY_RUSTWEBVIEWCLIENT_CLASS_EXTENSION`, in `.cargo/config.toml` **at the
+  project root**. In `src-tauri/.cargo/` it was silently not applied: no error,
+  the method was just not in the generated file.
+- To test without root on the emulator: `Page.crash` over the debugging channel.
+  Killing the renderer by hand needs a rooted image, which a production one is not.
+
 ## SQLite
 
 ### WAL does nothing with only one connection
@@ -1471,6 +1498,16 @@ pick on each call they named different items, and Previous could not retrace.
 
 ---
 
+### A page decodes a picture at its full size, however small it is drawn
+
+`loading="lazy"` and `decoding="async"` change when, not how much. 33 posters on
+one screen are 800 MB at 2000×3000 and 3 GB at 4000×6000, in the web process,
+kept while the page lives. Fetching only rows near the screen cannot help the
+first screen. **Do:** a card gives `thumbRem` to `Art`, and gets a small copy
+(`thumbs.rs`, `thumb://`). The page cannot make the copy itself without decoding
+the very picture it should not decode. A new `thumb.localhost` needs the content
+security policy too, and nothing says when it is missing but the fallback.
+
 ## Testing and tools
 
 ### Playwright's WebKit on Windows is not Linux's WebKit
@@ -2126,6 +2163,19 @@ mode on Windows turns every `
 ` into `
 ` in the index), and check
 `git diff` afterwards shows only the other feature's lines.
+
+### Stopping a film does not give back mpv's memory
+
+After 4K, mpv holds about a gigabyte of picture buffers and decoders for as long
+as it runs: `stop` and `drop-buffers` change nothing. Only ending it does. On
+Linux that alone leaves most of it with the process, in the allocator's free
+lists (565 MB against 190): `malloc_trim(0)` after ending it is what returns it.
+**Do:** nothing by hand; `giveBackEngineSoon` in engine.ts ends it 30 s after the
+player closes and the next film starts it again. Anything set on mpv only once
+per run would be lost with it: options belong in `startMpv` or the file's opening.
+The timer must be set in the same moment the player unmounts, not after the
+asynchronous stop, or it lands after the next film's `startEngine` cleared it,
+and ends mpv under that film.
 
 ## Linux, and building it from Windows
 

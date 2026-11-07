@@ -52,6 +52,9 @@ tokio = { version = "1", features = ["time", "sync"] }
 # Already compiled in through Tauri and the libmpv plugin; named so their
 # warnings and errors can be sent to app.log (applog.rs, `Forward`).
 log = "0.4"
+# Small copies of posters for the grids (thumbs.rs). Pure Rust; these three
+# picture formats are all artwork ever is.
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
 # Network shares (netshare.rs), where the system does not open them for Kinema
 # — Android. Pure Rust, MIT, no C library; SMB 2 and 3 with signing and
 # encryption. The blocking flavour, as the scanner and the file reading

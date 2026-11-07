@@ -16,6 +16,7 @@ const NOT_CONTACTED: Record<string, string> = {
   localhost: 'the app’s own pages',
   'asset.localhost': 'the app’s own files',
   'ipc.localhost': 'the app talking to itself',
+  'thumb.localhost': 'the app’s own small copies of pictures',
   '127.0.0.1': 'the player streaming from Kinema on this device',
   '192.168.1.10': 'an example address in the own-server field, never contacted',
   'schema.tauri.app': 'the config file’s schema, read by editors',

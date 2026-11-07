@@ -622,6 +622,8 @@ pub async fn clear_artwork_cache(
                     removed += 1;
                 }
             }
+            // Made from those, and made again when next seen.
+            let _ = std::fs::remove_dir_all(dir.join(crate::thumbs::FOLDER));
         }
         Ok(removed)
     })

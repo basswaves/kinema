@@ -14,6 +14,7 @@
  */
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { useState, type ReactNode } from 'react';
+import { fileName, remPx, thumbSize } from './thumbSize';
 
 interface Props {
   /** Absolute path to the cached file, from the `*_path` field. */
@@ -36,6 +37,18 @@ interface Props {
   lazy?: boolean;
   /** Describes the image where it carries meaning, as a logo does. */
   alt?: string;
+  /**
+   * The picture's width on the page in rem, where it is one of many: a small
+   * copy of that size is shown (`thumbs.rs`), for what a page full of them
+   * costs. Left off where the picture is the point, as on a title's own page.
+   */
+  thumbRem?: number;
+}
+
+/** The small copy's address; null when no size fits. */
+function thumbSrc(local: string, rem: number): string | null {
+  const width = thumbSize(rem, remPx(), window.devicePixelRatio || 1);
+  return width ? `${convertFileSrc(fileName(local), 'thumb')}?w=${width}` : null;
 }
 
 export default function Art({
@@ -45,6 +58,7 @@ export default function Art({
   fallback = null,
   lazy,
   alt = '',
+  thumbRem,
 }: Props) {
   // The set of sources that have failed, keyed by URL. Keying by URL rather
   // than counting attempts means new props are retried automatically — the new
@@ -52,8 +66,10 @@ export default function Art({
   const [failed, setFailed] = useState<ReadonlySet<string>>(() => new Set());
 
   const localSrc = local ? convertFileSrc(local) : null;
+  const small = local && thumbRem ? thumbSrc(local, thumbRem) : null;
   // Local first, remote second: the cache is an accelerator, the URL the truth.
-  const sources = [localSrc, remote].filter((s): s is string => Boolean(s));
+  // The small copy before both; a picture that cannot make one shows as itself.
+  const sources = [small, localSrc, remote].filter((s): s is string => Boolean(s));
   const src = sources.find((candidate) => !failed.has(candidate)) ?? null;
 
   if (!src) return <>{fallback}</>;

@@ -125,6 +125,7 @@ export default memo(function Card({ title, onSelect, focusKey: key, note }: Prop
             local={title.poster_path}
             remote={sizedPoster(title.poster_url, 'w500')}
             lazy
+            thumbRem={9.5}
             fallback={<DrawnPoster title={title.title} year={title.year} />}
           />
           {state.badge && <span className="card-badge">{state.badge}</span>}

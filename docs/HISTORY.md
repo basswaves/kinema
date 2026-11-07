@@ -4176,6 +4176,36 @@ real pointer. Browsing costs the same: 9.5 s of processor against 9.6 s (0.15.0
 against this) for the same 14 s of scrolling and hovering on that weak box, three
 runs each. That counts processor time, not smoothness.
 
+## The page ending, mpv's memory, small posters (2026-11-07)
+
+Measured first, on a slow 3.7 GB Linux computer and on Windows. A tester's Windows
+laptop froze; **the cause of that is not known**, was not reproduced, and none of
+this claims to fix it. What the measuring did find:
+
+- **The page's process ending looked like a freeze.** It is now heard on all three
+  systems, the page starts again and says so. A film goes on: a computer's mpv is
+  outside that process, and the new page reopens the film where it was, paused if
+  it was paused. A short jump; attaching a new page to a running film would have
+  needed a second way through the whole player. Three endings in five minutes and
+  Kinema says so and closes, as reloading into a memory shortage only prolongs it.
+- **mpv ends 30 s after the player closes.** It cost about 430 ms on the next film
+  on Windows (674 against 243 ms, same file) and nothing that could be told from
+  run to run on the slow computer (661–689 against 605–804 ms). Not at once: leaving
+  a film for another costs nothing. The memory is worth it: on Windows after 4K, 729
+  in use / 1557 private / 1065 graphics MB became 511 / 345 / 95; on the slow
+  computer 964 MB became 390, which is what it holds before any film.
+- **Grids show small copies, made when a card nears the screen** (the `thumb://`
+  scheme, kept in `artwork/thumbs`), at one of six widths chosen from the card's
+  width on this screen. Not at a scan: sizes depend on the screen, and a scan was
+  not to get slower. Not by the page: that decodes the big picture. `image` (pure
+  Rust) is the one new crate; nothing new leaves the computer. On the slow computer,
+  416 films: peak 2577 MB and killed at 4000×6000 became 599; 927 with TMDB's became
+  565; scrolling to the end at 2000×3000 went from 14.4 to 2.0 s.
+- **Visited tabs are not kept, nor rows windowed.** Returning to Movies on the slow
+  computer is now 194–370 ms against 98 with the page kept, on Windows 135–216 ms,
+  and memory no longer asks for it. Keeping pages would touch the focus engine, the
+  nav map and what Back restores, for a tenth of a second on the slowest machine.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

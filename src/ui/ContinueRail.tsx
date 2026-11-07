@@ -161,6 +161,7 @@ function ContinueCardBody({
           local={item.image_path}
           remote={item.image_url}
           lazy
+          thumbRem={16.75}
           fallback={<DrawnPoster title={item.title} wide />}
         />
         <div className="continue-play">▶</div>

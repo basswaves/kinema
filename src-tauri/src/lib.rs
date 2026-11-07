@@ -46,6 +46,7 @@ mod overlay;
 mod page_life;
 mod people;
 mod posters;
+mod thumbs;
 mod pointer;
 mod omdb;
 mod opened;
@@ -295,6 +296,9 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_http::init())
+        .register_asynchronous_uri_scheme_protocol(thumbs::SCHEME, |context, request, responder| {
+            thumbs::serve(context.app_handle().clone(), request, responder)
+        })
         .setup(|app| {
             if let Err(message) = open_library(app.handle()) {
                 // Release builds set `windows_subsystem = "windows"`, so there

@@ -313,6 +313,8 @@ correctable by hand: the **Needs attention** view carries the reason for each re
 and a provider search, links are recorded with a `manual:` reason so they stay
 auditable, and a wrong match can be unlinked back into the queue.
 
+**Grids show small copies** (`thumbs.rs`, the `thumb://` scheme, `artwork/thumbs`), made when a card nears the screen; anything that fails falls back to the picture itself.
+
 **The artwork cache is an accelerator, never a source of truth.** Provider URLs stay
 in `titles` and `episodes`; the cache is a separate table keyed by URL. Every query
 returns both, and the UI falls back to the URL whenever the local file is missing —

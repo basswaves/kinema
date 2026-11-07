@@ -160,11 +160,7 @@ fn open_library(app: &tauri::AppHandle) -> Result<(), String> {
             Err(reason) => {
                 log!("backup: restore failed: {reason}");
                 app.dialog()
-                    .message(format!(
-                        "Your library was not changed.
-
-{reason}"
-                    ))
+                    .message(reason)
                     .title("The safety copy could not be put back")
                     .kind(MessageDialogKind::Warning)
                     .blocking_show();

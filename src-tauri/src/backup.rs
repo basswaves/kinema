@@ -11,6 +11,12 @@
 //! cannot replace it under itself. [`request_restore`] writes a note and Kinema
 //! closes; [`apply_pending_restore`] runs at the next start, before anything
 //! opens the library, and does the swap.
+//!
+//! [`swap_in`] changes nothing until it can change everything: the copy is made
+//! under a temporary name first, and the old file's logs are moved aside and
+//! not deleted, so that a refusal half way can be undone. Something holding a
+//! log open (a backup tool, an antivirus) refuses at that point on Windows, and
+//! the library is left as it was.
 
 use crate::db::{self, BACKUP_DIR, SCHEMA_VERSION};
 use rusqlite::{Connection, OpenFlags};
@@ -24,7 +30,17 @@ const MARKER: &str = "restore-pending.txt";
 /// restore is never a one-way door.
 const BEFORE_RESTORE_PREFIX: &str = "library-before-restore-";
 
-#[derive(Serialize, Debug, PartialEq)]
+/// The copy being put back, until it takes the library's name.
+const INCOMING: &str = "library.db.restoring";
+
+/// The library's write-ahead log and shared-memory file, and where each waits
+/// during a swap. Left beside the restored file they would be replayed onto it.
+const LOGS: [(&str, &str); 2] = [
+    ("library.db-wal", "library.db-wal.restoring"),
+    ("library.db-shm", "library.db-shm.restoring"),
+];
+
+#[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct BackupCopy {
     /// The file name, which is also what [`request_restore`] takes.
     pub name: String,
@@ -98,41 +114,163 @@ pub struct Restored {
 /// opened.
 ///
 /// The note is removed first: a restore that fails once must not fail again at
-/// every start. The library that was there is copied into the folder of copies
-/// before anything is replaced, and the copy being restored is checked first,
-/// so a bad file changes nothing.
+/// every start.
+///
+/// An error is the whole message for the person, and says what became of the
+/// library.
 pub fn apply_pending_restore(data_dir: &Path) -> Result<Option<Restored>, String> {
+    finish_interrupted_swap(data_dir);
+
     let marker = data_dir.join(MARKER);
     let Ok(name) = std::fs::read_to_string(&marker) else {
         return Ok(None);
     };
     let _ = std::fs::remove_file(&marker);
+    put_back(data_dir, name.trim()).map(Some)
+}
 
-    let name = name.trim();
-    let (_, made_at) = read_name(name).ok_or_else(|| format!("{name} is not a safety copy."))?;
+/// Put one copy back, now. The library is not open.
+///
+/// The library that was there is copied into the folder of copies before
+/// anything is replaced, and the copy being restored is checked first, so a bad
+/// file changes nothing.
+pub fn put_back(data_dir: &Path, name: &str) -> Result<Restored, String> {
+    let not_changed = |reason: String| format!("Your library was not changed.\n\n{reason}");
+
+    let (_, made_at) =
+        read_name(name).ok_or_else(|| not_changed(format!("{name} is not a safety copy.")))?;
     let backups = data_dir.join(BACKUP_DIR);
     let source = backups.join(name);
     if !source.is_file() {
-        return Err(format!("The safety copy {name} is no longer there."));
+        return Err(not_changed(format!("The safety copy {name} is no longer there.")));
     }
-    check_copy(&source)?;
+    check_copy(&source).map_err(not_changed)?;
 
     let library = data_dir.join("library.db");
+    let aside = backups.join(format!("{BEFORE_RESTORE_PREFIX}{}.db", crate::util::now_secs()));
     if library.exists() {
-        let aside = backups.join(format!("{BEFORE_RESTORE_PREFIX}{}.db", crate::util::now_secs()));
-        set_aside(&library, &aside)?;
+        set_aside(&library, &aside).map_err(not_changed)?;
+    }
+    match swap_in(data_dir, &source) {
+        Ok(()) => Ok(Restored { made_at }),
+        Err(SwapFailed::Undone(reason)) => {
+            // Nothing was replaced, so nothing needs keeping.
+            let _ = std::fs::remove_file(&aside);
+            Err(not_changed(reason))
+        }
+        Err(SwapFailed::LogsLeftAside(reason)) => Err(format!(
+            "The safety copy could not be put back, and Kinema could not put everything \
+             back as it was. The library's latest changes may be missing from it now. A \
+             complete copy of it is kept with the safety copies, under Settings, Advanced.\n\n\
+             {reason}"
+        )),
+    }
+}
+
+/// How a swap failed, for saying so truthfully.
+#[derive(Debug)]
+enum SwapFailed {
+    /// Everything is where it was.
+    Undone(String),
+    /// A log could not be moved back: the library is there, without it.
+    LogsLeftAside(String),
+}
+
+/// Replace `library.db` with `source`, or leave things as they were.
+fn swap_in(data_dir: &Path, source: &Path) -> Result<(), SwapFailed> {
+    let incoming = data_dir.join(INCOMING);
+    let fail = |reason: String| {
+        let _ = std::fs::remove_file(&incoming);
+        SwapFailed::Undone(reason)
+    };
+    std::fs::copy(source, &incoming)
+        .map_err(|e| fail(format!("The safety copy could not be copied: {e}")))?;
+    // On disk before the old library is given up for it.
+    std::fs::OpenOptions::new()
+        .write(true)
+        .open(&incoming)
+        .and_then(|file| file.sync_all())
+        .map_err(|e| fail(format!("The safety copy could not be copied: {e}")))?;
+
+    let mut moved = Vec::new();
+    for (log, waiting) in LOGS {
+        let path = data_dir.join(log);
+        if !path.exists() {
+            continue;
+        }
+        if let Err(e) = std::fs::rename(&path, data_dir.join(waiting)) {
+            let reason =
+                format!("Another program is using {log}. Close it and try again.\n({e})");
+            return Err(undo_logs(data_dir, &moved, &incoming, reason));
+        }
+        moved.push((log, waiting));
+    }
+    if let Err(e) = std::fs::rename(&incoming, data_dir.join("library.db")) {
+        let reason =
+            format!("Another program is using library.db. Close it and try again.\n({e})");
+        return Err(undo_logs(data_dir, &moved, &incoming, reason));
     }
 
-    // The old file's write-ahead log and shared-memory file go with it. Left
-    // beside the restored one they would be replayed onto it.
-    for file in ["library.db", "library.db-wal", "library.db-shm"] {
-        let path = data_dir.join(file);
-        if path.exists() {
-            std::fs::remove_file(&path).map_err(|e| format!("Could not remove {file}: {e}"))?;
+    // The swap is done. A log that will not go away now is harmless where it
+    // is, under a name nothing reads, and goes at the next start.
+    for (_, waiting) in moved {
+        let _ = std::fs::remove_file(data_dir.join(waiting));
+    }
+    Ok(())
+}
+
+fn undo_logs(
+    data_dir: &Path,
+    moved: &[(&str, &str)],
+    incoming: &Path,
+    reason: String,
+) -> SwapFailed {
+    let _ = std::fs::remove_file(incoming);
+    for (log, waiting) in moved {
+        if let Err(e) = std::fs::rename(data_dir.join(waiting), data_dir.join(log)) {
+            crate::log!("backup: could not put {log} back: {e}");
+            return SwapFailed::LogsLeftAside(format!("{reason}\n({log}: {e})"));
         }
     }
-    std::fs::copy(&source, &library).map_err(|e| format!("Could not put {name} back: {e}"))?;
-    Ok(Some(Restored { made_at }))
+    SwapFailed::Undone(reason)
+}
+
+/// A swap cut short by a power cut. With the incoming copy still under its
+/// temporary name the library was never replaced, and its logs go back; without
+/// it the swap had finished, and they are left-overs.
+fn finish_interrupted_swap(data_dir: &Path) {
+    let incoming = data_dir.join(INCOMING);
+    let unfinished = incoming.exists();
+    for (log, waiting) in LOGS {
+        let waiting = data_dir.join(waiting);
+        if !waiting.exists() {
+            continue;
+        }
+        let tidied = if unfinished {
+            std::fs::rename(&waiting, data_dir.join(log))
+        } else {
+            std::fs::remove_file(&waiting)
+        };
+        if let Err(e) = tidied {
+            crate::log!("backup: could not tidy {}: {e}", waiting.display());
+        }
+    }
+    if unfinished {
+        let _ = std::fs::remove_file(&incoming);
+    }
+}
+
+/// The newest copy that is whole and that this Kinema can read, for offering
+/// when the library itself will not open.
+pub fn newest_good_copy(data_dir: &Path) -> Option<BackupCopy> {
+    let backups = data_dir.join(BACKUP_DIR);
+    list(data_dir).into_iter().find(|copy| check_copy(&backups.join(&copy.name)).is_ok())
+}
+
+/// A copy's date, for saying which one is meant.
+pub fn date_of(copy: &BackupCopy) -> String {
+    let (year, month, day) = crate::report::civil((copy.made_at / 86_400) as i64);
+    format!("{year}-{month:02}-{day:02}")
 }
 
 /// Refuse a copy that is damaged or too new for this Kinema, before it
@@ -271,6 +409,155 @@ mod tests {
         let kept: Vec<_> = list(&dir).into_iter().filter(|c| c.kind == "before_restore").collect();
         assert_eq!(kept.len(), 1, "what was replaced is kept");
         assert_eq!(position_in(&dir.join(BACKUP_DIR).join(&kept[0].name)), 900.0);
+    }
+
+    /// A file held open with no sharing, as a backup tool or antivirus holds
+    /// one: Windows refuses to move or delete it.
+    #[cfg(windows)]
+    fn hold(path: &Path) -> std::fs::File {
+        use std::os::windows::fs::OpenOptionsExt;
+        std::fs::OpenOptions::new().read(true).write(true).share_mode(0).open(path).unwrap()
+    }
+
+    /// Review 2026-11, finding 3: the library used to be deleted first, and the
+    /// refusal on its log then reported "not changed" over an empty folder.
+    #[cfg(windows)]
+    #[test]
+    fn a_log_held_by_another_program_changes_nothing_and_says_so() {
+        for log in ["library.db-wal", "library.db-shm"] {
+            let dir = folder(&format!("held-{log}"));
+            library_at(&dir.join("library.db"), 900.0);
+            library_at(&dir.join(BACKUP_DIR).join("library-auto-v18-500.db"), 10.0);
+            std::fs::write(dir.join("library.db-wal"), b"").unwrap();
+            std::fs::write(dir.join("library.db-shm"), b"").unwrap();
+            let held = hold(&dir.join(log));
+
+            request_restore(&dir, "library-auto-v18-500.db").unwrap();
+            let refused = apply_pending_restore(&dir).unwrap_err();
+            drop(held);
+
+            assert!(refused.starts_with("Your library was not changed."), "{refused}");
+            assert!(refused.contains(log), "{refused}");
+            assert_eq!(position_in(&dir.join("library.db")), 900.0);
+            for (log, waiting) in LOGS {
+                assert!(dir.join(log).exists(), "{log} is back where it was");
+                assert!(!dir.join(waiting).exists());
+            }
+            assert!(!dir.join(INCOMING).exists());
+            assert!(
+                list(&dir).iter().all(|copy| copy.kind != "before_restore"),
+                "nothing was replaced, so nothing is kept for it"
+            );
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_library_held_by_another_program_changes_nothing_and_says_so() {
+        let dir = folder("held-library");
+        library_at(&dir.join("library.db"), 900.0);
+        library_at(&dir.join(BACKUP_DIR).join("library-auto-v18-500.db"), 10.0);
+        std::fs::write(dir.join("library.db-wal"), b"").unwrap();
+        // Shared for reading only: the copy aside can still read it, and a
+        // rename over it is refused.
+        use std::os::windows::fs::OpenOptionsExt;
+        let held =
+            std::fs::OpenOptions::new().read(true).share_mode(1).open(dir.join("library.db")).unwrap();
+
+        request_restore(&dir, "library-auto-v18-500.db").unwrap();
+        let refused = apply_pending_restore(&dir).unwrap_err();
+        drop(held);
+
+        assert!(refused.starts_with("Your library was not changed."), "{refused}");
+        assert_eq!(position_in(&dir.join("library.db")), 900.0);
+        assert!(dir.join("library.db-wal").exists());
+    }
+
+    /// The copy cannot be made at all (a full disk): same thing.
+    #[test]
+    fn a_copy_that_cannot_be_made_changes_nothing() {
+        let dir = folder("full");
+        library_at(&dir.join("library.db"), 900.0);
+        library_at(&dir.join(BACKUP_DIR).join("library-auto-v18-500.db"), 10.0);
+        std::fs::write(dir.join("library.db-wal"), b"").unwrap();
+        // A folder under the temporary name stands in for the failure.
+        std::fs::create_dir(dir.join(INCOMING)).unwrap();
+
+        request_restore(&dir, "library-auto-v18-500.db").unwrap();
+        let refused = apply_pending_restore(&dir).unwrap_err();
+
+        assert!(refused.starts_with("Your library was not changed."), "{refused}");
+        assert_eq!(position_in(&dir.join("library.db")), 900.0);
+        assert!(dir.join("library.db-wal").exists());
+    }
+
+    /// A power cut between the renames: the next start puts things back.
+    #[test]
+    fn a_swap_cut_short_is_undone_at_the_next_start() {
+        let dir = folder("cut-short");
+        library_at(&dir.join("library.db"), 900.0);
+        std::fs::write(dir.join(INCOMING), b"half a copy").unwrap();
+        std::fs::write(dir.join("library.db-wal.restoring"), b"the log").unwrap();
+
+        assert_eq!(apply_pending_restore(&dir), Ok(None));
+
+        assert_eq!(std::fs::read(dir.join("library.db-wal")).unwrap(), b"the log");
+        assert!(!dir.join("library.db-wal.restoring").exists());
+        assert!(!dir.join(INCOMING).exists());
+    }
+
+    /// A power cut just after the last rename: only left-overs to clear, and
+    /// they must not be replayed onto the restored file.
+    #[test]
+    fn a_swap_that_had_finished_only_tidies_up() {
+        let dir = folder("cut-after");
+        library_at(&dir.join("library.db"), 10.0);
+        std::fs::write(dir.join("library.db-wal.restoring"), b"the old log").unwrap();
+
+        assert_eq!(apply_pending_restore(&dir), Ok(None));
+
+        assert!(!dir.join("library.db-wal").exists());
+        assert!(!dir.join("library.db-wal.restoring").exists());
+    }
+
+    /// The copy offered at start-up: the newest whole one this Kinema can read.
+    #[test]
+    fn the_newest_good_copy_skips_damaged_and_too_new_ones() {
+        let dir = folder("newest");
+        let backups = dir.join(BACKUP_DIR);
+        assert_eq!(newest_good_copy(&dir), None);
+        library_at(&backups.join("library-auto-v18-100.db"), 1.0);
+        library_at(&backups.join("library-v17-200.db"), 2.0);
+        std::fs::write(backups.join("library-auto-v18-300.db"), vec![7u8; 5000]).unwrap();
+        library_at(&backups.join("library-auto-v99-400.db"), 4.0);
+        Connection::open(backups.join("library-auto-v99-400.db"))
+            .unwrap()
+            .execute_batch(&format!("PRAGMA user_version={};", SCHEMA_VERSION + 1))
+            .unwrap();
+
+        let found = newest_good_copy(&dir).unwrap();
+        assert_eq!(found.name, "library-v17-200.db");
+        assert_eq!(date_of(&BackupCopy { made_at: 1_790_198_863, ..found }), "2026-09-23");
+    }
+
+    /// The way back a dialog offers: a damaged library with a crash's log beside
+    /// it comes back as the copy, undamaged, with the damaged file kept.
+    #[test]
+    fn putting_back_over_a_damaged_library_and_a_crash_s_log_is_clean() {
+        let dir = folder("damaged-library");
+        std::fs::write(dir.join("library.db"), vec![9u8; 8192]).unwrap();
+        std::fs::write(dir.join("library.db-wal"), vec![3u8; 4096]).unwrap();
+        library_at(&dir.join(BACKUP_DIR).join("library-auto-v18-500.db"), 10.0);
+
+        assert_eq!(put_back(&dir, "library-auto-v18-500.db"), Ok(Restored { made_at: 500 }));
+
+        assert!(!dir.join("library.db-wal").exists());
+        let conn = crate::db::open(&dir.join("library.db")).unwrap();
+        let verdict: String = conn.query_row("PRAGMA quick_check", [], |r| r.get(0)).unwrap();
+        assert_eq!(verdict, "ok");
+        drop(conn);
+        assert_eq!(position_in(&dir.join("library.db")), 10.0);
+        assert!(list(&dir).iter().any(|copy| copy.kind == "before_restore"), "what was there is kept");
     }
 
     #[test]

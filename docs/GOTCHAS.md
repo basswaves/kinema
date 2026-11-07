@@ -436,8 +436,11 @@ silently missing what the log held. A crash leaves the log behind; a clean
 close usually removes it, which is why "replace the file by hand" works nearly
 every time and is worse for it.
 
-`backup::apply_pending_restore` removes all three, and does it before anything
-opens the library. Copying the database out of a *running* app has the reverse
+`backup::swap_in` moves the logs aside and renames the copy in, before anything
+opens the library. Moves and not deletes, in that order: on Windows a program
+holding a log open refuses a delete just as it refuses a rename, and deleting
+the library first and meeting that refusal second left no library and a message
+saying "not changed" (2026-11). Copying the database out of a *running* app has the reverse
 trap, and it is why every copy here is `VACUUM INTO` and never a file copy (see
 `backup_before_upgrade`).
 

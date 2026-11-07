@@ -4206,6 +4206,41 @@ this claims to fix it. What the measuring did find:
   and memory no longer asks for it. Keeping pages would touch the focus engine, the
   nav map and what Back restores, for a tenth of a second on the slowest machine.
 
+## Names and ties (2026-11-07)
+
+A review of scanning and matching found files named after the wrong thing and
+one confident wrong match that was by design. The 0.75 threshold and 0.05 margin
+stay; every change below either refuses more, or asks a better question.
+
+- **A folder's year is not a better name.** It gave a folder +2 over a file with
+  none, so `Back to the Future (1985)/Back to the Future Part II.mkv` was the
+  first film, at full confidence. A film's folder now names a file only when the
+  file has no title of its own (a ripper's `title_t00`, a release group joined to
+  the name) or fits it, and lends its year only then.
+- **Every alphabet.** Comparing kept a-z and 0-9, so `七人の侍` was empty and could
+  never match itself. Marks stay, since Hindi and Thai vowels are marks. A number
+  beside a year is a title, a folder above seasons may be only digits, and the
+  library folder never names a file.
+- **Season folders, one list.** `Staffel 1` was a show called Staffel. Parser and
+  Rust keep one rule, tested against one list of names.
+- **Different numbers at the end are different films**, as a refusal: with the
+  right film missing from the answers, `Toy Story 2` took `Toy Story 3` at 0.91.
+- **Ties (owner's choice).** Popularity stood in for the margin when two real
+  films shared a name and the file gave no year: `Dune.mkv` was the film of 2021
+  whichever it held. Being better known says nothing about which film a file
+  holds. Popularity now decides only against a stub (fewer than 50 votes, known);
+  with no year in the file so do votes. With a year in the file votes still settle
+  a tie, since the year has already narrowed it (1828 against 95). A dry run on a
+  real library with TMDB's real answers: 2 of 405 titles changed; the show that
+  went to Needs attention had been matched to the wrong one of its two entries by
+  this very rule, and put right by hand. The same rule covers shows, so `Doctor
+  Who` and `The Office` in folders with no year now ask.
+- **Folders such as `Shorts` and `Other`** are skipped only in a film's or show's
+  own folder; elsewhere they hid every film in them without a word.
+
+Files already matched keep their match: only refusals are asked again (GOTCHAS,
+"A rule change does not reach a file that is already matched").
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

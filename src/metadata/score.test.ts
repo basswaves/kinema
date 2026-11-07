@@ -140,8 +140,8 @@ describe('pickBest', () => {
   it('breaks a tie when one entry is overwhelmingly the one people mean', () => {
     const { matched, best } = pickBest(
       [
-        candidate({ title: 'The Office', popularity: 300 }),
-        candidate({ title: 'The Office', popularity: 4 }),
+        candidate({ title: 'The Office', popularity: 300, voteCount: 3000 }),
+        candidate({ title: 'The Office', popularity: 4, voteCount: 3 }),
       ],
       { parsedTitle: 'The Office', parsedYear: null }
     );
@@ -270,7 +270,7 @@ describe('pickBest', () => {
       ],
       { parsedTitle: 'The Father', parsedYear: 2020 }
     );
-    expect(matched).toBe(true); // popularity 20 vs 3 still decides, as before
+    expect(matched).toBe(false); // popularity decides only against a stub (owner, 2026-11-07)
     const coin = pickBest(
       [
         candidate({ title: 'The Father', year: 2020, popularity: 20, voteCount: 2500 }),
@@ -471,5 +471,99 @@ describe('numbers at the end of a title', () => {
     );
     expect(matched).toBe(true);
     expect(best?.title).toBe('Toy Story 2');
+  });
+});
+
+/**
+ * The owner's choice (review 2026-11, finding 18): `Dune.mkv` with the film of
+ * 1984 and the film of 2021 in the answers went to the more popular one.
+ */
+describe('two real films of one name', () => {
+  const dune = [
+    candidate({ title: 'Dune', year: 1984, popularity: 20, voteCount: 2000 }),
+    candidate({ title: 'Dune', year: 2021, popularity: 300, voteCount: 11000 }),
+  ];
+
+  it('with no year in the file, go to Needs attention', () => {
+    const { matched, best } = pickBest(dune, { parsedTitle: 'Dune', parsedYear: null });
+    expect(matched).toBe(false);
+    expect(best?.reason).toContain('ambiguous');
+  });
+
+  it('with no year, even ten times the votes do not settle it', () => {
+    const { matched } = pickBest(
+      [
+        candidate({ title: 'Solaris', year: 1972, popularity: 10, voteCount: 1500 }),
+        candidate({ title: 'Solaris', year: 2002, popularity: 40, voteCount: 15000 }),
+      ],
+      { parsedTitle: 'Solaris', parsedYear: null }
+    );
+    expect(matched).toBe(false);
+  });
+
+  it('with a year in the file, the year decides', () => {
+    const { matched, best } = pickBest(dune, { parsedTitle: 'Dune', parsedYear: 1984 });
+    expect(matched).toBe(true);
+    expect(best?.year).toBe(1984);
+  });
+
+  it('popularity alone never decides between two with real votes', () => {
+    const { matched } = pickBest(
+      [
+        candidate({ title: 'The Father', year: 2020, popularity: 20, voteCount: 2500 }),
+        candidate({ title: 'The Father', year: 2020, popularity: 3, voteCount: 400 }),
+      ],
+      { parsedTitle: 'The Father', parsedYear: 2020 }
+    );
+    expect(matched).toBe(false);
+  });
+
+  it('with no year, a stub beside the film does not get in the way', () => {
+    for (const stub of [0, 2, 49]) {
+      const { matched, best } = pickBest(
+        [
+          candidate({ title: 'Heat', year: 1995, popularity: 40, voteCount: 8000 }),
+          candidate({ title: 'Heat', year: 1972, popularity: 1, voteCount: stub }),
+        ],
+        { parsedTitle: 'Heat', parsedYear: null }
+      );
+      expect(matched).toBe(true);
+      expect(best?.year).toBe(1995);
+    }
+  });
+
+  it('with no year, one real film and one stub and a second real film is refused', () => {
+    const { matched } = pickBest(
+      [
+        candidate({ title: 'Heat', year: 1995, popularity: 40, voteCount: 8000 }),
+        candidate({ title: 'Heat', year: 1972, popularity: 1, voteCount: 2 }),
+        candidate({ title: 'Heat', year: 1986, popularity: 5, voteCount: 300 }),
+      ],
+      { parsedTitle: 'Heat', parsedYear: null }
+    );
+    expect(matched).toBe(false);
+  });
+
+  it('a film called just that is not sharing its name with one with an article', () => {
+    const { matched, best } = pickBest(
+      [
+        candidate({ title: 'Heat', year: 1995, popularity: 60, voteCount: 8868 }),
+        candidate({ title: 'The Heat', year: 2013, popularity: 15, voteCount: 4313 }),
+      ],
+      { parsedTitle: 'Heat', parsedYear: null }
+    );
+    expect(matched).toBe(true);
+    expect(best?.year).toBe(1995);
+  });
+
+  it('votes we were not told are no sign of a stub', () => {
+    const { matched } = pickBest(
+      [
+        candidate({ title: 'The Office', popularity: 300 }),
+        candidate({ title: 'The Office', popularity: 4 }),
+      ],
+      { parsedTitle: 'The Office', parsedYear: null }
+    );
+    expect(matched).toBe(false);
   });
 });

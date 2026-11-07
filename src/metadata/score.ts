@@ -341,12 +341,21 @@ export function scoreCandidate(candidate: Candidate, ctx: ScoreContext): ScoredC
  * Votes that settle a tie: the best has at least ten times the other's and at
  * least this many. TMDB keeps stubs beside the real film under the same name
  * and year — 1828 votes against 95, 613 against 2 — where popularity, this
- * week's traffic, can be as close as 5 against 2. Two real films have votes of
- * the same order, and stay a coin-flip.
+ * week's traffic, can be as close as 5 against 2.
  */
 const VOTES_DECISIVE = 50;
 const VOTES_RATIO = 10;
 const POPULARITY_RATIO = 3;
+
+/**
+ * Fewer votes than this is a stub: an entry almost nobody has seen, under the
+ * same name as a film (2, 0, 49). Not knowing the votes is no sign of one.
+ */
+const STUB_VOTES = 50;
+
+function isStub(c: Candidate): boolean {
+  return c.voteCount !== null && c.voteCount !== undefined && c.voteCount < STUB_VOTES;
+}
 
 /** What the exact year is worth over one a year off (0.12 against 0.04). */
 const YEAR_BAND = 0.08 + 0.001;
@@ -412,13 +421,23 @@ export function pickBest(
   if (close.length > 0) {
     // Databases routinely hold several entries with the same name — the real
     // film plus stubs, documentaries or regional duplicates. That is not
-    // genuine ambiguity if one is overwhelmingly the entry people mean, so
-    // popularity or votes break the tie, as long as neither points the other
-    // way. Only a genuine coin-flip is refused.
+    // genuine ambiguity when the others are stubs, so popularity or votes break
+    // the tie, as long as neither points the other way.
+    //
+    // Two real films are genuine ambiguity, and being better known does not say
+    // which one a file holds: `Dune.mkv` may well be the film of 1984 (owner,
+    // 2026-11-07). Popularity decides only against stubs. Votes also settle a
+    // tie the file's own year has already narrowed to one name and year (1828
+    // against 95); with no year in the file they decide only against stubs too.
     const runnerUp = close[0];
     const contradicted = close.some((c) => morePopular(c, best) || moreVoted(c, best));
-    const popular = close.every((c) => morePopular(best, c));
-    const voted = close.every((c) => moreVoted(best, c));
+    // Of one name, to the letter: "The Heat" is not a second "Heat".
+    const stubs = close
+      .filter((c) => literalTitle(c.title) === literalTitle(best.title))
+      .every(isStub);
+    const popular = stubs && close.every((c) => morePopular(best, c));
+    const voted =
+      (stubs || Boolean(ctx.parsedYear)) && close.every((c) => moreVoted(best, c));
 
     if (!contradicted && (popular || voted)) {
       return {

@@ -601,7 +601,9 @@ reasoning is in [docs/DESIGN.md](docs/DESIGN.md) and [docs/HISTORY.md](docs/HIST
   which is only defensible because the **Needs attention** queue makes refusals
   correctable, so that queue is load-bearing. A second source (Wikidata, for
   movies) is a fallback for when TMDB cannot be asked, never a way to accept
-  what TMDB alone would not.
+  what TMDB alone would not. Popularity breaks a tie only against a stub (fewer
+  than 50 votes); two real entries of one name with no year in the file go to
+  Needs attention.
 - **Nothing that breaks by itself if left alone.** This has to run untended
   for years: a copy that works today must go on working without anyone
   touching it. A scraper, a stream resolver or anything that depends on a

@@ -26,9 +26,11 @@ const VIDEO_EXTENSIONS: &[&str] = &[
     "iso", "divx", "ogm", "rmvb", "3gp", "mts",
 ];
 
-/// Directories that never contain primary media. Skipping them saves a lot of
-/// stat calls on a big library and avoids indexing disc-structure noise.
-const SKIP_DIRS: &[&str] = &[
+/// What a film's or show's own folder calls the things that go with it. Only
+/// there: directly under a library folder, or in a folder that holds no title,
+/// `Shorts` or `Other` is a person's own way of sorting, and skipping it hid
+/// every film in it without a word (`is_skipped_dir`).
+const SKIP_DIRS_IN_TITLE: &[&str] = &[
     "extras",
     "featurettes",
     "behind the scenes",
@@ -40,6 +42,12 @@ const SKIP_DIRS: &[&str] = &[
     "other",
     "sample",
     "samples",
+];
+
+/// Directories that never contain primary media, wherever they are. Skipping
+/// them saves a lot of stat calls on a big library and avoids indexing
+/// disc-structure noise.
+const SKIP_DIRS: &[&str] = &[
     "bdmv",
     "certificate",
     "video_ts",
@@ -105,6 +113,40 @@ pub(crate) fn is_video(path: &Path) -> bool {
 fn is_skipped_dir(name: &str) -> bool {
     let lower = name.to_lowercase();
     SKIP_DIRS.contains(&lower.as_str()) || lower.starts_with('.')
+}
+
+/// A name that is skipped only inside a film's or show's own folder.
+fn is_extras_name(name: &str) -> bool {
+    SKIP_DIRS_IN_TITLE.contains(&name.to_lowercase().as_str())
+}
+
+/// Whether a folder is a film's or a show's own, from its name and what it
+/// holds: a season folder, a video, a disc, or season folders. Anything else
+/// (`Action`) is only a way of sorting, and a folder in it may hold films.
+/// Getting this wrong shows some extras in Needs attention, which can be seen
+/// and ignored; the other way round, films vanish with nothing to say so.
+fn is_title_folder<'a>(name: &str, mut entries: impl Iterator<Item = (&'a str, bool)>) -> bool {
+    crate::util::is_season_folder(name)
+        || entries.any(|(entry, is_dir)| {
+            if is_dir {
+                crate::util::is_season_folder(entry) || crate::disc::is_bdmv_name(entry)
+            } else {
+                is_video(Path::new(entry))
+            }
+        })
+}
+
+/// [`is_title_folder`] for a folder on a local disk. Listed only when one of
+/// its folders has an extras name, which is rare. One that cannot be listed is
+/// not called a title's, so nothing is hidden on a doubt.
+fn is_local_title_folder(dir: &Path) -> bool {
+    let Ok(entries) = crate::files::read_dir(dir) else { return false };
+    let names: Vec<(String, bool)> = entries
+        .into_iter()
+        .filter_map(|(p, is_dir)| Some((p.file_name()?.to_string_lossy().into_owned(), is_dir)))
+        .collect();
+    let name = dir.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    is_title_folder(&name, names.iter().map(|(n, is_dir)| (n.as_str(), *is_dir)))
 }
 
 /// Scan every configured root, updating `media_files` in place.
@@ -245,7 +287,10 @@ fn walk_local(
                     .file_name()
                     .to_str()
                     .map(|name| {
-                        is_skipped_dir(name) && !(discs_play && crate::disc::is_bdmv_name(name))
+                        (is_skipped_dir(name) && !(discs_play && crate::disc::is_bdmv_name(name)))
+                            || (e.depth() > 1
+                                && is_extras_name(name)
+                                && e.path().parent().is_some_and(is_local_title_folder))
                     })
                     .unwrap_or(false);
             }
@@ -361,10 +406,16 @@ fn walk_share(
                 continue;
             }
         };
+        // Never directly under the library folder, as on a local disk.
+        let in_title = dir != root.trim_end_matches('/')
+            && is_title_folder(
+                dir.rsplit('/').next().unwrap_or(""),
+                entries.iter().map(|e| (e.name.as_str(), e.is_dir)),
+            );
         for entry in entries {
             let path = format!("{dir}/{}", entry.name);
             if entry.is_dir {
-                if !is_skipped_dir(&entry.name) {
+                if !is_skipped_dir(&entry.name) && !(in_title && is_extras_name(&entry.name)) {
                     folders.push(path);
                 }
                 continue;
@@ -551,6 +602,72 @@ fn mark_missing(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// What a walk of a real folder finds, by path below the folder.
+    fn walked(root: &Path) -> Vec<String> {
+        let mut seen = Vec::new();
+        walk_local(root, &mut |file| {
+            let file = file.expect("a readable file");
+            let path = Path::new(&file.path).strip_prefix(root).unwrap().to_owned();
+            seen.push(path.to_string_lossy().replace('\\', "/"));
+            Ok(())
+        })
+        .unwrap();
+        seen.sort();
+        seen
+    }
+
+    /// Names such as `Shorts` hid every film in the folder, without a word
+    /// (review 2026-11, finding 7).
+    #[test]
+    fn extras_names_are_skipped_only_in_a_title_folder() {
+        let root = std::env::temp_dir().join(format!("kinema-extras-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        for file in [
+            "Shorts/A Short Film.mkv",
+            "Other/Second.mkv",
+            "EXTRAS/Third.mkv",
+            "Trailers/Fourth.mkv",
+            "Action/Shorts/Fifth.mkv",
+            "Heat (1995)/Heat.mkv",
+            "Heat (1995)/Extras/Making of.mkv",
+            "Heat (1995)/Other/Interview.mkv",
+            "Show/Season 1/S01E01.mkv",
+            "Show/Extras/Gag reel.mkv",
+            "Show/Season 1/Scenes/Cut.mkv",
+            ".hidden/Sixth.mkv",
+            "$RECYCLE.BIN/Seventh.mkv",
+            "Action/Heat/.git/Eighth.mkv",
+        ] {
+            let path = root.join(file);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, "x").unwrap();
+        }
+
+        assert_eq!(
+            walked(&root),
+            [
+                "Action/Shorts/Fifth.mkv",
+                "EXTRAS/Third.mkv",
+                "Heat (1995)/Heat.mkv",
+                "Other/Second.mkv",
+                "Shorts/A Short Film.mkv",
+                "Show/Season 1/S01E01.mkv",
+                "Trailers/Fourth.mkv",
+            ]
+        );
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// The share's walk asks the same question of a listing it already has.
+    #[test]
+    fn a_folder_with_a_film_or_seasons_is_a_title_folder() {
+        assert!(is_title_folder("Heat", [("Heat.mkv", false)].into_iter()));
+        assert!(is_title_folder("Show", [("Season 1", true)].into_iter()));
+        assert!(is_title_folder("Season 1", std::iter::empty()));
+        assert!(is_title_folder("Disc", [("BDMV", true)].into_iter()));
+        assert!(!is_title_folder("Action", [("Shorts", true), ("poster.jpg", false)].into_iter()));
+    }
 
     /// A real database rather than a hand-written schema: the point of these
     /// tests is what happens to `playback_state` when `media_files` is updated,

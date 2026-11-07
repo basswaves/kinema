@@ -2734,6 +2734,34 @@ gives a worker small parts rather than one long batch, which cannot be stopped.
 proves it is in front, because a scan waiting by mistake looks like one that
 never ends. A desktop never sets them.
 
+### A TV box's screen going off stops a scan, and says nothing until someone is back
+
+When a box goes to sleep at its screen timeout, Kinema has left the screen, so
+the rule above holds the scan there. Nothing keeps a box awake for a scan, and
+a film does stay awake on its own. Seen on a box whose timeout is 60 minutes:
+the scan stopped at the moment the screen went off and went on at wake with
+nothing lost, and the "Picked up after a pause" line only shows once someone is
+there to read it. So a scan longer than the timeout waits unseen. Whether it
+should keep the box awake is the owner's choice, not a bug to fix quietly.
+
+### Seek parameters do not reach the position Media3 opens at
+
+`setMediaItem(item, start)` with `SeekParameters.PREVIOUS_SYNC` changes nothing:
+they are used only for a seek on a prepared file. Opened at a resume point,
+Media3 decodes from the keyframe before it and shows nothing until it gets
+there, 2.8 s against 0.5 s on a box with keyframes ten seconds apart. **Do:**
+seek to the same place with those parameters at the first `onTracksChanged`
+that has tracks, before any frame is shown, and put them back straight after
+(`Media3Plugin.kt` `resumeMs`).
+
+### A WebView older than the build target is a black screen, and no message
+
+The interface's JavaScript is built for Vite's default target. WebView 66
+(Android TV 9's own, on a device that never updates it) stops at the first `?`
+with "Unexpected token ?": no page, no log file, a black screen for good. **Do:**
+when something looks dead on an old system, read the page's exceptions over
+the debugging socket before anything else; the app's own log starts too late.
+
 ### A TV box may have one video decoder, and the app in front is owed it
 
 A box's decoder list can say `concurrent-instances max="1"`. An app that

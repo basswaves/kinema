@@ -115,6 +115,17 @@ export interface Guess {
   raw: Record<string, unknown>;
 }
 
+/** What is known from a name that says nothing, or was not asked. */
+const NO_GUESS: Guess = {
+  title: null,
+  year: null,
+  season: null,
+  episode: null,
+  episodeLast: null,
+  kind: null,
+  raw: {},
+};
+
 /** The highest of several episode numbers, or null when there are not several. */
 function lastOf(value: unknown): number | null {
   if (!Array.isArray(value)) return null;
@@ -178,7 +189,7 @@ function filmTitle(input: string, raw: Record<string, unknown>): string | null {
     const words = (s: string) =>
       s
         .toLowerCase()
-        .replace(/[^a-z0-9]+/g, ' ')
+        .replace(/[^\p{L}\p{M}\p{N}]+/gu, ' ')
         .trim();
     if (words(input).includes(`${words(title)} ${words(alt)}`)) title = `${title} - ${alt.trim()}`;
   }
@@ -208,15 +219,7 @@ function runGuessit(input: string, kind: LibraryKind): Guess {
     // Never swallow this silently — a parser that throws on every file looks
     // exactly like a parser that works and finds nothing.
     lastParseError = `${input}: ${e instanceof Error ? e.message : String(e)}`;
-    return {
-      title: null,
-      year: null,
-      season: null,
-      episode: null,
-      episodeLast: null,
-      kind: null,
-      raw: {},
-    };
+    return NO_GUESS;
   }
 
   const type = raw.type as string | undefined;
@@ -241,13 +244,15 @@ function runGuessit(input: string, kind: LibraryKind): Guess {
 function scoreGuess(guess: Guess, kind: LibraryKind): number {
   if (!guess.title) return 0;
 
-  const normalised = guess.title.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const normalised = guess.title.toLowerCase().replace(/[^\p{L}\p{M}\p{N}]/gu, '');
   if (!normalised) return 0;
 
   // A "title" that is really a codec or resolution is worse than nothing,
   // because it would silently poison the TMDB query later.
   if (TECHNICAL_TOKENS.has(guess.title.toLowerCase().replace(/\s+/g, ''))) return 0;
-  if (/^\d+$/.test(normalised)) return 0;
+  // Only a number: a disc's `00001`, unless a year stands beside it. `1917 (2019)`
+  // and `2012.2009` are films.
+  if (/^\d+$/.test(normalised) && !guess.year) return 0;
 
   let score = 1;
   if (guess.title.length >= 3) score += 1;
@@ -259,6 +264,17 @@ function scoreGuess(guess: Guess, kind: LibraryKind): number {
   }
 
   return score;
+}
+
+/**
+ * What a folder above a season folder says the show is called, if anything. A
+ * name of only digits counts here (`24`, `1923`): the file is already known to
+ * be an episode, and this folder holds its seasons, so it can only be the show.
+ */
+function folderName(name: string, kind: LibraryKind): { title: string; year: number | null } | null {
+  const guess = runGuessit(name, kind);
+  if (scoreGuess(guess, kind) > 0 && guess.title) return { title: guess.title, year: guess.year };
+  return /^\d+$/.test(name.trim()) ? { title: name.trim(), year: null } : null;
 }
 
 /** A title's words without the spaces between them: `Blade Runner`, `bladerunner`. */
@@ -345,8 +361,12 @@ export function parseMediaFile(file: MediaFile, kind: LibraryKind, rootPath?: st
   const fromFile = runGuessit(file.file_name, kind);
   const fileScore = scoreGuess(fromFile, kind);
 
+  // The library folder never names a file: `D:/Movies/1917 (2019).mkv` is not
+  // a film called Movies, and the year on `Films 2019` says nothing either.
   const parentName = baseName(file.parent_dir);
-  const fromParent = runGuessit(parentName, kind);
+  const parentIsRoot =
+    rootPath !== undefined && comparablePath(file.parent_dir) === comparablePath(rootPath);
+  const fromParent = parentIsRoot ? NO_GUESS : runGuessit(parentName, kind);
   const parentScore = scoreGuess(fromParent, kind);
 
   // Prefer the filename on a tie: it is the more specific source, and for TV
@@ -374,16 +394,29 @@ export function parseMediaFile(file: MediaFile, kind: LibraryKind, rootPath?: st
   let fromGrandparent = false;
   if (!chosen.title) {
     const grandparent = parentOf(file.parent_dir);
-    const insideRoot =
+    const insideRoot: boolean =
       grandparent !== null &&
       (rootPath === undefined ||
         comparablePath(grandparent).startsWith(comparablePath(rootPath) + '/'));
     if (grandparent !== null && insideRoot) {
-      const above = runGuessit(baseName(grandparent), kind);
-      if (scoreGuess(above, kind) > 0 && above.title) {
+      const above = folderName(baseName(grandparent), kind);
+      if (above) {
         chosen = { ...chosen, title: above.title, year: chosen.year ?? above.year };
         fromGrandparent = true;
       }
+    }
+    // `24/S01E01.mkv`: a show named only with a number, with nothing between it
+    // and the library folder. Not `Show/2/S02E01.mkv`, where it is the season.
+    if (
+      !chosen.title &&
+      !parentIsRoot &&
+      kind === 'tv' &&
+      /^\d+$/.test(parentName.trim()) &&
+      Number(parentName) !== chosen.season &&
+      (grandparent === null || !insideRoot)
+    ) {
+      chosen = { ...chosen, title: parentName.trim() };
+      fromGrandparent = true;
     }
   }
 

@@ -399,3 +399,32 @@ describe('pickBest', () => {
     expect(MATCH_THRESHOLD).toBe(0.75);
   });
 });
+
+describe('other alphabets', () => {
+  it.each(['七人の侍', 'Брат', 'Ζ', 'शोले', 'พี่มาก'])('%s is itself', (name) => {
+    expect(titleSimilarity(name, name)).toBe(1);
+  });
+
+  it('a title in another alphabet matches by its original title', () => {
+    const { matched, best } = pickBest(
+      [candidate({ title: 'Seven Samurai', originalTitle: '七人の侍', year: 1954 })],
+      { parsedTitle: '七人の侍', parsedYear: 1954 }
+    );
+    expect(matched).toBe(true);
+    expect(best?.confidence).toBeGreaterThanOrEqual(0.95);
+  });
+
+  it('names sharing only a number do not match', () => {
+    expect(titleSimilarity('Брат 2', 'Сестра 2')).toBeLessThan(0.5);
+    expect(titleSimilarity('七人の侍 2', '東京物語 2')).toBeLessThan(0.75);
+    const { matched } = pickBest([candidate({ title: 'Сестра 2', year: 2000 })], {
+      parsedTitle: 'Брат 2',
+      parsedYear: 2000,
+    });
+    expect(matched).toBe(false);
+  });
+
+  it('accents on Latin letters still do not count', () => {
+    expect(titleSimilarity('Amélie', 'Amelie')).toBe(1);
+  });
+});

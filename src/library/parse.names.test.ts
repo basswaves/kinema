@@ -77,3 +77,53 @@ describe('a folder with a year and a file with a name', () => {
     });
   });
 });
+
+describe('names only in digits or in other alphabets', () => {
+  beforeAll(initParser);
+
+  it.each([
+    ['D:/Movies/1917 (2019).mkv', '1917', 2019],
+    ['D:/Movies/Action/1917 (2019).mkv', '1917', 2019],
+    ['D:/Movies/2012.2009.1080p.BluRay.mkv', '2012', 2009],
+    ['D:/Movies/300 (2006)/300.mkv', '300', 2006],
+    ['D:/Movies/300 (2006)/movie.mkv', '300', 2006],
+    ['D:/Movies/Action/七人の侍 (1954).mkv', '七人の侍', 1954],
+    ['D:/Movies/七人の侍 (1954)/七人の侍.mkv', '七人の侍', 1954],
+    ['D:/Movies/Action/Брат (1997).mkv', 'Брат', 1997],
+  ])('%s', (path, title, year) => {
+    expect(parse(path)).toMatchObject({ title, year });
+  });
+
+  it('a Japanese file keeps its name in a folder of another name', () => {
+    expect(parse('D:/Movies/Action/七人の侍.mkv')).toMatchObject({ title: '七人の侍', year: null });
+  });
+
+  it.each([
+    ['D:/TV/24/Season 1/S01E01.mkv', '24', null],
+    ['D:/TV/1923 (2022)/Season 1/S01E01.mkv', '1923', 2022],
+    ['D:/TV/24/S01E01.mkv', '24', null],
+  ])('%s is a show named with a number', (path, title, year) => {
+    expect(parse(path, 'tv', 'D:/TV')).toMatchObject({ title, year, season: 1, episode: 1 });
+  });
+
+  it('a number that is the season folder is not the show', () => {
+    expect(parse('D:/TV/1/S01E01.mkv', 'tv', 'D:/TV').title).toBeNull();
+    expect(parse('D:/TV/Lost/1/S01E01.mkv', 'tv', 'D:/TV').title).toBe('Lost');
+  });
+});
+
+describe('the library folder', () => {
+  beforeAll(initParser);
+
+  it('never names a file or lends it a year', () => {
+    expect(parse('D:/Movies 2019/S01E01.mkv', 'tv', 'D:/Movies 2019')).toMatchObject({
+      title: null,
+      year: null,
+    });
+    expect(parse('D:/Films 2019/Heat.mkv', 'movies', 'D:/Films 2019')).toMatchObject({
+      title: 'Heat',
+      year: null,
+    });
+    expect(parse('//nas/Movies/00001.mkv', 'movies', '//nas/Movies/').title).not.toBe('Movies');
+  });
+});

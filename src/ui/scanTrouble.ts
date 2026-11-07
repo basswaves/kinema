@@ -17,6 +17,21 @@
 const UNREACHABLE = /^root unavailable, skipped: (.+)$/;
 
 /**
+ * What `mark_missing` in scanner.rs says when part of a folder goes. The first
+ * is known to be unknown, the other two cannot be told from someone deleting
+ * things, so nothing here says deleted. The system's own words come in the
+ * person's language, so they sit beside a sentence of ours.
+ */
+const UNREAD = /^could not read: (.+) :: (.*)$/s;
+const EMPTIED = /^folder now empty: (\d+) :: (.+)$/;
+const GONE = /^videos gone: (\d+) :: (.+)$/;
+const UNREAD_NOTE = 'Nothing in it was hidden. Kinema tries again at the next scan.';
+const EMPTIED_NOTE =
+  'They stay in your library. If a disk belongs there, connect it. If you emptied it yourself, delete the folder.';
+const GONE_NOTE =
+  'They are hidden until they are back. A disk that was only disconnected brings them back by itself.';
+
+/**
  * Wikidata still busy after waiting (wikidata.ts), once per film it held up:
  * one plain line for all of them, never Wikimedia's own sentence.
  */
@@ -55,12 +70,27 @@ export interface ScanTrouble {
  */
 export function scanTrouble(errors: string[], waiting = true): ScanTrouble | null {
   const folders = errors.flatMap((e) => UNREACHABLE.exec(e)?.[1] ?? []);
+  const lineFor = (pattern: RegExp, line: (first: string, second: string) => string) =>
+    errors.flatMap((e) => {
+      const found = pattern.exec(e);
+      return found ? [line(found[1], found[2])] : [];
+    });
+  const unread = lineFor(UNREAD, (path, why) => `Could not read ${path} (${why})`);
+  const emptied = lineFor(EMPTIED, (n, path) => `${path} is empty where it held ${n} videos`);
+  const gone = lineFor(GONE, (n, path) => `${n} videos can no longer be found in ${path}`);
   const busy = waiting && errors.some((e) => BUSY.test(e)) ? [BUSY_LINE] : [];
   const backgroundOf = (e: string) => BACKGROUND.find(([raw]) => raw.test(e))?.[1];
   const background = [...new Set(errors.flatMap((e) => backgroundOf(e) ?? []))];
-  const others = errors.filter((e) => !UNREACHABLE.test(e) && !BUSY.test(e) && !backgroundOf(e));
+  const others = errors.filter(
+    (e) =>
+      ![UNREACHABLE, UNREAD, EMPTIED, GONE, BUSY].some((pattern) => pattern.test(e)) &&
+      !backgroundOf(e)
+  );
   const lines = [
     ...folders.map((path) => `Could not reach ${path}`),
+    ...unread,
+    ...emptied,
+    ...gone,
     ...busy,
     ...others,
     ...background,
@@ -70,11 +100,10 @@ export function scanTrouble(errors: string[], waiting = true): ScanTrouble | nul
   // The scanner leaves a missing folder's files as they were, so they stay on
   // the shelves; what does not work is playing them (scanner.rs,
   // an_unreachable_folder_hides_nothing, an_empty_folder_that_had_files_hides_nothing).
+  const partNote = unread.length ? UNREAD_NOTE : emptied.length ? EMPTIED_NOTE : gone.length ? GONE_NOTE : null;
   const note =
     folders.length === 0
-      ? background.length === lines.length
-        ? BACKGROUND_NOTE
-        : null
+      ? (partNote ?? (background.length === lines.length ? BACKGROUND_NOTE : null))
       : folders.length === 1
         ? 'Anything in that folder can’t be played until it is back.'
         : 'Anything in those folders can’t be played until they are back.';

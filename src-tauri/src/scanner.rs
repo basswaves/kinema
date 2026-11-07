@@ -14,8 +14,8 @@
 use crate::util::now_secs;
 use rusqlite::{params, Connection};
 use serde::Serialize;
-use std::collections::HashSet;
-use std::path::Path;
+use std::collections::{HashMap, HashSet};
+use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 use walkdir::WalkDir;
 
@@ -218,12 +218,13 @@ fn scan_root(
     let now = now_secs();
     let mut seen_paths: HashSet<String> = HashSet::new();
     let mut pending: Vec<SeenFile> = Vec::with_capacity(WRITE_BATCH);
+    let mut unread: Vec<Unread> = Vec::new();
 
-    let mut found = |file: Result<SeenFile, String>| -> rusqlite::Result<()> {
+    let mut found = |file: Result<SeenFile, Unread>| -> rusqlite::Result<()> {
         let file = match file {
             Ok(f) => f,
             Err(e) => {
-                report.errors.push(e);
+                unread.push(e);
                 return Ok(());
             }
         };
@@ -255,20 +256,35 @@ fn scan_root(
     // its old titles and this notice until it is removed in Settings — the
     // cheaper mistake of the two.
     if seen_paths.is_empty() && has_known_files(conn, root_id)? {
+        for e in &unread {
+            crate::log!("scan: could not read {}: {}", e.path, e.why);
+        }
         report
             .errors
             .push(format!("root unavailable, skipped: {root_path}"));
         return Ok(());
     }
 
-    mark_missing(conn, root_id, &seen_paths, report)?;
+    for e in &unread {
+        report.errors.push(format!("could not read: {} :: {}", e.path, e.why));
+    }
+    mark_missing(conn, root_id, root_path, &seen_paths, &unread, report)?;
     Ok(())
+}
+
+/// A folder or file the walk could not read. What is under it is unknown, which
+/// is not the same as gone: nothing under it may be marked missing.
+#[derive(Debug)]
+struct Unread {
+    path: String,
+    /// The system's own words, in the person's language.
+    why: String,
 }
 
 /// Every video under a folder the system opened, handed to `found` one by one.
 fn walk_local(
     root: &Path,
-    found: &mut dyn FnMut(Result<SeenFile, String>) -> rusqlite::Result<()>,
+    found: &mut dyn FnMut(Result<SeenFile, Unread>) -> rusqlite::Result<()>,
 ) -> rusqlite::Result<()> {
     // Links are followed: a folder or film linked into the library from
     // another drive is part of it, as people arrange libraries on Linux (and
@@ -305,6 +321,9 @@ fn walk_local(
             true
         });
     let mut discs: HashSet<std::path::PathBuf> = HashSet::new();
+    // The folder last entered at each depth: the walk lists a folder's
+    // children after the folder itself.
+    let mut entered: Vec<PathBuf> = vec![root.to_path_buf()];
 
     while let Some(entry) = walker.next() {
         let entry = match entry {
@@ -314,10 +333,29 @@ fn walk_local(
                 continue;
             }
             Err(e) => {
-                found(Err(e.to_string()))?;
+                let why = e.io_error().map_or_else(|| e.to_string(), ToString::to_string);
+                match e.path() {
+                    Some(path) => {
+                        found(Err(Unread { path: path.to_string_lossy().into_owned(), why }))?;
+                    }
+                    // On Windows, following links, a folder that refuses to be
+                    // opened comes back with no path (walkdir opens it to watch
+                    // for loops, and that error carries none). It is one of the
+                    // folders in the one being listed: find which.
+                    None => {
+                        let listing = entered.get(e.depth().saturating_sub(1)).unwrap_or(&entered[0]);
+                        for unread in refusing_folders(listing, why) {
+                            found(Err(unread))?;
+                        }
+                    }
+                }
                 continue;
             }
         };
+        if entry.file_type().is_dir() {
+            entered.truncate(entry.depth());
+            entered.push(entry.path().to_path_buf());
+        }
 
         // Android, with Kinema behind another app: the walk waits between
         // folders (jobs::set_behind). Not for a film, as a share's walk does:
@@ -366,7 +404,10 @@ fn walk_local(
         let meta = match entry.metadata() {
             Ok(m) => m,
             Err(e) => {
-                found(Err(format!("{}: {e}", entry.path().display())))?;
+                found(Err(Unread {
+                    path: entry.path().to_string_lossy().into_owned(),
+                    why: e.to_string(),
+                }))?;
                 continue;
             }
         };
@@ -387,13 +428,37 @@ fn walk_local(
     Ok(())
 }
 
+/// The folders in `listing` that refuse to be listed, each with the system's
+/// words. Only asked when a walk met a refusal it could not place. Finding none,
+/// the whole of `listing` counts as unread: hiding nothing is the safe side.
+fn refusing_folders(listing: &Path, why: String) -> Vec<Unread> {
+    let refusing: Vec<Unread> = std::fs::read_dir(listing)
+        .map(|entries| {
+            entries
+                .flatten()
+                .filter(|entry| entry.file_type().is_ok_and(|t| t.is_dir() || t.is_symlink()))
+                .filter_map(|entry| {
+                    let path = entry.path();
+                    let refused = std::fs::read_dir(&path).err()?;
+                    Some(Unread { path: path.to_string_lossy().into_owned(), why: refused.to_string() })
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    if refusing.is_empty() {
+        vec![Unread { path: listing.to_string_lossy().into_owned(), why }]
+    } else {
+        refusing
+    }
+}
+
 /// Every video under a folder on a share Kinema opens itself (netshare.rs).
 /// A folder listing there carries each file's size and time, so a file costs
 /// no request of its own — the one stat per file the rules above allow is
 /// already paid for.
 fn walk_share(
     root: &str,
-    found: &mut dyn FnMut(Result<SeenFile, String>) -> rusqlite::Result<()>,
+    found: &mut dyn FnMut(Result<SeenFile, Unread>) -> rusqlite::Result<()>,
 ) -> rusqlite::Result<()> {
     let mut folders = vec![root.trim_end_matches('/').to_string()];
     while let Some(dir) = folders.pop() {
@@ -410,7 +475,7 @@ fn walk_share(
         let entries = match crate::netshare::list(&dir) {
             Ok(e) => e,
             Err(e) => {
-                found(Err(format!("{dir}: {e}")))?;
+                found(Err(Unread { path: dir, why: e.to_string() }))?;
                 continue;
             }
         };
@@ -569,30 +634,134 @@ fn write_batch(
     tx.commit()
 }
 
-/// Flag anything under this root the walk did not see.
+/// From how many videos going at once a scan says so. One or two are someone
+/// tidying up, and not worth a line on Home.
+const SAID_FROM: usize = 3;
+
+/// Whether `path` is `folder` or something under it.
+fn is_under(path: &str, folder: &str) -> bool {
+    Path::new(path).starts_with(folder)
+}
+
+/// Where the videos gone from one still-existing folder were, by the folder
+/// nearest to them that is gone too, or that folder itself.
+#[derive(Default)]
+struct GoneFrom {
+    ids: Vec<i64>,
+    by_place: HashMap<PathBuf, usize>,
+}
+
+/// What became of `stale` files, by the deepest folder above each that is still
+/// there. Only for files that went, so an ordinary scan asks the disk nothing.
+fn gone_from(root: &Path, stale: Vec<(i64, String)>) -> HashMap<PathBuf, GoneFrom> {
+    let mut there: HashMap<PathBuf, bool> = HashMap::new();
+    let mut exists = |dir: &Path| -> bool {
+        *there
+            .entry(dir.to_path_buf())
+            .or_insert_with(|| crate::files::metadata(dir).is_ok())
+    };
+    let mut folders: HashMap<PathBuf, GoneFrom> = HashMap::new();
+    for (id, path) in stale {
+        let mut place = Path::new(&path).parent().unwrap_or(root);
+        let mut folder = place;
+        while folder != root && !exists(folder) {
+            place = folder;
+            folder = folder.parent().unwrap_or(root);
+        }
+        let gone = folders.entry(folder.to_path_buf()).or_default();
+        gone.ids.push(id);
+        *gone.by_place.entry(place.to_path_buf()).or_default() += 1;
+    }
+    folders
+}
+
+/// Flag anything under this root the walk did not see, and say so when it is
+/// more than someone tidying up.
 ///
 /// Flagged, never deleted — the user may have unplugged a drive, and their
-/// watch history should survive that.
+/// watch history should survive that. The next scan that finds them clears it.
+///
+/// Three things look alike from a listing, and are told apart as far as they can
+/// be:
+///
+/// - A folder that **could not be read**: what is under it is unknown, so nothing
+///   there is touched. The scan's errors already name it.
+/// - A folder that is **there and empty** where it held videos. That is how a disk
+///   not mounted looks on Linux, or a volume mounted in a folder on Windows.
+///   Nothing is hidden, as for a library folder (`scan_root`), and the line says
+///   how to end it, since it may also have been emptied on purpose.
+/// - **Gone**, or a folder with other things in it. A disk mounted below the
+///   library folder, removed with its mount point, looks exactly like a deletion:
+///   they are hidden, the line says how many from where, and never that they were
+///   deleted, which Kinema cannot know.
 fn mark_missing(
     conn: &mut Connection,
     root_id: i64,
+    root_path: &str,
     seen_paths: &HashSet<String>,
+    unread: &[Unread],
     report: &mut ScanReport,
 ) -> rusqlite::Result<()> {
+    let stale: Vec<(i64, String)> = {
+        let mut known =
+            conn.prepare("SELECT id, path FROM media_files WHERE root_id = ?1 AND missing = 0")?;
+        let rows = known.query_map(params![root_id], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        let mut stale = Vec::new();
+        for row in rows {
+            let (id, path): (i64, String) = row?;
+            if !seen_paths.contains(&path) && !unread.iter().any(|u| is_under(&path, &u.path)) {
+                stale.push((id, path));
+            }
+        }
+        stale
+    };
+    if stale.is_empty() {
+        return Ok(());
+    }
+
+    // Before the write lock: over a share each of these is a request.
+    let root = Path::new(root_path);
+    let mut hide: Vec<i64> = Vec::new();
+    let mut folders: Vec<(PathBuf, GoneFrom)> = gone_from(root, stale).into_iter().collect();
+    folders.sort_by(|a, b| a.0.cmp(&b.0));
+    for (folder, gone) in folders {
+        let many = gone.ids.len() >= SAID_FROM;
+        let empty = folder != root
+            && crate::files::read_dir(&folder).is_ok_and(|entries| entries.is_empty());
+        if many && empty {
+            report.errors.push(format!(
+                "folder now empty: {} :: {}",
+                gone.ids.len(),
+                folder.display()
+            ));
+            continue;
+        }
+        if many {
+            // By the folder that went, when one did; together when they are
+            // scattered, as films from a folder of films.
+            let mut places: Vec<(PathBuf, usize)> = gone.by_place.into_iter().collect();
+            places.sort();
+            let mut scattered = 0;
+            for (place, count) in places {
+                if count >= SAID_FROM {
+                    report.errors.push(format!("videos gone: {count} :: {}", place.display()));
+                } else {
+                    scattered += count;
+                }
+            }
+            if scattered >= SAID_FROM {
+                report.errors.push(format!("videos gone: {scattered} :: {}", folder.display()));
+            }
+        }
+        hide.extend(gone.ids);
+    }
+
     let tx = conn.transaction()?;
     {
-        let mut stale =
-            tx.prepare("SELECT id, path FROM media_files WHERE root_id = ?1 AND missing = 0")?;
-        let candidates: Vec<(i64, String)> = stale
-            .query_map(params![root_id], |r| Ok((r.get(0)?, r.get(1)?)))?
-            .collect::<rusqlite::Result<Vec<_>>>()?;
-
         let mut mark = tx.prepare("UPDATE media_files SET missing = 1 WHERE id = ?1")?;
-        for (id, path) in candidates {
-            if !seen_paths.contains(&path) {
-                mark.execute(params![id])?;
-                report.files_missing += 1;
-            }
+        for id in hide {
+            mark.execute(params![id])?;
+            report.files_missing += 1;
         }
     }
     tx.commit()
@@ -840,6 +1009,143 @@ mod tests {
             Ok((r.get(0)?, r.get(1)?))
         })
         .unwrap()
+    }
+
+    /// A real library of six films in two folders, scanned once.
+    fn two_disks(name: &str) -> (Connection, PathBuf) {
+        let dir = std::env::temp_dir().join(format!("pn-scanner-disks-{name}"));
+        let _ = std::fs::remove_dir_all(&dir);
+        let root = dir.join("media");
+        for n in 0..3 {
+            for disk in ["Disk1", "Disk2"] {
+                let film = root.join(disk).join(format!("Film {n}"));
+                std::fs::create_dir_all(&film).unwrap();
+                std::fs::write(film.join(format!("Film {n}.mkv")), "x").unwrap();
+            }
+        }
+        let mut conn = crate::db::open(&dir.join("library.db")).unwrap();
+        conn.execute(
+            "INSERT INTO library_roots (id, path, kind, added_at) VALUES (1, ?1, 'movies', 0)",
+            params![root.to_string_lossy()],
+        )
+        .unwrap();
+        let report = scan_all(&mut conn).unwrap();
+        assert_eq!((report.files_seen, report.errors.len()), (6, 0));
+        (conn, root)
+    }
+
+    fn hidden(conn: &Connection) -> i64 {
+        conn.query_row("SELECT COUNT(*) FROM media_files WHERE missing = 1", [], |r| r.get(0))
+            .unwrap()
+    }
+
+    /// Review 2026-11, finding 6. A disk mounted below the library folder,
+    /// removed with its mount point, cannot be told from a deletion: hidden, but
+    /// said, with how many and from where. The next good scan brings them back.
+    #[test]
+    fn a_part_of_a_root_going_away_is_said_and_comes_back() {
+        let (mut conn, root) = two_disks("gone");
+        let disk = root.join("Disk2");
+        let aside = root.with_file_name("Disk2-away");
+        std::fs::rename(&disk, &aside).unwrap();
+
+        let report = scan_all(&mut conn).unwrap();
+        assert_eq!(report.files_missing, 3);
+        assert_eq!(report.errors, vec![format!("videos gone: 3 :: {}", disk.display())]);
+        assert_eq!(hidden(&conn), 3);
+
+        let again = scan_all(&mut conn).unwrap();
+        assert_eq!(again.errors, Vec::<String>::new(), "said once, when it happened");
+
+        std::fs::rename(&aside, &disk).unwrap();
+        let back = scan_all(&mut conn).unwrap();
+        assert_eq!(back.errors, Vec::<String>::new());
+        assert_eq!(hidden(&conn), 0);
+    }
+
+    /// How a disk not mounted looks: its folder there, with nothing in it.
+    #[test]
+    fn a_folder_left_empty_hides_nothing_until_it_is_removed() {
+        let (mut conn, root) = two_disks("empty");
+        let disk = root.join("Disk2");
+        std::fs::remove_dir_all(&disk).unwrap();
+        std::fs::create_dir(&disk).unwrap();
+
+        let report = scan_all(&mut conn).unwrap();
+        assert_eq!(report.errors, vec![format!("folder now empty: 3 :: {}", disk.display())]);
+        assert_eq!(hidden(&conn), 0);
+        assert_eq!(report.files_missing, 0);
+
+        // The way out the line gives, if it was emptied on purpose.
+        std::fs::remove_dir(&disk).unwrap();
+        scan_all(&mut conn).unwrap();
+        assert_eq!(hidden(&conn), 3);
+    }
+
+    /// Someone tidying up is not worth a line.
+    #[test]
+    fn one_film_gone_says_nothing() {
+        let (mut conn, root) = two_disks("one");
+        std::fs::remove_dir_all(root.join("Disk2").join("Film 1")).unwrap();
+        let report = scan_all(&mut conn).unwrap();
+        assert_eq!(report.errors, Vec::<String>::new());
+        assert_eq!(hidden(&conn), 1);
+    }
+
+    /// Films each in a folder of their own, gone from one that stays.
+    #[test]
+    fn films_gone_from_a_folder_are_counted_together() {
+        let (mut conn, root) = two_disks("scattered");
+        let disk = root.join("Disk2");
+        std::fs::write(disk.join("poster.jpg"), "x").unwrap();
+        for n in 0..3 {
+            std::fs::remove_dir_all(disk.join(format!("Film {n}"))).unwrap();
+        }
+        let report = scan_all(&mut conn).unwrap();
+        assert_eq!(report.errors, vec![format!("videos gone: 3 :: {}", disk.display())]);
+        assert_eq!(hidden(&conn), 3);
+    }
+
+    /// A folder that cannot be read: what is in it is unknown, so nothing there
+    /// is hidden, and it is named beside the system's own words.
+    #[cfg(any(windows, unix))]
+    #[test]
+    fn a_folder_that_cannot_be_read_hides_nothing() {
+        let (mut conn, root) = two_disks("denied");
+        let locked = root.join("Disk2");
+        let lock = |on: bool| {
+            #[cfg(windows)]
+            {
+                let me = std::env::var("USERNAME").unwrap();
+                let (how, what) =
+                    if on { ("/deny", format!("{me}:(OI)(CI)(RX)")) } else { ("/remove:d", me) };
+                let done = std::process::Command::new("icacls").arg(&locked).args([how, &what]).output();
+                assert!(done.unwrap().status.success());
+            }
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let mode = if on { 0o000 } else { 0o755 };
+                std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(mode)).unwrap();
+            }
+        };
+        lock(true);
+        let report = scan_all(&mut conn);
+        lock(false);
+
+        let report = report.unwrap();
+        // Superuser reads anything; then there is nothing to test here.
+        if report.files_seen == 6 {
+            return;
+        }
+        assert_eq!(hidden(&conn), 0);
+        assert_eq!(report.files_missing, 0);
+        let start = format!("could not read: {} :: ", locked.display());
+        assert!(
+            report.errors.len() == 1 && report.errors[0].starts_with(&start),
+            "{:?}",
+            report.errors
+        );
     }
 
     /// A drive that was unplugged and is back: the file is unchanged, but it

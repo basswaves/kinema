@@ -142,6 +142,17 @@ for (const [label, errors, notice] of [
     ['A film: TMDB /search/movie failed: HTTP 401', 'root unavailable, skipped: \\\\nas\\Films'],
     'Could not reach \\\\nas\\Films · and 1 more. Anything in that folder can’t be played until it is back.',
   ],
+  // Part of a folder went: how many, from where, and never "deleted".
+  [
+    'part of a folder going away says how many and from where',
+    ['videos gone: 12 :: /media/films/Disk2'],
+    '12 videos can no longer be found in /media/films/Disk2. They are hidden until they are back. A disk that was only disconnected brings them back by itself.',
+  ],
+  [
+    'a folder that could not be read is named beside the system’s words',
+    ['could not read: /media/films/Locked :: Permission denied (os error 13)'],
+    'Could not read /media/films/Locked (Permission denied (os error 13)). Nothing in it was hidden. Kinema tries again at the next scan.',
+  ],
   // Matching went wrong, not a folder: nothing about one being away.
   [
     'any other problem says only what happened',

@@ -16,6 +16,29 @@ describe('scanTrouble', () => {
     });
   });
 
+  it('names a folder that could not be read beside the system’s own words', () => {
+    expect(scanTrouble(['could not read: D:\\Films\\Locked :: Ingen tilgang. (os error 5)'])).toEqual({
+      text: 'Could not read D:\\Films\\Locked (Ingen tilgang. (os error 5))',
+      note: 'Nothing in it was hidden. Kinema tries again at the next scan.',
+    });
+  });
+
+  it('says how many videos went, from where, and never that they were deleted', () => {
+    const gone = scanTrouble(['videos gone: 12 :: /media/films/Disk2']);
+    expect(gone).toEqual({
+      text: '12 videos can no longer be found in /media/films/Disk2',
+      note: 'They are hidden until they are back. A disk that was only disconnected brings them back by itself.',
+    });
+    expect(JSON.stringify(gone)).not.toMatch(/delet/i);
+  });
+
+  it('says a folder left empty keeps its videos, and how to end that', () => {
+    expect(scanTrouble(['folder now empty: 12 :: /media/films/Disk2'])).toEqual({
+      text: '/media/films/Disk2 is empty where it held 12 videos',
+      note: 'They stay in your library. If a disk belongs there, connect it. If you emptied it yourself, delete the folder.',
+    });
+  });
+
   it('says nothing about folders when the problem was not one', () => {
     expect(scanTrouble([tmdb])).toEqual({ text: tmdb, note: null });
     expect(scanTrouble([tmdb, '2 artwork downloads failed'])).toEqual({

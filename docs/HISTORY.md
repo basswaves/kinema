@@ -4268,6 +4268,23 @@ private X server, Android on the emulator with the remote. Linux showed that no
 start-up dialog had ever appeared there (GOTCHAS, "A blocking dialog in `setup` never
 appears on Linux").
 
+### Part of a library folder going away is said (2026-11)
+
+The guard in `scan_root` protected a library folder showing nothing at all. A
+folder inside it that failed to list, a share dropping half way, or a disk mounted
+under it going away hid its films from Home with no message, or with the system's
+bare words and no folder named. They came back at the next good scan, which on a TV
+device left running may be far off.
+
+Now a folder that could not be read marks nothing under it missing, and is named
+beside the system's words. A folder there and empty where it held at least three
+videos, which is how a disk not mounted looks, also hides nothing, and the line says
+to connect the disk or delete the folder. Gone altogether, it cannot be told from a
+deletion by listing: they are hidden, and from three videos a line says how many and
+from which folder, once, and never says deleted. Storing each disk's identity would
+tell them apart, at the cost of a stat call per folder and a column that means nothing
+over a share. Not taken: the line and the next good scan are enough.
+
 ### A watched tick clears only when the old copy is shown to be partial (2026-11)
 
 A file that changed size used to lose its tick for good, in `watch_history` too.

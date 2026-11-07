@@ -457,6 +457,16 @@ saying "not changed" (2026-11). Copying the database out of a *running* app has 
 trap, and it is why every copy here is `VACUUM INTO` and never a file copy (see
 `backup_before_upgrade`).
 
+### A folder that fails to list is not a folder with nothing in it
+
+A walk that carries on after a failed listing, then marks what it did not see as
+missing, hides everything under that folder because of a permission or a dropped
+connection. **Do:** keep what could not be read (`Unread` in `scanner.rs`) and let
+`mark_missing` touch nothing under it. The same trap one level up: a disk not mounted
+leaves its folder there, empty, so a folder empty where it held videos is left alone
+too. A mount point removed with the disk cannot be told from a deletion by listing: it
+is hidden and said with a count, never called deleted (HISTORY).
+
 ### `busy_timeout` is load-bearing the moment there is a second connection
 
 SQLite allows one writer at a time. With two connections, a write that arrives

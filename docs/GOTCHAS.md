@@ -2766,6 +2766,14 @@ The interface's JavaScript is built for Vite's default target. WebView 66
 with "Unexpected token ?": no page, no log file, a black screen for good. **Do:**
 when something looks dead on an old system, read the page's exceptions over
 the debugging socket before anything else; the app's own log starts too late.
+The small script at the top of `index.html` now says so in plain words. It keeps
+to the oldest syntax, has no timer so a slow start cannot trip it, and acts only
+on an error before anything is drawn: a `SyntaxError` before `ran.ts` has run, or
+any error when something the interface uses is missing. `new Function` cannot
+test the syntax: the page's CSP refuses it on a healthy engine too. The same goes
+the other way: `Runtime.evaluate` is let through the CSP, so `new Function` working
+over the debugging socket proves nothing about the page's rules; a stray inline
+script does. An inline script of our own passes because Tauri hashes it at build.
 
 ### A TV box may have one video decoder, and the app in front is owed it
 

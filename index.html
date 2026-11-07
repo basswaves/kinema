@@ -5,6 +5,130 @@
     <link rel="icon" type="image/png" href="/icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Kinema</title>
+    <!--
+      A system whose web engine is too old cannot read Kinema's scripts: a black
+      screen for good, with no log. This says so instead. Keep it in the oldest
+      syntax there is (var, function, no arrows or template strings), because it is
+      the one thing that must run there. No timer: a slow start must never show it.
+      It only ever acts on an error, before anything is drawn.
+    -->
+    <script>
+      (function () {
+        var shown = false;
+        var drawn = function () {
+          var root = document.getElementById('root');
+          return !!(root && root.firstChild);
+        };
+        // What the interface takes for granted. Tried, never read from a version.
+        var lacksSomething = function () {
+          return (
+            typeof Promise === 'undefined' ||
+            !Promise.allSettled ||
+            !Object.fromEntries ||
+            !String.prototype.replaceAll ||
+            !Array.prototype.at ||
+            !Object.hasOwn ||
+            typeof structuredClone === 'undefined'
+          );
+        };
+        var line = function (box, tag, text, style) {
+          var el = document.createElement(tag);
+          el.textContent = text;
+          el.style.cssText = 'margin:0 0 0.75em;max-width:38em;color:#fff;' + style;
+          box.appendChild(el);
+        };
+        var show = function (reason) {
+          if (shown) return;
+          if (!document.body) {
+            document.addEventListener('DOMContentLoaded', function () {
+              show(reason);
+            });
+            return;
+          }
+          shown = true;
+          var android = /Android/.test(navigator.userAgent);
+          // Only this has a background: the window behind it is see-through.
+          var box = document.createElement('div');
+          box.id = 'too-old';
+          box.setAttribute('role', 'alert');
+          box.style.cssText =
+            'position:fixed;top:0;right:0;bottom:0;left:0;z-index:2147483647;overflow:auto;' +
+            'box-sizing:border-box;padding:6vh 6vw;background:#000;' +
+            'font:18px/1.45 sans-serif;';
+          line(
+            box,
+            'h1',
+            android ? 'Kinema needs a newer Android System WebView' : 'Kinema needs a newer web engine',
+            'font-size:28px;line-height:1.25;font-weight:bold;'
+          );
+          if (android) {
+            line(
+              box,
+              'p',
+              'This device has a version too old to run Kinema. Your files and your library are untouched.',
+              ''
+            );
+            line(
+              box,
+              'p',
+              'To update it: open Google Play on this device, search for Android System WebView, and choose Update. Then open Kinema again.',
+              ''
+            );
+            line(
+              box,
+              'p',
+              'If Google Play does not list it, look in Settings under Apps, among the system apps, and install any system update the device offers. A device with no update for it cannot run Kinema.',
+              ''
+            );
+          } else {
+            line(
+              box,
+              'p',
+              'This computer has a version too old to run Kinema. Your files and your library are untouched.',
+              ''
+            );
+            line(
+              box,
+              'p',
+              'On Windows, update the Microsoft Edge WebView2 Runtime. On Linux, update your system, which brings a newer WebKitGTK. Then open Kinema again.',
+              ''
+            );
+          }
+          line(box, 'p', 'What it said: ' + reason, 'font-size:14px;opacity:0.7;margin-top:1em;');
+          document.body.appendChild(box);
+          // Should the interface draw after all, it has the screen.
+          var gone = setInterval(function () {
+            if (!drawn()) return;
+            clearInterval(gone);
+            if (box.parentNode) box.parentNode.removeChild(box);
+          }, 1000);
+        };
+        var heard = function (error, message) {
+          if (shown || drawn()) return;
+          var name = error && error.name;
+          var words = String(message || (error && error.message) || name || 'unknown');
+          var syntax = name === 'SyntaxError' || /SyntaxError/.test(words);
+          // Kinema's scripts run as one: one that cannot be read means none ran.
+          // Once they run, a SyntaxError can be bad data, and any error can be a
+          // plain fault, which this must not blame on the system.
+          if ((syntax && !window.__kinemaRan) || lacksSomething()) show(words);
+        };
+        window.addEventListener('error', function (event) {
+          // A picture that failed to load comes here too, with no message.
+          if (event.message || event.error) heard(event.error, event.message);
+        });
+        window.addEventListener('unhandledrejection', function (event) {
+          var reason = event.reason;
+          heard(reason, reason && reason.message);
+        });
+        window.__kinemaTooOld = function () {
+          show('no module scripts');
+        };
+      })();
+    </script>
+    <script nomodule>
+      window.__kinemaTooOld();
+    </script>
   </head>
 
   <body>

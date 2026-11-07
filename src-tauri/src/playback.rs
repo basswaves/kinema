@@ -186,6 +186,11 @@ fn store_progress(
     // Where a play finished is not a re-watch to resume: a file can finish at
     // its credits from half way (`is_complete`), below resume.ts's 80 %.
     let position_secs = if completed { 0.0 } else { position_secs };
+    // The player knows this copy's length: a file that changed size may be
+    // shown here to have replaced a partial one.
+    if let Some(length) = duration_secs {
+        crate::history::settle_old_copy(conn, file_id, length)?;
+    }
     conn.execute(
         "INSERT INTO playback_state (file_id, position_secs, duration_secs, completed, updated_at)
          VALUES (?1, ?2, ?3, ?4, ?5)
@@ -193,6 +198,8 @@ fn store_progress(
             position_secs = excluded.position_secs,
             duration_secs = excluded.duration_secs,
             completed     = MAX(playback_state.completed, excluded.completed),
+            -- Finished on these bytes: nothing about an older copy matters now.
+            old_copy_secs = CASE WHEN excluded.completed = 1 THEN NULL ELSE old_copy_secs END,
             updated_at    = excluded.updated_at,
             fraction      = NULL",
         params![file_id, position_secs, duration_secs, completed as i64, now],
@@ -226,6 +233,8 @@ pub fn set_watched(
              VALUES (?1, 0, NULL, 1, ?2)
              ON CONFLICT(file_id) DO UPDATE SET
                 completed  = 1,
+                -- The person says so of these bytes.
+                old_copy_secs = NULL,
                 -- Where it was stopped is not a re-watch to resume.
                 position_secs = 0,
                 updated_at = excluded.updated_at,
@@ -885,6 +894,30 @@ mod tests {
             })
             .unwrap();
         assert_eq!((position, completed), (16.0, 1));
+    }
+
+    /// The whole way through the player: a partial download ticked at its false
+    /// end, the rest arrives, and the first save of the real file clears it. A
+    /// better copy of the same length keeps it.
+    #[test]
+    fn playing_a_file_that_changed_size_decides_its_tick() {
+        for (old, new, stays) in [(600.0, 5400.0, false), (5400.0, 5400.0, true)] {
+            let conn = loose_library();
+            conn.execute_batch(
+                "INSERT INTO library_roots (id, path, kind, added_at) VALUES (1, 'D:/TV', 'tv', 0);
+                 INSERT INTO media_files (id, root_id, path, parent_dir, file_name, extension,
+                                          size_bytes, modified_at, first_seen_at, last_seen_at)
+                 VALUES (1, 1, 'D:/TV/a.mkv', 'D:/TV', 'a.mkv', 'mkv', 1, 0, 0, 0);",
+            )
+            .unwrap();
+            store_progress(&conn, 1, old, Some(old), true, 1).unwrap();
+            crate::history::file_changed_size(&conn, 1).unwrap();
+            store_progress(&conn, 1, 30.0, Some(new), false, 2).unwrap();
+            let completed: i64 = conn
+                .query_row("SELECT completed FROM playback_state WHERE file_id = 1", [], |r| r.get(0))
+                .unwrap();
+            assert_eq!(completed == 1, stays, "{old} then {new}");
+        }
     }
 
     fn loose_library() -> rusqlite::Connection {

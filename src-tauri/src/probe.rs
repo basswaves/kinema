@@ -648,6 +648,10 @@ pub(crate) fn save(
              details = excluded.details, error = excluded.error",
         params![file.id, file.size, file.modified, PROBE_VERSION, now_secs(), details, error],
     )?;
+    // A file that changed size: its new length decides what it was before.
+    if let Some(length) = result.as_ref().ok().and_then(|details| details.duration_secs) {
+        crate::history::settle_old_copy(conn, file.id, length)?;
+    }
     Ok(())
 }
 
@@ -1235,6 +1239,30 @@ mod tests {
         )
         .unwrap();
         conn
+    }
+
+    /// Reading the new file is enough: nobody has to play it for a partial
+    /// download's false tick to go.
+    #[test]
+    fn reading_a_file_that_changed_size_decides_its_tick() {
+        let conn = library();
+        conn.execute(
+            "INSERT INTO playback_state (file_id, position_secs, duration_secs, completed, updated_at)
+             VALUES (1, 0, 600, 1, 0)",
+            [],
+        )
+        .unwrap();
+        crate::history::file_changed_size(&conn, 1).unwrap();
+        let file = Pending { id: 1, path: String::new(), size: 300, modified: 6 };
+        let read = |secs| Ok(MediaDetails { duration_secs: Some(secs), ..Default::default() });
+        let ticked = |conn: &Connection| -> i64 {
+            conn.query_row("SELECT completed FROM playback_state WHERE file_id = 1", [], |r| r.get(0))
+                .unwrap()
+        };
+        save(&conn, &file, &read(610.0)).unwrap();
+        assert_eq!(ticked(&conn), 1, "as long as the old copy: nothing shown");
+        save(&conn, &file, &read(5400.0)).unwrap();
+        assert_eq!(ticked(&conn), 0);
     }
 
     fn pending_ids(conn: &Connection) -> Vec<i64> {

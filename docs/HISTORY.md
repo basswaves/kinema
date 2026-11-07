@@ -4241,6 +4241,34 @@ stay; every change below either refuses more, or asks a better question.
 Files already matched keep their match: only refusals are asked again (GOTCHAS,
 "A rule change does not reach a file that is already matched").
 
+### A watched tick clears only when the old copy is shown to be partial (2026-11)
+
+A file that changed size used to lose its tick for good, in `watch_history` too.
+The rule was written for one case: a partial download plays, reaches its false end
+and is marked watched, then the rest arrives. It also took the tick from a film
+swapped for a better copy under the same name, and from a whole library at once if
+a tool rewrote it (0 of 1200 ticks left, in the test that replaced the old one), and
+it contradicted `history.rs`, which promised an upgraded copy keeps its history. The
+owner chose: **the tick clears only when the old copy is shown to be partial.**
+
+A size says nothing by itself, since a better copy is bigger too. So the scanner now
+keeps the length of the copy the tick was earned on (`playback_state.old_copy_secs`,
+schema 37) and the tick stays. The decision comes when a length is known:
+
+- the new file's, from ffprobe or from the player's first save: partial when the old
+  run is under 70 % of it. Not nearer, because the long extended cuts run about 75 %
+  theatrical against extended, and those are not downloads that finished;
+- the title's, from the metadata, at the scan itself: partial under 50 % of it. This
+  is what covers a device with no ffprobe (Android) and a file not played again. Lower,
+  because it describes the title and not this file.
+
+No length to compare (ticked by hand, imported, from another copy) means it cannot be
+shown, and the tick stays. A file still arriving keeps the *first* length through every
+change, so a short step at a time cannot walk past the rule. Finishing the new copy, or
+ticking it by hand, ends the question. Accepted: a false tick from a download that got
+past 70 % stays, and with no ffprobe and no metadata runtime a false tick stays until
+the file is played. A tick lost by the old rule does not come back.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

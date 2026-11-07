@@ -21,9 +21,11 @@
 //!   history takes it, and every other copy of the same episode follows;
 //! * **a file is matched** — a moved, renamed, upgraded or re-added copy picks
 //!   up the episode's history, if the history is newer than its own;
-//! * **a file grows** — a partial download marked watched against a duration
-//!   that was never real forgets it, in the history too, so the next match
-//!   does not bring the false tick back.
+//! * **a file changes size** — a copy swapped for a better one under the same
+//!   name keeps its history like any other upgrade. Only an old copy shown to
+//!   have been partial — a download marked watched against a duration that was
+//!   never real — forgets the tick, in the history too, so the next match does
+//!   not bring it back ([`file_changed_size`]).
 //!
 //! A copy's own `duration_secs` is never overwritten from another copy: it is
 //! what TheIntroDB is asked with to tell releases apart, and another release's
@@ -430,10 +432,99 @@ pub fn merge(conn: &Connection, c: &Carried) -> rusqlite::Result<Merged> {
     Ok(outcome)
 }
 
-/// The file's bytes changed size — a partial download that has grown. Whatever
-/// was marked watched against the short version was never real, so the
-/// episode forgets it too. The position is kept, as the scanner keeps it.
-pub fn forget_completion(conn: &Connection, file_id: i64) -> rusqlite::Result<()> {
+/// The old copy is called partial when its run is shorter than this share of the
+/// new file. Far enough down that a longer cut is not taken for a download that
+/// finished: the long extended cuts run about 75 % theatrical against extended.
+const PARTIAL_OF_NEW: f64 = 0.7;
+
+/// The same, against the length the metadata gives the film or episode. Lower,
+/// because it is weaker evidence: it describes the title and not this file.
+const PARTIAL_OF_RUNTIME: f64 = 0.5;
+
+/// The file's bytes changed size. That alone says nothing about what was
+/// watched: a better copy under the same name, or a tool adding a subtitle
+/// track, changes it too, and a whole library can be rewritten at once. So the
+/// tick stays, and the length of the copy it was earned on is kept beside it,
+/// to be held against the new length when that is known ([`settle_old_copy`]).
+/// A tick with no known length (ticked by hand, imported, or from another copy)
+/// can never be shown partial, and stays.
+///
+/// Called on every change while a file is still growing: the first length is
+/// kept, since that is the copy the tick was earned on.
+///
+/// The length itself goes either way: it is what TheIntroDB is asked with, and
+/// the old copy's would fetch another release's markers.
+pub fn file_changed_size(conn: &Connection, file_id: i64) -> rusqlite::Result<()> {
+    conn.execute(
+        "UPDATE playback_state
+            SET old_copy_secs = CASE WHEN completed = 1
+                                     THEN COALESCE(old_copy_secs, duration_secs) END,
+                duration_secs = NULL
+          WHERE file_id = ?1",
+        [file_id],
+    )?;
+    // Without ffprobe, and with the film not played again, the metadata is the
+    // only length there is.
+    if let Some(runtime) = runtime_secs(conn, file_id)? {
+        if old_copy_secs(conn, file_id)?.is_some_and(|old| old < runtime * PARTIAL_OF_RUNTIME) {
+            crate::log!("history: file {file_id} changed size; its old copy was partial");
+            forget_tick(conn, file_id)?;
+        }
+    }
+    Ok(())
+}
+
+/// The file's new length has become known, from reading the file or from the
+/// player. If it shows the old copy was partial, the tick was never real.
+/// Otherwise the old length stays: a file still arriving may be longer next time.
+pub fn settle_old_copy(conn: &Connection, file_id: i64, new_secs: f64) -> rusqlite::Result<()> {
+    if new_secs > 0.0
+        && old_copy_secs(conn, file_id)?.is_some_and(|old| old < new_secs * PARTIAL_OF_NEW)
+    {
+        crate::log!("history: file {file_id} is longer than the copy marked watched; tick cleared");
+        forget_tick(conn, file_id)?;
+    }
+    Ok(())
+}
+
+fn old_copy_secs(conn: &Connection, file_id: i64) -> rusqlite::Result<Option<f64>> {
+    conn.query_row(
+        "SELECT old_copy_secs FROM playback_state WHERE file_id = ?1 AND completed = 1",
+        [file_id],
+        |r| r.get(0),
+    )
+    .optional()
+    .map(Option::flatten)
+}
+
+/// The length the metadata gives what this file shows, if it is matched.
+fn runtime_secs(conn: &Connection, file_id: i64) -> rusqlite::Result<Option<f64>> {
+    let minutes: Option<i64> = conn
+        .query_row(
+            "SELECT CASE WHEN t.kind = 'movie' THEN t.runtime_mins
+                         ELSE (SELECT e.runtime_mins FROM episodes e
+                                WHERE e.title_id = t.id AND e.season = m.parsed_season
+                                  AND e.episode = m.parsed_episode) END
+               FROM media_files m JOIN titles t ON t.id = m.title_id
+              WHERE m.id = ?1",
+            [file_id],
+            |r| r.get(0),
+        )
+        .optional()?
+        .flatten();
+    Ok(minutes.filter(|m| *m > 0).map(|m| m as f64 * 60.0))
+}
+
+/// Forget a tick that was never real, in the history too. The position is kept.
+fn forget_tick(conn: &Connection, file_id: i64) -> rusqlite::Result<()> {
+    conn.execute(
+        "UPDATE playback_state SET completed = 0, old_copy_secs = NULL WHERE file_id = ?1",
+        [file_id],
+    )?;
+    forget_completion(conn, file_id)
+}
+
+fn forget_completion(conn: &Connection, file_id: i64) -> rusqlite::Result<()> {
     for item in items_of(conn, file_id)? {
         if let Some((id, _)) = find(conn, &item)? {
             conn.execute(
@@ -624,19 +715,100 @@ mod tests {
         assert_eq!(state(&conn, 2), Some((2900.0, true, None)));
     }
 
+    /// Set a file's tick as one run of `secs` would, then change its size.
+    fn ticked_then_resized(conn: &Connection, secs: f64) {
+        file(conn, 1, Some(4), 4, 5);
+        play(conn, 1, 0.0, true, 100);
+        conn.execute("UPDATE playback_state SET duration_secs = ?1", [secs]).unwrap();
+        file_changed_size(conn, 1).unwrap();
+    }
+
+    /// The tick shown by a second copy matched later, which reads the history.
+    fn tick_in_history(conn: &Connection) -> bool {
+        file(conn, 2, None, 4, 5);
+        match_to(conn, 2, 4);
+        state(conn, 2).unwrap().1
+    }
+
     /// A partial download marked watched, then completed: the tick was never
     /// real, and a later match must not bring it back from the history.
     #[test]
-    fn a_grown_file_forgets_it_was_watched_everywhere() {
+    fn an_old_copy_shown_partial_forgets_the_tick_everywhere() {
+        let conn = library();
+        ticked_then_resized(&conn, 600.0);
+        settle_old_copy(&conn, 1, 5400.0).unwrap();
+        assert_eq!(state(&conn, 1), Some((0.0, false, None)));
+        assert!(!tick_in_history(&conn));
+    }
+
+    /// A better copy of the same film: the same length, the same tick, in the
+    /// history too. So is a longer cut, which is not a download that finished.
+    #[test]
+    fn a_better_copy_or_a_longer_cut_keeps_the_tick_everywhere() {
+        let conn = library();
+        ticked_then_resized(&conn, 5400.0);
+        settle_old_copy(&conn, 1, 5403.0).unwrap();
+        settle_old_copy(&conn, 1, 7000.0).unwrap();
+        assert_eq!(state(&conn, 1), Some((0.0, true, None)));
+        assert!(tick_in_history(&conn));
+    }
+
+    /// Length read while a download still arrives, a little longer each time:
+    /// each step alone proves nothing, the whole file does.
+    #[test]
+    fn a_file_still_growing_is_judged_against_the_copy_the_tick_was_earned_on() {
+        let conn = library();
+        ticked_then_resized(&conn, 600.0);
+        settle_old_copy(&conn, 1, 650.0).unwrap();
+        assert!(state(&conn, 1).unwrap().1, "not shown partial yet");
+        conn.execute("UPDATE playback_state SET duration_secs = 650", []).unwrap();
+        file_changed_size(&conn, 1).unwrap();
+        settle_old_copy(&conn, 1, 800.0).unwrap();
+        assert!(state(&conn, 1).unwrap().1, "still not");
+        file_changed_size(&conn, 1).unwrap();
+        settle_old_copy(&conn, 1, 5400.0).unwrap();
+        assert!(!state(&conn, 1).unwrap().1);
+    }
+
+    /// Ticked by hand, imported or from another copy: no run to hold against
+    /// the new length, so it can never be shown partial.
+    #[test]
+    fn a_tick_with_no_known_length_stays() {
         let conn = library();
         file(&conn, 1, Some(4), 4, 5);
-        play(&conn, 1, 300.0, true, 100);
-        conn.execute("UPDATE playback_state SET completed = 0, duration_secs = NULL", []).unwrap();
-        forget_completion(&conn, 1).unwrap();
+        play(&conn, 1, 0.0, true, 100);
+        conn.execute("UPDATE playback_state SET duration_secs = NULL", []).unwrap();
+        file_changed_size(&conn, 1).unwrap();
+        settle_old_copy(&conn, 1, 5400.0).unwrap();
+        assert!(state(&conn, 1).unwrap().1);
+    }
 
-        file(&conn, 2, None, 4, 5);
-        match_to(&conn, 2, 4);
-        assert_eq!(state(&conn, 2), Some((300.0, false, None)));
+    /// No ffprobe, not played again (Android, say): a run far shorter than the
+    /// episode's known length shows it at the scan.
+    #[test]
+    fn a_run_far_shorter_than_the_known_runtime_is_partial_at_once() {
+        let conn = library();
+        conn.execute(
+            "INSERT INTO episodes (title_id, season, episode, runtime_mins) VALUES (4, 4, 5, 45)",
+            [],
+        )
+        .unwrap();
+        ticked_then_resized(&conn, 600.0);
+        assert!(!state(&conn, 1).unwrap().1);
+        assert!(!tick_in_history(&conn));
+    }
+
+    /// A run close to the known length is not touched by it.
+    #[test]
+    fn a_run_near_the_known_runtime_stays_at_the_scan() {
+        let conn = library();
+        conn.execute(
+            "INSERT INTO episodes (title_id, season, episode, runtime_mins) VALUES (4, 4, 5, 45)",
+            [],
+        )
+        .unwrap();
+        ticked_then_resized(&conn, 2500.0);
+        assert!(state(&conn, 1).unwrap().1);
     }
 
     /// A file that remembers something newer keeps it.

@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use std::path::Path;
 
 /// The schema this build understands. Bump it with every new `SCHEMA_V*`.
-pub const SCHEMA_VERSION: i64 = 36;
+pub const SCHEMA_VERSION: i64 = 37;
 
 /// What can go wrong opening the library.
 ///
@@ -915,6 +915,13 @@ CREATE TABLE poster_choice (
 );
 "#;
 
+/// Schema version 37: the length of the copy a tick was earned on, kept when the
+/// file changes size, until the new copy's length says whether the old one was a
+/// partial download (`history::file_changed_size`).
+const SCHEMA_V37: &str = r#"
+ALTER TABLE playback_state ADD COLUMN old_copy_secs REAL;
+"#;
+
 /// How long a statement waits for the write lock before giving up.
 ///
 /// Load-bearing from the moment there is more than one connection. SQLite
@@ -1137,7 +1144,7 @@ pub(crate) const MIGRATIONS: [&str; SCHEMA_VERSION as usize] = [
     SCHEMA_V15, SCHEMA_V16, SCHEMA_V17, SCHEMA_V18, SCHEMA_V19,
     SCHEMA_V20, SCHEMA_V21, SCHEMA_V22, SCHEMA_V23, SCHEMA_V24, SCHEMA_V25,
     SCHEMA_V26, SCHEMA_V27, SCHEMA_V28, SCHEMA_V29, SCHEMA_V30, SCHEMA_V31,
-    SCHEMA_V32, SCHEMA_V33, SCHEMA_V34, SCHEMA_V35, SCHEMA_V36,
+    SCHEMA_V32, SCHEMA_V33, SCHEMA_V34, SCHEMA_V35, SCHEMA_V36, SCHEMA_V37,
 ];
 
 /// Bring the database up to [`SCHEMA_VERSION`].

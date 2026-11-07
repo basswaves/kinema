@@ -514,13 +514,6 @@ fn write_batch(
                 SET size_bytes = ?2, modified_at = ?3, last_seen_at = ?4, missing = 0
               WHERE id = ?1",
         )?;
-        // …and forget that the old bytes were watched. See `resize_forgets_progress`
-        // below for why this is keyed on the size alone.
-        let mut resize = tx.prepare(
-            "UPDATE playback_state
-                SET completed = 0, duration_secs = NULL
-              WHERE file_id = ?1",
-        )?;
 
         for file in batch {
             let existing: Option<(i64, i64, i64, bool)> = select
@@ -540,22 +533,20 @@ fn write_batch(
                 }
                 Some((id, old_size, _, _)) => {
                     update.execute(params![id, file.size, file.modified, now])?;
-                    // A file that changed *size* is different content, and
-                    // "watched" is a claim about content. The commonest way this
-                    // happens is a download or a copy that was scanned before it
-                    // finished: the partial file plays — MKV streams happily from
-                    // an incomplete file — reaches its short end, and
-                    // `save_progress` marks it complete at 94% of a duration that
-                    // was never the real one. The flag then survives the full file
-                    // arriving, and the episode is silently never offered again.
+                    // A file that changed *size* may be a download or a copy
+                    // scanned before it finished: the partial file plays — MKV
+                    // streams happily from an incomplete file — reaches its short
+                    // end, and `save_progress` marks it complete at 94% of a
+                    // duration that was never the real one. It may just as well
+                    // be a better copy, or a tool rewriting the file, so the tick
+                    // is decided once the new length is known. See
+                    // `history::file_changed_size`.
                     //
                     // **Size only, never mtime.** An mtime moves for reasons that
                     // are not content: another tool writing metadata, a copy
-                    // between drives, a NAS touching a file. Clearing watch state
-                    // on mtime would let moving a library wipe every tick in it.
+                    // between drives, a NAS touching a file.
                     if old_size != file.size {
-                        resize.execute(params![id])?;
-                        crate::history::forget_completion(&tx, id)?;
+                        crate::history::file_changed_size(&tx, id)?;
                     }
                     report.files_updated += 1;
                 }
@@ -761,11 +752,12 @@ mod tests {
         .unwrap()
     }
 
-    /// The bug this exists for: a partial download plays, reaches its short
-    /// end, and is marked complete against a duration that was never real. When
-    /// the rest of the file arrives the episode must not still count as watched.
+    /// A size alone says nothing about what was watched: a film swapped for a
+    /// better copy under the same name, or a tool adding a subtitle track,
+    /// changes it too (review 2026-11, finding 1; the owner's choice). The tick
+    /// stays until the old copy is shown to have been partial.
     #[test]
-    fn a_file_that_grows_forgets_it_was_watched() {
+    fn a_file_that_changes_size_keeps_its_tick_until_shown_partial() {
         let mut conn = database("grew");
         let id = watched_file(&mut conn, 60_000_000, 100);
 
@@ -773,9 +765,41 @@ mod tests {
         write_batch(&mut conn, 1, 1, &[seen(500_000_000, 200)], &mut report).unwrap();
 
         assert_eq!(report.files_updated, 1);
-        // The duration goes with it: it is what gets sent to TheIntroDB to tell
-        // releases apart, and a truncated one fetches the wrong release.
-        assert_eq!(completion(&conn, id), (0, None));
+        // The duration goes, though: it is what gets sent to TheIntroDB to tell
+        // releases apart, and the old copy's fetches the wrong release.
+        assert_eq!(completion(&conn, id), (1, None));
+    }
+
+    /// A tool run over a whole library: every file changes size in one scan,
+    /// and no tick goes.
+    #[test]
+    fn a_whole_library_rewritten_at_once_keeps_every_tick() {
+        let mut conn = database("rewritten");
+        let files: Vec<SeenFile> = (0..1200)
+            .map(|n| SeenFile { path: format!(r"C:\media\{n}.mkv"), ..seen(1000 + n, 100) })
+            .collect();
+        let mut report = ScanReport::default();
+        for batch in files.chunks(WRITE_BATCH) {
+            write_batch(&mut conn, 1, 0, batch, &mut report).unwrap();
+        }
+        conn.execute_batch(
+            "INSERT INTO playback_state (file_id, position_secs, duration_secs, completed, updated_at)
+             SELECT id, 0, 6000, 1, 0 FROM media_files",
+        )
+        .unwrap();
+
+        let rewritten: Vec<SeenFile> = (0..1200)
+            .map(|n| SeenFile { path: format!(r"C:\media\{n}.mkv"), ..seen(9000 + n, 200) })
+            .collect();
+        let mut report = ScanReport::default();
+        for batch in rewritten.chunks(WRITE_BATCH) {
+            write_batch(&mut conn, 1, 1, batch, &mut report).unwrap();
+        }
+        assert_eq!(report.files_updated, 1200);
+        let ticks: i64 = conn
+            .query_row("SELECT COUNT(*) FROM playback_state WHERE completed = 1", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(ticks, 1200);
     }
 
     /// **The other half, and the more dangerous one to get wrong.** An mtime

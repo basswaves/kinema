@@ -261,7 +261,7 @@ test('Android: subtitle files beside the film, hiding subtitles, and finding the
   });
 
   // Subtitles off hides them and keeps the track; Find online adds one.
-  const off = panel.locator('.track-option', { hasText: 'Off' });
+  const off = panel.locator('.track-option', { hasText: /^Off$/ });
   for (let i = 0; i < 10 && !(await off.evaluate((el) => el.classList.contains('focused'))); i++) {
     await press(page, 'ArrowUp');
   }
@@ -270,9 +270,22 @@ test('Android: subtitle files beside the film, hiding subtitles, and finding the
     name: 'show_subtitles',
     args: { visible: false },
   });
-  const find = panel.locator('.track-online');
-  for (let i = 0; i < 12 && !(await find.evaluate((el) => el.classList.contains('focused'))); i++) {
+  // The box behind the words reaches Media3; there is no size here to press.
+  const box = panel.locator('.track-option', { hasText: 'Dark box behind' });
+  await expect(box).toHaveText('Dark box behind: Off');
+  await expect(panel.locator('.track-option', { hasText: /^Size:/ })).toHaveCount(0);
+  for (let i = 0; i < 20 && !(await box.evaluate((el) => el.classList.contains('focused'))); i++) {
     await press(page, 'ArrowDown');
+  }
+  await press(page, 'Enter');
+  await expect.poll(async () => (await media3(page)).commands.at(-1)).toEqual({
+    name: 'set_subtitle_box',
+    args: { box: true },
+  });
+  await expect(box).toHaveText('Dark box behind: On');
+  const find = panel.locator('.track-online');
+  for (let i = 0; i < 20 && !(await find.evaluate((el) => el.classList.contains('focused'))); i++) {
+    await press(page, 'ArrowUp');
   }
   await press(page, 'Enter');
   await expect(panel.locator('.track-note', { hasText: 'Showing' })).toContainText(

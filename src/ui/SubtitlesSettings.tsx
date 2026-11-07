@@ -43,7 +43,8 @@ import {
 /**
  * Subtitle size and the box behind them, for the screen this window is on.
  * Readability — the distance to the screen and the eyes watching — never a
- * look to pick (HISTORY, round 5). Media3 draws Android's captions itself.
+ * look to pick (HISTORY, round 5). Media3 draws Android's captions itself:
+ * there the box only, for the device's one screen.
  */
 export function SubtitleStyleRows({ onError }: { onError: (message: string) => void }) {
   const caps = useCapabilities();
@@ -52,27 +53,45 @@ export function SubtitleStyleRows({ onError }: { onError: (message: string) => v
   const desktop = caps?.engine !== 'media3';
 
   useEffect(() => {
-    if (!desktop) return;
+    if (!caps) return;
     void (async () => {
-      const here = await screenHere();
+      const here = desktop ? await screenHere() : { id: null, name: null };
       setScreen(here);
       setStyle(await readSubStyle(here.id));
     })();
-  }, [desktop]);
+  }, [caps, desktop]);
 
-  if (!desktop) {
-    return (
-      <p className="settings-hint">
-        Subtitle size and a dark box behind them are on computers only for now.
-      </p>
-    );
-  }
   if (!style || !screen) return null;
   const change = (next: SubStyle) => {
     setStyle(next);
     void saveSubStyle(screen.id, next).catch((e) => onError(userError(e)));
   };
   const where = screen.name ? `on ${screen.name}` : 'on this screen';
+  const box = (
+    <ChoiceRow
+      label="Dark box behind subtitles"
+      choices={[
+        { value: 'off', label: 'Off' },
+        { value: 'on', label: 'On' },
+      ]}
+      value={style.box ? 'on' : 'off'}
+      onChange={(v) => change({ ...style, box: v === 'on' })}
+      note="A dark box behind each line, so white text stays readable on a bright picture. Also for forced subtitles and those from OpenSubtitles."
+      hint={
+        desktop
+          ? 'Text subtitles only: picture subtitles carry their own background, and subtitles with their own styling keep it.'
+          : 'Text subtitles only: picture subtitles carry their own background.'
+      }
+    />
+  );
+  if (!desktop) {
+    return (
+      <>
+        {box}
+        <p className="settings-hint">Subtitle size is on computers only for now.</p>
+      </>
+    );
+  }
   return (
     <>
       <ChoiceRow
@@ -83,17 +102,7 @@ export function SubtitleStyleRows({ onError }: { onError: (message: string) => v
         note={`How big subtitles are drawn ${where} — for the distance you sit from it and the eyes watching. Each screen keeps its own; the player's Audio & subtitles panel changes it too.`}
         hint="Picture subtitles (Blu-ray, DVD) are drawn pictures: they only change size. Subtitles with their own styling keep their look."
       />
-      <ChoiceRow
-        label="Dark box behind subtitles"
-        choices={[
-          { value: 'off', label: 'Off' },
-          { value: 'on', label: 'On' },
-        ]}
-        value={style.box ? 'on' : 'off'}
-        onChange={(v) => change({ ...style, box: v === 'on' })}
-        note="A dark box behind each line, so white text stays readable on a bright picture. Also for forced subtitles and those from OpenSubtitles."
-        hint="Text subtitles only: picture subtitles carry their own background, and subtitles with their own styling keep it."
-      />
+      {box}
     </>
   );
 }

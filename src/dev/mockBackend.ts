@@ -2262,6 +2262,7 @@ const handlers: Record<string, Handler> = {
   'plugin:media3|tracks': () => fakeMedia3.tracks(),
   'plugin:media3|select_track': (a) => fakeMedia3.selectTrack(a),
   'plugin:media3|show_subtitles': (a) => fakeMedia3.showSubtitles(a),
+  'plugin:media3|set_subtitle_box': (a) => fakeMedia3.setSubtitleBox(a),
   'plugin:media3|add_subtitle': (a) => fakeMedia3.addSubtitle(a),
   'plugin:media3|facts': () => fakeMedia3.facts(),
   'plugin:media3|decoder_limits': () => fakeMedia3.decoderLimits(),

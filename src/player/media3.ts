@@ -113,6 +113,7 @@ export const tracks = () => call<{ tracks: Track[] }>('tracks').then((r) => r.tr
 /** Answers once Media3 has made the choice, so tracks read after it say so. */
 export const selectTrack = (kind: 'audio' | 'sub', id: number) => call('select_track', { kind, id });
 export const showSubtitles = (visible: boolean) => call('show_subtitles', { visible });
+export const setSubtitleBox = (box: boolean) => call('set_subtitle_box', { box });
 
 export interface State {
   path: string | null;

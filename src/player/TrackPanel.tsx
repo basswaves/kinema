@@ -150,6 +150,7 @@ export default function TrackPanel({
   playlistItem,
   subStyle,
   onSubStyle,
+  subSizes = true,
   delay,
   level,
   timing,
@@ -176,9 +177,11 @@ export default function TrackPanel({
   playlistItem?: NewItem | null;
   /**
    * How big the subtitles are drawn on this screen, and the box behind them
-   * (subtitleStyle.ts). None where Media3 draws them (Android).
+   * (subtitleStyle.ts). Where Media3 draws them (Android) the box alone:
+   * `subSizes` is false.
    */
   subStyle?: SubStyle | null;
+  subSizes?: boolean;
   onSubStyle?: (style: SubStyle) => void;
   /**
    * The sound delay kept for the device the sound goes to (audioDelay.ts),
@@ -406,12 +409,14 @@ export default function TrackPanel({
             <div className="track-panel-head">
               <span>Reading them</span>
             </div>
-            <FocusButton
-              className="track-option"
-              onSelect={() => onSubStyle({ ...subStyle, size: nextSize(subStyle.size) })}
-            >
-              Size: {sizeLabel(subStyle.size)}
-            </FocusButton>
+            {subSizes && (
+              <FocusButton
+                className="track-option"
+                onSelect={() => onSubStyle({ ...subStyle, size: nextSize(subStyle.size) })}
+              >
+                Size: {sizeLabel(subStyle.size)}
+              </FocusButton>
+            )}
             <FocusButton
               className={`track-option ${subStyle.box ? 'active' : ''}`}
               onSelect={() => onSubStyle({ ...subStyle, box: !subStyle.box })}
@@ -419,9 +424,11 @@ export default function TrackPanel({
               Dark box behind: {subStyle.box ? 'On' : 'Off'}
             </FocusButton>
             <p className="track-note">
-              {pictureShown
-                ? 'No box on picture subtitles: they are drawn as made, and only change size.'
-                : 'For this screen. Picture subtitles (Blu-ray, DVD) only change size.'}
+              {!subSizes
+                ? 'No box on picture subtitles (Blu-ray, DVD): they are drawn as made.'
+                : pictureShown
+                  ? 'No box on picture subtitles: they are drawn as made, and only change size.'
+                  : 'For this screen. Picture subtitles (Blu-ray, DVD) only change size.'}
             </p>
           </>
         )}

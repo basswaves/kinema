@@ -297,6 +297,11 @@ export function addSubtitle(args: Record<string, unknown>): null {
   return null;
 }
 
+export function setSubtitleBox(args: Record<string, unknown>): null {
+  record('set_subtitle_box', args);
+  return null;
+}
+
 export function showSubtitles(args: Record<string, unknown>): null {
   record('show_subtitles', args);
   state.subtitlesShown = Boolean(args.visible);

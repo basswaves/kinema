@@ -13,11 +13,14 @@
  *  - subtitles with their own styling (typeset ASS) keep their look, scaled;
  *  - picture subtitles (Blu-ray PGS, DVD) are drawn pictures: scaled only.
  * The film's own tracks, forced subtitles and OpenSubtitles files are all
- * drawn by the same mpv, so all of them follow. Desktop only: on Android
- * Media3 draws its own captions (Media3Plugin.kt), which this does not reach.
+ * drawn by the same mpv, so all of them follow.
+ *
+ * On Android Media3 draws the captions (Media3Plugin.kt) and only the box
+ * reaches them, as the caption background behind the words; the size is still
+ * computers only. A device has one screen, kept as UNKNOWN_SCREEN.
  */
 import { getSetting, setSetting } from '../metadata/api';
-import { hasMpv, mpvCommand, readProperty } from './engine';
+import { hasMpv, mpvCommand, readProperty, setCaptionBox } from './engine';
 
 export type SubSize = 'small' | 'normal' | 'large' | 'larger';
 
@@ -152,7 +155,7 @@ async function set(name: string, value: string): Promise<boolean> {
  * refuses that too costs only the box, said in the log — never the film.
  */
 export async function applySubStyle(style: SubStyle): Promise<void> {
-  if (!hasMpv()) return;
+  if (!hasMpv()) return setCaptionBox(style.box);
   if (!plain) {
     const [borderStyle, backColor, borderColor] = await Promise.all([
       readProperty<string>('sub-border-style', 'string'),

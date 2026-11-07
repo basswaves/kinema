@@ -534,7 +534,8 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           online={onlinePanel}
           onClose={closeTracks}
           onDetails={openStatsFromTracks}
-          subStyle={hasMpv() ? subStyle : null}
+          subStyle={subStyle}
+          subSizes={hasMpv()}
           onSubStyle={(style) => void changeSubStyle(style)}
           delay={hasMpv() ? { ms: delayMs, onChange: changeDelay } : null}
           timing={hasMpv() ? { ms: subDelayMs, onChange: changeTiming } : null}

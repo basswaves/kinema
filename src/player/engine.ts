@@ -770,6 +770,11 @@ export async function chooseSecondTrack(id: number | null): Promise<void> {
 }
 
 /** Show or hide the subtitles, keeping the track chosen. */
+/** The box behind Media3's captions (subtitleStyle.ts); mpv's has its own options. */
+export async function setCaptionBox(box: boolean): Promise<void> {
+  if (isMedia3()) return media3.setSubtitleBox(box);
+}
+
 export async function showSubtitles(visible: boolean): Promise<void> {
   if (isMedia3()) return media3.showSubtitles(visible);
   await command('set', ['sub-visibility', visible ? 'yes' : 'no']);

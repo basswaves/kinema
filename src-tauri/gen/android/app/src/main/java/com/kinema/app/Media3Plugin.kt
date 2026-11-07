@@ -134,6 +134,11 @@ class ShowArgs {
 }
 
 @InvokeArg
+class BoxArgs {
+  var box: Boolean = false
+}
+
+@InvokeArg
 class SeekArgs {
   var seconds: Double = 0.0
   /** Relative to where it is, rather than from the start. */
@@ -212,6 +217,7 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
    * (owner, 2026-10-05), drawn the way mpv draws them on the desktop.
    */
   private var subtitleView: SubtitleView? = null
+  private var subtitleBox = false
   /**
    * What is open, with its subtitle files: kept so the film can be opened
    * again as it is — after a sound fallback, or with a subtitle added.
@@ -404,14 +410,7 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
     surface = s
     pictureFrame = frame
     val subs = SubtitleView(activity)
-    // mpv's look on the desktop: white letters with a black outline, no box,
-    // 38 of 720 lines high and 22 above the bottom edge (mpv's defaults).
-    subs.setStyle(
-      CaptionStyleCompat(
-        Color.WHITE, Color.TRANSPARENT, Color.TRANSPARENT,
-        CaptionStyleCompat.EDGE_TYPE_OUTLINE, Color.BLACK, Typeface.SANS_SERIF,
-      )
-    )
+    applySubtitleStyle(subs)
     subs.setFractionalTextSize(38f / 720f)
     subs.setBottomPaddingFraction(22f / 720f)
     // Above the film, beneath the page.
@@ -449,6 +448,21 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
     lp.height = h
     s.layoutParams = lp
     Log.i("Kinema", "media3: picture ${v.width}x${v.height} (pixels ${v.pixelWidthHeightRatio}) on ${frame.width}x${frame.height} -> ${w}x${h}")
+  }
+
+  /**
+   * mpv's look on the desktop: white letters with a black outline, 38 of 720
+   * lines high and 22 above the bottom edge (mpv's defaults). The dark box is
+   * the caption background behind the words, as solid as the desktop's
+   * (subtitleStyle.ts); a picture subtitle has no words and takes none.
+   */
+  private fun applySubtitleStyle(view: SubtitleView) {
+    view.setStyle(
+      CaptionStyleCompat(
+        Color.WHITE, if (subtitleBox) 0xC0000000.toInt() else Color.TRANSPARENT, Color.TRANSPARENT,
+        CaptionStyleCompat.EDGE_TYPE_OUTLINE, Color.BLACK, Typeface.SANS_SERIF,
+      )
+    )
   }
 
   /** The subtitle layer shows or not; the chosen track stays chosen either way. */
@@ -1263,6 +1277,17 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
     main.post {
       subtitlesShown = args.visible
       showOrHideSubtitles()
+      invoke.resolve()
+    }
+  }
+
+  /** A dark box behind the words from now on, and on any layer made later. */
+  @Command
+  fun setSubtitleBox(invoke: Invoke) {
+    val args = invoke.parseArgs(BoxArgs::class.java)
+    main.post {
+      subtitleBox = args.box
+      subtitleView?.let { applySubtitleStyle(it) }
       invoke.resolve()
     }
   }

@@ -58,7 +58,7 @@ export function useTracks({
   const [subVisible, setSubVisible] = useState(true);
   /** The second subtitles, drawn at the top (mpv only); null: none. */
   const [sid2, setSid2] = useState<number | null>(null);
-  /** Subtitle size and box for the screen the picture is on (desktop). */
+  /** Subtitle size and box for the screen the picture is on; on Android the box only. */
   const [subStyle, setSubStyle] = useState<SubStyle>(DEFAULT_STYLE);
   const styleScreen = useRef<string | null>(null);
   /**
@@ -75,12 +75,10 @@ export function useTracks({
     // The size first, so the first line is drawn at it. Read per file: the
     // window may have moved to another screen since the last one.
     try {
-      if (hasMpv()) {
-        styleScreen.current = (await screenHere()).id;
-        const style = await readSubStyle(styleScreen.current);
-        setSubStyle(style);
-        await applySubStyle(style);
-      }
+      styleScreen.current = hasMpv() ? (await screenHere()).id : null;
+      const style = await readSubStyle(styleScreen.current);
+      setSubStyle(style);
+      await applySubStyle(style);
     } catch (e) {
       console.warn('could not apply the subtitle size', e);
     }

@@ -189,7 +189,6 @@ export const SETTINGS_INDEX: SettingEntry[] = [
     label: 'Dark box behind subtitles',
     about: 'background black box contrast readable bright picture',
     values: ['Off', 'On'],
-    when: (can) => can.engine !== 'media3',
   },
   {
     section: 'subtitles',

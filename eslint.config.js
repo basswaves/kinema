@@ -6,7 +6,8 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 
 export default tseslint.config(
   // `.claude`: Claude Code's worktrees, whole copies of the project.
-  { ignores: ['dist', 'src-tauri/target', 'node_modules', '.claude'] },
+  // test-results: Playwright empties it while verify's lint walks the tree beside it.
+  { ignores: ['dist', 'src-tauri/target', 'node_modules', '.claude', 'test-results'] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ['**/*.{ts,tsx}'],

@@ -1672,7 +1672,13 @@ const handlers: Record<string, Handler> = {
   },
   list_unparsed: () => [],
   save_parse_results: () => 0,
-  library_stats: () => ({ total: files.length, unparsed: 0, parsed: 0, missing: 0, total_bytes: 0 }),
+  library_stats: () => ({
+    total: EMPTY && !emptyLibrary.scanned ? 0 : files.length,
+    unparsed: 0,
+    parsed: 0,
+    missing: 0,
+    total_bytes: 0,
+  }),
   add_library_root: (a) => {
     // A library that has its folder already gains another (Library → Folders).
     if (emptyLibrary.hasRoot && !EMPTY) {
@@ -2252,6 +2258,12 @@ const handlers: Record<string, Handler> = {
   // Media3, Android's player (Media3Plugin.kt).
   'plugin:media3|register_listener': (a) => fakeMedia3.registerListener(a),
   'plugin:media3|in_front': () => ({ inFront: true }),
+  // Recorded for the flows: what the page asked of the screen, in order.
+  'plugin:media3|hold_screen': (a) => {
+    const w = window as unknown as { __screenHold?: boolean[] };
+    (w.__screenHold ??= []).push(Boolean(a.on));
+    return null;
+  },
   'plugin:media3|remove_listener': (a) => fakeMedia3.removeListener(a),
   'plugin:media3|open': (a) => fakeMedia3.open(a),
   'plugin:media3|stop': () => fakeMedia3.stop(),

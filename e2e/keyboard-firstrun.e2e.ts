@@ -201,6 +201,43 @@ test('first run: where to watch, a folder, then the setup pages, all by remote',
   await expect.poll(() => setting('setup_pages')).toBe('done');
 });
 
+for (const system of ['android', 'windows'] as const) {
+  test(`${system}: a first scan ${
+    system === 'android' ? 'keeps the screen on until it ends' : 'leaves the screen alone'
+  }, and a later one does too`, async ({ page }) => {
+    await page.addInitScript((s) => {
+      if (s === 'android') localStorage.setItem('kinemaMockSystem', 'android');
+      localStorage.setItem('kinemaMockEmpty', '1');
+    }, system);
+    await firstRunToSetupPage(page, system, 'Skipping intros');
+    const asked = () =>
+      page.evaluate(() => (window as unknown as { __screenHold?: boolean[] }).__screenHold ?? []);
+    const setting = () =>
+      page.evaluate(async () => {
+        const path = '/src/metadata/api.ts';
+        const api = await import(/* @vite-ignore */ path);
+        return api.getSetting('first_scan') as Promise<string | null>;
+      });
+    if (system === 'android') {
+      await expect.poll(asked).toEqual([true, false]);
+      await expect.poll(setting).toBe('');
+    } else {
+      await pause(page, 300, 'nothing should come; there is no event for that');
+      expect(await asked()).toEqual([]);
+      expect(await setting()).toBeNull();
+    }
+
+    // The library has its files now: another scan asks nothing of the screen.
+    const before = await asked();
+    await page.evaluate(async () => {
+      const path = '/src/library/pipeline.ts';
+      const pipeline = await import(/* @vite-ignore */ path);
+      await pipeline.runScanPipeline();
+    });
+    expect(await asked()).toEqual(before);
+  });
+}
+
 test('Android: a folder on a USB drive, chosen in Kinema’s own browser', async ({ page }) => {
   await page.setViewportSize({ width: 960, height: 540 });
   await page.addInitScript(() => {

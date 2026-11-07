@@ -2737,12 +2737,17 @@ never ends. A desktop never sets them.
 ### A TV box's screen going off stops a scan, and says nothing until someone is back
 
 When a box goes to sleep at its screen timeout, Kinema has left the screen, so
-the rule above holds the scan there. Nothing keeps a box awake for a scan, and
-a film does stay awake on its own. Seen on a box whose timeout is 60 minutes:
-the scan stopped at the moment the screen went off and went on at wake with
-nothing lost, and the "Picked up after a pause" line only shows once someone is
-there to read it. So a scan longer than the timeout waits unseen. Whether it
-should keep the box awake is the owner's choice, not a bug to fix quietly.
+the rule above holds the scan there. A film stays awake on its own. Seen on a box
+whose timeout is 60 minutes: the scan stopped at the moment the screen went off
+and went on at wake with nothing lost, and the "Picked up after a pause" line
+only shows once someone is there to read it. **Do:** a library's first scan keeps
+the screen on (`screenHold.ts`, Android's `FLAG_KEEP_SCREEN_ON`), on a lease it
+renews as the work moves on, so a step that hangs cannot hold a TV awake for
+good; a film lets go, since a paused one could otherwise do just that. Later
+scans still wait. The flag stays set when Kinema is behind, and Android ignores
+it there: `dumpsys window` showing it proves nothing about the screen, read
+`mWakefulness`. An emulator has `stay_on_while_plugged_in` at 15 and never sleeps
+until that is 0, which looks exactly like a hold that is never let go.
 
 ### Seek parameters do not reach the position Media3 opens at
 

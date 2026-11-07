@@ -44,6 +44,7 @@ import {
 } from './parse';
 import { parseInWorker } from './parseClient';
 import { onBackOnScreen, yieldToPlayback } from './playback';
+import { firstScanFinished, holdScreenIfFirstScan, letScreenGo, scanMovedOn } from './screenHold';
 import { cacheArtwork, findLocalPictures, listUnmatched } from '../metadata/api';
 import {
   backfillTitleDetails,
@@ -125,6 +126,7 @@ let pickedUpTimer: ReturnType<typeof setTimeout> | null = null;
 function setStatus(next: ScanStatus | null): void {
   status = next && pickedUp ? { ...next, waited: true } : next;
   emit();
+  scanMovedOn();
 }
 
 // A scan does nothing behind another app (playback.ts), and someone coming back
@@ -325,6 +327,7 @@ export async function runScanPipeline(): Promise<ScanOutcome> {
 
   try {
     setStatus({ stage: 'scanning', detail: count(roots.length, 'folder') });
+    await holdScreenIfFirstScan();
     const report = await scanLibrary();
     errors.push(...report.errors);
 
@@ -447,10 +450,12 @@ export async function runScanPipeline(): Promise<ScanOutcome> {
       parseError: lastParseError,
       finishedAt: Date.now(),
     };
+    await firstScanFinished();
     return { status: 'done', summary: lastSummary };
   } catch (e) {
     return { status: 'failed', error: String(e) };
   } finally {
+    letScreenGo();
     setStatus(null);
     // ffmpeg arrived while this scan ran; what it skipped before then is
     // done now rather than at the next start.

@@ -16,11 +16,18 @@ const POLL_MS = 1000;
 let playing = false;
 let behind = false;
 const whenBack = new Set<() => void>();
+const onTurn = new Set<() => void>();
+
+/** Called when a film opens or closes, and each time the library's work goes on. */
+export function onLibraryTurn(listener: () => void): void {
+  onTurn.add(listener);
+}
 
 /** The player screen opened (`true`) or closed (`false`). */
 export function setPlaybackActive(on: boolean): void {
   if (playing === on) return;
   playing = on;
+  for (const listener of onTurn) listener();
   // Told to the native side as well; a failure there changes nothing here,
   // and a build without the command (a test, the mock) must not notice.
   try {
@@ -71,4 +78,5 @@ export async function yieldToPlayback(): Promise<void> {
   while (playing || behind) {
     await new Promise<void>((resolve) => setTimeout(resolve, POLL_MS));
   }
+  for (const listener of onTurn) listener();
 }

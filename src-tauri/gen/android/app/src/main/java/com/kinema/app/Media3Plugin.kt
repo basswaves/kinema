@@ -19,6 +19,7 @@ import android.view.Gravity
 import android.view.SurfaceView
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.webkit.WebView
 import android.widget.FrameLayout
 import androidx.media3.common.C
@@ -100,6 +101,13 @@ class SubtitleArg {
 @InvokeArg
 class PausedArgs {
   var paused: Boolean = false
+}
+
+@InvokeArg
+class HoldScreenArgs {
+  var on: Boolean = false
+  /** Let go after this long unless asked again. */
+  var forMs: Long = 0
 }
 
 @InvokeArg
@@ -314,6 +322,35 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
   private fun sayWhereKinemaIs(nowBehind: Boolean) {
     behind = nowBehind
     trigger("presence", JSObject().apply { put("behind", nowBehind) })
+  }
+
+  /** A lease ran out: whoever asked has stopped saying so, and a TV is not left on for it. */
+  private val letScreenGo = Runnable {
+    activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    Log.i("Kinema", "screen hold: lease ran out")
+  }
+
+  /**
+   * The screen stays on while the library's first scan runs (library/screenHold.ts).
+   * A window's flag, so it counts only while Kinema is on the screen, and goes with
+   * the window. No film uses it, and nothing else may be left holding a TV awake.
+   */
+  @Command
+  fun holdScreen(invoke: Invoke) {
+    val args = invoke.parseArgs(HoldScreenArgs::class.java)
+    main.post {
+      main.removeCallbacks(letScreenGo)
+      val flag = WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+      val was = activity.window.attributes.flags and flag != 0
+      if (args.on) {
+        activity.window.addFlags(flag)
+        main.postDelayed(letScreenGo, args.forMs)
+      } else {
+        activity.window.clearFlags(flag)
+      }
+      if (was != args.on) Log.i("Kinema", "screen hold: ${if (args.on) "on" else "off"}")
+      invoke.resolve()
+    }
   }
 
   /** For a page that started while Kinema was already behind: nothing would tell it. */

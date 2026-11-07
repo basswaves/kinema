@@ -32,6 +32,7 @@ fn main() {
             "output",
             "decoder_limits",
             "in_front",
+            "hold_screen",
             "register_listener",
             "remove_listener",
         ])

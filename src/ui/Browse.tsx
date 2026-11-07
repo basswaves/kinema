@@ -6,7 +6,7 @@
  * it keeps typing responsive on a TV remote.
  */
 import { describeError, userError } from './errors';
-import { scanStageWords } from '../library/scanWords';
+import { scanBarWords } from '../library/scanWords';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Home, { HERO_PLAY_FOCUS_KEY } from './Home';
 import { SCAN_OK_KEY } from './HomeNotices';
@@ -1097,7 +1097,7 @@ function TopNav({
         >
           ?
         </FocusButton>
-        {scan && <span className="nav-count">{scanStageWords(scan.stage)}</span>}
+        {scan && <span className="nav-count">{scanBarWords(scan)}</span>}
       </nav>
     </FocusProvider>
   );

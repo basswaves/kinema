@@ -43,7 +43,7 @@ import {
   recordParseError,
 } from './parse';
 import { parseInWorker } from './parseClient';
-import { yieldToPlayback } from './playback';
+import { onBackOnScreen, yieldToPlayback } from './playback';
 import { cacheArtwork, findLocalPictures, listUnmatched } from '../metadata/api';
 import {
   backfillTitleDetails,
@@ -75,6 +75,8 @@ export interface ScanStatus {
   stage: ScanStage;
   /** What it is working on right now — a count, or the title being matched. */
   detail: string;
+  /** It waited while Kinema was behind another app, and has just gone on. */
+  waited?: boolean;
 }
 
 export interface ScanSummary {
@@ -115,10 +117,29 @@ function emit(): void {
   for (const listener of listeners) listener();
 }
 
+/** How long a scan says it has just been waiting, once Kinema is back. */
+const PICKED_UP_MS = 15_000;
+let pickedUp = false;
+let pickedUpTimer: ReturnType<typeof setTimeout> | null = null;
+
 function setStatus(next: ScanStatus | null): void {
-  status = next;
+  status = next && pickedUp ? { ...next, waited: true } : next;
   emit();
 }
+
+// A scan does nothing behind another app (playback.ts), and someone coming back
+// to it should not take the time it lost for a slow scan. It goes on from where
+// it was; this is only said, for a moment.
+onBackOnScreen(() => {
+  if (status === null) return;
+  pickedUp = true;
+  setStatus(status);
+  if (pickedUpTimer) clearTimeout(pickedUpTimer);
+  pickedUpTimer = setTimeout(() => {
+    pickedUp = false;
+    if (status) setStatus({ stage: status.stage, detail: status.detail });
+  }, PICKED_UP_MS);
+});
 
 export function subscribeScan(listener: () => void): () => void {
   listeners.add(listener);
@@ -144,6 +165,8 @@ export { parseForLibrary };
 
 /** The longest the parser works before the page gets a turn. */
 const PARSE_SLICE_MS = 25;
+/** How many names the worker is given at once. */
+const WORKER_PART = 50;
 
 /**
  * Parse a batch the way `parseForLibrary` does, without holding the page.
@@ -160,19 +183,28 @@ export async function parseBatchForLibrary(
   files: MediaFile[],
   roots: LibraryRoot[]
 ): Promise<ParseResultPayload[]> {
-  const fromWorker = await parseInWorker(files, roots);
-  if (fromWorker) {
+  const payloads: ParseResultPayload[] = [];
+  // A little at a time: a whole batch is most of a minute on a weak box, and a
+  // worker cannot be stopped when Kinema leaves the screen or a film opens.
+  let done = 0;
+  while (done < files.length) {
+    await yieldToPlayback();
+    const part = files.slice(done, done + WORKER_PART);
+    const fromWorker = await parseInWorker(part, roots);
+    if (!fromWorker) break;
     if (fromWorker.parseError) recordParseError(fromWorker.parseError);
-    return fromWorker.payloads;
+    payloads.push(...fromWorker.payloads);
+    done += part.length;
   }
+  if (done === files.length) return payloads;
 
   await initParser();
-  const payloads: ParseResultPayload[] = [];
   let since = performance.now();
-  for (const file of files) {
+  for (const file of files.slice(done)) {
     payloads.push(parseForLibrary(file, roots));
     if (performance.now() - since >= PARSE_SLICE_MS) {
       await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      await yieldToPlayback();
       since = performance.now();
     }
   }

@@ -542,6 +542,7 @@ pub fn run() {
             nfo::nfo_targets,
             jobs::stop_detection,
             jobs::set_playing,
+            jobs::set_behind,
             power::power_action,
         ])
         .build(tauri::generate_context!())

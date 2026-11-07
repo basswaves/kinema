@@ -381,7 +381,7 @@ pub(crate) async fn take_in_turn(
     if target.is_file() {
         return Ok(Some(target.to_string_lossy().into_owned()));
     }
-    crate::jobs::wait_while_playing_async().await;
+    crate::jobs::wait_for_turn_async().await;
     crate::jobs::off_main(move || {
         if let Some(dir) = target.parent() {
             std::fs::create_dir_all(dir).map_err(to_string_err)?;

@@ -296,8 +296,26 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
   private var suspended = false
   /** A taken decoder was asked for once more for this file (`decoderTaken`). */
   private var retried = false
+  /**
+   * Kinema is not on the screen. The library's work waits until it is back
+   * (library/playback.ts, jobs.rs): a scan going on behind another app costs
+   * that app the box's processor and line, with nothing there to say why.
+   */
+  @Volatile private var behind = false
+
+  private fun sayWhereKinemaIs(nowBehind: Boolean) {
+    behind = nowBehind
+    trigger("presence", JSObject().apply { put("behind", nowBehind) })
+  }
+
+  /** For a page that started while Kinema was already behind: nothing would tell it. */
+  @Command
+  fun inFront(invoke: Invoke) {
+    invoke.resolve(JSObject().apply { put("inFront", !behind) })
+  }
 
   override fun onStop() {
+    sayWhereKinemaIs(true)
     main.post {
       val p = player ?: return@post
       if (path == null || suspended) return@post
@@ -314,6 +332,7 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
   }
 
   override fun onResume() {
+    sayWhereKinemaIs(false)
     main.post {
       if (!suspended) return@post
       suspended = false

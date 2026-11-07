@@ -75,18 +75,52 @@ pub fn set_playing(on: bool) {
     PLAYING.store(on, Ordering::Relaxed);
 }
 
-/// Block this thread while a film plays. Call between two units of work, and
-/// **never while holding the database lock** — the page's own commands need it.
-pub fn wait_while_playing() {
-    while playing() {
+/// Kinema is behind another app (Android, where the page hears of it from the
+/// plugin, Media3Plugin.kt). Never set on a desktop.
+static BEHIND: AtomicBool = AtomicBool::new(false);
+
+/// Whether Kinema is behind another app (see [`set_behind`]).
+pub fn behind() -> bool {
+    BEHIND.load(Ordering::Relaxed)
+}
+
+/// Tell the background work whether Kinema has left the screen. Also the Tauri
+/// command `set_behind`, with one argument, `on`.
+///
+/// Why: measured on a 2-core box, a scan went on behind the home screen with
+/// the processor and the line, and nothing on screen said why the box was slow.
+/// So the library only advances while Kinema is in front. Nothing is lost: the
+/// loops wait between units of work, and each picks up what is not stored yet.
+#[tauri::command]
+pub fn set_behind(on: bool) {
+    if BEHIND.swap(on, Ordering::Relaxed) != on {
+        crate::log!(
+            "{}",
+            if on { "left the screen: the library's work waits" } else { "back on the screen" }
+        );
+    }
+}
+
+/// Block this thread while a film plays or Kinema is behind another app. Call
+/// between two units of work, and **never while holding the database lock** —
+/// the page's own commands need it.
+pub fn wait_for_turn() {
+    while playing() || behind() {
         std::thread::sleep(PLAYING_POLL);
     }
 }
 
-/// [`wait_while_playing`] for async code: waits without holding a thread.
-pub async fn wait_while_playing_async() {
-    while playing() {
+/// [`wait_for_turn`] for async code: waits without holding a thread.
+pub async fn wait_for_turn_async() {
+    while playing() || behind() {
         tokio::time::sleep(PLAYING_POLL).await;
+    }
+}
+
+/// Block this thread while Kinema is behind another app, and not for a film.
+pub fn wait_while_behind() {
+    while behind() {
+        std::thread::sleep(PLAYING_POLL);
     }
 }
 
@@ -423,12 +457,25 @@ mod tests {
     fn work_waits_while_a_film_plays_and_goes_on_after() {
         super::set_playing(true);
         assert!(super::playing());
-        let waiter = std::thread::spawn(super::wait_while_playing);
+        let waiter = std::thread::spawn(super::wait_for_turn);
         std::thread::sleep(std::time::Duration::from_millis(700));
         assert!(!waiter.is_finished(), "should still be waiting");
         super::set_playing(false);
         waiter.join().unwrap();
         assert!(!super::playing());
+    }
+
+    /// Behind another app: both ways of waiting hold, and let go when Kinema is back.
+    #[test]
+    fn work_waits_while_kinema_is_behind_and_goes_on_after() {
+        super::set_behind(true);
+        let turn = std::thread::spawn(super::wait_for_turn);
+        let walk = std::thread::spawn(super::wait_while_behind);
+        std::thread::sleep(std::time::Duration::from_millis(700));
+        assert!(!turn.is_finished() && !walk.is_finished(), "should still be waiting");
+        super::set_behind(false);
+        turn.join().unwrap();
+        walk.join().unwrap();
     }
 
     /// Background work runs, hands back what it made, and a panic in it

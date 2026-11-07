@@ -521,7 +521,7 @@ pub async fn cache_artwork(app: tauri::AppHandle) -> Result<CacheResult, String>
         tauri::async_runtime::spawn(async move {
             for (id, url) in pending {
                 // Between two downloads, never inside one.
-                crate::jobs::wait_while_playing_async().await;
+                crate::jobs::wait_for_turn_async().await;
                 let Ok(slot) = slots.clone().acquire_owned().await else {
                     break; // closed: the run was given up
                 };

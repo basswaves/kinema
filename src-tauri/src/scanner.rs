@@ -266,6 +266,13 @@ fn walk_local(
             }
         };
 
+        // Android, with Kinema behind another app: the walk waits between
+        // folders (jobs::set_behind). Not for a film, as a share's walk does:
+        // a walk of a local disk has never had to.
+        if entry.file_type().is_dir() {
+            crate::jobs::wait_while_behind();
+        }
+
         let is_bdmv = entry.depth() > 0
             && entry.file_type().is_dir()
             && entry.file_name().to_str().is_some_and(crate::disc::is_bdmv_name);
@@ -346,7 +353,7 @@ fn walk_share(
         // to a share, and on Linux and Android the threads that connection
         // starts would inherit the low priority — and a film read through it
         // later would run slowly.
-        crate::jobs::wait_while_playing();
+        crate::jobs::wait_for_turn();
         let entries = match crate::netshare::list(&dir) {
             Ok(e) => e,
             Err(e) => {

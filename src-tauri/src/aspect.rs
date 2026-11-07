@@ -378,7 +378,7 @@ pub async fn measure_pictures(app: tauri::AppHandle) -> Result<MeasureReport, St
                 continue;
             }
             // Between two files: wait while a film plays. No lock is held.
-            crate::jobs::wait_while_playing();
+            crate::jobs::wait_for_turn();
             if file.season.is_none_or(|s| seasons_started.insert(s)) {
                 let _ = app.emit(PROGRESS_EVENT, MeasureProgress { done, total });
                 done += 1;

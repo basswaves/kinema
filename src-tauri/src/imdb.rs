@@ -179,7 +179,7 @@ pub async fn refresh_imdb_ratings(app: tauri::AppHandle) -> Result<ImdbReport, S
 
     // A nine-megabyte download and a few seconds of unpacking: neither is
     // started while a film plays (the lock above is already let go).
-    crate::jobs::wait_while_playing_async().await;
+    crate::jobs::wait_for_turn_async().await;
     let client = tauri_plugin_http::reqwest::Client::builder()
         .timeout(TIMEOUT)
         .user_agent(concat!("Kinema/", env!("CARGO_PKG_VERSION")))
@@ -198,7 +198,7 @@ pub async fn refresh_imdb_ratings(app: tauri::AppHandle) -> Result<ImdbReport, S
         .await
         .map_err(|e| format!("IMDb ratings: {e}"))?;
 
-    crate::jobs::wait_while_playing_async().await;
+    crate::jobs::wait_for_turn_async().await;
     // Unpacking is the heavy part, so it runs at background priority, on a
     // thread of its own (it opens no connection to a share).
     crate::jobs::off_main_background(move || {

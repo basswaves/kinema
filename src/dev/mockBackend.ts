@@ -2251,6 +2251,7 @@ const handlers: Record<string, Handler> = {
   'plugin:libmpv|set_property': mpvOnly((a) => fakeMpv.setProperty(String(a.name), a.value)),
   // Media3, Android's player (Media3Plugin.kt).
   'plugin:media3|register_listener': (a) => fakeMedia3.registerListener(a),
+  'plugin:media3|in_front': () => ({ inFront: true }),
   'plugin:media3|remove_listener': (a) => fakeMedia3.removeListener(a),
   'plugin:media3|open': (a) => fakeMedia3.open(a),
   'plugin:media3|stop': () => fakeMedia3.stop(),
@@ -2363,6 +2364,7 @@ const handlers: Record<string, Handler> = {
   },
   // The scan waits while a film plays and tells the native side so (playback.ts).
   set_playing: () => null,
+  set_behind: () => null,
   mpv_started: () => false,
   mpv_give_back: () => fakeMpv.destroy(),
   // A test sets `kinemaMockPageEnded` to play a page whose process ended.

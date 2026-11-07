@@ -2720,6 +2720,20 @@ box's only video decoder, until the operator's own TV app took it away.
 (`ProcessLifecycleOwner.get().lifecycle.addObserver(TauriLifecycleObserver)`);
 registering it twice is harmless if a later Tauri does it too.
 
+### An app behind the home screen goes on working, and Android lets it
+
+Nothing stops a page or its native side when Kinema leaves the screen: the
+WebView only slows the page's timers, and a worker and Rust's threads are not
+slowed at all. A scan left behind on a 2-core box read file names at one full
+core, and the box got slower with Kinema nowhere in sight, so people force
+closed it. There is no error, and an idle Kinema or a film left paused cost
+next to nothing, so only a scan shows it. **Do:** work a person is not waiting for calls
+`yieldToPlayback` (page) or `jobs::wait_for_turn` (Rust) between its units, and
+gives a worker small parts rather than one long batch, which cannot be stopped.
+`presence.ts` turns Kinema's being in front or not into those two flags; any key
+proves it is in front, because a scan waiting by mistake looks like one that
+never ends. A desktop never sets them.
+
 ### A TV box may have one video decoder, and the app in front is owed it
 
 A box's decoder list can say `concurrent-instances max="1"`. An app that

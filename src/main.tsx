@@ -5,6 +5,7 @@ import { loadCapabilities } from './capabilities';
 import { installBackButton } from './backButton';
 import { installContextMenu } from './ui/contextMenu';
 import { loadLaunchRequest } from './library/opened';
+import { watchPresence } from './library/presence';
 
 /**
  * Deliberately NOT wrapped in React.StrictMode.
@@ -20,6 +21,7 @@ function start(): void {
   // Asked now, answered long before Leave or Settings can be opened.
   void loadCapabilities();
   void installBackButton();
+  void watchPresence();
   installContextMenu();
   // A video Kinema was started for decides the first view (opened.ts): asked
   // before drawing, so Home never shows for a moment first.

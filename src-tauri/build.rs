@@ -30,6 +30,7 @@ fn main() {
             "restore_mode",
             "output",
             "decoder_limits",
+            "in_front",
             "register_listener",
             "remove_listener",
         ])

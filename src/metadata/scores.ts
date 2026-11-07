@@ -15,6 +15,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { getSetting, setSetting } from './api';
 import { OmdbStop, omdbTomatometer } from './providers';
+import { yieldToPlayback } from '../library/playback';
 
 /** Lookups one scan may make. */
 export const PER_SCAN = 100;
@@ -81,6 +82,7 @@ export async function refreshTomatometer(deps: ScoreDeps = defaultDeps): Promise
 
   const found: ScoreResult[] = [];
   for (const imdbId of await deps.listDue(allowance)) {
+    await yieldToPlayback();
     try {
       const tomatometer = await deps.lookup(key, imdbId);
       report.looked_up++;

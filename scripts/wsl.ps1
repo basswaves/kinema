@@ -34,7 +34,9 @@
 param(
     [Parameter(Mandatory, Position = 0)]
     [string]$Command,
-    [string]$Distro = 'Ubuntu-24.04'
+    [string]$Distro = 'Ubuntu-24.04',
+    # Which copy: a job that runs beside others has its own (android-bench.sh does).
+    [string]$Mirror = 'kinema'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -74,7 +76,7 @@ try {
     $script = @"
 set -e
 . "`$HOME/.cargo/env" 2>/dev/null || true
-dst="`$HOME/kinema"
+dst="`$HOME/$Mirror"
 mkdir -p "`$dst"
 cd "`$dst"
 [ -d .git ] || git init -q
@@ -90,7 +92,14 @@ $Command
 "@
     $file = New-TemporaryFile
     [IO.File]::WriteAllText($file.FullName, ($script -replace "`r", ''))
-    wsl -d $Distro --exec bash (wsl -d $Distro --exec wslpath -a "$($file.FullName)").Trim()
+    # One at a time per copy: every run overwrites it, so a second session would swap
+    # the sources under a first one's build. A wsl.ps1 from before this lock does not
+    # wait for it, which is why the Android kit has a copy of its own. Exit 75 after 45 minutes of waiting.
+    # `flock -o`: what the command leaves running (adb's server) does not keep the lock.
+    $inWsl = (wsl -d $Distro --exec wslpath -a "$($file.FullName)").Trim()
+    wsl -d $Distro --cd '~' --exec flock -n ".$Mirror-mirror.lock" true
+    if ($LASTEXITCODE -ne 0) { Write-Host "Another session is using ~/$Mirror; waiting for it." }
+    wsl -d $Distro --cd '~' --exec flock -o -w 2700 -E 75 ".$Mirror-mirror.lock" bash $inWsl
     $status = $LASTEXITCODE
 } finally {
     git -C $root update-ref -d $ref

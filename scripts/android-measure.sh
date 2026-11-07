@@ -90,17 +90,22 @@ sample() {
 # Same clock on both sides: logcat's monotonic stamp of a line written just before
 # the press, and SurfaceFlinger's present times.
 keys() {
-  local out="$1" count="$2" gap="${3:-4}" i=0 tag t0
+  local out="$1" count="$2" gap="${3:-4}" i=0 tag t0 layer
   echo "n,answer_ms" > "$out"
+  # The exact name, read from the device: a wrong one answers with nothing, not an error.
+  layer=$(dev shell dumpsys SurfaceFlinger --list | grep -m1 "$ACTIVITY")
+  [ -n "$layer" ] || { echo "keys: Kinema has no window on the screen; nothing measured" >&2; return 1; }
   while [ "$i" -lt "$count" ]; do
     i=$((i + 1)); tag="KMEASURE$$_$i"
     dev shell "log -t $tag x; input keyevent $(( i % 2 ? 22 : 21 )); sleep 1.5" >/dev/null
     t0=$(dev shell logcat -d -v monotonic -s "$tag" | awk -v t="$tag" 'index($0,t){print $1; exit}')
-    dev shell dumpsys SurfaceFlinger --latency "\"$ACTIVITY#0\"" | awk -v t0="$t0" -v n="$i" '
+    dev shell dumpsys SurfaceFlinger --latency "\"$layer\"" | awk -v t0="$t0" -v n="$i" '
       NF==3 && $2>0 && $2<9e18 { s=$2/1e9; if (s>t0 && !f) f=s }
       END { if (f) printf "%d,%.0f\n", n, (f-t0)*1000; else printf "%d,\n", n }' >> "$out"
     sleep "$gap"
   done
+  local blank; blank=$(tail -n +2 "$out" | grep -c ',$')
+  [ "$blank" -lt $(( (count + 1) / 2 )) ] || echo "keys: $blank of $count changed nothing on screen: a page with nothing to move to, not a stall" >&2
 }
 
 names() {

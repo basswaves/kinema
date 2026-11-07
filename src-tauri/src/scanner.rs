@@ -106,8 +106,16 @@ pub(crate) fn is_video(path: &Path) -> bool {
     !path
         .file_name()
         .and_then(|n| n.to_str())
-        .map(crate::trailer::is_trailer_file_name)
+        .map(|name| crate::trailer::is_trailer_file_name(name) || is_sample_file_name(name))
         .unwrap_or(false)
+}
+
+/// A release's few seconds beside the film: `Film-sample.mkv`, `Film.2010.sample.mkv`.
+/// With a space before it, it may be the end of a title.
+fn is_sample_file_name(file_name: &str) -> bool {
+    let lower = file_name.to_lowercase();
+    let stem = lower.rsplit_once('.').map_or(lower.as_str(), |(stem, _)| stem);
+    stem == "sample" || ["-sample", ".sample", "_sample"].iter().any(|end| stem.ends_with(end))
 }
 
 fn is_skipped_dir(name: &str) -> bool {
@@ -602,6 +610,16 @@ fn mark_missing(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn samples_are_not_videos_and_titles_about_them_are() {
+        for name in ["Film-sample.mkv", "Film.2010.SAMPLE.mkv", "film_sample.mp4", "sample.mkv"] {
+            assert!(!is_video(Path::new(name)), "{name}");
+        }
+        for name in ["The Sample.mkv", "Free.Sample.2013.mkv", "Sampler.mkv"] {
+            assert!(is_video(Path::new(name)), "{name}");
+        }
+    }
 
     /// What a walk of a real folder finds, by path below the folder.
     fn walked(root: &Path) -> Vec<String> {

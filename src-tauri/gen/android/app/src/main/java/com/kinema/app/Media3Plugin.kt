@@ -231,6 +231,8 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
   private var started = false
   /** A seek was asked for: the next time the player is ready, playback has restarted. */
   private var seeking = false
+  /** Where this file opened, until its keyframe is known (onTracksChanged). */
+  private var resumeMs: Long? = null
   /** The share of the file to open at, until Media3 knows its length (`OpenArgs.startShare`). */
   private var pendingShare: Double? = null
   /**
@@ -680,6 +682,18 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
         rememberVideo(tracks)
         if (!loadedSaid && !tracks.isEmpty) {
           loadedSaid = true
+          // Opened at a resume point, Media3 decodes from the keyframe before
+          // it and shows nothing until it gets there: 2.8 s against 0.5 s on
+          // a box, with keyframes ten seconds apart. Seek parameters do not
+          // reach an opening position and need a prepared file, so this is
+          // the first moment: start on that keyframe instead, never later
+          // than where the person stopped. No keyframes known: as it was.
+          resumeMs?.let {
+            p.setSeekParameters(SeekParameters.PREVIOUS_SYNC)
+            p.seekTo(it)
+            p.setSeekParameters(SeekParameters.DEFAULT)
+          }
+          resumeMs = null
           emit("loaded")
         }
       }
@@ -1025,6 +1039,7 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
         subtitleView?.setCues(emptyList())
         val start = args.start
         pendingShare = if (start == null) args.startShare?.takeIf { it > 0.0 && it < 1.0 } else null
+        resumeMs = start?.let { (it * 1000).toLong() }?.takeIf { it > 0 }
         if (start != null) p.setMediaItem(media, (start * 1000).toLong())
         else p.setMediaItem(media)
         perf.open()

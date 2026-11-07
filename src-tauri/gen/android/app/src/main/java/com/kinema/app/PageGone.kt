@@ -14,7 +14,7 @@ import java.io.File
  * has the whole app killed with it, and one that does must throw that WebView
  * away, which Tauri cannot do while running. So Kinema starts anew, with a note
  * for the new page to say what happened (`page_life.rs`, the same file). Called
- * from `RustWebViewClient`, into which `src-tauri/.cargo/config.toml` adds the
+ * from `RustWebViewClient`, into which `.cargo/config.toml` adds the
  * call: that class is generated, and nothing can subclass it.
  *
  * A note still there means the last new Kinema never got as far as reading it.

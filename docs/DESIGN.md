@@ -28,6 +28,9 @@ with no frame up shows the desktop.
 That is Windows. On Linux, Wayland has no way to put one program's surface
 under another's window, so mpv plays in a full-screen window of its own and
 draws Kinema's page over the video as a picture ([Platforms](#platforms)).
+Nothing shows through Kinema's window there, so it is opaque
+(`tauri.linux.conf.json`) and only the page itself stays transparent, which is
+what the picture's see-through parts come from.
 
 ```
 src-tauri/src/

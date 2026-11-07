@@ -270,4 +270,21 @@ MemTotal:       16384 kB
             assert!(!c.sleep && !c.shut_down);
         }
     }
+
+    /// Linux's config replaces the whole window list, so anything added to the
+    /// main config's window would quietly not reach Linux. The two may differ
+    /// only in Linux being opaque (docs/GOTCHAS.md, GitHub #17).
+    #[test]
+    fn the_linux_window_differs_only_in_being_opaque() {
+        let window = |text: &str| {
+            let config: serde_json::Value = serde_json::from_str(text).unwrap();
+            config["app"]["windows"][0].as_object().unwrap().clone()
+        };
+        let mut main = window(include_str!("../tauri.conf.json"));
+        let mut linux = window(include_str!("../tauri.linux.conf.json"));
+        assert_eq!(main.remove("transparent"), Some(true.into()));
+        assert_eq!(linux.remove("transparent"), Some(false.into()));
+        assert!(linux.remove("backgroundColor").is_some());
+        assert_eq!(main, linux);
+    }
 }

@@ -2296,6 +2296,27 @@ runs — because the compositor stops asking a covered window to draw, and
 WebKit's DMA-BUF renderer waits for it. `WEBKIT_DISABLE_DMABUF_RENDERER=1`,
 set in `run()` on Linux, keeps them coming (1–2 ms each).
 
+### A transparent window without DMA-BUF loses everything but what just changed
+
+That same setting has a price if the window is see-through. WebKitGTK then
+repaints only what changed, and on a transparent window the rest is not kept:
+hovering a button left that button alone over the desktop, and a real KDE
+Wayland box with an Intel card showed the whole page missing, with no error in
+any log (GitHub #17). Our WSL and headless runs never showed it, which is why it
+reached a release. So Linux's window is opaque (`tauri.linux.conf.json`), which
+costs nothing: mpv has a window of its own there, so nothing has to show through
+Kinema's.
+
+The page stays transparent, and that is what the player needs. The photo for mpv
+asks WebKit for a transparent background, and keeps its see-through parts with an
+opaque window behind it (seen on that box: the film moving behind the controls).
+If the photo ever came back solid, the controls would hide the film, again with
+no error: after a change here, look at a real picture, not the logs.
+
+Linux's config replaces the main config's whole window list rather than adding to
+it, so a new window setting has to go in both; a test in `capabilities.rs` fails
+if they drift apart.
+
 ### `overlay-add` takes a size to scale to only from mpv 0.38
 
 Before that it has exactly nine arguments, and eleven are refused ("has only

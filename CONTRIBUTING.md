@@ -686,8 +686,9 @@ reasoning is in [docs/DESIGN.md](docs/DESIGN.md) and [docs/HISTORY.md](docs/HIST
   welcome, and a fix for one is made only where it costs the TV nothing.
 - **The window is transparent so mpv can render behind the webview** (on
   Windows; on Linux mpv has a window of its own with the page drawn over it,
-  and on Android Media3 draws the film — the same page runs on all three, so
-  the rule holds everywhere). Never give
+  so that window is opaque with a dark background and only the page stays
+  transparent; on Android Media3 draws the film — the same page runs on all
+  three, so the rule for the page holds everywhere). Never give
   `html`, `body` or `#root` an opaque background — it hides the video entirely.
   Full-screen browsing views paint their own background; the player must never
   paint over a video frame. Its one opaque surface is the black cover shown

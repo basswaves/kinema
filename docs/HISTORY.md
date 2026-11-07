@@ -4151,6 +4151,31 @@ whole measuring stage with the database's own words on every tab; the
 query skips files with no title, and a failed background stage is one
 plain line on Home.
 
+## An opaque window on Linux (2026-11-07, GitHub #17)
+
+On a KDE Wayland box with an Intel card, 0.15.0 lost the whole page: one
+hovered or focused button stayed, over the desktop. The window was transparent
+on every system because Windows needs it, and on Linux the setting that keeps the
+player's page photographs coming also makes WebKit repaint only what changed,
+which a see-through window does not keep. The reporter found both ways out:
+turn that setting off, or make the window opaque. Turning it off stops the
+photographs while mpv's window covers Kinema's, and then the controls stop
+updating, so the window is opaque.
+
+Nothing on Linux needs the see-through window: mpv has a window of its own there.
+The page itself stays transparent on all systems, and so does the rule that
+`html`, `body` and `#root` have no background, because that is where the
+photograph's clear parts come from. The dark colour is the window's, not the
+page's, so no system's stylesheet changed.
+
+The risk was the photograph coming back solid and hiding the film, so that was
+what got checked, by looking: on the box the film moves behind the controls, the
+mouse seeks and pauses and opens the panel, and Back brings the page back; the
+same picture on a headless Wayland desktop and on a private X11 display with a
+real pointer. Browsing costs the same: 9.5 s of processor against 9.6 s (0.15.0
+against this) for the same 14 s of scrolling and hovering on that weak box, three
+runs each. That counts processor time, not smoothness.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

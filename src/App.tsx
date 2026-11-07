@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import Browse from './ui/Browse';
+import PageEndedNotice from './ui/PageEndedNotice';
 import ErrorBoundary from './ui/ErrorBoundary';
 import FolderBrowser from './ui/FolderBrowser';
 import LinkCard from './ui/LinkCard';
@@ -119,6 +120,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <Browse />
+      <PageEndedNotice />
       {/* Over any screen: each is a dialog on the focus engine (focusStore.ts). */}
       {folderRequest && <FolderBrowser request={folderRequest} />}
       {shownTrailer && <TrailerOverlay trailer={shownTrailer} />}

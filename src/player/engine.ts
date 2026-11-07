@@ -157,7 +157,12 @@ export function startEngine(): Promise<string> {
 }
 
 async function startMpv(options: MpvConfig['initialOptions']): Promise<string> {
+  // Already there means this page replaced one whose process ended, and mpv
+  // has gone on (pageRecovery.ts). It is set up already: `init` changes nothing
+  // and Kinema's mouse script must not be loaded into it twice.
+  const already = await invoke<boolean>('mpv_started').catch(() => false);
   const label = await init({ initialOptions: options, observedProperties: OBSERVED });
+  if (already) return label;
   // Applied individually and after startup: if a build rejects one of these
   // option names, we lose that refinement rather than the whole player.
   // `tone-mapping-mode` is exactly such a case — this libplacebo build
@@ -466,6 +471,30 @@ export async function nowPlaying(): Promise<{
     getProperty('duration', 'double') as Promise<number | null>,
   ]);
   return { path, position, duration };
+}
+
+/**
+ * The file mpv has open and how far it is, without starting mpv: for a page
+ * that has just replaced one whose process ended (pageRecovery.ts). Null when
+ * mpv is not running or has nothing open, and for what a new page cannot open
+ * by a path it can read back (a disc).
+ */
+export async function filmPlayingNow(): Promise<{
+  path: string;
+  position: number;
+  paused: boolean;
+} | null> {
+  await loadCapabilities();
+  if (isMedia3()) return null;
+  const started = await invoke<boolean>('mpv_started').catch(() => false);
+  if (!started) return null;
+  const [path, position, paused] = await Promise.all([
+    getProperty('path', 'string') as Promise<string | null>,
+    getProperty('time-pos', 'double') as Promise<number | null>,
+    getProperty('pause', 'flag') as Promise<boolean | null>,
+  ]);
+  if (!path || position === null || /^[a-z]+:\/\//.test(path)) return null;
+  return { path, position, paused: paused === true };
 }
 
 /**

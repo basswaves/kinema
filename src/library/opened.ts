@@ -10,6 +10,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { episodeLabel, type PlaybackTarget } from '../player/api';
+import { recoverFromPageEnd } from '../player/pageRecovery';
 
 /** What opened.rs says: a file, and whether Kinema was started for it. */
 export interface Opened {
@@ -77,6 +78,10 @@ export async function loadLaunchRequest(): Promise<void> {
   } catch (e) {
     console.warn('opened: could not ask for a file at launch', e);
   }
+  // Asked every time, as the answer is good for one asking: the page before
+  // this one ended by itself (pageRecovery.ts) and a film may be waiting.
+  const film = await recoverFromPageEnd(targetFor);
+  if (film && !atLaunch) atLaunch = { target: film, launched: false };
 }
 
 /** The video Kinema was started for, if any (after `loadLaunchRequest`). */

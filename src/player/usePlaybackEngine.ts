@@ -163,7 +163,9 @@ export function usePlaybackEngine({
         // "Play from start" skips it; the stored position is overwritten as
         // soon as this playback saves its own.
         // A video from outside the library resumes by its path and size.
-        if (!target.fromStart && (target.fileId !== null || target.resumeByPath)) {
+        if (target.resumeAt != null) {
+          pendingSeek.current = target.resumeAt;
+        } else if (!target.fromStart && (target.fileId !== null || target.resumeByPath)) {
           const stored =
             target.fileId !== null
               ? await getProgress(target.fileId)
@@ -212,7 +214,7 @@ export function usePlaybackEngine({
           await matchScreen();
           if (cancelled) return;
         }
-        await setPaused(false);
+        await setPaused(target.startPaused === true);
       } catch (e) {
         if (!cancelled) fail(e);
       }
@@ -226,6 +228,8 @@ export function usePlaybackEngine({
     target.fileId,
     target.fromStart,
     target.resumeByPath,
+    target.resumeAt,
+    target.startPaused,
     fail,
     matchScreen,
     dispatch,

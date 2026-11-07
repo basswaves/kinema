@@ -78,6 +78,9 @@ tauri-plugin-single-instance = "2"
 # own memory, threads and handles for the self-test's leak runs.
 # SystemInformation is capabilities.rs asking how much memory the PC has.
 [target.'cfg(windows)'.dependencies]
+# Hearing WebView2's processes end (page_life.rs). The version Tauri's own
+# webview compiles in, so nothing new is built.
+webview2-com = "0.38"
 windows = { version = "0.61", features = [
   "Win32_Foundation",
   "Win32_Devices_Display",

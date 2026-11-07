@@ -2363,6 +2363,13 @@ const handlers: Record<string, Handler> = {
   },
   // The scan waits while a film plays and tells the native side so (playback.ts).
   set_playing: () => null,
+  mpv_started: () => false,
+  // A test sets `kinemaMockPageEnded` to play a page whose process ended.
+  page_recovery: () => {
+    const why = localStorage.getItem('kinemaMockPageEnded');
+    localStorage.removeItem('kinemaMockPageEnded');
+    return why;
+  },
   forget_share_login: (a) => {
     const i = shareLogins.findIndex((l) => l.server === String(a.server));
     if (i >= 0) shareLogins.splice(i, 1);

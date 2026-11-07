@@ -53,6 +53,12 @@ export interface PlaybackTarget {
   /** Ignore the stored position: "Play from start". */
   fromStart?: boolean;
   /**
+   * Where to open, over any stored position, and held paused: the film mpv was
+   * playing when the page's process ended (pageRecovery.ts).
+   */
+  resumeAt?: number | null;
+  startPaused?: boolean;
+  /**
    * A video opened from outside the library (opened.ts): resumed by its path
    * and size. Other targets with no file — a trailer — are not resumed.
    */

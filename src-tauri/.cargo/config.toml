@@ -1,0 +1,5 @@
+# Added into the Kotlin wry generates at build time (its `{{class-extension}}`):
+# `RustWebViewClient` is a final class written out by wry's build, so this is the
+# one way to answer Android when the WebView's process ends. See PageGone.kt.
+[env]
+WRY_RUSTWEBVIEWCLIENT_CLASS_EXTENSION = "override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean = PageGone.handle(view, detail.didCrash())"

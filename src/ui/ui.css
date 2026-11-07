@@ -3296,6 +3296,23 @@ button.cast-member {
 }
 
 /* ---- resume toast -------------------------------------------------------- */
+.page-ended-notice {
+  position: fixed;
+  /* Above the player's Resumed line, which comes back with it. */
+  top: 0.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  width: min(62rem, calc(100vw - 2rem));
+  padding: 0.5rem 1.125rem;
+  border-radius: 0.5rem;
+  background: rgba(0, 0, 0, 0.88);
+  color: #fff;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  pointer-events: none;
+}
+
 .resume-toast {
   display: flex;
   align-items: center;

@@ -36,6 +36,22 @@ fn media3<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
         .build()
 }
 
+/// Whether mpv is running. The plugin's own `init` says nothing about that, and
+/// a new page has to know (`startMpv` in engine.ts).
+#[tauri::command]
+#[cfg(desktop)]
+pub fn mpv_started(app: tauri::AppHandle) -> bool {
+    use tauri_plugin_libmpv::MpvExt;
+    app.mpv().instances.lock().map(|i| i.contains_key("main")).unwrap_or(false)
+}
+
+/// Android has no mpv.
+#[tauri::command]
+#[cfg(mobile)]
+pub fn mpv_started() -> bool {
+    false
+}
+
 /// Shut the engine down before the process ends. The plugin does that only
 /// when a window's close button is used; Leave, the power actions and a
 /// self-test all end with `app.exit`, and left mpv's video thread drawing

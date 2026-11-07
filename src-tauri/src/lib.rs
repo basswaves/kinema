@@ -43,6 +43,7 @@ mod local_art;
 mod netshare;
 mod nfo;
 mod overlay;
+mod page_life;
 mod people;
 mod posters;
 mod pointer;
@@ -335,6 +336,10 @@ pub fn run() {
             // Anything finished while SIMKL could not be reached goes now.
             tracking::send_soon(app.handle());
 
+            // The page's own process ending must not look like a frozen window.
+            #[cfg(desktop)]
+            page_life::watch(app.handle());
+
             // The window starts hidden and the page shows it once it has
             // something to paint (App.tsx). If that never happens — a script
             // error before the first render — an app that never appears is a
@@ -355,6 +360,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             updates::latest_release,
+            engine::mpv_started,
+            page_life::page_recovery,
             capabilities::capabilities,
             places::list_folders,
             places::folder_places,

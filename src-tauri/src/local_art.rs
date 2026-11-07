@@ -112,24 +112,6 @@ fn last_part(dir: &str) -> &str {
     trimmed.rsplit_once(['/', '\\']).map_or(trimmed, |(_, name)| name)
 }
 
-/// Whether a folder's name says it holds one season: `Season 1`, `S01`,
-/// `Staffel 2`, `Specials`.
-fn is_season_folder(name: &str) -> bool {
-    let lower = name.trim().to_lowercase();
-    if lower == "specials" {
-        return true;
-    }
-    for prefix in ["season", "series", "staffel", "saison", "temporada", "stagione", "sezon", "s"] {
-        if let Some(rest) = lower.strip_prefix(prefix) {
-            let digits = rest.trim_start_matches([' ', '.', '_', '-']);
-            if !digits.is_empty() && digits.len() <= 4 && digits.chars().all(|c| c.is_ascii_digit()) {
-                return true;
-            }
-        }
-    }
-    false
-}
-
 /// Whether `dir` is `root` or inside it, whichever separator either uses.
 fn is_within(dir: &str, root: &str) -> bool {
     let root = root.trim_end_matches(['/', '\\']);
@@ -144,7 +126,7 @@ fn show_folder(files: &[File]) -> Option<String> {
     let mut counts: HashMap<&str, usize> = HashMap::new();
     for f in files {
         let dir = f.dir.as_str();
-        let show = if is_season_folder(last_part(dir)) {
+        let show = if crate::util::is_season_folder(last_part(dir)) {
             parent_of(dir).unwrap_or(dir)
         } else {
             dir
@@ -691,10 +673,10 @@ mod tests {
     #[test]
     fn season_folders_are_known_by_their_names() {
         for name in ["Season 1", "season01", "S02", "Staffel 3", "Specials", "Series.4"] {
-            assert!(is_season_folder(name), "{name}");
+            assert!(crate::util::is_season_folder(name), "{name}");
         }
         for name in ["Show", "Seasons", "S", "Season One", "2001"] {
-            assert!(!is_season_folder(name), "{name}");
+            assert!(!crate::util::is_season_folder(name), "{name}");
         }
     }
 

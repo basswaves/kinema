@@ -119,11 +119,46 @@ export function searchableName(fileName: string): string {
  * file can be seen and fixed by hand. They used to be skipped everywhere,
  * so a file the parser could not name was in the library and on no screen.
  */
+/**
+ * A series is identified by its episode numbering, or a date a TV folder's file
+ * is named by, not by which folder it came from: a mislabelled root should not
+ * force the wrong provider.
+ */
+function isSeriesFile(file: MediaFile): boolean {
+  return (
+    file.parsed_season !== null || file.parsed_episode !== null || file.parsed_kind === 'dated'
+  );
+}
+
+/**
+ * The year of an episode's file, when it says which show this is: from a folder
+ * or before the numbering (`Doctor.Who.2005.S01E01`). After the numbering it
+ * says when the episode aired, and differs from season to season of one show.
+ */
+function showYearOf(file: MediaFile): number | null {
+  const year = file.parsed_year;
+  if (!year) return null;
+  const at = file.file_name.indexOf(String(year));
+  if (at < 0) return year;
+  const numbering = file.file_name.search(/s\d{1,3}\s*e\d|\d{1,2}x\d{2}|season/i);
+  return numbering < 0 || at < numbering ? year : null;
+}
+
 export function groupFiles(
   files: MediaFile[],
   { includeUntitled = false }: { includeUntitled?: boolean } = {}
 ): FileGroup[] {
   const groups = new Map<string, FileGroup>();
+
+  // Which years each show's files name. Only with more than one does the year
+  // tell shows apart, so a show with one year keeps the files that give none.
+  const showYears = new Map<string, Set<number>>();
+  for (const file of files) {
+    const year = showYearOf(file);
+    if (!file.parsed_title || !isSeriesFile(file) || year === null) continue;
+    const name = file.parsed_title.toLowerCase();
+    showYears.set(name, (showYears.get(name) ?? new Set()).add(year));
+  }
 
   for (const file of files) {
     if (!file.parsed_title) {
@@ -132,7 +167,7 @@ export function groupFiles(
           key: `untitled::${file.id}`,
           title: file.file_name.replace(/\.[^.]+$/, ''),
           year: file.parsed_year,
-          isSeries: file.parsed_season !== null || file.parsed_episode !== null,
+          isSeries: isSeriesFile(file),
           files: [file],
           maxSeason: file.parsed_season,
           untitled: true,
@@ -141,11 +176,14 @@ export function groupFiles(
       continue;
     }
 
-    // A series is identified by having episode numbering, not by which folder
-    // it came from — a mislabelled root should not force the wrong provider.
-    const isSeries = file.parsed_season !== null || file.parsed_episode !== null;
-    const key = `${isSeries ? 'tv' : 'movie'}::${file.parsed_title.toLowerCase()}::${
-      isSeries ? '' : (file.parsed_year ?? '')
+    const isSeries = isSeriesFile(file);
+    const name = file.parsed_title.toLowerCase();
+    // Two shows of one name (Battlestar Galactica 1978 and 2003) are two
+    // groups. They were one, linked to the first, with its NFO deciding for both.
+    const showYear = isSeries ? showYearOf(file) : null;
+    const apart = (showYears.get(name)?.size ?? 0) > 1;
+    const key = `${isSeries ? 'tv' : 'movie'}::${name}::${
+      isSeries ? (apart ? (showYear ?? '') : '') : (file.parsed_year ?? '')
     }`;
 
     let group = groups.get(key);
@@ -165,8 +203,11 @@ export function groupFiles(
     if (file.parsed_season !== null) {
       group.maxSeason = Math.max(group.maxSeason ?? 0, file.parsed_season);
     }
-    // A movie group's year comes from whichever file has one.
-    if (!group.year && file.parsed_year) group.year = file.parsed_year;
+    // A movie group's year comes from whichever file has one; a show's from a
+    // file where the year names the show, before one where it only says when
+    // the episode aired.
+    if (showYear !== null) group.year = showYear;
+    else if (!group.year && file.parsed_year) group.year = file.parsed_year;
   }
 
   return [...groups.values()];

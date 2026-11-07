@@ -40,6 +40,80 @@ const files = [
   file(3, 'S01E05.mkv', null, 5),
 ];
 
+/** A show's file with a year, as the parser leaves it. */
+function shown(id: number, path: string, title: string, year: number | null, season = 1): MediaFile {
+  const cut = path.lastIndexOf('/');
+  return {
+    ...file(id, path.slice(cut + 1), title, id),
+    path,
+    parent_dir: path.slice(0, cut),
+    parsed_year: year,
+    parsed_season: season,
+  };
+}
+
+describe('groupFiles: shows of one name', () => {
+  const FIRST = 'D:/TV/Battlestar Galactica (1978)/Season 1/S01E01.mkv';
+  const SECOND = 'D:/TV/Battlestar Galactica (2003)/Season 1/S01E01.mkv';
+
+  it('different years are different shows', () => {
+    const groups = groupFiles([
+      shown(1, FIRST, 'Battlestar Galactica', 1978),
+      shown(2, SECOND, 'Battlestar Galactica', 2003),
+    ]);
+    expect(groups.map((g) => g.year)).toEqual([1978, 2003]);
+    expect(groups.every((g) => g.isSeries && g.files.length === 1)).toBe(true);
+  });
+
+  it('files with no year join the one year there is, whichever comes first', () => {
+    const groups = groupFiles([
+      shown(1, 'D:/TV/Lost/Lost S01E01.mkv', 'Lost', null),
+      shown(2, 'D:/TV/Lost (2004)/S01E02.mkv', 'Lost', 2004),
+    ]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toMatchObject({ year: 2004, key: 'tv::lost::' });
+    expect(groups[0].files).toHaveLength(2);
+  });
+
+  it('with two years, a file with none stays on its own', () => {
+    const groups = groupFiles([
+      shown(1, FIRST, 'Battlestar Galactica', 1978),
+      shown(2, SECOND, 'Battlestar Galactica', 2003),
+      shown(3, 'D:/TV/Battlestar Galactica/S01E03.mkv', 'Battlestar Galactica', null),
+    ]);
+    expect(groups.map((g) => g.year)).toEqual([1978, 2003, null]);
+  });
+
+  it('a year after the episode number is when it aired, not another show', () => {
+    const groups = groupFiles([
+      shown(1, 'D:/TV/Show/Season 1/Show S01E01 (2019).mkv', 'Show', 2019),
+      shown(2, 'D:/TV/Show/Season 2/Show S02E01 (2020).mkv', 'Show', 2020, 2),
+    ]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].maxSeason).toBe(2);
+  });
+
+  it('a year before the episode number names the show', () => {
+    const groups = groupFiles([
+      shown(1, 'D:/TV/Doctor.Who.1963.S01E01.mkv', 'Doctor Who', 1963),
+      shown(2, 'D:/TV/Doctor.Who.2005.S01E01.mkv', 'Doctor Who', 2005),
+    ]);
+    expect(groups.map((g) => g.year)).toEqual([1963, 2005]);
+  });
+});
+
+describe('groupFiles: dates', () => {
+  it('a dated file is a series, and every date one show', () => {
+    const dated = (id: number, day: string): MediaFile => ({
+      ...file(id, `The Daily Show ${day}.mkv`, 'The Daily Show', null),
+      parsed_kind: 'dated',
+    });
+    const groups = groupFiles([dated(1, '2023-01-15'), dated(2, '2023-01-16')]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toMatchObject({ isSeries: true, maxSeason: null });
+  });
+});
+
 describe('groupFiles', () => {
   /** The matcher has nothing to search for with no title, so it never sees one. */
   it('leaves untitled files out by default', () => {

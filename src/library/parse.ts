@@ -111,7 +111,8 @@ export interface Guess {
    * so E02 showed as missing from a season that had it.
    */
   episodeLast: number | null;
-  kind: 'movie' | 'episode' | null;
+  /** `dated`: an episode known by its date (`Show 2023-01-15`) in a TV folder. */
+  kind: 'movie' | 'episode' | 'dated' | null;
   raw: Record<string, unknown>;
 }
 
@@ -266,6 +267,76 @@ function scoreGuess(guess: Guess, kind: LibraryKind): number {
   return score;
 }
 
+/** Words a season's folder is called by, followed by its number. */
+const SEASON_WORDS = [
+  'seasons',
+  'season',
+  'saisons',
+  'saison',
+  'staffel',
+  'sæson',
+  'saeson',
+  'sesong',
+  'säsong',
+  'sasong',
+  'series',
+  'serie',
+  'temporadas',
+  'temporada',
+  'stagione',
+  'сезон',
+  'sezon',
+  'sezona',
+  'seizoen',
+  'kausi',
+  'évad',
+  'evad',
+  '시즌',
+  'シーズン',
+];
+/** Folders of one disc of a season or a film: the same layout, but no season number. */
+const DISC_WORDS = ['disc', 'disk', 'dvd', 'bd'];
+const SPECIALS = new Set([
+  'specials',
+  'special',
+  'spezial',
+  'specialer',
+  'speciale',
+  'speciali',
+  'especiales',
+  'spéciaux',
+  'speciaux',
+]);
+
+/** The number after a word from `words`, as long as no letter joins on to it. */
+function numberAfterWord(lower: string, words: string[]): number | null {
+  for (const word of words) {
+    if (!lower.startsWith(word)) continue;
+    const found = /^[ ._-]*(\d{1,4})(?![\p{L}\p{N}])/u.exec(lower.slice(word.length));
+    if (found) return Number(found[1]);
+  }
+  return null;
+}
+
+/**
+ * Whether a folder's name says it holds a season or a disc, and so never names
+ * a show: `Staffel 1`, `Specials`, `S01`, `第1季`. The same rule, and the same
+ * list of test names, as `util::is_season_folder` in Rust.
+ */
+export function isSeasonFolder(name: string): boolean {
+  const lower = name.trim().toLowerCase();
+  if (SPECIALS.has(lower) || /^s\d+$/.test(lower) || /^第.+季$/.test(lower)) return true;
+  return numberAfterWord(lower, [...SEASON_WORDS, ...DISC_WORDS]) !== null;
+}
+
+/** The season a season folder holds: 0 for Specials, null for a disc. */
+function seasonOfFolder(name: string): number | null {
+  const lower = name.trim().toLowerCase();
+  if (SPECIALS.has(lower)) return 0;
+  const short = /^s(\d+)$/.exec(lower) ?? /^第(\d+)季$/.exec(lower);
+  return short ? Number(short[1]) : numberAfterWord(lower, SEASON_WORDS);
+}
+
 /**
  * What a folder above a season folder says the show is called, if anything. A
  * name of only digits counts here (`24`, `1923`): the file is already known to
@@ -366,7 +437,12 @@ export function parseMediaFile(file: MediaFile, kind: LibraryKind, rootPath?: st
   const parentName = baseName(file.parent_dir);
   const parentIsRoot =
     rootPath !== undefined && comparablePath(file.parent_dir) === comparablePath(rootPath);
-  const fromParent = parentIsRoot ? NO_GUESS : runGuessit(parentName, kind);
+  const parentIsSeason = !parentIsRoot && isSeasonFolder(parentName);
+  const fromParent = parentIsRoot
+    ? NO_GUESS
+    : parentIsSeason
+      ? { ...NO_GUESS, season: seasonOfFolder(parentName) }
+      : runGuessit(parentName, kind);
   const parentScore = scoreGuess(fromParent, kind);
 
   // Prefer the filename on a tie: it is the more specific source, and for TV
@@ -392,8 +468,12 @@ export function parseMediaFile(file: MediaFile, kind: LibraryKind, rootPath?: st
   // matched against nothing, and shown nowhere. The show is named one folder
   // up. Only the title is taken from there; the numbering stays the file's.
   let fromGrandparent = false;
-  if (!chosen.title) {
-    const grandparent = parentOf(file.parent_dir);
+  if (!chosen.title || (parentIsSeason && fileScore === 0)) {
+    let grandparent = parentOf(file.parent_dir);
+    // `Show/Staffel 1/Disc 2/S01E05.mkv`
+    while (grandparent !== null && isSeasonFolder(baseName(grandparent))) {
+      grandparent = parentOf(grandparent);
+    }
     const insideRoot: boolean =
       grandparent !== null &&
       (rootPath === undefined ||
@@ -428,8 +508,14 @@ export function parseMediaFile(file: MediaFile, kind: LibraryKind, rootPath?: st
 
   // Episode numbers live in the filename even when the title lives in the
   // folder, so merge rather than discarding one side entirely.
+  const numbered =
+    (chosen.season ?? fromFile.season ?? fromParent.season) !== null ||
+    (chosen.episode ?? fromFile.episode ?? fromParent.episode) !== null;
   const merged: Guess = {
     ...chosen,
+    // Numbers are how a series is told from a film (`groupFiles`). A date in the
+    // name of a file in a TV folder is the one other sign of an episode.
+    kind: kind === 'tv' && !numbered && fromFile.raw.date ? 'dated' : chosen.kind,
     season: chosen.season ?? fromFile.season ?? fromParent.season,
     episode: chosen.episode ?? fromFile.episode ?? fromParent.episode,
     // From whichever side supplied the episode number, so the range and its

@@ -4,8 +4,9 @@
  * all became the first film, at full confidence (review 2026-11, finding 10).
  */
 import { beforeAll, describe, expect, it } from 'vitest';
-import { initParser, parseMediaFile } from './parse';
+import { initParser, isSeasonFolder, parseMediaFile } from './parse';
 import type { MediaFile } from './api';
+import seasonNames from './seasonFolderNames.json';
 
 const ROOT = 'D:/Movies';
 
@@ -125,5 +126,78 @@ describe('the library folder', () => {
       year: null,
     });
     expect(parse('//nas/Movies/00001.mkv', 'movies', '//nas/Movies/').title).not.toBe('Movies');
+  });
+});
+
+describe('season folders', () => {
+  beforeAll(initParser);
+
+  // One list for this and for `util::is_season_folder` in Rust, whose test reads it too.
+  it.each(seasonNames.season)('%s is a season folder', (name) => {
+    expect(isSeasonFolder(name)).toBe(true);
+  });
+  it.each(seasonNames.not)('"%s" is not', (name) => {
+    expect(isSeasonFolder(name)).toBe(false);
+  });
+
+  it.each(['Staffel 1', 'Sæson 1', 'Sesong 1', 'Säsong 1', 'Series 1', 'Disc 1', 'Kausi 1'])(
+    '%s is never the name of the show',
+    (folder) => {
+      expect(parse(`D:/TV/Dark/${folder}/S01E01.mkv`, 'tv', 'D:/TV')).toMatchObject({
+        title: 'Dark',
+        season: 1,
+        episode: 1,
+      });
+    }
+  );
+
+  it('Specials are not the show, and hold season 0', () => {
+    expect(parse('D:/TV/Dark/Specials/S00E01.mkv', 'tv', 'D:/TV')).toMatchObject({
+      title: 'Dark',
+      season: 0,
+      episode: 1,
+    });
+    expect(parse('D:/TV/Dark/Specials/Episode 2.mkv', 'tv', 'D:/TV')).toMatchObject({
+      title: 'Dark',
+      season: 0,
+    });
+  });
+
+  it('the season comes from the folder when the file has only an episode', () => {
+    expect(parse('D:/TV/Dark/Staffel 2/E03.mkv', 'tv', 'D:/TV')).toMatchObject({
+      title: 'Dark',
+      season: 2,
+      episode: 3,
+    });
+  });
+
+  it('a disc folder is not a season, and a disc number is not an episode', () => {
+    expect(parse('D:/TV/Dark/Disc 2/S01E05.mkv', 'tv', 'D:/TV')).toMatchObject({
+      title: 'Dark',
+      season: 1,
+      episode: 5,
+    });
+    expect(parse('D:/Movies/Heat (1995)/Disc 1/00001.mkv')).toMatchObject({
+      title: 'Heat',
+      year: 1995,
+      season: null,
+      episode: null,
+    });
+  });
+
+  it('climbs past more than one such folder, and never to the library folder', () => {
+    expect(parse('D:/TV/Dark/Staffel 1/Disc 2/S01E05.mkv', 'tv', 'D:/TV').title).toBe('Dark');
+    expect(parse('D:/TV/Staffel 1/S01E01.mkv', 'tv', 'D:/TV').title).toBeNull();
+  });
+});
+
+describe('a date in a TV folder', () => {
+  beforeAll(initParser);
+
+  it('is an episode of a series; in a film folder it is left alone', () => {
+    expect(
+      parse('D:/TV/The Daily Show/The Daily Show 2023-01-15.mkv', 'tv', 'D:/TV')
+    ).toMatchObject({ title: 'The Daily Show', kind: 'dated', year: null, season: null, episode: null });
+    expect(parse('D:/Movies/Show 2023-01-15.mkv').kind).toBe('movie');
   });
 });

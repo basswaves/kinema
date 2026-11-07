@@ -38,21 +38,46 @@ pub fn now_millis() -> u64 {
         .unwrap_or(0)
 }
 
-/// Does this folder name look like a season folder rather than a show's own?
+/// Words a season's or a disc's folder is called by, followed by its number.
+const SEASON_WORDS: &[&str] = &[
+    "seasons", "season", "saisons", "saison", "staffel", "s\u{e6}son", "saeson", "sesong", "s\u{e4}song",
+    "sasong", "series", "serie", "temporadas", "temporada", "stagione", "\u{441}\u{435}\u{437}\u{43e}\u{43d}",
+    "sezon", "sezona", "seizoen", "kausi", "\u{e9}vad", "evad", "\u{c2dc}\u{c98c}",
+    "\u{30b7}\u{30fc}\u{30ba}\u{30f3}", "disc", "disk", "dvd", "bd",
+];
+const SPECIALS: &[&str] = &[
+    "specials", "special", "spezial", "specialer", "speciale", "speciali", "especiales",
+    "sp\u{e9}ciaux", "speciaux",
+];
+
+/// Does this folder name say it holds a season or a disc, rather than a show?
 ///
-/// `Season 1`, `season 02`, `Staffel 3`, `Specials`, `S01`, `s1` — and not
-/// `Severance` or `Succession`, so after an `s` the rest must be all digits.
-/// Not `Example Show S01 1080p BluRay` either: a release folder named
-/// after a season is the show's folder as far as layout goes.
+/// `Season 1`, `season 02`, `Staffel 3`, `Specials`, `S01`, `s1`, `Disc 1`, and
+/// not `Severance`, `Season of the Witch` or `Special (2006)`. Not `Example Show
+/// S01 1080p BluRay` either: a release folder named after a season is the show's
+/// folder as far as layout goes. The parser has the same rule (`isSeasonFolder`
+/// in `parse.ts`); the test below and its test read one list of names.
 pub fn is_season_folder(name: &str) -> bool {
     let lower = name.trim().to_lowercase();
-    if lower.starts_with("season") || lower.starts_with("staffel") || lower.starts_with("specials")
+    if SPECIALS.contains(&lower.as_str()) {
+        return true;
+    }
+    if lower
+        .strip_prefix('s')
+        .is_some_and(|rest| !rest.is_empty() && rest.chars().all(|c| c.is_ascii_digit()))
     {
         return true;
     }
-    lower
-        .strip_prefix('s')
-        .is_some_and(|rest| !rest.is_empty() && rest.chars().all(|c| c.is_ascii_digit()))
+    if lower.starts_with('\u{7b2c}') && lower.ends_with('\u{5b63}') {
+        return true;
+    }
+    SEASON_WORDS.iter().any(|word| {
+        lower.strip_prefix(word).is_some_and(|rest| {
+            let rest = rest.trim_start_matches([' ', '.', '_', '-']);
+            let digits = rest.chars().take_while(char::is_ascii_digit).count();
+            (1..=4).contains(&digits) && !rest[digits..].starts_with(char::is_alphanumeric)
+        })
+    })
 }
 
 /// `path` if it is a file, or the file beside it whose name differs only in
@@ -142,24 +167,17 @@ mod tests {
         assert_eq!(count(12, "episode"), "12 episodes");
     }
 
-    /// Everything either of the two old rules accepted.
+    /// One list for this and for the parser's rule (`parse.names.test.ts`).
     #[test]
     fn season_folders() {
-        for name in ["Season 1", "season 02", "Season 01", "S01", "s1", "Specials", "Staffel 3"] {
+        let names: serde_json::Value =
+            serde_json::from_str(include_str!("../../src/library/seasonFolderNames.json")).unwrap();
+        for name in names["season"].as_array().unwrap() {
+            let name = name.as_str().unwrap();
             assert!(is_season_folder(name), "{name} is a season folder");
         }
-    }
-
-    #[test]
-    fn not_season_folders() {
-        for name in [
-            "Severance",
-            "Succession",
-            "",
-            "Example Film (2017)",
-            "films",
-            "Example Show S01 1080p BluRay",
-        ] {
+        for name in names["not"].as_array().unwrap() {
+            let name = name.as_str().unwrap();
             assert!(!is_season_folder(name), "{name} is not a season folder");
         }
     }

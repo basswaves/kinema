@@ -2364,6 +2364,7 @@ const handlers: Record<string, Handler> = {
   // The scan waits while a film plays and tells the native side so (playback.ts).
   set_playing: () => null,
   mpv_started: () => false,
+  mpv_give_back: () => fakeMpv.destroy(),
   // A test sets `kinemaMockPageEnded` to play a page whose process ended.
   page_recovery: () => {
     const why = localStorage.getItem('kinemaMockPageEnded');

@@ -361,6 +361,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             updates::latest_release,
             engine::mpv_started,
+            engine::mpv_give_back,
             page_life::page_recovery,
             capabilities::capabilities,
             places::list_folders,

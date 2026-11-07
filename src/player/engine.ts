@@ -131,12 +131,23 @@ const OBSERVED = [
   [MOUSE_PROPERTY, 'string', 'none'],
 ] as const;
 
+/** On `window` for the reason above; each is about the one mpv. */
+const onWindow = () =>
+  window as unknown as {
+    __mpvInit?: Promise<string>;
+    __mpvGiveBack?: number;
+    __mpvGoing?: Promise<void>;
+  };
+
 /** Start the engine, or wait for the start already under way. */
 export function startEngine(): Promise<string> {
-  const host = window as unknown as { __mpvInit?: Promise<string> };
+  const host = onWindow();
+  window.clearTimeout(host.__mpvGiveBack);
 
   if (!host.__mpvInit) {
-    host.__mpvInit = loadCapabilities()
+    const going = host.__mpvGoing ?? Promise.resolve();
+    host.__mpvInit = going
+      .then(loadCapabilities)
       .then(() => {
         // Media3 starts with the first file; there is nothing to start here.
         if (isMedia3()) return null;
@@ -411,7 +422,45 @@ export async function discFailure(): Promise<DiscFailure | null> {
   return invoke<DiscFailure | null>('disc_failure', { from: discLogMark }).catch(() => null);
 }
 
-/** Close the file. Nothing plays afterwards; the engine stays up. */
+/**
+ * After leaving a film, mpv holds on to about a gigabyte: its picture buffers
+ * and decoders (seen after 4K: 1.3 GB and 1.09 GB of graphics memory on one
+ * computer for as long as anyone watched, 500 MB on another). Stopping the film
+ * does not free them; ending mpv does, within a second. It is started again for
+ * the next film, which then opens about half a second later (GOTCHAS, HISTORY).
+ * Not at once, so leaving a film to choose another costs nothing.
+ */
+export const GIVE_BACK_MS = 30000;
+
+/**
+ * The player closed: end mpv in a while, unless a film opens first. Called in
+ * the same moment as the player closing, before the next can open: `startEngine`
+ * takes it back.
+ */
+export function giveBackEngineSoon(): void {
+  if (isMedia3()) return;
+  const host = onWindow();
+  window.clearTimeout(host.__mpvGiveBack);
+  host.__mpvGiveBack = window.setTimeout(() => void giveBackEngine(), GIVE_BACK_MS);
+}
+
+async function giveBackEngine(): Promise<void> {
+  const host = onWindow();
+  // Something the timer did not hear of is playing: leave it.
+  const idle = await readProperty<boolean>('idle-active', 'flag');
+  if (idle !== true || !host.__mpvInit) return;
+  host.__mpvInit = undefined;
+  // Everything mpv's end could wait for is done by now, and the next start
+  // waits for this: two of them on one window is the crash above.
+  host.__mpvGoing = invoke<void>('mpv_give_back')
+    .catch((e) => console.warn('mpv: could not be ended', e))
+    .finally(() => {
+      host.__mpvGoing = undefined;
+    });
+  console.info('mpv: ended until the next film, to give back its memory');
+}
+
+/** Close the file. Nothing plays afterwards; the engine stays up for a while. */
 export async function stopPlayback(): Promise<void> {
   if (isMedia3()) return media3.stop();
   await command('stop');

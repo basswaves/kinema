@@ -27,6 +27,7 @@ import {
   chooseTrack,
   discFailure,
   fitWindowForPlayer,
+  giveBackEngineSoon,
   hasMpv,
   hasReachedEnd,
   isPictureFullscreen,
@@ -543,6 +544,7 @@ export function usePlaybackEngine({
   // give the screen its own mode back however the player was left.
   useEffect(() => {
     return () => {
+      giveBackEngineSoon();
       // Stopped first, so mpv has let go of the receiver's card before the
       // sound server is given it back (audioOutput.ts → holdDevice).
       void stopPlayback()

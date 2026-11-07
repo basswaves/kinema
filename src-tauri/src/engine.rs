@@ -52,6 +52,30 @@ pub fn mpv_started() -> bool {
     false
 }
 
+/// End mpv until the next film, for the memory it holds on to after one
+/// (`giveBackEngineSoon` in engine.ts). Linux's allocator keeps what was freed
+/// for the program's own later use unless told otherwise.
+#[tauri::command]
+#[cfg(desktop)]
+pub async fn mpv_give_back(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri_plugin_libmpv::MpvExt;
+    crate::jobs::off_main(move || {
+        app.mpv().destroy("main").map_err(|e| e.to_string())?;
+        // SAFETY: takes a plain number and touches only the allocator's free lists.
+        #[cfg(target_os = "linux")]
+        unsafe {
+            libc::malloc_trim(0);
+        }
+        Ok(())
+    })
+    .await
+}
+
+/// Android has no mpv.
+#[tauri::command]
+#[cfg(mobile)]
+pub fn mpv_give_back() {}
+
 /// Shut the engine down before the process ends. The plugin does that only
 /// when a window's close button is used; Leave, the power actions and a
 /// self-test all end with `app.exit`, and left mpv's video thread drawing

@@ -23,6 +23,8 @@ const TICK_MS = 100;
 
 export interface FakeMpvState {
   initialised: boolean;
+  /** How many times mpv has been ended (engine.ts, `giveBackEngineSoon`). */
+  destroyed: number;
   path: string | null;
   duration: number | null;
   position: number;
@@ -85,6 +87,7 @@ let lookupDuration: DurationLookup = () => 1500;
 
 const state: FakeMpvState = {
   initialised: false,
+  destroyed: 0,
   path: null,
   duration: null,
   position: 0,
@@ -332,6 +335,8 @@ export function getProperty(name: string): unknown {
       return state.path === null ? 0 : tracks().length;
     case 'audio-delay':
       return state.audioDelay;
+    case 'idle-active':
+      return state.path === null;
     case 'chapters':
       return state.path === null ? 0 : state.chapters.length;
     case 'chapter': {
@@ -359,6 +364,12 @@ export function init(durations: DurationLookup): string {
   state.initialised = true;
   send({ event: 'idle' });
   return 'main';
+}
+
+/** `plugin:libmpv|destroy`. */
+export function destroy(): void {
+  state.initialised = false;
+  state.destroyed += 1;
 }
 
 /** Handle on the fake, for driving it from DevTools or the browser pane. */

@@ -350,10 +350,63 @@ fn video_nfo_paths(video: &Path) -> Vec<PathBuf> {
         paths.push(video.with_file_name(name));
     }
     // `movie.nfo` beside it, which tinyMediaManager can be configured to write.
+    // It speaks for the whole folder, so only in a folder of one film: one left
+    // at the top of a flat folder linked every film there to its id, unscored.
+    // The folder is listed only when there is such a file.
     if let Some(dir) = video.parent() {
-        paths.push(dir.join("movie.nfo"));
+        let nfo = dir.join("movie.nfo");
+        if crate::util::existing_file(&nfo).is_some() && holds_one_film(dir) {
+            paths.push(nfo);
+        }
     }
     paths
+}
+
+/// Words after which a video's name stops being the film's: its year, and how
+/// a copy or part of it is told from another.
+const NOT_THE_NAME: &[&str] = &[
+    "480p", "576p", "720p", "1080p", "2160p", "4k", "uhd", "hdr", "sdr", "bluray", "remux", "web", "webrip",
+    "webdl", "dvdrip", "bdrip", "x264", "x265", "h264", "h265", "hevc", "extended", "director", "directors",
+    "theatrical", "unrated", "remastered", "imax", "edition", "cut", "version", "cd1", "cd2", "cd3", "disc1",
+    "disc2", "disk1", "disk2", "part1", "part2", "pt1", "pt2",
+];
+
+/// A video file's film: the words of its name, and its year if it says one.
+fn film_of(stem: &str) -> (Vec<String>, Option<String>) {
+    let lower = stem.to_lowercase();
+    let mut name = Vec::new();
+    let mut year = None;
+    for word in lower.split(|c: char| !c.is_alphanumeric()).filter(|w| !w.is_empty()) {
+        let is_year = word.len() == 4 && (word.starts_with("19") || word.starts_with("20"));
+        if is_year && word.chars().all(|c| c.is_ascii_digit()) && !name.is_empty() {
+            year = Some(word.to_string());
+            break;
+        }
+        if NOT_THE_NAME.contains(&word) || ((word == "cd" || word == "disc") && !name.is_empty()) {
+            break;
+        }
+        name.push(word.to_string());
+    }
+    (name, year)
+}
+
+/// Whether every video in a folder is one film: alone, or copies and parts of
+/// it, the same name and no two years. Any doubt says no, and the file is then
+/// matched by its name as a file with no `movie.nfo` is.
+fn holds_one_film(dir: &Path) -> bool {
+    let Ok(entries) = crate::files::read_dir(dir) else { return false };
+    let mut films = entries
+        .into_iter()
+        .filter(|(path, is_dir)| !is_dir && crate::scanner::is_video(path))
+        .filter_map(|(path, _)| path.file_stem().map(|s| film_of(&s.to_string_lossy())));
+    let Some((name, mut year)) = films.next() else { return true };
+    films.all(|(other, other_year)| {
+        if other != name || (year.is_some() && other_year.is_some() && year != other_year) {
+            return false;
+        }
+        year = year.take().or(other_year);
+        true
+    })
 }
 
 /// Where the *show* NFO may sit, given one of its episode files.
@@ -678,6 +731,34 @@ fn write_all(exports: Vec<NfoExport>, overwrite: bool) -> WriteReport {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A `movie.nfo` and these videos in a folder of their own; whether it counts.
+    fn movie_nfo_counts(tag: &str, videos: &[&str]) -> bool {
+        let dir = std::env::temp_dir().join(format!("kinema-movie-nfo-{}-{tag}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("movie.nfo"), "<movie><title>Stray</title></movie>").unwrap();
+        for video in videos {
+            std::fs::write(dir.join(video), "x").unwrap();
+        }
+        let counts = video_nfo_paths(&dir.join(videos[0]))
+            .iter()
+            .any(|p| p.ends_with("movie.nfo"));
+        std::fs::remove_dir_all(&dir).unwrap();
+        counts
+    }
+
+    #[test]
+    fn movie_nfo_counts_only_for_a_folder_of_one_film() {
+        assert!(movie_nfo_counts("alone", &["Heat (1995).mkv"]));
+        assert!(movie_nfo_counts("copies", &["Heat (1995) 1080p.mkv", "Heat (1995) 2160p.mkv"]));
+        assert!(movie_nfo_counts("noyear", &["Heat.mkv", "Heat (1995) Extended.mkv"]));
+        assert!(movie_nfo_counts("parts", &["Heat CD1.avi", "Heat CD2.avi"]));
+        assert!(movie_nfo_counts("trailer", &["Heat.mkv", "Heat-trailer.mkv"]));
+        assert!(!movie_nfo_counts("flat", &["Heat (1995).mkv", "Inception (2010).mkv"]));
+        assert!(!movie_nfo_counts("sequel", &["The Matrix.mkv", "The Matrix Reloaded.mkv"]));
+        assert!(!movie_nfo_counts("remake", &["Dune (1984).mkv", "Dune (2021).mkv"]));
+    }
 
     #[test]
     fn reads_modern_uniqueid() {

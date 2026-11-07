@@ -242,6 +242,10 @@ mod platform {
                                 }
                                 Then::NewKinema => {
                                     if ended(&app, Why::Ended, what) {
+                                        // On this thread `restart` skips the exit
+                                        // event that frees the single-instance lock:
+                                        // the new Kinema would find it held and leave.
+                                        tauri_plugin_single_instance::destroy(&app);
                                         app.restart();
                                     } else if let Some(path) = marker(&app) {
                                         let _ = std::fs::remove_file(path);

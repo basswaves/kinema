@@ -403,7 +403,7 @@ reason, so words to the person cannot claim the cause.
   instance is harmless in plugin 0.3.2 (it returns), but loading the mouse
   script again would double every click: ask `mpv_started` first. The new page
   reads what mpv has open and reopens it there (`pageRecovery.ts`).
-- WebView2's *browser* process ending cannot be reloaded from: only a new Kinema.
+- WebView2's *browser* process ending cannot be reloaded from: only a new Kinema. `app.restart()` on the main thread skips the exit event that frees the single-instance lock, so the new one found it held and left, and Kinema simply closed. It showed only in a real release build, not under a self-test (no lock there): free the lock first (`tauri_plugin_single_instance::destroy`).
 - Android: not answering `onRenderProcessGone` has the system kill the whole
   app, and answering means that WebView may never be used again. Tauri cannot
   replace it, so Kinema starts anew (`PageGone.kt`). `RustWebViewClient` is

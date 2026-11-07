@@ -302,7 +302,7 @@ export function scoreCandidate(candidate: Candidate, ctx: ScoreContext): ScoredC
   const theirEnding = endNumber(name);
   if (ending !== theirEnding) {
     confidence -= OTHER_NUMBER_PENALTY;
-    reasons.push(`ends in ${theirEnding}, not ${ending}`);
+    reasons.push(`ends in ${theirEnding} not ${ending}`);
   }
 
   if (ctx.parsedYear && candidate.year) {

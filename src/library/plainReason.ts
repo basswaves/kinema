@@ -33,6 +33,8 @@ function plainScore(part: string): string {
   if (off) return `the year is ${off[1]} years off`;
   if (part === 'no candidate year') return 'it has no year to compare';
   if (part === 'candidate has no episodes') return 'it lists no episodes';
+  const ending = /^ends in (\d+) not (\d+)$/.exec(part);
+  if (ending) return `its number is ${ending[1]}, this file's ${ending[2]}`;
   return part;
 }
 

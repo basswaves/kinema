@@ -18,6 +18,12 @@ describe('plainReason', () => {
     );
   });
 
+  it('says a different number at the end', () => {
+    expect(plainReason('title 91%, ends in 3 not 2')).toBe(
+      "The name is 91 % alike, its number is 3, this file's 2"
+    );
+  });
+
   it('keeps the searched-as note', () => {
     expect(plainReason('no candidates returned · searched as “X” from a .nfo')).toBe(
       'Nothing came back for this name · searched as “X” from a .nfo'

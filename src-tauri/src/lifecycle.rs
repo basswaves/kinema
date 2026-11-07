@@ -217,13 +217,16 @@ pub fn reset_matches(conn: &Connection) -> rusqlite::Result<usize> {
 /// when a change to them can turn a refusal into a match (MATCHING.md, round
 /// 6: ties, ids in names, other names, parts), so a library refused under the
 /// old rules is read and asked once more under the new ones.
-pub const MATCHER_RULES: &str = "2";
+pub const MATCHER_RULES: &str = "3";
 const MATCHER_RULES_KEY: &str = "matcher_rules";
 
+/// 3: names and ties (round 8 L1): other alphabets, numbers, season folders.
+///
 /// Once per [`MATCHER_RULES`]: files the matcher refused, and files with no
 /// title read from their name, go back to the parser — and from there to the
 /// matcher. Never a held file (a person decided), an ignored one, or one with a
-/// title (matched, or kept under its own name). A refusal is otherwise never
+/// title (matched, or kept under its own name), so a wrong match made under the
+/// old rules stays until someone corrects it. A refusal is otherwise never
 /// re-asked (see `MATCHABLE_WHERE`), so without this a library would keep every
 /// refusal the old rules made.
 pub fn reask_after_new_rules(conn: &Connection) -> rusqlite::Result<usize> {

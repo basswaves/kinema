@@ -630,6 +630,25 @@ the votes *and* three times the popularity goes first (`score.ts`). Any change
 to scoring needs the dry run against a real library's answers, not only
 tests: compare every matched file before and after.
 
+### guessit reads a bare folder name as an episode
+
+With the type hint `episode`, `Staffel 1` is `{title: "Staffel", episode: 1}`,
+`Disc 1` the same, and `24` is `{episode: 24}` with no title at all. Nothing
+fails: the folder's word becomes the show's name, every show laid out that way
+becomes one group, and the folder's number can become the episode. **Do:** ask
+`isSeasonFolder` (`parse.ts`) before giving a folder to guessit. It and
+`util::is_season_folder` in Rust are tested against one list,
+`src/library/seasonFolderNames.json`; add a word to both, and to the list.
+
+### A rule change does not reach a file that is already matched
+
+`reask_after_new_rules` re-reads refusals and untitled files only, once per
+`MATCHER_RULES`, and never a held or ignored file. A file matched wrongly under
+older rules keeps that match, with nothing saying so. Tests of the matcher pass
+and a real library looks unchanged: to see a fix on a library, look at its
+refusals, or use the dry run in `notes/tools/review/l1-dryrun.test.ts`.
+`reset_parses` (developer tools) is not the way out: it clears hand matches too.
+
 ## Child processes
 
 ### Draining stdout and stderr in sequence can deadlock

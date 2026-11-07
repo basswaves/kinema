@@ -30,15 +30,37 @@ impl std::fmt::Display for DbError {
             DbError::Sqlite(e) => write!(f, "{e}"),
             DbError::TooNew { found, supported } => write!(
                 f,
-                "This library was created by a newer version of Kinema \
-                 (database version {found}; this build understands {supported}). \
-                 Update Kinema, or point it at a different library."
+                "This library was last used by a newer version of Kinema \
+                 (database version {found}; this version understands {supported}). \
+                 It was not changed, and that newer version can still use it."
             ),
             DbError::Backup(reason) => write!(
                 f,
                 "This version of Kinema needs to upgrade your library, and it \
                  makes a safety copy first. The copy could not be made, so \
                  nothing was changed.\n\n{reason}"
+            ),
+        }
+    }
+}
+
+impl DbError {
+    /// Whether putting a safety copy back could help. A locked file, a full disk
+    /// or a folder that cannot be written to is something in the way of a good
+    /// library, and a copy would meet it too.
+    pub fn may_be_damaged(&self) -> bool {
+        use rusqlite::ErrorCode::{
+            CannotOpen, DatabaseBusy, DatabaseLocked, DiskFull, PermissionDenied, ReadOnly,
+            SystemIoFailure,
+        };
+        match self {
+            DbError::TooNew { .. } | DbError::Backup(_) => false,
+            DbError::Sqlite(e) => !matches!(
+                e.sqlite_error_code(),
+                Some(
+                    CannotOpen | DatabaseBusy | DatabaseLocked | DiskFull | PermissionDenied
+                        | ReadOnly | SystemIoFailure
+                )
             ),
         }
     }

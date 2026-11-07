@@ -427,6 +427,19 @@ a mutex around one connection serialises everything regardless.
 **Do:** give the scanner its own connection (`ScanDb`). The mutex then only
 serialises access to each connection, and SQLite does the rest.
 
+### A blocking dialog in `setup` never appears on Linux
+
+`app.dialog().message(…).blocking_show()` inside `setup` runs on the main thread. On
+Windows and Android the dialog has a loop of its own and works. On Linux the plugin's
+dialog is drawn by the GTK loop that the main thread runs, and the main thread is
+blocked waiting for it: no window, no error, Kinema hangs with nothing on screen
+(the main thread sits in a futex wait). Every start-up message had this since Linux
+support began. **Do:** `startup_dialog::tell` / `ask`, which run a GTK dialog
+directly on Linux. **And when testing it in WSL:** set `GDK_BACKEND=x11` and a
+private `XDG_RUNTIME_DIR` beside `DISPLAY=:N`; with only `WAYLAND_DISPLAY` unset,
+GTK still finds WSLg's socket and the window opens on the desktop of whoever is at
+the computer.
+
 ### Swapping a WAL database's file leaves its log behind
 
 `library.db` in WAL mode has `library.db-wal` and `library.db-shm` beside it. Put

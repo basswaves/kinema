@@ -59,6 +59,7 @@ mod probe;
 mod procstats;
 mod scanner;
 mod selftest;
+mod startup_dialog;
 mod reach;
 mod report;
 mod settings;
@@ -80,7 +81,6 @@ mod videos;
 use library::{Db, ScanDb};
 use std::sync::Mutex;
 use tauri::Manager;
-use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
 /// Where the library, its backups, the artwork cache and the logs live.
 ///
@@ -150,45 +150,32 @@ fn open_library(app: &tauri::AppHandle) -> Result<(), String> {
         match backup::apply_pending_restore(&dir) {
             Ok(Some(done)) => {
                 log!("backup: restored the copy made at {}", done.made_at);
-                app.dialog()
-                    .message("Your library was put back from the safety copy you chose.")
-                    .title("Kinema")
-                    .kind(MessageDialogKind::Info)
-                    .blocking_show();
+                startup_dialog::tell(
+                    app,
+                    "Kinema",
+                    "Your library was put back from the safety copy you chose.",
+                    startup_dialog::Kind::Info,
+                );
             }
             Ok(None) => {}
             Err(reason) => {
                 log!("backup: restore failed: {reason}");
-                app.dialog()
-                    .message(reason)
-                    .title("The safety copy could not be put back")
-                    .kind(MessageDialogKind::Warning)
-                    .blocking_show();
+                startup_dialog::tell(
+                    app,
+                    "The safety copy could not be put back",
+                    &reason,
+                    startup_dialog::Kind::Warning,
+                );
             }
         }
     }
 
     let path = dir.join("library.db");
 
-    let primary = db::open(&path).map_err(|e| {
-        // A library from a newer Kinema is not damaged, and its message says
-        // what to do. Anything else might be, and the weekly copies are the
-        // way back: nobody should have to find that out from a bug report.
-        let copies = if matches!(e, db::DbError::TooNew { .. }) {
-            String::new()
-        } else {
-            format!(
-                "\n\nIf the file is damaged, earlier copies of it are kept in {}. \
-                 Close Kinema, replace library.db with the newest copy there (renamed), \
-                 and start it again.",
-                dir.join(db::BACKUP_DIR).display()
-            )
-        };
-        format!(
-            "Kinema could not open its library database.\n\n{}\n\n{e}{copies}",
-            path.display()
-        )
-    })?;
+    let primary = match db::open(&path) {
+        Ok(conn) => conn,
+        Err(e) => open_from_a_safety_copy(app, &dir, &path, e)?,
+    };
     // A library brought from another system (a restored safety copy).
     match artwork::use_this_systems_separator(&primary) {
         Ok(0) => {}
@@ -227,6 +214,52 @@ fn open_library(app: &tauri::AppHandle) -> Result<(), String> {
     app.manage(simkl::SimklState::default());
     app.manage(trakt::TraktState::default());
     Ok(())
+}
+
+/// The library will not open. Say why and, where a safety copy could help, offer
+/// to put the newest good one back: Settings, which does this otherwise, cannot be
+/// reached now. Returns the library opened from the copy, or what to tell the
+/// person if that is not to be.
+fn open_from_a_safety_copy(
+    app: &tauri::AppHandle,
+    dir: &std::path::Path,
+    path: &std::path::Path,
+    failure: db::DbError,
+) -> Result<rusqlite::Connection, String> {
+    log!("library: could not open it: {failure}");
+    let copy = backup::copy_to_offer(dir, &failure);
+    let said = backup::failed_open_message(path, &failure, copy.as_ref(), &dir.join(db::BACKUP_DIR));
+    let Some(copy) = copy else { return Err(said) };
+
+    let put_back = startup_dialog::ask(
+        app,
+        "Kinema could not open its library",
+        &said,
+        startup_dialog::Kind::Warning,
+        "Put it back",
+        Some("Close Kinema"),
+    );
+    if !put_back {
+        log!("library: the safety copy was declined; closing");
+        std::process::exit(0);
+    }
+    backup::put_back(dir, &copy.name)?;
+    log!("library: put back {}", copy.name);
+    let conn = db::open(path).map_err(|e| {
+        format!(
+            "Kinema put back the safety copy from {}, and could not open that either. The \
+             library as it was is kept among the safety copies.\n\n{}\n\n{e}",
+            backup::date_of(&copy),
+            path.display()
+        )
+    })?;
+    startup_dialog::tell(
+        app,
+        "Kinema",
+        &format!("Your library was put back from the safety copy from {}.", backup::date_of(&copy)),
+        startup_dialog::Kind::Info,
+    );
+    Ok(conn)
 }
 
 /// How long the page gets to show the window itself before the backend does.
@@ -302,11 +335,12 @@ pub fn run() {
                 // with no window, no message and nothing in either log — an app
                 // that "just doesn't start". A dialog is the only surface left
                 // this early, since the webview does not exist yet.
-                app.dialog()
-                    .message(&message)
-                    .title("Kinema could not start")
-                    .kind(MessageDialogKind::Error)
-                    .blocking_show();
+                startup_dialog::tell(
+                    app.handle(),
+                    "Kinema could not start",
+                    &message,
+                    startup_dialog::Kind::Error,
+                );
                 // Not a returned error: that path ends in `.expect` below, and
                 // panicking after we have already explained ourselves would
                 // only add an invisible second failure.

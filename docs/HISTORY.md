@@ -4241,6 +4241,33 @@ stay; every change below either refuses more, or asks a better question.
 Files already matched keep their match: only refusals are asked again (GOTCHAS,
 "A rule change does not reach a file that is already matched").
 
+### A library that will not open is offered its copy (2026-11)
+
+The start-up message for a library that would not open told people to replace
+`library.db` with the newest safety copy by hand. After a crash the library's log is
+still beside it, and SQLite replays it onto whatever takes the name: a second damaged
+library. Restore in Settings did it properly, but Settings cannot be reached when the
+library will not open. Now the message offers the newest copy that is whole and that
+this version can read, names its date and that anything after it is not in it, and
+puts it back itself, through the same swap as Settings, keeping the damaged file among
+the copies. A locked file, a full disk or a folder without permission is not offered a
+copy: a copy would meet the same thing, and the library is probably fine. With no good
+copy the message says to leave the folder as it is.
+
+A library from a newer Kinema used to say "point it at a different library", which
+nothing in Kinema can do. It now says the library was not changed and the newer
+version can still use it, and offers the copy made before that upgrade.
+
+The restore itself deleted the library first, then met a refusal on its log (a backup
+tool or antivirus holding it) and said "not changed" over an empty folder. It now
+copies under a temporary name, moves the logs aside rather than deleting them, and
+renames the copy in last, so any refusal is undone and the message stays true.
+
+Checked in the real app on all three: Windows on a desktop of its own, Linux under a
+private X server, Android on the emulator with the remote. Linux showed that no
+start-up dialog had ever appeared there (GOTCHAS, "A blocking dialog in `setup` never
+appears on Linux").
+
 ### A watched tick clears only when the old copy is shown to be partial (2026-11)
 
 A file that changed size used to lose its tick for good, in `watch_history` too.

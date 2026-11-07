@@ -273,6 +273,85 @@ pub fn date_of(copy: &BackupCopy) -> String {
     format!("{year}-{month:02}-{day:02}")
 }
 
+/// A copy that could help with this failure to open the library, if there is one.
+/// Putting one back is offered for damage and for a library from a newer Kinema,
+/// and not for a locked file or a full disk.
+pub fn copy_to_offer(data_dir: &Path, failure: &db::DbError) -> Option<BackupCopy> {
+    let helps = failure.may_be_damaged() || matches!(failure, db::DbError::TooNew { .. });
+    if helps {
+        newest_good_copy(data_dir)
+    } else {
+        None
+    }
+}
+
+/// What to tell someone whose library would not open, with `copy` from
+/// [`copy_to_offer`]. With a copy this ends in a question, answered by the buttons.
+///
+/// Never to swap files by hand: a crash's `library.db-wal` beside the library is
+/// replayed onto whatever takes its name, and damages that too (GOTCHAS,
+/// "Swapping a WAL database's file leaves its log behind").
+pub fn failed_open_message(
+    library: &Path,
+    failure: &db::DbError,
+    copy: Option<&BackupCopy>,
+    backups: &Path,
+) -> String {
+    let library = library.display();
+    let keep = "The library as it is now is kept among the safety copies.";
+    let copy_is = |copy: &BackupCopy| {
+        let which = if copy.kind == "before_upgrade" {
+            "the safety copy made before the upgrade"
+        } else {
+            "the newest good safety copy"
+        };
+        format!(
+            "{which}, {}, from {}. Anything you watched or changed after that date is not in it.",
+            copy.name,
+            date_of(copy)
+        )
+    };
+    if matches!(failure, db::DbError::TooNew { .. }) {
+        return match copy {
+            Some(copy) => format!(
+                "{failure}\n\nTo use this version instead, Kinema can put back {} {keep}\n\n\
+                 Put that copy back? Or close Kinema and install the newer version again.",
+                copy_is(copy)
+            ),
+            None => format!(
+                "{failure}\n\nInstall the newer version again. There is no safety copy this \
+                 version can read."
+            ),
+        };
+    }
+    if !failure.may_be_damaged() {
+        let what = if matches!(failure, db::DbError::Backup(_)) {
+            String::new()
+        } else {
+            "\n\nThe file does not look damaged, and it was not changed. Usually something is \
+             in the way: another program using it, a full disk, or no permission to write in \
+             that folder. See to that, then start Kinema again."
+                .to_string()
+        };
+        return format!("Kinema could not open its library.\n\n{library}\n\n{failure}{what}");
+    }
+    let opening = format!(
+        "Kinema could not open its library. The file looks damaged.\n\n{library}\n\n{failure}"
+    );
+    match copy {
+        Some(copy) => format!(
+            "{opening}\n\nKinema can put back {} {keep}\n\nPut that copy back?",
+            copy_is(copy)
+        ),
+        None => format!(
+            "{opening}\n\nThere is no good safety copy in {}.\n\nKeep that folder as it is, and \
+             do not replace or delete library.db or the files beside it: a rescue may still be \
+             possible from them. Kinema's page on GitHub is the place to ask.",
+            backups.display()
+        ),
+    }
+}
+
 /// Refuse a copy that is damaged or too new for this Kinema, before it
 /// replaces anything.
 fn check_copy(path: &Path) -> Result<(), String> {
@@ -538,6 +617,77 @@ mod tests {
         let found = newest_good_copy(&dir).unwrap();
         assert_eq!(found.name, "library-v17-200.db");
         assert_eq!(date_of(&BackupCopy { made_at: 1_790_198_863, ..found }), "2026-09-23");
+    }
+
+    fn copy_named(name: &str, kind: &str) -> BackupCopy {
+        BackupCopy { name: name.into(), kind: kind.into(), made_at: 1_790_198_863, bytes: 1 }
+    }
+
+    /// Review 2026-11, finding 2: this used to send people to swap the file by
+    /// hand, which replays a crash's log onto the copy and damages that too.
+    #[test]
+    fn a_damaged_library_is_offered_the_copy_and_never_a_swap_by_hand() {
+        let damaged = db::DbError::Sqlite(rusqlite::Error::SqliteFailure(
+            rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_NOTADB),
+            None,
+        ));
+        assert!(damaged.may_be_damaged());
+        let library = Path::new("data/library.db");
+        let backups = Path::new("data/backups");
+
+        let copy = copy_named("library-auto-v37-1790198863.db", "weekly");
+        let offered = failed_open_message(library, &damaged, Some(&copy), backups);
+        assert!(offered.contains(&copy.name) && offered.contains("2026-09-23"), "{offered}");
+        assert!(offered.contains("Anything you watched or changed after"), "{offered}");
+        assert!(offered.ends_with("Put that copy back?"), "{offered}");
+
+        let none = failed_open_message(library, &damaged, None, backups);
+        assert!(none.contains("do not replace or delete library.db"), "{none}");
+        assert!(!none.contains("Put that copy back"), "{none}");
+        for said in [offered, none] {
+            assert!(!said.contains("renamed"), "{said}");
+        }
+    }
+
+    /// Review 2026-11, finding 21: it promised "point it at a different library",
+    /// which nothing in Kinema can do. The real way back is the copy made before
+    /// the upgrade, and a copy too new for this version is not offered.
+    #[test]
+    fn a_library_from_a_newer_kinema_names_the_copy_made_before_the_upgrade() {
+        let dir = folder("too-new");
+        let backups = dir.join(BACKUP_DIR);
+        library_at(&backups.join("library-v36-1790198863.db"), 1.0);
+        library_at(&backups.join("library-auto-v99-1790300000.db"), 2.0);
+        Connection::open(backups.join("library-auto-v99-1790300000.db"))
+            .unwrap()
+            .execute_batch(&format!("PRAGMA user_version={};", SCHEMA_VERSION + 1))
+            .unwrap();
+        let newer = db::DbError::TooNew { found: 99, supported: SCHEMA_VERSION };
+
+        let copy = copy_to_offer(&dir, &newer).unwrap();
+        assert_eq!(copy.name, "library-v36-1790198863.db");
+        let said = failed_open_message(&dir.join("library.db"), &newer, Some(&copy), &backups);
+        assert!(said.contains("the safety copy made before the upgrade"), "{said}");
+        assert!(said.contains("library-v36-1790198863.db"), "{said}");
+        assert!(said.contains("install the newer version again"), "{said}");
+        assert!(!said.contains("different library"), "{said}");
+    }
+
+    /// Something in the way of a good library: a copy would meet it too, and
+    /// offering one would throw away what is safe.
+    #[test]
+    fn a_locked_or_full_library_is_offered_nothing() {
+        let dir = folder("locked");
+        library_at(&dir.join(BACKUP_DIR).join("library-auto-v18-500.db"), 1.0);
+        for code in [rusqlite::ffi::SQLITE_BUSY, rusqlite::ffi::SQLITE_FULL, rusqlite::ffi::SQLITE_CANTOPEN] {
+            let locked = db::DbError::Sqlite(rusqlite::Error::SqliteFailure(
+                rusqlite::ffi::Error::new(code),
+                None,
+            ));
+            assert_eq!(copy_to_offer(&dir, &locked), None);
+            let said = failed_open_message(&dir.join("library.db"), &locked, None, &dir);
+            assert!(said.contains("does not look damaged"), "{said}");
+        }
     }
 
     /// The way back a dialog offers: a damaged library with a crash's log beside

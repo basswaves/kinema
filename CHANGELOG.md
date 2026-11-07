@@ -5,6 +5,37 @@ Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [semantic
 versioning](https://semver.org/), with the usual caveat that a `0.x` release
 makes no stability promises.
 
+## [0.15.1] — 2026-11-07
+
+### Fixed
+
+- **Linux: hovering a button lost the page** (#17). The Linux window is now
+  opaque, so the page stays, and the film still shows behind the player's
+  controls.
+- **Back to a title far down Home went to the top** (#16) when the rows arrived
+  late. It now keeps your place.
+- **The card under the mouse looked like all the others** (#15). It stands out
+  now, in the Light look too. While you use the mouse the ring no longer sits on
+  another control, and the next key brings it back from where the keys were.
+- **Levelling's steps in the player panel were cut short** to "O…", "Al…". They
+  are read whole.
+- **Jellyfin import refused by newer servers.** The key now goes in both forms
+  Jellyfin knows, and "not accepted" and "not allowed" are said apart. Tested
+  against a stand-in server, not a real Jellyfin.
+- **The search box scrolled away** with the results. It stays under the top bar.
+
+### Changed
+
+- **If the page's process ends, Kinema brings it back.** It used to look frozen.
+  It says what happened, and a film mpv is playing goes on from the same place.
+  On Android the film ends with the page.
+- **After a film Kinema gives its memory back**: 30 seconds after you leave the
+  player, mpv is ended and started again for the next film. A 4K film left about
+  1 GB behind; now it does not. The next film can open about half a second later.
+- **Grids show small copies of posters**, made the first time a card is near the
+  screen and kept in Kinema's own artwork folder. Your pictures are not touched.
+  Very large pictures beside your files no longer use up the memory.
+
 ## [0.15.0] — 2026-11-01
 
 ### Added

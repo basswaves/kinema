@@ -2586,7 +2586,7 @@ dependencies = [
 
 [[package]]
 name = "kinema"
-version = "0.15.0"
+version = "0.15.1"
 dependencies = [
  "alsa",
  "flate2",

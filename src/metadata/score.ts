@@ -74,6 +74,25 @@ export function partOf(title: string): number | null {
   return found ? Number(found[1]) : null;
 }
 
+const ROMAN_AT_END: Record<string, number> = {
+  ii: 2,
+  iii: 3,
+  iv: 4,
+  v: 5,
+  vi: 6,
+  vii: 7,
+  viii: 8,
+  ix: 9,
+  x: 10,
+};
+
+/** The number a title ends in, as a digit or from II to X; none counts as 1. */
+function endNumber(title: string): number {
+  const last = literalTitle(title).split(' ').pop() ?? '';
+  const digits = /\d+$/.exec(last);
+  return digits ? Number(digits[0]) : (ROMAN_AT_END[last] ?? 1);
+}
+
 /** The part of a title before its first ": " — "Batman v Superman" — or null. */
 function beforeColon(title: string): string | null {
   const cut = title.indexOf(': ');
@@ -212,6 +231,13 @@ const ARTICLE_BONUS = 0.02;
 /** A candidate naming another part than the file, or none when the file names one. */
 const OTHER_PART_PENALTY = 0.15;
 
+/**
+ * Names ending in different numbers are different films: `Toy Story 2` is close
+ * to `Toy Story 3` in spelling and to nothing else. Enough to refuse by itself
+ * at any similarity, so the answer is the right entry or none.
+ */
+const OTHER_NUMBER_PENALTY = 0.5;
+
 interface NameMatch {
   similarity: number;
   /** The candidate's name that matched best. */
@@ -270,6 +296,13 @@ export function scoreCandidate(candidate: Candidate, ctx: ScoreContext): ScoredC
   if (part !== null && theirs !== part) {
     confidence -= OTHER_PART_PENALTY;
     reasons.push(theirs === null ? `no part ${part}` : `part ${theirs}, not ${part}`);
+  }
+
+  const ending = endNumber(parsed);
+  const theirEnding = endNumber(name);
+  if (ending !== theirEnding) {
+    confidence -= OTHER_NUMBER_PENALTY;
+    reasons.push(`ends in ${theirEnding}, not ${ending}`);
   }
 
   if (ctx.parsedYear && candidate.year) {

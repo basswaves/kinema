@@ -428,3 +428,48 @@ describe('other alphabets', () => {
     expect(titleSimilarity('Amélie', 'Amelie')).toBe(1);
   });
 });
+
+describe('numbers at the end of a title', () => {
+  const one = (parsedTitle: string, title: string) =>
+    pickBest([candidate({ title })], { parsedTitle, parsedYear: null }).matched;
+
+  it.each([
+    ['Toy Story 2', 'Toy Story 3'],
+    ['Rocky IV', 'Rocky V'],
+    ['Toy Story', 'Toy Story 2'],
+    ['Ocean 12', 'Ocean 13'],
+    ['1917', '1918'],
+    ['2012', '2010'],
+  ])('%s is not %s', (parsed, title) => {
+    expect(one(parsed, title)).toBe(false);
+  });
+
+  it.each([
+    ['Toy Story 2', 'Toy Story 2'],
+    ['Rocky 4', 'Rocky IV'],
+    ['Rocky IV', 'Rocky 4'],
+    ['Terminator 2', 'Terminator 2: Judgment Day'],
+    ['Alien 3', 'Alien³'],
+    ['Malcolm X', 'Malcolm X'],
+    ['Dune Part Two', 'Dune: Part 2'],
+  ])('%s is %s', (parsed, title) => {
+    expect(one(parsed, title)).toBe(true);
+  });
+
+  it('another name of the right number still counts', () => {
+    const { matched } = pickBest(
+      [candidate({ title: 'Toy Story 3', altTitles: ['Toy Story 2'] })],
+      { parsedTitle: 'Toy Story 2', parsedYear: null }
+    );
+    expect(matched).toBe(true);
+  });
+
+  it('the right number beats the wrong one with no doubt', () => {
+    const { best, matched } = pickBest(
+      [candidate({ title: 'Toy Story 3', year: 2010 }), candidate({ title: 'Toy Story 2', year: 1999 })],
+      { parsedTitle: 'Toy Story 2', parsedYear: null }
+    );
+    expect(matched).toBe(true);
+    expect(best?.title).toBe('Toy Story 2');
+  });
+});

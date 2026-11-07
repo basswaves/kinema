@@ -17,6 +17,7 @@
  * improved without touching the filesystem again.
  */
 import type { LibraryKind, LibraryRoot, MediaFile, ParseResultPayload } from './api';
+import { normaliseTitle } from '../metadata/score';
 
 /**
  * guessit-js, loaded on demand.
@@ -94,6 +95,9 @@ const TECHNICAL_TOKENS = new Set([
   'movie',
   'film',
   'untitled',
+  'main',
+  'feature',
+  'title',
 ]);
 
 export interface Guess {
@@ -257,6 +261,49 @@ function scoreGuess(guess: Guess, kind: LibraryKind): number {
   return score;
 }
 
+/** A title's words without the spaces between them: `Blade Runner`, `bladerunner`. */
+function squished(title: string): string {
+  return normaliseTitle(title).replace(/\s+/g, '');
+}
+
+/**
+ * Whether a file's title and its folder's speak of one thing: the same name, or
+ * a file naming only part of the folder's (`Mission Impossible - Fallout (2018)/
+ * Fallout.mkv`). Only then does the folder's year say anything about the file.
+ * More words on the file's side is the other way round and does not fit:
+ * `Back to the Future Part II` in `Back to the Future (1985)` is another film.
+ */
+function fitsFolder(fileTitle: string, folderTitle: string): boolean {
+  if (squished(fileTitle) === squished(folderTitle)) return true;
+  const folderWords = new Set(normaliseTitle(folderTitle).split(' '));
+  return normaliseTitle(fileTitle)
+    .split(' ')
+    .every((word) => folderWords.has(word));
+}
+
+/**
+ * A file name that only looks like a title, read inside a folder that has one:
+ * a disc ripper's `title_t00`, `abc123`, a release group joined to the film's
+ * name (`grp-inception`, `grp inception`). Written by tools, so all in lower
+ * case and without spaces, or one word before the folder's own name. Getting
+ * this wrong reads a file as its folder's film, as every file was before.
+ */
+function isReleaseJunk(title: string, folderTitle: string): boolean {
+  const t = title.trim();
+  if (t.length < 2 || /^title[ _-]?t?\d+$/i.test(t)) return true;
+  if (/\p{Lu}/u.test(t)) return false;
+  if (/^(?:\p{L}+\d+|\d+\p{L}+)$/u.test(t)) return true;
+  const folder = normaliseTitle(folderTitle);
+  if (!folder) return false;
+  if (!/\s/.test(t)) {
+    // Without "part 2": the file may write it `partii`, or `parttwo`.
+    const stem = folder.replace(/\s+part \d+$/, '').replace(/\s+/g, '');
+    return /[-_]/.test(t) && squished(t).includes(stem);
+  }
+  const words = normaliseTitle(t).split(' ');
+  return words.length === folder.split(' ').length + 1 && words.slice(1).join(' ') === folder;
+}
+
 /** Directory name only, from a full path (handles Windows and UNC paths). */
 function baseName(dir: string): string {
   const parts = dir.split(/[\\/]/).filter(Boolean);
@@ -304,7 +351,20 @@ export function parseMediaFile(file: MediaFile, kind: LibraryKind, rootPath?: st
 
   // Prefer the filename on a tie: it is the more specific source, and for TV
   // it is usually the only thing carrying the episode number.
-  const useParent = parentScore > fileScore;
+  //
+  // A film's folder wins only when the file has no title of its own or fits it:
+  // a year on the folder is not a better name, and all three parts of a trilogy
+  // kept in the first film's folder were linked to the first film at full
+  // confidence. Not for TV, where a file named only for its episode (`Pilot`)
+  // does not name the show.
+  const ownTitle =
+    kind === 'movies' &&
+    fileScore > 0 &&
+    !!fromFile.title &&
+    !!fromParent.title &&
+    !fitsFolder(fromFile.title, fromParent.title) &&
+    !isReleaseJunk(fromFile.title, fromParent.title);
+  const useParent = parentScore > fileScore && !ownTitle;
   let chosen = useParent ? fromParent : fromFile;
 
   // `Show/Season 1/S01E01.mkv`: the file name has only numbering and so has
@@ -327,6 +387,12 @@ export function parseMediaFile(file: MediaFile, kind: LibraryKind, rootPath?: st
     }
   }
 
+  // The folder's year, only where it speaks of this file.
+  const lendsYear =
+    !chosen.title ||
+    fromFile.title === null ||
+    (fromParent.title !== null && fitsFolder(chosen.title, fromParent.title));
+
   // Episode numbers live in the filename even when the title lives in the
   // folder, so merge rather than discarding one side entirely.
   const merged: Guess = {
@@ -341,7 +407,7 @@ export function parseMediaFile(file: MediaFile, kind: LibraryKind, rootPath?: st
         : fromFile.episode !== null
           ? fromFile.episodeLast
           : fromParent.episodeLast,
-    year: chosen.year ?? fromFile.year ?? fromParent.year,
+    year: chosen.year ?? fromFile.year ?? (lendsYear ? fromParent.year : null),
   };
 
   return {

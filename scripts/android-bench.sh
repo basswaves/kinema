@@ -23,6 +23,7 @@
 #   scripts/android-bench.sh mcp [PORT]        the installed build as an interactive self-test,
 #                                             its WebView forwarded to PORT (default 9223) for
 #                                             the Kinema MCP: kinema_app attach, then kinema_run
+# What Kinema costs a device, read from the side: scripts/android-measure.sh.
 #   scripts/android-bench.sh leak DIR [EVERY]   `selftest DIR`, and every EVERY seconds
 #                                             (default 20) while it runs, a row in
 #                                             DIR/meminfo.csv: the app's memory from `dumpsys

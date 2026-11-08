@@ -546,6 +546,25 @@ export function navAnswering(): boolean {
   return answering();
 }
 
+/**
+ * `fn` runs each time the ring moves inside (or into or out of) the area
+ * `key`: for a grid that draws only the rows near the ring (CardGrid.tsx).
+ */
+export function navWatch(key: string, fn: () => void): () => void {
+  let set = keyListeners.get(key);
+  if (!set) keyListeners.set(key, (set = new Set()));
+  set.add(fn);
+  return () => {
+    set.delete(fn);
+    if (set.size === 0) keyListeners.delete(key);
+  };
+}
+
+/** The control Back is returning to, until the page has it (or the person acts). */
+export function navWanted(): string | null {
+  return pending?.key ?? null;
+}
+
 /** The control holding the ring here, or null. */
 export function navFocused(): string | null {
   return active() ? focused : null;

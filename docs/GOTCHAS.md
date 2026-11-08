@@ -1287,6 +1287,20 @@ parent's own search, which sees the whole grid as one block. A group with no
 cards is `focusable: false`, and names a `preferredChildFocusKey`, or focusing
 the group measures all its children after all.
 
+### A big grid draws only the rows near the screen, and the ring needs rows ahead of it (round 8, part I)
+
+Index steps (`gridStep`) work on the cards that are drawn, so a grid with rows
+left out must always keep a few rows beyond the ring: past the last drawn row
+a press finds "nothing further down" and stops, with no error. `CardGrid.tsx`
+draws the visible rows plus three either side, and the ring's own rows too
+(`navWatch` tells it when the ring moves, before the page has scrolled); Back
+(`navWanted`) draws only the place it is returning to, since the page is put
+there next. Empty space (padding of one measured row height) stands in for the
+rest, so the page is as tall as before. Rows of unequal height (a search
+result's note) cannot be skipped by arithmetic: those grids are drawn whole.
+Measured on a 2-core PC with 1000 films: 100 ms a frame by keys before, 40
+after (17-38 at 416 before); 6000 elements drawn before, 490 after.
+
 ### An Enter a text field acts on must stop there
 
 A field's `onEnter` that answers at once (a sign-in against the mock) put

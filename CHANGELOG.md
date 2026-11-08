@@ -5,6 +5,15 @@ Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [semantic
 versioning](https://semver.org/), with the usual caveat that a `0.x` release
 makes no stability promises.
 
+## [Unreleased]
+
+### Changed
+
+- **A big library keeps only what is on screen.** Movies, See all and the
+  other full grids draw the rows you see and a few around them, not every
+  title at once, so a thousand films browse as lightly as a few hundred and
+  hold far fewer pictures in memory. Nothing looks different.
+
 ## [0.15.2] — 2026-11-08
 
 ### Changed

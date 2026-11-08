@@ -20,6 +20,7 @@ import { addToPlaylist, createPlaylist, playlistEntries } from './library/playli
 import { invoke } from '@tauri-apps/api/core';
 import {
   availableMonitors,
+  currentMonitor,
   getCurrentWindow,
   PhysicalPosition,
   primaryMonitor,
@@ -285,6 +286,36 @@ const CALLABLE: Record<string, (...args: never[]) => Promise<unknown>> = {
     invoke('read_rate', { path, mb, seeks }),
   // Display switching only happens fullscreen, and Browse has no key for it.
   setFullscreen: (on: boolean) => getCurrentWindow().setFullscreen(on),
+  // Kinema's window, its screen, and the picture mpv draws, side by side:
+  // after a screen-mode switch a full-screen window must have the screen's
+  // new size, not the old one (round 8, J).
+  windowAndScreen: async () => {
+    const win = getCurrentWindow();
+    const [size, monitor, fullscreen, screenNow, osdW, osdH] = await Promise.all([
+      win.outerSize(),
+      currentMonitor(),
+      win.isFullscreen(),
+      invoke<{ width: number; height: number; hz: number; hdr: string }>('screen_now', {
+        screen: null,
+      }).catch((e) => String(e)),
+      mpvGet('osd-dimensions/w', 'int64').catch(() => null),
+      mpvGet('osd-dimensions/h', 'int64').catch(() => null),
+    ]);
+    const screenSize =
+      typeof screenNow === 'string' ? null : { width: screenNow.width, height: screenNow.height };
+    return {
+      fullscreen,
+      window: { width: size.width, height: size.height },
+      monitor: monitor ? { width: monitor.size.width, height: monitor.size.height } : null,
+      screen: screenNow,
+      picture: { width: osdW, height: osdH },
+      fits:
+        !fullscreen ||
+        (screenSize !== null &&
+          size.width === screenSize.width &&
+          size.height === screenSize.height),
+    };
+  },
   // TV mode is read at launch, before a plan's first action; this switches it
   // the way the setting and Ctrl+Shift+T do — layout and fullscreen together.
   setTvMode: async (on: boolean) => setTvMode(on),
@@ -352,7 +383,10 @@ export interface SelfTestAction {
 }
 
 export interface SelfTestPlan {
+  /** Empty with `pick` set: Rust fills it in from the library (selftest.rs). */
   path: string;
+  /** `4k-hdr`: play the smallest 4K HDR file the library has probed. */
+  pick?: '4k-hdr';
   fileId: number | null;
   titleId: number | null;
   label?: string;

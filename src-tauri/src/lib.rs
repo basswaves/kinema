@@ -392,6 +392,8 @@ pub fn run() {
             equipment::check_at_startup(app.handle().clone());
             // A screen a crashed session switched and never put back.
             display::restore_after_crash(app.handle());
+            // A full-screen window follows its screen's mode changes.
+            display::watch_screen_changes(app.handle());
             // Anything finished while SIMKL could not be reached goes now.
             tracking::send_soon(app.handle());
 

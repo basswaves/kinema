@@ -80,6 +80,8 @@ tauri-plugin-single-instance = "2"
 # ToolHelp, ProcessStatus and Threading are procstats.rs reading this process's
 # own memory, threads and handles for the self-test's leak runs.
 # SystemInformation is capabilities.rs asking how much memory the PC has.
+# UI_Shell and UI_WindowsAndMessaging are display.rs hearing the screen change
+# mode and fitting the full-screen window to its new size.
 [target.'cfg(windows)'.dependencies]
 # Hearing WebView2's processes end (page_life.rs). The version Tauri's own
 # webview compiles in, so nothing new is built.
@@ -106,7 +108,9 @@ windows = { version = "0.61", features = [
   "Win32_System_Registry",
   "Win32_System_Threading",
   "Win32_System_Variant",
+  "Win32_UI_Shell",
   "Win32_UI_Shell_PropertiesSystem",
+  "Win32_UI_WindowsAndMessaging",
 ] }
 
 # Linux and Android: lowering the priority of the threads that do background

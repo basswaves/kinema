@@ -74,14 +74,37 @@ pub fn seed(real_library: &Path, dir: &Path) -> Result<(), String> {
 }
 
 /// The plan, for the frontend. `None` outside self-test mode.
+///
+/// A plan with no `path` and `"pick": "4k-hdr"` plays the smallest 4K HDR
+/// file the library's own probe knows of — for a plan carried to another
+/// machine, whose files' names nobody here knows.
 #[tauri::command]
-pub fn selftest_plan() -> Result<Option<serde_json::Value>, String> {
+pub fn selftest_plan(db: tauri::State<crate::library::Db>) -> Result<Option<serde_json::Value>, String> {
     let Some(path) = plan_path() else { return Ok(None) };
     let raw = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-    serde_json::from_str(&raw)
-        .map(Some)
-        .map_err(|e| format!("{} is not valid JSON: {e}", path.display()))
+    let mut plan: serde_json::Value = serde_json::from_str(&raw)
+        .map_err(|e| format!("{} is not valid JSON: {e}", path.display()))?;
+    let unnamed = plan.get("path").and_then(|p| p.as_str()).is_none_or(str::is_empty);
+    if unnamed && plan.get("pick").and_then(|p| p.as_str()) == Some("4k-hdr") {
+        let conn = db.0.lock().map_err(|e| e.to_string())?;
+        let picked: Option<String> = conn
+            .query_row(PICK_4K_HDR, [], |r| r.get(0))
+            .ok();
+        let Some(picked) = picked else {
+            return Err("the plan asks for a 4K HDR file and the library has none probed".into());
+        };
+        crate::log!("selftest: picked {picked} as the 4K HDR file");
+        plan["path"] = serde_json::Value::String(picked);
+    }
+    Ok(Some(plan))
 }
+
+/// The smallest 4K HDR file in the library that is still there.
+const PICK_4K_HDR: &str = "SELECT f.path FROM media_files f JOIN media_probe p ON p.file_id = f.id
+     WHERE f.missing = 0 AND p.details IS NOT NULL
+       AND json_extract(p.details, '$.video.height') >= 2000
+       AND json_extract(p.details, '$.video.transfer') IN ('pq', 'hlg')
+     ORDER BY f.size_bytes LIMIT 1";
 
 /// Write the report beside the plan and quit.
 #[tauri::command]

@@ -118,6 +118,18 @@ export function checkPicture(f: OutputFacts): Check | null {
           : undefined,
     };
   }
+  // Full screen, yet the picture smaller than the screen on both sides: the
+  // window has not got the screen's size (it once kept a 1080p desktop's size
+  // after a switch to 4K). Saying "the desktop is set lower" would be untrue.
+  if (f.screen && f.drawn.width < f.screen.width - 2 && f.drawn.height < f.screen.height - 2) {
+    return {
+      label,
+      verdict: 'limited',
+      value: `${film} video shrunk ×${scale.toFixed(2)} to fit the window`,
+      why: `The picture is drawn at ${res(f.drawn)} on a ${res(f.screen)} screen: the window has not taken the screen’s size.`,
+      fix: 'Leave fullscreen and go back to it (f).',
+    };
+  }
   const canShow = f.screen?.modes.some(
     (m) => m.width >= f.source!.width && m.height >= f.source!.height
   );

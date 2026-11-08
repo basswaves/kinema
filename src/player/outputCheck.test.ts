@@ -121,6 +121,20 @@ describe('outputCheck', () => {
     expect(c['Picture size']?.fix).toMatch(/Resolution → Auto/);
   });
 
+  it('says a full-screen window smaller than its screen is the window, not the desktop', () => {
+    // A switch to 4K left the window at the 1080p desktop's size.
+    const c = byLabel(
+      outputCheck({
+        ...base,
+        drawn: { width: 1920, height: 1080 },
+        screen: { ...base.screen!, width: 3840, height: 2160 },
+      })
+    );
+    expect(c['Picture size']).toMatchObject({ verdict: 'limited' });
+    expect(c['Picture size']?.value).toMatch(/to fit the window/);
+    expect(c['Picture size']?.why).not.toMatch(/desktop is set lower/);
+  });
+
   it('only notes the window size when not fullscreen', () => {
     const c = byLabel(outputCheck({ ...base, fullscreen: false, drawn: { width: 1280, height: 533 } }));
     expect(c['Picture size']).toMatchObject({ verdict: 'info' });

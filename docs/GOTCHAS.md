@@ -2096,6 +2096,23 @@ for the new mode (`QueryDisplayConfig`'s exact fraction, not the nominal
 23.976 — mpv warns that even slightly wrong values spoil display-sync), and set
 it back to 0 on restore, when mpv's own stale value is right again.
 
+### A full-screen window keeps the size of the mode it was made full screen in
+
+On the TV PC, with the desktop at 1080p, Kinema switched the TV to 4K for a 4K
+film and the film went on playing in the top-left quarter of the screen: the
+window was still 1920×1080. Tauri sizes a full-screen window once, to the
+screen's bounds at that moment, and Windows moves nothing when the screen
+changes mode under it. No error; the stats panel then blamed "the desktop is
+set lower than the video", which was no longer true. Reproduced on the second
+monitor (720p switched to 1080p: mpv's `osd-dimensions` stayed 1280×720). A
+desktop already at 4K, switching only HDR, never showed it.
+
+**Do:** after a switch and a restore, and whenever Windows sends
+`WM_DISPLAYCHANGE`, set a full-screen window to its screen's bounds as Windows
+reports them now (`display.rs` → `fit_window`, `display/win.rs` →
+`fit_to_screen`); app.log says "full-screen window … → …". The self-test's
+`windowAndScreen` call reads window, screen and picture side by side.
+
 ### Turning HDR on puts back Windows' own HDR mode
 
 On the test TV, a switch that set 4K@23.976 and *then* turned HDR on ended at

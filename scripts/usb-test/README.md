@@ -13,7 +13,12 @@ Kinema on the stick, on a fresh copy of that machine's library each time, and
 copies each run's report, screenshots and logs to `Logs from the TV PC\auto-*`.
 The person at the other end sets Windows up once, double-clicks, and waits.
 
-The plans name files by the paths they have on that machine's shares. For a
+The plans name files by the paths they have on that machine's shares, or
+leave `path` empty and say `"pick": "4k-hdr"`: the app then plays the
+smallest 4K HDR file its own library has probed (`selftest.rs`).
+`switch-up/` does that: from a 1080p desktop it lets Kinema switch the screen
+up to 4K and HDR, and calls `windowAndScreen` before, during and after —
+`"fits": true` means the full-screen window had the screen's new size. For a
 dry run here without disturbing the main screen, add
 `{ "at": 0.6, "do": "call", "fn": "moveToScreen", "args": [-1] }` before
 `setFullscreen` - it moves the window to the first screen that is not primary.

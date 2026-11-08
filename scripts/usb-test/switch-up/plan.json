@@ -1,0 +1,95 @@
+{
+  "label": "Automatic test: switching up from a 1080p desktop (round 8, J)",
+  "path": "",
+  "pick": "4k-hdr",
+  "fileId": null,
+  "titleId": null,
+  "seconds": 32,
+  "openAfter": 4,
+  "usbShots": "15000,23000",
+  "actions": [
+    {
+      "do": "call",
+      "at": 0.3,
+      "fn": "setSetting",
+      "args": [
+        "display_switch_refresh",
+        "on"
+      ]
+    },
+    {
+      "do": "call",
+      "at": 0.4,
+      "fn": "setSetting",
+      "args": [
+        "display_switch_hdr",
+        "on"
+      ]
+    },
+    {
+      "do": "call",
+      "at": 0.5,
+      "fn": "setSetting",
+      "args": [
+        "display_switch_resolution",
+        "auto"
+      ]
+    },
+    {
+      "do": "call",
+      "at": 0.7,
+      "fn": "windowAndScreen",
+      "args": []
+    },
+    {
+      "do": "call",
+      "at": 0.8,
+      "fn": "setFullscreen",
+      "args": [
+        true
+      ]
+    },
+    {
+      "do": "call",
+      "at": 16,
+      "fn": "windowAndScreen",
+      "args": []
+    },
+    {
+      "do": "probe",
+      "at": 16.5,
+      "args": [
+        "osd-dimensions/w",
+        "osd-dimensions/h",
+        "display-fps",
+        "video-target-params/gamma"
+      ]
+    },
+    {
+      "do": "key",
+      "at": 20,
+      "key": "Escape"
+    },
+    {
+      "do": "call",
+      "at": 24,
+      "fn": "windowAndScreen",
+      "args": []
+    },
+    {
+      "do": "key",
+      "at": 26,
+      "key": "Escape"
+    },
+    {
+      "do": "call",
+      "at": 29,
+      "fn": "windowAndScreen",
+      "args": []
+    }
+  ],
+  "probe": [
+    "display-fps",
+    "container-fps"
+  ]
+}

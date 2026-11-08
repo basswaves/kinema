@@ -8,7 +8,12 @@ use crate::equipment::{rate_meaning, HdrState};
 use std::mem::size_of;
 use windows::core::PCWSTR;
 use windows::Win32::Devices::Display::*;
+use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM};
 use windows::Win32::Graphics::Gdi::*;
+use windows::Win32::UI::Shell::{DefSubclassProc, SetWindowSubclass};
+use windows::Win32::UI::WindowsAndMessaging::{
+    GetWindowRect, SetWindowPos, SWP_NOACTIVATE, SWP_NOOWNERZORDER, SWP_NOZORDER, WM_DISPLAYCHANGE,
+};
 
 fn wide_z(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(Some(0)).collect()
@@ -150,4 +155,79 @@ pub fn set_hdr(gdi: &str, on: bool) -> Result<(), String> {
         0 => Ok(()),
         code => Err(format!("turning HDR {} on {gdi}: error {code}", if on { "on" } else { "off" })),
     }
+}
+
+/// The screen's bounds as Windows reports them now, for the screen the window
+/// is mostly on.
+fn screen_rect(hwnd: HWND) -> Option<RECT> {
+    let monitor = unsafe { MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) };
+    let mut info = MONITORINFO { cbSize: size_of::<MONITORINFO>() as u32, ..Default::default() };
+    unsafe { GetMonitorInfoW(monitor, &mut info) }.as_bool().then_some(info.rcMonitor)
+}
+
+/// Set a full-screen window to its screen's bounds as they are now. A window
+/// made full screen at 1920×1080 stays 1920×1080 when the screen goes to
+/// 3840×2160 under it — Windows moves nothing and Tauri sized it once — so
+/// the film played in the top-left quarter of a 4K TV. Returns the window's
+/// size before and after when it had to change.
+pub fn fit_to_screen(hwnd: HWND) -> Result<Option<(Size, Size)>, String> {
+    let mut now = RECT::default();
+    unsafe { GetWindowRect(hwnd, &mut now) }.map_err(|e| e.to_string())?;
+    let screen = screen_rect(hwnd).ok_or("the window's screen could not be read")?;
+    let Some(to) = super::fitted(rect(now), rect(screen)) else { return Ok(None) };
+    unsafe {
+        SetWindowPos(
+            hwnd,
+            None,
+            to.0,
+            to.1,
+            to.2 - to.0,
+            to.3 - to.1,
+            SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER,
+        )
+    }
+    .map_err(|e| e.to_string())?;
+    Ok(Some(((now.right - now.left, now.bottom - now.top), (to.2 - to.0, to.3 - to.1))))
+}
+
+/// Width and height.
+pub type Size = (i32, i32);
+
+fn rect(r: RECT) -> (i32, i32, i32, i32) {
+    (r.left, r.top, r.right, r.bottom)
+}
+
+/// Hear Windows say a screen changed mode (`WM_DISPLAYCHANGE`, sent to every
+/// top-level window once the change is made), whoever changed it: Kinema's
+/// own switch and restore, HDR moving the mode by itself, or someone in
+/// Windows' settings. `then` runs on its own thread, since asking Tauri
+/// whether the window is full screen from inside the window's own message
+/// handler would wait on that very handler.
+pub fn on_display_change(hwnd: HWND, then: Box<dyn Fn() + Send + Sync>) -> Result<(), String> {
+    let data = Box::into_raw(Box::new(then)) as usize;
+    // Kept for the life of the window: there is one, and it lives as long as
+    // the process.
+    let ok = unsafe { SetWindowSubclass(hwnd, Some(display_change_proc), 0x4b44_4350, data) };
+    if ok.as_bool() {
+        Ok(())
+    } else {
+        Err("the window's messages could not be listened to".into())
+    }
+}
+
+unsafe extern "system" fn display_change_proc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+    _id: usize,
+    data: usize,
+) -> LRESULT {
+    if msg == WM_DISPLAYCHANGE {
+        let then = data as *const Box<dyn Fn() + Send + Sync>;
+        // The pointer lives as long as the window (never freed).
+        let then: &'static (dyn Fn() + Send + Sync) = unsafe { &**then };
+        std::thread::spawn(then);
+    }
+    unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) }
 }

@@ -244,6 +244,9 @@ pub async fn switch_screen(
                     describe(after.width, after.height, after.hz)
                 );
             }
+            // The window to the screen's new size before the film goes on:
+            // Windows leaves a full-screen window at the old one.
+            fit_window(&window);
             Ok(after)
         }
         #[cfg(target_os = "linux")]
@@ -368,7 +371,22 @@ pub fn restore(app: &tauri::AppHandle) -> Result<bool, String> {
 
 #[tauri::command]
 pub async fn restore_screen(app: tauri::AppHandle) -> Result<bool, String> {
-    crate::jobs::off_main(move || restore(&app)).await
+    crate::jobs::off_main(move || {
+        let restored = restore(&app)?;
+        // A window still full screen (TV mode keeps it so) shrinks with the
+        // screen. Here rather than in `restore`, which also runs on the
+        // window's own thread at exit, where asking the window would wait on
+        // itself.
+        #[cfg(windows)]
+        if restored {
+            use tauri::Manager;
+            for window in app.webview_windows().values() {
+                fit_window(window);
+            }
+        }
+        Ok(restored)
+    })
+    .await
 }
 
 /// Kinema's window while the player is open, on a tiling desktop.
@@ -393,6 +411,58 @@ pub fn player_window(window: tauri::WebviewWindow, how: String) -> Result<(), St
     Ok(())
 }
 
+/// A full-screen window's new place when its screen's bounds have changed
+/// under it: the screen's, or `None` when it already fits. Rectangles are
+/// left, top, right, bottom.
+#[cfg(any(windows, test))]
+fn fitted(window: (i32, i32, i32, i32), screen: (i32, i32, i32, i32)) -> Option<(i32, i32, i32, i32)> {
+    (window != screen).then_some(screen)
+}
+
+/// Kinema's window, when it is full screen, to the size of its screen as
+/// Windows reports it now. Called after every switch and restore, and
+/// whenever Windows says a screen changed mode (`watch_screen_changes`), so
+/// the window follows what Windows reports rather than a guess at when it is
+/// done. Never fails; a window not full screen is left alone.
+#[cfg(windows)]
+fn fit_window(window: &tauri::WebviewWindow) {
+    if !window.is_fullscreen().unwrap_or(false) {
+        return;
+    }
+    let Ok(hwnd) = window.hwnd() else { return };
+    match win::fit_to_screen(hwnd) {
+        Ok(Some((from, to))) => crate::log!(
+            "display: full-screen window {}×{} → {}×{}, the screen's size now",
+            from.0,
+            from.1,
+            to.0,
+            to.1
+        ),
+        Ok(None) => {}
+        Err(e) => crate::log!("display: the window could not be fitted to its screen: {e}"),
+    }
+}
+
+/// Keep a full-screen window the size of its screen whenever the screen
+/// changes mode, by whoever: Windows only. Elsewhere the desktop does it.
+pub fn watch_screen_changes(app: &tauri::AppHandle) {
+    #[cfg(windows)]
+    {
+        use tauri::Manager;
+        for window in app.webview_windows().into_values() {
+            let Ok(hwnd) = window.hwnd() else { continue };
+            let label = window.label().to_string();
+            let watched = window.clone();
+            let then = Box::new(move || fit_window(&watched));
+            if let Err(e) = win::on_display_change(hwnd, then) {
+                crate::log!("display: screen changes not heard for window {label}: {e}");
+            }
+        }
+    }
+    #[cfg(not(windows))]
+    let _ = app;
+}
+
 /// A switched screen left behind by a session that never got to restore it —
 /// a crash, a power cut, a killed process.
 pub fn restore_after_crash(app: &tauri::AppHandle) {
@@ -412,6 +482,21 @@ pub(crate) mod linux;
 #[cfg(test)]
 mod signal_tests {
     use super::same_signal;
+
+    #[test]
+    fn a_full_screen_window_takes_the_screens_new_bounds() {
+        use super::fitted;
+        // Made full screen on a 1080p desktop, then the screen went to 4K.
+        assert_eq!(fitted((0, 0, 1920, 1080), (0, 0, 3840, 2160)), Some((0, 0, 3840, 2160)));
+        // And back: a 4K window on a screen put back to 1080p.
+        assert_eq!(fitted((0, 0, 3840, 2160), (0, 0, 1920, 1080)), Some((0, 0, 1920, 1080)));
+        // A second screen whose origin moved with its size.
+        assert_eq!(
+            fitted((2560, 0, 3840, 720), (2560, 0, 4480, 1080)),
+            Some((2560, 0, 4480, 1080))
+        );
+        assert_eq!(fitted((0, 0, 3840, 2160), (0, 0, 3840, 2160)), None);
+    }
 
     #[test]
     fn signals_match_on_size_and_near_enough_rate() {

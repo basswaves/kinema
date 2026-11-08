@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decideLook, medianFrameInterval } from './lightLook';
+import { decideLook, medianFrameInterval, screenFrameInterval, screenPace } from './lightLook';
 
 describe('decideLook', () => {
   it('does what Settings says, whatever the device', () => {
@@ -85,5 +85,42 @@ describe('medianFrameInterval', () => {
   it('says nothing without enough frames', () => {
     expect(medianFrameInterval(steady(16, 10))).toBeUndefined();
     expect(medianFrameInterval([])).toBeUndefined();
+  });
+});
+
+describe('screenPace', () => {
+  // Drawn unevenly on a 60 Hz screen: late frames, each followed by an early one.
+  const uneven = [0];
+  for (let i = 0; i < 60; i++) uneven.push(uneven[uneven.length - 1] + (i % 2 ? 8 : 46));
+
+  it('the gaps alone misread an uneven 60 Hz screen as a fast one', () => {
+    expect(screenFrameInterval(uneven)).toBe(8);
+  });
+
+  it('takes the rate the system reports when the screens agree', () => {
+    const pace = screenPace(screenFrameInterval(uneven), [60]);
+    expect(pace.hz).toBe(60);
+    expect(pace.ms).toBeCloseTo(16.67, 1);
+    expect(screenPace(8, [59.94, 60]).hz).toBe(59.94);
+  });
+
+  it('screens that differ: the gaps, never quicker than the quickest screen', () => {
+    expect(screenPace(5, [60, 144]).ms).toBeCloseTo(6.94, 1);
+    expect(screenPace(8, [60, 144]).ms).toBe(8);
+    expect(screenPace(8, [60, 144]).hz).toBeUndefined();
+    expect(screenPace(8, [24, 60]).ms).toBeCloseTo(16.67, 1);
+    expect(screenPace(40, [24, 60]).ms).toBe(40);
+  });
+
+  it('without rates, the gaps alone', () => {
+    expect(screenPace(8, [])).toEqual({ ms: 8 });
+    expect(screenPace(undefined, [0])).toEqual({ ms: undefined });
+  });
+
+  it('the reason names the rate the system reported', () => {
+    const d = decideLook('auto', { cores: 4, medianFrameMs: 27, screenFrameMs: 1000 / 60, screenHz: 60 });
+    expect(d.light).toBe(true);
+    expect(d.reason).toBe('Light: while Kinema opened it drew a frame every 27 ms on a 60 Hz screen');
+    expect(decideLook('auto', { cores: 4, medianFrameMs: 17, screenFrameMs: 1000 / 60, screenHz: 60 }).light).toBe(false);
   });
 });

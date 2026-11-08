@@ -19,7 +19,9 @@
  * `ui.css` keys off `:root[data-look='light']` and nothing else.
  */
 import { useSyncExternalStore } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { getSetting, setSetting } from '../metadata/api';
+import { getEquipment, refreshRate } from '../player/equipment';
 
 export const LOOK_KEY = 'look';
 
@@ -39,6 +41,8 @@ export interface DeviceFacts {
    * slow measured against this — a 24 Hz screen is not a weak device.
    */
   screenFrameMs?: number;
+  /** The screen's refresh rate as the system reports it, when it settled `screenFrameMs`. */
+  screenHz?: number;
 }
 
 export interface LookDecision {
@@ -82,7 +86,9 @@ export function decideLook(setting: LookSetting, facts: DeviceFacts): LookDecisi
   ) {
     return {
       light: true,
-      reason: `Light: while Kinema opened it drew a frame every ${Math.round(medianFrameMs)} ms on a screen that takes one every ${Math.round(screenFrameMs)} ms`,
+      reason: `Light: while Kinema opened it drew a frame every ${Math.round(medianFrameMs)} ms on ${
+        facts.screenHz ? `a ${Math.round(facts.screenHz)} Hz screen` : `a screen that takes one every ${Math.round(screenFrameMs)} ms`
+      }`,
     };
   }
 
@@ -107,6 +113,39 @@ export function screenFrameInterval(times: number[], skip = 2, minIntervals = 20
   if (rest.length < minIntervals) return undefined;
   rest.sort((a, b) => a - b);
   return rest[Math.floor(rest.length / 10)];
+}
+
+/**
+ * Pure: the screen's pace, in ms per frame. Frame gaps alone mislead where
+ * the page is drawn unevenly: a late frame is followed by an early one, and
+ * the quickest tenth then said 8 ms on a 60 Hz screen. So the system's answer
+ * wins — the connected screens' refresh rates — when they agree; where they
+ * differ (Kinema may be on either), the gaps decide, but never quicker than
+ * the quickest screen. Without rates, the gaps alone.
+ */
+export function screenPace(
+  measuredMs: number | undefined,
+  ratesHz: number[]
+): { ms: number | undefined; hz?: number } {
+  const rates = ratesHz.filter((r) => Number.isFinite(r) && r > 1);
+  if (rates.length === 0) return { ms: measuredMs };
+  const fastest = Math.max(...rates);
+  if (rates.every((r) => Math.abs(r - rates[0]) <= rates[0] * 0.02)) {
+    return { ms: 1000 / rates[0], hz: rates[0] };
+  }
+  return { ms: measuredMs === undefined ? undefined : Math.max(measuredMs, 1000 / fastest) };
+}
+
+/**
+ * The refresh rate of the screen the page is on, as the system says: GTK's
+ * answer where it is the toolkit (Linux, any desktop), else the connected
+ * screens' rates from the equipment check. None when unknown.
+ */
+async function screenRates(): Promise<number[]> {
+  const own = await invoke<number | null>('page_screen_hz').catch(() => null);
+  if (typeof own === 'number' && own > 0) return [own];
+  const equipment = await getEquipment().catch(() => null);
+  return (equipment?.displays ?? []).filter((d) => d.connected).map(refreshRate);
 }
 
 /** Pure: the middle interval between frame times, or undefined if too few. */
@@ -212,7 +251,9 @@ async function probe(): Promise<void> {
       console.log('look: too few frames to judge the screen', { frames: times.length });
     } else {
       facts.medianFrameMs = median;
-      facts.screenFrameMs = screenFrameInterval(times);
+      const pace = screenPace(screenFrameInterval(times), await screenRates());
+      facts.screenFrameMs = pace.ms;
+      if (pace.hz) facts.screenHz = pace.hz;
     }
   } finally {
     probing = false;

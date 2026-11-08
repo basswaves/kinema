@@ -218,6 +218,37 @@ pub fn webkit_drawing() -> Drawing {
     drawing
 }
 
+/// The refresh rate of the screen Kinema's window is on, in Hz, as GTK has
+/// it from the display server (Wayland's output mode, X11's RandR): any
+/// desktop, no desktop's own interface. For the Look check (lightLook.ts),
+/// which cannot tell a screen's pace from frame gaps where the page is drawn
+/// unevenly. None where GTK is not the page's toolkit or does not know.
+#[tauri::command]
+pub async fn page_screen_hz(window: tauri::WebviewWindow) -> Option<f64> {
+    #[cfg(target_os = "linux")]
+    {
+        use gtk::prelude::*;
+        let (tx, rx) = tokio::sync::oneshot::channel::<Option<i32>>();
+        window
+            .with_webview(move |webview| {
+                let view = webview.inner();
+                let millihertz = view
+                    .window()
+                    .and_then(|w| view.display().monitor_at_window(&w))
+                    .map(|m| m.refresh_rate());
+                let _ = tx.send(millihertz);
+            })
+            .ok()?;
+        let millihertz = rx.await.ok()??;
+        (millihertz > 0).then(|| f64::from(millihertz) / 1000.0)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = window;
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

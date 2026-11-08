@@ -438,6 +438,7 @@ pub fn run() {
             subtitle_files::subtitle_span,
             overlay::overlay_frame,
             webkit_drawing::webkit_drawing,
+            webkit_drawing::page_screen_hz,
             overlay::overlay_reset,
             pointer::pointer_script,
             pointer::pointer_event,

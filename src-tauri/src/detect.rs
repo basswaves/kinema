@@ -292,9 +292,55 @@ fn split_settled(
         return (seasons, Vec::new());
     };
     let cutoff = now_secs() - secs;
-    seasons
-        .into_iter()
-        .partition(|season| season.episodes.iter().all(|e| e.mtime <= cutoff))
+    seasons.into_iter().partition(|season| {
+        season
+            .episodes
+            .iter()
+            .all(|e| e.mtime <= cutoff && !changed_on_disk(e))
+    })
+}
+
+/// Whether the file is being written *right now*, judged from the disk and not
+/// from what the last scan stored: the stored mtime is from the scan, so a copy
+/// that began after it (or kept its source's old mtime, as a Windows copy does)
+/// looks finished. Three signs, any one of which holds the file back:
+///
+///  - its size is not the one the scan saw;
+///  - its modified time is inside the settling window;
+///  - on Windows, a writer still has it open (opening it while refusing to
+///    share write access fails exactly then; readers do not matter).
+///
+/// A file that cannot be looked at is not held back: ffmpeg will say so itself.
+/// Failing the other way would hide a season for ever behind an odd file.
+fn changed_on_disk(e: &crate::analyse::Episode) -> bool {
+    let Ok(meta) = std::fs::metadata(&e.path) else {
+        return false;
+    };
+    if e.size > 0 && i64::try_from(meta.len()).is_ok_and(|len| len != e.size) {
+        return true;
+    }
+    let recent = meta
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .is_some_and(|d| i64::try_from(d.as_secs()).is_ok_and(|m| m > now_secs() - SETTLING_SECS));
+    recent || open_by_a_writer(&e.path)
+}
+
+#[cfg(windows)]
+fn open_by_a_writer(path: &str) -> bool {
+    use std::os::windows::fs::OpenOptionsExt;
+    const SHARE_READ_ONLY: u32 = 1;
+    match std::fs::OpenOptions::new().read(true).share_mode(SHARE_READ_ONLY).open(path) {
+        Ok(_) => false,
+        // 32: a sharing violation, which is what a writer causes.
+        Err(e) => e.raw_os_error() == Some(32),
+    }
+}
+
+#[cfg(not(windows))]
+fn open_by_a_writer(_path: &str) -> bool {
+    false
 }
 
 /// Run this app's own audio analysis over a library root.
@@ -1021,6 +1067,36 @@ mod tests {
 
     /// The Detect button waits for nothing. Pressing it is saying "now", and a
     /// button that quietly declined would look exactly like a broken one.
+    #[test]
+    fn a_file_that_grew_since_the_scan_holds_back_its_season() {
+        let dir = std::env::temp_dir().join(format!("kinema-settle-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("a.mkv");
+        std::fs::write(&path, b"12345").unwrap();
+        let old = super::now_secs() - 2 * super::SETTLING_SECS;
+        let mut s = season("s1", &[old]);
+        s.episodes[0].path = path.to_string_lossy().into_owned();
+        s.episodes[0].size = 3; // the scan saw 3 bytes; now there are 5
+        let (ready, settling) = super::split_settled(vec![s], Some(super::SETTLING_SECS));
+        std::fs::remove_dir_all(&dir).ok();
+        assert!(ready.is_empty());
+        assert_eq!(settling.len(), 1);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_file_a_writer_still_has_open_holds_back_its_season() {
+        let dir = std::env::temp_dir().join(format!("kinema-writer-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("a.mkv");
+        let writer = std::fs::File::create(&path).unwrap();
+        let ep = Episode { file_id: 0, path: path.to_string_lossy().into_owned(), size: 0, mtime: 0 };
+        assert!(super::open_by_a_writer(&ep.path));
+        drop(writer);
+        assert!(!super::open_by_a_writer(&ep.path));
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
     #[test]
     fn the_manual_path_ignores_settling_entirely() {
         let (ready, settling) =

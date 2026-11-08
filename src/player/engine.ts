@@ -44,7 +44,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { logPaths } from '../metadata/api';
 import { capabilitiesNow, loadCapabilities } from '../capabilities';
 import { keyCommand, keyFromValue, KEY_PROPERTY, MPV_KEYS } from './mpvKeys';
-import { MOUSE_PROPERTY, newEvents, parseMouse, type MouseKind } from './mpvMouse';
+import { MOUSE_PROPERTY, parseMouse, type MouseEvent } from './mpvMouse';
 import * as media3 from './media3';
 import type { Film } from './displayMode';
 
@@ -227,8 +227,6 @@ async function watchMouse(): Promise<void> {
   );
 }
 
-/** The last mouse event handed on (mpvMouse.ts → `newEvents`). */
-let lastMouseSeq = 0;
 
 // ---- Kinema's terms ----------------------------------------------------------
 
@@ -257,11 +255,12 @@ export type PlaybackEvent =
    */
   | { type: 'key'; key: string }
   /**
-   * The mouse on the engine's own window, at `x`, `y` in that window's
-   * pixels, `time` on the engine's clock in milliseconds — only where the
-   * engine has one (capabilities `own_window`).
+   * The mouse on the engine's own window: every event its script still lists
+   * (mpvMouse.ts), at `x`, `y` in that window's pixels, `time` on the
+   * engine's clock in milliseconds; the page takes the new ones
+   * (pageMouse.ts). Only where the engine has one (capabilities `own_window`).
    */
-  | { type: 'mouse'; kind: MouseKind; x: number; y: number; time: number }
+  | { type: 'mouse'; events: MouseEvent[] }
   /**
    * The sound would not play the way it was opened, and the engine took the
    * next way (Media3 only): `step` 1 decoded on the device — `chosen` is the
@@ -321,11 +320,13 @@ export async function onPlaybackEvent(handle: (event: PlaybackEvent) => void): P
         break;
       }
       case MOUSE_PROPERTY: {
-        const events = newEvents(parseMouse(data), lastMouseSeq);
-        for (const { seq, kind, x, y, time } of events) {
-          lastMouseSeq = seq;
-          handle({ type: 'mouse', kind, x, y, time });
-        }
+        // Every event the script still lists, not only the new ones: which
+        // are new is decided once, where they reach the page (pageMouse.ts),
+        // because more than one listener can hear this property and a number
+        // shared between them let the first take events the player's own
+        // never saw (round 8, Part H build).
+        const events = parseMouse(data);
+        if (events.length) handle({ type: 'mouse', events });
         break;
       }
     }

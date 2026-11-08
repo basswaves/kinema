@@ -22,7 +22,10 @@ pub fn send(
     window
         .with_webview(move |webview| {
             let view = webview.inner();
-            let Some(target) = view.window() else { return };
+            let Some(target) = view.window() else {
+                said_once("the web view has no window of its own yet");
+                return;
+            };
             // Relative to the view's own window; a view drawn into its
             // parent's is offset by where it sits in it.
             let (x, y) = if view.has_window() {
@@ -32,11 +35,21 @@ pub fn send(
                 (x + at.x() as f64, y + at.y() as f64)
             };
             let Some(pointer) = view.display().default_seat().and_then(|seat| seat.pointer()) else {
+                said_once("the display has no pointer");
                 return;
             };
             unsafe { dispatch(&target, &pointer, kind, x, y, time, held) };
         })
         .map_err(crate::util::to_string_err)
+}
+
+/// Say once per start why a mouse event was not handed to the page: these
+/// are dropped without a sound otherwise, and the controls never come.
+fn said_once(why: &str) {
+    static SAID: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    if !SAID.swap(true, std::sync::atomic::Ordering::Relaxed) {
+        crate::log!("pointer: a mouse event was not handed to the page: {why}");
+    }
 }
 
 /// Build the event in GDK's own memory and dispatch it. Through the C

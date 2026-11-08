@@ -14,13 +14,34 @@
  */
 import { invoke } from '@tauri-apps/api/core';
 import { mpvSet } from './engine';
-import type { MouseKind } from './mpvMouse';
+import { newEvents, type MouseEvent, type MouseKind } from './mpvMouse';
 import { pageFromVideo } from './overlay';
 
 /** Whether the left button is down, from what mpv reported. */
 let held = false;
 /** One warning in app.log, not one per mouse move. */
 let warned = false;
+
+/**
+ * The last event handed to the page (mpvMouse.ts `newEvents`). Kept here, at
+ * the one place events reach the page, and not by each listener: two
+ * listeners once shared it in the engine, and whichever heard a change first
+ * marked its events seen — in about half the film openings on a slow Linux
+ * computer that was not the player's own, and the page heard no mouse at all.
+ */
+let lastHandedSeq = 0;
+
+/**
+ * Hand on the events of one report from mpv's script that the page has not
+ * had yet; any listener may offer the same report, and each event goes to the
+ * page once.
+ */
+export function handMouseEventsToPage(events: MouseEvent[]): void {
+  for (const { seq, kind, x, y, time } of newEvents(events, lastHandedSeq)) {
+    lastHandedSeq = seq;
+    handMouseToPage(kind, x, y, time);
+  }
+}
 
 /** Do on the page what the mouse did at `x`, `y` on mpv's window. */
 export function handMouseToPage(kind: MouseKind, x: number, y: number, time: number): void {

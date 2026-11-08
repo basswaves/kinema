@@ -45,7 +45,7 @@ import { VIDEO_SYNC_KEY, VIDEO_SYNC_MODES } from './mpvOptions';
 import { startOverlay } from './overlay';
 import { applyRememberedStepDown } from './stepDown';
 import { useStepDown } from './useStepDown';
-import { handMouseToPage, startPointerFollowingControls } from './pageMouse';
+import { handMouseEventsToPage, startPointerFollowingControls } from './pageMouse';
 import { resumePoint, resumeShare } from './resume';
 import { readSound, soundLost, soundLostNotice, type SoundSnapshot } from './soundWatch';
 import { audioFallbackNotice } from './systemOutput';
@@ -390,7 +390,7 @@ export function usePlaybackEngine({
       }
       // The mouse on mpv's own window (Linux): done again on this page, as
       // real mouse input where the picture of the page shows that point.
-      if (event.type === 'mouse') handMouseToPage(event.kind, event.x, event.y, event.time);
+      if (event.type === 'mouse') handMouseEventsToPage(event.events);
       // The engine took another way for the sound (Media3): say which.
       if (event.type === 'audio-fallback') {
         const system = capabilitiesNow()?.system ?? 'The system';

@@ -199,7 +199,39 @@ function filmTitle(input: string, raw: Record<string, unknown>): string | null {
   return title;
 }
 
-function runGuessit(input: string, kind: LibraryKind): Guess {
+/**
+ * `Spider-Man.2002.mkv`: guessit takes a word, a hyphen and the rest at the very
+ * start of a name for a release group's prefix, and reads a film called "Man" by
+ * a group called "Spider" (`Ant-Man`, `Iron-Man`, `Jean-Claude` the same). A
+ * title with a hyphen is far more common there than a group in front, so the two
+ * halves are put back together. A group at the end (`…BluRay-GROUP`), a
+ * bracketed one in front (`[GROUP] Film`) and `-sample` are not touched. A
+ * scene file named after its group (`grp-film.2010.mkv` in `Film.2010…-GRP`)
+ * stays as guessit read it, because its folder names that group; with no such
+ * folder it becomes `grp-film`, which matches nothing rather than the wrong film.
+ */
+function withHyphenedTitle(
+  input: string,
+  raw: Record<string, unknown>,
+  folder: string | null
+): Record<string, unknown> {
+  const group = raw.release_group;
+  const title = raw.title;
+  if (typeof group !== 'string' || typeof title !== 'string' || !group || !title.trim()) {
+    return raw;
+  }
+  const escaped = group.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if (folder && new RegExp(`-${escaped}(?![\\p{L}\\p{N}])`, 'iu').test(folder)) return raw;
+  const firstWord = title.trim().split(/\s+/)[0];
+  const lead = input.slice(0, group.length + 1 + firstWord.length);
+  if (lead.toLowerCase() !== `${group}-${firstWord}`.toLowerCase()) return raw;
+  const fixed: Record<string, unknown> = { ...raw, title: `${lead.slice(0, group.length)}-${title.trim()}` };
+  delete fixed.release_group;
+  return fixed;
+}
+
+/** `folder`: the name of the folder a file is in, when `input` is the file's name. */
+function runGuessit(input: string, kind: LibraryKind, folder: string | null = null): Guess {
   // A programming error, not a bad filename: some caller started parsing
   // without loading the parser. Thrown rather than folded into `lastParseError`
   // so it stops the run loudly instead of quietly recording every file as
@@ -212,10 +244,11 @@ function runGuessit(input: string, kind: LibraryKind): Guess {
   try {
     // The type hint matters: without it "Show 2019" is ambiguous between a
     // movie titled with a year and a series episode.
-    raw = guessit(input, { type: kind === 'movies' ? 'movie' : 'episode' }) as Record<
-      string,
-      unknown
-    >;
+    raw = withHyphenedTitle(
+      input,
+      guessit(input, { type: kind === 'movies' ? 'movie' : 'episode' }) as Record<string, unknown>,
+      folder
+    );
   } catch (e) {
     // Never swallow this silently — a parser that throws on every file looks
     // exactly like a parser that works and finds nothing.
@@ -429,7 +462,7 @@ export interface ParsedFile extends Guess {
  * because "TV" or "Serier" is not a show.
  */
 export function parseMediaFile(file: MediaFile, kind: LibraryKind, rootPath?: string): ParsedFile {
-  const fromFile = runGuessit(file.file_name, kind);
+  const fromFile = runGuessit(file.file_name, kind, baseName(file.parent_dir));
   const fileScore = scoreGuess(fromFile, kind);
 
   // The library folder never names a file: `D:/Movies/1917 (2019).mkv` is not

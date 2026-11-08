@@ -693,9 +693,13 @@ whether the words changed.
 `Spider-Man.2002.1080p.mkv` is `{release_group: "Spider", title: "Man"}`, and
 so are other names that start with a hyphenated word (not all of them). Nothing fails: the title is wrong and
 the match may still pass on similarity. Since a file's own name outranks a
-release folder's (round 8 L1), more files are read this way. Not fixed yet
-(found by Worth a look's dry run, 2026-11-08); `Spider-Man.Across.the.Spider-Verse`
-reads right.
+release folder's (round 8 L1), more files are read this way.
+`Spider-Man.Across.the.Spider-Verse` reads right. **Fixed** (`withHyphenedTitle`
+in parse.ts): a group whose name and a hyphen start the file name, followed by
+the title's first word, is put back into the title. Except when the file's folder
+names that group (`blow-film.2016.mkv` in `Film.2016…-BLOW`): a scene file named
+after its group, which a first version of the fix turned into "blow-film" on a
+real library. A group at the end and `[GROUP]` in front are untouched.
 
 ## Child processes
 

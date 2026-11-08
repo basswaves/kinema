@@ -85,6 +85,73 @@ describe('parseMediaFile', () => {
   });
 });
 
+/**
+ * guessit reads `Spider-Man.2002.mkv` as a film called "Man" by a release group
+ * called "Spider": a word, a hyphen and the rest at the start of a name looks
+ * like a group's prefix to it. A title with a hyphen is far more common there.
+ */
+describe('a hyphen in a title', () => {
+  const cases: [string, string, number | null][] = [
+    ['Spider-Man.2002.mkv', 'Spider-Man', 2002],
+    ['Spider-Man.2002.1080p.mkv', 'Spider-Man', 2002],
+    ['Spider-Man.2.2004.mkv', 'Spider-Man 2', 2004],
+    ['Spider-Man.Homecoming.2017.mkv', 'Spider-Man Homecoming', 2017],
+    ['Ant-Man.and.the.Wasp.2018.mkv', 'Ant-Man and the Wasp', 2018],
+    ['Iron-Man.2008.mkv', 'Iron-Man', 2008],
+    ['Mission-Impossible.1996.mkv', 'Mission-Impossible', 1996],
+    ['Man-Thing.2005.mkv', 'Man-Thing', 2005],
+    ['Jean-Claude.2010.mkv', 'Jean-Claude', 2010],
+    ['X-Men.2000.mkv', 'X-Men', 2000],
+  ];
+  it.each(cases)('keeps %s whole', (name, title, year) => {
+    const parsed = parseMediaFile(file(name, 'D:/Films'), 'movies', 'D:/Films');
+    expect([parsed.title, parsed.year]).toEqual([title, year]);
+    expect(parsed.raw.release_group).toBeUndefined();
+  });
+
+  it('wins over a release folder, as a name of its own should', () => {
+    const parsed = parseMediaFile(file('Spider-Man.2002.mkv', 'D:/Films/Some Other Film (1999)'), 'movies');
+    expect(parsed.title).toBe('Spider-Man');
+  });
+
+  it('still finds a real release group at the end', () => {
+    const parsed = parseMediaFile(file('Movie.2010.1080p.BluRay-GROUP.mkv', 'D:/Films'), 'movies', 'D:/Films');
+    expect([parsed.title, parsed.year, parsed.raw.release_group]).toEqual(['Movie', 2010, 'GROUP']);
+    const hyphened = parseMediaFile(
+      file('Ant-Man.2015.1080p.BluRay.x264-GROUP.mkv', 'D:/Films'),
+      'movies',
+      'D:/Films'
+    );
+    expect([hyphened.title, hyphened.raw.release_group]).toEqual(['Ant-Man', 'GROUP']);
+  });
+
+  it('still reads -sample and -trailer as what they are', () => {
+    const sample = parseMediaFile(file('Movie.2010-sample.mkv', 'D:/Films'), 'movies', 'D:/Films');
+    expect([sample.title, sample.raw.other]).toEqual(['Movie', 'Sample']);
+    const trailer = parseMediaFile(file('Movie-trailer.mkv', 'D:/Films'), 'movies', 'D:/Films');
+    expect([trailer.title, trailer.raw.other]).toEqual(['Movie', 'Trailer']);
+  });
+
+  it('leaves a scene file named after the group its folder names', () => {
+    const parsed = parseMediaFile(
+      file('grp-film.2016.1080p.bluray.x264.mkv', 'D:/Films/Film.2016.1080p.BluRay.x264-GRP[tag]'),
+      'movies',
+      'D:/Films'
+    );
+    expect([parsed.title, parsed.year]).toEqual(['film', 2016]);
+  });
+
+  it('leaves a bracketed group in front alone', () => {
+    const parsed = parseMediaFile(file('[GROUP] Movie 2010.mkv', 'D:/Films'), 'movies', 'D:/Films');
+    expect([parsed.title, parsed.raw.release_group]).toEqual(['Movie', 'GROUP']);
+  });
+
+  it('keeps a show whole too', () => {
+    const parsed = parseMediaFile(file('Spider-Man.2002.mkv', 'D:/TV/Spider-Man'), 'tv', 'D:/TV');
+    expect(parsed.title).toBe('Spider-Man');
+  });
+});
+
 describe('a title from the show folder', () => {
   /**
    * The case that vanished: neither the file name nor its season folder has a

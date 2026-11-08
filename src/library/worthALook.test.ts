@@ -96,6 +96,27 @@ describe('reading a matched file again', () => {
     expect(check(file)).toMatchObject({ kind: 'title' });
   });
 
+  it('lists a hyphenated title an older parser cut in two and linked to the second half', () => {
+    // 0.15.1 read `Spider-Man.2002.mkv` as "Man" by a release group "Spider".
+    const wrong = matched(
+      'D:/Movies/Spider-Man.2002.mkv',
+      { title: 'Man', year: 2002 },
+      'title 100%, year exact',
+      { title: 'Man', year: 2002 }
+    );
+    const why = check(wrong);
+    expect(why).toMatchObject({ kind: 'title', was: 'Man' });
+    expect(whyWords(JSON.stringify(why), 'Man')).toContain('Spider-Man');
+    // Linked to the right film all along: nothing to look at.
+    const right = matched(
+      'D:/Movies/Spider-Man.2002.mkv',
+      { title: 'Man', year: 2002 },
+      'title 100%, year exact',
+      { title: 'Spider-Man', year: 2002 }
+    );
+    expect(check(right)).toBeNull();
+  });
+
   it('does not list a name that only differs in spelling', () => {
     expect(check(matched('D:/Movies/Heat (1995)/Heat.1995.mkv', { title: 'heat', year: 1995 }))).toBeNull();
   });

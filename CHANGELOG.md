@@ -5,6 +5,42 @@ Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [semantic
 versioning](https://semver.org/), with the usual caveat that a `0.x` release
 makes no stability promises.
 
+## [0.15.2] — 2026-11-08
+
+### Changed
+
+- **When Kinema cannot tell two films or shows of one name apart, it asks.**
+  With no year in the file (`Dune.mkv`, `Doctor Who`) they now go to Needs
+  attention instead of to the better-known one, so a few more files may land
+  there after this update. Files already in Needs attention are looked at again
+  once; your own matches and ignores are never changed.
+- **Worth a look.** Once after this update, Kinema reads the names of what it
+  matched by itself again and lists the matches the new rules doubt in Needs
+  attention, with the reason. Nothing changes until you choose.
+- **Android: a scan waits while Kinema is off the screen** and goes on when you
+  come back, saying so. Behind another app it used to keep a processor core busy.
+- **Android: the first scan keeps the screen on** until it ends.
+- **Android: a dark box behind subtitles**, as on a computer, and a resumed film
+  shows a picture sooner.
+
+### Fixed
+
+- **Hyphenated titles** (`Spider-Man.2002.mkv`) were read as the part after the
+  hyphen.
+- **Sequels kept in the first film's folder** were all linked to the first film.
+- Titles in other alphabets, titles that are numbers (`1917`, `300`, `24`),
+  season folders in other languages and `Specials`, two shows of one name with
+  different years, and shows named by date are read right.
+- `Shorts`, `Other` and `Extras` directly under a library folder are scanned.
+- **A film swapped for a better copy keeps its watched tick.**
+- **A library that will not open offers its safety copy** and puts it back. On
+  Linux, messages before the window opens never appeared; they do now.
+- **A restore that cannot finish leaves the library as it was.**
+- **Part of a folder going away is said**, and a folder that cannot be read
+  hides nothing.
+- **Android: a plain message on a too old Android System WebView** instead of a
+  black screen.
+
 ## [0.15.1] — 2026-11-07
 
 ### Fixed

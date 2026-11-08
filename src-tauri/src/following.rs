@@ -684,6 +684,15 @@ mod tests {
         lib.rename("Shows/B.mkv", "Other/B.mkv");
         std::fs::create_dir_all(lib.dir.join("Other/Again")).unwrap();
         std::fs::copy(lib.dir.join("Other/B.mkv"), lib.dir.join("Other/Again/B.mkv")).unwrap();
+        // The copy's time as well (a Linux copy gets a new one, and the moved
+        // file would rightly be told apart by it): two files nothing separates.
+        let time = std::fs::metadata(lib.dir.join("Other/B.mkv")).unwrap().modified().unwrap();
+        std::fs::File::options()
+            .write(true)
+            .open(lib.dir.join("Other/Again/B.mkv"))
+            .unwrap()
+            .set_modified(time)
+            .unwrap();
 
         let report = scan_all(&mut lib.conn).unwrap();
         assert_eq!(report.files_followed, 1);

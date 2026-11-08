@@ -503,6 +503,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
           (found on a box, round 7 F6). It is back when the panel closes. */}
       {skipPrompt && !showTracks && !showChapters && (
         <SkipButton
+          key={skipPrompt.key}
           prompt={skipPrompt}
           nextIsEpisode={!neighbours.next?.target && !neighbours.next?.video}
           onSkip={() => void performSkip()}

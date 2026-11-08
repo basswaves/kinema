@@ -67,6 +67,7 @@ import {
   addWithoutMatch,
   cacheArtwork,
   findMatchForLocal,
+  getSetting,
   ignoreFileIds,
   listNeedsReview,
   listUnmatched,
@@ -227,8 +228,10 @@ const CALLABLE: Record<string, (...args: never[]) => Promise<unknown>> = {
   addToPlaylist,
   playlistEntries,
   // Settings the player reads when a file opens — sound, display — so a plan
-  // can set them on the copied library before opening the player (`openAfter`).
+  // can set them on the copied library before opening the player (`openAfter`),
+  // and read one back.
   setSetting,
+  getSetting,
   // The scan's refresh of out-of-date TMDB data, and the artwork pass after it,
   // without the rest of a scan (which would also start intro detection).
   refreshStaleTitles,

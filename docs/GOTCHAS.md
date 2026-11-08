@@ -2128,6 +2128,12 @@ mode change in the NVIDIA panel cleared it. `ScreenNow.signal` reads the signal
 actually on the cable (`QueryDisplayConfig`'s target mode), the one before the
 first switch is saved, and `restore` forces a full mode change (`CDS_RESET`) if
 the signal did not come back with the desktop.
+That forced change is belt and braces and must never fail the restore: it
+once returned its error before the record was cleared, and a record saved on
+a day the desktop was 4K@60 — a mode the TV no longer offered — failed at
+every launch and after every film, and stood in for the real desktop at
+every switch (TV PC, round 8 J). A refused forced change is now logged and
+the record cleared.
 
 ### A temporary display mode dies with the process; HDR does not
 

@@ -333,7 +333,15 @@ pub fn restore(app: &tauri::AppHandle) -> Result<bool, String> {
                 describe_signal(now.signal),
                 describe_signal(original.signal)
             );
-            win::force_mode(gdi, original.width, original.height, original.hz)?;
+            // Belt and braces, so a refusal is no failure: the desktop is
+            // already back at Windows' own mode. Returned as an error, it
+            // kept the record, and a record from a day the desktop was 4K@60
+            // on a TV that no longer offers that mode failed at every launch
+            // and every film, and stood in for the real desktop (TV PC,
+            // round 8 J).
+            if let Err(e) = win::force_mode(gdi, original.width, original.height, original.hz) {
+                crate::log!("display: {e}; leaving {gdi} at Windows' own mode");
+            }
             now = win::screen_now(gdi)?;
         }
         crate::log!(

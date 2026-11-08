@@ -35,7 +35,7 @@ pub const FOLDER: &str = "thumbs";
 /// ones at once would be the very thing this is here to stop.
 static WORKERS: Semaphore = Semaphore::const_new(2);
 
-/// Refused beyond this, which falls back to the page's own way.
+/// Refused beyond this: no small copy, and the grid shows the remote picture or a drawn poster, never this one at full size (Art.tsx).
 const MOST_MEMORY: u64 = 512 << 20;
 
 /// JPEG quality: nothing to see at the size these are drawn.
@@ -104,7 +104,7 @@ fn make(source: &Path, made: &Path, name: &str, width: u32) -> Option<Vec<u8>> {
     let bytes = match shrink(&std::fs::read(source).ok()?, width) {
         Ok(bytes) => bytes,
         Err(e) => {
-            crate::log!("thumbs: {name}: {e}; using the picture itself");
+            crate::log!("thumbs: {name}: {e}; no small copy (the grid shows the remote picture or a drawn one)");
             Vec::new()
         }
     };

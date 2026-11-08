@@ -1301,6 +1301,16 @@ result's note) cannot be skipped by arithmetic: those grids are drawn whole.
 Measured on a 2-core PC with 1000 films: 100 ms a frame by keys before, 40
 after (17-38 at 416 before); 6000 elements drawn before, 490 after.
 
+### A picture too big to shrink is not shown as itself (round 8, part I)
+
+`thumbs.rs` decodes at most 512 MB per picture. A poster beside a file of
+14000×14000 (a 7 MB JPEG) is over that, so no small copy is made — and the page
+used to fall back to the original, which the web process decodes at full size,
+780 MB each: thirty on screen took a 3.7 GB PC to 66 MB free, a full swap and the
+kernel's out-of-memory killer, with no error in the app. `Art.tsx` now, where a
+small copy is asked for, falls back to the remote picture and then the drawn
+poster, never to the original (same PC, same pictures: peak 909 MB, no stall).
+
 ### An Enter a text field acts on must stop there
 
 A field's `onEnter` that answers at once (a sign-in against the mock) put

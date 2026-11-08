@@ -68,8 +68,12 @@ export default function Art({
   const localSrc = local ? convertFileSrc(local) : null;
   const small = local && thumbRem ? thumbSrc(local, thumbRem) : null;
   // Local first, remote second: the cache is an accelerator, the URL the truth.
-  // The small copy before both; a picture that cannot make one shows as itself.
-  const sources = [small, localSrc, remote].filter((s): s is string => Boolean(s));
+  // Where a small copy is asked for (a grid), a picture that could not make one
+  // is NOT then shown as itself: it is one the computer cannot decode within
+  // its means (a 200-megapixel poster beside a file), and thirty of them at
+  // full size froze a 4 GB computer (round 8 part I). Its place is the remote
+  // picture, or the drawn poster.
+  const sources = (small ? [small, remote] : [localSrc, remote]).filter((s): s is string => Boolean(s));
   const src = sources.find((candidate) => !failed.has(candidate)) ?? null;
 
   if (!src) return <>{fallback}</>;

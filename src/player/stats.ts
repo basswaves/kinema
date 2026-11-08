@@ -668,6 +668,49 @@ async function readOutputCheck(from: {
  * take the process down, and a panel that refreshes once a second has no need
  * of the concurrency.
  */
+/** How WebKitGTK draws the page this start (webkit_drawing.rs). */
+export interface PageDrawing {
+  mode: string;
+  since: number | null;
+  value: string | null;
+  stopped_now: boolean;
+}
+
+/**
+ * The row saying how the page (and so the controls over the film) is drawn,
+ * where Kinema chooses that (Linux). Null elsewhere, or when unknown.
+ */
+export function describeDrawing(d: PageDrawing | null): StatRow | null {
+  if (!d) return null;
+  const label = 'Page drawn with';
+  if (d.mode === 'card') {
+    return d.stopped_now
+      ? {
+          label,
+          value: 'graphics card',
+          note: "the controls' photos stopped while the film covered the page; the processor draws it from the next start",
+          warn: true,
+        }
+      : { label, value: 'graphics card' };
+  }
+  if (d.mode === 'processor') {
+    const when = d.since ? ` on ${new Date(d.since * 1000).toLocaleDateString()}` : '';
+    return {
+      label,
+      value: 'processor',
+      note: `the controls' photos stopped here with the graphics card${when}; it is tried again when WebKitGTK or the graphics change`,
+    };
+  }
+  if (d.mode === 'given') {
+    return {
+      label,
+      value: 'set outside Kinema',
+      note: `WEBKIT_DISABLE_DMABUF_RENDERER=${d.value ?? ''}`,
+    };
+  }
+  return null;
+}
+
 export async function readPlaybackStats(): Promise<StatGroup[]> {
   // ---- source ----
   const videoCodec = await readProperty<string>('video-codec', 'string');
@@ -743,6 +786,8 @@ export async function readPlaybackStats(): Promise<StatGroup[]> {
     ['display-fps', 'estimated-display-fps', 'display-fps-override'],
     'double'
   );
+
+  const drawingRow = describeDrawing(await invoke<PageDrawing>('webkit_drawing').catch(() => null));
 
   // ---- audio ----
   const audioCodec = await readProperty<string>('audio-codec-name', 'string');
@@ -999,6 +1044,7 @@ export async function readPlaybackStats(): Promise<StatGroup[]> {
       heading: 'Health',
       rows: [
         startRow(),
+        ...(drawingRow ? [drawingRow] : []),
         {
           label: 'Dropped frames',
           value: `${dropped ?? 0} output · ${decoderDropped ?? 0} decoder`,

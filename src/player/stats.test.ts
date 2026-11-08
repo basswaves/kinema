@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  describeDrawing,
   describeAudioPath,
   describeDolbyVision,
   describeHdr,
@@ -138,5 +139,24 @@ describe('parseRenderPasses', () => {
     expect(parseRenderPasses('')).toEqual([]);
     expect(parseRenderPasses('{"fresh":[],"redraw":[]}')).toEqual([]);
     expect(parseRenderPasses('- color decoding: last 8us')).toEqual([]);
+  });
+});
+
+describe('describeDrawing', () => {
+  const base = { since: null, value: null, stopped_now: false };
+  it('says nothing where Kinema does not choose', () => {
+    expect(describeDrawing(null)).toBeNull();
+    expect(describeDrawing({ ...base, mode: 'none' })).toBeNull();
+  });
+  it('the card, and its photos stopping now', () => {
+    expect(describeDrawing({ ...base, mode: 'card' })).toEqual({ label: 'Page drawn with', value: 'graphics card' });
+    const stopped = describeDrawing({ ...base, mode: 'card', stopped_now: true });
+    expect(stopped?.warn).toBe(true);
+    expect(stopped?.note).toContain('from the next start');
+  });
+  it('the processor as the remembered fallback, and a setting from outside', () => {
+    expect(describeDrawing({ ...base, mode: 'processor', since: 1762600000 })?.value).toBe('processor');
+    expect(describeDrawing({ ...base, mode: 'processor' })?.note).toContain('tried again');
+    expect(describeDrawing({ ...base, mode: 'given', value: '1' })?.note).toBe('WEBKIT_DISABLE_DMABUF_RENDERER=1');
   });
 });

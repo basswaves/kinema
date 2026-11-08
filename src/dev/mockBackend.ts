@@ -2206,6 +2206,8 @@ const handlers: Record<string, Handler> = {
     return null;
   },
   get_equipment: () => (ON_LINUX ? mockEquipmentOnLinux() : mockEquipment()),
+  // How WebKitGTK draws (webkit_drawing.rs): Linux only.
+  webkit_drawing: () => ({ mode: ON_LINUX ? 'card' : 'none', since: null, value: null, stopped_now: false }),
   check_equipment: () => (ON_LINUX ? mockEquipmentOnLinux() : mockEquipment()),
   window_display: () => ({ gdi_name: '', hdr: 'unknown' }),
   // The mock TV, by the name its equipment entry carries: the screen the

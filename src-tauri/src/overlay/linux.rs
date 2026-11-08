@@ -1,13 +1,22 @@
 //! Photographing the page through WebKitGTK: the Linux side of overlay.rs.
 //!
-//! A WebKitGTK window covered by mpv's stops producing snapshots after about
-//! a second, because the compositor stops asking it to draw.
-//! `WEBKIT_DISABLE_DMABUF_RENDERER`, set at start in lib.rs, keeps them coming.
+//! On some desktops a WebKitGTK window covered by mpv's stops producing
+//! snapshots when WebKit draws with the graphics card, because the compositor
+//! stops asking it to draw: the callback simply never runs. So a snapshot is
+//! given `STALLED` to come back, and one that does not is the sign
+//! webkit_drawing.rs remembers, so the next start draws on the processor.
 
 use gtk::cairo::ImageSurface;
 use webkit2gtk::{SnapshotOptions, SnapshotRegion, WebViewExt};
 
 type Pixels = (i32, i32, i32, Vec<u8>);
+
+/// Longer than any photo was seen to take: 820 ms on a weak computer already
+/// overloaded by a 4K film decoded on its processor; 30-70 ms is usual.
+const STALLED: std::time::Duration = std::time::Duration::from_secs(3);
+
+/// The error a stalled snapshot gives; the page (overlay.ts) knows it.
+pub const STOPPED: &str = "photos stopped";
 
 /// The visible page with a transparent background: width, height, stride and
 /// premultiplied BGRA bytes.
@@ -25,7 +34,13 @@ pub async fn snapshot(window: &tauri::WebviewWindow) -> Result<Pixels, String> {
             );
         })
         .map_err(crate::util::to_string_err)?;
-    rx.await.map_err(|_| "the snapshot was never delivered".to_string())?
+    match tokio::time::timeout(STALLED, rx).await {
+        Ok(delivered) => delivered.map_err(|_| "the snapshot was never delivered".to_string())?,
+        Err(_) => {
+            crate::webkit_drawing::photos_stopped(STALLED);
+            Err(STOPPED.to_string())
+        }
+    }
 }
 
 fn pixels(surface: gtk::cairo::Surface) -> Result<Pixels, String> {

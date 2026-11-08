@@ -16,6 +16,12 @@
  * film — no more are taken until the page changes (`watchForChanges`): at 4K
  * each photo is 33 MB to copy and compare, for a picture of nothing.
  *
+ * Where WebKit draws with the graphics card, some desktops stop the photos
+ * while mpv's window covers the page (webkit_drawing.rs). A photo that does not
+ * come back is then an error of its own (`STOPPED`): mpv says on the film why
+ * the controls are gone, the photos go on being asked for in case they come
+ * back, and Kinema draws on the processor from its next start.
+ *
  * The photo is the size of Kinema's window; mpv 0.38 and later scale it to
  * their own (`dw`/`dh`), so the controls land where they would on the screen.
  * An older mpv cannot, so Kinema's window — hidden behind mpv's anyway — is
@@ -44,6 +50,31 @@ interface OverlayFrame {
 }
 
 const INTERVAL_MS = 100;
+/** overlay/linux.rs `STOPPED`: no photo came back while mpv covered the page. */
+export const STOPPED = 'photos stopped';
+
+/** What mpv says on the film when the photos stopped; `next` when the next start draws another way. */
+export function stoppedMessage(next: boolean): string {
+  return next
+    ? 'Kinema cannot show its controls over the film on this computer until it is started again.\nThe film plays on, and the keys still work.'
+    : 'Kinema cannot show its controls over the film right now.\nThe film plays on, and the keys still work.';
+}
+
+interface Drawing {
+  mode: string;
+  stopped_now: boolean;
+}
+
+/** Say on the film, once, that the controls cannot be drawn. */
+async function sayStopped(): Promise<void> {
+  const drawing = await invoke<Drawing>('webkit_drawing').catch(() => null);
+  const next = !!drawing?.stopped_now;
+  console.warn(
+    `overlay: no photo of the page came back while mpv covered it${next ? '; the processor draws the page from the next start' : ''}`
+  );
+  // Level 0: shown although Kinema keeps mpv's own messages off (osd-level 0).
+  await mpvCommand('show-text', [stoppedMessage(next), 15000, 0]).catch(() => undefined);
+}
 /** The first overlay id; each band takes the next (overlay.rs: at most four). */
 const ID = 0;
 
@@ -222,6 +253,7 @@ export function startOverlay(): () => void {
     drawnBands = Math.min(drawnBands, count);
   };
   let warned = false;
+  let saidStopped = false;
   let scaled = true;
   // Whether the page may have changed since the last photo. While nothing is
   // shown, a photo is only taken when it has.
@@ -322,6 +354,12 @@ export function startOverlay(): () => void {
       // Drawn at its own size: one device pixel of the page per pixel of mpv's.
       drawnScale = videoToPageScale(frame, frame, window.devicePixelRatio || 1);
     } catch (e) {
+      if (!stopped && String(e).includes(STOPPED)) {
+        if (!saidStopped) await sayStopped();
+        saidStopped = true;
+        dirty = true;
+        return;
+      }
       // Once: a failure here repeats ten times a second. Not once the player
       // has closed: mpv shutting down refuses the picture being handed to it.
       if (!warned && !stopped) console.warn('overlay: the page could not be drawn over the video', e);

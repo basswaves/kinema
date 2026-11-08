@@ -2482,11 +2482,52 @@ copies the new event and leaks the original, one per mouse move.
 ### A covered WebKitGTK window stops producing snapshots
 
 On Linux the player's page reaches the screen as a snapshot mpv draws
-(`overlay.rs`), taken while mpv's window covers Kinema's. After about a
-second the snapshots simply stop arriving — no error, the callback never
-runs — because the compositor stops asking a covered window to draw, and
-WebKit's DMA-BUF renderer waits for it. `WEBKIT_DISABLE_DMABUF_RENDERER=1`,
-set in `run()` on Linux, keeps them coming (1–2 ms each).
+(`overlay.rs`), taken while mpv's window covers Kinema's. With the WebKitGTK of
+2026-10, in nested KWin 5.27 and GNOME 46, the snapshots simply stopped
+arriving after about a second — no error, the callback never runs — because the
+compositor stops asking a covered window to draw, and WebKit's DMA-BUF renderer
+waited for it. `WEBKIT_DISABLE_DMABUF_RENDERER=1` kept them coming.
+
+That setting cost browsing smoothness on every Linux computer (22–37 frames a
+second on a weak one, against 60), so since 2026-11-08 the card draws and the
+snapshots are watched instead (`webkit_drawing.rs`): one not back within 3 s is
+remembered, and the next start on that system draws on the processor. With
+WebKitGTK 2.52 and 2.54 the stop was **not** seen anywhere it was looked for:
+real KDE + Intel, headless Sway, nested KWin, an X11 display, and even with the
+compositor frozen for 6 s. A frozen *page* process does not imitate it either:
+its own requests freeze with it, so nothing waits. The fallback's trigger has
+therefore never fired for real; its file and its next start were checked by a
+unit test and a start with the file in place.
+
+### `crate::log!` before the log is open goes nowhere
+
+`applog::write` drops a line while no log file is set, and the file is set in
+`setup`. Anything decided in `run()` before that (how WebKit draws) has to keep
+its sentence and say it later (`webkit_drawing::say_choice`).
+
+### Frame gaps are not the screen's rate
+
+The Look check read the screen's pace from the quickest tenth of the gaps
+between frames. Where frames come unevenly — a late one, then an early one to
+catch up — that read 8–11 ms on a 60 Hz screen, with the processor drawing *and*
+with the card, and Auto chose Light "on a screen that takes one every 11 ms".
+The system knows the rate: on Linux GTK has it from the display server for the
+monitor the window is on, on any desktop (`page_screen_hz`); elsewhere the
+equipment check's. Gaps are the last resort.
+
+### Two listeners of one property shared a "last seen" number
+
+The player hears mpv's mouse script through an observed property whose value
+lists the last events, numbered (`mpvMouse.ts`). The engine kept the last
+number it handed on in one module-level variable — and two listeners were alive
+during every film on Linux (one of them, the first ever made, across all films;
+why it lives on is not known). Whichever heard a change first marked the events
+seen; when that was the long-lived one, the player's own found nothing new and
+the page heard no mouse for the whole film. On the slow Linux test PC with the
+processor drawing that was about half the openings, with the card none — a
+race, so timing decides. Which events are new is now decided once, where they
+reach the page (`pageMouse.ts` `handMouseEventsToPage`), and any listener may
+offer them.
 
 ### A transparent window without DMA-BUF loses everything but what just changed
 

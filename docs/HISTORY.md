@@ -4458,6 +4458,60 @@ The intro scan also asks the disk, not only the stored scan, whether a file is
 still being written (size changed, modified in the last five minutes, or on
 Windows a writer holds it open); such a season waits for the next scan.
 
+## The page drawn with the graphics card on Linux (2026-11-08)
+
+Since the first Linux player, Kinema started WebKitGTK with
+`WEBKIT_DISABLE_DMABUF_RENDERER=1`, because a covered WebKitGTK window stopped
+producing the photos the player's controls are drawn from (GOTCHAS). That made
+WebKit draw every page on the processor. A tester on a Raspberry Pi 4 and a
+Linux laptop found Kinema slow; measuring on a weak Linux computer (two cores,
+Intel graphics, KDE on Wayland) showed browsing was the cost: scrolling the
+films at 22 frames a second in the full look and 37 in the light one, with
+WebKit's process holding one processor thread full. A film costs little either
+way.
+
+The owner chose: draw with the graphics card, and fall back by itself where the
+photos stop, remembered per computer. Same build, same steps, only the drawing
+changed:
+
+| WebKit drawing | Full look | Light look | WebKit's processor |
+|---|---|---|---|
+| Processor (before) | 48 ms a frame, ~21 a second | 27 ms, ~37 a second | one thread full |
+| Graphics card (now) | 17 ms, 60 a second | 17 ms, 60 a second | about half a thread |
+
+How the fallback works (`webkit_drawing.rs`): the photos are watched while the
+player is open, and one that does not come back within 3 s (the slowest seen
+was 0.8 s, on a computer overloaded by a 4K film decoded on its processor) is
+written down with the system it happened on — WebKitGTK's version, the
+graphics devices the kernel lists, Wayland or X11. Every later start on that
+same system draws on the processor; a change to any of those tries the card
+again. Nothing is decided by a desktop's, vendor's or model's name. Meanwhile
+the film plays on: mpv says on the picture that the controls cannot be shown
+until Kinema starts again and that the keys still work, and the stats say how
+the page is drawn ("Page drawn with"). `WEBKIT_DISABLE_DMABUF_RENDERER` set
+outside Kinema still wins and is reported as such.
+
+With current WebKitGTK (2.52, 2.54) the photos did not stop on any desktop
+looked at (GOTCHAS), so the fallback is a safety net that has not been needed
+yet. The see-through window that once lost the page without DMA-BUF is not a
+risk either way: Linux's window has been opaque since 2026-11-07.
+
+The same measuring found three faults, fixed with it:
+
+- **The mouse in the player sometimes did nothing for a whole film.** Two
+  listeners of mpv's mouse report shared one "last event seen" number, and the
+  wrong one could take the events (GOTCHAS). On the weak computer with
+  processor drawing the page heard the mouse in 0 of 40 openings in one run and
+  4 of 8 in another; after, in 30 of 30 (and 20 of 20 with the card), each
+  move exactly once.
+- **The Look check misread a 60 Hz screen** as one drawing every 8–11 ms and
+  chose Light for a wrong reason. It now takes the screen's rate from the
+  system (GTK's answer for the window's monitor on Linux, the equipment check
+  elsewhere) and says "on a 60 Hz screen".
+- **One hang opening a film** (once in 37, earlier): not seen again in about
+  200 openings with stacks ready to be taken (slowest 1.3 s); cause unknown,
+  nothing changed for it.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

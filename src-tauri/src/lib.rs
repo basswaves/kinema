@@ -79,6 +79,7 @@ mod trailer;
 mod updates;
 mod util;
 mod videos;
+mod webkit_drawing;
 mod worth_a_look;
 
 use library::{Db, ScanDb};
@@ -141,6 +142,7 @@ fn open_library(app: &tauri::AppHandle) -> Result<(), String> {
     }
     log!("--- Kinema {} started ---", env!("CARGO_PKG_VERSION"));
     log!("capabilities: {:?}", capabilities::current());
+    webkit_drawing::say_choice();
     if let Err(e) = util::keep_private(&dir) {
         log!("could not make {} private to this account: {e}", dir.display());
     }
@@ -275,14 +277,10 @@ pub fn run() {
     applog::install_panic_hook();
     opened::mark_start();
     applog::forward_library_logs();
-    // The page is photographed for mpv while mpv's window covers it
-    // (overlay.rs), and a covered WebKitGTK window stops producing snapshots
-    // after about a second unless it draws without the DMA-BUF renderer.
-    // Before any window exists; left alone if set already.
+    // With the graphics card, unless this computer showed the player's photos
+    // of the page stop that way (webkit_drawing.rs). Before any window exists.
     #[cfg(target_os = "linux")]
-    if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
-        std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
-    }
+    webkit_drawing::choose();
 
     #[cfg_attr(mobile, allow(unused_mut))]
     let mut builder = tauri::Builder::default();
@@ -439,6 +437,7 @@ pub fn run() {
             subtitle_files::subtitle_files,
             subtitle_files::subtitle_span,
             overlay::overlay_frame,
+            webkit_drawing::webkit_drawing,
             overlay::overlay_reset,
             pointer::pointer_script,
             pointer::pointer_event,

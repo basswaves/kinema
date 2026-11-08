@@ -27,6 +27,8 @@ makes no stability promises.
 
 - **Hyphenated titles** (`Spider-Man.2002.mkv`) were read as the part after the
   hyphen.
+- **The search box no longer sits on a black band** the width of the window that
+  hid the results scrolling under it. Only the box itself stays put.
 - **Sequels kept in the first film's folder** were all linked to the first film.
 - Titles in other alphabets, titles that are numbers (`1917`, `300`, `24`),
   season folders in other languages and `Specials`, two shows of one name with

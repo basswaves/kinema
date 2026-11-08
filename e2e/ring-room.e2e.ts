@@ -123,3 +123,73 @@ test('the search box stays under the top bar while results scroll, and the ring 
     expect(g.cardTop, `the ring on ${key} is clear of the box`).toBeGreaterThanOrEqual(g.barBottom - 1);
   }
 });
+
+test('the sticky search strip hides nothing beside the box, in every look', async ({ page }) => {
+  // The strip was a near-black band the window's width that hid the posters
+  // scrolling under it (owner, 0.15.1). The earlier test only measured where it was.
+  await page.setViewportSize({ width: 960, height: 320 });
+  await open(page, 'windows');
+  await press(page, 'ArrowUp', 2);
+  for (let i = 0; i < 6 && (await focused(page)) !== 'Search'; i++) await press(page, 'ArrowRight');
+  await press(page, 'Enter');
+  await expect(page.locator('.search-bar')).toBeVisible();
+  await page.keyboard.type('e');
+  await press(page, 'ArrowDown', 6);
+  await settled(page);
+  const alpha = (c: string) => {
+    const m = /rgba?\(([^)]+)\)/.exec(c);
+    if (!m) return c === 'transparent' ? 0 : 1;
+    const parts = m[1].split(',').map((s) => parseFloat(s));
+    return parts.length > 3 ? parts[3] : 1;
+  };
+  for (const look of [
+    { look: 'full', contrast: null },
+    { look: 'light', contrast: null },
+    { look: 'full', contrast: 'high' },
+  ]) {
+    const seen = await page.evaluate(async ({ look, contrast }) => {
+      const path = '/src/ui/lightLook.ts';
+      (await import(/* @vite-ignore */ path)).setLook(look);
+      if (contrast) document.documentElement.dataset.contrast = contrast;
+      else delete document.documentElement.dataset.contrast;
+      // Results passing under the strip, as in the owner's picture.
+      document.querySelector('.browse')!.scrollTop = 120;
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const bar = document.querySelector('.search-bar')!;
+      const input = document.querySelector('.search-input')!;
+      const b = bar.getBoundingClientRect();
+      const i = input.getBoundingClientRect();
+      // A point on the strip, right of the box: what is there is what a click reaches.
+      const x = Math.min(b.right - 4, i.right + 40);
+      const y = (b.top + b.bottom) / 2;
+      const hit = document.elementFromPoint(x, y);
+      return {
+        bar: getComputedStyle(bar).backgroundColor,
+        input: getComputedStyle(input).backgroundColor,
+        right: x > i.right,
+        hitIsStrip: !!hit && bar.contains(hit),
+      };
+    }, look);
+    const name = `${look.look}${look.contrast ? ' + high contrast' : ''}`;
+    // KINEMA_SHOTS=<folder>: a picture of each look, to see it with one's own eyes.
+    if (process.env.KINEMA_SHOTS) {
+      await page.screenshot({ path: `${process.env.KINEMA_SHOTS}/search-strip-${name.replace(/\W+/g, '-')}.png` });
+    }
+    expect(alpha(seen.bar), `${name}: the strip has no background`).toBe(0);
+    expect(alpha(seen.input), `${name}: the box is solid enough to read`).toBeGreaterThanOrEqual(0.9);
+    expect(seen.right, `${name}: there is strip beside the box`).toBe(true);
+    expect(seen.hitIsStrip, `${name}: the pointer reaches what is behind the strip`).toBe(false);
+  }
+  // The keys still reach the box and type into it.
+  const onBox = () =>
+    page.evaluate(() => document.querySelector('.focused')?.getAttribute('data-nav-key') === 'search-input');
+  for (let i = 0; i < 12 && !(await onBox()); i++) await press(page, 'ArrowUp');
+  expect(await onBox(), 'the keys reach the box').toBe(true);
+  await page.keyboard.type('x');
+  await expect(page.locator('.search-input')).toHaveValue('ex');
+  // And the mouse reaches the box itself through the strip.
+  await page.locator('.search-input').click();
+  await page.keyboard.press('End');
+  await page.keyboard.type('y');
+  await expect(page.locator('.search-input')).toHaveValue('exy');
+});

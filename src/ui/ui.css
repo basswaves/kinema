@@ -1944,16 +1944,17 @@ button.cast-member {
 }
 
 /* The box stays under the top bar while the results scroll by (as Back does on
-   a title's page, T25). Solid enough to read results passing under it, wide to
-   the page's edges, with room above and below for the ring. */
+   a title's page, T25), with room above and below for the ring. The strip
+   itself is see-through and lets the pointer through: it used to be a near-black
+   band the window's width that hid the posters beside the box (owner, 0.15.1).
+   Only the box carries a background, solid enough to read over a poster. */
 .search-bar {
   position: sticky;
   top: calc(3.25rem + var(--safe-top));
   z-index: 10;
   margin: -0.5rem calc(-1 * var(--gutter));
   padding: 0.5rem var(--gutter);
-  background: rgba(10, 10, 12, 0.94);
-  backdrop-filter: blur(8px);
+  pointer-events: none;
 }
 
 .search-input {
@@ -1962,9 +1963,21 @@ button.cast-member {
   padding: 0.8125rem 1.125rem;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 0.625rem;
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(28, 28, 32, 0.92);
+  backdrop-filter: blur(8px);
   color: #fff;
   font-size: 0.9375rem;
+  pointer-events: auto;
+}
+
+:root[data-look='light'] .search-input {
+  backdrop-filter: none;
+}
+
+:root[data-contrast='high'] .search-input {
+  background: #000;
+  border-color: #f5f5f7;
+  backdrop-filter: none;
 }
 
 .search-input:focus,

@@ -13,6 +13,7 @@ const STAGE_WORDS: Record<ScanStage, string> = {
   examining: 'Looking inside the files',
   detecting: 'Finding intros and credits',
   measuring: 'Measuring each picture',
+  rereading: 'Reading matched names again',
 };
 
 /** Said for a moment on coming back to a scan that waited (`ScanStatus.waited`). */

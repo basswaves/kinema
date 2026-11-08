@@ -4313,6 +4313,41 @@ ticking it by hand, ends the question. Accepted: a false tick from a download th
 past 70 % stays, and with no ffprobe and no metadata runtime a false tick stays until
 the file is played. A tick lost by the old rule does not come back.
 
+## Worth a look (2026-11-08)
+
+The new rules reach refusals by themselves, never a matched file, so a sequel
+linked to the first film under the old rules stayed linked with nothing said.
+Re-matching would need the network and would move matches people had looked at.
+The owner chose a one-time check that only asks (`worth_a_look.rs`,
+`worthALook.ts`).
+
+- **Once per rules version, crash-safe.** At start-up, in the same breath as the
+  migration, the ids of every file matched by score go into a to-do table and
+  the rules version is stored, in one transaction: taken before any scan of the
+  new version can match anything. The page reads them again a batch at a time
+  in a scan once its pictures are fetched (before the long look inside files and the intro search, which held it many minutes in a real-app run); each batch's entries and its removal from the list are
+  one transaction, and an entry's key is its file. A crash leaves the rest for
+  the next scan; nothing is listed twice.
+- **By score only.** A reason that starts with the scorer's `title NN%` and was
+  not searched under an NFO's title. Hand matches, NFO and id matches, ignored
+  and held files are never read again.
+- **Read differently means the linked title would no longer be taken.**
+  Comparing the stored reading with today's listed three files in a real
+  library that an older parser had written another way and that were linked
+  right (two parts of a film series, each linked to its own part). Now a changed reading counts only when the
+  linked title, scored as the matcher scores a candidate, no longer clears 0.75.
+- **A tie only against a title of the same name.** Against another name the new
+  rule still lets popularity decide, so listing it would ask about a choice
+  today's Kinema makes the same way. Whether the other entry was a stub is not
+  stored, so the sentence says the choice "is not always the one meant", not
+  that Kinema would now ask.
+- **Keep as it is** writes `manual: kept …` as the reason, so it is a hand
+  match everywhere (Move to a new computer carries it). Finding the right match
+  links only that entry's files, not the whole title.
+- Measured: a real library of 349 score matches lists 8 files of one show; the
+  start-up part costs 6–7 ms for 10,000 files; reading 10,000 names again takes
+  about 40 s on a desktop processor, in the parse worker, during the scan.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

@@ -673,7 +673,29 @@ becomes one group, and the folder's number can become the episode. **Do:** ask
 older rules keeps that match, with nothing saying so. Tests of the matcher pass
 and a real library looks unchanged: to see a fix on a library, look at its
 refusals, or use the dry run in `notes/tools/review/l1-dryrun.test.ts`.
-`reset_parses` (developer tools) is not the way out: it clears hand matches too.
+`reset_parses` (developer tools) is not the way out: it clears hand matches too. Since
+round 8 L3, "Worth a look" lists such files once per `MATCHER_RULES` for a
+person to decide; bump `MATCHER_RULES` for a parser or scorer change, or it
+reaches neither refusals nor matched files.
+
+### A stored reading is not what today's parser would make of the name
+
+`parsed_title` was written by whatever parser version scanned the file. Comparing
+it with today's reading to find "files the new rules read differently" listed a
+third of the real library's candidates for nothing: an older parser wrote a
+series' name without `Part 2` for a file correctly linked to Part 2. No error,
+just a list asking people about right matches. **Do:** ask whether today's
+reading would still take the linked title (`worthALook.ts`, `stillTakes`), not
+whether the words changed.
+
+### guessit reads a word before a hyphen as a release group
+
+`Spider-Man.2002.1080p.mkv` is `{release_group: "Spider", title: "Man"}`, and
+so are other names that start with a hyphenated word (not all of them). Nothing fails: the title is wrong and
+the match may still pass on similarity. Since a file's own name outranks a
+release folder's (round 8 L1), more files are read this way. Not fixed yet
+(found by Worth a look's dry run, 2026-11-08); `Spider-Man.Across.the.Spider-Verse`
+reads right.
 
 ## Child processes
 

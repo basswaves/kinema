@@ -54,6 +54,42 @@ test('needs attention by remote: the Review button and an opened item are on scr
     .toBe(true);
 });
 
+// Round 8 L3: Worth a look. Matches an older version made that today's rules
+// read differently wait at the top of Needs attention, each saying why;
+// "Keep as it is" takes one off and the ring goes to the next, by keys alone.
+test('worth a look: the reason is said, and Keep as it is takes an entry off', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('kinemaMockWorth', '1'));
+  await open(page, 'windows');
+  for (let i = 0; i < 4 && (await focused(page)) !== 'Review'; i++) await press(page, 'ArrowDown');
+  expect(await focused(page)).toBe('Review');
+  await press(page, 'Enter');
+  await expect.poll(() => focused(page)).toMatch(/^Review 3 items/);
+  await expect(page.locator('.fixmatch-worth h3')).toHaveText('Worth a look');
+
+  await press(page, 'ArrowDown');
+  await expect.poll(() => focused(page)).toContain('Back to the Future (1985)');
+  await expect.poll(() => focused(page)).toContain("The file's own name says Part 2");
+  await press(page, 'Enter');
+  // Open: its file, Keep as it is, then the search for what the name says now.
+  await expect(page.locator('.fixmatch-row.open .fixmatch-files')).toHaveText(
+    'Back to the Future Part II.mkv'
+  );
+  await expect(page.locator('.fixmatch-row.open .fixmatch-input')).toHaveValue(
+    'Back to the Future Part 2'
+  );
+  await press(page, 'ArrowDown');
+  await expect.poll(() => focused(page)).toBe('Keep as it is');
+  await press(page, 'Enter');
+  await expect(page.getByText('Kept 1 file with “Back to the Future” (1985).')).toBeVisible();
+  // The next entry has the ring; the kept one is gone.
+  await expect.poll(() => focused(page)).toContain('says Part 3');
+  await expect(page.locator('.fixmatch-worth .fixmatch-summary')).toHaveCount(2);
+
+  await press(page, 'ArrowDown');
+  await expect.poll(() => focused(page)).toContain('Dune (2021)');
+  await expect.poll(() => focused(page)).toContain('the file gives no year');
+});
+
 // LOCAL-MEDIA.md phase 3: what no database lists is kept under its own name,
 // renamed on its own page, and sent back to be matched after all — the whole
 // way by remote.

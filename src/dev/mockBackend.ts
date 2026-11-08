@@ -1249,9 +1249,10 @@ const openedLinks: string[] = [];
  * Read at each count, so a test can match them "by hand" part-way through.
  */
 const reviewCount = (): number =>
-  flag('kinemaMockReview') === 'items'
+  worthItems().length +
+  (flag('kinemaMockReview') === 'items'
     ? reviewItems().length
-    : Number(flag('kinemaMockReview') ?? 0) || 0;
+    : Number(flag('kinemaMockReview') ?? 0) || 0);
 /** Review items kept as titles of their own (`add_without_match`). */
 const keptLocally = new Set<number>();
 const reviewItems = () => REVIEW_ITEMS.filter((f) => !keptLocally.has(f.id));
@@ -1342,6 +1343,32 @@ const REVIEW_ITEMS = (
   matched_title: null,
   episode_name: null,
 }));
+/**
+ * `kinemaMockWorth=1`: Worth a look (worth_a_look.rs) lists two parts of a
+ * trilogy the old rules linked to the first film, and a tie with no year.
+ * "Keep as it is" and a link take an entry off, as the backend does.
+ */
+const WORTH_ITEMS = [
+  [9101, 'Back to the Future Part II.mkv', 501, 'Back to the Future', 1985, 'movie', { kind: 'title', was: 'Back to the Future', now: 'Back to the Future Part 2' }],
+  [9102, 'Back to the Future Part III.mkv', 501, 'Back to the Future', 1985, 'movie', { kind: 'title', was: 'Back to the Future', now: 'Back to the Future Part 3' }],
+  [9103, 'Dune.mkv', 502, 'Dune', 2021, 'movie', { kind: 'tie' }],
+] as const;
+const worthDecided = new Set<number>();
+const worthItems = () =>
+  flag('kinemaMockWorth') === '1'
+    ? WORTH_ITEMS.filter(([id]) => !worthDecided.has(id)).map(
+        ([file_id, file_name, title_id, title, year, kind, why]) => ({
+          file_id,
+          path: `C:\\fixture\\films\\${file_name}`,
+          file_name,
+          title_id,
+          title,
+          year,
+          kind,
+          why: JSON.stringify(why),
+        })
+      )
+    : [];
 /** `kinemaMockScanErrors`: the scan's problems, as the scanner words them. */
 const SCAN_ERRORS: string[] = (() => {
   try {
@@ -1757,6 +1784,13 @@ const handlers: Record<string, Handler> = {
   // "Wrong title?" → Unlink: the files go to Needs attention (not kept here).
   unlink_files: (a) => (a.fileIds as number[]).length,
   list_needs_review: () => (flag('kinemaMockReview') === 'items' ? reviewItems() : []),
+  worth_a_look_list: () => worthItems(),
+  worth_a_look_keep: (a) => {
+    for (const id of a.fileIds as number[]) worthDecided.add(id);
+    return (a.fileIds as number[]).length;
+  },
+  worth_a_look_next: () => [],
+  worth_a_look_save: () => 0,
   add_without_match: (a) =>
     addWithoutMatch(
       a.fileIds as number[],

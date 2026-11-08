@@ -1025,8 +1025,10 @@ pub fn count_needs_review(db: tauri::State<Db>) -> Result<i64, String> {
             crate::lifecycle::NEEDS_ATTENTION
         ),
         [],
-        |r| r.get(0),
+        |r| r.get::<_, i64>(0),
     )
+    // Plus what Worth a look asks about: also waiting for a person.
+    .and_then(|n| Ok(n + crate::worth_a_look::count(&conn)?))
     .map_err(to_string_err)
 }
 

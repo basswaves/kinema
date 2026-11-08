@@ -77,6 +77,7 @@ mod trailer;
 mod updates;
 mod util;
 mod videos;
+mod worth_a_look;
 
 use library::{Db, ScanDb};
 use std::sync::Mutex;
@@ -476,6 +477,10 @@ pub fn run() {
             metadata::list_unmatched,
             metadata::list_needs_review,
             metadata::count_needs_review,
+            worth_a_look::worth_a_look_next,
+            worth_a_look::worth_a_look_save,
+            worth_a_look::worth_a_look_list,
+            worth_a_look::worth_a_look_keep,
             metadata::reset_matches,
             metadata::list_titles_needing_detail,
             metadata::list_stale_titles,

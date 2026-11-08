@@ -56,6 +56,7 @@ import {
 import { syncBuiltinKey } from '../metadata/builtinKey';
 import { refreshTomatometer } from '../metadata/scores';
 import { applyMovedMatches } from '../metadata/moving';
+import { runWorthALook } from './worthALook';
 
 /** Batched so a large library reports progress and never builds one huge IPC payload. */
 const PARSE_BATCH = 500;
@@ -70,7 +71,8 @@ export type ScanStage =
   | 'details'
   | 'examining'
   | 'detecting'
-  | 'measuring';
+  | 'measuring'
+  | 'rereading';
 
 export interface ScanStatus {
   stage: ScanStage;
@@ -421,6 +423,18 @@ export async function runScanPipeline(): Promise<ScanOutcome> {
     await findLocalPictures().catch((e: unknown) => console.warn('local pictures:', e));
     const art = await cacheArtwork();
     if (art.failed > 0) errors.push(`${count(art.failed, 'artwork download')} failed`);
+
+    // Once after an update that changed the matching rules: matches the old
+    // rules made are read again by name, and what reads differently waits in
+    // Needs attention as "Worth a look" (worthALook.ts). Usually nothing to
+    // do. After pictures, when browsing has all it needs, and before looking
+    // inside files and finding intros, which can take many minutes on a first
+    // scan; what a closed Kinema left unread is picked up by the next scan.
+    await yieldToPlayback();
+    setStatus({ stage: 'rereading', detail: '' });
+    await runWorthALook(roots, parseBatchForLibrary).catch((e: unknown) =>
+      errors.push(`Worth a look: ${String(e)}`)
+    );
 
     // Before detection, which can take minutes: a fraction of a second per new
     // file, and the badges on a new film should not wait for a season's intros.

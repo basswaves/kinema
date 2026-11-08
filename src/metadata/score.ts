@@ -52,7 +52,7 @@ export function normaliseTitle(raw: string): string {
 }
 
 /** The same, keeping a leading article — for telling "Strays" from "The Strays". */
-function literalTitle(raw: string): string {
+export function literalTitle(raw: string): string {
   // Letters of every alphabet: with only a-z a Japanese or Russian title was
   // empty, or just the number at its end, and could never match its own name.
   // Marks stay (Hindi and Thai vowels are marks); only Latin-style accents go.

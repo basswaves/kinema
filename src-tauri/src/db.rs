@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use std::path::Path;
 
 /// The schema this build understands. Bump it with every new `SCHEMA_V*`.
-pub const SCHEMA_VERSION: i64 = 37;
+pub const SCHEMA_VERSION: i64 = 38;
 
 /// What can go wrong opening the library.
 ///
@@ -944,6 +944,19 @@ const SCHEMA_V37: &str = r#"
 ALTER TABLE playback_state ADD COLUMN old_copy_secs REAL;
 "#;
 
+/// Schema version 38: "Worth a look" (`worth_a_look.rs`): the files to read
+/// again under new matching rules, and what that found, for a person to decide.
+/// Two new tables; nothing existing is touched.
+const SCHEMA_V38: &str = r#"
+CREATE TABLE worth_a_look_todo (
+    file_id INTEGER PRIMARY KEY REFERENCES media_files(id) ON DELETE CASCADE
+);
+CREATE TABLE worth_a_look (
+    file_id INTEGER PRIMARY KEY REFERENCES media_files(id) ON DELETE CASCADE,
+    why     TEXT NOT NULL
+);
+"#;
+
 /// How long a statement waits for the write lock before giving up.
 ///
 /// Load-bearing from the moment there is more than one connection. SQLite
@@ -997,6 +1010,11 @@ pub fn open(path: &Path) -> Result<Connection, DbError> {
     let reasked = crate::lifecycle::reask_after_new_rules(&conn)?;
     if reasked > 0 {
         crate::log!("matching: new rules; {reasked} refused or untitled file(s) will be read again");
+    }
+    let mut conn = conn;
+    let to_check = crate::worth_a_look::snapshot_after_new_rules(&mut conn)?;
+    if to_check > 0 {
+        crate::log!("matching: new rules; {to_check} matched file(s) to read again for Worth a look");
     }
     Ok(conn)
 }
@@ -1166,7 +1184,7 @@ pub(crate) const MIGRATIONS: [&str; SCHEMA_VERSION as usize] = [
     SCHEMA_V15, SCHEMA_V16, SCHEMA_V17, SCHEMA_V18, SCHEMA_V19,
     SCHEMA_V20, SCHEMA_V21, SCHEMA_V22, SCHEMA_V23, SCHEMA_V24, SCHEMA_V25,
     SCHEMA_V26, SCHEMA_V27, SCHEMA_V28, SCHEMA_V29, SCHEMA_V30, SCHEMA_V31,
-    SCHEMA_V32, SCHEMA_V33, SCHEMA_V34, SCHEMA_V35, SCHEMA_V36, SCHEMA_V37,
+    SCHEMA_V32, SCHEMA_V33, SCHEMA_V34, SCHEMA_V35, SCHEMA_V36, SCHEMA_V37, SCHEMA_V38,
 ];
 
 /// Bring the database up to [`SCHEMA_VERSION`].

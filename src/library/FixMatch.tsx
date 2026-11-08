@@ -41,6 +41,8 @@ import {
   type Provider,
 } from '../metadata/match';
 import type { Candidate } from '../metadata/score';
+import { groupWorth, listWorthALook, worthRowKey, type WorthALookEntry } from './worthALook';
+import { WorthALookSection } from './WorthALookSection';
 import './fixmatch.css';
 
 interface Props {
@@ -86,6 +88,7 @@ const rowKey = (group: FileGroup) => `fixmatch-row:${group.key}`;
 
 export default function FixMatch({ onChanged }: Props) {
   const [files, setFiles] = useState<MediaFile[]>([]);
+  const [worth, setWorth] = useState<WorthALookEntry[]>([]);
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [showIgnored, setShowIgnored] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -95,7 +98,9 @@ export default function FixMatch({ onChanged }: Props) {
   // wants these rows and it wants exactly them.
   const reload = useCallback(async () => {
     try {
-      setFiles(await listNeedsReview(QUEUE_LIMIT));
+      const [queue, toLook] = await Promise.all([listNeedsReview(QUEUE_LIMIT), listWorthALook()]);
+      setFiles(queue);
+      setWorth(toLook);
     } catch (e) {
       setError(userError(e));
     }
@@ -118,6 +123,8 @@ export default function FixMatch({ onChanged }: Props) {
     [files]
   );
 
+  const worthGroups = useMemo(() => groupWorth(worth), [worth]);
+
   const ignored = useMemo(
     () => groupFiles(files.filter((f) => f.match_status === 'ignored')),
     [files]
@@ -132,8 +139,9 @@ export default function FixMatch({ onChanged }: Props) {
   useLayoutEffect(() => {
     if (!refocus.current) return;
     refocus.current = false;
-    if (pending.length > 0) navFocus(rowKey(pending[0]));
-  }, [pending]);
+    if (worthGroups.length > 0) navFocus(worthRowKey(worthGroups[0]));
+    else if (pending.length > 0) navFocus(rowKey(pending[0]));
+  }, [pending, worthGroups]);
 
   const run = useCallback(
     async (work: () => Promise<string>) => {
@@ -159,7 +167,7 @@ export default function FixMatch({ onChanged }: Props) {
     [onChanged, reload]
   );
 
-  if (pending.length === 0 && ignored.length === 0) {
+  if (pending.length === 0 && ignored.length === 0 && worthGroups.length === 0) {
     return (
       <section className="fixmatch">
         <p className="muted">
@@ -175,15 +183,22 @@ export default function FixMatch({ onChanged }: Props) {
     <FocusGroup kind="panel" className="fixmatch">
       <header className="fixmatch-head">
         <h2>Needs attention</h2>
-        <span className="muted">
-          {pending.length} title{pending.length === 1 ? '' : 's'} Kinema would not guess at
-        </span>
+        {pending.length > 0 && (
+          <span className="muted">
+            {pending.length} title{pending.length === 1 ? '' : 's'} Kinema would not guess at
+          </span>
+        )}
       </header>
 
       {error && (
         <div className="fixmatch-error" onClick={() => setError(null)}>
           {error}
         </div>
+      )}
+
+      {/* First: Down from the Review button lands on it, and there are few. */}
+      {worthGroups.length > 0 && (
+        <WorthALookSection groups={worthGroups} busy={busy} run={(work) => void run(work)} />
       )}
 
       {pending.map((group) => (

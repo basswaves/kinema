@@ -18,8 +18,8 @@ import { useSyncExternalStore } from 'react';
 import { countNeedsReview } from './api';
 import { getScanStatus, subscribeScan, type ScanStage } from '../library/pipeline';
 
-/** The stages before matching has finished. */
-const DECIDING: ReadonlySet<ScanStage> = new Set(['scanning', 'parsing', 'matching']);
+/** The stages before matching has finished, and Worth a look's reading again. */
+const DECIDING: ReadonlySet<ScanStage> = new Set(['scanning', 'parsing', 'matching', 'rereading']);
 
 let shown = 0;
 const listeners = new Set<() => void>();

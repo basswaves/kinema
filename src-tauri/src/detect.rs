@@ -303,10 +303,13 @@ fn split_settled(
 /// Whether the file is being written *right now*, judged from the disk and not
 /// from what the last scan stored: the stored mtime is from the scan, so a copy
 /// that began after it (or kept its source's old mtime, as a Windows copy does)
-/// looks finished. Three signs, any one of which holds the file back:
+/// looks finished. Four signs, any one of which holds the file back:
 ///
 ///  - its size is not the one the scan saw;
 ///  - its modified time is inside the settling window;
+///  - it has holes: a download that reserved its full length up front and has
+///    not filled it (a torrent paused for weeks changes nothing else);
+///  - its name says so (`.part`, `.!qB`, `.crdownload` ...);
 ///  - on Windows, a writer still has it open (opening it while refusing to
 ///    share write access fails exactly then; readers do not matter).
 ///
@@ -324,7 +327,40 @@ fn changed_on_disk(e: &crate::analyse::Episode) -> bool {
         .ok()
         .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
         .is_some_and(|d| i64::try_from(d.as_secs()).is_ok_and(|m| m > now_secs() - SETTLING_SECS));
-    recent || open_by_a_writer(&e.path)
+    recent || open_by_a_writer(&e.path) || has_holes(&meta) || named_unfinished(&e.path)
+}
+
+/// A file whose disk space is well under its length: mostly empty, so still
+/// arriving. Unix (Linux, Android) counts the 512-byte blocks actually
+/// allocated; Windows reads the "sparse" flag a client sets when it reserves
+/// the length without writing it. A client that writes zeros up front shows
+/// nothing here: the name and the other signs are what is left for it.
+#[cfg(unix)]
+fn has_holes(meta: &std::fs::Metadata) -> bool {
+    use std::os::unix::fs::MetadataExt;
+    let len = meta.len();
+    // 1 MiB of slack plus 2 % covers block rounding and filesystem metadata.
+    len > 0 && meta.blocks().saturating_mul(512) + (1 << 20) + len / 50 < len
+}
+
+#[cfg(windows)]
+fn has_holes(meta: &std::fs::Metadata) -> bool {
+    use std::os::windows::fs::MetadataExt;
+    const FILE_ATTRIBUTE_SPARSE_FILE: u32 = 0x200;
+    meta.file_attributes() & FILE_ATTRIBUTE_SPARSE_FILE != 0
+}
+
+#[cfg(not(any(unix, windows)))]
+fn has_holes(_meta: &std::fs::Metadata) -> bool {
+    false
+}
+
+/// The endings download clients give a file until it is whole.
+fn named_unfinished(path: &str) -> bool {
+    let lower = path.to_lowercase();
+    [".part", ".!qb", ".crdownload", ".!ut", ".bc!", ".aria2", ".partial", ".downloading"]
+        .iter()
+        .any(|ext| lower.ends_with(ext))
 }
 
 #[cfg(windows)]
@@ -1095,6 +1131,29 @@ mod tests {
         drop(writer);
         assert!(!super::open_by_a_writer(&ep.path));
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn a_name_a_download_client_gives_holds_a_file_back() {
+        assert!(super::named_unfinished("/d/Show.S01E01.mkv.!qB"));
+        assert!(super::named_unfinished("C:/d/a.mkv.part"));
+        assert!(!super::named_unfinished("/d/Show.S01E01.mkv"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_file_with_holes_is_still_arriving() {
+        let dir = std::env::temp_dir().join(format!("kinema-holes-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let sparse = dir.join("sparse.mkv");
+        std::fs::File::create(&sparse).unwrap().set_len(200 << 20).unwrap();
+        let whole = dir.join("whole.mkv");
+        std::fs::write(&whole, vec![1u8; 4 << 20]).unwrap();
+        let holes = super::has_holes(&std::fs::metadata(&sparse).unwrap());
+        let full = super::has_holes(&std::fs::metadata(&whole).unwrap());
+        std::fs::remove_dir_all(&dir).ok();
+        assert!(holes);
+        assert!(!full);
     }
 
     #[test]

@@ -41,6 +41,8 @@ export interface ScanReport {
   files_updated: number;
   files_unchanged: number;
   files_missing: number;
+  /** Renamed or moved, found again with what was decided about them (following.rs). */
+  files_followed?: number;
   errors: string[];
   duration_ms: number;
 }

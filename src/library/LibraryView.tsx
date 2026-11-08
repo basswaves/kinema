@@ -431,6 +431,7 @@ export default function LibraryView() {
           Scanned {report.roots_scanned} root(s) in {report.duration_ms} ms: {report.files_seen} seen,{' '}
           {report.files_added} added, {report.files_updated} changed, {report.files_unchanged} unchanged,{' '}
           {report.files_missing} missing
+          {report.files_followed ? `, ${report.files_followed} renamed or moved` : ''}
           {report.errors.length > 0 && (
             <details>
               <summary>{report.errors.length} error(s)</summary>

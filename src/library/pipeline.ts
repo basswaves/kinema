@@ -84,6 +84,8 @@ export interface ScanStatus {
 
 export interface ScanSummary {
   filesAdded: number;
+  /** Files renamed or moved since the last scan, found again with what was decided about them. */
+  filesFollowed: number;
   filesParsed: number;
   matched: number;
   unmatched: number;
@@ -453,6 +455,7 @@ export async function runScanPipeline(): Promise<ScanOutcome> {
 
     lastSummary = {
       filesAdded: report.files_added,
+      filesFollowed: report.files_followed ?? 0,
       filesParsed,
       matched,
       unmatched,

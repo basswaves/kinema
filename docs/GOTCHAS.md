@@ -634,6 +634,27 @@ the viewing to be held back.
 whether the file itself is in it. Two of the three above were the same omission
 at different layers.
 
+### A renamed file is a new path, and a new path was a new file (2026-11-08)
+
+Every row is found by its exact path (`WHERE path = ?1`, binary), so a rename —
+a change of capitals on Windows too — made a new, empty row, and what was
+decided by hand stayed on the old one, now missing (review 2026-11, finding 4).
+`following.rs` now pairs them. Three things in it are easy to undo by accident:
+
+1. **Pair after every library folder is walked**, never inside `scan_root`. A
+   folder marks its missing only at its own end, and a file moved from one
+   library folder to another is new in the second before it is missing in the
+   first. A library folder left with no video at all hides nothing (an
+   unmounted disk looks like that), so files moved *all* out of one are not
+   missing there and cannot pair; a test that empties its folder proves nothing.
+2. **Anything said about missing files waits for the pairing.** "videos gone: 3"
+   was pushed by `mark_missing`, so a renamed folder of three episodes read as
+   three episodes gone on Home. The lines are kept with their rows
+   (`gone_lines`) and said in `scan_all`, less what was followed.
+3. **One against one, or nothing.** Same size and time, else same size and name;
+   two candidates either way and the file is new. Loosening this (a "best"
+   candidate) hands one film's watch history and hand match to another.
+
 ### A season is not a folder
 
 `analyse.rs` compares every episode of a season against every other, so how the

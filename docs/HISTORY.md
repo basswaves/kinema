@@ -4382,6 +4382,36 @@ its first piece; renames and "It moved" are the second.
 - Unchanged by design: what was sent to SIMKL or Trakt, or ticked as watched,
   under the old numbers stays; the message after a move says so.
 
+## A renamed file keeps its row (2026-11-08)
+
+The second piece of #14 (review 2026-11, finding 4). Every record about a file
+hangs on its row, found by exact path, so a rename — even a change of capitals —
+used to make a new row with nothing on it: the hand match, a season placed by
+hand, an "ignored", a title kept under its own name and an unmatched file's
+resume point stayed behind on a missing row nobody looks at.
+
+- **Pairing, after every folder is walked** (`following.rs`, called from
+  `scan_all`): a file can cross from one library folder to another, and a folder
+  marks its missing only at its own end. A file new in this scan is the missing
+  file with the **same size and time**; failing that the **same size and name**
+  (a copy to another drive gets a new time).
+- **Exactly one against one, or nothing.** Two candidates either way and the file
+  is new, as before: a wrong pairing hands one film's history to another, which
+  is worse than losing it (the settled rule). A file renamed *and* recopied with a
+  new time cannot be recognised and comes back as new.
+- **The old row takes the new path**, so `playback_state`, ticks, intro marks and
+  everything by row come along; the new row goes. Chosen versions and playlist
+  entries (by path) and a Videos folder's track choices (by folder) follow.
+- **Hand decisions stay; machine decisions are read again** from the new name
+  (held, ignored, placed, `manual:`, a local title), so renaming a badly named
+  file to fix a wrong match still works.
+- A Videos folder's file never pairs with a film's or show's (it is never parsed).
+- Nothing touches the disk: the scan already has the sizes and times. A folder
+  that could not be reached is never marked missing, so it cannot pair.
+- The scan says it: "3 files renamed or moved; what you decided came with them"
+  under Last scan; followed files are counted out of "added", "missing" and
+  "videos gone", so a renamed folder no longer reads as gone.
+
 ## Skip intro: from 0:00 only for an early intro (2026-11-08)
 
 The button used to show from 0:00 for every intro, so that an episode opening

@@ -66,8 +66,20 @@ pub struct ScanReport {
     pub files_updated: usize,
     pub files_unchanged: usize,
     pub files_missing: usize,
+    /// Files renamed or moved, found again with what was decided about them
+    /// (`following.rs`). Not counted in `files_added` or `files_missing`.
+    pub files_followed: usize,
     pub errors: Vec<String>,
     pub duration_ms: u128,
+    /// Rows written for the first time in this scan, for `following::follow`.
+    #[serde(skip)]
+    added_ids: Vec<i64>,
+    /// Rows hidden in this scan, and the "videos gone" lines waiting to be
+    /// said, each with its rows: said once the renamed ones are taken off.
+    #[serde(skip)]
+    hidden_ids: Vec<i64>,
+    #[serde(skip)]
+    gone_lines: Vec<(PathBuf, Vec<i64>)>,
 }
 
 fn mtime_secs(meta: &std::fs::Metadata) -> i64 {
@@ -171,6 +183,20 @@ pub fn scan_all(conn: &mut Connection) -> rusqlite::Result<ScanReport> {
     for (root_id, root_path) in roots {
         report.roots_scanned += 1;
         scan_root(conn, root_id, &root_path, &mut report)?;
+    }
+
+    // After every folder: a file can cross from one to another, and a folder
+    // marks its missing only at its own end.
+    let followed: HashSet<i64> =
+        crate::following::follow(conn, &report.added_ids)?.into_iter().collect();
+    report.files_followed = followed.len();
+    report.files_added -= followed.len();
+    report.files_missing -= report.hidden_ids.iter().filter(|id| followed.contains(id)).count();
+    for (place, ids) in std::mem::take(&mut report.gone_lines) {
+        let still = ids.iter().filter(|id| !followed.contains(id)).count();
+        if still >= SAID_FROM {
+            report.errors.push(format!("videos gone: {still} :: {}", place.display()));
+        }
     }
 
     report.duration_ms = started.elapsed().as_millis();
@@ -626,6 +652,7 @@ fn write_batch(
                         file.modified,
                         now
                     ])?;
+                    report.added_ids.push(tx.last_insert_rowid());
                     report.files_added += 1;
                 }
             }
@@ -648,7 +675,7 @@ fn is_under(path: &str, folder: &str) -> bool {
 #[derive(Default)]
 struct GoneFrom {
     ids: Vec<i64>,
-    by_place: HashMap<PathBuf, usize>,
+    by_place: HashMap<PathBuf, Vec<i64>>,
 }
 
 /// What became of `stale` files, by the deepest folder above each that is still
@@ -670,7 +697,7 @@ fn gone_from(root: &Path, stale: Vec<(i64, String)>) -> HashMap<PathBuf, GoneFro
         }
         let gone = folders.entry(folder.to_path_buf()).or_default();
         gone.ids.push(id);
-        *gone.by_place.entry(place.to_path_buf()).or_default() += 1;
+        gone.by_place.entry(place.to_path_buf()).or_default().push(id);
     }
     folders
 }
@@ -739,18 +766,20 @@ fn mark_missing(
         if many {
             // By the folder that went, when one did; together when they are
             // scattered, as films from a folder of films.
-            let mut places: Vec<(PathBuf, usize)> = gone.by_place.into_iter().collect();
+            // Said after every folder is walked, less the files found again
+            // under another name (`scan_all`).
+            let mut places: Vec<(PathBuf, Vec<i64>)> = gone.by_place.into_iter().collect();
             places.sort();
-            let mut scattered = 0;
-            for (place, count) in places {
-                if count >= SAID_FROM {
-                    report.errors.push(format!("videos gone: {count} :: {}", place.display()));
+            let mut scattered = Vec::new();
+            for (place, ids) in places {
+                if ids.len() >= SAID_FROM {
+                    report.gone_lines.push((place, ids));
                 } else {
-                    scattered += count;
+                    scattered.extend(ids);
                 }
             }
-            if scattered >= SAID_FROM {
-                report.errors.push(format!("videos gone: {scattered} :: {}", folder.display()));
+            if scattered.len() >= SAID_FROM {
+                report.gone_lines.push((folder.clone(), scattered));
             }
         }
         hide.extend(gone.ids);
@@ -761,6 +790,7 @@ fn mark_missing(
         let mut mark = tx.prepare("UPDATE media_files SET missing = 1 WHERE id = ?1")?;
         for id in hide {
             mark.execute(params![id])?;
+            report.hidden_ids.push(id);
             report.files_missing += 1;
         }
     }

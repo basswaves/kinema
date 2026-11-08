@@ -46,6 +46,7 @@ mod overlay;
 mod page_life;
 mod people;
 mod placing;
+mod following;
 mod posters;
 mod thumbs;
 mod pointer;

@@ -163,6 +163,9 @@ function summaryLine(s: ScanSummary): string {
     `${s.matched} matched`,
     `${s.unmatched} in Needs attention`,
   ];
+  if (s.filesFollowed) {
+    parts.push(`${count(s.filesFollowed, 'file')} renamed or moved; what you decided came with them`);
+  }
   if (s.artworkStored) parts.push(`${count(s.artworkStored, 'image')} cached`);
   if (s.detailsFilled) parts.push(`${count(s.detailsFilled, 'title')} enriched`);
   const moved = movedLine(s.movedToTmdb);

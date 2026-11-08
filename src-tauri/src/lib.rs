@@ -45,6 +45,7 @@ mod nfo;
 mod overlay;
 mod page_life;
 mod people;
+mod placing;
 mod posters;
 mod thumbs;
 mod pointer;
@@ -483,6 +484,11 @@ pub fn run() {
             metadata::save_title,
             metadata::save_episodes,
             lifecycle::record_match,
+            placing::title_files,
+            placing::place_files,
+            placing::unplace_files,
+            placing::placed_beside,
+            placing::place_as_beside,
             lifecycle::record_refusal,
             lifecycle::record_provider_failure,
             lifecycle::ignore_files,

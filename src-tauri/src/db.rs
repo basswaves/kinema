@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use std::path::Path;
 
 /// The schema this build understands. Bump it with every new `SCHEMA_V*`.
-pub const SCHEMA_VERSION: i64 = 38;
+pub const SCHEMA_VERSION: i64 = 39;
 
 /// What can go wrong opening the library.
 ///
@@ -957,6 +957,14 @@ CREATE TABLE worth_a_look (
 );
 "#;
 
+/// Schema version 39: a file placed by hand on another season or episode
+/// (`lifecycle::placed`, GitHub #14). `placed_from` holds what the name said,
+/// as JSON; empty means the numbers are the name's. It is both the mark and
+/// the undo. One nullable column; nothing existing is read or rewritten.
+const SCHEMA_V39: &str = r#"
+ALTER TABLE media_files ADD COLUMN placed_from TEXT;
+"#;
+
 /// How long a statement waits for the write lock before giving up.
 ///
 /// Load-bearing from the moment there is more than one connection. SQLite
@@ -1185,6 +1193,7 @@ pub(crate) const MIGRATIONS: [&str; SCHEMA_VERSION as usize] = [
     SCHEMA_V20, SCHEMA_V21, SCHEMA_V22, SCHEMA_V23, SCHEMA_V24, SCHEMA_V25,
     SCHEMA_V26, SCHEMA_V27, SCHEMA_V28, SCHEMA_V29, SCHEMA_V30, SCHEMA_V31,
     SCHEMA_V32, SCHEMA_V33, SCHEMA_V34, SCHEMA_V35, SCHEMA_V36, SCHEMA_V37, SCHEMA_V38,
+    SCHEMA_V39,
 ];
 
 /// Bring the database up to [`SCHEMA_VERSION`].
@@ -1421,6 +1430,29 @@ mod tests {
         )
         .unwrap();
         (dir, conn)
+    }
+
+    /// 0.15.2 (schema 38) to Files and title (39): every row and resume point
+    /// kept, nothing marked as placed, and the numbers left as the names say.
+    #[test]
+    fn upgrading_from_0_15_2_loses_nothing() {
+        let (_dir, conn) = library_on_disk("from-38", 38);
+        conn.execute(
+            "UPDATE media_files SET parsed_season = 1, parsed_episode = 2, match_status = 'parsed' WHERE id = 1",
+            [],
+        )
+        .unwrap();
+        migrate(&conn).unwrap();
+        assert_eq!(version_of(&conn), SCHEMA_VERSION);
+        let row: (i64, i64, Option<String>, f64) = conn
+            .query_row(
+                "SELECT m.parsed_season, m.parsed_episode, m.placed_from, p.position_secs
+                   FROM media_files m JOIN playback_state p ON p.file_id = m.id WHERE m.id = 1",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+            )
+            .unwrap();
+        assert_eq!(row, (1, 2, None, 812.5));
     }
 
     fn backups_in(dir: &Path) -> Vec<std::path::PathBuf> {

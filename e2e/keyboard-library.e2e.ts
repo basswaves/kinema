@@ -235,7 +235,7 @@ for (const [system, sections] of [
   });
 }
 
-test('Wrong title? on the title page: the queue’s search, by remote; Back closes it, Unlink goes to the queue', async ({
+test('Files and title on the title page: its files and the queue’s search, by remote; Back closes it, Unlink all goes to the queue', async ({
   page,
 }) => {
   await page.addInitScript(() => localStorage.setItem('kinemaMockVersions', '1'));
@@ -254,7 +254,7 @@ test('Wrong title? on the title page: the queue’s search, by remote; Back clos
   // Right walks the row in reading order, over the line it wraps at, to the
   // last button; Left walks it back.
   const names = (await row.allTextContents()).map((t) => t.trim());
-  expect(names.at(-1)).toBe('Wrong title?');
+  expect(names.at(-1)).toBe('Files and title');
   for (const name of names.slice(1)) {
     await press(page, 'ArrowRight');
     await expect.poll(() => focused(page)).toBe(name);
@@ -264,29 +264,31 @@ test('Wrong title? on the title page: the queue’s search, by remote; Back clos
     await expect.poll(() => focused(page)).toBe(name);
   }
   for (let i = 1; i < names.length; i++) await press(page, 'ArrowRight');
-  await expect.poll(() => focused(page)).toBe('Wrong title?');
+  await expect.poll(() => focused(page)).toBe('Files and title');
 
-  // Opens on the search box, the title's name in it, and what is linked said.
+  // Opens on the folder's row; under it the search, the title's name in it.
   await press(page, 'Enter');
-  const dialog = page.locator('[role="dialog"][aria-label="Wrong title?"]');
-  await expect(dialog).toContainText('2 files are linked to “Example Film” (2017)');
+  const dialog = page.locator('[role="dialog"][aria-label="Files and title"]');
+  await expect(dialog).toContainText('linked to “Example Film” (2017)');
   await expect(dialog.locator('.fixmatch-input')).toHaveValue('Example Film');
+  await expect.poll(() => focused(page)).toMatch(/^Example Film \(2017\)/);
+  await press(page, 'ArrowDown');
   await expect.poll(() => page.evaluate(() => document.activeElement?.className ?? '')).toContain('fixmatch-input');
 
   // Back closes it; the ring is back on the button.
   await press(page, 'Escape');
   await expect(dialog).toHaveCount(0);
-  await expect.poll(() => focused(page)).toBe('Wrong title?');
+  await expect.poll(() => focused(page)).toBe('Files and title');
 
-  // Again, down to Unlink: the files wait in Needs attention, which opens.
+  // Again, down to Unlink all: the files wait in Needs attention, which opens.
   await press(page, 'Enter');
   await expect(dialog).toHaveCount(1);
   // Down to the foot row (either of its two, by each engine's measure), then along it.
-  for (let i = 0; i < 4 && !/^(Unlink, decide later|Cancel)$/.test((await focused(page)) ?? ''); i++) {
+  for (let i = 0; i < 6 && !/^(Unlink all, decide later|Close)$/.test((await focused(page)) ?? ''); i++) {
     await press(page, 'ArrowDown');
   }
-  for (let i = 0; i < 2 && (await focused(page)) !== 'Unlink, decide later'; i++) await press(page, 'ArrowLeft');
-  await expect.poll(() => focused(page)).toBe('Unlink, decide later');
+  for (let i = 0; i < 2 && (await focused(page)) !== 'Unlink all, decide later'; i++) await press(page, 'ArrowLeft');
+  await expect.poll(() => focused(page)).toBe('Unlink all, decide later');
   await press(page, 'Enter');
   await expect(dialog).toHaveCount(0);
   await expect(page.locator('.settings-section h2').first()).toHaveText('Folders');

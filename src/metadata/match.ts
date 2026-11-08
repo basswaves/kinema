@@ -8,6 +8,7 @@
  * Every group ends up either linked with a confidence score, or explicitly
  * marked unmatched with a reason — never silently skipped.
  */
+import type { Placement } from '../library/placing';
 import type { MediaFile } from '../library/api';
 import {
   getSetting,
@@ -291,7 +292,31 @@ export async function applyMatch(
   isSeries: boolean,
   keys: ProviderKeys,
   confidence: number,
-  reason: string
+  reason: string,
+  /** "Link as…": where each file goes on the show (placing.ts). */
+  placements?: Placement[]
+): Promise<number> {
+  const titleId = await prepareTitle(provider, providerId, isSeries, keys);
+  await recordMatch(
+    files.map((f) => f.id),
+    titleId,
+    confidence,
+    reason,
+    placements
+  );
+  return titleId;
+}
+
+/**
+ * The first half of a link: the title and, for a show, its episodes, fetched
+ * and stored. Its own step so "Link as…" can show the service's seasons and
+ * episode names before anything is linked.
+ */
+export async function prepareTitle(
+  provider: Provider,
+  providerId: string,
+  isSeries: boolean,
+  keys: ProviderKeys
 ): Promise<number> {
   const kind = isSeries ? 'series' : 'movie';
 
@@ -326,14 +351,6 @@ export async function applyMatch(
         : await tvmazeGetEpisodes(providerId);
     if (episodes.length > 0) await saveEpisodes(titleId, episodes);
   }
-
-  await recordMatch(
-    files.map((f) => f.id),
-    titleId,
-    confidence,
-    reason
-  );
-
   return titleId;
 }
 

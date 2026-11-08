@@ -56,6 +56,19 @@ pub struct Hand {
     pub provider: Option<String>,
     pub provider_id: Option<String>,
     pub reason: Option<String>,
+    /// Where a person put the file on its show (Files and title, GitHub #14),
+    /// when not where its name says. Absent in files made before 0.16.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub placed: Option<Placed>,
+}
+
+/// A season and episode chosen by hand.
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct Placed {
+    pub season: Option<i64>,
+    pub episode: Option<i64>,
+    #[serde(default)]
+    pub episode_last: Option<i64>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -164,7 +177,8 @@ pub fn export(conn: &Connection) -> rusqlite::Result<MoveFile> {
     let mut stmt = conn.prepare(
         "SELECT m.file_name, m.size_bytes,
                 CASE WHEN m.match_reason = 'ignored by hand' THEN 'ignore' ELSE 'match' END,
-                t.kind, t.provider, t.provider_id, m.match_reason
+                t.kind, t.provider, t.provider_id, m.match_reason,
+                m.placed_from IS NOT NULL, m.parsed_season, m.parsed_episode, m.parsed_episode_last
            FROM media_files m LEFT JOIN titles t ON t.id = m.title_id
           WHERE (m.match_reason LIKE 'manual:%' AND t.id IS NOT NULL)
              OR m.match_reason = 'ignored by hand'",
@@ -179,6 +193,11 @@ pub fn export(conn: &Connection) -> rusqlite::Result<MoveFile> {
                 provider: r.get(4)?,
                 provider_id: r.get(5)?,
                 reason: r.get(6)?,
+                placed: if r.get::<_, bool>(7)? {
+                    Some(Placed { season: r.get(8)?, episode: r.get(9)?, episode_last: r.get(10)? })
+                } else {
+                    None
+                },
             })
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -397,6 +416,8 @@ pub struct ReadyMatch {
     pub provider: String,
     pub provider_id: String,
     pub reason: String,
+    /// Where the person put it on the other computer, applied with the match.
+    pub placed: Option<Placed>,
 }
 
 /// The waiting matches whose files are here; ones already matched so are
@@ -441,6 +462,7 @@ pub fn ready(conn: &Connection) -> Result<Vec<ReadyMatch>, String> {
                 provider: provider.clone(),
                 provider_id: provider_id.clone(),
                 reason: h.reason.clone().unwrap_or_else(|| "manual: moved".into()),
+                placed: h.placed.clone(),
             });
             keep.push(h);
         }
@@ -625,6 +647,7 @@ mod tests {
         let ready_now = ready(&new).unwrap();
         assert_eq!(ready_now.len(), 1);
         assert_eq!((ready_now[0].file_ids.clone(), ready_now[0].provider_id.as_str()), (vec![4], "777"));
+        assert_eq!(ready_now[0].placed, None);
         done(&new, "odd.mkv", 44).unwrap();
         assert!(ready(&new).unwrap().is_empty());
 
@@ -633,6 +656,37 @@ mod tests {
         assert_eq!(history_rows(&new), history_rows(&old));
         assert_eq!(count(&new, "SELECT COUNT(*) FROM playlists"), 1);
         assert_eq!(count(&new, "SELECT COUNT(*) FROM watch_outbox"), 0);
+    }
+
+    /// Files and title (GitHub #14): a file placed on Specials by hand is
+    /// placed there on the new computer too, and a file from before has none.
+    #[test]
+    fn a_placement_by_hand_moves_with_its_match() {
+        let mut old = library("old");
+        old.execute_batch(
+            "INSERT INTO titles (id, kind, provider, provider_id, title, fetched_at)
+                 VALUES (9, 'series', 'tmdb', '46296', 'A Show', 0);
+             UPDATE media_files SET title_id = 9, match_reason = 'manual: picked' WHERE id = 2;",
+        )
+        .unwrap();
+        crate::lifecycle::placed(
+            &mut old,
+            &[crate::lifecycle::Placement { file_id: 2, season: Some(0), episode: Some(3), episode_last: None }],
+            None,
+        )
+        .unwrap();
+        let json = serde_json::to_string(&export(&old).unwrap()).unwrap();
+        let mut new = library("new");
+        new.execute("UPDATE media_files SET title_id = NULL, match_status = 'parsed' WHERE id = 2", []).unwrap();
+        import(&mut new, &serde_json::from_str(&json).unwrap()).unwrap();
+        let r = ready(&new).unwrap();
+        let two = r.iter().find(|m| m.file_ids == vec![2]).expect("the placed file waits");
+        assert_eq!(two.placed, Some(Placed { season: Some(0), episode: Some(3), episode_last: None }));
+
+        // A file written before placements existed still reads.
+        let before = r#"{"file_name":"x.mkv","size_bytes":1,"what":"match","kind":"series","provider":"tmdb","provider_id":"1","reason":null}"#;
+        let h: Hand = serde_json::from_str(before).unwrap();
+        assert_eq!(h.placed, None);
     }
 
     #[test]

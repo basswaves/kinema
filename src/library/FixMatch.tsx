@@ -24,12 +24,13 @@ import { useFocusLeaf } from '../ui/focusGroups';
 import { navFocus } from '../ui/focusStore';
 import { lineUp, MOTION_MS } from '../ui/focusScroll';
 import { openLink } from '../ui/links';
-import { addWithoutMatch, findLocalPictures, listNeedsReview } from '../metadata/api';
+import { addWithoutMatch, findLocalPictures, listNeedsReview, recordMatch } from '../metadata/api';
 import { readLocalName, shelfOf } from './localTitle';
 import { plainReason } from './plainReason';
 import type { MediaFile } from './api';
 import {
   applyMatch,
+  prepareTitle,
   groupFiles,
   ignoreFiles,
   loadProviderKeys,
@@ -43,6 +44,18 @@ import {
 import type { Candidate } from '../metadata/score';
 import { groupWorth, listWorthALook, worthRowKey, type WorthALookEntry } from './worthALook';
 import { WorthALookSection } from './WorthALookSection';
+import { PlaceDialog } from './PlaceChooser';
+import {
+  BESIDE_REASON,
+  placeAsBeside,
+  placedBeside,
+  seasonLabel,
+  titleFiles,
+  wouldStack,
+  type Beside,
+  type PlaceFile,
+  type Placement,
+} from './placing';
 import './fixmatch.css';
 
 interface Props {
@@ -93,6 +106,20 @@ export default function FixMatch({ onChanged }: Props) {
   const [showIgnored, setShowIgnored] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * "Link as…", or a plain link that would stack on episodes another group
+   * already has (#14): the show is fetched and stored, and the person says
+   * where the files go before anything is linked.
+   */
+  const [placing, setPlacing] = useState<{
+    group: FileGroup;
+    titleId: number;
+    show: string;
+    provider: Provider;
+    question?: string;
+  } | null>(null);
+  /** The show is being fetched for a link: a second press waits. */
+  const preparing = useRef(false);
 
   // Loaded here rather than handed down, because this is the only screen that
   // wants these rows and it wants exactly them.
@@ -167,6 +194,18 @@ export default function FixMatch({ onChanged }: Props) {
     [onChanged, reload]
   );
 
+  const linkPlaced = (
+    to: NonNullable<typeof placing>,
+    plan: Placement[] | null,
+    where: string
+  ) =>
+    void run(async () => {
+      const ids = to.group.files.map((f) => f.id);
+      await recordMatch(ids, to.titleId, 1, `manual: “${to.show}” via ${to.provider}`, plan ?? undefined);
+      setPlacing(null);
+      return `Linked ${count(ids.length, 'file')} to “${to.show}”${plan ? `, ${where}` : ''}. File names are unchanged.`;
+    });
+
   if (pending.length === 0 && ignored.length === 0 && worthGroups.length === 0) {
     return (
       <section className="fixmatch">
@@ -209,22 +248,74 @@ export default function FixMatch({ onChanged }: Props) {
           open={openKey === group.key}
           onToggle={() => setOpenKey(openKey === group.key ? null : group.key)}
           onLink={(provider, candidate, isSeries) =>
+            void (async () => {
+              // A show first asks whether these would stack on episodes a
+              // differently named group already has (#14); every other link
+              // is the one press it always was.
+              if (isSeries) {
+                // Not `busy`: that disables the button under the ring, and the
+                // ring would have nowhere to come back to from the question.
+                if (preparing.current) return;
+                preparing.current = true;
+                setError(null);
+                try {
+                  const titleId = await prepareTitle(provider, candidate.providerId, true, await loadProviderKeys());
+                  const stack = wouldStack(placeFilesOf(group), await titleFiles(titleId));
+                  if (stack.count > 0) {
+                    setPlacing({
+                      group,
+                      titleId,
+                      show: candidate.title,
+                      provider,
+                      question: `${stack.seasons.map(seasonLabel).join(' and ')} already ${
+                        stack.seasons.length === 1 ? 'has' : 'have'
+                      } ${stack.count === 1 ? 'this episode' : `these ${stack.count} episodes`}. Add as second copies, or choose where they go?`,
+                    });
+                    return;
+                  }
+                } catch (e) {
+                  setError(await describeFailure(e));
+                  return;
+                } finally {
+                  preparing.current = false;
+                }
+              }
+              await run(async () => {
+                await applyMatch(
+                  group.files,
+                  provider,
+                  candidate.providerId,
+                  isSeries,
+                  await loadProviderKeys(),
+                  // A hand-picked title is authoritative, so there is no score to
+                  // record. The reason keeps it auditable: a manual link stays
+                  // distinguishable from one the scorer made.
+                  1,
+                  manualReason(candidate, provider)
+                );
+                return `Linked ${count(group.files.length, 'file')} to “${candidate.title}”.`;
+              });
+            })()
+          }
+          onLinkAs={(provider, candidate) =>
+            void (async () => {
+              if (preparing.current) return;
+              preparing.current = true;
+              setError(null);
+              try {
+                const titleId = await prepareTitle(provider, candidate.providerId, true, await loadProviderKeys());
+                setPlacing({ group, titleId, show: candidate.title, provider });
+              } catch (e) {
+                setError(await describeFailure(e));
+              } finally {
+                preparing.current = false;
+              }
+            })()
+          }
+          onSameAgain={(to) =>
             void run(async () => {
-              await applyMatch(
-                group.files,
-                provider,
-                candidate.providerId,
-                isSeries,
-                await loadProviderKeys(),
-                // A hand-picked title is authoritative, so there is no score to
-                // record. The reason keeps it auditable: a manual link stays
-                // distinguishable from one the scorer made.
-                1,
-                `manual: “${candidate.title}”${
-                  candidate.year ? ` (${candidate.year})` : ''
-                } via ${provider}`
-              );
-              return `Linked ${count(group.files.length, 'file')} to “${candidate.title}”.`;
+              await placeAsBeside(group.files.map((f) => f.id));
+              return `Linked ${count(group.files.length, 'file')} to “${to.title}”, ${seasonLabel(to.season)}, like the others in the folder.`;
             })
           }
           onIgnore={() =>
@@ -249,6 +340,19 @@ export default function FixMatch({ onChanged }: Props) {
           }
         />
       ))}
+
+      {placing && (
+        <PlaceDialog
+          titleId={placing.titleId}
+          show={placing.show}
+          files={placeFilesOf(placing.group)}
+          busy={busy}
+          question={placing.question}
+          onClose={() => setPlacing(null)}
+          onSecondCopies={() => linkPlaced(placing, null, '')}
+          onPlace={(plan, where) => linkPlaced(placing, plan, where)}
+        />
+      )}
 
       {ignored.length > 0 && (
         <div className="fixmatch-ignored">
@@ -360,6 +464,9 @@ function adviceFor(reason: string): string {
   if (/^added without a match, then sent back/.test(reason)) {
     return 'You sent this back from its own title to find a match. Search for it below, or add it without one again.';
   }
+  if (reason === BESIDE_REASON) {
+    return 'The other files in this folder were placed on a show by hand, so this one waits for you instead of going where its name says.';
+  }
   if (/^unlinked by hand/.test(reason)) {
     return 'You unlinked this from a wrong title. It waits here until you pick the right one below.';
   }
@@ -401,6 +508,8 @@ function GroupRow({
   open,
   onToggle,
   onLink,
+  onLinkAs,
+  onSameAgain,
   onIgnore,
   onKeep,
 }: {
@@ -409,6 +518,10 @@ function GroupRow({
   open: boolean;
   onToggle: () => void;
   onLink: (provider: Provider, candidate: Candidate, isSeries: boolean) => void;
+  /** A show: choose the season and numbers before linking (#14). */
+  onLinkAs: (provider: Provider, candidate: Candidate) => void;
+  /** A new file beside hand-placed ones: where they went. */
+  onSameAgain: (to: Beside) => void;
   onIgnore: () => void;
   /** Keep the group as a title of its own, under this name, year and kind. */
   onKeep: (name: string, year: number | null, isSeries: boolean) => void;
@@ -420,6 +533,18 @@ function GroupRow({
   const [localName, setLocalName] = useState(group.title);
   const [localYear, setLocalYear] = useState(group.year ? String(group.year) : '');
   const [localError, setLocalError] = useState<string | null>(null);
+  const besidePlaced = group.files.some((f) => f.match_reason === BESIDE_REASON);
+  const [beside, setBeside] = useState<Beside | null>(null);
+  useEffect(() => {
+    if (!open || !besidePlaced) return;
+    let cancelled = false;
+    placedBeside(group.files.map((f) => f.id))
+      .then((b) => !cancelled && setBeside(b))
+      .catch((e: unknown) => console.warn('placed beside:', e));
+    return () => {
+      cancelled = true;
+    };
+  }, [open, besidePlaced, group.files]);
   const keep = useCallback(() => {
     const read = readLocalName(localName, localYear);
     if (typeof read === 'string') {
@@ -464,6 +589,20 @@ function GroupRow({
             {group.files.length > 8 && <li className="muted">…and {group.files.length - 8} more</li>}
           </ul>
 
+          {/* New beside files placed by hand (#14): one press puts them
+              where the others went, instead of where their names say. */}
+          {beside && (
+            <FocusGroup kind="row" className="settings-row fixmatch-beside">
+              <span>
+                The others in this folder went to “{beside.title}”, {seasonLabel(beside.season)}.
+                Same again?
+              </span>
+              <FocusButton className="primary" disabled={busy} onSelect={() => onSameAgain(beside)}>
+                Same again
+              </FocusButton>
+            </FocusGroup>
+          )}
+
           <MatchSearch
             initialQuery={group.untitled ? searchableName(group.title) : group.title}
             isSeries={isSeries}
@@ -471,6 +610,7 @@ function GroupRow({
             busy={busy}
             linkLabel={`Link ${group.files.length} file${group.files.length === 1 ? '' : 's'}`}
             onLink={onLink}
+            onLinkAs={onLinkAs}
             extra={
               <FocusButton disabled={busy} onSelect={onIgnore}>
                 Ignore these
@@ -517,7 +657,7 @@ function GroupRow({
 /**
  * The search half of fixing a match: a name, Movie or TV series, Search, and
  * what the provider answered, each with its own Link. Shared by Needs
- * attention and the title page's "Wrong title?" (WrongTitle.tsx), so both
+ * attention and the title page's "Files and title" (FilesAndTitle.tsx), so both
  * follow the same rule: nothing is linked but the entry a person picks.
  */
 /** The search box and its buttons: Right from the box is Movie / TV series, Down the results. */
@@ -538,6 +678,7 @@ export function MatchSearch({
   onLink,
   extra,
   inputFocusKey,
+  onLinkAs,
 }: {
   initialQuery: string;
   isSeries: boolean;
@@ -545,6 +686,8 @@ export function MatchSearch({
   busy: boolean;
   linkLabel: string;
   onLink: (provider: Provider, candidate: Candidate, isSeries: boolean) => void;
+  /** Needs attention: a show's result also offers `Link as…` (#14). */
+  onLinkAs?: (provider: Provider, candidate: Candidate) => void;
   /** More controls at the end of the search row (Ignore these). */
   extra?: ReactNode;
   /** The search box's, for a dialog that opens on it. */
@@ -647,14 +790,33 @@ export function MatchSearch({
                     <p className="fixmatch-candidate-overview">{candidate.overview}</p>
                   )}
                 </div>
-                <FocusButton
-                  className="primary"
-                 
-                  disabled={busy}
-                  onSelect={() => onLink(used.provider, candidate, used.isSeries)}
-                >
-                  {linkLabel}
-                </FocusButton>
+                {onLinkAs && used.isSeries ? (
+                  // Two buttons side by side are a row (GOTCHAS).
+                  <FocusGroup kind="row" className="fixmatch-link-as">
+                    <FocusButton
+                      className="primary"
+                      disabled={busy}
+                      onSelect={() => onLink(used.provider, candidate, used.isSeries)}
+                    >
+                      {linkLabel}
+                    </FocusButton>
+                    <FocusButton
+                      disabled={busy}
+                      label={`Link as: choose the season for “${candidate.title}”`}
+                      onSelect={() => onLinkAs(used.provider, candidate)}
+                    >
+                      Link as…
+                    </FocusButton>
+                  </FocusGroup>
+                ) : (
+                  <FocusButton
+                    className="primary"
+                    disabled={busy}
+                    onSelect={() => onLink(used.provider, candidate, used.isSeries)}
+                  >
+                    {linkLabel}
+                  </FocusButton>
+                )}
               </div>
             ))}
           </FocusGroup>
@@ -663,3 +825,17 @@ export function MatchSearch({
     </>
   );
 }
+
+/** A queue group's files as "Where do these go?" reads them. */
+function placeFilesOf(group: FileGroup): PlaceFile[] {
+  return group.files.map((f) => ({
+    id: f.id,
+    file_name: f.file_name,
+    season: f.parsed_season,
+    episode: f.parsed_episode,
+    parsed_title: f.parsed_title,
+  }));
+}
+
+const manualReason = (candidate: Candidate, provider: Provider) =>
+  `manual: “${candidate.title}”${candidate.year ? ` (${candidate.year})` : ''} via ${provider}`;

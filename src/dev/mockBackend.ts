@@ -1099,6 +1099,26 @@ function personOf(personId: string) {
  * beside its file; a choice is kept by title and put back after a refresh.
  */
 let mockHttpBodySent = false;
+let mockHttpUrl = '';
+/**
+ * `kinemaMockTmdb=1`: TMDB knows one show, Example Saga, with Specials and
+ * two seasons, so Needs attention's search, link and `Link as…` run without
+ * a network (e2e/files-and-title.e2e.ts).
+ */
+function mockTmdb(url: string): unknown {
+  const show = { id: 3, name: 'Example Saga', first_air_date: '2019-03-01', overview: 'A fixture series.' };
+  if (url.includes('/search/tv')) return { results: [show] };
+  const season = (n: number, names: string[]) => ({
+    episodes: names.map((name, i) => ({ season_number: n, episode_number: i + 1, name })),
+  });
+  return {
+    ...show,
+    seasons: [{ season_number: 0 }, { season_number: 1 }, { season_number: 2 }],
+    'season/0': season(0, ['The First Special', 'The Second Special']),
+    'season/1': season(1, ['Saga One', 'Saga Two']),
+    'season/2': season(2, ['Saga Three', 'Saga Four', 'Saga Five', 'Saga Six']),
+  };
+}
 const FETCHED_POSTER = 'https://image.tmdb.org/t/p/original/first.jpg';
 const LOCAL_POSTER = 'C:\\fixture\\Example Part Two (2014)\\poster.jpg';
 const posterChoice = new Map<number, string>();
@@ -1255,7 +1275,14 @@ const reviewCount = (): number =>
     : Number(flag('kinemaMockReview') ?? 0) || 0);
 /** Review items kept as titles of their own (`add_without_match`). */
 const keptLocally = new Set<number>();
-const reviewItems = () => REVIEW_ITEMS.filter((f) => !keptLocally.has(f.id));
+const reviewItems = () =>
+  REVIEW_ITEMS.filter((f) => !keptLocally.has(f.id)).map((f) =>
+    // `kinemaMockReviewStack=1`: the queue's two episodes are S02E01-02, which
+    // Example Saga already has from a differently named folder (#14).
+    flag('kinemaMockReviewStack') === '1' && f.parsed_episode !== null
+      ? { ...f, parsed_episode: f.parsed_episode - 2, file_name: f.file_name.replace(/E0(\d)/, (_, d) => `E0${Number(d) - 2}`) }
+      : f
+  );
 /** local_title.rs, in memory: the title row and its files, as the scan would have them. */
 function addWithoutMatch(fileIds: number[], isSeries: boolean, name: string, year: number | null) {
   if (!name.trim()) throw new Error('A title needs a name.');
@@ -1312,6 +1339,57 @@ function releaseLocal(titleId: number): number {
   }
   return n;
 }
+/** The last link made, for a test to read (`window.__kinemaLastMatch`). */
+let mockLastMatch: unknown = null;
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, '__kinemaLastMatch', { get: () => mockLastMatch, configurable: true });
+}
+/** placing.rs in memory: what each placed file's name said. */
+const placedFrom = new Map<number, { season: number | null; episode: number | null }>();
+function placeMock(id: number, season: number | null, episode: number | null) {
+  const f = files.find((x) => x.id === id);
+  if (!f) return;
+  if (!placedFrom.has(id)) placedFrom.set(id, { season: f.season, episode: f.episode });
+  f.season = season;
+  f.episode = episode;
+  const was = placedFrom.get(id);
+  if (was && was.season === season && was.episode === episode) placedFrom.delete(id);
+}
+function unplaceMock(id: number): boolean {
+  const f = files.find((x) => x.id === id);
+  const was = placedFrom.get(id);
+  if (!f || !was) return false;
+  f.season = was.season;
+  f.episode = was.episode;
+  placedFrom.delete(id);
+  return true;
+}
+function titleFilesMock(titleId: number) {
+  return files
+    .filter((f) => f.titleId === titleId)
+    .map((f) => {
+      const was = placedFrom.get(f.id);
+      const cut = f.path.lastIndexOf('\\');
+      return {
+        file_id: f.id,
+        path: f.path,
+        parent_dir: f.path.slice(0, cut),
+        file_name: f.path.slice(cut + 1),
+        root_path: 'C:\\fixture',
+        missing: false,
+        season: f.season,
+        episode: f.episode,
+        episode_last: null,
+        name_season: was ? was.season : f.season,
+        name_episode: was ? was.episode : f.episode,
+        name_episode_last: null,
+        placed: Boolean(was),
+        parsed_title: titleById(f.titleId)?.title ?? null,
+      };
+    })
+    .sort((a, b) => a.parent_dir.localeCompare(b.parent_dir) || (a.season ?? 0) - (b.season ?? 0) || (a.episode ?? 0) - (b.episode ?? 0));
+}
+
 /**
  * `kinemaMockReview=items`: three plausible files wait in the queue, and
  * `list_needs_review` lists them (the navigation checker opens one). Only that
@@ -1781,8 +1859,36 @@ const handlers: Record<string, Handler> = {
       .filter((f) => f.season === num(a, 'season'))
       .map((f) => ({ file_id: f.id, ...mockFileFacts(f.id) })),
   list_unmatched: () => [],
-  // "Wrong title?" → Unlink: the files go to Needs attention (not kept here).
-  unlink_files: (a) => (a.fileIds as number[]).length,
+  // Files and title → Unlink: the files leave the title (they would wait in
+  // Needs attention; the mock does not list them there).
+  unlink_files: (a) => {
+    for (const f of files) {
+      if ((a.fileIds as number[]).includes(f.id)) {
+        unplaceMock(f.id);
+        f.titleId = 0;
+      }
+    }
+    return (a.fileIds as number[]).length;
+  },
+  // A link from Needs attention (match.ts), against the mock TMDB above.
+  save_title: (a) => ((a.title as { provider_id?: string }).provider_id === '3' ? SAGA_ID : 4242),
+  save_episodes: (a) => (a.episodes as unknown[]).length,
+  record_match: (a) => {
+    mockLastMatch = a;
+    return (a.fileIds as number[]).length;
+  },
+  // Files and title (placing.rs), in memory.
+  title_files: (a) => titleFilesMock(num(a, 'titleId')),
+  place_files: (a) => {
+    const list = a.placements as { file_id: number; season: number | null; episode: number | null }[];
+    for (const p of list) placeMock(p.file_id, p.season, p.episode);
+    return list.length;
+  },
+  unplace_files: (a) => (a.fileIds as number[]).filter((id) => unplaceMock(id)).length,
+  placed_beside: () => null,
+  place_as_beside: () => {
+    throw new Error('The files beside these are no longer placed.');
+  },
   list_needs_review: () => (flag('kinemaMockReview') === 'items' ? reviewItems() : []),
   worth_a_look_list: () => worthItems(),
   worth_a_look_keep: (a) => {
@@ -2252,7 +2358,9 @@ const handlers: Record<string, Handler> = {
   // TMDB's poster list for the Poster dialog (e2e/posters.e2e.ts), when
   // kinemaMockPosters is set: eleven posters through the http plugin's calls.
   // Without it TMDB is unreachable, as before.
-  'plugin:http|fetch': () => {
+  'plugin:http|fetch': (a) => {
+    mockHttpUrl = String((a.clientConfig as { url?: string } | undefined)?.url ?? '');
+    if (flag('kinemaMockTmdb') === '1' && /api\.themoviedb\.org\/3\/(search\/tv|tv\/)/.test(mockHttpUrl)) return 1;
     if (flag('kinemaMockPosters') !== '1') throw new Error('mock: no network');
     return 1;
   },
@@ -2263,6 +2371,9 @@ const handlers: Record<string, Handler> = {
   'plugin:http|fetch_read_body': () => {
     if (mockHttpBodySent) return new Uint8Array([1]).buffer;
     mockHttpBodySent = true;
+    if (flag('kinemaMockTmdb') === '1' && mockHttpUrl.includes('themoviedb')) {
+      return new Uint8Array([...new TextEncoder().encode(JSON.stringify(mockTmdb(mockHttpUrl))), 0]).buffer;
+    }
     const body = JSON.stringify({
       posters: Array.from({ length: 11 }, (_, i) => ({
         file_path: `/p${i}.jpg`,

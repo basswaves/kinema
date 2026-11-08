@@ -24,6 +24,7 @@ interface ReadyMatch {
   provider: string;
   provider_id: string;
   reason: string;
+  placed: { season: number | null; episode: number | null; episode_last: number | null } | null;
 }
 
 /** Write the file; answers how many history rows it holds. */
@@ -50,7 +51,16 @@ export async function applyMovedMatches(): Promise<number> {
         m.kind === 'series',
         keys,
         1,
-        m.reason
+        m.reason,
+        // Placed by hand on the other computer (Files and title): here too.
+        m.placed
+          ? m.file_ids.map((id) => ({
+              file_id: id,
+              season: m.placed?.season ?? null,
+              episode: m.placed?.episode ?? null,
+              episode_last: m.placed?.episode_last ?? null,
+            }))
+          : undefined
       );
       applied++;
       await invoke('moved_match_done', { fileName: m.file_name, sizeBytes: m.size_bytes });

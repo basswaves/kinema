@@ -1457,6 +1457,22 @@ failed; the text was just covered. **Do:** keep `--ring-room` (ui.css)
 above and below rows of controls; `ringCovers` (e2e/kb.ts) lists any text
 the ring overlaps, and e2e/ring-room.e2e.ts walks screens with it.
 
+### A button disabled while a press works has nowhere to take the ring back (round 8, G1)
+
+Needs attention's Link set `busy` while it fetched the show, which disabled
+the Link button under the ring; the question it then opened ("Season 2
+already has these episodes…") closed with the ring on nothing, on both
+engines, no error. **Do:** while a press fetches before opening a dialog,
+guard a second press with a ref instead of disabling the button.
+
+### Two Back handlers on `window`: the one added first runs first (round 8, G1)
+
+A dialog adds its Escape/Back listener (capture, on `window`) when it opens;
+a sub-view inside it (one row's episode menu) adds its own later.
+`stopImmediatePropagation` in the later one is too late: the dialog's ran
+first and closed everything. **Do:** the sub-view tells the dialog through a
+ref (`pickingRef`, PlaceChooser.tsx) and the dialog's handler steps aside.
+
 ## Frontend
 
 ### A condition inside `try` switches the react-hooks rules off for the whole component

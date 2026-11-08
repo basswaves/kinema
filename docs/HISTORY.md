@@ -4348,6 +4348,40 @@ The owner chose a one-time check that only asks (`worth_a_look.rs`,
   start-up part costs 6–7 ms for 10,000 files; reading 10,000 names again takes
   about 40 s on a desktop processor, in the parse worker, during the scan.
 
+## Files and title: a season or numbers by hand (2026-11-08)
+
+GitHub #14: a prequel TMDB keeps as a show's Specials 1-6 was named `S01E01-06`,
+so linking it by hand stacked six files on season 1, and the person could not
+rename them (they were seeding). The owner chose option A of
+`notes/G-DESIGN-14.md`: each file remembers what the person decided. This is
+its first piece; renames and "It moved" are the second.
+
+- **The person's numbers go where every reader already looks**:
+  `parsed_season`, `parsed_episode`, `parsed_episode_last`, which some 25 files
+  read (the page, next episode, watched ticks, SIMKL and Trakt, subtitles,
+  intros). None of them needed changing. A new column, `media_files.placed_from`
+  (schema 39), keeps what the name said as JSON: it is the mark and the undo.
+  Placing a file where its name already says clears it.
+- **One door**: `lifecycle::placed` / `unplaced`. An unlink, `reset_matches`
+  and `reset_parses` put the name's numbers back, since each means "from what
+  the names say". `save_parse_results` never overwrites a placed row's numbers;
+  `reask_after_new_rules` never takes a placed row.
+- **A hand link keeps its reason.** Placing a matched file sets a `manual:`
+  reason only when it had none, so who picked which title stays readable.
+- **A new file beside hand-placed ones waits** (`placing::hold_beside_placed`):
+  held in Needs attention with "The others in this folder went to …. Same
+  again?", one press. Otherwise a seventh file named S01E07 would quietly land
+  on season 1. Folders nobody placed by hand are untouched.
+- **A plain link asks only when it would stack** on episodes held by files of
+  another name (a second copy of the same show in another quality is not
+  asked about).
+- **Seasons as a row of buttons**, as the design drew them, kept on one line
+  that scrolls sideways: a wrapped row hides its second line from a remote.
+- **Moving to a new computer** carries a placement with its hand match
+  (`moving::Hand::placed`, `serde(default)`, so older files still read).
+- Unchanged by design: what was sent to SIMKL or Trakt, or ticked as watched,
+  under the old numbers stays; the message after a move says so.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

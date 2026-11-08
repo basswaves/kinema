@@ -147,6 +147,9 @@ pub fn add(
         }
     };
 
+    // A title of its own starts from what the names say: a placement by hand
+    // was about the title the files are leaving (Files and title).
+    lifecycle::unplaced(conn, file_ids).map_err(to_string_err)?;
     // A person's decision, like a link made in Fix match: no score to record.
     if let Err(e) = lifecycle::matched(conn, file_ids, title_id, None, Some(ADDED_REASON)) {
         // No row left behind with nothing in it.

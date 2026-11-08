@@ -170,20 +170,120 @@ pub fn returned_to_review(conn: &mut Connection, ids: &[i64]) -> rusqlite::Resul
     )
 }
 
+/// The columns that undo a placement: the name's numbers from `placed_from`,
+/// and the mark cleared. A row never placed keeps what it has.
+pub const NAME_NUMBERS_BACK: &str = "
+    parsed_season = CASE WHEN placed_from IS NULL THEN parsed_season
+                         ELSE json_extract(placed_from, '$.season') END,
+    parsed_episode = CASE WHEN placed_from IS NULL THEN parsed_episode
+                          ELSE json_extract(placed_from, '$.episode') END,
+    parsed_episode_last = CASE WHEN placed_from IS NULL THEN parsed_episode_last
+                               ELSE json_extract(placed_from, '$.episode_last') END,
+    placed_from = NULL";
+
+/// Where a person put one file: a season and episode (and the last episode,
+/// for a file holding two) other than its name says (GitHub #14).
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Placement {
+    pub file_id: i64,
+    pub season: Option<i64>,
+    pub episode: Option<i64>,
+    #[serde(default)]
+    pub episode_last: Option<i64>,
+}
+
+/// A person put these files on another season or episode. The name's own
+/// numbers are kept in `placed_from` the first time (a second move keeps the
+/// first record, so the undo always goes back to the name), and a placement
+/// that lands exactly where the name says clears the mark: nothing is placed
+/// any more. A matched file placed by hand becomes a hand decision (`reason`,
+/// `manual:...`), so nothing that re-matches by score touches it.
+///
+/// No file is opened, renamed or written: only these rows change.
+pub fn placed(conn: &mut Connection, places: &[Placement], reason: Option<&str>) -> rusqlite::Result<usize> {
+    let tx = conn.transaction()?;
+    let mut n = 0;
+    {
+        let mut put = tx.prepare(
+            "UPDATE media_files
+                SET placed_from = COALESCE(placed_from,
+                        json_object('season', parsed_season, 'episode', parsed_episode,
+                                    'episode_last', parsed_episode_last)),
+                    parsed_season = ?2, parsed_episode = ?3,
+                    -- Not given: a file holding two episodes keeps holding two.
+                    parsed_episode_last = CASE
+                        WHEN ?4 IS NOT NULL THEN ?4
+                        WHEN parsed_episode_last IS NOT NULL AND parsed_episode IS NOT NULL
+                             AND ?3 IS NOT NULL THEN parsed_episode_last + (?3 - parsed_episode)
+                        ELSE NULL END,
+                    -- A hand link keeps its own reason (who picked what).
+                    match_reason = CASE WHEN ?5 IS NOT NULL AND title_id IS NOT NULL
+                                         AND (match_reason IS NULL
+                                              OR match_reason NOT LIKE 'manual:%')
+                                        THEN ?5 ELSE match_reason END
+              WHERE id = ?1",
+        )?;
+        let mut same = tx.prepare(
+            "UPDATE media_files SET placed_from = NULL
+              WHERE id = ?1 AND placed_from IS NOT NULL
+                AND json_extract(placed_from, '$.season') IS parsed_season
+                AND json_extract(placed_from, '$.episode') IS parsed_episode
+                AND json_extract(placed_from, '$.episode_last') IS parsed_episode_last",
+        )?;
+        for p in places {
+            // A range ending where it starts is one episode.
+            let last = p.episode_last.filter(|l| Some(*l) != p.episode);
+            n += put.execute(rusqlite::params![p.file_id, p.season, p.episode, last, reason])?;
+            same.execute([p.file_id])?;
+        }
+    }
+    tx.commit()?;
+    Ok(n)
+}
+
+/// "Back to what the names say": the numbers from the file names again.
+pub fn unplaced(conn: &mut Connection, ids: &[i64]) -> rusqlite::Result<usize> {
+    update(
+        conn,
+        &format!("UPDATE media_files SET {NAME_NUMBERS_BACK} WHERE id = ?1 AND placed_from IS NOT NULL"),
+        ids,
+        |id| vec![Box::new(id)],
+    )
+}
+
 /// A wrong match taken off by hand, and held for a person to decide. Held,
 /// not merely returned: returned files are what the matcher picks up, and it
 /// made the same wrong choice at the next launch, undoing the unlink.
+///
+/// A file placed by hand gets the name's numbers back first: the placement
+/// was about the title it is leaving.
 pub fn unlinked(conn: &mut Connection, ids: &[i64], reason: &str) -> rusqlite::Result<usize> {
     let reason = reason.to_string();
     update(
         conn,
-        "UPDATE media_files
-            SET title_id = NULL, match_confidence = NULL, match_reason = ?2,
-                match_status = 'unmatched', match_hold = 1
-          WHERE id = ?1",
+        &format!(
+            "UPDATE media_files
+                SET {NAME_NUMBERS_BACK}, title_id = NULL, match_confidence = NULL,
+                    match_reason = ?2, match_status = 'unmatched', match_hold = 1
+              WHERE id = ?1"
+        ),
         ids,
         |id| vec![Box::new(id), Box::new(reason.clone())],
     )
+}
+
+/// A new file in a folder whose others were placed by hand: it waits for a
+/// person (`placing::hold_beside_placed`), held like an unlinked file so the
+/// matcher does not put it where its name says.
+pub fn held_beside(conn: &Connection, ids: &[i64], reason: &str) -> rusqlite::Result<usize> {
+    let mut stmt = conn.prepare_cached(
+        "UPDATE media_files SET match_hold = 1, match_reason = ?2 WHERE id = ?1",
+    )?;
+    let mut n = 0;
+    for &id in ids {
+        n += stmt.execute(rusqlite::params![id, reason])?;
+    }
+    Ok(n)
 }
 
 /// A provider key was added or changed — the one thing that can change a
@@ -197,18 +297,19 @@ pub fn reopen_refusals(conn: &Connection) -> rusqlite::Result<usize> {
 }
 
 /// Developer tools: match everything again from scratch. Files that were
-/// matched or refused go back to the matcher; ignored, failed and held
+/// matched or refused go back to the matcher, with the numbers their names
+/// say (a placement by hand is undone with the match it was made for); ignored, failed and held
 /// decisions are kept — and so are titles kept without a match, which are a
 /// person's decision too (local_title.rs): the matcher would only refuse them
 /// again, and the names typed for them would be lost.
 pub fn reset_matches(conn: &Connection) -> rusqlite::Result<usize> {
     conn.execute(
-        "UPDATE media_files
-            SET title_id = NULL, match_confidence = NULL, match_reason = NULL,
-                match_status = 'parsed'
+        &format!("UPDATE media_files
+            SET {NAME_NUMBERS_BACK}, title_id = NULL, match_confidence = NULL,
+                match_reason = NULL, match_status = 'parsed'
           WHERE match_status IN ('matched', 'unmatched') AND match_hold = 0
             AND NOT EXISTS (SELECT 1 FROM titles t
-                             WHERE t.id = media_files.title_id AND t.provider = 'local')",
+                             WHERE t.id = media_files.title_id AND t.provider = 'local')"),
         [],
     )
 }
@@ -246,7 +347,7 @@ pub fn reask_after_new_rules(conn: &Connection) -> rusqlite::Result<usize> {
                 parsed_year = NULL, parsed_season = NULL, parsed_episode = NULL,
                 parsed_kind = NULL, parsed_from = NULL, parsed_json = NULL,
                 parsed_episode_last = NULL, match_confidence = NULL, match_reason = NULL
-          WHERE match_hold = 0 AND title_id IS NULL
+          WHERE match_hold = 0 AND title_id IS NULL AND placed_from IS NULL
             AND (match_status = 'unmatched'
                  OR (match_status IN ('parsed', 'failed') AND parsed_title IS NULL))",
         [],
@@ -259,7 +360,8 @@ pub fn reask_after_new_rules(conn: &Connection) -> rusqlite::Result<usize> {
     Ok(n)
 }
 
-/// Developer tools: parse everything again. Match links go too — a file that
+/// Developer tools: parse everything again, so placements by hand go back to
+/// what the names say as well. Match links go too — a file that
 /// claims to be unparsed while pointing at a title is an inconsistent state.
 pub fn reset_parses(conn: &Connection) -> rusqlite::Result<usize> {
     conn.execute(
@@ -267,7 +369,7 @@ pub fn reset_parses(conn: &Connection) -> rusqlite::Result<usize> {
             SET match_status = 'unparsed', parsed_at = NULL, parsed_title = NULL,
                 parsed_year = NULL, parsed_season = NULL, parsed_episode = NULL,
                 parsed_kind = NULL, parsed_from = NULL, parsed_json = NULL,
-                parsed_episode_last = NULL,
+                parsed_episode_last = NULL, placed_from = NULL,
                 title_id = NULL, match_confidence = NULL, match_reason = NULL
           WHERE match_status <> 'video'",
         [],
@@ -288,10 +390,15 @@ pub fn record_match(
     title_id: i64,
     confidence: Option<f64>,
     reason: Option<String>,
+    // "Link as...": where the person put each file. Absent for a plain link.
+    placements: Option<Vec<Placement>>,
 ) -> Result<usize, String> {
     let mut conn = db.0.lock().map_err(to_string_err)?;
     let n = matched(&mut conn, &file_ids, title_id, confidence, reason.as_deref())
         .map_err(to_string_err)?;
+    if let Some(places) = placements.filter(|p| !p.is_empty()) {
+        placed(&mut conn, &places, reason.as_deref()).map_err(to_string_err)?;
+    }
     // Now that they are known, a moved, renamed, upgraded or re-added copy
     // picks up what was watched on the old one. See `history`.
     crate::history::restore(&conn, &file_ids).map_err(to_string_err)?;

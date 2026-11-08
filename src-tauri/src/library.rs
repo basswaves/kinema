@@ -454,14 +454,19 @@ pub fn save_parse_results(
             .prepare(
                 "UPDATE media_files
                     SET parsed_at = ?2, parsed_title = ?3, parsed_year = ?4,
-                        parsed_season = ?5, parsed_episode = ?6, parsed_kind = ?7,
-                        parsed_from = ?8, parsed_json = ?9, parsed_episode_last = ?10,
-                        match_status = 'parsed'
+                        parsed_kind = ?7, parsed_from = ?8, parsed_json = ?9,
+                        match_status = 'parsed',
+                        -- A file placed by hand keeps the person's numbers
+                        -- (placing.rs); only the name's reading is new.
+                        parsed_season = CASE WHEN placed_from IS NULL THEN ?5 ELSE parsed_season END,
+                        parsed_episode = CASE WHEN placed_from IS NULL THEN ?6 ELSE parsed_episode END,
+                        parsed_episode_last = CASE WHEN placed_from IS NULL THEN ?10
+                                                   ELSE parsed_episode_last END
                   WHERE id = ?1",
             )
             .map_err(to_string_err)?;
 
-        for r in results {
+        for r in &results {
             stmt.execute(params![
                 r.id, now, r.title, r.year, r.season, r.episode, r.kind, r.from, r.raw_json,
                 r.episode_last
@@ -471,6 +476,8 @@ pub fn save_parse_results(
         }
     }
 
+    let ids: Vec<i64> = results.iter().map(|r| r.id).collect();
+    crate::placing::hold_beside_placed(&tx, &ids).map_err(to_string_err)?;
     tx.commit().map_err(to_string_err)?;
     Ok(written)
 }

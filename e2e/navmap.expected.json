@@ -115,8 +115,8 @@
       "+ My list": { "U": "← Back", "D": "Show the film's file details", "L": "▶ Play", "R": "Mark watched" },
       "Mark watched": { "U": "← Back", "D": "Show the film's file details", "L": "+ My list", "R": "+ Playlist" },
       "+ Playlist": { "U": "← Back", "D": "Show the film's file details", "L": "Mark watched", "R": "Poster: choose the picture this title shows" },
-      "Poster: choose the picture this title shows": { "U": "← Back", "D": "Show the film's file details", "L": "+ Playlist", "R": "Wrong title?" },
-      "Wrong title?": { "U": "← Back", "D": "Show the film's file details", "L": "Poster: choose the picture this title shows", "R": "·" },
+      "Poster: choose the picture this title shows": { "U": "← Back", "D": "Show the film's file details", "L": "+ Playlist", "R": "Files and title" },
+      "Files and title": { "U": "← Back", "D": "Show the film's file details", "L": "Poster: choose the picture this title shows", "R": "·" },
       "Show the film's file details": { "U": "▶ Play", "D": "·", "L": "·", "R": "·" }
     },
     "detail-series": {
@@ -125,8 +125,8 @@
       "+ My list": { "U": "← Back", "D": "Episode 1", "L": "▶ Play S01E01", "R": "Mark show watched" },
       "Mark show watched": { "U": "← Back", "D": "Episode 1", "L": "+ My list", "R": "+ Playlist (season 1)" },
       "+ Playlist (season 1)": { "U": "← Back", "D": "Episode 1", "L": "Mark show watched", "R": "Poster: choose the picture this title shows" },
-      "Poster: choose the picture this title shows": { "U": "← Back", "D": "Episode 1", "L": "+ Playlist (season 1)", "R": "Wrong title?" },
-      "Wrong title?": { "U": "← Back", "D": "Episode 1", "L": "Poster: choose the picture this title shows", "R": "·" },
+      "Poster: choose the picture this title shows": { "U": "← Back", "D": "Episode 1", "L": "+ Playlist (season 1)", "R": "Files and title" },
+      "Files and title": { "U": "← Back", "D": "Episode 1", "L": "Poster: choose the picture this title shows", "R": "·" },
       "✓ Mark season watched": { "U": "▶ Play S01E01", "D": "Episode 1", "L": "·", "R": "·" },
       "Episode 1": { "U": "✓ Mark season watched", "D": "Episode 2", "L": "·", "R": "Mark watched #1" },
       "Mark watched #1": { "U": "✓ Mark season watched", "D": "Episode 2", "L": "Episode 1", "R": "Add to a playlist #1" },
@@ -151,8 +151,8 @@
       "+ My list": { "U": "← Back", "D": "Season 1", "L": "▶ Play S01E01", "R": "Mark show watched" },
       "Mark show watched": { "U": "← Back", "D": "Season 1", "L": "+ My list", "R": "+ Playlist (season 1)" },
       "+ Playlist (season 1)": { "U": "← Back", "D": "Season 1", "L": "Mark show watched", "R": "Poster: choose the picture this title shows" },
-      "Poster: choose the picture this title shows": { "U": "← Back", "D": "Season 1", "L": "+ Playlist (season 1)", "R": "Wrong title?" },
-      "Wrong title?": { "U": "← Back", "D": "Season 1", "L": "Poster: choose the picture this title shows", "R": "·" },
+      "Poster: choose the picture this title shows": { "U": "← Back", "D": "Season 1", "L": "+ Playlist (season 1)", "R": "Files and title" },
+      "Files and title": { "U": "← Back", "D": "Season 1", "L": "Poster: choose the picture this title shows", "R": "·" },
       "✓ Mark season watched": { "U": "▶ Play S01E01", "D": "Episode 1", "L": "Specials", "R": "·" },
       "Season 1": { "U": "▶ Play S01E01", "D": "Episode 1", "L": "·", "R": "Season 2" },
       "Season 2": { "U": "▶ Play S01E01", "D": "Episode 1", "L": "Season 1", "R": "Specials" },
@@ -505,6 +505,27 @@
       "ffmpeg": { "U": "Install ffmpeg", "D": "Get a free key ↗", "L": "·", "R": "·" },
       "Get a free key ↗": { "U": "ffmpeg", "D": "OMDb API key", "L": "·", "R": "·" },
       "OMDb API key": { "U": "Get a free key ↗", "D": "·", "L": "·", "R": "·" }
+    },
+    "files-and-title": {
+      "Season 1 2 files · Season 1 · C:\\fixture": { "U": "Unlink all, decide later", "D": "Season 2 2 files · Season 2 · C:\\fixture", "L": "·", "R": "·" },
+      "Season 2 2 files · Season 2 · C:\\fixture": { "U": "Season 1 2 files · Season 1 · C:\\fixture", "D": "Search for the right title…", "L": "·", "R": "·" },
+      "Search for the right title…": { "U": "Season 2 2 files · Season 2 · C:\\fixture", "D": "Unlink all, decide later", "L": "·", "R": "TV series" },
+      "TV series": { "U": "Season 2 2 files · Season 2 · C:\\fixture", "D": "Unlink all, decide later", "L": "Search for the right title…", "R": "Search" },
+      "Search": { "U": "Season 2 2 files · Season 2 · C:\\fixture", "D": "Unlink all, decide later", "L": "TV series", "R": "·" },
+      "Unlink all, decide later": { "U": "Search for the right title…", "D": "Season 1 2 files · Season 1 · C:\\fixture", "L": "·", "R": "Close" },
+      "Close": { "U": "Search for the right title…", "D": "Season 1 2 files · Season 1 · C:\\fixture", "L": "Unlink all, decide later", "R": "·" }
+    },
+    "files-and-title-place": {
+      "As the names say: Season 1": { "U": "Move 2 files", "D": "First episode: one lower", "L": "·", "R": "Specials" },
+      "Specials": { "U": "Move 2 files", "D": "First episode: one lower", "L": "As the names say: Season 1", "R": "Season 1" },
+      "Season 1": { "U": "Move 2 files", "D": "First episode: one lower", "L": "Specials", "R": "Season 2" },
+      "Season 2": { "U": "Move 2 files", "D": "First episode: one lower", "L": "Season 1", "R": "·" },
+      "First episode: one lower": { "U": "Specials", "D": "Example.Saga.S01E01.mkv: choose its episode", "L": "·", "R": "First episode: one higher" },
+      "First episode: one higher": { "U": "Specials", "D": "Example.Saga.S01E01.mkv: choose its episode", "L": "First episode: one lower", "R": "·" },
+      "Example.Saga.S01E01.mkv: choose its episode": { "U": "First episode: one lower", "D": "Example.Saga.S01E02.mkv: choose its episode", "L": "·", "R": "·" },
+      "Example.Saga.S01E02.mkv: choose its episode": { "U": "Example.Saga.S01E01.mkv: choose its episode", "D": "Move 2 files", "L": "·", "R": "·" },
+      "Cancel": { "U": "Example.Saga.S01E02.mkv: choose its episode", "D": "Specials", "L": "Move 2 files", "R": "·" },
+      "Move 2 files": { "U": "Example.Saga.S01E02.mkv: choose its episode", "D": "Specials", "L": "·", "R": "Cancel" }
     }
   },
   "linux": {
@@ -623,8 +644,8 @@
       "+ My list": { "U": "← Back", "D": "Show the film's file details", "L": "▶ Play", "R": "Mark watched" },
       "Mark watched": { "U": "← Back", "D": "Show the film's file details", "L": "+ My list", "R": "+ Playlist" },
       "+ Playlist": { "U": "← Back", "D": "Show the film's file details", "L": "Mark watched", "R": "Poster: choose the picture this title shows" },
-      "Poster: choose the picture this title shows": { "U": "← Back", "D": "Show the film's file details", "L": "+ Playlist", "R": "Wrong title?" },
-      "Wrong title?": { "U": "← Back", "D": "Show the film's file details", "L": "Poster: choose the picture this title shows", "R": "·" },
+      "Poster: choose the picture this title shows": { "U": "← Back", "D": "Show the film's file details", "L": "+ Playlist", "R": "Files and title" },
+      "Files and title": { "U": "← Back", "D": "Show the film's file details", "L": "Poster: choose the picture this title shows", "R": "·" },
       "Show the film's file details": { "U": "▶ Play", "D": "·", "L": "·", "R": "·" }
     },
     "detail-series": {
@@ -633,8 +654,8 @@
       "+ My list": { "U": "← Back", "D": "Episode 1", "L": "▶ Play S01E01", "R": "Mark show watched" },
       "Mark show watched": { "U": "← Back", "D": "Episode 1", "L": "+ My list", "R": "+ Playlist (season 1)" },
       "+ Playlist (season 1)": { "U": "← Back", "D": "Episode 1", "L": "Mark show watched", "R": "Poster: choose the picture this title shows" },
-      "Poster: choose the picture this title shows": { "U": "← Back", "D": "Episode 1", "L": "+ Playlist (season 1)", "R": "Wrong title?" },
-      "Wrong title?": { "U": "← Back", "D": "Episode 1", "L": "Poster: choose the picture this title shows", "R": "·" },
+      "Poster: choose the picture this title shows": { "U": "← Back", "D": "Episode 1", "L": "+ Playlist (season 1)", "R": "Files and title" },
+      "Files and title": { "U": "← Back", "D": "Episode 1", "L": "Poster: choose the picture this title shows", "R": "·" },
       "✓ Mark season watched": { "U": "▶ Play S01E01", "D": "Episode 1", "L": "·", "R": "·" },
       "Episode 1": { "U": "✓ Mark season watched", "D": "Episode 2", "L": "·", "R": "Mark watched #1" },
       "Mark watched #1": { "U": "✓ Mark season watched", "D": "Episode 2", "L": "Episode 1", "R": "Add to a playlist #1" },
@@ -659,8 +680,8 @@
       "+ My list": { "U": "← Back", "D": "Season 1", "L": "▶ Play S01E01", "R": "Mark show watched" },
       "Mark show watched": { "U": "← Back", "D": "Season 1", "L": "+ My list", "R": "+ Playlist (season 1)" },
       "+ Playlist (season 1)": { "U": "← Back", "D": "Season 1", "L": "Mark show watched", "R": "Poster: choose the picture this title shows" },
-      "Poster: choose the picture this title shows": { "U": "← Back", "D": "Season 1", "L": "+ Playlist (season 1)", "R": "Wrong title?" },
-      "Wrong title?": { "U": "← Back", "D": "Season 1", "L": "Poster: choose the picture this title shows", "R": "·" },
+      "Poster: choose the picture this title shows": { "U": "← Back", "D": "Season 1", "L": "+ Playlist (season 1)", "R": "Files and title" },
+      "Files and title": { "U": "← Back", "D": "Season 1", "L": "Poster: choose the picture this title shows", "R": "·" },
       "✓ Mark season watched": { "U": "▶ Play S01E01", "D": "Episode 1", "L": "Specials", "R": "·" },
       "Season 1": { "U": "▶ Play S01E01", "D": "Episode 1", "L": "·", "R": "Season 2" },
       "Season 2": { "U": "▶ Play S01E01", "D": "Episode 1", "L": "Season 1", "R": "Specials" },
@@ -998,6 +1019,27 @@
       "ffmpeg": { "U": "Open the ffmpeg download page ↗", "D": "Get a free key ↗", "L": "·", "R": "·" },
       "Get a free key ↗": { "U": "ffmpeg", "D": "OMDb API key", "L": "·", "R": "·" },
       "OMDb API key": { "U": "Get a free key ↗", "D": "·", "L": "·", "R": "·" }
+    },
+    "files-and-title": {
+      "Season 1 2 files · Season 1 · C:\\fixture": { "U": "Unlink all, decide later", "D": "Season 2 2 files · Season 2 · C:\\fixture", "L": "·", "R": "·" },
+      "Season 2 2 files · Season 2 · C:\\fixture": { "U": "Season 1 2 files · Season 1 · C:\\fixture", "D": "Search for the right title…", "L": "·", "R": "·" },
+      "Search for the right title…": { "U": "Season 2 2 files · Season 2 · C:\\fixture", "D": "Unlink all, decide later", "L": "·", "R": "TV series" },
+      "TV series": { "U": "Season 2 2 files · Season 2 · C:\\fixture", "D": "Unlink all, decide later", "L": "Search for the right title…", "R": "Search" },
+      "Search": { "U": "Season 2 2 files · Season 2 · C:\\fixture", "D": "Unlink all, decide later", "L": "TV series", "R": "·" },
+      "Unlink all, decide later": { "U": "Search for the right title…", "D": "Season 1 2 files · Season 1 · C:\\fixture", "L": "·", "R": "Close" },
+      "Close": { "U": "Search for the right title…", "D": "Season 1 2 files · Season 1 · C:\\fixture", "L": "Unlink all, decide later", "R": "·" }
+    },
+    "files-and-title-place": {
+      "As the names say: Season 1": { "U": "Move 2 files", "D": "First episode: one lower", "L": "·", "R": "Specials" },
+      "Specials": { "U": "Move 2 files", "D": "First episode: one lower", "L": "As the names say: Season 1", "R": "Season 1" },
+      "Season 1": { "U": "Move 2 files", "D": "First episode: one lower", "L": "Specials", "R": "Season 2" },
+      "Season 2": { "U": "Move 2 files", "D": "First episode: one lower", "L": "Season 1", "R": "·" },
+      "First episode: one lower": { "U": "Specials", "D": "Example.Saga.S01E01.mkv: choose its episode", "L": "·", "R": "First episode: one higher" },
+      "First episode: one higher": { "U": "Specials", "D": "Example.Saga.S01E01.mkv: choose its episode", "L": "First episode: one lower", "R": "·" },
+      "Example.Saga.S01E01.mkv: choose its episode": { "U": "First episode: one lower", "D": "Example.Saga.S01E02.mkv: choose its episode", "L": "·", "R": "·" },
+      "Example.Saga.S01E02.mkv: choose its episode": { "U": "Example.Saga.S01E01.mkv: choose its episode", "D": "Move 2 files", "L": "·", "R": "·" },
+      "Cancel": { "U": "Example.Saga.S01E02.mkv: choose its episode", "D": "Specials", "L": "Move 2 files", "R": "·" },
+      "Move 2 files": { "U": "Example.Saga.S01E02.mkv: choose its episode", "D": "Specials", "L": "·", "R": "Cancel" }
     }
   },
   "android": {
@@ -1112,8 +1154,8 @@
       "+ My list": { "U": "← Back", "D": "Show the film's file details", "L": "▶ Play", "R": "Mark watched" },
       "Mark watched": { "U": "← Back", "D": "Show the film's file details", "L": "+ My list", "R": "+ Playlist" },
       "+ Playlist": { "U": "← Back", "D": "Show the film's file details", "L": "Mark watched", "R": "Poster: choose the picture this title shows" },
-      "Poster: choose the picture this title shows": { "U": "← Back", "D": "Show the film's file details", "L": "+ Playlist", "R": "Wrong title?" },
-      "Wrong title?": { "U": "← Back", "D": "Show the film's file details", "L": "Poster: choose the picture this title shows", "R": "·" },
+      "Poster: choose the picture this title shows": { "U": "← Back", "D": "Show the film's file details", "L": "+ Playlist", "R": "Files and title" },
+      "Files and title": { "U": "← Back", "D": "Show the film's file details", "L": "Poster: choose the picture this title shows", "R": "·" },
       "Show the film's file details": { "U": "▶ Play", "D": "·", "L": "·", "R": "·" }
     },
     "detail-series": {
@@ -1122,8 +1164,8 @@
       "+ My list": { "U": "← Back", "D": "Episode 1", "L": "▶ Play S01E01", "R": "Mark show watched" },
       "Mark show watched": { "U": "← Back", "D": "Episode 1", "L": "+ My list", "R": "+ Playlist (season 1)" },
       "+ Playlist (season 1)": { "U": "← Back", "D": "Episode 1", "L": "Mark show watched", "R": "Poster: choose the picture this title shows" },
-      "Poster: choose the picture this title shows": { "U": "← Back", "D": "Episode 1", "L": "+ Playlist (season 1)", "R": "Wrong title?" },
-      "Wrong title?": { "U": "← Back", "D": "Episode 1", "L": "Poster: choose the picture this title shows", "R": "·" },
+      "Poster: choose the picture this title shows": { "U": "← Back", "D": "Episode 1", "L": "+ Playlist (season 1)", "R": "Files and title" },
+      "Files and title": { "U": "← Back", "D": "Episode 1", "L": "Poster: choose the picture this title shows", "R": "·" },
       "✓ Mark season watched": { "U": "▶ Play S01E01", "D": "Episode 1", "L": "·", "R": "·" },
       "Episode 1": { "U": "✓ Mark season watched", "D": "Episode 2", "L": "·", "R": "Mark watched #1" },
       "Mark watched #1": { "U": "✓ Mark season watched", "D": "Episode 2", "L": "Episode 1", "R": "Add to a playlist #1" },
@@ -1148,8 +1190,8 @@
       "+ My list": { "U": "← Back", "D": "Season 1", "L": "▶ Play S01E01", "R": "Mark show watched" },
       "Mark show watched": { "U": "← Back", "D": "Season 1", "L": "+ My list", "R": "+ Playlist (season 1)" },
       "+ Playlist (season 1)": { "U": "← Back", "D": "Season 1", "L": "Mark show watched", "R": "Poster: choose the picture this title shows" },
-      "Poster: choose the picture this title shows": { "U": "← Back", "D": "Season 1", "L": "+ Playlist (season 1)", "R": "Wrong title?" },
-      "Wrong title?": { "U": "← Back", "D": "Season 1", "L": "Poster: choose the picture this title shows", "R": "·" },
+      "Poster: choose the picture this title shows": { "U": "← Back", "D": "Season 1", "L": "+ Playlist (season 1)", "R": "Files and title" },
+      "Files and title": { "U": "← Back", "D": "Season 1", "L": "Poster: choose the picture this title shows", "R": "·" },
       "✓ Mark season watched": { "U": "▶ Play S01E01", "D": "Episode 1", "L": "Specials", "R": "·" },
       "Season 1": { "U": "▶ Play S01E01", "D": "Episode 1", "L": "·", "R": "Season 2" },
       "Season 2": { "U": "▶ Play S01E01", "D": "Episode 1", "L": "Season 1", "R": "Specials" },
@@ -1401,6 +1443,27 @@
       "Go to Keep track of what I watch, for Trakt": { "U": "Go to Keep track of what I watch, for SIMKL", "D": "Go to Keep track of what I watch, for Your own Jellyfin, Emby or Plex server", "L": "Privacy", "R": "·" },
       "Go to Keep track of what I watch, for Your own Jellyfin, Emby or Plex server": { "U": "Go to Keep track of what I watch, for Trakt", "D": "Go to Advanced, for GitHub (new versions)", "L": "Privacy", "R": "·" },
       "Go to Advanced, for GitHub (new versions)": { "U": "Go to Keep track of what I watch, for Your own Jellyfin, Emby or Plex server", "D": "·", "L": "Privacy", "R": "·" }
+    },
+    "files-and-title": {
+      "Season 1 2 files · Season 1 · C:\\fixture": { "U": "Unlink all, decide later", "D": "Season 2 2 files · Season 2 · C:\\fixture", "L": "·", "R": "·" },
+      "Season 2 2 files · Season 2 · C:\\fixture": { "U": "Season 1 2 files · Season 1 · C:\\fixture", "D": "Search for the right title…", "L": "·", "R": "·" },
+      "Search for the right title…": { "U": "Season 2 2 files · Season 2 · C:\\fixture", "D": "Unlink all, decide later", "L": "·", "R": "TV series" },
+      "TV series": { "U": "Season 2 2 files · Season 2 · C:\\fixture", "D": "Unlink all, decide later", "L": "Search for the right title…", "R": "Search" },
+      "Search": { "U": "Season 2 2 files · Season 2 · C:\\fixture", "D": "Unlink all, decide later", "L": "TV series", "R": "·" },
+      "Unlink all, decide later": { "U": "Search for the right title…", "D": "Season 1 2 files · Season 1 · C:\\fixture", "L": "·", "R": "Close" },
+      "Close": { "U": "Search for the right title…", "D": "Season 1 2 files · Season 1 · C:\\fixture", "L": "Unlink all, decide later", "R": "·" }
+    },
+    "files-and-title-place": {
+      "As the names say: Season 1": { "U": "Move 2 files", "D": "First episode: one lower", "L": "·", "R": "Specials" },
+      "Specials": { "U": "Move 2 files", "D": "First episode: one lower", "L": "As the names say: Season 1", "R": "Season 1" },
+      "Season 1": { "U": "Move 2 files", "D": "First episode: one lower", "L": "Specials", "R": "Season 2" },
+      "Season 2": { "U": "Move 2 files", "D": "First episode: one lower", "L": "Season 1", "R": "·" },
+      "First episode: one lower": { "U": "Specials", "D": "Example.Saga.S01E01.mkv: choose its episode", "L": "·", "R": "First episode: one higher" },
+      "First episode: one higher": { "U": "Specials", "D": "Example.Saga.S01E01.mkv: choose its episode", "L": "First episode: one lower", "R": "·" },
+      "Example.Saga.S01E01.mkv: choose its episode": { "U": "First episode: one lower", "D": "Example.Saga.S01E02.mkv: choose its episode", "L": "·", "R": "·" },
+      "Example.Saga.S01E02.mkv: choose its episode": { "U": "Example.Saga.S01E01.mkv: choose its episode", "D": "Move 2 files", "L": "·", "R": "·" },
+      "Cancel": { "U": "Example.Saga.S01E02.mkv: choose its episode", "D": "Specials", "L": "Move 2 files", "R": "·" },
+      "Move 2 files": { "U": "Example.Saga.S01E02.mkv: choose its episode", "D": "Specials", "L": "·", "R": "Cancel" }
     }
   }
 }

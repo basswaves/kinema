@@ -24,7 +24,7 @@ import MediaBadges, { BadgeRows } from './MediaBadges';
 import HeavyFileNotice from './HeavyFileNotice';
 import VersionDialog from './VersionDialog';
 import PosterDialog from './PosterDialog';
-import WrongTitle from '../library/WrongTitle';
+import FilesAndTitle from '../library/FilesAndTitle';
 import { useChosenVersion, useTitleVersions } from './useVersions';
 import { chooseVersion, pickVersion, readVersions, type Version } from '../library/versions';
 import { PlaylistDialog } from './PlaylistPicker';
@@ -74,7 +74,7 @@ interface Props {
    * it was on no longer exists. Opens the review queue in its place.
    */
   onFindMatch?: () => void;
-  /** "Wrong title?" linked the files to another title (its id) or unlinked them (null). */
+  /** "Files and title" linked the files to another title (its id) or unlinked them all (null). */
   onRelinked?: (titleId: number | null) => void;
   /** Another title's page: a film of the same collection. */
   onOpenTitle?: (title: Title) => void;
@@ -208,6 +208,8 @@ export default function TitleDetailView({
         : DETAIL_ACTIONS_KEY
   );
 
+  /** Raised when Files and title moved some files: the page reads itself again. */
+  const [reread, setReread] = useState(0);
   useEffect(() => {
     let cancelled = false;
     getTitleDetail(title.id)
@@ -222,7 +224,7 @@ export default function TitleDetailView({
     return () => {
       cancelled = true;
     };
-  }, [title.id]);
+  }, [title.id, reread]);
 
   /**
    * Which episode Play means, for a series.
@@ -261,7 +263,7 @@ export default function TitleDetailView({
     versionsHere.screen
   );
   const [versionsOpen, setVersionsOpen] = useState(false);
-  /** The "Wrong title?" search is up (WrongTitle.tsx). */
+  /** "Files and title" is up (FilesAndTitle.tsx). */
   const [wrongOpen, setWrongOpen] = useState(false);
   /** The poster list is up (PosterDialog.tsx, T20). */
   const [postersOpen, setPostersOpen] = useState(false);
@@ -884,15 +886,18 @@ export default function TitleDetailView({
                   </FocusButton>
                 )}
 
-                {/* Matched by Kinema or by hand, and wrong: fixed here, with the
-                    same search as Needs attention (T19). Last in the row: the
-                    rarest thing anyone comes to a title's page for. */}
-                {!isLocal && onRelinked && (
+                {/* The files this title holds, folder by folder (GitHub #14):
+                    one moved to another season, made its own title or
+                    unlinked alone; and the same search as Needs attention for
+                    a title that is wrong altogether (T19). Titles kept under
+                    their own name have it too. Last in the row: the rarest
+                    thing anyone comes to a title's page for. */}
+                {onRelinked && (
                   <FocusButton
                     className="btn-secondary"
                     onSelect={() => setWrongOpen(true)}
                   >
-                    Wrong title?
+                    Files and title
                   </FocusButton>
                 )}
                   </>
@@ -901,13 +906,15 @@ export default function TitleDetailView({
               {renameError && <div className="detail-error">{renameError}</div>}
               {playlistNote && <div className="detail-note">{playlistNote}</div>}
               {wrongOpen && onRelinked && (
-                <WrongTitle
+                <FilesAndTitle
                   titleId={title.id}
                   name={name}
                   year={year ?? null}
                   isSeries={title.kind === 'series'}
+                  isLocal={isLocal}
                   onClose={() => setWrongOpen(false)}
                   onDone={onRelinked}
+                  onChanged={() => setReread((n) => n + 1)}
                 />
               )}
               {postersOpen && (

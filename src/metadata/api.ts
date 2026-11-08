@@ -1,4 +1,5 @@
 /** Typed wrappers around the Rust metadata and settings commands. */
+import type { Placement } from '../library/placing';
 import { invoke } from '@tauri-apps/api/core';
 import type { MediaFile } from '../library/api';
 import type { EpisodeMetadata, TitleMetadata } from './providers';
@@ -102,8 +103,10 @@ export const recordMatch = (
   fileIds: number[],
   titleId: number,
   confidence: number | null,
-  reason: string | null
-) => invoke<number>('record_match', { fileIds, titleId, confidence, reason });
+  reason: string | null,
+  /** "Link as…": where each file goes (placing.ts). Left out for a plain link. */
+  placements?: Placement[]
+) => invoke<number>('record_match', { fileIds, titleId, confidence, reason, placements });
 
 /** The scorer refused. Waits in Needs attention until a provider key changes. */
 export const recordRefusal = (fileIds: number[], confidence: number | null, reason: string) =>

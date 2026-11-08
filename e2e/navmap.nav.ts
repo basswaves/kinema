@@ -816,6 +816,51 @@ async function walkSystem(ctx: Ctx): Promise<void> {
     });
   });
 
+  // Files and title (GitHub #14): the dialog on Example Saga's page, then one
+  // folder's "Where do these go?".
+  await screen(ctx, 'files-and-title', 'Files and title (a show’s folders, the search)', {}, async (p) => {
+    if (!(await pressUntil(p, 'ArrowDown', (c) => c.key.startsWith('rail:'), 14))) return null;
+    if (!(await pressUntil(p, 'ArrowRight', isLabel('Example Saga'), 4))) return null;
+    await press(p, 'Enter');
+    await p.waitForFunction("window.__nav.leaves().some((l) => l.key.startsWith('episode:'))", undefined, { timeout: 8000 });
+    await quiet(p);
+    const button = (await rawLeaves(p)).find((l) => l.label === 'Files and title');
+    if (!button) return null;
+    await p.evaluate(`window.__navw.focusAndSettle(${JSON.stringify(button.key)})`);
+    const page = new Set((await rawLeaves(p)).map((l) => l.key));
+    await press(p, 'Enter');
+    await p.waitForFunction("window.__nav.leaves().some((l) => l.key.startsWith('files-row-'))", undefined, { timeout: 8000 });
+    await drawn(p);
+    await quiet(p);
+    const out: ScreenResult[] = [];
+    out.push(
+      await w(p, 'files-and-title', 'Files and title (a show’s folders, the search)', {
+        how: 'keyboard',
+        note: 'The probe stood on the page’s Files and title button, then OK. Only the dialog is walked.',
+      }, { origins: (l) => !page.has(l.key) })
+    );
+    // The first folder opened, then Move to another season….
+    const first = (await rawLeaves(p)).find((l) => l.key.startsWith('files-row-') && l.key !== 'files-row-move');
+    if (!first) return out;
+    await p.evaluate(`window.__navw.focusAndSettle(${JSON.stringify(first.key)})`);
+    await press(p, 'Enter');
+    if (!(await pressUntil(p, 'ArrowDown', isLabel('Move to another season…'), 3))) return out;
+    await press(p, 'Enter');
+    await p.waitForFunction("window.__nav.leaves().some((l) => l.key === 'place-as-names')", undefined, { timeout: 8000 });
+    // A season chosen, so the episode rows and First episode are there too.
+    await press(p, 'ArrowRight');
+    await press(p, 'Enter');
+    await drawn(p);
+    await quiet(p);
+    out.push(
+      await w(p, 'files-and-title-place', 'Files and title: where do these go? (Specials chosen)', {
+        how: 'keyboard',
+        note: 'From the first folder: OK, Move to another season…, Right, OK. Only the dialog is walked.',
+      }, { origins: (l) => !page.has(l.key) })
+    );
+    return out;
+  });
+
   // Settings: every section in the list. The top bar and the list are pressed
   // from once, in the first section.
   for (const [sid, label] of SECTIONS) {

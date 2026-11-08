@@ -105,7 +105,7 @@ fn choose(conn: &Connection, title_id: i64, path: &str, key: &str, now: i64) -> 
     Ok(())
 }
 
-fn duplicates(conn: &Connection) -> rusqlite::Result<Vec<Duplicate>> {
+pub(crate) fn duplicates(conn: &Connection) -> rusqlite::Result<Vec<Duplicate>> {
     // A film is one group; an episode is its season and number. A file with no
     // episode number in a series is left out: there is nothing to say it is the
     // same as another.

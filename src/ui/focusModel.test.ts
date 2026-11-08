@@ -565,7 +565,7 @@ describe('an actor’s page and a collection', () => {
   });
 });
 
-describe('dialogs: the card menu, Wrong title?, the poster chooser', () => {
+describe('dialogs: the card menu, Files and title, Where do these go?, the poster chooser', () => {
   const menu = (children: A['children'], extra: Partial<AreaSpec> = {}): A => ({
     area: { kind: 'menu', ...extra },
     children,
@@ -584,27 +584,60 @@ describe('dialogs: the card menu, Wrong title?, the poster chooser', () => {
     for (const a of ['left', 'right'] as Arrow[]) expect(move(tree, 'list', a, none)).toBeNull();
   });
 
-  it('Wrong title?: opens on the search box; its buttons a row, the results under it, the foot a row', () => {
+  it('Files and title: opens on the first folder; an open row is a row of actions; the search and foot under', () => {
     const tree = build(
       column([
-        ['page', column(['wrong-button'])],
+        ['page', column(['files-button'])],
         [
-          'wrong',
+          'files',
           menu(
-            [['search', row(['input', 'kind', 'search-button'])], 'this-1', 'this-2', ['foot', row(['unlink', 'cancel'])]],
-            { current: 'input' }
+            [
+              ['rows', column([['r1', column(['row-1'])], ['r2', column(['row-2', ['acts', row(['move', 'own', 'unlink'], { current: 'move' })]])]])],
+              ['search', row(['input', 'kind', 'search-button'])],
+              'this-1',
+              ['foot', row(['unlink-all', 'close'])],
+            ],
+            { current: 'row-1' }
           ),
         ],
       ])
     );
-    expect(enter(tree, 'wrong', none)).toBe('input');
+    expect(enter(tree, 'files', none)).toBe('row-1');
+    expect(move(tree, 'row-1', 'down', none)).toBe('row-2');
+    expect(move(tree, 'row-2', 'down', none)).toBe('move');
+    expect(move(tree, 'move', 'right', none)).toBe('own');
+    expect(move(tree, 'unlink', 'right', none)).toBeNull();
+    expect(move(tree, 'own', 'down', none)).toBe('input');
     expect(move(tree, 'input', 'right', none)).toBe('kind');
-    expect(move(tree, 'search-button', 'down', none)).toBe('this-1');
-    expect(move(tree, 'this-2', 'down', none)).toBe('unlink');
-    expect(move(tree, 'unlink', 'right', none)).toBe('cancel');
-    expect(move(tree, 'cancel', 'up', none)).toBe('this-2');
-    expect(move(tree, 'cancel', 'down', none)).toBe('input');
-    expect(move(tree, 'input', 'left', none)).toBeNull();
+    expect(move(tree, 'this-1', 'down', none)).toBe('unlink-all');
+    expect(move(tree, 'unlink-all', 'right', none)).toBe('close');
+    expect(move(tree, 'close', 'down', none)).toBe('row-1');
+  });
+
+  it('Where do these go?: seasons a row landing on the chosen one, then first episode, the rows, the foot', () => {
+    const tree = build(
+      column([
+        [
+          'place',
+          menu(
+            [
+              ['seasons', row(['names', 's0', 's1', 's2'], { current: 's0' })],
+              ['first', row(['minus', 'plus'])],
+              ['rows', column(['f1', 'f2'])],
+              ['foot', row(['link', 'cancel'])],
+            ],
+            { current: 's0' }
+          ),
+        ],
+      ])
+    );
+    expect(enter(tree, 'place', none)).toBe('s0');
+    expect(move(tree, 's0', 'left', none)).toBe('names');
+    expect(move(tree, 's2', 'right', none)).toBeNull();
+    expect(move(tree, 's1', 'down', none)).toBe('minus');
+    expect(move(tree, 'plus', 'down', none)).toBe('f1');
+    expect(move(tree, 'f2', 'down', none)).toBe('link');
+    expect(move(tree, 'link', 'right', none)).toBe('cancel');
   });
 
   it('the poster chooser: one row of posters landing on the one shown now, Cancel under it', () => {

@@ -296,6 +296,12 @@ jobs:
           echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/kinema-release.p12"
           echo "KINEMA_KEYSTORE_FILE=$RUNNER_TEMP/kinema-release.p12" >> "$GITHUB_ENV"
 
+      # Gradle from GitHub's cache (filled by ci.yml on master), so a release
+      # does not depend on downloading it (504s for hours on 2026-11-08).
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: true
+
       # The version code comes from the version (0.10.0 -> 10000), so it
       # rises with every release.
       - name: Build the signed app

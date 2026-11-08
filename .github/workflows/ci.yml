@@ -230,6 +230,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Gradle's own action: keeps the Gradle the wrapper downloads in GitHub's
+      # cache, so a build does not depend on fetching it each time. On
+      # 2026-11-08 GitHub served that download with 504s for hours and every
+      # Android job failed. Only master writes the cache; others read it.
+      - uses: gradle/actions/setup-gradle@v6
+
       # A debug build: it needs no signing key, and installs on any device
       # with debugging on. 32-bit ARM too: many TV boxes run a 32-bit Android
       # even on a 64-bit chip, and install nothing else.

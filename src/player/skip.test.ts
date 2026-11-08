@@ -62,6 +62,37 @@ describe('activeSkip', () => {
     }
   });
 
+  /** Changed 2026-11-08: an intro at 10:52 left the button up for eleven minutes. */
+  it('offers a late intro only from a few seconds before it begins', () => {
+    const m = markers({ intro: { start: 652, end: 666 } });
+    for (const position of [0, 10, 300, 643.9]) {
+      expect(activeSkip(m, position), `at ${position}`).toBeNull();
+    }
+    for (const position of [644, 650, 652, 660]) {
+      expect(activeSkip(m, position)?.kind, `at ${position}`).toBe('intro');
+    }
+    expect(activeSkip(m, 650)?.inSegment).toBe(false);
+    expect(activeSkip(m, 653)?.inSegment).toBe(true);
+    expect(activeSkip(m, 650)?.seekTo).toBe(666);
+  });
+
+  it('counts an intro within the first three minutes as early', () => {
+    expect(activeSkip(markers({ intro: { start: 180, end: 230 } }), 0)?.kind).toBe('intro');
+    expect(activeSkip(markers({ intro: { start: 181, end: 230 } }), 0)).toBeNull();
+  });
+
+  it('counts a late intro right after a recap as early', () => {
+    const m = markers({
+      recap: { start: 400, end: 560 },
+      intro: { start: 565, end: 620 },
+    });
+    expect(activeSkip(m, 0)?.kind).toBe('intro');
+    // A recap long before the intro does not make it early.
+    const far = markers({ recap: { start: 10, end: 90 }, intro: { start: 700, end: 750 } });
+    expect(activeSkip(far, 100)).toBeNull();
+    expect(activeSkip(far, 695)?.kind).toBe('intro');
+  });
+
   it('offers nothing once the intro is over', () => {
     const m = markers({ intro: { start: 30, end: 90 } });
     expect(activeSkip(m, 90)).toBeNull();

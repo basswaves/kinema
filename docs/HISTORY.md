@@ -4382,6 +4382,25 @@ its first piece; renames and "It moved" are the second.
 - Unchanged by design: what was sent to SIMKL or Trakt, or ticked as watched,
   under the old numbers stays; the message after a move says so.
 
+## Skip intro: from 0:00 only for an early intro (2026-11-08)
+
+The button used to show from 0:00 for every intro, so that an episode opening
+on a scene never looked like it had no button (decided 2026-09-30). A
+community timing of an intro at 10:52 showed the owner what that costs: the
+button sat on screen for eleven minutes, and pressing it in the first act would
+have skipped the first act.
+
+Now: an intro starting within the first three minutes, or right after a recap
+(within 15 s of its end), is still offered from 0:00, cold open included. A
+later one is offered from 8 seconds before it begins. After ten seconds on
+screen the button shrinks to a small mark (same control, same key, same ring)
+and grows back on a mouse move, key press or touch. Skip.ts holds the rule
+(`introOfferedFrom`), SkipButton.tsx the shrink.
+
+The intro scan also asks the disk, not only the stored scan, whether a file is
+still being written (size changed, modified in the last five minutes, or on
+Windows a writer holds it open); such a season waits for the next scan.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

@@ -3669,6 +3669,21 @@ button.cast-member {
   outline: none;
 }
 
+/* The shrunk button: a small mark in the same corner, still the same control.
+   The words are only hidden, so the label stays readable to a screen reader. */
+.skip-button.compact {
+  padding: 0.5rem 0.875rem;
+  font-size: 0;
+  letter-spacing: 0;
+  animation: none;
+}
+
+.skip-button.compact::before {
+  content: '»';
+  font-size: 1.125rem;
+  line-height: 1;
+}
+
 @keyframes skip-fade-in {
   from {
     opacity: 0;

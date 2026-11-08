@@ -196,10 +196,10 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
       dismiss,
     });
 
-  // There is deliberately no timer taking the Skip intro button away. It used
-  // to leave after ten seconds, which on an intro offered from 0:00 would
-  // remove it before the intro had even begun; it now stays until the intro is
-  // over, and the seek that skipping performs is what removes it.
+  // The Skip button is never taken away by a timer (it would leave an intro
+  // offered from 0:00 before the intro began). After ten seconds it shrinks to a
+  // small mark instead and grows back on any input (SkipButton.tsx); a seek
+  // past the segment is what removes it.
 
   // Previous/next: the episodes either side, or for a video outside the
   // library the files beside it in its folder (LOCAL-MEDIA.md phase 1).

@@ -375,7 +375,8 @@ const files: FixtureFile[] = [
     season: 1,
     episode: 5,
     duration: 1500,
-    markers: null,
+    // A late intro (community timing): offered only from just before it.
+    markers: marked({ ...intro(652, 666, 'introdb-app') }),
   },
   {
     id: 201,

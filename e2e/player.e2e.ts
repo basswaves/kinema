@@ -514,6 +514,40 @@ test('the film: the scene after the credits is offered, and the end goes back to
   await expect.poll(() => focused(page)).toBeTruthy();
 });
 
+test('a late intro: no button at the start, one just before it, small after ten seconds, full on input', async ({ page }) => {
+  await play(page, 'series');
+  // On to the last episode, whose intro is community-timed at 10:52-11:06.
+  for (const n of ['S01E02', 'S01E03', 'S01E04', 'S01E05']) {
+    await press(page, 'n');
+    await expect.poll(async () => (await mpv(page)).path).toContain(n);
+  }
+  const button = page.locator('.skip-button');
+  await pause(page, 1500, 'time on purpose: a button that is not due must not appear late');
+  await expect(button).toHaveCount(0);
+
+  // Eight seconds before the intro: the button, full size.
+  await playheadTo(page, 645);
+  await expect(button).toHaveText('Skip intro');
+  await expect(button).not.toHaveClass(/compact/);
+
+  // Ten seconds on, a small mark; a key press makes it full again, a mouse
+  // move does too.
+  await expect(button).toHaveClass(/compact/, { timeout: 15_000 });
+  await press(page, 'Shift');
+  await expect(button).not.toHaveClass(/compact/);
+  await playheadTo(page, 645); // the fake film runs on; keep it inside the offer
+  await expect(button).toHaveClass(/compact/, { timeout: 15_000 });
+  await page.mouse.move(40, 40);
+  await expect(button).not.toHaveClass(/compact/);
+  await playheadTo(page, 645);
+  await expect(button).toHaveClass(/compact/, { timeout: 15_000 });
+
+  // Small, it still works with its key.
+  await press(page, 'Enter');
+  await expect.poll(async () => (await mpv(page)).position).toBeGreaterThanOrEqual(666);
+  await expect(button).toHaveCount(0);
+});
+
 test('a recap and then an intro: two prompts, one after the other', async ({ page }) => {
   await play(page, 'saga');
   await expect.poll(async () => (await mpv(page)).path).toContain('Example.Saga.S01E01');

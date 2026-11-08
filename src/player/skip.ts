@@ -41,10 +41,11 @@ export interface ActiveSkip {
    */
   key: string;
   /**
-   * Whether the position is inside the segment itself. For an intro the skip
-   * is offered from 0:00, before the intro starts — through a cold open — and
-   * this is false there. Automatic mode acts only when it is true, so it never
-   * skips a cold open on its own; a person pressing the button may.
+   * Whether the position is inside the segment itself. For an early intro the
+   * skip is offered from 0:00, before the intro starts — through a cold open —
+   * and this is false there; so it is in the few seconds before a late one.
+   * Automatic mode acts only when it is true, so it never skips a cold open on
+   * its own; a person pressing the button may.
    */
   inSegment: boolean;
   /**
@@ -61,6 +62,29 @@ export interface ActiveSkip {
  * as watching it, and the prompt would appear just as it becomes pointless.
  */
 const MIN_WORTH_SKIPPING_SECS = 3;
+
+/** An intro starting within this many seconds is "early": offered from 0:00. */
+export const EARLY_INTRO_SECS = 180;
+
+/** A late intro is offered this many seconds before it begins. */
+export const INTRO_LEAD_SECS = 8;
+
+/**
+ * An intro that follows a recap closely is early however far into the file the
+ * recap put it: the recap's own offer ends where this one picks up.
+ */
+const AFTER_RECAP_SECS = 15;
+
+/** From which position an intro is offered: 0 when early, else just before it. */
+export function introOfferedFrom(intro: Segment, recap: Segment | null): number {
+  const early =
+    intro.start <= EARLY_INTRO_SECS ||
+    (recap !== null &&
+      recap.end !== null &&
+      intro.start >= recap.end - 1 &&
+      intro.start - recap.end <= AFTER_RECAP_SECS);
+  return early ? 0 : Math.max(0, intro.start - INTRO_LEAD_SECS);
+}
 
 /** Which segment, if any, the current position falls inside. */
 export function activeSkip(
@@ -90,23 +114,31 @@ export function activeSkip(
     };
   }
 
-  // Offered from the very start of the file, not from where the intro begins.
-  // That is the decided behaviour: an episode with a known intro shows Skip
-  // from 0:00, and pressing it during a cold open goes to the end of the intro
-  // — the cold open included, knowingly. Waiting for the intro to begin made
-  // the button look missing on exactly the episodes that open on a scene.
+  // An intro that starts early is offered from the very start of the file, not
+  // from where it begins. That is the decided behaviour for those: pressing it
+  // during a cold open goes to the end of the intro — the cold open included,
+  // knowingly — and waiting for the intro to begin made the button look missing
+  // on exactly the episodes that open on a scene.
+  //
+  // A *late* intro (a community timing of 10:52, say) is another case: from 0:00
+  // the button would sit on screen for eleven minutes, and skipping from it
+  // would throw away the whole first act. Those are offered only from a few
+  // seconds before the intro (changed 2026-11-08, see HISTORY).
   //
   // An intro with no end has nowhere to seek to, so there is no skip to offer.
   // Every source drops one, but the type allows it because credits genuinely
   // have no end, and a check costs less than two segment types would.
   if (intro && intro.end !== null && timePos < intro.end - MIN_WORTH_SKIPPING_SECS) {
-    return {
-      kind: 'intro',
-      seekTo: intro.end,
-      key: `intro:${intro.start}`,
-      inSegment: timePos >= intro.start,
-      toScene: false,
-    };
+    const offeredFrom = introOfferedFrom(intro, recap);
+    if (timePos >= offeredFrom) {
+      return {
+        kind: 'intro',
+        seekTo: intro.end,
+        key: `intro:${intro.start}`,
+        inSegment: timePos >= intro.start,
+        toScene: false,
+      };
+    }
   }
 
   // Credits run to the end of the file, so only the start matters — there is

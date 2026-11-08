@@ -108,14 +108,14 @@ pub struct LibraryStats {
 /// Deliberately not what gets stored. The path the user picked is the path they
 /// see in Settings, and lower-casing a display string to win an argument with
 /// SQLite is the wrong trade.
-fn comparable(path: &str) -> String {
+pub(crate) fn comparable(path: &str) -> String {
     path.replace('\\', "/")
         .trim_end_matches('/')
         .to_lowercase()
 }
 
 /// Whether `inner` is `outer` or sits beneath it.
-fn is_within(inner: &str, outer: &str) -> bool {
+pub(crate) fn is_within(inner: &str, outer: &str) -> bool {
     inner == outer || inner.starts_with(&format!("{outer}/"))
 }
 
@@ -283,6 +283,51 @@ fn merge_roots(conn: &mut rusqlite::Connection, path: &str, kind: &str, name: Op
     }
     tx.commit().map_err(to_string_err)?;
     Ok(new_id)
+}
+
+/// "58 of 60 files found there": how many of a library folder's files are at
+/// the same place under `path` (`following::move_root`).
+#[derive(Serialize)]
+pub struct MoveCheck {
+    pub found: usize,
+    pub total: usize,
+}
+
+/// Async, and the looking off the main thread: a sleeping share can take
+/// minutes to answer, and this asks once per file.
+#[tauri::command]
+pub async fn check_library_root_move(
+    db: tauri::State<'_, Db>,
+    id: i64,
+    path: String,
+) -> Result<MoveCheck, String> {
+    let paths = {
+        let conn = db.0.lock().map_err(to_string_err)?;
+        crate::following::moved_paths(&conn, id, &path).map_err(to_string_err)?
+    };
+    crate::jobs::off_main(move || {
+        let found = paths
+            .iter()
+            .filter(|p| crate::files::metadata(std::path::Path::new(p)).is_ok())
+            .count();
+        Ok(MoveCheck { found, total: paths.len() })
+    })
+    .await
+}
+
+/// "It moved…": the library folder `id` is now at `path`, with all its rows.
+#[tauri::command]
+pub async fn move_library_root(
+    db: tauri::State<'_, Db>,
+    id: i64,
+    path: String,
+) -> Result<crate::following::Moved, String> {
+    let probe = path.clone();
+    if !crate::jobs::off_main(move || Ok(crate::files::is_dir(std::path::Path::new(&probe)))).await? {
+        return Err(format!("not a directory: {path}"));
+    }
+    let mut conn = db.0.lock().map_err(to_string_err)?;
+    crate::following::move_root(&mut conn, id, &path)
 }
 
 #[tauri::command]

@@ -445,6 +445,8 @@ pub fn run() {
             library::add_library_root,
             library::library_roots_inside,
             library::merge_library_roots,
+            library::check_library_root_move,
+            library::move_library_root,
             library::remove_library_root,
             library::list_library_roots,
             library::scan_library,

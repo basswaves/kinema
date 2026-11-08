@@ -4412,6 +4412,33 @@ resume point stayed behind on a missing row nobody looks at.
   under Last scan; followed files are counted out of "added", "missing" and
   "videos gone", so a renamed folder no longer reads as gone.
 
+## "It moved…": a library folder under another letter (2026-11-08)
+
+Finding 5 of the same review. A drive back under another letter, or a disk
+mounted under a new name, left the folder unreachable for good — never marked
+missing, so its rows stayed live and a page could offer the dead copy — and
+adding the new place gave every file a second, empty row.
+
+- **Settings → Library**: a folder the last scan could not reach says "Not found"
+  and gets `It moved…`. The new place is picked, Kinema says how many of its files
+  are there ("58 of 60 files found there", counted off the main thread: a
+  sleeping share can take minutes), and `Move` rewrites the folder's and every
+  row's path in one transaction (`following::move_root`), by the path below the
+  folder, so a share's `/` and a Windows `\` can stand for each other. A scan
+  follows straight away.
+- **Adding a folder where a missing one's files are asks first**: "This looks
+  like E:\TV, moved here … Move it, or add as new?" That closes the trap of
+  adding the new path and keeping the old.
+- **Already added there anyway**: moving onto that folder takes it in, and where
+  both have a row for a file the older row wins (it holds the history); the
+  newer copy goes. A place inside or around another library folder, or a folder
+  of another kind, is refused as adding it would be.
+- "Not found" comes from the last scan's own words (`root unavailable`), so the
+  Settings page asks the disk nothing to draw it.
+- Not built yet: the same question when a folder is added from Library →
+  Folders' "Add this folder to the library" (the first run has no folders to
+  miss). There, adding still makes the second copy; `It moved…` then takes it in.
+
 ## Skip intro: from 0:00 only for an early intro (2026-11-08)
 
 The button used to show from 0:00 for every intro, so that an episode opening

@@ -15,7 +15,7 @@
  * to be needed when no mouse is present.
  */
 import { userError } from './errors';
-import { scanTrouble } from './scanTrouble';
+import { scanTrouble, unreachableFolders } from './scanTrouble';
 import { scanStageWords, scanWords } from '../library/scanWords';
 import LanguageSection from './LanguageSection';
 import ChoiceRow, { LandLeftmost } from './ChoiceRow';
@@ -50,6 +50,7 @@ import {
 } from './SubtitlesSettings';
 import ConfirmButton from './ConfirmButton';
 import MergeOffer, { type MergeOfferState } from './MergeOffer';
+import MovedOffer, { type MovedOfferState } from './MovedOffer';
 import EquipmentSection from './EquipmentSection';
 import WhatLeavesSection from './WhatLeavesSection';
 import { makeReport as packReport, openReportForm, REPORT_WORDS, reportSaved, showReport } from './report';
@@ -74,7 +75,9 @@ import {
   detectIntros,
   stopDetection,
   ffmpegStatus,
+  checkLibraryRootMove,
   listLibraryRoots,
+  moveLibraryRoot,
   removeLibraryRoot,
   DEFAULT_SKIPTRO_EXPORT_ARGS,
   DEFAULT_SKIPTRO_SCAN_ARGS,
@@ -155,6 +158,31 @@ function movedLine(moved: { films: number; shows: number } | undefined): string 
     .filter(Boolean)
     .join(' and ');
   return `${what} got pictures from TMDB`;
+}
+
+/** A library folder's Remove, asked twice. */
+function RemoveRoot({
+  root,
+  onRemoved,
+  onError,
+}: {
+  root: LibraryRoot;
+  onRemoved: () => Promise<void> | void;
+  onError: (message: string) => void;
+}) {
+  return (
+    <ConfirmButton
+      className="settings-remove"
+      confirmLabel="Remove it"
+      onConfirm={() =>
+        void removeLibraryRoot(root.id)
+          .then(onRemoved)
+          .catch((e) => onError(userError(e)))
+      }
+    >
+      Remove
+    </ConfirmButton>
+  );
 }
 
 function summaryLine(s: ScanSummary): string {
@@ -695,14 +723,12 @@ export default function Settings({
   const [mergeOffer, setMergeOffer] = useState<MergeOfferState | null>(null);
   /** A Videos folder picked and waiting for its name (videos.rs). */
   const [videosFolder, setVideosFolder] = useState<{ path: string; name: string } | null>(null);
-  const pickFolder = useCallback(
-    async (kind: LibraryKind) => {
+  /** A folder not found, told where it went, or a picked one that looks like it. */
+  const [movedOffer, setMovedOffer] = useState<MovedOfferState | null>(null);
+  const addPicked = useCallback(
+    async (kind: LibraryKind, selected: string) => {
       setError(null);
       try {
-        const selected = await chooseFolder(
-          kind === 'tv' ? 'TV' : kind === 'videos' ? 'videos' : 'movies'
-        );
-        if (!selected) return;
         if (kind === 'videos') {
           // Named before it is added: a folder called "Camera" says little on
           // a tile. Its own name to start with.
@@ -723,6 +749,47 @@ export default function Settings({
     },
     [refresh]
   );
+
+  const pickFolder = useCallback(
+    async (kind: LibraryKind) => {
+      setError(null);
+      try {
+        const selected = await chooseFolder(
+          kind === 'tv' ? 'TV' : kind === 'videos' ? 'videos' : 'movies'
+        );
+        if (!selected) return;
+        // Where a folder that is not found has its files, ask before adding
+        // a second copy of each (following.rs, "It moved").
+        const away = unreachableFolders(getLastScanSummary()?.errors ?? []);
+        for (const root of roots.filter((r) => r.kind === kind && away.includes(r.path))) {
+          const check = await checkLibraryRootMove(root.id, selected);
+          if (check.found > 0) {
+            setMovedOffer({ root, path: selected, ...check, adding: true });
+            return;
+          }
+        }
+        await addPicked(kind, selected);
+      } catch (e) {
+        setError(userError(e));
+      }
+    },
+    [roots, addPicked]
+  );
+
+  /** "It moved…" on a folder not found: where is it now? */
+  const itMoved = useCallback(async (root: LibraryRoot) => {
+    setError(null);
+    try {
+      const selected = await chooseFolder(
+        root.kind === 'tv' ? 'TV' : root.kind === 'videos' ? 'videos' : 'movies'
+      );
+      if (!selected) return;
+      const check = await checkLibraryRootMove(root.id, selected);
+      setMovedOffer({ root, path: selected, ...check });
+    } catch (e) {
+      setError(userError(e));
+    }
+  }, []);
 
   const addVideosFolder = useCallback(
     async (folder: { path: string; name: string }) => {
@@ -759,6 +826,26 @@ export default function Settings({
     [refresh]
   );
 
+  const moveRoot = useCallback(
+    async (offer: MovedOfferState) => {
+      setMovedOffer(null);
+      setError(null);
+      try {
+        const moved = await moveLibraryRoot(offer.root.id, offer.path);
+        await refresh();
+        // A scan straight away: it sees what is really there now, and the
+        // folder stops being "not found".
+        await scanNow();
+        setNote(
+          `Moved to ${offer.path}: ${count(moved.files, 'file')}, with what you watched and decided.`
+        );
+      } catch (e) {
+        setError(userError(e));
+      }
+    },
+    [refresh, scanNow]
+  );
+
   const exportNfo = useCallback(async (overwrite: boolean) => {
     setError(null);
     setNote(null);
@@ -780,6 +867,7 @@ export default function Settings({
   }, []);
 
   const last = getLastScanSummary();
+  const away = unreachableFolders(last?.errors ?? []);
   const tvRoots = roots.filter((r) => r.kind === 'tv');
 
   return (
@@ -837,18 +925,22 @@ export default function Settings({
                             {root.path}
                           </span>
                           <span className="muted">{count(root.file_count, 'file')}</span>
-                          <ConfirmButton
-                           
-                            className="settings-remove"
-                            confirmLabel="Remove it"
-                            onConfirm={() =>
-                              void removeLibraryRoot(root.id)
-                                .then(refresh)
-                                .catch((e) => setError(userError(e)))
-                            }
-                          >
-                            Remove
-                          </ConfirmButton>
+                          {away.includes(root.path) ? (
+                            // Two buttons in one row: a group, so a remote
+                            // moves between them (GOTCHAS, "Two focusables").
+                            <FocusGroup kind="row" className="root-moved">
+                              <span className="root-missing">Not found</span>
+                              <FocusButton
+                                className="btn-secondary"
+                                onSelect={() => void itMoved(root)}
+                              >
+                                It moved…
+                              </FocusButton>
+                              <RemoveRoot root={root} onRemoved={refresh} onError={setError} />
+                            </FocusGroup>
+                          ) : (
+                            <RemoveRoot root={root} onRemoved={refresh} onError={setError} />
+                          )}
                         </li>
                       ))}
                     </ul>
@@ -860,6 +952,18 @@ export default function Settings({
                       onChange={(name) => setVideosFolder({ ...videosFolder, name })}
                       onAdd={() => void addVideosFolder(videosFolder)}
                       onCancel={() => setVideosFolder(null)}
+                    />
+                  )}
+
+                  {movedOffer && (
+                    <MovedOffer
+                      offer={movedOffer}
+                      onMove={() => void moveRoot(movedOffer)}
+                      onAddAsNew={() => {
+                        setMovedOffer(null);
+                        void addPicked(movedOffer.root.kind, movedOffer.path);
+                      }}
+                      onCancel={() => setMovedOffer(null)}
                     />
                   )}
 

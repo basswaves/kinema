@@ -89,6 +89,19 @@ export async function rootsToMerge(path: string, kind: LibraryKind): Promise<Lib
   return inside.length > 0 && inside.every((root) => root.kind === kind) ? inside : [];
 }
 
+/** How many of a library folder's files are at the same place under `path` (following.rs). */
+export interface MoveCheck {
+  found: number;
+  total: number;
+}
+
+export const checkLibraryRootMove = (id: number, path: string) =>
+  invoke<MoveCheck>('check_library_root_move', { id, path });
+
+/** "It moved…": the folder `id` is now at `path`, with every file and what was decided about it. */
+export const moveLibraryRoot = (id: number, path: string) =>
+  invoke<{ files: number; replaced: number }>('move_library_root', { id, path });
+
 export const removeLibraryRoot = (id: number) => invoke<void>('remove_library_root', { id });
 
 export const listLibraryRoots = () => invoke<LibraryRoot[]>('list_library_roots');

@@ -1448,10 +1448,18 @@ const worthItems = () =>
         })
       )
     : [];
+/**
+ * `kinemaMockAway=1`: a second TV folder, on a drive now under another letter,
+ * that the scan could not reach ("It moved…", following.rs). Its 60 files are
+ * at the picked folder but 2.
+ */
+const AWAY = flag('kinemaMockAway') === '1';
+const awayRoot = { id: 30, path: 'E:\\TV', kind: 'tv', name: null as string | null, file_count: 60 };
 /** `kinemaMockScanErrors`: the scan's problems, as the scanner words them. */
 const SCAN_ERRORS: string[] = (() => {
   try {
-    return JSON.parse(flag('kinemaMockScanErrors') ?? '[]') as string[];
+    const given = JSON.parse(flag('kinemaMockScanErrors') ?? '[]') as string[];
+    return AWAY ? [...given, `root unavailable, skipped: ${awayRoot.path}`] : given;
   } catch {
     return [];
   }
@@ -1644,6 +1652,7 @@ const handlers: Record<string, Handler> = {
           ...(flag('kinemaMockNoVideos') === '1' || EMPTY
             ? []
             : [{ ...VIDEOS_ROOT, file_count: mockVideos.length }]),
+          ...(AWAY ? [awayRoot] : []),
           ...addedRoots,
         ]
       : [],
@@ -1808,6 +1817,15 @@ const handlers: Record<string, Handler> = {
     emptyLibrary.hasRoot = true;
     emptyLibrary.path = String(a.path ?? emptyLibrary.path);
     return 13;
+  },
+  check_library_root_move: (a) =>
+    AWAY && num(a, 'id') === awayRoot.id ? { found: 58, total: 60 } : { found: 0, total: 0 },
+  move_library_root: (a) => {
+    if (AWAY && num(a, 'id') === awayRoot.id) {
+      awayRoot.path = String(a.path);
+      SCAN_ERRORS.splice(0, SCAN_ERRORS.length, ...SCAN_ERRORS.filter((e) => !e.startsWith('root unavailable')));
+    }
+    return { files: 60, replaced: 0 };
   },
   // In an empty library's first run, removing its one folder empties it again
   // (the Welcome page's Remove); elsewhere an added folder goes.

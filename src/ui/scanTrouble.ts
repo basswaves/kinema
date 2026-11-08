@@ -68,6 +68,11 @@ export interface ScanTrouble {
  * with a TMDB key added since — it went on saying films were waiting, on
  * Home, until the next start (owner, 2026-10-09).
  */
+/** The library folders a scan could not reach: Settings offers "It moved…" on them. */
+export function unreachableFolders(errors: string[]): string[] {
+  return errors.flatMap((e) => UNREACHABLE.exec(e)?.[1] ?? []);
+}
+
 export function scanTrouble(errors: string[], waiting = true): ScanTrouble | null {
   const folders = errors.flatMap((e) => UNREACHABLE.exec(e)?.[1] ?? []);
   const lineFor = (pattern: RegExp, line: (first: string, second: string) => string) =>

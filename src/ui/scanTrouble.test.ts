@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { scanTrouble } from './scanTrouble';
+import { scanTrouble, unreachableFolders } from './scanTrouble';
 
 const away = (path: string) => `root unavailable, skipped: ${path}`;
 const tmdb = 'A film: TMDB /search/movie failed: HTTP 401, the key was not accepted';
@@ -94,5 +94,13 @@ describe('scanTrouble', () => {
       text: `${tmdb} · and 1 more`,
       note: null,
     });
+  });
+});
+
+describe('unreachableFolders', () => {
+  it('names only the library folders the scan could not reach', () => {
+    expect(
+      unreachableFolders(['root unavailable, skipped: E:/TV', 'videos gone: 3 :: E:/Films/Old', 'TMDB said no'])
+    ).toEqual(['E:/TV']);
   });
 });

@@ -230,6 +230,150 @@ fn carry_dir(conn: &Connection, old_dir: &str, new_dir: &str) -> rusqlite::Resul
     Ok(())
 }
 
+// ---- "It moved": a library folder under another letter or mount (finding 5) ----
+//
+// A drive that comes back under another letter, or a disk mounted under a new
+// name, left the old folder unreachable — never marked missing, so its rows
+// stayed live and the page could offer the dead copy — and adding the new
+// place made every file a second, empty row. Now the folder itself is told
+// where it went, and every row under it takes the new path: the same rows,
+// nothing lost, no dead copies.
+
+/// Where `path`, under the library folder `old_root`, is under `new_root`. By
+/// the path below the folder, so a share (`/`) and a Windows folder (`\`) can
+/// stand for each other. `None` for a path not under `old_root`.
+pub(crate) fn relocated(old_root: &str, new_root: &str, path: &str) -> Option<String> {
+    let rest = path.strip_prefix(old_root)?;
+    let boundary = old_root.ends_with(['/', '\\'])
+        || rest.is_empty()
+        || rest.starts_with('/')
+        || (!old_root.starts_with('/') && rest.starts_with('\\'));
+    if !boundary {
+        return None;
+    }
+    // A Linux name may hold a backslash; only a Windows path splits on one.
+    let parts: Vec<&str> = if old_root.starts_with('/') || crate::netshare::is_share_path(old_root) {
+        rest.split('/').filter(|p| !p.is_empty()).collect()
+    } else {
+        rest.split(['/', '\\']).filter(|p| !p.is_empty()).collect()
+    };
+    if parts.is_empty() {
+        return Some(new_root.to_string());
+    }
+    if crate::netshare::is_share_path(new_root) {
+        return Some(format!("{}/{}", new_root.trim_end_matches('/'), parts.join("/")));
+    }
+    let mut joined = std::path::PathBuf::from(new_root);
+    joined.extend(parts);
+    Some(joined.to_string_lossy().into_owned())
+}
+
+/// Every file of a library folder, where it would be under `new_root`: what
+/// "58 of 60 files found there" counts.
+pub fn moved_paths(conn: &Connection, root_id: i64, new_root: &str) -> rusqlite::Result<Vec<String>> {
+    let old_root: String =
+        conn.query_row("SELECT path FROM library_roots WHERE id = ?1", [root_id], |r| r.get(0))?;
+    let mut stmt = conn.prepare("SELECT path FROM media_files WHERE root_id = ?1")?;
+    let paths = stmt.query_map([root_id], |r| r.get::<_, String>(0))?;
+    let mut out = Vec::new();
+    for path in paths {
+        if let Some(p) = relocated(&old_root, new_root, &path?) {
+            out.push(p);
+        }
+    }
+    Ok(out)
+}
+
+/// What moving a library folder did.
+#[derive(Debug, serde::Serialize, PartialEq)]
+pub struct Moved {
+    /// Rows that took the new path.
+    pub files: usize,
+    /// Rows already at the new place (the folder was added there as well):
+    /// the older row wins and these go.
+    pub replaced: usize,
+}
+
+/// The library folder `root_id` is now at `new_root`. One transaction, as
+/// `merge_roots`. A library folder already added at `new_root` (the person
+/// added the new place before finding this) is taken in: where both have a
+/// row for a file the older one stays. A place inside or around another
+/// library folder is refused, as adding it would be.
+pub fn move_root(conn: &mut Connection, root_id: i64, new_root: &str) -> Result<Moved, String> {
+    use crate::util::to_string_err;
+    let (old_root, kind): (String, String) = conn
+        .query_row("SELECT path, kind FROM library_roots WHERE id = ?1", [root_id], |r| {
+            Ok((r.get(0)?, r.get(1)?))
+        })
+        .map_err(to_string_err)?;
+    let others: Vec<(i64, String, String)> = {
+        let mut stmt =
+            conn.prepare("SELECT id, path, kind FROM library_roots WHERE id <> ?1").map_err(to_string_err)?;
+        let rows = stmt.query_map([root_id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).map_err(to_string_err)?;
+        rows.collect::<rusqlite::Result<_>>().map_err(to_string_err)?
+    };
+    let wanted = crate::library::comparable(new_root);
+    let mut absorb: Option<(i64, String)> = None;
+    for (id, path, other_kind) in others {
+        let known = crate::library::comparable(&path);
+        if known == wanted {
+            if other_kind != kind {
+                return Err(format!("That folder is already a library folder of another kind:\n{path}"));
+            }
+            absorb = Some((id, path));
+        } else if crate::library::is_within(&wanted, &known) || crate::library::is_within(&known, &wanted) {
+            return Err(format!(
+                "That folder overlaps a library folder you have already added:\n{path}"
+            ));
+        }
+    }
+    // Spelled as the folder already added is, so its rows' paths compare.
+    let target = absorb.as_ref().map_or(new_root.to_string(), |(_, p)| p.clone());
+
+    let tx = conn.transaction().map_err(to_string_err)?;
+    let mut moved = Moved { files: 0, replaced: 0 };
+    {
+        let rows: Vec<(i64, String, String)> = {
+            let mut stmt = tx
+                .prepare("SELECT id, path, parent_dir FROM media_files WHERE root_id = ?1 ORDER BY id")
+                .map_err(to_string_err)?;
+            let rows = stmt.query_map([root_id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).map_err(to_string_err)?;
+            rows.collect::<rusqlite::Result<_>>().map_err(to_string_err)?
+        };
+        let mut dirs: Vec<(String, String)> = Vec::new();
+        for (id, path, dir) in rows {
+            let Some(new_path) = relocated(&old_root, &target, &path) else { continue };
+            let new_dir = relocated(&old_root, &target, &dir).unwrap_or_else(|| target.clone());
+            moved.replaced += tx
+                .execute("DELETE FROM media_files WHERE path = ?1 AND id <> ?2", params![new_path, id])
+                .map_err(to_string_err)?;
+            tx.execute(
+                "UPDATE media_files SET path = ?2, parent_dir = ?3 WHERE id = ?1",
+                params![id, new_path, new_dir],
+            )
+            .map_err(to_string_err)?;
+            carry_file(&tx, id, &path, &new_path).map_err(to_string_err)?;
+            if !dirs.iter().any(|(d, _)| *d == dir) {
+                dirs.push((dir, new_dir));
+            }
+            moved.files += 1;
+        }
+        for (old_dir, new_dir) in dirs {
+            carry_dir(&tx, &old_dir, &new_dir).map_err(to_string_err)?;
+        }
+        if let Some((other, _)) = &absorb {
+            tx.execute("UPDATE media_files SET root_id = ?1 WHERE root_id = ?2", params![root_id, other])
+                .map_err(to_string_err)?;
+            tx.execute("DELETE FROM library_roots WHERE id = ?1", [other]).map_err(to_string_err)?;
+        }
+        tx.execute("UPDATE library_roots SET path = ?2 WHERE id = ?1", params![root_id, target])
+            .map_err(to_string_err)?;
+    }
+    tx.commit().map_err(to_string_err)?;
+    crate::log!("library: folder moved, {} files, {} copies replaced", moved.files, moved.replaced);
+    Ok(moved)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -573,5 +717,117 @@ mod tests {
         assert_eq!((report.files_followed, report.files_missing, report.files_added), (3, 3, 0));
         let gone = Path::new(&lib.path("Other/Gone")).display().to_string();
         assert_eq!(report.errors, vec![format!("videos gone: 3 :: {gone}")]);
+    }
+
+    // ---- It moved ----
+
+    #[test]
+    fn a_path_below_one_folder_is_the_same_below_another() {
+        assert_eq!(
+            relocated(r"E:\TV", r"F:\Shows", r"E:\TV\Show\Season 1\a.mkv"),
+            Some(std::path::PathBuf::from(r"F:\Shows").join("Show").join("Season 1").join("a.mkv").to_string_lossy().into_owned())
+        );
+        assert_eq!(relocated(r"E:\TV", r"F:\Shows", r"E:\TV"), Some(r"F:\Shows".into()));
+        assert_eq!(relocated(r"E:\TV", "F:", r"E:\TV2\a.mkv"), None, "TV2 is not under TV");
+        assert_eq!(relocated("/media/old", "/media/new", "/media/old/A/b.mkv").map(|p| p.replace('\\', "/")), Some("/media/new/A/b.mkv".into()));
+        assert_eq!(
+            relocated(r"E:\TV", "smb://nas/tv/", r"E:\TV\Show\a.mkv"),
+            Some("smb://nas/tv/Show/a.mkv".into())
+        );
+        assert_eq!(relocated("smb://nas/tv", "smb://nas2/tv", "smb://nas/tv/a.mkv"), Some("smb://nas2/tv/a.mkv".into()));
+        // A Linux name may hold a backslash.
+        if cfg!(unix) {
+            assert_eq!(relocated("/m/a", "/m/b", r"/m/a/x\y.mkv"), Some(r"/m/b/x\y.mkv".into()));
+        }
+    }
+
+    /// The setup for It moved: a library folder whose drive is now elsewhere
+    /// (the folder renamed stands for a new letter), so the scan cannot reach it.
+    fn moved_away(name: &str) -> (Lib, Vec<i64>) {
+        let mut lib = Lib::new(
+            name,
+            &[("Shows/Show/S01E01.mkv", 51), ("Shows/Show/S01E02.mkv", 52), ("Shows/Show/S01E03.mkv", 53)],
+        );
+        let ids: Vec<i64> = ["S01E01", "S01E02", "S01E03"].iter().map(|e| lib.id(&format!("Shows/Show/{e}.mkv"))).collect();
+        crate::lifecycle::matched(&mut lib.conn, &ids, 7, Some(1.0), Some("manual: “A Show” via tmdb")).unwrap();
+        played(&lib, ids[1], 77.0);
+        lib.conn
+            .execute(
+                "INSERT INTO playlists (id, name, created_at, updated_at) VALUES (1, 'P', 0, 0)",
+                [],
+            )
+            .unwrap();
+        lib.conn
+            .execute(
+                "INSERT INTO playlist_items (playlist_id, position, file_id, path) VALUES (1, 0, ?1, ?2)",
+                params![ids[0], lib.path("Shows/Show/S01E01.mkv")],
+            )
+            .unwrap();
+        std::fs::rename(lib.dir.join("Shows"), lib.dir.join("Moved")).unwrap();
+        let report = scan_all(&mut lib.conn).unwrap();
+        assert!(report.errors.iter().any(|e| e.starts_with("root unavailable")), "{:?}", report.errors);
+        (lib, ids)
+    }
+
+    fn after_move(lib: &mut Lib, ids: &[i64]) {
+        let report = scan_all(&mut lib.conn).unwrap();
+        assert_eq!((report.files_added, report.files_missing, report.files_followed), (0, 0, 0));
+        assert!(report.errors.is_empty(), "{:?}", report.errors);
+        assert_eq!(lib.rows(), 3);
+        for (i, e) in ["S01E01", "S01E02", "S01E03"].iter().enumerate() {
+            assert_eq!(lib.id(&format!("Moved/Show/{e}.mkv")), ids[i]);
+            assert_eq!(state(lib, ids[i]).1, Some(7));
+        }
+        assert_eq!(resume(lib, ids[1]), 77.0);
+        let item: String = lib.conn.query_row("SELECT path FROM playlist_items", [], |r| r.get(0)).unwrap();
+        assert_eq!(item, lib.path("Moved/Show/S01E01.mkv"));
+        let roots: Vec<String> = {
+            let mut stmt = lib.conn.prepare("SELECT path FROM library_roots ORDER BY id").unwrap();
+            stmt.query_map([], |r| r.get(0)).unwrap().map(Result::unwrap).collect()
+        };
+        assert_eq!(roots, vec![lib.path("Moved"), lib.path("Other")]);
+    }
+
+    #[test]
+    fn it_moved_takes_every_row_to_the_new_place() {
+        let (mut lib, ids) = moved_away("moved");
+        let new_root = lib.path("Moved");
+        let paths = moved_paths(&lib.conn, 1, &new_root).unwrap();
+        let found = paths.iter().filter(|p| Path::new(p).exists()).count();
+        assert_eq!((found, paths.len()), (3, 3), "3 of 3 files found there");
+
+        let moved = move_root(&mut lib.conn, 1, &new_root).unwrap();
+        assert_eq!(moved, Moved { files: 3, replaced: 0 });
+        after_move(&mut lib, &ids);
+    }
+
+    /// The trap the review found: the new place added as a folder of its own
+    /// and scanned, so each episode had two rows and the page offered the dead
+    /// one. Moving the old folder there keeps the old rows and drops the copies.
+    #[test]
+    fn it_moved_onto_a_folder_added_since_keeps_the_older_rows() {
+        let (mut lib, ids) = moved_away("trap");
+        lib.conn
+            .execute("INSERT INTO library_roots (id, path, kind, added_at) VALUES (3, ?1, 'tv', 0)", [lib.path("Moved")])
+            .unwrap();
+        let report = scan_all(&mut lib.conn).unwrap();
+        assert_eq!(report.files_added, 3, "today's behaviour: three new rows");
+        assert_eq!(lib.rows(), 6);
+
+        let there = lib.path("Moved");
+        let moved = move_root(&mut lib.conn, 1, &there).unwrap();
+        assert_eq!(moved, Moved { files: 3, replaced: 3 });
+        after_move(&mut lib, &ids);
+    }
+
+    #[test]
+    fn it_moved_never_overlaps_another_folder_or_kind() {
+        let (mut lib, _) = moved_away("overlap");
+        let inside = lib.path("Other");
+        let err = move_root(&mut lib.conn, 1, &format!("{inside}{}Sub", std::path::MAIN_SEPARATOR)).unwrap_err();
+        assert!(err.contains("overlaps"), "{err}");
+        let err = move_root(&mut lib.conn, 1, &inside).unwrap_err();
+        assert!(err.contains("another kind"), "{err}");
+        assert_eq!(lib.rows(), 3, "nothing changed");
     }
 }

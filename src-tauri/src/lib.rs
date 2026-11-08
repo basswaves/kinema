@@ -355,6 +355,29 @@ pub fn run() {
                 log!("opened: started for {}", path.display());
             }
             app.manage(opened::AtLaunch(Mutex::new(at_launch)));
+            // A dialog before this point spoils the page's start. On Linux it ran
+            // before the library was open, said "state not managed" and showed
+            // Welcome over a library that was there; on Android it stayed black.
+            // Both seen 2026-11-08 after "Put it back". Start it again now. Not
+            // on Windows, where the page waits for the dialog and starts well.
+            #[cfg(not(target_os = "windows"))]
+            if startup_dialog::any_shown() {
+                let app = app.handle().clone();
+                std::thread::spawn(move || {
+                    // Android makes its window after `setup`; wait for it.
+                    for _ in 0..50 {
+                        if let Some(window) = app.get_webview_window("main") {
+                            log!("window: a start-up dialog was shown; starting the page again");
+                            if let Err(e) = window.reload() {
+                                log!("window: could not start the page again: {e}");
+                            }
+                            return;
+                        }
+                        std::thread::sleep(std::time::Duration::from_millis(200));
+                    }
+                    log!("window: no window to start again after a start-up dialog");
+                });
+            }
             // An offer to Windows naming a folder Kinema has moved from.
             default_player::refresh();
 

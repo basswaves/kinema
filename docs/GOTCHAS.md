@@ -440,6 +440,17 @@ private `XDG_RUNTIME_DIR` beside `DISPLAY=:N`; with only `WAYLAND_DISPLAY` unset
 GTK still finds WSLg's socket and the window opens on the desktop of whoever is at
 the computer.
 
+### A dialog in `setup` spoils the page's start (Linux, Android)
+
+The GTK loop a Linux dialog turns also runs the webview: the page starts while the
+dialog waits, before `setup` has managed the library, and every call it makes fails
+("state not managed for field `db`"). After "Put it back" the window showed those raw
+errors over Welcome, as if the library were gone. On Android the page stayed black
+until Kinema was started again. Windows waits and starts well. Nothing in the tests
+showed it: the dialogs were checked, not the page behind them (seen on the Linux test
+PC and the emulator before 0.15.2). **Do:** `setup` reloads the page once a
+start-up dialog was shown (`startup_dialog::any_shown`), off Windows.
+
 ### Swapping a WAL database's file leaves its log behind
 
 `library.db` in WAL mode has `library.db-wal` and `library.db-shm` beside it. Put

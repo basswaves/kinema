@@ -16,6 +16,19 @@ pub enum Kind {
     Error,
 }
 
+/// Whether anything was said this start.
+static SHOWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Whether a dialog was shown during this start. On Linux the GTK loop a dialog
+/// turns also runs the page, which then starts before the library is open and
+/// shows the errors of every call it made (seen on the Linux test PC,
+/// 2026-11-08); on Android the page stayed black. `setup` starts the page again
+/// when this is true.
+#[cfg_attr(target_os = "windows", allow(dead_code))]
+pub fn any_shown() -> bool {
+    SHOWN.load(std::sync::atomic::Ordering::Relaxed)
+}
+
 /// Say something, and wait until it has been read.
 pub fn tell(app: &tauri::AppHandle, title: &str, message: &str, kind: Kind) {
     ask(app, title, message, kind, "OK", None);
@@ -31,6 +44,7 @@ pub fn ask(
     ok: &str,
     cancel: Option<&str>,
 ) -> bool {
+    SHOWN.store(true, std::sync::atomic::Ordering::Relaxed);
     #[cfg(target_os = "linux")]
     {
         let _ = app;

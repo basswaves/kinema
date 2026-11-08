@@ -16,7 +16,7 @@
  * and scrolls the same. The ring always has rows ahead of it, so the
  * engine's steps by index never meet the end of what is drawn.
  */
-import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { startTransition, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import Card from './Card';
 import { FocusProvider } from './FocusGroup';
 import { useNavGroup } from './focusGroups';
@@ -28,6 +28,8 @@ import type { Title } from './api';
 const WINDOW_FROM = 120;
 /** Rows drawn above and below what is on screen (and around the ring). */
 const OVERSCAN_ROWS = 3;
+/** The drawn rows move in steps of this many, so a slow scroll changes them seldom. */
+const STEP_ROWS = 4;
 /** Rows drawn before the first measurement of a row's height. */
 const FIRST_ROWS = 8;
 
@@ -107,7 +109,7 @@ export default function CardGrid({ name, entries, onSelect, fromAboveFirst = fal
       const at = key === null ? undefined : indexOf.get(key);
       return at === undefined ? -1 : Math.floor(at / across);
     };
-    const update = () => {
+    const update = (urgent = true) => {
       frame = 0;
       let from: number;
       let to: number;
@@ -129,16 +131,20 @@ export default function CardGrid({ name, entries, onSelect, fromAboveFirst = fal
           to = Math.max(to, ring + OVERSCAN_ROWS + 1);
         }
       }
-      from = Math.max(0, from);
-      to = Math.max(from + 1, Math.min(rowCount, to));
-      setRows((now) => (now[0] === from && now[1] === to ? now : [from, to]));
+      from = Math.max(0, Math.floor(from / STEP_ROWS) * STEP_ROWS);
+      to = Math.max(from + 1, Math.min(rowCount, Math.ceil(to / STEP_ROWS) * STEP_ROWS));
+      const set = () => setRows((now) => (now[0] === from && now[1] === to ? now : [from, to]));
+      // A scroll can wait for a quiet moment between frames (the rows ahead are
+      // already drawn); the ring cannot: its next press needs its rows now.
+      if (urgent) set();
+      else startTransition(set);
     };
     const schedule = () => {
-      if (!frame) frame = requestAnimationFrame(update);
+      if (!frame) frame = requestAnimationFrame(() => update(false));
     };
-    update();
+    update(true);
     page?.addEventListener('scroll', schedule, { passive: true });
-    const unwatch = navWatch(focusKey, update);
+    const unwatch = navWatch(focusKey, () => update(true));
     const resize = new ResizeObserver(schedule);
     if (page) resize.observe(page);
     return () => {

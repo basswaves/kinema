@@ -14,6 +14,13 @@ makes no stability promises.
   title at once, so a thousand films browse as lightly as a few hundred and
   hold far fewer pictures in memory. Nothing looks different.
 
+### Fixed
+
+- **Linux: arrow keys and the mouse wheel over a big page of posters are
+  quick again.** Moving the ring or the pointer to another poster made the
+  page redraw every poster on it; on a two-core PC with a thousand films a
+  key press took about a quarter of a second. Now only what changed is drawn.
+
 ## [0.15.2] — 2026-11-08
 
 ### Changed

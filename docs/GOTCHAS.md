@@ -1301,6 +1301,21 @@ result's note) cannot be skipped by arithmetic: those grids are drawn whole.
 Measured on a 2-core PC with 1000 films: 100 ms a frame by keys before, 40
 after (17-38 at 416 before); 6000 elements drawn before, 490 after.
 
+### The page that scrolls must be a stacking context, or WebKit repaints every card (round 8, part I2)
+
+`.browse` scrolls but had no z-index, so it was not a stacking context, and each
+card's picture box (`position: relative`, for its badges) belonged to the
+window's paint order. Whenever one card's level changed — the focused or
+hovered card's zoom sets `z-index: 1` — WebKit (Linux) repainted every one of
+them: about 3,800 paints and a 250 ms frame per key press at 1000 films on a
+2-core PC, growing with the library, and every wheel step over the grid too
+(the pointer hovers a new card). Chromium (Windows, Android) is not affected.
+No error; it looks like "a big page is slow". **Do:** `isolation: isolate` on a
+scrolling page (`.browse`): same picture, 47,000 paints for eight presses fell
+to 284. Find such a case by counting paints, not by timing: WebKit's own
+inspector (`WEBKIT_INSPECTOR_HTTP_SERVER`, its Timeline domain) reports one
+Paint per layer painted.
+
 ### A picture too big to shrink is not shown as itself (round 8, part I)
 
 `thumbs.rs` decodes at most 512 MB per picture. A poster beside a file of

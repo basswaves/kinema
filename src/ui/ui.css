@@ -96,9 +96,17 @@ html {
   outline: none;
 }
 
+/* `isolation`: the page that scrolls is a stacking context of its own. Without
+   it every card's picture (positioned, for its badges) belonged to the
+   window's paint order while scrolling inside this box, and WebKit (Linux)
+   repainted all of them whenever one card's level changed — the focused or
+   hovered card's zoom: about 250 ms a key press with a thousand films on a
+   2-core PC, and as many paints as cards (docs/GOTCHAS.md). Nothing outside
+   the page sits between its layers, so the order on screen is unchanged. */
 .browse {
   position: absolute;
   inset: 0;
+  isolation: isolate;
   overflow-y: auto;
   overflow-x: hidden;
   background: #0a0a0c;

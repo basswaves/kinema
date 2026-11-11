@@ -12,7 +12,8 @@ makes no stability promises.
 - **A big library keeps only what is on screen.** Movies, See all and the
   other full grids draw the rows you see and a few around them, not every
   title at once, so a thousand films browse as lightly as a few hundred and
-  hold far fewer pictures in memory. Nothing looks different.
+  hold far fewer pictures in memory. Nothing looks different, and a mouse
+  wheel or the scroll bar moves the page as far as before.
 
 ### Fixed
 

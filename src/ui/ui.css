@@ -2058,6 +2058,11 @@ button.cast-member {
   margin-top: 1.5rem;
 }
 
+/* A big grid's rows left out between two drawn parts (CardGrid.tsx). */
+.search-grid-gap {
+  grid-column: 1 / -1;
+}
+
 .empty-state {
   padding: 5.625rem var(--gutter);
   text-align: center;

@@ -1301,6 +1301,14 @@ result's note) cannot be skipped by arithmetic: those grids are drawn whole.
 Measured on a 2-core PC with 1000 films: 100 ms a frame by keys before, 40
 after (17-38 at 416 before); 6000 elements drawn before, 490 after.
 
+The card holding the ring must stay drawn even when the page has scrolled far
+from it (a wheel, the scroll bar): `CardGrid.tsx` keeps the ring's rows as a
+part of their own, with empty space between. Left out, the card went, the
+focus engine put the ring on another card and scrolled the page back to it — a
+wheel turned fast moved the page 622 px instead of 2500 (WebView2) and 59 px a
+notch instead of 149 (WebKit), with no error (round 8, part I2; e2e/big-grid
+"a wheel turned away from the ring").
+
 ### The page that scrolls must be a stacking context, or WebKit repaints every card (round 8, part I2)
 
 `.browse` scrolls but had no z-index, so it was not a stacking context, and each

@@ -138,3 +138,38 @@ test('a held key runs ahead of the drawing and the ring still lands on a drawn c
   await press(page, 'ArrowUp');
   expect(await focusKey(page)).not.toBe(here);
 });
+
+test('a wheel turned away from the ring keeps its distance and the ring', async ({ page }) => {
+  await open(page);
+  await press(page, 'ArrowDown', 3);
+  await settled(page);
+  const ring = await focusKey(page);
+  expect(ring).toMatch(/^grid:/);
+  const box = page.locator('.browse');
+  const start = await box.evaluate((b) => b.scrollTop);
+  await page.mouse.move(640, 400);
+  // Far past the rows around the ring: they are no longer the ones on screen.
+  for (let i = 0; i < 40; i++) await page.mouse.wheel(0, 150);
+  await expect.poll(() => box.evaluate((b) => b.scrollTop)).toBeGreaterThan(start + 5000);
+  // The rows there are drawn (the ring's rows left out, before the fix), and
+  // whatever the engine did about it has finished.
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        Array.from(document.querySelectorAll('.search-grid .card')).some((c) => {
+          const r = c.getBoundingClientRect();
+          return r.top > 0 && r.bottom < window.innerHeight;
+        })
+      )
+    )
+    .toBe(true);
+  await settled(page);
+  // Nothing scrolled the page back to the ring, and the ring stayed where it was.
+  expect(await box.evaluate((b) => b.scrollTop)).toBeGreaterThan(start + 5000);
+  expect(await focusKey(page)).toBe(ring);
+  expect(await drawnCards(page)).toBeLessThan(200);
+  // A key then goes on from the ring: the page comes back to it.
+  await press(page, 'ArrowDown');
+  await settled(page);
+  expect(await ringIsOnScreen(page)).toBe(true);
+});

@@ -5,22 +5,52 @@ Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [semantic
 versioning](https://semver.org/), with the usual caveat that a `0.x` release
 makes no stability promises.
 
-## [Unreleased]
+## [0.15.3] — 2026-11-12
+
+### Added
+
+- **Files and title** (#14). On a film's or show's page, choose which season
+  and numbers its files belong to, make one folder its own title, or unlink one
+  folder and decide later. Nothing on disk is renamed or moved.
 
 ### Changed
 
+- **Skip intro shows up when the intro does.** For an intro that starts early it
+  is there from the first second; for one that starts later (after a recap or a
+  long cold open) it appears about eight seconds before. After ten seconds it
+  shrinks to a small mark so it does not sit on the picture, and grows again on
+  any key, touch or mouse move.
+- **A renamed or moved file keeps what you decided.** Rename a file or a folder,
+  or move it between library folders, and the next scan finds it again with its
+  match, season and numbers, resume point and everything else you set by hand.
+  Two files of exactly the same size and date are still not guessed apart.
+- **A library folder that moved to another drive letter or share keeps its
+  rows.** In Settings, a folder that cannot be found has an `It moved…` button;
+  point it at the new place and it asks first.
 - **A big library keeps only what is on screen.** Movies, See all and the
   other full grids draw the rows you see and a few around them, not every
   title at once, so a thousand films browse as lightly as a few hundred and
   hold far fewer pictures in memory. Nothing looks different, and a mouse
   wheel or the scroll bar moves the page as far as before.
+- **Linux: the page is drawn by the graphics card**, and falls back by itself
+  if pictures stop showing.
 
 ### Fixed
 
+- **A full-screen window keeps its size when the screen changes mode.** After
+  Kinema switched a TV up to 4K or another refresh rate, the window could stay
+  at the old size.
+- **Putting the screen back no longer fails for ever** when the TV no longer
+  offers the mode that was saved.
+- **Intro scanning waits for a file that is still being copied** instead of
+  reading half of it.
 - **Linux: arrow keys and the mouse wheel over a big page of posters are
   quick again.** Moving the ring or the pointer to another poster made the
   page redraw every poster on it; on a two-core PC with a thousand films a
   key press took about a quarter of a second. Now only what changed is drawn.
+- **Linux: the mouse reaches the player's controls** in every film again.
+- **A poster far larger than the screen** is no longer drawn at full size in a
+  grid, which could take a small PC's memory.
 
 ## [0.15.2] — 2026-11-08
 

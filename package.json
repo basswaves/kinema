@@ -1,6 +1,6 @@
 {
   "name": "kinema",
-  "version": "0.15.2",
+  "version": "0.15.3",
   "description": "A local, serverless media library for movies and TV shows. Tauri 2 + React 19 + libmpv.",
   "license": "MIT",
   "author": "Basswaves",

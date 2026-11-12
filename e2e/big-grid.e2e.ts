@@ -173,3 +173,21 @@ test('a wheel turned away from the ring keeps its distance and the ring', async 
   await settled(page);
   expect(await ringIsOnScreen(page)).toBe(true);
 });
+
+test('a page that jumps to the top is not left without its first rows, even on a slow computer', async ({ page, browserName }) => {
+  test.skip(browserName !== 'chromium', 'slows the processor through the browser, which only Chromium offers');
+  await open(page);
+  await press(page, 'ArrowDown', 100);
+  await settled(page);
+  const slow = await page.context().newCDPSession(page);
+  await slow.send('Emulation.setCPUThrottlingRate', { rate: 8 });
+  await page.evaluate(() => document.querySelector('.browse')!.scrollTo({ top: 0, behavior: 'instant' }));
+  // Five frames later the rows at the top must be there: a change the page is
+  // already waiting for is not left to a quiet moment (round 8, release 0.15.3).
+  await page.evaluate(
+    () => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => done()))))))
+  );
+  const top = await page.evaluate(() => parseFloat(document.querySelector<HTMLElement>('.search-grid')!.style.paddingTop || '0'));
+  await slow.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+  expect(top).toBe(0);
+});

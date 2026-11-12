@@ -16,7 +16,7 @@
  * and scrolls the same. The ring always has rows ahead of it, so the
  * engine's steps by index never meet the end of what is drawn.
  */
-import { startTransition, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
+import { startTransition, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Card from './Card';
 import { FocusProvider } from './FocusGroup';
 import { useNavGroup } from './focusGroups';
@@ -59,6 +59,11 @@ export default function CardGrid({ name, entries, onSelect, fromAboveFirst = fal
    * they are far from those (from, up to; equal when there are none).
    */
   const [rows, setRows] = useState<[number, number, number, number]>([0, FIRST_ROWS, 0, 0]);
+  /** The rows on the page now, for the window to tell whether a change may wait. */
+  const drawn = useRef(rows);
+  useLayoutEffect(() => {
+    drawn.current = rows;
+  }, [rows]);
 
   // Rows of different heights (a note under a card) cannot be left out by
   // arithmetic: those grids are small (search) and drawn whole.
@@ -125,6 +130,11 @@ export default function CardGrid({ name, entries, onSelect, fromAboveFirst = fal
       // another card and scroll the page back to it: a wheel turned fast lost
       // most of its distance (round 8, part I2).
       let island: [number, number] = [0, 0];
+      // Whether every row on screen is drawn already: only then may a change wait
+      // for a quiet moment. A page that has run ahead of its rows (a fast walk
+      // up, the ring leaving the grid while the page scrolls to the top) shows
+      // empty space until the change is made, and under load that can be long.
+      let covered = true;
       const wanted = rowOf(navWanted());
       if (wanted >= 0) {
         from = wanted - OVERSCAN_ROWS;
@@ -133,8 +143,12 @@ export default function CardGrid({ name, entries, onSelect, fromAboveFirst = fal
         const top = page ? page.getBoundingClientRect().top : 0;
         const offset = grid.getBoundingClientRect().top - top + (page?.scrollTop ?? 0);
         const seen = page ? page.clientHeight : window.innerHeight;
-        from = Math.floor(((page?.scrollTop ?? 0) - offset) / pitch) - OVERSCAN_ROWS;
-        to = Math.floor(((page?.scrollTop ?? 0) + seen - offset) / pitch) + OVERSCAN_ROWS + 1;
+        const shownFrom = Math.max(0, Math.floor(((page?.scrollTop ?? 0) - offset) / pitch));
+        const shownTo = Math.min(rowCount, Math.floor(((page?.scrollTop ?? 0) + seen - offset) / pitch) + 1);
+        const [d0, d1, i0, i1] = drawn.current;
+        covered = shownTo <= shownFrom || (shownFrom >= d0 && shownTo <= d1) || (shownFrom >= i0 && shownTo <= i1);
+        from = shownFrom - OVERSCAN_ROWS;
+        to = shownTo + OVERSCAN_ROWS;
         // The ring's row too, when it is near: a press steps to the next
         // row at once, before the page has scrolled and drawn more.
         const ring = rowOf(navFocused());
@@ -154,7 +168,7 @@ export default function CardGrid({ name, entries, onSelect, fromAboveFirst = fal
         );
       // A scroll can wait for a quiet moment between frames (the rows ahead are
       // already drawn); the ring cannot: its next press needs its rows now.
-      if (urgent) set();
+      if (urgent || !covered) set();
       else startTransition(set);
     };
     const schedule = () => {

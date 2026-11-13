@@ -1854,7 +1854,7 @@ Edge on Windows, WebKit on Windows and WebKit on Linux are three sets (fonts
 differ; one set would fail on the others). A new engine or OS with no
 baseline writes one and **passes** the first time — so a missing set is not
 a green check. Linux's come from Ubuntu 24.04 (CI's image; WSL's distro is
-the same): `scriptswsl.ps1 'npx playwright test e2e/screens.e2e.ts
+the same): `scripts\wsl.ps1 'npx playwright test e2e/screens.e2e.ts
 --update-snapshots'`, then copy the `*-linux.png` back. The Look is seeded
 by `kinemaMockLook` in localStorage: the mock's settings are in memory, so
 setting it after load is lost on a reload.

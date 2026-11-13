@@ -271,7 +271,7 @@ review them in the diff before committing:
 npx playwright test e2e/screens.e2e.ts --update-snapshots
 ```
 
-Linux's pictures come from Linux: `scriptswsl.ps1 'npx playwright test
+Linux's pictures come from Linux: `scripts\wsl.ps1 'npx playwright test
 e2e/screens.e2e.ts --update-snapshots'`, or the `playwright-results`
 artifact of a failed CI run (its `-actual.png` files, renamed).
 

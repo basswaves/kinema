@@ -130,7 +130,12 @@ fn all_urls(conn: &rusqlite::Connection) -> rusqlite::Result<Vec<(String, Kind)>
          UNION ALL
          SELECT logo_url,     4 FROM titles   WHERE logo_url     IS NOT NULL AND logo_url     <> ''
          UNION ALL
-         SELECT still_url,    3 FROM episodes WHERE still_url    IS NOT NULL AND still_url    <> ''
+         SELECT still_url,    3 FROM episodes e WHERE still_url   IS NOT NULL AND still_url    <> ''
+            AND EXISTS (SELECT 1 FROM media_files m
+                         WHERE m.title_id = e.title_id AND m.missing = 0
+                           AND m.parsed_season = e.season
+                           AND e.episode BETWEEN m.parsed_episode
+                                             AND COALESCE(m.parsed_episode_last, m.parsed_episode))
          UNION ALL
          SELECT profile_url,  0 FROM people   WHERE profile_url  IS NOT NULL AND profile_url  <> ''
          UNION ALL
@@ -782,12 +787,16 @@ mod tests {
                                   poster_url TEXT, backdrop_url TEXT, logo_url TEXT);
              CREATE TABLE local_art (title_id INTEGER, kind TEXT);
              CREATE TABLE poster_choice (kind TEXT, provider TEXT, provider_id TEXT, url TEXT);
-             CREATE TABLE episodes (still_url TEXT);
+             CREATE TABLE episodes (title_id INTEGER, season INTEGER, episode INTEGER, still_url TEXT);
+             CREATE TABLE media_files (title_id INTEGER, missing INTEGER, parsed_season INTEGER,
+                                       parsed_episode INTEGER, parsed_episode_last INTEGER);
              CREATE TABLE people (profile_url TEXT);
              CREATE TABLE studios (logo_url TEXT);
              INSERT INTO titles (poster_url, backdrop_url, logo_url)
                   VALUES ('p', 'b', 'l'), ('p', 'b', NULL), ('both', 'both', '');
-             INSERT INTO episodes VALUES ('s'), ('s');
+             INSERT INTO media_files VALUES (1, 0, 1, 1, 2), (1, 1, 1, 4, NULL);
+             INSERT INTO episodes VALUES (1, 1, 1, 's'), (1, 1, 2, 's'), (1, 1, 3, 'not-owned'),
+                                         (1, 1, 4, 'gone');
              INSERT INTO people VALUES ('f');
              INSERT INTO studios VALUES ('st');",
         )

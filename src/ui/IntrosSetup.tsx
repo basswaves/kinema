@@ -18,6 +18,8 @@ import { open } from '@tauri-apps/plugin-dialog';
 import {
   INTRODB_APP_ENABLED_KEY,
   INTRODB_ENABLED_KEY,
+  FFMPEG_PATH_KEY,
+  ffmpegStatus,
   SKIPTRO_DB_PATH_KEY,
   SKIPTRO_PATH_KEY,
   skiptroFound,
@@ -44,6 +46,20 @@ export default function IntrosSetup() {
   const [skiptro, setSkiptro] = useState<boolean | null>(null);
   const [skiptroPath, setSkiptroPath] = useState('');
   const [error, setError] = useState<string | null>(null);
+  /** Whether ffmpeg is here; null until asked. Without it Kinema finds nothing itself. */
+  const [ffmpegHere, setFfmpegHere] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!programs) return;
+    let live = true;
+    void getSetting(FFMPEG_PATH_KEY)
+      .then((path) => ffmpegStatus((path ?? '').trim()))
+      .then((s) => live && setFfmpegHere(s.available))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [programs]);
 
   useEffect(() => {
     let live = true;
@@ -96,7 +112,9 @@ export default function IntrosSetup() {
   return (
     <>
       <p className="muted">
-        {programs
+        {programs && ffmpegHere === false
+          ? 'With ffmpeg (the last page) Kinema finds where intros, recaps and end credits are by itself; without it, only times shared by other viewers are used. Two choices about it; both are in Settings at any time.'
+          : programs
           ? 'Kinema finds where intros, recaps and end credits are by itself, and new episodes are checked after every scan. Two choices about it; both are in Settings at any time.'
           : `On ${can?.system ?? 'this system'} Kinema learns where intros, recaps and end credits are from times shared by other viewers. Two choices about it; both are in Settings at any time.`}
       </p>
@@ -132,7 +150,7 @@ export default function IntrosSetup() {
           ]);
         }}
         note="TheIntroDB and IntroDB are free collections of intro and credit times shared by viewers. Asked the first time an episode or film plays, they answer at once, and IntroDB knows where a film has a scene after its credits."
-        hint={`Kinema tells them only which film or episode is playing, keeps each answer for a month and never looks up your whole library. No account or key. ${programs ? 'Off, Kinema relies on what it finds itself.' : 'Off, nothing tells Kinema where they are, so there is nothing to skip.'}`}
+        hint={`Kinema tells them only which film or episode is playing, keeps each answer for a month and never looks up your whole library. No account or key. ${programs ? (ffmpegHere === false ? 'Off, and with no ffmpeg, nothing tells Kinema where they are, so there is nothing to skip.' : 'Off, Kinema relies on what it finds itself.') : 'Off, nothing tells Kinema where they are, so there is nothing to skip.'}`}
       />
 
       {programs && skiptro === true && (

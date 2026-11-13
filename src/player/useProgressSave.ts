@@ -4,6 +4,7 @@
  */
 import { useEffect, type RefObject } from 'react';
 import { saveLooseProgress, saveProgress } from './api';
+import { createSaveWatch } from './progressFailure';
 import type { Session } from './session';
 
 const PROGRESS_SAVE_MS = 5000;
@@ -14,6 +15,7 @@ export function useProgressSave({
   byPath,
   sessionRef,
   countedCreditsStart,
+  say,
 }: {
   /** The library's file, or null for something that is not in it. */
   fileId: number | null;
@@ -24,6 +26,8 @@ export function useProgressSave({
   sessionRef: RefObject<Session>;
   /** Where the credits start, when that counts as watched (useSkipMarkers). */
   countedCreditsStart: RefObject<number | null>;
+  /** Where a notice goes, when the resume point cannot be kept. */
+  say: (text: string) => void;
 }) {
   // ---- persist progress ---------------------------------------------------
   useEffect(() => {
@@ -49,10 +53,12 @@ export function useProgressSave({
       };
     };
 
+    const watch = createSaveWatch(say, (text, error) => console.warn(text, error ?? ''));
+
     const id = window.setInterval(() => {
       const { position, total, creditsStart } = current();
       if (position > 0) {
-        void save(position, total, creditsStart).catch(() => undefined);
+        save(position, total, creditsStart).then(watch.saved, watch.failed);
       }
     }, PROGRESS_SAVE_MS);
 
@@ -63,8 +69,11 @@ export function useProgressSave({
       // outgoing file's position. Copying it into the effect would be stale.
       const { position, total, creditsStart } = current();
       if (position > 0) {
-        void save(position, total, creditsStart, true).catch(() => undefined);
+        // Leaving: nobody is there to read a notice, so the log only.
+        save(position, total, creditsStart, true).catch((e) =>
+          console.warn('progress: could not save the resume point on leaving', e)
+        );
       }
     };
-  }, [fileId, path, byPath, sessionRef, countedCreditsStart]);
+  }, [fileId, path, byPath, sessionRef, countedCreditsStart, say]);
 }

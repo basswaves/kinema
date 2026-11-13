@@ -1010,6 +1010,18 @@ fn configure(conn: &Connection) -> rusqlite::Result<()> {
 
 pub fn open(path: &Path) -> Result<Connection, DbError> {
     let conn = Connection::open(path)?;
+    // SQLite quietly opens a file it may not write as read-only, and every later
+    // save then fails; a library that keeps nothing is said at start (A5-04).
+    if conn.is_readonly("main")? {
+        return Err(DbError::Sqlite(rusqlite::Error::SqliteFailure(
+            rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_READONLY),
+            Some(
+                "The library file or its folder is read-only, so nothing watched or changed \
+                 could be kept."
+                    .to_string(),
+            ),
+        )));
+    }
     configure(&conn)?;
     if let Some(dir) = path.parent() {
         backup_before_upgrade(&conn, &dir.join(BACKUP_DIR))?;
@@ -1389,6 +1401,31 @@ mod tests {
         let kept: i64 = copy.query_row("SELECT COUNT(*) FROM media_files", [], |r| r.get(0)).unwrap();
         assert_eq!(files, kept);
         println!("upgraded {before} -> {SCHEMA_VERSION}, {files} files kept, copy {:?}", copies[0].file_name());
+    }
+
+    /// A5-04: a library file that may not be written is refused at start, said
+    /// as a start-up problem that does not call the file damaged.
+    #[test]
+    fn a_read_only_library_is_refused_not_opened_quietly() {
+        let dir = std::env::temp_dir().join(format!("kinema-ro-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("library.db");
+        drop(open(&path).unwrap());
+        let mut perms = std::fs::metadata(&path).unwrap().permissions();
+        perms.set_readonly(true);
+        std::fs::set_permissions(&path, perms).unwrap();
+        let writable = std::fs::OpenOptions::new().append(true).open(&path).is_ok();
+        let result = open(&path);
+        let mut perms = std::fs::metadata(&path).unwrap().permissions();
+        #[allow(clippy::permissions_set_readonly_false)]
+        perms.set_readonly(false);
+        std::fs::set_permissions(&path, perms).unwrap();
+        if !writable {
+            let err = result.expect_err("read-only library must not open quietly");
+            assert!(!err.may_be_damaged());
+            assert!(err.to_string().contains("read-only"));
+        }
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     fn version_of(conn: &Connection) -> i64 {

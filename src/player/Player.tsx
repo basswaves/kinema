@@ -233,6 +233,7 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
     byPath: target.resumeByPath === true,
     sessionRef,
     countedCreditsStart,
+    say: setNotice,
   });
   usePlaybackEngine({
     target,

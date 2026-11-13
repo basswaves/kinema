@@ -2023,13 +2023,17 @@ const handlers: Record<string, Handler> = {
       : null;
   },
   trakt_resume_sync: () => traktResumeSync(),
-  save_progress: (a) =>
-    saveProgress(
+  save_progress: (a) => {
+    // A test can make saving fail, as a full disk does (e2e/save-fails).
+    const failure = (window as unknown as { __mockSaveError?: string }).__mockSaveError;
+    if (failure) throw failure;
+    return saveProgress(
       num(a, 'fileId'),
       num(a, 'positionSecs'),
       (a.durationSecs as number | null) ?? null,
       (a.creditsStart as number | null) ?? null
-    ),
+    );
+  },
   set_watched: (a) => {
     const id = num(a, 'fileId');
     if (a.watched) playback.set(id, { position: 0, duration: null, completed: true, updated: ++clock });

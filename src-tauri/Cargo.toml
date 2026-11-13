@@ -32,7 +32,7 @@ walkdir = "2.5.0"
 # NFO sidecars are XML. Event-based rather than deserialised into a struct:
 # the shape varies between MediaElch, tinyMediaManager and Kodi itself, and a
 # reader that ignores what it does not recognise survives all three.
-quick-xml = "0.38"
+quick-xml = "0.42"
 tauri-plugin-dialog = "2"
 tauri-plugin-http = "2"
 # Pure Rust, MIT, no C library. The audio fingerprinting behind intro/credits

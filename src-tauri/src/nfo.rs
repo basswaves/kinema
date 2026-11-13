@@ -199,7 +199,7 @@ pub fn parse_nfo(raw: &str, source: &str) -> Option<Nfo> {
         match reader.read_event() {
             Ok(Event::Start(e)) => {
                 depth += 1;
-                let name = String::from_utf8_lossy(e.name().as_ref()).to_ascii_lowercase();
+                let name = e.name().as_ref().to_ascii_lowercase();
 
                 if depth == 1 {
                     kind = match name.as_str() {
@@ -215,8 +215,8 @@ pub fn parse_nfo(raw: &str, source: &str) -> Option<Nfo> {
                 current_type.clear();
                 if name == "uniqueid" {
                     for attr in e.attributes().flatten() {
-                        if attr.key.as_ref().eq_ignore_ascii_case(b"type") {
-                            current_type = String::from_utf8_lossy(&attr.value).to_ascii_lowercase();
+                        if attr.key.as_ref().eq_ignore_ascii_case("type") {
+                            current_type = attr.value.to_ascii_lowercase();
                         }
                     }
                 }
@@ -274,22 +274,18 @@ pub fn parse_nfo(raw: &str, source: &str) -> Option<Nfo> {
                 buffer.clear();
             }
             Ok(Event::Text(e)) => {
-                if let Ok(text) = e.decode() {
-                    buffer.push_str(&text);
-                }
+                buffer.push_str(&e.xml10_content());
             }
             Ok(Event::CData(e)) => {
-                if let Ok(text) = e.decode() {
-                    buffer.push_str(&text);
-                }
+                buffer.push_str(&e.xml10_content());
             }
             // `&amp;`, `&#38;` and friends. quick-xml reports these separately
             // rather than resolving them into the surrounding text.
             Ok(Event::GeneralRef(e)) => match e.resolve_char_ref() {
                 Ok(Some(c)) => buffer.push(c),
                 _ => {
-                    if let Ok(name) = e.decode() {
-                        match name.as_ref() {
+                    { let name: &str = &e;
+                        match name {
                             "amp" => buffer.push('&'),
                             "lt" => buffer.push('<'),
                             "gt" => buffer.push('>'),
@@ -455,12 +451,24 @@ fn show_nfo_target(video: &Path) -> Option<PathBuf> {
     Some(folder.join("tvshow.nfo"))
 }
 
+/// An `.nfo` is a few KB; one over this is not one. Every scan reads every
+/// `.nfo`, so a hostile or mistaken giant must cost nothing (review A6-09).
+const MAX_NFO_BYTES: u64 = 1024 * 1024;
+
+fn too_big(path: &Path) -> bool {
+    std::fs::metadata(path).is_ok_and(|m| m.len() > MAX_NFO_BYTES)
+}
+
 fn first_parsed(paths: Vec<PathBuf>) -> Option<Nfo> {
     for path in paths {
         let Some(path) = crate::util::existing_file(&path) else {
             continue;
         };
         let source = path.display().to_string();
+        if too_big(&path) {
+            crate::log!("nfo: {source} is too big to read (over 1 MB), treated as no nfo");
+            continue;
+        }
         let Some(raw) = read_text(&path) else {
             crate::log!("nfo: could not read {source}");
             continue;
@@ -731,6 +739,36 @@ fn write_all(exports: Vec<NfoExport>, overwrite: bool) -> WriteReport {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn nfo_over_a_megabyte_is_treated_as_absent() {
+        let dir = std::env::temp_dir().join(format!("kinema-nfo-big-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let big = dir.join("big.nfo");
+        let pad = "x".repeat(MAX_NFO_BYTES as usize);
+        std::fs::write(&big, format!("<movie><title>Big</title><plot>{pad}</plot></movie>")).unwrap();
+        let small = dir.join("small.nfo");
+        std::fs::write(&small, "<movie><title>Small</title></movie>").unwrap();
+        assert!(too_big(&big));
+        assert!(!too_big(&small));
+        assert!(first_parsed(vec![big.clone()]).is_none());
+        // An over-size file does not stop a later, ordinary one being used.
+        assert_eq!(first_parsed(vec![big, small]).unwrap().title.as_deref(), Some("Small"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_tag_with_thousands_of_attributes_parses_quickly() {
+        // RUSTSEC-2026-0194: duplicate-name checking was quadratic per tag.
+        let attrs: String = (0..20_000).map(|i| format!(" a{i}=\"v\"")).collect();
+        let xml = format!("<movie><title>T</title><uniqueid type=\"imdb\"{attrs}>tt1234567</uniqueid></movie>");
+        assert!(xml.len() < MAX_NFO_BYTES as usize);
+        let started = std::time::Instant::now();
+        let nfo = parse_nfo(&xml, "t.nfo").unwrap();
+        assert_eq!(nfo.title.as_deref(), Some("T"));
+        assert!(started.elapsed() < std::time::Duration::from_secs(2), "took {:?}", started.elapsed());
+    }
 
     /// A `movie.nfo` and these videos in a folder of their own; whether it counts.
     fn movie_nfo_counts(tag: &str, videos: &[&str]) -> bool {

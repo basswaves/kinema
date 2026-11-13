@@ -10,7 +10,9 @@
     "shortDescription": "A local, serverless media library for movies and TV shows",
     "resources": {
       "lib/libmpv-2.dll": "libmpv-2.dll",
-      "lib/libmpv-wrapper.dll": "libmpv-wrapper.dll"
+      "lib/libmpv-wrapper.dll": "libmpv-wrapper.dll",
+      "../LICENSE": "LICENSE",
+      "../NOTICE.md": "NOTICE.md"
     },
     "windows": {
       "webviewInstallMode": { "type": "downloadBootstrapper", "silent": true },

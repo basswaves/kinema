@@ -32,15 +32,20 @@
         "depends": ["libmpv2"],
         "recommends": ["ffmpeg"],
         "files": {
-          "/usr/lib/kinema/libmpv-wrapper.so": "lib/libmpv-wrapper.so"
+          "/usr/lib/kinema/libmpv-wrapper.so": "lib/libmpv-wrapper.so",
+          "/usr/share/doc/kinema/LICENSE": "../LICENSE",
+          "/usr/share/doc/kinema/NOTICE.md": "../NOTICE.md"
         }
       },
       "rpm": {
         "desktopTemplate": "linux/kinema.desktop",
         "depends": ["mpv-libs"],
         "recommends": ["(ffmpeg or ffmpeg-free)"],
+        "postRemoveScript": "linux/rpm-postremove.sh",
         "files": {
-          "/usr/lib/kinema/libmpv-wrapper.so": "lib/libmpv-wrapper.so"
+          "/usr/lib/kinema/libmpv-wrapper.so": "lib/libmpv-wrapper.so",
+          "/usr/share/doc/kinema/LICENSE": "../LICENSE",
+          "/usr/share/doc/kinema/NOTICE.md": "../NOTICE.md"
         }
       }
     }

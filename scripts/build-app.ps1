@@ -150,6 +150,8 @@ if ($Test) {
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 Copy-Item $exe $outDir -Force
 foreach ($dll in $dlls) { Copy-Item (Join-Path $libDir $dll) $outDir -Force }
+# The licence text and notice go with the libraries (NOTICE.md).
+foreach ($doc in @("LICENSE", "NOTICE.md")) { Copy-Item (Join-Path $root $doc) $outDir -Force }
 
 $target = Join-Path $outDir 'kinema.exe'
 

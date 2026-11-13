@@ -31,6 +31,7 @@
  */
 
 :root {
+  --fs-floor: 0px;
   --ui-scale: 1;
 
   /* Horizontal page gutter — the alignment spine for nav, hero, rails and
@@ -57,6 +58,9 @@
  * every edge, and content pinned near the frame is the first thing to vanish.
  */
 :root[data-tv='on'] {
+  /* The smallest a text may be on a TV (Android TV's own minimum). Small
+     font sizes are written max(var(--fs-floor), Nrem); off a TV it is 0. */
+  --fs-floor: 12px;
   --ui-scale: 1.45;
   --gutter: 3.6rem;
   --safe-top: 1.25rem;
@@ -199,7 +203,7 @@ button {
   border-radius: 999px;
   background: transparent;
   color: rgba(245, 245, 247, 0.7);
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
   white-space: nowrap;
   cursor: pointer;
 }
@@ -226,7 +230,7 @@ button {
 
 .nav-count {
   margin-left: 0.75rem;
-  font-size: 0.75rem;
+  font-size: max(var(--fs-floor), 0.75rem);
   opacity: 0.6;
 }
 
@@ -242,7 +246,7 @@ button {
   border-radius: 999px;
   background: #e50914;
   color: #fff;
-  font-size: 0.625rem;
+  font-size: max(var(--fs-floor), 0.625rem);
   font-weight: 800;
   vertical-align: 0.0625rem;
 }
@@ -369,7 +373,7 @@ button {
 .home-notice-text {
   flex: 1;
   min-width: 0;
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
   line-height: 1.5;
 }
 
@@ -401,7 +405,7 @@ button {
   border-radius: 0.5rem;
   border: 1px solid rgba(232, 168, 56, 0.5);
   background: rgba(232, 168, 56, 0.14);
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
   cursor: pointer;
 }
 
@@ -479,14 +483,14 @@ button {
 }
 
 .hero-meta {
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
   opacity: 0.75;
   margin-bottom: 0.75rem;
 }
 
 .hero-overview {
   margin: 0 0 1.25rem;
-  font-size: 0.875rem;
+  font-size: max(var(--fs-floor), 0.875rem);
   line-height: 1.55;
   opacity: 0.88;
   display: -webkit-box;
@@ -507,7 +511,7 @@ button {
   padding: 0.625rem 1.5rem;
   border: none;
   border-radius: 0.375rem;
-  font-size: 0.875rem;
+  font-size: max(var(--fs-floor), 0.875rem);
   font-weight: 700;
   cursor: pointer;
   transition: transform 120ms ease, background 120ms ease;
@@ -542,7 +546,7 @@ button {
   border-radius: 0.5rem;
   background: rgba(218, 54, 51, 0.95);
   color: #fff;
-  font-size: 0.875rem;
+  font-size: max(var(--fs-floor), 0.875rem);
   font-weight: 600;
   cursor: pointer;
 }
@@ -580,7 +584,7 @@ button {
 
 .rail-heading {
   margin: 0 0 0.625rem var(--gutter);
-  font-size: 1rem;
+  font-size: max(var(--fs-floor), 1rem);
   font-weight: 700;
   letter-spacing: -0.01em;
 }
@@ -673,7 +677,7 @@ button {
   padding: 0.0625rem 0.4375rem;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.12);
-  font-size: 0.6875rem;
+  font-size: max(var(--fs-floor), 0.6875rem);
   font-weight: 600;
   vertical-align: middle;
   opacity: 0.75;
@@ -718,7 +722,7 @@ button {
 }
 
 .see-all-label {
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
   font-weight: 600;
 }
 
@@ -781,14 +785,14 @@ button {
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 4;
-  font-size: 0.95rem;
+  font-size: max(var(--fs-floor), 0.95rem);
   font-weight: 800;
   line-height: 1.15;
   overflow-wrap: anywhere;
 }
 
 .drawn-poster-year {
-  font-size: 0.75rem;
+  font-size: max(var(--fs-floor), 0.75rem);
   font-weight: 600;
   opacity: 0.85;
 }
@@ -800,7 +804,7 @@ button {
 
 .drawn-poster.wide .drawn-poster-title {
   -webkit-line-clamp: 2;
-  font-size: 0.85rem;
+  font-size: max(var(--fs-floor), 0.85rem);
 }
 
 .drawn-poster.detail-poster {
@@ -826,7 +830,7 @@ button {
   padding: 0.125rem 0.4375rem;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.75);
-  font-size: 0.625rem;
+  font-size: max(var(--fs-floor), 0.625rem);
   font-weight: 600;
 }
 
@@ -843,7 +847,7 @@ button {
   border-radius: 50%;
   background: #fff;
   color: #0a0a0c;
-  font-size: 0.75rem;
+  font-size: max(var(--fs-floor), 0.75rem);
   font-weight: 800;
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
 }
@@ -866,7 +870,7 @@ button {
 
 .card-title {
   margin-top: 0.4375rem;
-  font-size: 0.78125rem;
+  font-size: max(var(--fs-floor), 0.78125rem);
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -874,14 +878,14 @@ button {
 }
 
 .card-meta {
-  font-size: 0.6875rem;
+  font-size: max(var(--fs-floor), 0.6875rem);
   opacity: 0.5;
 }
 
 /* Why a search result is here, when it is not its title. */
 .card-note {
   margin-top: 0.125rem;
-  font-size: 0.6875rem;
+  font-size: max(var(--fs-floor), 0.6875rem);
   color: #f5c518;
   white-space: nowrap;
   overflow: hidden;
@@ -968,7 +972,7 @@ button {
 
 .continue-title {
   margin-top: 0.5rem;
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -976,7 +980,7 @@ button {
 }
 
 .continue-meta {
-  font-size: 0.71875rem;
+  font-size: max(var(--fs-floor), 0.71875rem);
   opacity: 0.6;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -984,7 +988,7 @@ button {
 }
 
 .continue-remaining {
-  font-size: 0.6875rem;
+  font-size: max(var(--fs-floor), 0.6875rem);
   opacity: 0.6;
 }
 
@@ -1013,7 +1017,7 @@ button {
   border-radius: 999px;
   background: transparent;
   color: #fff;
-  font-size: 0.6875rem;
+  font-size: max(var(--fs-floor), 0.6875rem);
   cursor: pointer;
   opacity: 0;
   transition: opacity 140ms ease, background 140ms ease;
@@ -1070,7 +1074,7 @@ button {
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.5);
   color: #fff;
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
   cursor: pointer;
 }
 
@@ -1132,7 +1136,7 @@ button {
 /* Dimmed by colour, not opacity: an opacity here would fade the score chips
    inside the line too, and they must stay solid to be read from a sofa. */
 .detail-meta {
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
   color: rgba(255, 255, 255, 0.7);
   margin-bottom: 0.875rem;
 }
@@ -1155,7 +1159,7 @@ button {
 
 .media-badges-note {
   margin: 0;
-  font-size: 0.75rem;
+  font-size: max(var(--fs-floor), 0.75rem);
   opacity: 0.6;
 }
 
@@ -1164,12 +1168,12 @@ button {
 .heavy-file-note {
   margin: 0.875rem 0 0;
   max-width: 38rem;
-  font-size: 0.75rem;
+  font-size: max(var(--fs-floor), 0.75rem);
   opacity: 0.6;
 }
 
 .media-badges-heading {
-  font-size: 0.625rem;
+  font-size: max(var(--fs-floor), 0.625rem);
   font-weight: 700;
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -1184,7 +1188,7 @@ button {
 
 .badge-row-heading {
   flex: 0 0 3.75rem;
-  font-size: 0.625rem;
+  font-size: max(var(--fs-floor), 0.625rem);
   font-weight: 700;
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -1213,7 +1217,7 @@ button {
 }
 
 .media-badge-label {
-  font-size: 0.5625rem;
+  font-size: max(var(--fs-floor), 0.5625rem);
   font-weight: 600;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -1242,7 +1246,7 @@ button {
 }
 
 .media-badge-value {
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -1253,7 +1257,7 @@ button {
   padding: 0 0.3125rem;
   border: 1px solid currentColor;
   border-radius: 0.1875rem;
-  font-size: 0.6875rem;
+  font-size: max(var(--fs-floor), 0.6875rem);
   font-weight: 700;
   line-height: 1.3;
 }
@@ -1274,7 +1278,7 @@ button {
   margin-right: 0.375rem;
   padding: 0.0625rem 0.375rem;
   border-radius: 0.25rem;
-  font-size: 0.6875rem;
+  font-size: max(var(--fs-floor), 0.6875rem);
   font-weight: 800;
   line-height: 1.35;
 }
@@ -1297,20 +1301,20 @@ button {
 .detail-overview {
   max-width: 45rem;
   margin: 0 0 1.25rem;
-  font-size: 0.875rem;
+  font-size: max(var(--fs-floor), 0.875rem);
   line-height: 1.6;
   opacity: 0.9;
 }
 
 .detail-credit {
   margin: -0.75rem 0 1.25rem;
-  font-size: 0.75rem;
+  font-size: max(var(--fs-floor), 0.75rem);
 }
 
 /* "Directed by …", "Ended": under the overview, quieter than it. */
 .detail-crew {
   margin: -0.5rem 0 0.75rem;
-  font-size: 0.875rem;
+  font-size: max(var(--fs-floor), 0.875rem);
   opacity: 0.75;
 }
 .detail-crew + .detail-crew {
@@ -1338,7 +1342,7 @@ button {
   display: grid;
   gap: 0.25rem;
   margin: 0.75rem 0 0;
-  font-size: 0.875rem;
+  font-size: max(var(--fs-floor), 0.875rem);
   user-select: text;
   -webkit-user-select: text;
 }
@@ -1378,7 +1382,7 @@ button {
   border-radius: 999px;
   background: transparent;
   color: rgba(245, 245, 247, 0.75);
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
   cursor: pointer;
 }
 
@@ -1406,7 +1410,7 @@ button {
 
 .cast-heading {
   margin: 0 0 0.875rem;
-  font-size: 1rem;
+  font-size: max(var(--fs-floor), 1rem);
   font-weight: 700;
   letter-spacing: -0.01em;
   opacity: 0.85;
@@ -1488,7 +1492,7 @@ button.cast-member {
   background: none;
   color: inherit;
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
   cursor: pointer;
 }
 .poster-choice:hover,
@@ -1538,7 +1542,7 @@ button.cast-member {
 .person-bio {
   max-width: 48rem;
   margin: 0 0 1rem;
-  font-size: 0.9375rem;
+  font-size: max(var(--fs-floor), 0.9375rem);
   line-height: 1.5;
   opacity: 0.85;
   display: -webkit-box;
@@ -1576,14 +1580,14 @@ button.cast-member {
 }
 
 .cast-name {
-  font-size: 0.75rem;
+  font-size: max(var(--fs-floor), 0.75rem);
   font-weight: 600;
   line-height: 1.25;
 }
 
 .cast-role {
   margin-top: 0.125rem;
-  font-size: 0.6875rem;
+  font-size: max(var(--fs-floor), 0.6875rem);
   line-height: 1.25;
   opacity: 0.55;
 }
@@ -1664,7 +1668,7 @@ button.cast-member {
   border-radius: 999px;
   background: transparent;
   color: rgba(255, 255, 255, 0.4);
-  font-size: 0.75rem;
+  font-size: max(var(--fs-floor), 0.75rem);
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
@@ -1679,7 +1683,7 @@ button.cast-member {
   height: 1.25rem;
   border: 1.5px solid currentColor;
   border-radius: 50%;
-  font-size: 0.6875rem;
+  font-size: max(var(--fs-floor), 0.6875rem);
 }
 
 .watched-text {
@@ -1769,7 +1773,7 @@ button.cast-member {
   border-radius: 999px;
   background: transparent;
   color: rgba(245, 245, 247, 0.85);
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
   cursor: pointer;
 }
 
@@ -1818,7 +1822,7 @@ button.cast-member {
   padding: 0.0625rem 0.4375rem;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.72);
-  font-size: 0.6875rem;
+  font-size: max(var(--fs-floor), 0.6875rem);
   font-weight: 700;
 }
 
@@ -1835,7 +1839,7 @@ button.cast-member {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.92);
   color: #0a0a0c;
-  font-size: 0.6875rem;
+  font-size: max(var(--fs-floor), 0.6875rem);
   font-weight: 800;
 }
 
@@ -1869,7 +1873,7 @@ button.cast-member {
   border: 1px solid rgba(242, 201, 106, 0.7);
   border-radius: 0.25rem;
   color: #f2c96a;
-  font-size: 0.625rem;
+  font-size: max(var(--fs-floor), 0.625rem);
   font-style: normal;
   font-weight: 700;
   line-height: 1.5;
@@ -1880,7 +1884,7 @@ button.cast-member {
   display: flex;
   align-items: center;
   gap: 0.5625rem;
-  font-size: 0.875rem;
+  font-size: max(var(--fs-floor), 0.875rem);
   font-weight: 600;
   margin-bottom: 0.1875rem;
 }
@@ -1889,7 +1893,7 @@ button.cast-member {
   padding: 0.0625rem 0.4375rem;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.12);
-  font-size: 0.625rem;
+  font-size: max(var(--fs-floor), 0.625rem);
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -1897,7 +1901,7 @@ button.cast-member {
 
 .episode-overview {
   margin: 0;
-  font-size: 0.78125rem;
+  font-size: max(var(--fs-floor), 0.78125rem);
   line-height: 1.5;
   opacity: 0.6;
   display: -webkit-box;
@@ -1908,7 +1912,7 @@ button.cast-member {
 }
 
 .episode-runtime {
-  font-size: 0.75rem;
+  font-size: max(var(--fs-floor), 0.75rem);
   opacity: 0.5;
   white-space: nowrap;
 }
@@ -1988,7 +1992,7 @@ button.cast-member {
   background: rgba(28, 28, 32, 0.92);
   backdrop-filter: blur(8px);
   color: #fff;
-  font-size: 0.9375rem;
+  font-size: max(var(--fs-floor), 0.9375rem);
   pointer-events: auto;
 }
 
@@ -2010,7 +2014,7 @@ button.cast-member {
 
 .search-hint {
   margin: 0.625rem 0 1.25rem;
-  font-size: 0.78125rem;
+  font-size: max(var(--fs-floor), 0.78125rem);
 }
 
 /* ---- on-screen keyboard (OnScreenKeyboard) ------------------------------ */
@@ -2040,7 +2044,7 @@ button.cast-member {
   border-radius: 0.4375rem;
   background: rgba(255, 255, 255, 0.07);
   color: #fff;
-  font-size: 0.9375rem;
+  font-size: max(var(--fs-floor), 0.9375rem);
   font-weight: 600;
   text-transform: uppercase;
   cursor: pointer;
@@ -2048,7 +2052,7 @@ button.cast-member {
 
 .osk-key.osk-wide {
   min-width: 6rem;
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
   text-transform: none;
 }
 
@@ -2109,7 +2113,7 @@ button.cast-member {
 
 .first-run-lede {
   margin: 0 0 2.5rem;
-  font-size: 0.9375rem;
+  font-size: max(var(--fs-floor), 0.9375rem);
   line-height: 1.55;
   opacity: 0.7;
 }
@@ -2129,7 +2133,7 @@ button.cast-member {
 
 .first-run-step p {
   margin: 0 0 0.875rem;
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
   line-height: 1.55;
   max-width: 38rem;
 }
@@ -2145,7 +2149,7 @@ button.cast-member {
   height: 1.625rem;
   border-radius: 999px;
   background: rgba(229, 9, 20, 0.9);
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
   font-weight: 800;
 }
 
@@ -2153,7 +2157,7 @@ button.cast-member {
   padding: 0.125rem 0.5rem;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.12);
-  font-size: 0.6875rem;
+  font-size: max(var(--fs-floor), 0.6875rem);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -2173,7 +2177,7 @@ button.cast-member {
   flex-wrap: wrap;
   gap: 0.375rem 1.5rem;
   margin-bottom: 0.75rem;
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
 }
 
 .setup-nav {
@@ -2182,7 +2186,7 @@ button.cast-member {
 }
 
 .setup-later {
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
 }
 
 .first-run-roots .settings-remove {
@@ -2195,7 +2199,7 @@ button.cast-member {
   gap: 0.75rem;
   padding: 0.5rem 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
 }
 
 .center {
@@ -2237,7 +2241,7 @@ button.cast-member {
   border-radius: 0.5rem;
   background: transparent;
   color: rgba(245, 245, 247, 0.72);
-  font-size: 0.875rem;
+  font-size: max(var(--fs-floor), 0.875rem);
   text-align: left;
   cursor: pointer;
 }
@@ -2283,7 +2287,7 @@ button.cast-member {
   border-radius: 0.5rem;
   background: rgba(255, 255, 255, 0.06);
   color: #fff;
-  font-size: 0.9375rem;
+  font-size: max(var(--fs-floor), 0.9375rem);
   text-align: left;
   cursor: pointer;
 }
@@ -2348,7 +2352,7 @@ button.cast-member {
    stutter. The top margin is what separates the groups. */
 .settings-section h3 {
   margin: 2.25rem 0 0.75rem;
-  font-size: 0.75rem;
+  font-size: max(var(--fs-floor), 0.75rem);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -2387,7 +2391,7 @@ button.cast-member {
 
 .settings-section p {
   margin: 0 0 0.75rem;
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
   line-height: 1.55;
   max-width: 44rem;
 }
@@ -2405,7 +2409,7 @@ button.cast-member {
  */
 .settings-section .settings-intro {
   margin: 0 0 1.25rem;
-  font-size: 0.90625rem;
+  font-size: max(var(--fs-floor), 0.90625rem);
   line-height: 1.55;
   color: rgba(245, 245, 247, 0.86);
 }
@@ -2431,7 +2435,7 @@ button.cast-member {
 }
 
 .what-leaves-state {
-  font-size: 0.75rem;
+  font-size: max(var(--fs-floor), 0.75rem);
   color: rgba(245, 245, 247, 0.6);
 }
 
@@ -2444,7 +2448,7 @@ button.cast-member {
   grid-template-columns: max-content 1fr;
   gap: 0.25rem 1rem;
   margin: 0.5rem 0;
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
   line-height: 1.5;
 }
 
@@ -2457,13 +2461,13 @@ button.cast-member {
 }
 
 .settings-section p.what-leaves-hosts {
-  font-size: 0.75rem;
+  font-size: max(var(--fs-floor), 0.75rem);
   word-break: break-word;
 }
 
 .settings-section .choice-note {
   margin: 0.25rem 0 0;
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
   line-height: 1.5;
   color: rgba(245, 245, 247, 0.72);
 }
@@ -2481,7 +2485,7 @@ button.cast-member {
 .settings-section .choice-hint,
 .settings-section .settings-hint {
   margin: 0.3125rem 0 0.75rem;
-  font-size: 0.78125rem;
+  font-size: max(var(--fs-floor), 0.78125rem);
   line-height: 1.5;
   color: rgba(245, 245, 247, 0.58);
 }
@@ -2499,7 +2503,7 @@ button.cast-member {
   margin: 0.75rem 0 0;
   padding: 0;
   list-style: none;
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
 }
 
 .detect-folders li {
@@ -2523,7 +2527,7 @@ button.cast-member {
 
 .choice-label {
   margin-bottom: 0.25rem;
-  font-size: 0.9375rem;
+  font-size: max(var(--fs-floor), 0.9375rem);
   font-weight: 600;
 }
 
@@ -2543,7 +2547,7 @@ button.cast-member {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.06);
   color: #e8e8e8;
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
   cursor: pointer;
 }
 
@@ -2564,7 +2568,7 @@ button.cast-member {
 }
 
 .choice-tick {
-  font-size: 0.75rem;
+  font-size: max(var(--fs-floor), 0.75rem);
 }
 
 /* The devices "only these" means (DeviceChoice): one per line, each its own
@@ -2586,7 +2590,7 @@ button.cast-member {
   border-radius: 0.75rem;
   background: rgba(255, 255, 255, 0.06);
   color: #e8e8e8;
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
   text-align: left;
   cursor: pointer;
 }
@@ -2628,7 +2632,7 @@ button.cast-member {
 .settings-toggle-row span {
   flex: 1;
   min-width: 16rem;
-  font-size: 0.78125rem;
+  font-size: max(var(--fs-floor), 0.78125rem);
   line-height: 1.5;
 }
 
@@ -2644,7 +2648,7 @@ button.cast-member {
   gap: 0.75rem;
   padding: 0.5rem 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
 }
 
 /* A library folder the last scan could not reach: It moved… beside Remove. */
@@ -2664,7 +2668,7 @@ button.cast-member {
   padding: 0.125rem 0.5rem;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.12);
-  font-size: 0.6875rem;
+  font-size: max(var(--fs-floor), 0.6875rem);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -2697,7 +2701,7 @@ button.cast-member {
   border-radius: 999px;
   background: transparent;
   color: rgba(245, 245, 247, 0.8);
-  font-size: 0.75rem;
+  font-size: max(var(--fs-floor), 0.75rem);
   cursor: pointer;
 }
 
@@ -2716,7 +2720,7 @@ button.cast-member {
 .settings-field {
   display: block;
   margin-bottom: 0.875rem;
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
 }
 
 .settings-field > span {
@@ -2732,7 +2736,7 @@ button.cast-member {
   border-radius: 0.5rem;
   background: rgba(255, 255, 255, 0.07);
   color: #fff;
-  font-size: 0.875rem;
+  font-size: max(var(--fs-floor), 0.875rem);
 }
 
 .settings-input:focus,
@@ -2770,13 +2774,13 @@ button.cast-member {
 .import-unmatched {
   margin: 0.25rem 0 0;
   padding-left: 1.25rem;
-  font-size: 0.875rem;
+  font-size: max(var(--fs-floor), 0.875rem);
   opacity: 0.8;
 }
 
 .settings-ok,
 .settings-warn {
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
 }
 
 .settings-ok {
@@ -2795,7 +2799,7 @@ button.cast-member {
   border-radius: 0.375rem;
   background: rgba(255, 255, 255, 0.06);
   font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
-  font-size: 0.75rem;
+  font-size: max(var(--fs-floor), 0.75rem);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -2834,7 +2838,7 @@ button.cast-member {
   margin-bottom: 1rem;
   padding: 0.625rem 1rem;
   border-radius: 0.5rem;
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
   cursor: pointer;
 }
 
@@ -2857,18 +2861,18 @@ button.cast-member {
   flex-wrap: wrap;
   align-items: baseline;
   gap: 0.25rem 0.75rem;
-  font-size: 0.875rem;
+  font-size: max(var(--fs-floor), 0.875rem);
 }
 
 .equipment-head .muted {
-  font-size: 0.78125rem;
+  font-size: max(var(--fs-floor), 0.78125rem);
 }
 
 .equipment-new {
   padding: 0 0.4rem;
   border-radius: 999px;
   background: rgba(90, 150, 240, 0.25);
-  font-size: 0.6875rem;
+  font-size: max(var(--fs-floor), 0.6875rem);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -2879,7 +2883,7 @@ button.cast-member {
   margin: 0.35rem 0 0;
   padding: 0;
   list-style: none;
-  font-size: 0.78125rem;
+  font-size: max(var(--fs-floor), 0.78125rem);
   line-height: 1.5;
 }
 
@@ -2915,7 +2919,7 @@ button.cast-member {
 
 .equipment-problem {
   color: rgb(240, 140, 130);
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
 }
 
 /* The developer tools render the old Library harness, which paints its own
@@ -3044,7 +3048,7 @@ button.cast-member {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.9375rem;
+  font-size: max(var(--fs-floor), 0.9375rem);
   font-weight: 700;
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
 }
@@ -3056,7 +3060,7 @@ button.cast-member {
 
 .player-ends {
   flex: 0 0 auto;
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
   font-variant-numeric: tabular-nums;
   opacity: 0.85;
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
@@ -3112,7 +3116,7 @@ button.cast-member {
 }
 
 .player-time {
-  font-size: 0.75rem;
+  font-size: max(var(--fs-floor), 0.75rem);
   font-variant-numeric: tabular-nums;
   min-width: 3.5rem;
   text-align: center;
@@ -3214,7 +3218,7 @@ button.cast-member {
   height: 2.75rem;
   padding: 0 0.875rem;
   border-radius: 999px;
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -3334,13 +3338,13 @@ button.cast-member {
 }
 
 .volume-pop-hint {
-  font-size: 0.625rem;
+  font-size: max(var(--fs-floor), 0.625rem);
   opacity: 0.6;
 }
 
 .volume-pop-note {
   width: 7.5rem;
-  font-size: 0.75rem;
+  font-size: max(var(--fs-floor), 0.75rem);
   font-weight: 500;
   line-height: 1.35;
   text-align: center;
@@ -3360,7 +3364,7 @@ button.cast-member {
   border-radius: 0.5rem;
   background: rgba(0, 0, 0, 0.88);
   color: #fff;
-  font-size: 0.875rem;
+  font-size: max(var(--fs-floor), 0.875rem);
   line-height: 1.4;
   pointer-events: none;
 }
@@ -3372,7 +3376,7 @@ button.cast-member {
   padding: 0.375rem 0.375rem 0.375rem 1.125rem;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.8);
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
   white-space: nowrap;
   /* Long enough to read, notice the offer and reach for OK. */
   animation: toast-fade 7s ease forwards;
@@ -3388,7 +3392,7 @@ button.cast-member {
   background: rgba(255, 255, 255, 0.92);
   color: #111;
   font-weight: 700;
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
   cursor: pointer;
 }
 
@@ -3401,7 +3405,7 @@ button.cast-member {
   padding: 0.0625rem 0.375rem;
   border-radius: 0.3125rem;
   background: rgba(0, 0, 0, 0.14);
-  font-size: 0.6875rem;
+  font-size: max(var(--fs-floor), 0.6875rem);
 }
 
 @keyframes toast-fade {
@@ -3430,7 +3434,7 @@ button.cast-member {
   align-items: center;
   justify-content: space-between;
   margin: 0.625rem 0 0.4375rem;
-  font-size: 0.6875rem;
+  font-size: max(var(--fs-floor), 0.6875rem);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -3447,7 +3451,7 @@ button.cast-member {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.1);
   color: #fff;
-  font-size: 0.625rem;
+  font-size: max(var(--fs-floor), 0.625rem);
   cursor: pointer;
 }
 
@@ -3467,7 +3471,7 @@ button.cast-member {
   border-radius: 0.4375rem;
   background: rgba(255, 255, 255, 0.06);
   color: #fff;
-  font-size: 0.75rem;
+  font-size: max(var(--fs-floor), 0.75rem);
   text-align: left;
   cursor: pointer;
   overflow: hidden;
@@ -3483,7 +3487,7 @@ button.cast-member {
   padding: 0.0625rem 0.3125rem;
   border: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: 0.25rem;
-  font-size: 0.625rem;
+  font-size: max(var(--fs-floor), 0.625rem);
   font-weight: 700;
   letter-spacing: 0.04em;
   text-align: center;
@@ -3509,14 +3513,14 @@ button.cast-member {
 }
 
 .track-empty {
-  font-size: 0.6875rem;
+  font-size: max(var(--fs-floor), 0.6875rem);
   opacity: 0.5;
   padding: 0.1875rem 0;
 }
 
 .track-note {
   margin: 0.625rem 0 0;
-  font-size: 0.65625rem;
+  font-size: max(var(--fs-floor), 0.65625rem);
   opacity: 0.6;
 }
 
@@ -3534,7 +3538,7 @@ button.cast-member {
 }
 
 .up-next-label {
-  font-size: 0.6875rem;
+  font-size: max(var(--fs-floor), 0.6875rem);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -3543,7 +3547,7 @@ button.cast-member {
 }
 
 .up-next-title {
-  font-size: 0.9375rem;
+  font-size: max(var(--fs-floor), 0.9375rem);
   font-weight: 600;
   margin-bottom: 1rem;
   line-height: 1.35;
@@ -3556,7 +3560,7 @@ button.cast-member {
 
 .up-next-actions button {
   padding: 0.5625rem 1rem;
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
 }
 
 /* ---- stats for nerds ------------------------------------------------------
@@ -3625,7 +3629,7 @@ button.cast-member {
 
 .stats-group h3 {
   margin: 0 0 0.25rem;
-  font-size: 10px;
+  font-size: max(var(--fs-floor), 10px);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -3654,7 +3658,7 @@ button.cast-member {
 .stats-note {
   display: block;
   font-style: normal;
-  font-size: 11px;
+  font-size: max(var(--fs-floor), 11px);
   opacity: 0.6;
 }
 
@@ -3691,7 +3695,7 @@ button.cast-member {
   border-radius: 0.375rem;
   background: rgba(12, 12, 14, 0.88);
   color: #fff;
-  font-size: 0.9375rem;
+  font-size: max(var(--fs-floor), 0.9375rem);
   font-weight: 600;
   letter-spacing: 0.01em;
   cursor: pointer;
@@ -3751,7 +3755,7 @@ button.cast-member {
   border-radius: 0.375rem;
   background: rgba(0, 0, 0, 0.5);
   color: #f2f2f2;
-  font-size: 1rem;
+  font-size: max(var(--fs-floor), 1rem);
 }
 
 .detail-rename-input.detail-rename-year {
@@ -3814,7 +3818,7 @@ kbd {
   border-radius: 0.3125rem;
   background: rgba(255, 255, 255, 0.1);
   font-family: inherit;
-  font-size: 0.75rem;
+  font-size: max(var(--fs-floor), 0.75rem);
   font-weight: 600;
   line-height: 1.3;
   text-align: center;
@@ -3917,7 +3921,7 @@ kbd {
 
 .shortcuts-group h3 {
   margin: 0 0 0.625rem;
-  font-size: 0.9375rem;
+  font-size: max(var(--fs-floor), 0.9375rem);
   font-weight: 700;
 }
 
@@ -3927,7 +3931,7 @@ kbd {
 
 .shortcuts-group p {
   margin: 0.625rem 0 0;
-  font-size: 0.75rem;
+  font-size: max(var(--fs-floor), 0.75rem);
   line-height: 1.5;
 }
 
@@ -3950,14 +3954,14 @@ kbd {
 
 .shortcuts-row dd {
   margin: 0;
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
   line-height: 1.45;
   opacity: 0.85;
 }
 
 .shortcuts-plus {
   margin: 0 0.1875rem;
-  font-size: 0.6875rem;
+  font-size: max(var(--fs-floor), 0.6875rem);
   opacity: 0.5;
 }
 
@@ -4007,7 +4011,7 @@ kbd {
   border-radius: 0.5rem;
   background: rgba(255, 255, 255, 0.12);
   color: #fff;
-  font-size: 1rem;
+  font-size: max(var(--fs-floor), 1rem);
   font-weight: 700;
   cursor: pointer;
   transition: transform 120ms ease, background 120ms ease;
@@ -4093,24 +4097,24 @@ kbd {
 
 .something-why {
   margin: 0.375rem 0 0;
-  font-size: 0.9375rem;
+  font-size: max(var(--fs-floor), 0.9375rem);
 }
 
 .leave-busy {
   margin: 1rem 0;
-  font-size: 1rem;
+  font-size: max(var(--fs-floor), 1rem);
 }
 
 .leave-error {
   margin: 1rem 0 0;
   color: #ff8a80;
-  font-size: 0.875rem;
+  font-size: max(var(--fs-floor), 0.875rem);
 }
 
 /* Room below for the ring of a button right under the line (--ring-room). */
 .leave .muted {
   margin: 1.25rem 0 var(--ring-room);
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
 }
 
 /* ---- Kinema's own folder browser (FolderBrowser.tsx) ------------------------ */
@@ -4173,7 +4177,7 @@ kbd {
   border-radius: 0.5rem;
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
-  font-size: 1rem;
+  font-size: max(var(--fs-floor), 1rem);
   text-align: left;
   cursor: pointer;
   transition: transform 120ms ease, background 120ms ease;
@@ -4231,7 +4235,7 @@ kbd {
 
 .folder-hint {
   margin: 1rem 0 0;
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
 }
 
 /* ---- the light look ---------------------------------------------------------
@@ -4413,7 +4417,7 @@ kbd {
 
 .library-tile-meta,
 .video-tile-date {
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
   opacity: 0.7;
 }
 
@@ -4433,7 +4437,7 @@ kbd {
 
 .folders-heading {
   margin: 0 0 0.5rem;
-  font-size: 1rem;
+  font-size: max(var(--fs-floor), 1rem);
   font-weight: 700;
   opacity: 0.75;
 }
@@ -4516,7 +4520,7 @@ kbd {
   padding: 0.125rem 0.5rem;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.65);
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
 }
 
 .video-tile-name {
@@ -4559,7 +4563,7 @@ kbd {
   border-radius: 0.375rem;
   background: rgba(0, 0, 0, 0.5);
   color: #f2f2f2;
-  font-size: 1rem;
+  font-size: max(var(--fs-floor), 1rem);
 }
 
 .playlist-name-input.focused {
@@ -4653,7 +4657,7 @@ kbd {
 }
 
 .playlist-row-note {
-  font-size: 0.875rem;
+  font-size: max(var(--fs-floor), 0.875rem);
 }
 
 /* Sound delay in the player's panel: the amount, then a step each way and
@@ -4667,7 +4671,7 @@ kbd {
 
 .track-delay-label {
   flex: 1;
-  font-size: 0.75rem;
+  font-size: max(var(--fs-floor), 0.75rem);
 }
 
 .track-delay .track-option {
@@ -4722,6 +4726,11 @@ kbd {
 }
 :root[data-tv='on'] :is(.card-meta, .episode-number, .continue-meta, .media-badges-note, .heavy-file-note) {
   font-size: max(12px, 0.6875rem);
+}
+/* Text that sets no size of its own inherits the page's 1rem, which is 11.6px
+   at 960 x 540. */
+:root[data-tv='on'] body {
+  font-size: max(12px, 1rem);
 }
 :root[data-tv='on'] :is(.card-title, .top-nav button) {
   font-size: max(12px, 0.8125rem);

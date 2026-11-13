@@ -26,7 +26,7 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 0.625rem;
   background: rgba(255, 255, 255, 0.03);
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
 }
 
 .fixmatch-head {
@@ -38,7 +38,7 @@
 
 .fixmatch-head h2 {
   margin: 0;
-  font-size: 0.9375rem;
+  font-size: max(var(--fs-floor), 0.9375rem);
 }
 
 /* ---- buttons ------------------------------------------------------------- */
@@ -48,7 +48,7 @@
   border-radius: 0.4375rem;
   background: rgba(255, 255, 255, 0.07);
   color: #f2f2f2;
-  font-size: 0.75rem;
+  font-size: max(var(--fs-floor), 0.75rem);
   cursor: pointer;
 }
 
@@ -126,7 +126,7 @@
    the line that gets the queue emptied. */
 .fixmatch-advice {
   margin-top: 0.25rem;
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
   line-height: 1.45;
 }
 
@@ -134,7 +134,7 @@
    useful once you know what it means, noise until then. */
 .fixmatch-reason {
   margin-top: 0.1875rem;
-  font-size: 0.6875rem;
+  font-size: max(var(--fs-floor), 0.6875rem);
   line-height: 1.4;
   color: #f0883e;
   opacity: 0.7;
@@ -153,7 +153,7 @@
 .fixmatch-files {
   margin: 0;
   padding-left: 1.125rem;
-  font-size: 0.6875rem;
+  font-size: max(var(--fs-floor), 0.6875rem);
   opacity: 0.6;
   line-height: 1.6;
 }
@@ -175,7 +175,7 @@
   border-radius: 0.375rem;
   background: rgba(0, 0, 0, 0.4);
   color: #f2f2f2;
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
 }
 
 .fixmatch-input:focus,
@@ -188,7 +188,7 @@
   padding: 0.5rem 0.75rem;
   border-radius: 0.5rem;
   background: rgba(218, 54, 51, 0.9);
-  font-size: 0.75rem;
+  font-size: max(var(--fs-floor), 0.75rem);
   cursor: pointer;
 }
 
@@ -198,7 +198,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 0.5rem;
-  font-size: 0.6875rem;
+  font-size: max(var(--fs-floor), 0.6875rem);
   opacity: 0.75;
 }
 
@@ -207,7 +207,7 @@
 .fixmatch-source .provider-pill {
   padding: 0.1875rem 0.5rem;
   border-radius: 0.375rem;
-  font-size: 0.6875rem;
+  font-size: max(var(--fs-floor), 0.6875rem);
 }
 
 .fixmatch-results {
@@ -232,7 +232,7 @@
   flex: 0 0 auto;
   border-radius: 0.25rem;
   object-fit: cover;
-  font-size: 0.5625rem;
+  font-size: max(var(--fs-floor), 0.5625rem);
 }
 
 .fixmatch-candidate-text {
@@ -246,7 +246,7 @@
 
 .fixmatch-candidate-overview {
   margin: 0.1875rem 0 0;
-  font-size: 0.6875rem;
+  font-size: max(var(--fs-floor), 0.6875rem);
   line-height: 1.45;
   opacity: 0.6;
   /* Two lines is enough to tell a remake from the original. */
@@ -300,7 +300,7 @@
 
 .wrong-title-note {
   margin: 0.5rem 0 0;
-  font-size: 0.8125rem;
+  font-size: max(var(--fs-floor), 0.8125rem);
 }
 
 /* Files and title and "Where do these go?" (FilesAndTitle.tsx,

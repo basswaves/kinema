@@ -67,9 +67,11 @@ html {
   font-size: calc(16px * var(--ui-scale));
 }
 
-/* 0.909vw is 16px at 1,760 wide; 1.55vh is 16px at 1,032 high. */
+/* 0.909vw is 16px at 1,760 wide; 1.55vh is 16px at 1,032 high. The 23.2px cap
+   lifts only on pages past about 2,600 wide (a 4K screen at 100 %), where the
+   size goes on growing with the page (A10-04); up to 2,560 x 1,440 it is as before. */
 :root:not([data-tv='on']) {
-  font-size: clamp(16px, min(0.909vw, 1.55vh), 23.2px);
+  font-size: clamp(16px, min(0.909vw, 1.55vh), max(23.2px, calc(min(0.6vw, 1.03vh) * 1.5)));
 }
 
 /*
@@ -4249,6 +4251,12 @@ kbd {
 :root[data-look='light'] .top-nav,
 :root[data-look='light'] .btn-secondary {
   backdrop-filter: none;
+}
+
+/* No blur behind the bar in Light, so the gradient stays solid behind the words
+   and fades only at the bottom edge (A10-03). */
+:root[data-look='light'] .top-nav {
+  background: linear-gradient(180deg, rgba(10, 10, 12, 0.96) 0%, rgba(10, 10, 12, 0.92) 70%, rgba(10, 10, 12, 0));
 }
 
 :root[data-look='light'] .hero-logo {

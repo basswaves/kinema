@@ -33,6 +33,29 @@ const day = (secs: number) =>
     year: 'numeric',
   });
 
+interface Remembered {
+  name: string;
+  connected: boolean;
+  last_seen: number;
+}
+
+/**
+ * Devices remembered but not connected, newest first. One whose name is
+ * connected now is left out: a re-created endpoint (new driver, monitor
+ * plugged in again) gets a new id under the same name, and listing the old
+ * one beside the live one says it is both there and away.
+ */
+export function awayDevices<A extends Remembered, B extends Remembered>(
+  displays: A[],
+  audio: B[]
+): (A | B)[] {
+  const gone = <D extends Remembered>(list: D[]): D[] => {
+    const live = new Set(list.filter((d) => d.connected).map((d) => d.name));
+    return list.filter((d) => !d.connected && !live.has(d.name));
+  };
+  return [...gone(displays), ...gone(audio)].sort((a, b) => b.last_seen - a.last_seen);
+}
+
 /** `system` is for the wording only: "What Windows reports", "What Linux reports". */
 export default function EquipmentSection({ system }: { system: string }) {
   const [equipment, setEquipment] = useState<Equipment | null>(null);
@@ -65,10 +88,7 @@ export default function EquipmentSection({ system }: { system: string }) {
 
   const displays = equipment?.displays.filter((d) => d.connected) ?? [];
   const audio = equipment?.audio.filter((a) => a.connected) ?? [];
-  const away = [
-    ...(equipment?.displays.filter((d) => !d.connected) ?? []),
-    ...(equipment?.audio.filter((a) => !a.connected) ?? []),
-  ].sort((a, b) => b.last_seen - a.last_seen);
+  const away = awayDevices(equipment?.displays ?? [], equipment?.audio ?? []);
 
   return (
     <section className="settings-section">

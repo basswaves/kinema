@@ -108,18 +108,48 @@ pub fn existing_file(path: &Path) -> Option<PathBuf> {
     found.into_iter().next()
 }
 
-/// Make Kinema's data folder openable by this account only.
+/// Make Kinema's data folder openable by this account only: the folder 0700,
+/// the library (and its -wal and -shm) and the safety copies 0600.
 ///
-/// It holds the SIMKL and Trakt sign-ins and, outside Windows, a kept
-/// OpenSubtitles password. Windows gives app data that protection already; on
-/// Linux a new folder is readable by every account on the machine.
+/// The folder holds the sign-ins and keys. Windows gives app data that
+/// protection already, and Android's app folder is private to the app; on
+/// Linux a new folder is readable by every account on the machine, and there
+/// is no secret store every desktop has, so this is what keeps them out.
+/// Never an error that stops start-up: the caller logs it.
 pub fn keep_private(dir: &Path) -> std::io::Result<()> {
-    #[cfg(unix)]
+    #[cfg(all(unix, not(target_os = "android")))]
     {
         use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))?;
+        let set = |path: &Path, mode: u32| std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode));
+        set(dir, 0o700)?;
+        let mut first_error = None;
+        let mut note = |r: std::io::Result<()>| {
+            if let Err(e) = r {
+                first_error.get_or_insert(e);
+            }
+        };
+        for name in ["library.db", "library.db-wal", "library.db-shm"] {
+            let file = dir.join(name);
+            if file.exists() {
+                note(set(&file, 0o600));
+            }
+        }
+        let backups = dir.join(crate::db::BACKUP_DIR);
+        if backups.is_dir() {
+            note(set(&backups, 0o700));
+            if let Ok(entries) = std::fs::read_dir(&backups) {
+                for entry in entries.flatten() {
+                    if entry.path().is_file() {
+                        note(set(&entry.path(), 0o600));
+                    }
+                }
+            }
+        }
+        if let Some(e) = first_error {
+            return Err(e);
+        }
     }
-    #[cfg(not(unix))]
+    #[cfg(not(all(unix, not(target_os = "android"))))]
     let _ = dir;
     Ok(())
 }
@@ -131,14 +161,23 @@ mod tests {
     #[test]
     fn keep_private_leaves_the_folder_usable() {
         let dir = std::env::temp_dir().join(format!("kinema-private-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
+        let backups = dir.join(crate::db::BACKUP_DIR);
+        std::fs::create_dir_all(&backups).unwrap();
+        for name in ["library.db", "library.db-wal", "library.db-shm"] {
+            std::fs::write(dir.join(name), "x").unwrap();
+        }
+        std::fs::write(backups.join("copy.db"), "x").unwrap();
         keep_private(&dir).unwrap();
-        std::fs::write(dir.join("library.db"), "x").unwrap();
-        #[cfg(unix)]
+        assert_eq!(std::fs::read(dir.join("library.db")).unwrap(), b"x");
+        #[cfg(all(unix, not(target_os = "android")))]
         {
             use std::os::unix::fs::PermissionsExt;
-            let mode = std::fs::metadata(&dir).unwrap().permissions().mode();
-            assert_eq!(mode & 0o777, 0o700);
+            let mode = |p: &std::path::Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
+            assert_eq!(mode(&dir), 0o700);
+            assert_eq!(mode(&backups), 0o700);
+            for p in ["library.db", "library.db-wal", "library.db-shm", "backups/copy.db"] {
+                assert_eq!(mode(&dir.join(p)), 0o600, "{p}");
+            }
         }
         std::fs::remove_dir_all(&dir).unwrap();
     }

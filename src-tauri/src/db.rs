@@ -1108,7 +1108,7 @@ fn backup_before_upgrade(conn: &Connection, dir: &Path) -> Result<Option<std::pa
 /// backup tool never carries a way into someone's accounts. Restoring a copy
 /// means connecting SIMKL and Trakt again and typing the OMDb key and the
 /// OpenSubtitles password once more; the watch history is all there.
-const SECRET_SETTINGS: [&str; 9] = [
+pub(crate) const SECRET_SETTINGS: [&str; 9] = [
     "simkl_access_token",
     "simkl_refresh_token",
     "trakt_access_token",

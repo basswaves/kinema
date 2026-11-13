@@ -486,6 +486,8 @@ back where you stopped a film or episode, so it continues on your other
 devices; the newer position wins. Trakt's card there, "Continue where
 you stopped on another device", turns that off. SIMKL is only ever sent to.
 
+**Your sign-ins and keys** (SIMKL, Trakt, OpenSubtitles, and any TMDB or OMDb key you typed in) are kept sealed on Windows and Android, so the library file alone does not give them away, and the weekly safety copies leave them out. On Linux the Kinema folder is readable only by you. Restoring a safety copy means connecting SIMKL and Trakt and typing the keys again.
+
 ## Platform support
 
 **Windows 11**, using the WebView2 runtime that ships with it. Nothing else to

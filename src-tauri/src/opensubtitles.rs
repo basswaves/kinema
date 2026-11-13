@@ -66,22 +66,8 @@ fn api_key(conn: &Connection) -> Option<String> {
         .or_else(|| BUILTIN_API_KEY.map(str::trim).filter(|k| !k.is_empty()).map(String::from))
 }
 
-
 fn store(conn: &Connection, key: &str, value: &str) -> Result<(), String> {
     crate::settings::store(conn, key, value)
-}
-
-/// A password kept as `plain:` by an older Kinema is sealed the way this
-/// system seals it, on first read. Where nothing can seal it (Linux, or a
-/// key store that does not answer) it stays as it was: a sign-in is never
-/// lost for the sake of locking it.
-fn seal_kept_password(conn: &Connection) {
-    let Some(stored) = setting(conn, PASSWORD_KEY) else { return };
-    let Some(plain) = stored.strip_prefix("plain:") else { return };
-    let sealed = protect(plain);
-    if !sealed.starts_with("plain:") {
-        let _ = store(conn, PASSWORD_KEY, &sealed);
-    }
 }
 
 fn clear(conn: &Connection, key: &str) -> Result<(), String> {
@@ -92,103 +78,16 @@ fn clear(conn: &Connection, key: &str) -> Result<(), String> {
 
 // ---- the password -------------------------------------------------------------
 
-/// Kept so Kinema can sign in again when the day's sign-in runs out.
-///
-/// On Windows it is encrypted with DPAPI to the Windows user — only that user
-/// on that PC can read it back. On Android it is locked by the system's key
-/// store, as network-share passwords are (`share_logins.rs`). On Linux, with
-/// no secret store every desktop has, it is kept as it is, in Kinema's own
-/// settings, which is how Kodi and Jellyfin keep theirs. The safety copies of
-/// the library leave it out altogether (`db.rs`, `SECRET_SETTINGS`).
+/// Kept so Kinema can sign in again when the day's sign-in runs out. The
+/// settings code locks it with the rest of the sign-ins and keys
+/// (`secrets.rs`); the `plain:` marker is how an older Kinema wrote it and
+/// still reads back.
 fn protect(password: &str) -> String {
-    #[cfg(windows)]
-    if let Some(sealed) = dpapi::seal(password.as_bytes()) {
-        return format!("dpapi:{}", hex(&sealed));
-    }
-    #[cfg(target_os = "android")]
-    if let Ok(sealed) = crate::share_logins::key_store("seal", password) {
-        return format!("keystore:{sealed}");
-    }
     format!("plain:{password}")
 }
 
 fn unprotect(stored: &str) -> Option<String> {
-    if let Some(plain) = stored.strip_prefix("plain:") {
-        return Some(plain.to_string());
-    }
-    #[cfg(target_os = "android")]
-    if let Some(sealed) = stored.strip_prefix("keystore:") {
-        return crate::share_logins::key_store("unseal", sealed).ok();
-    }
-    #[cfg(windows)]
-    if let Some(sealed) = stored.strip_prefix("dpapi:") {
-        let bytes = unhex(sealed)?;
-        return dpapi::open(&bytes).and_then(|b| String::from_utf8(b).ok());
-    }
-    None
-}
-
-#[cfg_attr(not(windows), allow(dead_code))]
-fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{b:02x}")).collect()
-}
-
-#[cfg_attr(not(windows), allow(dead_code))]
-fn unhex(text: &str) -> Option<Vec<u8>> {
-    if !text.len().is_multiple_of(2) {
-        return None;
-    }
-    (0..text.len())
-        .step_by(2)
-        .map(|i| u8::from_str_radix(text.get(i..i + 2)?, 16).ok())
-        .collect()
-}
-
-#[cfg(windows)]
-mod dpapi {
-    use windows::Win32::Foundation::{LocalFree, HLOCAL};
-    use windows::Win32::Security::Cryptography::{
-        CryptProtectData, CryptUnprotectData, CRYPTPROTECT_UI_FORBIDDEN, CRYPT_INTEGER_BLOB,
-    };
-
-    fn take(blob: &CRYPT_INTEGER_BLOB) -> Vec<u8> {
-        // SAFETY: the blob was filled in by DPAPI, which owns `cbData` bytes at
-        // `pbData` until LocalFree below.
-        let out = unsafe { std::slice::from_raw_parts(blob.pbData, blob.cbData as usize).to_vec() };
-        unsafe {
-            let _ = LocalFree(Some(HLOCAL(blob.pbData as _)));
-        }
-        out
-    }
-
-    pub fn seal(data: &[u8]) -> Option<Vec<u8>> {
-        let input = CRYPT_INTEGER_BLOB {
-            cbData: data.len() as u32,
-            pbData: data.as_ptr() as *mut u8,
-        };
-        let mut output = CRYPT_INTEGER_BLOB::default();
-        // SAFETY: input points at `data`, alive for the call; output is
-        // allocated by DPAPI and freed in `take`.
-        unsafe {
-            CryptProtectData(&input, None, None, None, None, CRYPTPROTECT_UI_FORBIDDEN, &mut output)
-                .ok()?;
-        }
-        Some(take(&output))
-    }
-
-    pub fn open(data: &[u8]) -> Option<Vec<u8>> {
-        let input = CRYPT_INTEGER_BLOB {
-            cbData: data.len() as u32,
-            pbData: data.as_ptr() as *mut u8,
-        };
-        let mut output = CRYPT_INTEGER_BLOB::default();
-        // SAFETY: as in `seal`.
-        unsafe {
-            CryptUnprotectData(&input, None, None, None, None, CRYPTPROTECT_UI_FORBIDDEN, &mut output)
-                .ok()?;
-        }
-        Some(take(&output))
-    }
+    Some(stored.strip_prefix("plain:").unwrap_or(stored).to_string())
 }
 
 // ---- the file's fingerprint -----------------------------------------------------
@@ -457,7 +356,6 @@ async fn session(app: &tauri::AppHandle) -> Result<Session, String> {
         let db = app.state::<Db>();
         let conn = db.0.lock().map_err(to_string_err)?;
         let key = api_key(&conn).ok_or("This copy of Kinema has no OpenSubtitles app key.")?;
-        seal_kept_password(&conn);
         (
             key,
             base(&conn),
@@ -951,30 +849,16 @@ mod tests {
 
     #[test]
     fn a_kept_password_reads_back() {
-        let kept = protect("correct horse");
-        // Elsewhere it is kept as given, in a folder only this account can
-        // open (`util::keep_private`): the owner's "no extra work for the
-        // ports".
-        #[cfg(windows)]
-        {
-            assert!(kept.starts_with("dpapi:"), "encrypted on Windows");
-            assert!(!kept.contains("correct horse"));
-        }
-        assert_eq!(unprotect(&kept).as_deref(), Some("correct horse"));
-        assert_eq!(unprotect("plain:abc").as_deref(), Some("abc"));
-        assert_eq!(unprotect("dpapi:zz"), None);
-    }
-
-    #[test]
-    fn an_old_plain_password_is_sealed_where_it_can_be_and_never_lost() {
+        // Locked or not is the settings code's business (`secrets.rs`).
         let conn = Connection::open_in_memory().unwrap();
         conn.execute_batch("CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);").unwrap();
-        store(&conn, PASSWORD_KEY, "plain:old secret").unwrap();
-        seal_kept_password(&conn);
-        let now = setting(&conn, PASSWORD_KEY).unwrap();
-        #[cfg(windows)]
-        assert!(now.starts_with("dpapi:") && !now.contains("old secret"));
-        assert_eq!(unprotect(&now).as_deref(), Some("old secret"));
+        store(&conn, PASSWORD_KEY, &protect("correct horse")).unwrap();
+        let kept = setting(&conn, PASSWORD_KEY).unwrap();
+        assert_eq!(unprotect(&kept).as_deref(), Some("correct horse"));
+        // An older Kinema's plain value still reads back.
+        conn.execute("UPDATE settings SET value = 'plain:old secret'", []).unwrap();
+        let old = setting(&conn, PASSWORD_KEY).unwrap();
+        assert_eq!(unprotect(&old).as_deref(), Some("old secret"));
     }
 
     #[test]

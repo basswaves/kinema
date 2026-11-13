@@ -65,6 +65,7 @@ mod selftest;
 mod startup_dialog;
 mod reach;
 mod report;
+mod secrets;
 mod settings;
 mod share_logins;
 mod simkl;
@@ -182,6 +183,10 @@ fn open_library(app: &tauri::AppHandle) -> Result<(), String> {
         Ok(conn) => conn,
         Err(e) => open_from_a_safety_copy(app, &dir, &path, e)?,
     };
+    // The library's own files now exist (-wal, -shm): the same again, for them.
+    if let Err(e) = util::keep_private(&dir) {
+        log!("could not make the library files private to this account: {e}");
+    }
     // A library brought from another system (a restored safety copy).
     match artwork::use_this_systems_separator(&primary) {
         Ok(0) => {}

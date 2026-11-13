@@ -21,21 +21,31 @@ pub fn setting(conn: &rusqlite::Connection, key: &str) -> Option<String> {
     )
     .ok()
     .filter(|v| !v.trim().is_empty())
+    .and_then(|v| crate::secrets::from_storage(conn, key, v))
 }
 
 #[tauri::command]
 pub fn get_setting(db: tauri::State<Db>, key: String) -> Result<Option<String>, String> {
     let conn = db.0.lock().map_err(to_string_err)?;
-    conn.query_row(
-        "SELECT value FROM settings WHERE key = ?1",
-        params![&key],
-        |r| r.get::<_, String>(0),
-    )
-    .map(Some)
-    .or_else(|e| match e {
-        rusqlite::Error::QueryReturnedNoRows => Ok(None),
-        other => Err(to_string_err(other)),
-    })
+    let stored = conn
+        .query_row(
+            "SELECT value FROM settings WHERE key = ?1",
+            params![&key],
+            |r| r.get::<_, String>(0),
+        )
+        .map(Some)
+        .or_else(|e| match e {
+            rusqlite::Error::QueryReturnedNoRows => Ok(None),
+            other => Err(to_string_err(other)),
+        })?;
+    // Sealed secrets are opened here; a blank one stays blank, as before.
+    Ok(stored.and_then(|v| {
+        if v.trim().is_empty() {
+            Some(v)
+        } else {
+            crate::secrets::from_storage(&conn, &key, v)
+        }
+    }))
 }
 
 #[tauri::command]
@@ -51,10 +61,11 @@ const PROVIDER_KEYS: [&str; 3] = ["tmdb_api_key", "omdb_api_key", "tmdb_builtin_
 
 pub(crate) fn store(conn: &rusqlite::Connection, key: &str, value: &str) -> Result<(), String> {
     let before = setting(conn, key);
+    let kept = crate::secrets::for_storage(key, value);
     conn.execute(
         "INSERT INTO settings (key, value) VALUES (?1, ?2)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-        params![key, value],
+        params![key, kept],
     )
     .map_err(to_string_err)?;
 

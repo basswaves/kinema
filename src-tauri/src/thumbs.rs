@@ -26,7 +26,7 @@ pub const SCHEME: &str = "thumb";
 
 /// The sizes made, which `thumbSize` in `Art.tsx` chooses from. A few fixed ones,
 /// so a window dragged wider does not make a new set of every picture.
-const WIDTHS: [u32; 6] = [240, 360, 480, 720, 960, 1280];
+const WIDTHS: [u32; 7] = [240, 360, 480, 720, 960, 1280, 1920];
 
 /// Inside the artwork folder (`artwork::clear_artwork_cache` knows it too).
 pub const FOLDER: &str = "thumbs";
@@ -200,6 +200,16 @@ mod tests {
         // Between the quick step and straight to the filter.
         let out = image::load_from_memory(&shrink(&jpeg(500, 750), 240).unwrap()).unwrap();
         assert_eq!((out.width(), out.height()), (240, 360));
+    }
+
+    #[test]
+    fn a_screen_sized_copy_of_a_big_picture_is_made_and_a_damaged_one_is_refused_not_passed_on() {
+        // 1920 is asked for by a title's backdrop (A6-08, `Art.tsx` screenRem).
+        assert!(WIDTHS.contains(&1920));
+        let big = shrink(&jpeg(6000, 4000), 1920).unwrap();
+        let out = image::load_from_memory(&big).unwrap();
+        assert_eq!((out.width(), out.height()), (1920, 1280));
+        assert!(shrink(b"\xff\xd8\xffnot a picture", 1920).is_err());
     }
 
     #[test]

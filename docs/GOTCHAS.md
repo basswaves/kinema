@@ -1404,6 +1404,15 @@ kernel's out-of-memory killer, with no error in the app. `Art.tsx` now, where a
 small copy is asked for, falls back to the remote picture and then the drawn
 poster, never to the original (same PC, same pictures: peak 909 MB, no stall).
 
+The title page's backdrop and poster and Home's big picture were left out (no
+`thumbRem`), so a print-size fanart (14000×14000: 780 MB; 30000×30000: about
+3.6 GB) was drawn as itself there. They now pass `screenRem` to `Art`: a
+screen-sized `thumb://` copy (window width, or the poster's rem, times the
+pixel ratio, never above 1920 — the largest size `thumbs.rs` makes), with the
+same fallback, remote picture then drawn one, never the original. **Do:** a new
+picture on any page asks for a copy (`thumbRem` in a grid, `screenRem` where it
+is the point); `Art.test.tsx` checks the three call sites.
+
 ### An Enter a text field acts on must stop there
 
 A field's `onEnter` that answers at once (a sign-in against the mock) put

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fileName, thumbSize } from './thumbSize';
+import { detailThumbSize, fileName, thumbSize } from './thumbSize';
 
 describe('thumbSize', () => {
   it('takes the next size up from what the card needs on this screen', () => {
@@ -11,6 +11,16 @@ describe('thumbSize', () => {
 
   it('has no answer past the largest, and then the picture itself is used', () => {
     expect(thumbSize(16.75, 64, 2)).toBeNull();
+  });
+});
+
+describe('detailThumbSize', () => {
+  it('fits the window and never goes past 1920, and always has an answer', () => {
+    expect(detailThumbSize(null, 16, 1280, 1)).toBe(1280);
+    expect(detailThumbSize(null, 16, 1920, 1)).toBe(1920);
+    expect(detailThumbSize(null, 32, 1920, 2)).toBe(1920); // 4K TV
+    expect(detailThumbSize(11.875, 16, 1920, 1)).toBe(240);
+    expect(detailThumbSize(11.875, 32, 1920, 2)).toBe(960);
   });
 });
 

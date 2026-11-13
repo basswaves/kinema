@@ -609,6 +609,7 @@ export default function TitleDetailView({
       <div className="detail" ref={ref}>
         <Art
           className="detail-backdrop"
+          screenRem="window"
           local={shown.backdrop_path}
           remote={shown.backdrop_url}
           fallback={<div className="detail-backdrop drawn-backdrop" style={drawnStyle(shown.title, shown.year)} />}
@@ -626,6 +627,7 @@ export default function TitleDetailView({
           <div className="detail-head">
             <Art
               className="detail-poster"
+              screenRem={11.875}
               local={shown.poster_path}
               remote={sizedPoster(shown.poster_url, 'w780')}
               fallback={<DrawnPoster className="detail-poster" title={shown.title} year={shown.year} />}

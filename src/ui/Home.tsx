@@ -427,6 +427,7 @@ function Hero({
       <header className="hero" ref={ref}>
         <Art
           className="hero-backdrop"
+          screenRem="window"
           local={title.backdrop_path}
           remote={title.backdrop_url}
           fallback={<div className="hero-backdrop drawn-backdrop" style={drawnStyle(title.title, title.year)} />}

@@ -3,7 +3,7 @@
  * same widths): the card's width on this screen, scaled for a card that grows
  * when focused, and the next size up, so 4K and high-DPI screens stay sharp.
  */
-const WIDTHS = [240, 360, 480, 720, 960, 1280];
+const WIDTHS = [240, 360, 480, 720, 960, 1280, 1920];
 
 /** How much a card grows with the ring on it (`.card.focused`, `ui.css`). */
 const FOCUS_GROWTH = 1.07;
@@ -12,6 +12,19 @@ const FOCUS_GROWTH = 1.07;
 export function thumbSize(rem: number, remPx: number, dpr: number): number | null {
   const needs = rem * remPx * dpr * FOCUS_GROWTH;
   return WIDTHS.find((width) => width >= needs) ?? null;
+}
+
+/**
+ * The width for a picture on a title's own page or Home's big picture: what it
+ * is drawn at on this screen, never more than the largest copy. Unlike a grid
+ * card there is no "too big for a copy, show the original": a 14000-pixel
+ * fanart at full size is 780 MB in the page, and a 1920-wide copy is what a 4K
+ * backdrop (under a scrim) needs. `rem` is the drawn width in rem, or null for
+ * the whole window.
+ */
+export function detailThumbSize(rem: number | null, remPx: number, windowPx: number, dpr: number): number {
+  const needs = (rem === null ? windowPx : rem * remPx) * dpr;
+  return WIDTHS.find((width) => width >= needs) ?? WIDTHS[WIDTHS.length - 1];
 }
 
 /** The root's font size in pixels: it is what TV mode scales the interface by. */

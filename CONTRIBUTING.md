@@ -674,7 +674,9 @@ reasoning is in [docs/DESIGN.md](docs/DESIGN.md) and [docs/HISTORY.md](docs/HIST
   present. On Windows one button installs ffmpeg: Kinema still downloads
   nothing itself — on that press, and only then, it asks Windows' own package
   manager (winget) to install Gyan's build, which then belongs to winget, not
-  to Kinema, and stays if Kinema is removed.
+  to Kinema, and stays if Kinema is removed. The winget package for Kinema declares
+  Gyan's ffmpeg as a dependency, so installing Kinema through winget installs
+  it too, without the press; this is deliberate and the README says so.
   One exception, for building only: the Android project's
   `gradle/wrapper/gradle-wrapper.jar` (Gradle's own 59 KB starter, which
   every Android project keeps). It runs on the build machine and is never

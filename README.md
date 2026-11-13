@@ -257,7 +257,9 @@ On Windows you can use either file:
   for your own Windows account only, so it does not ask for an administrator.
   It adds a Start menu entry and a desktop shortcut, and lists Kinema in
   Settings → Apps. If Windows lacks Microsoft's WebView2 (most have it), the
-  installer fetches it from Microsoft. To remove Kinema, use Settings → Apps.
+  installer fetches it from Microsoft, so it needs an internet connection that
+  one time; without one it stops with "Failed to install WebView2" and installs
+  nothing. To remove Kinema, use Settings → Apps.
   That removes the program, the shortcuts and the "Offer Kinema as a video
   player" entries in Windows. It then asks, with a box you must tick, whether
   to delete your library and settings too; left unticked, they stay. Installing
@@ -303,11 +305,22 @@ sudo apt install ./kinema-linux-amd64.deb    # Ubuntu 24.04 or later, Debian 13
 ```
 
 ```bash
-sudo dnf install ./kinema-linux-x86_64.rpm   # Fedora
+sudo dnf install --setopt=install_weak_deps=False ./kinema-linux-x86_64.rpm   # Fedora
 ```
 
-Anything else: unpack the folder and run `./kinema`; its README.txt names the
-two libraries to install. Updates are as on Windows: Kinema says when there
+The `--setopt=install_weak_deps=False` keeps Fedora from adding yt-dlp and
+Python through mpv-libs' optional dependencies; Kinema never starts yt-dlp. If
+you want ffmpeg for the detail page's badges, install it yourself (see below).
+
+Anything else: unpack the folder and run `./kinema`; it needs Ubuntu 24.04 or
+Debian 13 or newer (or a distribution of the same age), plus the system's mpv
+library (`libmpv.so.2`), WebKitGTK 4.1, GTK 3 and sound libraries; its
+README.txt names the packages to install. On Ubuntu 22.04 the folder opens but
+cannot play, because that release only has the older libmpv1.
+
+Removing the Linux package leaves your library and settings, which live in
+`~/.local/share/com.kinema.app` and `~/.cache/com.kinema.app`; delete those
+folders if you want them gone. Updates are as on Windows: Kinema says when there
 is one, and you install it when you choose.
 
 **HDR on Linux** needs three things, and Kinema says in its stats panel
@@ -429,6 +442,11 @@ it straight away and reads your files with it in the background. It is then a
 program of its own: it stays if Kinema is removed, and `winget uninstall
 Gyan.FFmpeg.Essentials` removes it. A Windows without winget gets the download
 page instead.
+
+**Installing Kinema with winget** (`winget install Basswaves.Kinema`) installs
+the same ffmpeg first, because the winget package lists it as a dependency; you
+do not need to press the button then. Uninstalling Kinema leaves it, as above.
+The installer from this page does not install ffmpeg until you press the button.
 
 Elsewhere — or to use a copy you already have — put ffmpeg on your `PATH`, or
 point Settings at it. On Linux the `.deb` and `.rpm` packages recommend it.
@@ -650,4 +668,5 @@ uses Google's Media3 player (Apache-2.0) instead. It uses data from TMDB,
 TVmaze, Wikidata, Wikipedia, TheIntroDB and IntroDB, each under their own terms. [NOTICE.md](NOTICE.md) has the
 detail.
 
-This product uses the TMDB API but is not endorsed or certified by TMDB.
+<img src="public/tmdb.svg" alt="TMDB" height="20"><br>
+This product uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB.

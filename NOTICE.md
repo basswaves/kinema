@@ -112,7 +112,7 @@ here.
 
 ### TMDB
 
-This product uses the TMDB API but is **not endorsed or certified by TMDB**.
+This product uses TMDB and the TMDB APIs but is **not endorsed, certified, or otherwise approved by TMDB**.
 
 Data and images from [The Movie Database](https://www.themoviedb.org), used
 non-commercially under [TMDB's terms of use](https://www.themoviedb.org/api-terms-of-use).

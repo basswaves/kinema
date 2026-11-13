@@ -28,6 +28,19 @@ import { spawn, execSync } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createServer } from 'node:net';
+import { cpus } from 'node:os';
+
+/** A port nothing listens on, so two verify runs (two worktrees) never share a dev server. */
+const freePort = () =>
+  new Promise((resolve, reject) => {
+    const s = createServer();
+    s.once('error', reject);
+    s.listen(0, () => {
+      const { port } = s.address();
+      s.close(() => resolve(port));
+    });
+  });
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const logDir = join(root, '.verify');
@@ -134,6 +147,20 @@ if (groups.has('nav')) {
   lanes.push([{ name: 'test:nav', cmd: `npx playwright test -c playwright.nav.config.ts ${pwProjects}` }]);
 }
 
+// Playwright's dev server: its own free port per run. When the keyboard flows
+// and the navigation walk run side by side, each takes half the cores (two
+// pools of one-per-core starved each other and the cargo lane: timeouts that
+// pass alone, see GOTCHAS "e2e under load").
+const both = groups.has('ui') && groups.has('nav');
+const pwWorkers = both ? { KINEMA_E2E_WORKERS: String(Math.max(2, Math.floor(cpus().length / 2))) } : {};
+for (const lane of lanes)
+  for (const step of lane) {
+    if (step.name === 'playwright')
+      step.env = { ...pwWorkers, KINEMA_E2E_PORT: String(await freePort()) };
+    if (step.name === 'test:nav')
+      step.env = { ...pwWorkers, KINEMA_E2E_NAV_PORT: String(await freePort()) };
+  }
+
 const TAIL = 40;
 const results = [];
 
@@ -143,7 +170,7 @@ function runStep(step) {
     const child = spawn(step.cmd, {
       cwd: root,
       shell: true,
-      env: { ...process.env, FORCE_COLOR: '0', CI: process.env.CI ?? '' },
+      env: { ...process.env, FORCE_COLOR: '0', CI: process.env.CI ?? '', ...(step.env ?? {}) },
     });
     let out = '';
     child.stdout.on('data', (d) => (out += d));

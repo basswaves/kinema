@@ -139,8 +139,8 @@ test('every setting the search knows is found on its section, next to its name',
       await page
         .locator('.settings-search-result', { has: page.locator('span:first-child', { hasText: label }) })
         .first()
-        .click({ timeout: 2000 });
-    }).toPass({ timeout: 15_000 });
+        .click({ timeout: 4000 });
+    }).toPass({ timeout: 30_000 });
     // The ring on a control in the same row, field or part as the name.
     const near = await page
       .waitForFunction(

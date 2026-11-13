@@ -16,7 +16,9 @@ import { defineConfig } from '@playwright/test';
 // (vite.config.ts does the same with a ts-expect-error).
 declare const process: { platform: string; env: Record<string, string | undefined> };
 
-const PORT = 1440;
+// 1440 for a plain `npx playwright test`; `npm run verify` picks a free one
+// (KINEMA_E2E_PORT) so two runs in two worktrees do not collide.
+const PORT = Number(process.env.KINEMA_E2E_PORT ?? 1440);
 
 export default defineConfig({
   testDir: 'e2e',
@@ -26,7 +28,10 @@ export default defineConfig({
   // What a check waits for is a state, and a starved runner reaches it late,
   // not never: 5 s ended two flows in two ×5 runs (round 7, F5) with the app
   // right. A wrong app still fails, a little later.
-  expect: { timeout: 15_000 },
+  // 2026-11-13: 30 s. A run beside a build (3 busy cores here) still lost one
+  // starved startup wait in two of three full runs (a page that had not drawn
+  // its first focus in 15 s), a different flow each time, all passing alone.
+  expect: { timeout: 30_000 },
   // No retries, here or on CI, and a pass that needed one is a failure: a flake
   // must never hide behind a second try (round 7, F5). `failOnFlakyTests`
   // is the second lock should someone add `retries` later.
@@ -39,8 +44,21 @@ export default defineConfig({
   // 4 cores (WebKit, 122 flows): 1 worker 8.6 min, 6 with fullyParallel
   // 1.7 min and steady over three runs, 8 started to fail. So: one per core
   // here (the owner uses the computer meanwhile), 5 on CI's 4-core runner.
+  // 2026-11-13, 6 cores, Windows: one per core still failed whenever anything
+  // else ran (cargo, the nav lane, another worktree's verify): WebKit-on-
+  // Windows flows that take 10 s alone took 45 s, `goto` and the first checks
+  // ran out of time, and every one passed alone. Half the cores, then; and
+  // `KINEMA_E2E_WORKERS` for a caller that knows better (verify sets it when
+  // two Playwright runs share the machine).
   fullyParallel: true,
-  workers: process.env.CI ? 5 : '100%',
+  workers: process.env.KINEMA_E2E_WORKERS
+    ? Number(process.env.KINEMA_E2E_WORKERS)
+    : process.env.CI
+      ? 5
+      : '50%',
+  // Loads the app once so Vite's cold transforms are not paid by the first
+  // pages all at once (e2e/warmupSetup.ts).
+  globalSetup: './e2e/warmupSetup.ts',
   reporter: [['list']],
   use: {
     baseURL: `http://localhost:${PORT}`,

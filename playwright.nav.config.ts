@@ -10,7 +10,7 @@ import { defineConfig } from '@playwright/test';
 
 declare const process: { platform: string; env: Record<string, string | undefined> };
 
-const PORT = 1441;
+const PORT = Number(process.env.KINEMA_E2E_NAV_PORT ?? 1441);
 
 const ENGINES = [
   { name: 'webkit', use: { browserName: 'webkit' as const } },
@@ -24,7 +24,7 @@ export default defineConfig({
   // Not `.spec.ts` or `.e2e.ts`: neither vitest nor `npm run test:ui` runs these.
   testMatch: '**/*.nav.ts',
   // Clears the parts of the last run (navmap-results/parts/).
-  globalSetup: './e2e/navmapSetup.ts',
+  globalSetup: ['./e2e/navmapSetup.ts', './e2e/warmupSetup.ts'],
   timeout: 40 * 60_000,
   retries: 0,
   failOnFlakyTests: true,
@@ -33,7 +33,11 @@ export default defineConfig({
   // one worker per core, 5 on CI's 4-core runner (8 on 4 cores started to
   // fail the keyboard flows).
   fullyParallel: true,
-  workers: process.env.CI ? 5 : '100%',
+  workers: process.env.KINEMA_E2E_WORKERS
+    ? Number(process.env.KINEMA_E2E_WORKERS)
+    : process.env.CI
+      ? 5
+      : '50%',
   reporter: [['list']],
   use: {
     baseURL: `http://localhost:${PORT}`,

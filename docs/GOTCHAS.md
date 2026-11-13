@@ -1847,6 +1847,23 @@ time checks and the input pacing go through `pause(page, ms, why)` in
 `e2e/kb.ts`, the one place eslint allows `waitForTimeout`. `open()` waits
 30 s for the page: expect's 5 s ended a starved startup as a failure.
 
+### The e2e suite fails under load and passes alone (2026-11-13)
+
+A full `npm run verify -- --all`, or any run beside a cargo build or another
+worktree's verify, ended a few flows with a timeout (`page.goto`, "Previous
+file" never attached) that passed alone. No app error: the app was right and
+late. Cause: one worker per core, and `verify` ran the keyboard flows and the
+nav walk at once, so two pools of that size plus cargo on 6 cores; WebKit on
+Windows runs the same flow about 4x slower than Edge (10 s became 45 s of a
+60 s test), and the first pages of a run all waited on Vite's cold
+transforms. (`useFolderNeighbours` is a plain async call, no timer: not an
+app race.) **Do:** workers default to half the cores (`KINEMA_E2E_WORKERS`
+overrides; verify halves them again when ui and nav share the machine),
+`e2e/warmupSetup.ts` loads the app once before the flows, and the dev-server
+port is `KINEMA_E2E_PORT` / `KINEMA_E2E_NAV_PORT` (verify picks free ones, so
+two worktrees can verify at once; a plain `npx playwright test` is still
+1440). Do not answer the next one with a longer timeout or a retry.
+
 ### Screenshot baselines are per engine and per OS
 
 `toHaveScreenshot` names a picture `name-<look>-<engine>-<platform>.png`:

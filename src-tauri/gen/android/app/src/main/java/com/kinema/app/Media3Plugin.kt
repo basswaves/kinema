@@ -862,8 +862,26 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
     return when {
       decoderTaken(error) ->
         "the video decoder on this device is in use by something else. Close other video apps and try again."
-      error.errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED ->
-        "Android's player cannot open this kind of file" + (path?.substringAfterLast('.', "")?.takeIf { it.isNotEmpty() && it.length <= 5 }?.let { " (.$it)" } ?: "") + "."
+      error.errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED -> {
+        val ext = path?.substringAfterLast('.', "")?.lowercase()?.takeIf { it.isNotEmpty() && it.length <= 5 }
+        // A kind Android's player does read, that it could not read here: the
+        // file is the trouble, not the kind (A4-03).
+        if (ext in setOf("mkv", "mp4", "m4v", "mov", "ts", "m2ts", "webm", "avi"))
+          "it could not be read as a video. The file may be damaged or incomplete."
+        else
+          "Android's player cannot open this kind of file" + (ext?.let { " (.$it)" } ?: "") + "."
+      }
+      error.errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED ||
+        error.errorCode == PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED ->
+        "it could not be read as a video. The file may be damaged or incomplete."
+      error.errorCode == PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE ->
+        "the file ends sooner than it should. It may be incomplete."
+      error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ||
+        error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
+        error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT ->
+        "could not read the file. It may be incomplete, or its drive or share may have gone away."
+      error.errorCode == PlaybackException.ERROR_CODE_IO_UNSPECIFIED ->
+        "could not read the file. It may be damaged, or its drive may be unavailable."
       error.errorCode == PlaybackException.ERROR_CODE_DECODER_INIT_FAILED ||
         error.errorCode == PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES ||
         error.errorCode == PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED ||
@@ -873,7 +891,8 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
         "the file is not there any more. It may have been moved, or its drive may be unplugged."
       error.errorCode == PlaybackException.ERROR_CODE_IO_NO_PERMISSION ->
         "Kinema is not allowed to read it. Check Kinema's permissions in the system's settings."
-      else -> error.errorCodeName + (error.message?.let { ": $it" } ?: "")
+      // The code name is in the log; the screen gets words (A4-04).
+      else -> "the player stopped with an error it has no words for. The file may be damaged or unsupported."
     }
   }
 

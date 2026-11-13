@@ -3158,3 +3158,14 @@ the error's source chain, which the webview never sees. Every failure then
 looked the same, and the log held the keys. **Do:** use `reach.rs`
 (`check_reach`) to ask the host again from Rust, and never print the raw URL
 without `applog`'s key hiding.
+
+### mpv plays a text file named `.mkv` as a playlist and fetches what it names
+
+mpv picks the demuxer by content, not by extension: an M3U, PLS, CUE or mpv
+EDL saved as `.mkv` is opened as that playlist, and mpv then requests every
+address in it, `http://` included. With yt-dlp installed, mpv's ytdl helper
+visits the address again posing as a browser. **Do:** keep
+`access-references=no` and `ytdl=no` in `BASE_MPV_OPTIONS` (`mpvOptions.ts`);
+Kinema reads its own playlists. The same switch also turns off Matroska
+ordered chapters (mpv `demux_mkv_timeline.c`), so such a file plays straight
+through; `bd://` and `sub-add` are not references and still work.

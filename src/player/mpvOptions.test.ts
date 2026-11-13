@@ -48,3 +48,13 @@ describe('the log', () => {
     expect(Object.keys(BASE_MPV_OPTIONS).slice(0, 2)).toEqual(['log-file', 'msg-level']);
   });
 });
+
+describe('BASE_MPV_OPTIONS: nothing is fetched that a file only points to', () => {
+  it('does not follow playlists, EDL or CUE inside a file', () => {
+    expect(BASE_MPV_OPTIONS['access-references']).toBe('no');
+  });
+
+  it('never hands an address to yt-dlp', () => {
+    expect(BASE_MPV_OPTIONS.ytdl).toBe('no');
+  });
+});

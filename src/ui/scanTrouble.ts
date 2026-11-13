@@ -60,6 +60,17 @@ export interface ScanTrouble {
   note: string | null;
   /** Only background stages failed: said once on Home, not on every tab. */
   homeOnly?: true;
+  /** The lookups failed for want of a connection: Home says so, not that the names are wrong. */
+  offline?: true;
+}
+
+/**
+ * Whether the scan's errors say the services could not be reached (reach.ts,
+ * match.ts): a first scan with no internet names nothing, and the page must
+ * blame the connection, not the file names (A2-01).
+ */
+export function lookupsUnreachable(errors: string[]): boolean {
+  return errors.some((e) => /could not be reached|did not answer in time/.test(e));
 }
 
 /**

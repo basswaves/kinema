@@ -41,7 +41,11 @@ import { dismissFfmpegNotice, readFfmpegNotice } from './ffmpegNotice';
 import { ffmpegInstalled, useFfmpegInstall } from './ffmpegInstallState';
 import { needsOwnTmdbKey } from '../metadata/builtinKey';
 import { availableUpdate } from './updates';
-import { scanTrouble as describeScanTrouble, type ScanTrouble } from './scanTrouble';
+import {
+  lookupsUnreachable,
+  scanTrouble as describeScanTrouble,
+  type ScanTrouble,
+} from './scanTrouble';
 import { runScanPipeline, useScanStatus } from '../library/pipeline';
 import { setPlaybackActive } from '../library/playback';
 import { getTitleDetail, listTitles, powerAction, type Title } from './api';
@@ -362,6 +366,12 @@ export default function Browse() {
           setScanFailed({
             text: `Could not read your library folders: ${describeError(outcome.error)}`,
             note: null,
+          });
+        } else if (outcome.status === 'done' && lookupsUnreachable(outcome.summary.errors)) {
+          setScanFailed({
+            text: 'Kinema could not reach the services that name films and shows. Check the internet connection',
+            note: 'Kinema asks again at the next scan and every time it starts',
+            offline: true,
           });
         }
       })

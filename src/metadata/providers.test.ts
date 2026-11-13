@@ -245,6 +245,12 @@ describe('OMDb Rotten Tomatoes score', () => {
     expect(await ask(200, { Response: 'False', Error: 'Incorrect IMDb ID.' })).toBeNull();
   });
 
+  it('does not turn an unreadable answer into "no score" (A6-07)', async () => {
+    const said = await ask(200, null);
+    expect(said).toBeInstanceOf(Error);
+    expect((said as Error).message).toBe('OMDb sent an answer Kinema could not read');
+  });
+
   it('stops the pass on a wrong key or a spent allowance', async () => {
     const wrongKey = await ask(401, { Response: 'False', Error: 'Invalid API key!' });
     expect(wrongKey).toBeInstanceOf(OmdbStop);

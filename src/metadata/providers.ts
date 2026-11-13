@@ -437,13 +437,31 @@ export async function fetchPolitely(
   }
 }
 
+/**
+ * An answer's body as JSON, or a plain sentence when it is not: a portal's
+ * page, a cut-short answer, `null`. Never the parser's own words (A6-07).
+ */
+export async function readJson<T>(response: Response, service: string): Promise<T> {
+  let data: unknown;
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error(`${service} sent an answer Kinema could not read`);
+  }
+  if (data === null || typeof data !== 'object') {
+    throw new Error(`${service} sent an answer Kinema could not read`);
+  }
+  return data as T;
+}
+
 export async function tvmazeSearch(title: string): Promise<Candidate[]> {
   return tvmazeQueued(async () => {
     const url = `https://api.tvmaze.com/search/shows?q=${encodeURIComponent(title)}`;
     const response = await fetchPolitely(url, 'TVmaze search');
     if (!response.ok) throw new Error(`TVmaze search failed: HTTP ${response.status}`);
 
-    const results = (await response.json()) as Array<{ show: TvmazeShow }>;
+    const results = await readJson<Array<{ show: TvmazeShow }>>(response, 'TVmaze');
+    if (!Array.isArray(results)) throw new Error('TVmaze sent an answer Kinema could not read');
     return results.slice(0, 8).map(({ show }) => ({
       providerId: String(show.id),
       title: show.name,
@@ -461,7 +479,7 @@ export async function tvmazeGetShow(id: string): Promise<TitleMetadata> {
   const show = await tvmazeQueued(async () => {
     const response = await fetchPolitely(`https://api.tvmaze.com/shows/${id}`, 'TVmaze show');
     if (!response.ok) throw new Error(`TVmaze show failed: HTTP ${response.status}`);
-    return (await response.json()) as TvmazeShow;
+    return readJson<TvmazeShow>(response, 'TVmaze');
   });
 
   // Backdrop art lives on a separate endpoint and is the reason TVmaze is
@@ -667,7 +685,7 @@ async function tmdbGet<T>(key: string, path: string, params?: Record<string, str
       throw new TmdbKeyRejected(`TMDB ${path} failed: HTTP 401, the key was not accepted`);
     }
     if (!response.ok) throw new Error(`TMDB ${path} failed: HTTP ${response.status}`);
-    return (await response.json()) as T;
+    return readJson<T>(response, 'TMDB');
   });
 }
 
@@ -1002,7 +1020,7 @@ export async function omdbGetMovie(key: string, imdbId: string): Promise<TitleMe
   );
   if (!response.ok) throw new Error(`OMDb lookup failed: HTTP ${response.status}`);
 
-  const d = (await response.json()) as Record<string, string>;
+  const d = await readJson<Record<string, string>>(response, 'OMDb');
   if (d.Response === 'False') throw new Error(`OMDb: ${d.Error ?? 'unknown error'}`);
 
   const runtime = Number((d.Runtime ?? '').replace(/[^0-9]/g, ''));
@@ -1049,10 +1067,16 @@ export async function omdbTomatometer(key: string, imdbId: string): Promise<numb
   );
   let data: { Response?: string; Error?: string; Ratings?: Array<{ Source?: string; Value?: string }> } =
     {};
+  let readable = true;
   try {
     data = (await response.json()) ?? {};
   } catch {
-    // An unreadable body falls through to the status check below.
+    readable = false;
+  }
+  // An answer that is not an answer is an error, not "no score": a score
+  // already stored must not be written over with nothing (A6-07).
+  if (response.ok && (!readable || typeof data !== 'object')) {
+    throw new Error('OMDb sent an answer Kinema could not read');
   }
 
   if (!response.ok || data.Response === 'False') {

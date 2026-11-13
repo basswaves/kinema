@@ -151,6 +151,7 @@ export default function Home(props: Props) {
             reviewCount={reviewCount}
             onReview={onReview}
             onAddFolder={onAddFolder}
+            offline={scanTrouble?.offline === true}
           />
         </FocusScreen>
       );
@@ -180,11 +181,13 @@ function NothingNamed({
   reviewCount,
   onReview,
   onAddFolder,
+  offline = false,
 }: {
   files: number;
   reviewCount: number;
   onReview: () => void;
   onAddFolder?: () => void;
+  offline?: boolean;
 }) {
   const { ref, focusKey } = useNavGroup({ kind: 'column' }, { focusKey: NOTHING_NAMED_FOCUS_KEY });
   // The count of files to review comes after Home is up: the ring, already on
@@ -194,7 +197,18 @@ function NothingNamed({
   return (
     <FocusProvider value={focusKey}>
       <section className="first-run first-scan nothing-named" ref={ref}>
-        {files > 0 ? (
+        {files > 0 && offline ? (
+          <>
+            <h1>
+              Kinema found {count(files, 'file')} but could not reach the internet to name{' '}
+              {files === 1 ? 'it' : 'them'}
+            </h1>
+            <p className="muted">
+              Check the connection. Kinema asks again at the next scan and every time it starts, so
+              nothing needs renaming.
+            </p>
+          </>
+        ) : files > 0 ? (
           <>
             <h1>
               Kinema found {count(files, 'file')} but could not name {files === 1 ? 'it' : 'them'}

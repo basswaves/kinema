@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { scanTrouble, unreachableFolders } from './scanTrouble';
+import { lookupsUnreachable, scanTrouble, unreachableFolders } from './scanTrouble';
 
 const away = (path: string) => `root unavailable, skipped: ${path}`;
 const tmdb = 'A film: TMDB /search/movie failed: HTTP 401, the key was not accepted';
@@ -102,5 +102,17 @@ describe('unreachableFolders', () => {
     expect(
       unreachableFolders(['root unavailable, skipped: E:/TV', 'videos gone: 3 :: E:/Films/Old', 'TMDB said no'])
     ).toEqual(['E:/TV']);
+  });
+});
+
+describe('lookupsUnreachable', () => {
+  it('knows a first scan that never reached the services', () => {
+    expect(
+      lookupsUnreachable([
+        'A film: TMDB could not be reached: timed out, and neither could Wikidata. Check the internet connection.',
+      ])
+    ).toBe(true);
+    expect(lookupsUnreachable([tmdb])).toBe(false);
+    expect(lookupsUnreachable([])).toBe(false);
   });
 });

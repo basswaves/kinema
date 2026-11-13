@@ -1027,6 +1027,7 @@ pub fn open(path: &Path) -> Result<Connection, DbError> {
         backup_before_upgrade(&conn, &dir.join(BACKUP_DIR))?;
     }
     migrate(&conn)?;
+    clamp_future_times(&conn, crate::util::now_secs())?;
     let reasked = crate::lifecycle::reask_after_new_rules(&conn)?;
     if reasked > 0 {
         crate::log!("matching: new rules; {reasked} refused or untitled file(s) will be read again");
@@ -1037,6 +1038,22 @@ pub fn open(path: &Path) -> Result<Connection, DbError> {
         crate::log!("matching: new rules; {to_check} matched file(s) to read again for Worth a look");
     }
     Ok(conn)
+}
+
+/// A time written while the clock ran ahead stays "newest" until real time
+/// catches up: first in Continue watching, and no TMDB refresh for just as
+/// long. Anything more than a day ahead of now is set to now (A5-05). A day's
+/// slack leaves a time-zone slip alone; every time here is seconds since 1970.
+fn clamp_future_times(conn: &Connection, now: i64) -> rusqlite::Result<usize> {
+    let limit = now + 86_400;
+    let mut n = 0;
+    n += conn.execute("UPDATE playback_state SET updated_at = ?1 WHERE updated_at > ?2", [now, limit])?;
+    n += conn.execute("UPDATE loose_playback SET updated_at = ?1 WHERE updated_at > ?2", [now, limit])?;
+    n += conn.execute("UPDATE titles SET fetched_at = ?1 WHERE fetched_at > ?2", [now, limit])?;
+    if n > 0 {
+        crate::log!("library: {n} time(s) written while the clock ran ahead set back to now");
+    }
+    Ok(n)
 }
 
 /// Where the safety copies go, beside the database.
@@ -1584,6 +1601,18 @@ mod tests {
         )
         .unwrap();
         (dir, conn)
+    }
+
+    /// A5-05: times a year ahead come back to now; honest ones stay.
+    #[test]
+    fn times_from_a_wrong_clock_are_set_back() {
+        let (_dir, conn) = library_on_disk("clamp", 38);
+        conn.execute("UPDATE playback_state SET updated_at = 5000000", []).unwrap();
+        clamp_future_times(&conn, 1_000_000).unwrap();
+        let at: i64 = conn.query_row("SELECT updated_at FROM playback_state", [], |r| r.get(0)).unwrap();
+        assert_eq!(at, 1_000_000);
+        conn.execute("UPDATE playback_state SET updated_at = 999000", []).unwrap();
+        assert_eq!(clamp_future_times(&conn, 1_000_000).unwrap(), 0);
     }
 
     /// 0.15.2 (schema 38) to Files and title (39): every row and resume point

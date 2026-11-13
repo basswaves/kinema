@@ -4711,6 +4711,22 @@ kbd {
   font-variant-numeric: tabular-nums;
 }
 
+/* ---- a floor for small text on a TV (A10-02) ---------------------------------
+ *
+ * TV mode scales the 1080p layout to the screen, so on a 960 x 540 page the
+ * smallest labels came out at 6-9px, under Android TV's own 12 minimum. These
+ * are the smallest classes, badges first; each keeps its size where that is
+ * already 12px or more. */
+:root[data-tv='on'] :is(.media-badge-label, .media-badges-heading, .badge-row-heading) {
+  font-size: max(12px, 0.5625rem);
+}
+:root[data-tv='on'] :is(.card-meta, .episode-number, .continue-meta, .media-badges-note, .heavy-file-note) {
+  font-size: max(12px, 0.6875rem);
+}
+:root[data-tv='on'] :is(.card-title, .top-nav button) {
+  font-size: max(12px, 0.8125rem);
+}
+
 /*
  * High contrast (contrast.ts; a need, not a look). Every quiet line of text
  * at full strength, the player's panels solid, a thicker ring. Nothing moves

@@ -329,6 +329,12 @@ export default function Settings({
     // first) has nothing to land on yet: its entry in the list, then.
     const ready = document.querySelector('.settings-content button, .settings-content input');
     focusTo(ready ? 'settings-content' : `settings-nav:${goneTo.id}`);
+    // In a window too low for the whole list the chosen entry can sit below the
+    // edge; keep it in view (a no-op wherever it already is).
+    const frame = requestAnimationFrame(() =>
+      document.querySelector('.settings-nav button.active')?.scrollIntoView({ block: 'nearest' })
+    );
+    return () => cancelAnimationFrame(frame);
   }, [goneTo]);
 
   // Land on the open section in the list — or, from Home's notice, straight

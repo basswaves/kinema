@@ -191,6 +191,15 @@ export function channelLabel(track: Pick<AudioTrack, 'layout' | 'channels'>): st
   return track.channels ? `${track.channels} ch` : null;
 }
 
+/** A track Auro-3D can ride in: PCM or lossless (it cannot be in AAC, AC3...). */
+function couldHoldAuro(t: AudioTrack): boolean {
+  return (
+    t.codec.startsWith('pcm_') ||
+    ['truehd', 'flac', 'alac'].includes(t.codec) ||
+    (t.codec === 'dts' && (t.profile ?? '').includes('MA'))
+  );
+}
+
 /**
  * One audio track as a badge. The heading is the format, the value what it
  * carries: `DOLBY TRUEHD` / `Atmos · 7.1`, `DTS-HD MA` / `DTS:X · 7.1`.
@@ -339,7 +348,12 @@ export function buildBadges(
     seen.add(key);
     if (sound.length < MAX_SOUND_BADGES) sound.push(badge);
   }
-  if (release?.auro3d) sound.push({ label: 'Immersive', value: 'Auro-3D' });
+  // Auro-3D hides inside PCM or lossless sound, so the name's word is shown
+  // only if the file has such a track. With the file unread, the name is all
+  // there is.
+  if (release?.auro3d && (!details || (details.audio ?? []).some(couldHoldAuro))) {
+    sound.push({ label: 'Immersive', value: 'Auro-3D' });
+  }
 
   const source = release ? sourceLabel(release) : null;
   if (source) file.push({ label: 'Source', value: source });

@@ -127,6 +127,21 @@ describe('buildBadges', () => {
     ]);
   });
 
+  it('shows Auro-3D from the name only if the file has a PCM or lossless track', () => {
+    const named = { ...REMUX, auro3d: true };
+    const immersive = (f: FileFacts) =>
+      buildBadges(f, named)
+        .flatMap((r) => r.badges)
+        .some((b) => b.label === 'Immersive');
+    const base = facts();
+    expect(immersive(base)).toBe(true);
+    const aac = {
+      ...base,
+      details: { ...base.details!, audio: [track('aac', 'LC', 'mono')] },
+    };
+    expect(immersive(aac)).toBe(false);
+  });
+
   it('shows nothing at all for a file nothing is known about', () => {
     expect(buildBadges(facts({ details: null }), null)).toEqual([]);
   });

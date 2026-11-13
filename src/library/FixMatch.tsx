@@ -32,6 +32,7 @@ import {
   applyMatch,
   prepareTitle,
   groupFiles,
+  groupName,
   ignoreFiles,
   loadProviderKeys,
   providerForKind,
@@ -364,7 +365,7 @@ export default function FixMatch({ onChanged }: Props) {
               <div key={group.key} className="fixmatch-row ignored">
                 <div className="fixmatch-summary">
                   <div className="fixmatch-title">
-                    {group.title}
+                    {groupName(group)}
                     {group.year ? ` (${group.year})` : ''}
                     <span className="muted"> · {count(group.files.length, 'file')}</span>
                   </div>
@@ -436,7 +437,7 @@ function RowSummary({
       tabIndex={0}
     >
       <div className="fixmatch-title">
-        {group.title}
+        {groupName(group)}
         {group.year ? ` (${group.year})` : ''}
         <span className="muted">
           {' '}
@@ -530,7 +531,7 @@ function GroupRow({
   // Named from the file to start with (the parsed title, or the file name when
   // there was none) — editable, since a file name is rarely what anyone calls
   // a home video.
-  const [localName, setLocalName] = useState(group.title);
+  const [localName, setLocalName] = useState(groupName(group));
   const [localYear, setLocalYear] = useState(group.year ? String(group.year) : '');
   const [localError, setLocalError] = useState<string | null>(null);
   const besidePlaced = group.files.some((f) => f.match_reason === BESIDE_REASON);
@@ -604,7 +605,7 @@ function GroupRow({
           )}
 
           <MatchSearch
-            initialQuery={group.untitled ? searchableName(group.title) : group.title}
+            initialQuery={group.untitled ? searchableName(group.title) : groupName(group)}
             isSeries={isSeries}
             onToggleSeries={() => setIsSeries((v) => !v)}
             busy={busy}
@@ -708,7 +709,12 @@ export function MatchSearch({
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
+  // A second press while a search runs is ignored here, not by `disabled`: a
+  // disabled button under the ring sends the ring to "Ignore these".
+  const searchingRef = useRef(false);
   const search = useCallback(async () => {
+    if (searchingRef.current) return;
+    searchingRef.current = true;
     setSearching(true);
     setSearchError(null);
     try {
@@ -723,6 +729,7 @@ export function MatchSearch({
     } catch (e) {
       setSearchError(await describeFailure(e));
     } finally {
+      searchingRef.current = false;
       setSearching(false);
     }
   }, [query, isSeries]);
@@ -747,7 +754,7 @@ export function MatchSearch({
         <FocusButton
           className="primary"
          
-          disabled={searching || !query.trim()}
+          disabled={!query.trim()}
           onSelect={() => void search()}
         >
           {searching ? 'Searching…' : 'Search'}

@@ -2381,7 +2381,9 @@ const handlers: Record<string, Handler> = {
   // TMDB's poster list for the Poster dialog (e2e/posters.e2e.ts), when
   // kinemaMockPosters is set: eleven posters through the http plugin's calls.
   // Without it TMDB is unreachable, as before.
-  'plugin:http|fetch': (a) => {
+  'plugin:http|fetch': async (a) => {
+    // `kinemaMockSlowSearch=1`: a search that takes a while, to press OK again in.
+    if (flag('kinemaMockSlowSearch') === '1') await new Promise((r) => setTimeout(r, 600));
     mockHttpUrl = String((a.clientConfig as { url?: string } | undefined)?.url ?? '');
     if (flag('kinemaMockTmdb') === '1' && /api\.themoviedb\.org\/3\/(search\/tv|tv\/)/.test(mockHttpUrl)) return 1;
     if (flag('kinemaMockPosters') !== '1') throw new Error('mock: no network');

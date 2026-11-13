@@ -151,3 +151,31 @@ test('Needs attention: Link as… puts a show’s files on Specials, and a stack
     [0, 2],
   ]);
 });
+
+// Review A7-03: Search must not be disabled while it searches, or the ring falls
+// to "Ignore these" and a second OK ignores the files without asking.
+test('Needs attention: OK twice on Search keeps the ring on Search and ignores nothing', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('kinemaMockReview', 'items');
+    localStorage.setItem('kinemaMockTmdb', '1');
+    localStorage.setItem('kinemaMockSlowSearch', '1');
+  });
+  await open(page, 'windows');
+  await until(page, 'ArrowDown', /^Review$/, 4);
+  await press(page, 'Enter');
+  await expect.poll(() => focused(page)).toMatch(/^Review 3 items/);
+  await until(page, 'ArrowDown', /Sample Series/, 3);
+  await press(page, 'Enter');
+  const placeholder = () =>
+    page.evaluate(() => document.querySelector('.focused')?.getAttribute('placeholder'));
+  for (let i = 0; i < 4 && (await placeholder()) !== 'Search for the right title…'; i++) await press(page, 'ArrowDown');
+  await until(page, 'ArrowRight', /^Search$/, 4);
+  expect(await focused(page)).toBe('Search');
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Enter');
+  await expect(page.getByText('1 result, searched as a TV series')).toBeVisible();
+  expect(await focused(page)).toBe('Search');
+  // Nothing was ignored: the row is still in the queue.
+  await expect(page.locator('.fixmatch-row', { hasText: 'Sample Series' }).first()).toBeVisible();
+  await expect(page.getByText(/Ignored/)).toHaveCount(0);
+});

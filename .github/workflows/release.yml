@@ -76,9 +76,36 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # ~95 MB of LGPL native libraries, never committed. See NOTICE.md.
-      - name: Fetch the native playback libraries
-        run: npx tauri-plugin-libmpv-api setup-lib
+      # libmpv-2.dll (LGPL), never committed. See NOTICE.md. Not the plugin's
+      # `setup-lib`: that takes whatever is "latest" with no check. Pinned by
+      # exact asset URL and SHA-256; a mismatch stops the job. The plugin's
+      # wrapper DLL is not fetched: the next step builds it from source.
+      # To bump: pick a release of github.com/zhongfly/mpv-winbuild, then
+      #   gh api repos/zhongfly/mpv-winbuild/releases/tags/<tag> --jq '.assets[] | select(.name | startswith("mpv-dev-lgpl-x86_64-2")) | [.name, .digest]'
+      # and set MPV_TAG, MPV_ASSET and MPV_SHA256 (the digest without "sha256:").
+      # That repository keeps only about a month of builds: when the pinned tag
+      # is gone the download fails here, and the pin must be bumped (and tested).
+      - name: Fetch libmpv (pinned)
+        shell: pwsh
+        env:
+          MPV_TAG: 2026-11-07-55d3feb45c
+          MPV_ASSET: mpv-dev-lgpl-x86_64-20261107-git-55d3feb45c.7z
+          MPV_SHA256: 17bff1d2e90ad06a9d98ce0fae738feb64feaf10ddd804870e0144111a9715df
+        run: |
+          $tmp = Join-Path $env:RUNNER_TEMP 'mpv-dl'
+          New-Item -ItemType Directory -Force $tmp | Out-Null
+          $archive = Join-Path $tmp $env:MPV_ASSET
+          Invoke-WebRequest "https://github.com/zhongfly/mpv-winbuild/releases/download/$env:MPV_TAG/$env:MPV_ASSET" -OutFile $archive
+          $got = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLower()
+          if ($got -ne $env:MPV_SHA256) { throw "libmpv archive SHA-256 mismatch: expected $env:MPV_SHA256, got $got." }
+          $out = Join-Path $tmp 'x'
+          & 7z x $archive "-o$out" -y | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "7z extraction failed ($LASTEXITCODE)." }
+          $dll = Get-ChildItem $out -Recurse -Filter libmpv-2.dll | Select-Object -First 1
+          if (-not $dll) { throw 'libmpv-2.dll not found in the archive.' }
+          New-Item -ItemType Directory -Force src-tauri/lib | Out-Null
+          Move-Item $dll.FullName src-tauri/lib/libmpv-2.dll -Force
+          Remove-Item $tmp -Recurse -Force
 
       # The plugin's wrapper DLL needs VCRUNTIME140.dll, which a fresh Windows
       # may lack; this one, from the same pinned source as Linux's, has the

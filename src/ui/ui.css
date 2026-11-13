@@ -167,6 +167,10 @@ html {
 }
 
 /* ---- top nav ------------------------------------------------------------ */
+button {
+  font-family: inherit;
+}
+
 .top-nav {
   position: sticky;
   top: 0;
@@ -442,6 +446,12 @@ html {
   letter-spacing: -0.03em;
   line-height: 1.05;
   text-shadow: 0 2px 20px rgba(0, 0, 0, 0.6);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  overflow-wrap: anywhere;
 }
 
 /*

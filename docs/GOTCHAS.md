@@ -385,6 +385,23 @@ commands stay synchronous on purpose — the main thread serialises them, and
 that ordering is what keeps a `save_progress` ahead of the Home reload that
 follows it.
 
+**One stat call is enough.** A share that goes *silent* (a NAS switched off at
+the wall, a laptop off its Wi-Fi: connections open, nothing answering, nothing
+refused) holds every call to it until Windows' SMB client gives up — about
+three minutes. Four plain `fn` commands looked at the film's file
+(`disc_source` on every open, the loose-video saves every 5 s, `save_progress`
+at the end, `playable_path` on a drop) and the window sat "Not responding" for
+up to 3 min 5 s; a second Kinema started meanwhile hung too, invisibly, as the
+single-instance hand-over waits for the same thread. `off_main` alone is not
+enough either: the look never comes back, so each call would leave one more
+stuck thread. **Do:** look at a film's file through `files::within(path, wait,
+…)`, which gives up after `wait` and starts no second look at a path whose
+first is still stuck; say `files::NOT_ANSWERING` when it gave up. A command
+that must stay synchronous for its order (`save_progress`) waits at most
+half a second, far below the five seconds after which Windows calls a window
+not responding. The single-instance callback runs on the window's thread
+too: it hands the look to a thread of its own.
+
 ---
 
 ### The page's process can end and nothing says so

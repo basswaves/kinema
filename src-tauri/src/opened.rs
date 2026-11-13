@@ -66,7 +66,17 @@ where
         })
         // A flag is skipped by not being a playable file, not by its dash: a
         // video may be called "-clip.mkv".
-        .find_map(|p| playable(&p))
+        .find_map(|p| playable_within(&p))
+}
+
+/// `playable`, waited for at most `files::LOOK_WAIT`. A path whose drive does
+/// not answer is taken at its word when it is named as a video: the player
+/// then says the drive is not answering (`disc_source`), rather than Kinema
+/// freezing on it here or dropping it without a word.
+fn playable_within(path: &Path) -> Option<PathBuf> {
+    let owned = path.to_path_buf();
+    crate::files::within(path, crate::files::LOOK_WAIT, move || playable(&owned))
+        .unwrap_or_else(|| crate::scanner::has_video_extension(path).then(|| path.to_path_buf()))
 }
 
 /// What to play for `path`, if anything: a video file as it is; a Blu-ray
@@ -94,13 +104,18 @@ pub fn opened_at_launch(state: tauri::State<AtLaunch>) -> Option<Opened> {
     Some(Opened { path: path.to_string_lossy().into_owned(), launched: true, started_ms: started_ms() })
 }
 
-/// The first playable video among files dropped on the window.
+/// The first playable video among files dropped on the window. Off the
+/// window's thread: files dropped from a share that has gone silent would
+/// hold it until the system gives up (A5-01).
 #[tauri::command]
-pub fn playable_path(paths: Vec<String>) -> Option<String> {
-    paths
-        .iter()
-        .find_map(|p| playable(Path::new(p)))
-        .map(|p| p.to_string_lossy().into_owned())
+pub async fn playable_path(paths: Vec<String>) -> Result<Option<String>, String> {
+    crate::jobs::off_main(move || {
+        Ok(paths
+            .iter()
+            .find_map(|p| playable_within(Path::new(p)))
+            .map(|p| p.to_string_lossy().into_owned()))
+    })
+    .await
 }
 
 /// The videos either side of one in its own folder, for the player's

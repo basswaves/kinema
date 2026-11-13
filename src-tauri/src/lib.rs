@@ -306,19 +306,25 @@ pub fn run() {
                 let _ = window.set_focus();
             }
             // Started for a video (opened.rs): this one plays it instead.
-            let args = args.into_iter().map(std::ffi::OsString::from);
-            if let Some(path) = opened::from_args(args, std::path::Path::new(&cwd)) {
-                log!("opened: {} passed on by a second Kinema", path.display());
-                use tauri::Emitter;
-                let _ = app.emit(
-                    opened::EVENT,
-                    opened::Opened {
-                        path: path.to_string_lossy().into_owned(),
-                        launched: false,
-                        started_ms: opened::started_ms(),
-                    },
-                );
-            }
+            // Looked at off the window's thread: this runs on it, and the
+            // second Kinema waits until it returns (A5-02); a file on a share
+            // that has gone silent would hold both (A5-01).
+            let app = app.clone();
+            let args: Vec<std::ffi::OsString> = args.into_iter().map(Into::into).collect();
+            std::thread::spawn(move || {
+                if let Some(path) = opened::from_args(args, std::path::Path::new(&cwd)) {
+                    log!("opened: {} passed on by a second Kinema", path.display());
+                    use tauri::Emitter;
+                    let _ = app.emit(
+                        opened::EVENT,
+                        opened::Opened {
+                            path: path.to_string_lossy().into_owned(),
+                            launched: false,
+                            started_ms: opened::started_ms(),
+                        },
+                    );
+                }
+            });
         }));
     }
 

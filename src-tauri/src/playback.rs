@@ -3,6 +3,7 @@
 use crate::util::{now_secs, to_string_err};
 use crate::artwork::path_prefix;
 use crate::library::Db;
+use tauri::Manager;
 use rusqlite::{named_params, params, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -119,9 +120,25 @@ const STILL_ARRIVING_SECS: i64 = 120;
 ///
 /// Stat-ed only when a save would mark the file watched, so a NAS sees one
 /// extra metadata call per episode, not one every five seconds.
-fn still_being_written(path: &std::path::Path, now: i64) -> bool {
+///
+/// Waited for at most `wait` (`files::within`). A drive that does not answer
+/// is not proof of a file still arriving, so the file counts as finished —
+/// as one that cannot be found does.
+fn still_being_written(path: &std::path::Path, now: i64, wait: std::time::Duration) -> bool {
+    let owned = path.to_path_buf();
+    crate::files::within(path, wait, move || written_lately(&owned, now)).unwrap_or(false)
+}
+
+/// `still_being_written`'s look itself, with no limit on the wait.
+fn written_lately(path: &std::path::Path, now: i64) -> bool {
     crate::files::metadata(path).is_ok_and(|m| now - m.modified_secs() < STILL_ARRIVING_SECS)
 }
+
+/// How long `save_progress` waits for the film's drive. It runs on the
+/// window's thread on purpose (its order with the Home reload that follows,
+/// GOTCHAS "A command without `async`…"), so the wait is kept far below the
+/// five seconds after which Windows calls a window "not responding".
+const SAVE_LOOK_WAIT: std::time::Duration = std::time::Duration::from_millis(500);
 
 /// Store a resume point. Completion is decided here rather than by the caller
 /// so the rule stays in one place.
@@ -149,7 +166,9 @@ pub fn save_progress(
                 r.get(0)
             })
             .ok();
-        if path.is_some_and(|p| still_being_written(std::path::Path::new(&p), now_secs())) {
+        if path.is_some_and(|p| {
+            still_being_written(std::path::Path::new(&p), now_secs(), SAVE_LOOK_WAIT)
+        }) {
             crate::log!(
                 "playback: not marking file {file_id} watched — it was written to in the last \
                  {STILL_ARRIVING_SECS} s, so it is probably still arriving"
@@ -306,14 +325,38 @@ fn loose_size(path: &std::path::Path) -> Option<i64> {
     Some(size)
 }
 
+/// `loose_size` and, for a save that would finish the video, whether it is
+/// still arriving; looked at on a thread of their own and given up on after
+/// `files::LOOK_WAIT` (`None`: nothing is resumed or saved). Called through
+/// `jobs::off_main`: a share that has gone silent held the window's thread
+/// for minutes here, every five seconds while a video played (A5-01).
+fn loose_facts(path: &str, finishing: bool) -> Option<(i64, bool)> {
+    let file = std::path::PathBuf::from(path);
+    let look = file.clone();
+    crate::files::within(&file, crate::files::LOOK_WAIT, move || {
+        let size = loose_size(&look)?;
+        // Inside the same look: a second one would only queue behind it.
+        let arriving = finishing && written_lately(&look, now_secs());
+        Some((size, arriving))
+    })
+    .flatten()
+}
+
 /// The resume point of a video that is not in the library (schema 23).
 #[tauri::command]
-pub fn get_loose_progress(db: tauri::State<Db>, path: String) -> Result<Option<Progress>, String> {
-    let Some(size) = loose_size(std::path::Path::new(&path)) else {
-        return Ok(None);
-    };
-    let conn = db.0.lock().map_err(to_string_err)?;
-    loose_progress(&conn, &path, size).map_err(to_string_err)
+pub async fn get_loose_progress(
+    app: tauri::AppHandle,
+    path: String,
+) -> Result<Option<Progress>, String> {
+    crate::jobs::off_main(move || {
+        let Some((size, _)) = loose_facts(&path, false) else {
+            return Ok(None);
+        };
+        let db = app.state::<Db>();
+        let conn = db.0.lock().map_err(to_string_err)?;
+        loose_progress(&conn, &path, size).map_err(to_string_err)
+    })
+    .await
 }
 
 fn loose_progress(
@@ -344,22 +387,28 @@ fn loose_progress(
 /// Store the resume point of a video that is not in the library. Finished by
 /// the same rule as a library file's; nothing is sent to SIMKL or Trakt, as
 /// nothing says what the video is.
+///
+/// Off the window's thread (`loose_facts`). Its order with what follows does
+/// not matter as a library save's does: nothing on Home shows these.
 #[tauri::command]
-pub fn save_loose_progress(
-    db: tauri::State<Db>,
+pub async fn save_loose_progress(
+    app: tauri::AppHandle,
     path: String,
     position_secs: f64,
     duration_secs: Option<f64>,
 ) -> Result<(), String> {
-    let file = std::path::Path::new(&path);
-    let Some(size) = loose_size(file) else {
-        return Ok(());
-    };
-    let completed = is_complete(position_secs, duration_secs, None)
-        && !still_being_written(file, now_secs());
-    let conn = db.0.lock().map_err(to_string_err)?;
-    store_loose(&conn, &path, size, position_secs, duration_secs, completed, now_secs())
-        .map_err(to_string_err)
+    crate::jobs::off_main(move || {
+        let finishing = is_complete(position_secs, duration_secs, None);
+        let Some((size, arriving)) = loose_facts(&path, finishing) else {
+            return Ok(());
+        };
+        let completed = finishing && !arriving;
+        let db = app.state::<Db>();
+        let conn = db.0.lock().map_err(to_string_err)?;
+        store_loose(&conn, &path, size, position_secs, duration_secs, completed, now_secs())
+            .map_err(to_string_err)
+    })
+    .await
 }
 
 fn store_loose(
@@ -1073,17 +1122,19 @@ mod tests {
         let path = dir.join("episode.mkv");
         std::fs::write(&path, b"data").unwrap();
         let now = super::now_secs();
-        assert!(super::still_being_written(&path, now), "written a moment ago");
+        let wait = std::time::Duration::from_secs(5);
+        assert!(super::still_being_written(&path, now, wait), "written a moment ago");
 
         let old = std::time::SystemTime::now() - std::time::Duration::from_secs(3600);
         std::fs::File::options().write(true).open(&path).unwrap().set_modified(old).unwrap();
-        assert!(!super::still_being_written(&path, now), "untouched for an hour");
+        assert!(!super::still_being_written(&path, now, wait), "untouched for an hour");
     }
 
     /// Offline, or never there: nothing to hold back on.
     #[test]
     fn a_file_that_cannot_be_read_is_not_held_back() {
-        assert!(!super::still_being_written(std::path::Path::new(r"Z:\gone\x.mkv"), 0));
+        let wait = std::time::Duration::from_secs(5);
+        assert!(!super::still_being_written(std::path::Path::new(r"Z:\gone\x.mkv"), 0, wait));
     }
 
     /// A credits marker in the first half is a bad marker, not a short episode.

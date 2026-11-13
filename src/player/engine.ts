@@ -385,8 +385,11 @@ export async function openFile(
   share: number | null = null
 ): Promise<void> {
   if (isMedia3()) return media3.open(path, start, share);
+  // The one error Kinema answers with is a drive that does not answer
+  // (disc.rs): said as it is, rather than opening a file mpv cannot read.
   const source = await invoke<DiscSource>('disc_source', { path }).catch(
     (e): DiscSource => {
+      if (String(e).includes('not answering')) throw e;
       console.warn('player: could not ask whether this is a disc', e);
       return { disc: false, languages: {}, log_mark: null };
     }

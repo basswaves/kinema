@@ -131,7 +131,11 @@ function emit(): void {
  */
 export async function chooseFolder(what: string): Promise<string | null> {
   if (capabilitiesNow()?.folder_picker !== false) {
-    const selected = await open({ directory: true, multiple: false });
+    const selected = await open({
+      directory: true,
+      multiple: false,
+      title: what === 'the library' ? 'Choose your folder' : `Choose your ${what} folder`,
+    });
     return typeof selected === 'string' ? selected : null;
   }
   // A second request while one is open replaces it, answering the first

@@ -636,7 +636,10 @@ reasoning is in [docs/DESIGN.md](docs/DESIGN.md) and [docs/HISTORY.md](docs/HIST
   licensed products, which this is not. The services a user connects are
   different — Settings → Keep track of what I watch shows SIMKL's and Trakt's own marks because
   both ask apps to, each as its guidelines say (NOTICE.md). A service that
-  publishes no terms for its logo is shown by name.
+  publishes no terms for its logo is shown by name. TMDB's attribution — its
+  sentence and approved logo, smaller than Kinema's own — appears once where
+  Settings names the data sources, as TMDB's terms ask; it is an
+  attribution, not a badge, and never on a title page.
 - **No shared key for scores.** IMDb's rating comes from the file IMDb
   publishes, on its terms: that file only, never imdb.com, and only the
   library's rows kept. Rotten Tomatoes needs OMDb, and only with the user's own

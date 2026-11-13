@@ -2,7 +2,7 @@
  * How files are grouped before matching, and for the review queue.
  */
 import { describe, expect, it } from 'vitest';
-import { groupFiles, idsInGroupNames, searchableName, type FileGroup } from './match';
+import { groupFiles, groupName, idsInGroupNames, searchableName, type FileGroup } from './match';
 import { idsInName } from './nfo';
 import type { MediaFile } from '../library/api';
 
@@ -200,5 +200,27 @@ describe('searchableName', () => {
     expect(searchableName('Some.Film.2019.1080p.BluRay.mkv')).toBe('Some Film');
     expect(searchableName('Some_Film_720p.mkv')).toBe('Some Film');
     expect(searchableName('1917.mkv')).toBe('1917');
+  });
+});
+
+describe('groupFiles: a country in the show folder', () => {
+  it('The Office (US) and (UK) are two groups, each named with its country', () => {
+    const groups = groupFiles([
+      shown(1, 'D:/TV/The Office (US)/Season 01/The Office S01E01.mkv', 'The Office', null),
+      shown(2, 'D:/TV/The Office (UK)/Series 1/The Office S01E01.mkv', 'The Office', null),
+    ]);
+    expect(groups).toHaveLength(2);
+    expect(groups.map(groupName)).toEqual(['The Office (US)', 'The Office (UK)']);
+    expect(groups.map((g) => g.title)).toEqual(['The Office', 'The Office']);
+  });
+
+  it('a show with one folder keeps its plain name, and a year in brackets is not a country', () => {
+    const groups = groupFiles([
+      shown(1, 'D:/TV/The Office (US)/Season 01/The Office S01E01.mkv', 'The Office', null),
+      shown(2, 'D:/TV/The Office (US)/Season 01/The Office S01E02.mkv', 'The Office', null),
+      shown(3, 'D:/TV/Lost (2004)/Lost S01E01.mkv', 'Lost', 2004),
+    ]);
+    expect(groups.map(groupName)).toEqual(['The Office (US)', 'Lost']);
+    expect(groups[0].files).toHaveLength(2);
   });
 });

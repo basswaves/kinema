@@ -90,6 +90,27 @@ export interface FileGroup {
    * search a provider for, so the matcher never sees them.
    */
   untitled?: boolean;
+  /** A country in brackets on the show's folder, "US" in `The Office (US)`. */
+  country?: string;
+}
+
+/** A group's name as people read and search it: the title and a folder's country. */
+export function groupName(group: Pick<FileGroup, 'title' | 'country'>): string {
+  return group.country ? `${group.title} (${group.country})` : group.title;
+}
+
+/**
+ * The country in brackets on a show's folder, when the folder is the show's
+ * name and the country: `The Office (US)`. Two shows of one name differ by it.
+ */
+function showCountryOf(file: MediaFile): string | null {
+  if (!file.parsed_title) return null;
+  const wanted = normaliseTitle(file.parsed_title);
+  for (const part of file.parent_dir.split(/[\\/]/)) {
+    const m = /^(.*?)\s*\(([A-Z]{2,3})\)$/.exec(part.trim());
+    if (m && normaliseTitle(m[1]) === wanted) return m[2];
+  }
+  return null;
 }
 
 /**
@@ -182,10 +203,11 @@ export function groupFiles(
     // Two shows of one name (Battlestar Galactica 1978 and 2003) are two
     // groups. They were one, linked to the first, with its NFO deciding for both.
     const showYear = isSeries ? showYearOf(file) : null;
+    const country = isSeries ? showCountryOf(file) : null;
     const apart = (showYears.get(name)?.size ?? 0) > 1;
     const key = `${isSeries ? 'tv' : 'movie'}::${name}::${
       isSeries ? (apart ? (showYear ?? '') : '') : (file.parsed_year ?? '')
-    }`;
+    }${country ? `::${country}` : ''}`;
 
     let group = groups.get(key);
     if (!group) {
@@ -196,6 +218,7 @@ export function groupFiles(
         isSeries,
         files: [],
         maxSeason: null,
+        ...(country ? { country } : {}),
       };
       groups.set(key, group);
     }

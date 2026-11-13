@@ -92,6 +92,16 @@ describe('media3Groups', () => {
     );
   });
 
+  it('names a faster mode in the cadence only when the screen lists one', () => {
+    const sixty: PlayerFacts = { ...film, screen: { ...film.screen, hz: 60, rate: 60, modes: 3 } };
+    expect(row(sixty, 'Display', 'Cadence')?.note).not.toMatch(/120/);
+    expect(row(sixty, 'Display', 'Cadence')?.note).not.toMatch(/even 5:5/);
+    const note = (rates: number[]) =>
+      media3Groups(sixty, rates).find((g) => g.heading === 'Display')!.rows.find((r) => r.label === 'Cadence')?.note;
+    expect(note([60, 50])).not.toMatch(/120/);
+    expect(note([60, 120])).toMatch(/120 Hz mode/);
+  });
+
   it('says what Android says of HDR on this screen, never more', () => {
     const range = (screenHdr: string[] | undefined, video = film.video!) =>
       row({ ...film, video, screen: { ...film.screen, hdr: screenHdr } }, 'Source', 'Dynamic range');

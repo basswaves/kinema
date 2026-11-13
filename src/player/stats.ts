@@ -525,7 +525,7 @@ async function readRenderPasses(): Promise<{ rows: StatRow[]; unavailable: strin
 }
 
 /** Everything the webview can say about the panel it is being drawn on. */
-function displayGroup(
+export function displayGroup(
   refreshHz: number | null,
   outW: number | null,
   outH: number | null,
@@ -554,8 +554,11 @@ function displayGroup(
       },
       {
         label: 'Refresh',
-        value: num(refreshHz, 3, ' Hz'),
-        note: 'as measured by mpv, not as advertised by the driver',
+        // 0 is what mpv answers before it has measured anything.
+        value: refreshHz ? num(refreshHz, 3, ' Hz') : 'not known yet',
+        note: refreshHz
+          ? 'as measured by mpv, not as advertised by the driver'
+          : 'mpv has not reported a refresh rate',
       },
       { label: 'Output surface', value: resolution(outW, outH) },
       {

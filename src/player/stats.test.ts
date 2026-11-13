@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   describeCadence,
+  displayGroup,
   describeDrawing,
   describeAudioPath,
   describeDolbyVision,
@@ -167,5 +168,21 @@ describe('describeCadence', () => {
     expect(describeCadence(24, 60).note).not.toMatch(/120/);
     expect(describeCadence(24, 60, [60, 50]).note).not.toMatch(/120/);
     expect(describeCadence(24, 60, [60, 120]).note).toMatch(/120 Hz mode/);
+  });
+});
+
+describe('displayGroup refresh row', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const refreshRow = (hz: number | null) => {
+    vi.stubGlobal('window', { devicePixelRatio: 1, screen: { width: 1920, height: 1080 } });
+    return displayGroup(hz, null, null, null, null, false, 24, null).rows.find((r) => r.label === 'Refresh')!;
+  };
+  it('claims a measurement only once mpv has reported one', () => {
+    for (const none of [null, 0]) {
+      const r = refreshRow(none);
+      expect(r.value).toBe('not known yet');
+      expect(r.note).not.toMatch(/measured/);
+    }
+    expect(refreshRow(23.976)).toMatchObject({ value: '23.976 Hz', note: expect.stringMatching(/measured by mpv/) });
   });
 });

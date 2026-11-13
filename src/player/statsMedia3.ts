@@ -9,6 +9,7 @@
  * resolution, the bitrate, and the cadence, the panel's headline on every
  * system (stats.ts).
  */
+import { screen as readScreen } from './media3';
 import { playerFacts, type PlayerFacts } from './engine';
 import { startRow } from './startTime';
 import { bitrate, describeCadence, num, resolution, resolutionClass, type StatGroup } from './stats';
@@ -68,15 +69,18 @@ function hdrOnScreen(
  * The cadence, from the rate Android is given — which, where it is given only
  * one mode, may not be the rate the TV gets, and is said to be that.
  */
-function cadenceFrom(fps: number | null, screen: PlayerFacts['screen']) {
-  const row = describeCadence(fps, screen.rate);
+function cadenceFrom(fps: number | null, screen: PlayerFacts['screen'], modeRates: number[]) {
+  const row = describeCadence(fps, screen.rate, modeRates);
   if (screen.modes !== 1 || row.value === DASH) return row;
   const from = 'worked out from the rate Android is given';
   return { ...row, note: row.note ? `${row.note}; ${from}` : from };
 }
 
-/** The panel's groups from Media3's facts; pure, for the tests. */
-export function media3Groups(facts: PlayerFacts): StatGroup[] {
+/**
+ * The panel's groups from Media3's facts; pure, for the tests. `modeRates` are
+ * the refresh rates the screen lists at its current size; none known, none named.
+ */
+export function media3Groups(facts: PlayerFacts, modeRates: number[] = []): StatGroup[] {
   const { video, frames, audio, screen } = facts;
   const groups: StatGroup[] = [];
 
@@ -159,7 +163,7 @@ export function media3Groups(facts: PlayerFacts): StatGroup[] {
             },
           ]
         : []),
-      cadenceFrom(video?.fps ?? null, screen),
+      cadenceFrom(video?.fps ?? null, screen, modeRates),
     ],
   });
 
@@ -190,7 +194,14 @@ export function media3Groups(facts: PlayerFacts): StatGroup[] {
 export async function readMedia3Stats(): Promise<StatGroup[]> {
   // Start goes with Decoding: a group of its own would be one more stop for
   // the remote, and a change to every map of this panel.
-  return media3Groups(await playerFacts()).map((g) =>
+  const facts = await playerFacts();
+  // The screen's own list of modes; if Android cannot give it, no mode is named.
+  const modeRates = await readScreen()
+    .then((s) =>
+      s.modes.filter((m) => m.width === facts.screen.width && m.height === facts.screen.height).map((m) => m.rate)
+    )
+    .catch(() => []);
+  return media3Groups(facts, modeRates).map((g) =>
     g.heading === 'Decoding' ? { ...g, rows: [startRow(), ...g.rows] } : g
   );
 }

@@ -376,10 +376,30 @@ const omdbQueued = makeQueue(OMDB_GAP_MS);
 const RATE_LIMIT_RETRIES = 2;
 
 /**
+ * A page lookup that has not answered in this long is dead. The queues run one
+ * request after another, so one that waits for ever would stop every later
+ * lookup to that service until restart.
+ */
+export const REQUEST_TIMEOUT_MS = 30_000;
+
+/**
+ * The longest `Retry-After` that is waited out. A service asking for more (a
+ * day, say) is failed at once, so the queue moves on instead of standing still.
+ */
+export const MAX_RETRY_WAIT_MS = 60_000;
+
+/** A service asked us to wait longer than we are willing to. */
+export class RateLimited extends Error {}
+
+/** A lookup got no answer within {@link REQUEST_TIMEOUT_MS}. */
+export class RequestTimedOut extends Error {}
+
+/**
  * `fetch`, but a 429 is waited out rather than treated as a failure.
  *
- * Honours `Retry-After` when the server sends one, and backs off exponentially
- * when it does not. Everything else — 404, 401, a dead network — is handed
+ * Honours `Retry-After` when the server sends one (up to MAX_RETRY_WAIT_MS),
+ * and backs off exponentially when it does not. Every request has a time limit
+ * for the whole answer. Everything else — 404, 401, a dead network — is handed
  * straight back to the caller, which already knows what to do with it.
  */
 export async function fetchPolitely(
@@ -389,11 +409,29 @@ export async function fetchPolitely(
   connectTimeout?: number
 ): Promise<Response> {
   for (let attempt = 0; ; attempt++) {
-    const response = await fetch(url, { method: 'GET', headers, connectTimeout });
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const limit = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        controller.abort();
+        reject(new RequestTimedOut(`${label}: no answer within ${REQUEST_TIMEOUT_MS / 1000} s`));
+      }, REQUEST_TIMEOUT_MS);
+    });
+    let response: Response;
+    try {
+      const request = fetch(url, { method: 'GET', headers, connectTimeout, signal: controller.signal });
+      request.catch(() => undefined); // a request lost to the limit must not end unhandled
+      response = await Promise.race([request, limit]);
+    } finally {
+      clearTimeout(timer);
+    }
     if (response.status !== 429 || attempt >= RATE_LIMIT_RETRIES) return response;
 
     const header = Number(response.headers.get('retry-after'));
     const waitMs = Number.isFinite(header) && header > 0 ? header * 1000 : 1000 * 2 ** attempt;
+    if (waitMs > MAX_RETRY_WAIT_MS) {
+      throw new RateLimited(`${label}: the service asked for a wait of ${Math.round(waitMs / 1000)} s; try again later`);
+    }
     console.warn(`${label}: rate limited, waiting ${waitMs}ms`);
     await new Promise((r) => setTimeout(r, waitMs));
   }
@@ -610,6 +648,7 @@ async function tmdbFetch(
         }
         return response;
       } catch (e) {
+        if (e instanceof RateLimited) throw e; // the other address is the same service
         console.warn(`TMDB ${path}: no answer from ${host}:`, e instanceof Error ? e.message : String(e));
       }
     }
@@ -1011,7 +1050,7 @@ export async function omdbTomatometer(key: string, imdbId: string): Promise<numb
   let data: { Response?: string; Error?: string; Ratings?: Array<{ Source?: string; Value?: string }> } =
     {};
   try {
-    data = await response.json();
+    data = (await response.json()) ?? {};
   } catch {
     // An unreadable body falls through to the status check below.
   }

@@ -2899,6 +2899,17 @@ HDMI, Media3 passed a film's DTS through, and Android refused the output
 any failure of the sound renderer as a reason to step down, not to stop
 (`Media3Plugin.kt` `fallBack`).
 
+### Media3 leaves out sound it cannot play, without an error
+
+A track neither decoded on the device nor offered by the HDMI output for
+sending on untouched (TrueHD on most devices, even with a receiver that
+takes it) is marked `NO_UNSUPPORTED_SUBTYPE` and simply not chosen. No
+error comes, so a fallback that waits for one never runs, and a film whose
+only sound is that track plays silent with no word. **Do:** once the
+tracks are known, if none of the sound tracks is chosen, choose one that
+can play, or say the film plays without sound (`Media3Plugin.kt`
+`soundLeftOut`).
+
 ### Android's surround setting is not what a box does
 
 `Settings.Global` `encoded_surround_output` read 1 ("never") one night
@@ -2975,7 +2986,13 @@ ways that give no error:
 
 - Media3's factory reads stream type 0x80 (a disc's uncompressed sound) as
   video and 0x86 (DTS-HD) as an ad marker. `BdTsPayloadReaderFactory.kt`
-  decides these first.
+  decides these first. Dropping 0x80 made an LPCM disc play silent with no
+  track listed and no word: `BdLpcmReader` gives it as PCM, the disc's
+  big-endian samples and channel order turned into the WAV order.
+- ffmpeg, making a `.m2ts`, writes AAC and MPEG sound as stream type 0x06
+  ("private data") with no descriptor; Media3 reads that as nothing, so the
+  sound was silently missing. The start of the file is looked at for what
+  those streams' bytes are (`BdCoreScan.soundByBytes`).
 - Dolby TrueHD (0x83) is one stream holding the TrueHD access units and, now
   and then, a Dolby Digital frame. Media3 has no reader for it. It is given
   as two tracks, TrueHD and the Dolby Digital "core".

@@ -56,6 +56,12 @@ export interface FakeMedia3State {
    * that read its TV while it was off.
    */
   screenHdr: string[];
+  /**
+   * The film's sound, by name, when none of its tracks can play here: said
+   * with the tracks, as Media3Plugin.kt `soundLeftOut` does (a TrueHD-only
+   * film on a device that neither decodes it nor sends it on).
+   */
+  soundCannotPlay: string | null;
 }
 
 /** How long each fixture file runs. */
@@ -88,6 +94,7 @@ const state: FakeMedia3State = {
     { width: 3840, height: 2160, rate: 60 },
   ],
   screenHdr: ['HDR10', 'HLG'],
+  soundCannotPlay: null,
 };
 
 /**
@@ -211,7 +218,11 @@ export function open(args: Record<string, unknown>): null {
   window.clearInterval(ticker);
   ticker = window.setInterval(tick, TICK_MS);
   window.setTimeout(() => {
-    if (state.path !== null) emit('loaded');
+    if (state.path === null) return;
+    if (state.soundCannotPlay !== null) {
+      emit('audio-fallback', { step: 2, format: state.soundCannotPlay, chosen: null });
+    }
+    emit('loaded');
   }, state.loadDelayMs / 2);
   ready(() => {
     if (!started) {

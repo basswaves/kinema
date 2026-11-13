@@ -101,12 +101,13 @@ async function openTrackPanel(page: Page) {
   return panel;
 }
 
-/** Open Home as an Android box on the day whose hero is the film, and play it. */
-async function playFilm(page: Page): Promise<void> {
+/** Open Home as an Android box on the day whose hero is the film, and play it (`before`: set the fake up first). */
+async function playFilm(page: Page, before?: () => Promise<void>): Promise<void> {
   await page.clock.setFixedTime(new Date('2026-10-02T12:00:00'));
   await page.addInitScript(() => localStorage.setItem('kinemaMockSystem', 'android'));
   await page.goto('/');
   await expect.poll(() => focused(page)).toContain('Play');
+  await before?.();
   await press(page, 'Enter');
   await expect(page.locator('.player')).toBeAttached();
   await page.clock.setSystemTime(new Date('2026-10-02T12:00:00'));
@@ -157,6 +158,22 @@ test('Android: a film plays through Media3 — the screen matched, seeking, paus
 
   // Nothing on the way asked mpv, which Android does not have.
   expect(complaints).toEqual([]);
+});
+
+test('Android: a film whose only sound cannot play here says so, and the screen matching does not take the word away', async ({
+  page,
+}) => {
+  await playFilm(page, () =>
+    page.evaluate(() => {
+      (window as unknown as { __fakeMedia3: { soundCannotPlay: string | null } }).__fakeMedia3.soundCannotPlay =
+        'Dolby TrueHD 7.1';
+    })
+  );
+  // The screen was matched (Android does by default), after the sound's word.
+  await expect.poll(async () => (await media3(page)).commands.some((c) => c.name === 'set_mode')).toBe(true);
+  await expect(page.locator('.player-notice')).toHaveText(
+    "This film's sound (Dolby TrueHD 7.1) cannot be played on this device, so the film is playing without sound."
+  );
 });
 
 test('Android: the volume is Media3’s, remembered, and the receiver’s when the sound goes untouched', async ({

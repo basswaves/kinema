@@ -612,7 +612,9 @@ internal class BdEac3Splitter(private val sink: Sink) {
  * film starts, and on a weak box a loop over every byte of a megabyte is
  * seconds. It reads the packets' headers, the program's stream list (the
  * PMT) to know which packet ids are TrueHD, and looks through the bytes of
- * those streams only.
+ * those streams only. The same look finds the AAC and MPEG sound ffmpeg
+ * calls "private data", and checks the LPCM streams' headers (soundByBytes), for the same reason: the tracks are
+ * made before any of their bytes are read.
  */
 internal object BdCoreScan {
   private const val RAW = 192
@@ -656,12 +658,43 @@ internal object BdCoreScan {
    * is TrueHD). A file whose tables are not in the stretch gives none.
    */
   fun pidsWithCore(raw: ByteArray, count: Int): Set<Int> {
+    val trueHd = streamTypes(raw, count).filterValues { it == TRUEHD }.keys.take(MAX_STREAMS).toSet()
+    if (trueHd.isEmpty()) return emptySet()
+
+    val streams = HashMap<Int, ByteArrayOutputStream>()
+    var p = 0
+    while (p + RAW <= count) {
+      val t = p + 4
+      p += RAW
+      if (raw[t] != 0x47.toByte()) continue
+      val pid = ((raw[t + 1].toInt() and 0x1F) shl 8) or (raw[t + 2].toInt() and 0xFF)
+      if (pid !in trueHd) continue
+      var at = payloadAt(raw, t) ?: continue
+      if (raw[t + 1].toInt() and 0x40 != 0) {
+        // PES packet start: 00 00 01, stream id, length (2), flags (2), header length, header.
+        if (t + 188 - at < 9 || raw[at].toInt() != 0 || raw[at + 1].toInt() != 0 || raw[at + 2].toInt() != 1) continue
+        at += 9 + (raw[at + 8].toInt() and 0xFF)
+        if (at >= t + 188) continue
+      }
+      val out = streams.getOrPut(pid) { ByteArrayOutputStream() }
+      if (out.size() < MAX_PER_STREAM) out.write(raw, at, t + 188 - at)
+    }
+    val found = HashSet<Int>()
+    for ((pid, out) in streams) if (hasCore(out.toByteArray())) found.add(pid)
+    return found
+  }
+
+  /**
+   * The program's streams, packet id to stream type, from the PAT (packet id
+   * 0: which packet id has the program's PMT) and the PMT. Empty if the tables
+   * are not in the stretch.
+   */
+  private fun streamTypes(raw: ByteArray, count: Int): Map<Int, Int> {
     var pmtPid = -1
     val pat = Section()
     val pmt = Section()
-    val trueHd = HashSet<Int>()
     var p = 0
-    while (p + RAW <= count && trueHd.isEmpty()) {
+    while (p + RAW <= count) {
       val t = p + 4
       p += RAW
       if (raw[t] != 0x47.toByte()) continue
@@ -683,39 +716,58 @@ internal object BdCoreScan {
         }
       } else if (pid == pmtPid) {
         val table = pmt.feed(raw, payload, t + 188, start) ?: continue
+        val types = HashMap<Int, Int>()
         val programInfo = ((table[10].toInt() and 0x0F) shl 8) or (table[11].toInt() and 0xFF)
         var i = 12 + programInfo
         while (i + 5 <= table.size - 4) {
-          val type = table[i].toInt() and 0xFF
           val esPid = ((table[i + 1].toInt() and 0x1F) shl 8) or (table[i + 2].toInt() and 0xFF)
-          if (type == TRUEHD && trueHd.size < MAX_STREAMS) trueHd.add(esPid)
+          types[esPid] = table[i].toInt() and 0xFF
           i += 5 + (((table[i + 3].toInt() and 0x0F) shl 8) or (table[i + 4].toInt() and 0xFF))
         }
-        if (trueHd.isEmpty()) return emptySet()
+        return types
       }
     }
-    if (trueHd.isEmpty()) return emptySet()
+    return emptyMap()
+  }
 
-    val streams = HashMap<Int, ByteArrayOutputStream>()
-    p = 0
+  /**
+   * The sound streams whose kind is known only from their bytes: packet id to
+   * the stream type to read it as. A "private data" stream (PrivateSound)
+   * holding AAC or MPEG sound, as 0x0F or 0x03; an LPCM stream (0x80) whose
+   * header is one BdLpcm knows, as 0x80 (one it does not know would get no
+   * format, and the film would wait for it). The first two PES packets of a
+   * stream must say the same, or it is left out.
+   */
+  fun soundByBytes(raw: ByteArray, count: Int): Map<Int, Int> {
+    val types = streamTypes(raw, count)
+    val pids = types.filterValues { it == PrivateSound.PRIVATE || it == BdLpcm.STREAM_TYPE }.keys
+    if (pids.isEmpty()) return emptyMap()
+    val seen = HashMap<Int, MutableList<Int?>>()
+    var p = 0
     while (p + RAW <= count) {
       val t = p + 4
       p += RAW
-      if (raw[t] != 0x47.toByte()) continue
+      if (raw[t] != 0x47.toByte() || raw[t + 1].toInt() and 0x40 == 0) continue
       val pid = ((raw[t + 1].toInt() and 0x1F) shl 8) or (raw[t + 2].toInt() and 0xFF)
-      if (pid !in trueHd) continue
+      if (pid !in pids) continue
+      val list = seen.getOrPut(pid) { ArrayList() }
+      if (list.size >= 2) continue
       var at = payloadAt(raw, t) ?: continue
-      if (raw[t + 1].toInt() and 0x40 != 0) {
-        // PES packet start: 00 00 01, stream id, length (2), flags (2), header length, header.
-        if (t + 188 - at < 9 || raw[at].toInt() != 0 || raw[at + 1].toInt() != 0 || raw[at + 2].toInt() != 1) continue
-        at += 9 + (raw[at + 8].toInt() and 0xFF)
-        if (at >= t + 188) continue
-      }
-      val out = streams.getOrPut(pid) { ByteArrayOutputStream() }
-      if (out.size() < MAX_PER_STREAM) out.write(raw, at, t + 188 - at)
+      if (t + 188 - at < 9 || raw[at].toInt() != 0 || raw[at + 1].toInt() != 0 || raw[at + 2].toInt() != 1) continue
+      at += 9 + (raw[at + 8].toInt() and 0xFF)
+      list.add(
+        when {
+          at >= t + 188 -> null
+          types[pid] == BdLpcm.STREAM_TYPE -> if (at + BdLpcm.HEADER <= t + 188 && BdLpcm.layoutOf(raw, at) != null) BdLpcm.STREAM_TYPE else null
+          else -> PrivateSound.typeOf(raw, at, t + 188)
+        }
+      )
     }
-    val found = HashSet<Int>()
-    for ((pid, out) in streams) if (hasCore(out.toByteArray())) found.add(pid)
+    val found = HashMap<Int, Int>()
+    for ((pid, list) in seen) {
+      val type = list.firstOrNull()
+      if (type != null && list.size == 2 && list[1] == type) found[pid] = type
+    }
     return found
   }
 
@@ -738,5 +790,118 @@ internal object BdCoreScan {
       i++
     }
     return false
+  }
+}
+
+
+/**
+ * A disc's uncompressed sound (LPCM, stream type 0x80): each PES packet is a
+ * 4-byte header and then big-endian samples, the channels in the disc's order
+ * and an odd number of them made even with one unused. The header: payload
+ * size (2 bytes), then channel layout (high 4 bits) and sample rate (low 4),
+ * then bits per sample (top 2 bits).
+ *
+ * The player wants little-endian samples in the WAV order (front left, front
+ * right, centre, LFE, back left, back right, side left, side right), so each
+ * packet is turned into that ([convert]).
+ */
+internal object BdLpcm {
+  const val STREAM_TYPE = 0x80
+  const val HEADER = 4
+
+  class Layout(val sampleRate: Int, val bytesPerSample: Int, val storedChannels: Int, val map: IntArray) {
+    val channels get() = map.size
+    val bits get() = bytesPerSample * 8
+  }
+
+  /**
+   * For each channel given out, which stored channel it is, -1 for silence.
+   * The disc's orders (Blu-ray Read-Only Format, part 3): 3/2+LFE is L R C LS
+   * RS LFE; 3/4 is L R C LS Rls Rrs RS (LFE), where LS and RS are the side
+   * pair and Rls, Rrs the back pair. 3/4 without LFE is given as 7.1 with a
+   * silent LFE: Android's 7-channel layout is 6.1, not this.
+   */
+  private val MAPS = mapOf(
+    1 to intArrayOf(0),
+    3 to intArrayOf(0, 1),
+    4 to intArrayOf(0, 1, 2),
+    5 to intArrayOf(0, 1, 2),
+    6 to intArrayOf(0, 1, 2, 3),
+    7 to intArrayOf(0, 1, 2, 3),
+    8 to intArrayOf(0, 1, 2, 3, 4),
+    9 to intArrayOf(0, 1, 2, 5, 3, 4),
+    10 to intArrayOf(0, 1, 2, -1, 4, 5, 3, 6),
+    11 to intArrayOf(0, 1, 2, 7, 4, 5, 3, 6),
+  )
+  private val STORED = mapOf(1 to 2, 3 to 2, 4 to 4, 5 to 4, 6 to 4, 7 to 4, 8 to 6, 9 to 6, 10 to 8, 11 to 8)
+
+  /** The layout a packet's header says, or null for one this does not know. */
+  fun layoutOf(data: ByteArray, at: Int): Layout? {
+    val assignment = (data[at + 2].toInt() shr 4) and 0x0F
+    val rate = when (data[at + 2].toInt() and 0x0F) {
+      1 -> 48000
+      4 -> 96000
+      5 -> 192000
+      else -> return null
+    }
+    // 16 bits, or 20 and 24 (20 is kept in 3 bytes too).
+    val bytes = when ((data[at + 3].toInt() shr 6) and 3) {
+      1 -> 2
+      2, 3 -> 3
+      else -> return null
+    }
+    val map = MAPS[assignment] ?: return null
+    return Layout(rate, bytes, STORED.getValue(assignment), map)
+  }
+
+  /**
+   * The samples in `data[at, at + size)` (after the header) as the player
+   * wants them, into `out` from 0; returns how many bytes. A part frame at the
+   * end is left out. `out` must hold `size / storedChannels * channels` bytes.
+   */
+  fun convert(data: ByteArray, at: Int, size: Int, layout: Layout, out: ByteArray): Int {
+    val b = layout.bytesPerSample
+    val inFrame = layout.storedChannels * b
+    val frames = size / inFrame
+    val map = layout.map
+    var o = 0
+    for (f in 0 until frames) {
+      val frame = at + f * inFrame
+      for (src in map) {
+        if (src < 0) {
+          for (k in 0 until b) out[o + k] = 0
+        } else {
+          val s = frame + src * b
+          for (k in 0 until b) out[o + k] = data[s + b - 1 - k]
+        }
+        o += b
+      }
+    }
+    return o
+  }
+}
+
+/**
+ * Sound in a stream the program table calls "private data" (0x06) and says no
+ * more about, as ffmpeg writes AAC and MPEG sound when it makes a `.m2ts` (a
+ * disc has no such sound, so it has no number for it there). Media3 reads such
+ * a stream as nothing. What it is shows in its first bytes: ADTS (`FFF`, layer
+ * 0) is AAC, any other `FFE` frame header is MPEG sound. Given as the stream
+ * type Media3 reads it as, 0x0F or 0x03.
+ */
+internal object PrivateSound {
+  const val PRIVATE = 0x06
+  const val AAC = 0x0F
+  const val MPEG = 0x03
+
+  /** What a PES packet whose payload starts at `at` holds, or null if neither. */
+  fun typeOf(data: ByteArray, at: Int, end: Int): Int? {
+    if (end - at < 2 || data[at] != 0xFF.toByte()) return null
+    val b = data[at + 1].toInt() and 0xFF
+    return when {
+      b and 0xF6 == 0xF0 -> AAC
+      b and 0xE0 == 0xE0 && (b shr 1) and 3 != 0 -> MPEG
+      else -> null
+    }
   }
 }

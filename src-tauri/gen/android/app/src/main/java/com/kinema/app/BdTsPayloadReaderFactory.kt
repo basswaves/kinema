@@ -10,8 +10,10 @@ import androidx.media3.common.util.ParsableByteArray
 import androidx.media3.extractor.Ac3Util
 import androidx.media3.extractor.ExtractorOutput
 import androidx.media3.extractor.TrackOutput
+import androidx.media3.extractor.ts.AdtsReader
 import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory
 import androidx.media3.extractor.ts.ElementaryStreamReader
+import androidx.media3.extractor.ts.MpegAudioReader
 import androidx.media3.extractor.ts.PesReader
 import androidx.media3.extractor.ts.TsPayloadReader
 
@@ -20,20 +22,24 @@ import androidx.media3.extractor.ts.TsPayloadReader
  * own factory knows the broadcast kinds; a disc uses some of the numbers for
  * other things:
  *
- * - 0x80 is uncompressed sound on a disc, and video to Media3's factory: left out.
+ * - 0x80 is uncompressed sound (LPCM) on a disc, and video to Media3's factory: BdLpcmReader.
  * - 0x83 is Dolby TrueHD, with a Dolby Digital core in the same stream.
  * - 0x84 and 0xA1 are Dolby Digital Plus (the second one for a second, "secondary", sound): an AC-3 or E-AC-3 frame and the dependent frames after it, read together by BdEac3Reader.
  * - 0x85 and 0x86 are DTS-HD (High Resolution, Master Audio), a DTS core and the rest after it; Media3 reads DTS-HD as 0x88.
  * - 0x82 is DTS, which Media3 reads when told to.
  * - 0x90 is picture subtitles (PGS).
+ * - 0x06 ("private data") with nothing more said is how ffmpeg writes AAC and
+ *   MPEG sound into a `.m2ts`: read as what its bytes are (PrivateSound).
  *
  * The rest (video, Dolby Digital 0x81, MPEG sound) is Media3's.
  * `hasCore` says whether the TrueHD stream with this packet id has the
- * core (BdCoreScan).
+ * core, and `soundByBytes` which LPCM and private data streams can be read,
+ * and as what (BdCoreScan).
  */
 internal class BdTsPayloadReaderFactory(
   flags: Int,
   private val hasCore: (Int) -> Boolean,
+  private val soundByBytes: () -> Map<Int, Int>,
 ) : TsPayloadReader.Factory {
   private val base = DefaultTsPayloadReaderFactory(flags or DefaultTsPayloadReaderFactory.FLAG_ENABLE_HDMV_DTS_AUDIO_STREAMS)
 
@@ -55,7 +61,9 @@ internal class BdTsPayloadReaderFactory(
       videoRead = true
     }
     return when (streamType) {
-      LPCM -> null
+      LPCM -> PesReader(BdLpcmReader(esInfo.language, esInfo.roleFlags, soundByBytes))
+      // Media3 hands a private data stream it knows nothing more of on as -1.
+      PrivateSound.PRIVATE, -1 -> if (soundByBytes().isEmpty()) null else PesReader(PrivateSoundReader(esInfo, soundByBytes))
       TRUEHD -> PesReader(BdTrueHdReader(esInfo.language, esInfo.roleFlags, hasCore))
       DD_PLUS_BD, DD_PLUS_SECONDARY -> PesReader(BdEac3Reader(esInfo.language, esInfo.roleFlags))
       DTS_HD_HRA, DTS_HD_MA -> base.createPayloadReader(DTS_HD_MEDIA3, esInfo)
@@ -76,6 +84,148 @@ internal class BdTsPayloadReaderFactory(
 
     /** MPEG-1, MPEG-2, MPEG-4, H.264 and H.265 video. */
     val VIDEO_TYPES = setOf(0x01, 0x02, 0x10, 0x1B, 0x24)
+  }
+}
+
+/**
+ * A disc's uncompressed sound (BdLpcm): one sample of little-endian PCM in the
+ * WAV channel order for each PES packet, at the packet's time. The format is
+ * given at the first packet, whose header says it. A stream the scan of the
+ * file's start did not find a header it knows in makes no track.
+ */
+internal class BdLpcmReader(
+  private val language: String?,
+  private val roleFlags: Int,
+  private val known: () -> Map<Int, Int>,
+) : ElementaryStreamReader {
+  private var output: TrackOutput? = null
+  private var formatId: String? = null
+  private var pid = 0
+  private var layout: BdLpcm.Layout? = null
+  private var buf = ByteArray(8 * 1024)
+  private var size = 0
+  private var out = ByteArray(0)
+  private var timeUs = C.TIME_UNSET
+
+  override fun seek() {
+    size = 0
+    timeUs = C.TIME_UNSET
+  }
+
+  override fun createTracks(extractorOutput: ExtractorOutput, idGenerator: TsPayloadReader.TrackIdGenerator) {
+    idGenerator.generateNewId()
+    pid = idGenerator.trackId
+    if (known()[pid] != BdLpcm.STREAM_TYPE) {
+      Log.i("Kinema", "media3: LPCM stream $pid left out: no header this reads in the file's start")
+      return
+    }
+    output = extractorOutput.track(pid, C.TRACK_TYPE_AUDIO)
+    formatId = idGenerator.formatId
+  }
+
+  override fun packetStarted(pesTimeUs: Long, flags: Int) {
+    size = 0
+    timeUs = pesTimeUs
+  }
+
+  override fun consume(data: ParsableByteArray) {
+    val n = data.bytesLeft()
+    if (output == null || size + n > MAX_PACKET_BYTES) {
+      size = 0
+      data.skipBytes(n)
+      return
+    }
+    if (size + n > buf.size) buf = buf.copyOf(maxOf(buf.size * 2, size + n))
+    data.readBytes(buf, size, n)
+    size += n
+  }
+
+  override fun packetFinished() {
+    val o = output ?: return
+    if (size <= BdLpcm.HEADER || timeUs == C.TIME_UNSET) return
+    val l = layout ?: BdLpcm.layoutOf(buf, 0)?.also {
+      layout = it
+      o.format(
+        Format.Builder()
+          .setId(formatId)
+          .setContainerMimeType(MimeTypes.VIDEO_MP2T)
+          .setSampleMimeType(MimeTypes.AUDIO_RAW)
+          .setPcmEncoding(if (it.bytesPerSample == 2) C.ENCODING_PCM_16BIT else C.ENCODING_PCM_24BIT)
+          .setChannelCount(it.channels)
+          .setSampleRate(it.sampleRate)
+          .setLanguage(language)
+          .setRoleFlags(roleFlags)
+          .build()
+      )
+      Log.i("Kinema", "media3: LPCM stream $pid: ${it.channels} channels, ${it.sampleRate} Hz, ${it.bits} bits")
+    } ?: return
+    val bytes = size - BdLpcm.HEADER
+    val need = bytes / l.storedChannels * l.channels
+    if (out.size < need) out = ByteArray(need)
+    val n = BdLpcm.convert(buf, BdLpcm.HEADER, bytes, l, out)
+    if (n == 0) return
+    o.sampleData(ParsableByteArray(out, n), n)
+    o.sampleMetadata(timeUs, C.BUFFER_FLAG_KEY_FRAME, n, 0, null)
+    size = 0
+  }
+
+  private companion object {
+    /** A packet is 5 ms of sound: 8 channels of 24 bits at 192 kHz is under 24 KB. */
+    const val MAX_PACKET_BYTES = 64 * 1024
+  }
+}
+
+/**
+ * A "private data" stream (PrivateSound): read by Media3's own reader for what
+ * its first bytes are, AAC or MPEG sound, which the scan of the file's start
+ * found (BdCoreScan.soundByBytes). One the scan did not find makes no track, so
+ * nothing waits for a format from it.
+ */
+internal class PrivateSoundReader(
+  private val esInfo: TsPayloadReader.EsInfo,
+  private val found: () -> Map<Int, Int>,
+) : ElementaryStreamReader {
+  private var inner: ElementaryStreamReader? = null
+
+  override fun seek() {
+    inner?.seek()
+  }
+
+  override fun createTracks(extractorOutput: ExtractorOutput, idGenerator: TsPayloadReader.TrackIdGenerator) {
+    idGenerator.generateNewId()
+    val pid = idGenerator.trackId
+    val type = found()[pid] ?: return
+    val reader = when (type) {
+      PrivateSound.AAC -> AdtsReader(false, esInfo.language, esInfo.roleFlags, MimeTypes.VIDEO_MP2T)
+      PrivateSound.MPEG -> MpegAudioReader(esInfo.language, esInfo.roleFlags, MimeTypes.VIDEO_MP2T)
+      else -> return
+    }
+    inner = reader
+    // A generator of its own for the same packet id: the one given has been moved on.
+    val program = idGenerator.formatId.substringBefore('/', "").toIntOrNull() ?: Int.MIN_VALUE
+    reader.createTracks(extractorOutput, TsPayloadReader.TrackIdGenerator(program, pid, MAX_PID_PLUS_ONE))
+    Log.i("Kinema", "media3: private data stream $pid read as ${if (type == PrivateSound.AAC) "AAC" else "MPEG sound"}")
+  }
+
+  override fun packetStarted(pesTimeUs: Long, flags: Int) {
+    inner?.packetStarted(pesTimeUs, flags)
+  }
+
+  override fun consume(data: ParsableByteArray) {
+    val r = inner
+    if (r == null) data.skipBytes(data.bytesLeft()) else r.consume(data)
+  }
+
+  override fun packetFinished() {
+    inner?.packetFinished()
+  }
+
+  override fun endOfInputReached() {
+    inner?.endOfInputReached()
+  }
+
+  private companion object {
+    const val MAX_PID_PLUS_ONE = 0x2000
   }
 }
 

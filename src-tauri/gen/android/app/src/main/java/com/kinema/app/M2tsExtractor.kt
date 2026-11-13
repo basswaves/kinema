@@ -289,6 +289,8 @@ internal class M2tsExtractor(
 ) : Extractor {
   /** Packet ids of TrueHD streams that have a Dolby Digital core as well, found when the file was sniffed. */
   private val withCore = HashSet<Int>()
+  /** LPCM and "private data" sound streams that can be read, and as what (BdCoreScan.soundByBytes). */
+  private var soundByBytes: Map<Int, Int> = emptyMap()
   private val scratch = ByteArray(BdavLayout.BULK_PACKETS * BdavLayout.RAW)
   private val where = PositionHolder()
   private var view: BdavInput? = null
@@ -300,7 +302,7 @@ internal class M2tsExtractor(
     subtitleParserFactory,
     TimestampAdjuster(0),
     // A disc's H.264 often starts its pictures to be seeked to at non-IDR I pictures.
-    BdTsPayloadReaderFactory(DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES) { pid -> pid in withCore },
+    BdTsPayloadReaderFactory(DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES, { pid -> pid in withCore }, { soundByBytes }),
     TsExtractor.DEFAULT_TIMESTAMP_SEARCH_BYTES,
   )
 
@@ -325,6 +327,7 @@ internal class M2tsExtractor(
     }
     withCore.clear()
     withCore.addAll(BdCoreScan.pidsWithCore(head, have))
+    soundByBytes = BdCoreScan.soundByBytes(head, have)
     Log.i("Kinema", "media3: a Blu-ray stream file (192-byte packets); TrueHD with a Dolby Digital core in ${withCore.size} stream(s)")
     return true
   }

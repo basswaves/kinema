@@ -561,4 +561,73 @@ class BdStreamParsingTest {
     assertEquals(1, s.lostSyncCount)
     assertEquals(listOf(1168, 1168, 1168), g.sizes)
   }
+
+  // ---- uncompressed sound (LPCM) and ffmpeg's private data sound ----------
+
+  private fun lpcmHeader(assignment: Int, rate: Int, bits: Int) =
+    byteArrayOf(0, 0, ((assignment shl 4) or rate).toByte(), (bits shl 6).toByte())
+
+  @Test fun theLpcmHeaderSaysTheLayout() {
+    val stereo = BdLpcm.layoutOf(lpcmHeader(3, 1, 1), 0)!!
+    assertEquals(48000, stereo.sampleRate)
+    assertEquals(2, stereo.channels)
+    assertEquals(16, stereo.bits)
+    val mono = BdLpcm.layoutOf(lpcmHeader(1, 4, 3), 0)!!
+    assertEquals(96000, mono.sampleRate)
+    assertEquals(1, mono.channels)
+    assertEquals(2, mono.storedChannels)
+    assertEquals(24, mono.bits)
+    // 20 bits are kept in 3 bytes.
+    assertEquals(24, BdLpcm.layoutOf(lpcmHeader(9, 5, 2), 0)!!.bits)
+    assertNull(BdLpcm.layoutOf(lpcmHeader(2, 1, 1), 0))
+    assertNull(BdLpcm.layoutOf(lpcmHeader(3, 2, 1), 0))
+    assertNull(BdLpcm.layoutOf(lpcmHeader(3, 1, 0), 0))
+  }
+
+  @Test fun lpcmSamplesAreTurnedLittleEndianAndTheUnusedChannelDropped() {
+    val l = BdLpcm.layoutOf(lpcmHeader(4, 1, 1), 0)!! // 3/0: L R C and one unused
+    val data = byteArrayOf(0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x7F, 0x7F)
+    val out = ByteArray(6)
+    assertEquals(6, BdLpcm.convert(data, 0, data.size, l, out))
+    assertArrayEquals(byteArrayOf(0x02, 0x01, 0x04, 0x03, 0x06, 0x05), out)
+  }
+
+  @Test fun lpcmFiveOneTakesItsLfeToWhereAndroidWantsIt() {
+    val l = BdLpcm.layoutOf(lpcmHeader(9, 1, 3), 0)!! // L R C LS RS LFE, 24 bits
+    // Each channel's sample is three bytes of its own number.
+    val data = ByteArray(18) { (it / 3).toByte() }
+    val out = ByteArray(18)
+    assertEquals(18, BdLpcm.convert(data, 0, data.size, l, out))
+    assertArrayEquals(byteArrayOf(0, 0, 0, 1, 1, 1, 2, 2, 2, 5, 5, 5, 3, 3, 3, 4, 4, 4), out)
+  }
+
+  @Test fun lpcmSevenWithoutLfeIsSevenOneWithASilentLfe() {
+    val l = BdLpcm.layoutOf(lpcmHeader(10, 1, 1), 0)!! // L R C LS Rls Rrs RS and one unused
+    assertEquals(8, l.channels)
+    val data = ByteArray(16) { (it / 2 + 1).toByte() }
+    val out = ByteArray(16)
+    // A part frame at the end is left out.
+    assertEquals(16, BdLpcm.convert(data + byteArrayOf(9, 9), 0, 18, l, out))
+    assertArrayEquals(byteArrayOf(1, 1, 2, 2, 3, 3, 0, 0, 5, 5, 6, 6, 4, 4, 7, 7), out)
+  }
+
+  @Test fun privateDataSoundIsTakenForWhatItsFirstBytesAre() {
+    val adts = byteArrayOf(0xFF.toByte(), 0xF1.toByte(), 0x50, 0x80.toByte())
+    val mp2 = byteArrayOf(0xFF.toByte(), 0xFD.toByte(), 0x84.toByte(), 0x04)
+    val other = byteArrayOf(0x0B, 0x77, 0, 0)
+    val tables = psi(0x100, listOf(0x1B to 0x1011, 0x06 to 0x1100, 0x06 to 0x1101, 0x06 to 0x1102, 0x0F to 0x1103))
+    fun twice(pid: Int, es: ByteArray) = streamOf(pid, es + ByteArray(20)) + streamOf(pid, es + ByteArray(20))
+    val file = tables + twice(0x1100, adts) + twice(0x1101, mp2) + twice(0x1102, other) + twice(0x1103, adts)
+    assertEquals(mapOf(0x1100 to PrivateSound.AAC, 0x1101 to PrivateSound.MPEG), BdCoreScan.soundByBytes(file, file.size))
+    // One packet alone is not enough to go by.
+    val once = tables + streamOf(0x1100, adts + ByteArray(20))
+    assertEquals(emptyMap<Int, Int>(), BdCoreScan.soundByBytes(once, once.size))
+  }
+
+  @Test fun anLpcmStreamIsReadOnlyWithAHeaderThisKnows() {
+    val tables = psi(0x100, listOf(0x80 to 0x1100, 0x80 to 0x1101))
+    fun twice(pid: Int, es: ByteArray) = streamOf(pid, es + ByteArray(40)) + streamOf(pid, es + ByteArray(40))
+    val file = tables + twice(0x1100, lpcmHeader(3, 1, 1)) + twice(0x1101, lpcmHeader(2, 1, 1))
+    assertEquals(mapOf(0x1100 to BdLpcm.STREAM_TYPE), BdCoreScan.soundByBytes(file, file.size))
+  }
 }

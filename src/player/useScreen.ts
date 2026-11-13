@@ -2,13 +2,15 @@
  * The screen and the way out: matching the screen to the film, F for full
  * screen, Back out of full screen, and leaving the player.
  */
-import { useCallback, type RefObject } from 'react';
+import { useCallback, type Dispatch, type RefObject, type SetStateAction } from 'react';
 import { capabilitiesNow } from '../capabilities';
 import { isTvMode } from '../ui/tv';
 import { matchHdrToDisplay } from './displayHdr';
 import { filmNow, mayswitch, restoreScreen, switchForFilm } from './displaySwitch';
 import { isPictureFullscreen, setPaused, setPictureFullscreen } from './engine';
 import type { Session } from './session';
+
+const MATCHING = 'Matching the screen to the video…';
 
 export function useScreen({
   onExit,
@@ -19,7 +21,7 @@ export function useScreen({
   onExit: () => void;
   sessionRef: RefObject<Session>;
   /** A word on screen while the screen is being switched. */
-  setNotice: (notice: string | null) => void;
+  setNotice: Dispatch<SetStateAction<string | null>>;
 }) {
   /**
    * Switch the screen for the file that is open, if the settings call for it,
@@ -28,6 +30,8 @@ export function useScreen({
    */
   const matchScreen = useCallback(async () => {
     const film = await filmNow(sessionRef.current.path).catch(() => 'timeout' as const);
+    /** The word the matching one stood in front of, put back after. */
+    let covered: string | null = null;
     if (film === 'no-picture') {
       // Nothing to match: no video track, or none this system can decode
       // (decodeCheck.ts says which, on screen).
@@ -44,13 +48,18 @@ export function useScreen({
       // the film's mode, or one that offers no other (many TV boxes), is
       // not being matched to anything.
       const switched = await switchForFilm(film, () =>
-        setNotice('Matching the screen to the video…')
+        setNotice((n) => {
+          covered = n;
+          return MATCHING;
+        })
       );
       if (switched) await matchHdrToDisplay();
     } catch (e) {
       console.warn('display: switch failed', e);
     }
-    setNotice(null);
+    // Only its own word goes, and what it covered comes back: the film's
+    // sound cannot play, say, known from the same tracks just before.
+    setNotice((n) => (n === MATCHING ? covered : n));
   }, [setNotice, sessionRef]);
 
   /**

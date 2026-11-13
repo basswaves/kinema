@@ -272,6 +272,8 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
   private var timingDone = false
   /** The sound that would not play, to be named once the next way is known. */
   private var failedSound: String? = null
+  /** This file's tracks were looked at for sound that none was chosen of (soundLeftOut). */
+  private var soundLooked = false
   /**
    * Kinema's volume, 0–100, and mute: the player's own, kept across the
    * player being built again (`fallBack`, `open`) as mpv keeps its own.
@@ -716,6 +718,7 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
 
       override fun onTracksChanged(tracks: Tracks) {
         announceSound(tracks)
+        soundLeftOut(p, tracks)
         rememberVideo(tracks)
         if (!loadedSaid && !tracks.isEmpty) {
           loadedSaid = true
@@ -1021,6 +1024,33 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
     announce(1, soundName(f))
   }
 
+  /**
+   * Media3 leaves out a sound track it cannot play without an error (a
+   * TrueHD track on a device that neither decodes it nor offers it to the
+   * receiver: NO_UNSUPPORTED_SUBTYPE), so fallBack never runs and the film
+   * plays silent. Once the tracks are known: a track that can play is chosen
+   * if there is one, and otherwise the film is said to play without sound.
+   */
+  private fun soundLeftOut(p: ExoPlayer, tracks: Tracks) {
+    if (soundLooked || audioStep != 0) return
+    val audio = tracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO }
+    if (audio.isEmpty()) return
+    soundLooked = true
+    if (audio.any { it.isSelected }) return
+    for (g in audio) {
+      val i = (0 until g.length).firstOrNull { g.isTrackSupported(it) } ?: continue
+      Log.w("Kinema", "media3: no sound was chosen; choosing ${soundName(g.getTrackFormat(i))}, which can play")
+      p.trackSelectionParameters = p.trackSelectionParameters.buildUpon()
+        .setOverrideForType(TrackSelectionOverride(g.mediaTrackGroup, i))
+        .build()
+      return
+    }
+    val f = audio[0].getTrackFormat(0)
+    Log.w("Kinema", "media3: no sound track can play here (${soundName(f)}); the film plays without sound")
+    failedSound = soundName(f)
+    announce(2, null)
+  }
+
   private fun announce(step: Int, chosen: String?) {
     val format = failedSound ?: ""
     failedSound = null
@@ -1057,6 +1087,7 @@ class Media3Plugin(private val activity: Activity) : Plugin(activity) {
         timingDone = false
         main.removeCallbacks(timingTimeout)
         failedSound = null
+        soundLooked = false
         untouched = false
         loadedSaid = false
         videoDecoder = null

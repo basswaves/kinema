@@ -1069,13 +1069,15 @@ export async function omdbTomatometer(key: string, imdbId: string): Promise<numb
     {};
   let readable = true;
   try {
-    data = (await response.json()) ?? {};
+    const parsed: unknown = await response.json();
+    if (parsed === null || typeof parsed !== 'object') readable = false;
+    else data = parsed as typeof data;
   } catch {
     readable = false;
   }
   // An answer that is not an answer is an error, not "no score": a score
   // already stored must not be written over with nothing (A6-07).
-  if (response.ok && (!readable || typeof data !== 'object')) {
+  if (response.ok && !readable) {
     throw new Error('OMDb sent an answer Kinema could not read');
   }
 

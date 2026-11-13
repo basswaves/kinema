@@ -151,7 +151,7 @@ export default function Home(props: Props) {
             reviewCount={reviewCount}
             onReview={onReview}
             onAddFolder={onAddFolder}
-            offline={scanTrouble?.offline === true}
+            offline={props.scanTrouble?.offline === true}
           />
         </FocusScreen>
       );

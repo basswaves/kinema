@@ -150,7 +150,12 @@ export function bestFit(versions: Version[], screen: ScreenCan | null): Version 
     // mode list a few pixels short should not count against a file.
     const fits = !screen || (v.width <= screen.width * 1.05 && v.height <= screen.height * 1.05);
     const hdrShown = !v.hdr || screen?.hdr !== false;
+    // Pictures far smaller than the screen (a sample, a thumbnail copy) come
+    // after any copy that is a real picture for it, however it fits: scaling
+    // 4K down is fine, a 180p clip blown up is not (A8-05).
+    const real = !screen || v.width * v.height >= screen.width * screen.height * 0.1 ? 1 : 0;
     return [
+      real,
       (fits ? 1 : 0) + (hdrShown ? 1 : 0),
       screen?.hdr === true && v.hdr ? 1 : 0,
       v.width * v.height,

@@ -84,6 +84,17 @@ describe('bestFit', () => {
     expect(bestFit(both(), { width: 3840, height: 2160, hdr: true })?.file_id).toBe(1);
   });
 
+  it('never takes a tiny sample over the real picture (A8-05)', () => {
+    const v = nameVersions([read(1, 3840, 2160, { hdr: true }), read(2, 320, 180)]);
+    expect(bestFit(v, { width: 1920, height: 1080, hdr: false })?.file_id).toBe(1);
+    expect(bestFit(v, { width: 1920, height: 1080, hdr: true })?.file_id).toBe(1);
+  });
+
+  it('still counts a 1080p copy as a real picture on a 4K screen', () => {
+    const v = nameVersions([read(1, 3840, 2160, { hdr: true }), read(2, 1920, 1080)]);
+    expect(bestFit(v, { width: 3840, height: 2160, hdr: false })?.file_id).toBe(2);
+  });
+
   it('keeps HDR off a screen that cannot show it', () => {
     const v = nameVersions([read(1, 3840, 2160, { hdr: true }), read(2, 3840, 2160)]);
     expect(bestFit(v, { width: 3840, height: 2160, hdr: false })?.file_id).toBe(2);

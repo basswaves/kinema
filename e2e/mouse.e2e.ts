@@ -311,3 +311,16 @@ test('rails by mouse: the edge arrows, and the heading opens the whole shelf (Gi
   await expect(page.locator('.rail')).toHaveCount(0);
   await expect(page.getByText(heading, { exact: false }).first()).toBeVisible();
 });
+
+test('a mouse side button and Alt+Left go Back like Escape', async ({ page }) => {
+  await play(page);
+  await page.keyboard.press('Alt+ArrowLeft');
+  await expect(page.locator('.player')).toHaveCount(0);
+
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.player')).toBeAttached();
+  await page.evaluate(() =>
+    window.dispatchEvent(new MouseEvent('mouseup', { button: 3, bubbles: true, cancelable: true }))
+  );
+  await expect(page.locator('.player')).toHaveCount(0);
+});

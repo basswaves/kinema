@@ -506,6 +506,34 @@ let installed = false;
 function install(): void {
   if (installed) return;
   installed = true;
+  // A mouse's side "Back" button and Alt+Left are the same Back as Escape: Kinema
+  // keeps its own screen stack, so the web view's history has nothing behind it.
+  // Sent on as `BrowserBack`, which every screen already answers.
+  const sendBack = () => {
+    const target: EventTarget = document.activeElement ?? document.body;
+    target.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'BrowserBack', bubbles: true, cancelable: true })
+    );
+  };
+  window.addEventListener(
+    'mouseup',
+    (e) => {
+      if (e.button !== 3) return;
+      e.preventDefault();
+      sendBack();
+    },
+    true
+  );
+  window.addEventListener(
+    'keydown',
+    (e) => {
+      if (e.key !== 'ArrowLeft' || !e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      sendBack();
+    },
+    true
+  );
   window.addEventListener('keydown', () => lastInput('key'), { capture: true, passive: true });
   window.addEventListener('pointerdown', () => lastInput('pointer'), { capture: true, passive: true });
   // Bubble phase on `window`: a control that keeps a key to itself (a card's

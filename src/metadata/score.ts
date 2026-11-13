@@ -435,11 +435,14 @@ export function pickBest(
     const stubs = close
       .filter((c) => literalTitle(c.title) === literalTitle(best.title))
       .every(isStub);
+    // A tie is broken only for a winner that is called what the file is called,
+    // to the letter: "The Piper" is not "Piper", however popular (A7-05).
+    const named = literalTitle(best.title) === literalTitle(ctx.parsedTitle);
     const popular = stubs && close.every((c) => morePopular(best, c));
     const voted =
       (stubs || Boolean(ctx.parsedYear)) && close.every((c) => moreVoted(best, c));
 
-    if (!contradicted && (popular || voted)) {
+    if (named && !contradicted && (popular || voted)) {
       return {
         best: {
           ...best,

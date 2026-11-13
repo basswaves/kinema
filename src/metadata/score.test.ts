@@ -151,6 +151,20 @@ describe('pickBest', () => {
     expect(best?.reason).toContain('broken by popularity');
   });
 
+  /** A7-05: a rival of another name is not a stub; popularity must not pick between them. */
+  it('does not break a tie by popularity against a differently named rival', () => {
+    const { matched, best } = pickBest(
+      [
+        candidate({ title: 'The Piper', year: 2015, popularity: 12, voteCount: 40 }),
+        candidate({ title: 'Piper', year: null, popularity: 2, voteCount: 1 }),
+      ],
+      { parsedTitle: 'Piper', parsedYear: 2016 }
+    );
+
+    expect(matched).toBe(false);
+    expect(best?.reason).not.toContain('broken by');
+  });
+
   /** Clamped to 1 before comparing, 1.12 and 1.04 were a tie (2026-10-25). */
   it('lets the exact year beat a year off by one when both titles are perfect', () => {
     const { matched, best } = pickBest(

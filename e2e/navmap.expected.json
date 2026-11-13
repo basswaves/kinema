@@ -153,10 +153,10 @@
       "+ Playlist (season 1)": { "U": "← Back", "D": "Season 1", "L": "Mark show watched", "R": "Poster: choose the picture this title shows" },
       "Poster: choose the picture this title shows": { "U": "← Back", "D": "Season 1", "L": "+ Playlist (season 1)", "R": "Files and title" },
       "Files and title": { "U": "← Back", "D": "Season 1", "L": "Poster: choose the picture this title shows", "R": "·" },
-      "✓ Mark season watched": { "U": "▶ Play S01E01", "D": "Episode 1", "L": "Specials", "R": "·" },
       "Season 1": { "U": "▶ Play S01E01", "D": "Episode 1", "L": "·", "R": "Season 2" },
       "Season 2": { "U": "▶ Play S01E01", "D": "Episode 1", "L": "Season 1", "R": "Specials" },
       "Specials": { "U": "▶ Play S01E01", "D": "Episode 1", "L": "Season 2", "R": "✓ Mark season watched" },
+      "✓ Mark season watched": { "U": "▶ Play S01E01", "D": "Episode 1", "L": "Specials", "R": "·" },
       "Episode 1": { "U": "Season 1", "D": "Episode 2", "L": "·", "R": "Mark watched #1" },
       "Mark watched #1": { "U": "Season 1", "D": "Episode 2", "L": "Episode 1", "R": "Add to a playlist #1" },
       "Add to a playlist #1": { "U": "Season 1", "D": "Episode 2", "L": "Mark watched #1", "R": "·" },
@@ -262,10 +262,11 @@
       "✓On": { "U": "Settings", "D": "Clear artwork cache", "L": "Advanced", "R": "Off" },
       "Off": { "U": "Settings", "D": "Clear artwork cache", "L": "✓On", "R": "·" },
       "Clear artwork cache": { "U": "✓On", "D": "Write the missing ones", "L": "Advanced", "R": "·" },
-      "Write the missing ones": { "U": "Clear artwork cache", "D": "Save the library to a file…", "L": "Advanced", "R": "Replace every one" },
-      "Replace every one": { "U": "Clear artwork cache", "D": "Save the library to a file…", "L": "Write the missing ones", "R": "·" },
-      "Save the library to a file…": { "U": "Write the missing ones", "D": "Restore #1", "L": "Advanced", "R": "Take a library in…" },
-      "Take a library in…": { "U": "Write the missing ones", "D": "Restore #1", "L": "Save the library to a file…", "R": "·" },
+      "Write the missing ones": { "U": "Clear artwork cache", "D": "Forget the steps given up", "L": "Advanced", "R": "Replace every one" },
+      "Replace every one": { "U": "Clear artwork cache", "D": "Forget the steps given up", "L": "Write the missing ones", "R": "·" },
+      "Forget the steps given up": { "U": "Write the missing ones", "D": "Save the library to a file…", "L": "Advanced", "R": "·" },
+      "Save the library to a file…": { "U": "Forget the steps given up", "D": "Restore #1", "L": "Advanced", "R": "Take a library in…" },
+      "Take a library in…": { "U": "Forget the steps given up", "D": "Restore #1", "L": "Save the library to a file…", "R": "·" },
       "Restore #1": { "U": "Save the library to a file…", "D": "Restore #2", "L": "Advanced", "R": "·" },
       "Restore #2": { "U": "Restore #1", "D": "Open the folder of copies", "L": "Advanced", "R": "·" },
       "Open the folder of copies": { "U": "Restore #2", "D": "Show developer tools", "L": "Advanced", "R": "·" },
@@ -282,13 +283,13 @@
       "How Kinema reads file names ↗": { "U": "Sample Series · 2 files · seriesKinema could not i", "D": "Run setup again", "L": "Library #2", "R": "·" }
     },
     "settings-review-item": {
-      "Search for the right title…": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Name", "L": "Library #2", "R": "Movie" },
       "Movie": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Name", "L": "Search for the right title…", "R": "Search #2" },
       "Search #2": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Name", "L": "Movie", "R": "Ignore these" },
       "Ignore these": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Name", "L": "Search #2", "R": "·" },
+      "Search for the right title…": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Name", "L": "Library #2", "R": "Movie" },
+      "Add without a match": { "U": "Search for the right title…", "D": "Sample Series · 2 files · seriesKinema could not i", "L": "Year", "R": "·" },
       "Name": { "U": "Search for the right title…", "D": "Sample Series · 2 files · seriesKinema could not i", "L": "Library #2", "R": "Year" },
-      "Year": { "U": "Search for the right title…", "D": "Sample Series · 2 files · seriesKinema could not i", "L": "Name", "R": "Add without a match" },
-      "Add without a match": { "U": "Search for the right title…", "D": "Sample Series · 2 files · seriesKinema could not i", "L": "Year", "R": "·" }
+      "Year": { "U": "Search for the right title…", "D": "Sample Series · 2 files · seriesKinema could not i", "L": "Name", "R": "Add without a match" }
     },
     "leave": {
       "Close Kinema": { "U": "Cancel", "D": "Put the PC to sleep", "L": "·", "R": "·" },
@@ -509,9 +510,9 @@
     "files-and-title": {
       "Season 1 2 files · Season 1 · C:\\fixture": { "U": "Unlink all, decide later", "D": "Season 2 2 files · Season 2 · C:\\fixture", "L": "·", "R": "·" },
       "Season 2 2 files · Season 2 · C:\\fixture": { "U": "Season 1 2 files · Season 1 · C:\\fixture", "D": "Search for the right title…", "L": "·", "R": "·" },
-      "Search for the right title…": { "U": "Season 2 2 files · Season 2 · C:\\fixture", "D": "Unlink all, decide later", "L": "·", "R": "TV series" },
       "TV series": { "U": "Season 2 2 files · Season 2 · C:\\fixture", "D": "Unlink all, decide later", "L": "Search for the right title…", "R": "Search" },
       "Search": { "U": "Season 2 2 files · Season 2 · C:\\fixture", "D": "Unlink all, decide later", "L": "TV series", "R": "·" },
+      "Search for the right title…": { "U": "Season 2 2 files · Season 2 · C:\\fixture", "D": "Unlink all, decide later", "L": "·", "R": "TV series" },
       "Unlink all, decide later": { "U": "Search for the right title…", "D": "Season 1 2 files · Season 1 · C:\\fixture", "L": "·", "R": "Close" },
       "Close": { "U": "Search for the right title…", "D": "Season 1 2 files · Season 1 · C:\\fixture", "L": "Unlink all, decide later", "R": "·" }
     },
@@ -682,10 +683,10 @@
       "+ Playlist (season 1)": { "U": "← Back", "D": "Season 1", "L": "Mark show watched", "R": "Poster: choose the picture this title shows" },
       "Poster: choose the picture this title shows": { "U": "← Back", "D": "Season 1", "L": "+ Playlist (season 1)", "R": "Files and title" },
       "Files and title": { "U": "← Back", "D": "Season 1", "L": "Poster: choose the picture this title shows", "R": "·" },
-      "✓ Mark season watched": { "U": "▶ Play S01E01", "D": "Episode 1", "L": "Specials", "R": "·" },
       "Season 1": { "U": "▶ Play S01E01", "D": "Episode 1", "L": "·", "R": "Season 2" },
       "Season 2": { "U": "▶ Play S01E01", "D": "Episode 1", "L": "Season 1", "R": "Specials" },
       "Specials": { "U": "▶ Play S01E01", "D": "Episode 1", "L": "Season 2", "R": "✓ Mark season watched" },
+      "✓ Mark season watched": { "U": "▶ Play S01E01", "D": "Episode 1", "L": "Specials", "R": "·" },
       "Episode 1": { "U": "Season 1", "D": "Episode 2", "L": "·", "R": "Mark watched #1" },
       "Mark watched #1": { "U": "Season 1", "D": "Episode 2", "L": "Episode 1", "R": "Add to a playlist #1" },
       "Add to a playlist #1": { "U": "Season 1", "D": "Episode 2", "L": "Mark watched #1", "R": "·" },
@@ -782,10 +783,11 @@
       "✓On": { "U": "Settings", "D": "Clear artwork cache", "L": "Advanced", "R": "Off" },
       "Off": { "U": "Settings", "D": "Clear artwork cache", "L": "✓On", "R": "·" },
       "Clear artwork cache": { "U": "✓On", "D": "Write the missing ones", "L": "Advanced", "R": "·" },
-      "Write the missing ones": { "U": "Clear artwork cache", "D": "Save the library to a file…", "L": "Advanced", "R": "Replace every one" },
-      "Replace every one": { "U": "Clear artwork cache", "D": "Save the library to a file…", "L": "Write the missing ones", "R": "·" },
-      "Save the library to a file…": { "U": "Write the missing ones", "D": "Restore #1", "L": "Advanced", "R": "Take a library in…" },
-      "Take a library in…": { "U": "Write the missing ones", "D": "Restore #1", "L": "Save the library to a file…", "R": "·" },
+      "Write the missing ones": { "U": "Clear artwork cache", "D": "Forget the steps given up", "L": "Advanced", "R": "Replace every one" },
+      "Replace every one": { "U": "Clear artwork cache", "D": "Forget the steps given up", "L": "Write the missing ones", "R": "·" },
+      "Forget the steps given up": { "U": "Write the missing ones", "D": "Save the library to a file…", "L": "Advanced", "R": "·" },
+      "Save the library to a file…": { "U": "Forget the steps given up", "D": "Restore #1", "L": "Advanced", "R": "Take a library in…" },
+      "Take a library in…": { "U": "Forget the steps given up", "D": "Restore #1", "L": "Save the library to a file…", "R": "·" },
       "Restore #1": { "U": "Save the library to a file…", "D": "Restore #2", "L": "Advanced", "R": "·" },
       "Restore #2": { "U": "Restore #1", "D": "Open the folder of copies", "L": "Advanced", "R": "·" },
       "Open the folder of copies": { "U": "Restore #2", "D": "Show developer tools", "L": "Advanced", "R": "·" },
@@ -802,13 +804,13 @@
       "How Kinema reads file names ↗": { "U": "Sample Series · 2 files · seriesKinema could not i", "D": "Run setup again", "L": "Library #2", "R": "·" }
     },
     "settings-review-item": {
-      "Search for the right title…": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Name", "L": "Library #2", "R": "Movie" },
       "Movie": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Name", "L": "Search for the right title…", "R": "Search #2" },
       "Search #2": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Name", "L": "Movie", "R": "Ignore these" },
       "Ignore these": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Name", "L": "Search #2", "R": "·" },
+      "Search for the right title…": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Name", "L": "Library #2", "R": "Movie" },
+      "Add without a match": { "U": "Search for the right title…", "D": "Sample Series · 2 files · seriesKinema could not i", "L": "Year", "R": "·" },
       "Name": { "U": "Search for the right title…", "D": "Sample Series · 2 files · seriesKinema could not i", "L": "Library #2", "R": "Year" },
-      "Year": { "U": "Search for the right title…", "D": "Sample Series · 2 files · seriesKinema could not i", "L": "Name", "R": "Add without a match" },
-      "Add without a match": { "U": "Search for the right title…", "D": "Sample Series · 2 files · seriesKinema could not i", "L": "Year", "R": "·" }
+      "Year": { "U": "Search for the right title…", "D": "Sample Series · 2 files · seriesKinema could not i", "L": "Name", "R": "Add without a match" }
     },
     "leave": {
       "Close Kinema": { "U": "Cancel", "D": "Put the PC to sleep", "L": "·", "R": "·" },
@@ -1023,9 +1025,9 @@
     "files-and-title": {
       "Season 1 2 files · Season 1 · C:\\fixture": { "U": "Unlink all, decide later", "D": "Season 2 2 files · Season 2 · C:\\fixture", "L": "·", "R": "·" },
       "Season 2 2 files · Season 2 · C:\\fixture": { "U": "Season 1 2 files · Season 1 · C:\\fixture", "D": "Search for the right title…", "L": "·", "R": "·" },
-      "Search for the right title…": { "U": "Season 2 2 files · Season 2 · C:\\fixture", "D": "Unlink all, decide later", "L": "·", "R": "TV series" },
       "TV series": { "U": "Season 2 2 files · Season 2 · C:\\fixture", "D": "Unlink all, decide later", "L": "Search for the right title…", "R": "Search" },
       "Search": { "U": "Season 2 2 files · Season 2 · C:\\fixture", "D": "Unlink all, decide later", "L": "TV series", "R": "·" },
+      "Search for the right title…": { "U": "Season 2 2 files · Season 2 · C:\\fixture", "D": "Unlink all, decide later", "L": "·", "R": "TV series" },
       "Unlink all, decide later": { "U": "Search for the right title…", "D": "Season 1 2 files · Season 1 · C:\\fixture", "L": "·", "R": "Close" },
       "Close": { "U": "Search for the right title…", "D": "Season 1 2 files · Season 1 · C:\\fixture", "L": "Unlink all, decide later", "R": "·" }
     },
@@ -1192,10 +1194,10 @@
       "+ Playlist (season 1)": { "U": "← Back", "D": "Season 1", "L": "Mark show watched", "R": "Poster: choose the picture this title shows" },
       "Poster: choose the picture this title shows": { "U": "← Back", "D": "Season 1", "L": "+ Playlist (season 1)", "R": "Files and title" },
       "Files and title": { "U": "← Back", "D": "Season 1", "L": "Poster: choose the picture this title shows", "R": "·" },
-      "✓ Mark season watched": { "U": "▶ Play S01E01", "D": "Episode 1", "L": "Specials", "R": "·" },
       "Season 1": { "U": "▶ Play S01E01", "D": "Episode 1", "L": "·", "R": "Season 2" },
       "Season 2": { "U": "▶ Play S01E01", "D": "Episode 1", "L": "Season 1", "R": "Specials" },
       "Specials": { "U": "▶ Play S01E01", "D": "Episode 1", "L": "Season 2", "R": "✓ Mark season watched" },
+      "✓ Mark season watched": { "U": "▶ Play S01E01", "D": "Episode 1", "L": "Specials", "R": "·" },
       "Episode 1": { "U": "Season 1", "D": "Episode 2", "L": "·", "R": "Mark watched #1" },
       "Mark watched #1": { "U": "Season 1", "D": "Episode 2", "L": "Episode 1", "R": "Add to a playlist #1" },
       "Add to a playlist #1": { "U": "Season 1", "D": "Episode 2", "L": "Mark watched #1", "R": "·" },
@@ -1238,10 +1240,8 @@
       "Light": { "U": "Settings", "D": "✓Off", "L": "Full", "R": "·" },
       "✓Off": { "U": "✓Auto", "D": "Off", "L": "Playback", "R": "On" },
       "On": { "U": "✓Auto", "D": "Off", "L": "✓Off", "R": "·" },
-      "Off": { "U": "✓Off", "D": "✓Match the sound", "L": "Playback", "R": "✓On" },
-      "✓On": { "U": "✓Off", "D": "✓Match the sound", "L": "Off", "R": "·" },
-      "✓Match the sound": { "U": "Off", "D": "·", "L": "Playback", "R": "Match the screen" },
-      "Match the screen": { "U": "Off", "D": "·", "L": "✓Match the sound", "R": "·" }
+      "Off": { "U": "✓Off", "D": "·", "L": "Playback", "R": "✓On" },
+      "✓On": { "U": "✓Off", "D": "·", "L": "Off", "R": "·" }
     },
     "settings-picture": {
       "Search settings": { "U": "Settings", "D": "Library #2", "L": "·", "R": "✓On" },
@@ -1284,13 +1284,13 @@
       "How Kinema reads file names ↗": { "U": "Sample Series · 2 files · seriesKinema could not i", "D": "Run setup again", "L": "Library #2", "R": "·" }
     },
     "settings-review-item": {
-      "Search for the right title…": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Name", "L": "Library #2", "R": "Movie" },
       "Movie": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Name", "L": "Search for the right title…", "R": "Search #2" },
       "Search #2": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Name", "L": "Movie", "R": "Ignore these" },
       "Ignore these": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Name", "L": "Search #2", "R": "·" },
+      "Search for the right title…": { "U": "Fixture Movie (1999) · 1 file · movieKinema could ", "D": "Name", "L": "Library #2", "R": "Movie" },
+      "Add without a match": { "U": "Search for the right title…", "D": "Sample Series · 2 files · seriesKinema could not i", "L": "Year", "R": "·" },
       "Name": { "U": "Search for the right title…", "D": "Sample Series · 2 files · seriesKinema could not i", "L": "Library #2", "R": "Year" },
-      "Year": { "U": "Search for the right title…", "D": "Sample Series · 2 files · seriesKinema could not i", "L": "Name", "R": "Add without a match" },
-      "Add without a match": { "U": "Search for the right title…", "D": "Sample Series · 2 files · seriesKinema could not i", "L": "Year", "R": "·" }
+      "Year": { "U": "Search for the right title…", "D": "Sample Series · 2 files · seriesKinema could not i", "L": "Name", "R": "Add without a match" }
     },
     "leave": {
       "Close Kinema": { "U": "Cancel", "D": "Cancel", "L": "·", "R": "·" },
@@ -1447,9 +1447,9 @@
     "files-and-title": {
       "Season 1 2 files · Season 1 · C:\\fixture": { "U": "Unlink all, decide later", "D": "Season 2 2 files · Season 2 · C:\\fixture", "L": "·", "R": "·" },
       "Season 2 2 files · Season 2 · C:\\fixture": { "U": "Season 1 2 files · Season 1 · C:\\fixture", "D": "Search for the right title…", "L": "·", "R": "·" },
-      "Search for the right title…": { "U": "Season 2 2 files · Season 2 · C:\\fixture", "D": "Unlink all, decide later", "L": "·", "R": "TV series" },
       "TV series": { "U": "Season 2 2 files · Season 2 · C:\\fixture", "D": "Unlink all, decide later", "L": "Search for the right title…", "R": "Search" },
       "Search": { "U": "Season 2 2 files · Season 2 · C:\\fixture", "D": "Unlink all, decide later", "L": "TV series", "R": "·" },
+      "Search for the right title…": { "U": "Season 2 2 files · Season 2 · C:\\fixture", "D": "Unlink all, decide later", "L": "·", "R": "TV series" },
       "Unlink all, decide later": { "U": "Search for the right title…", "D": "Season 1 2 files · Season 1 · C:\\fixture", "L": "·", "R": "Close" },
       "Close": { "U": "Search for the right title…", "D": "Season 1 2 files · Season 1 · C:\\fixture", "L": "Unlink all, decide later", "R": "·" }
     },

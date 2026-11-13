@@ -1705,8 +1705,8 @@ export default function Settings({
                   <div className="settings-attribution">
                     <img src="/tmdb.svg" alt="TMDB" className="tmdb-logo" />
                     <p className="muted">
-                      Movie and TV data from TMDB. This product uses the TMDB API but is not
-                      endorsed or certified by TMDB. TV data also from <strong>TVmaze</strong>.
+                      This product uses TMDB and the TMDB APIs but is not endorsed, certified,
+                      or otherwise approved by TMDB. TV data also from <strong>TVmaze</strong>.
                       Movies found without a TMDB key: data from <strong>Wikidata</strong>, and
                       descriptions from <strong>Wikipedia</strong> under CC BY-SA 4.0.
                     </p>

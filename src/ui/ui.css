@@ -2764,7 +2764,9 @@ button.cast-member {
 
 .tmdb-logo {
   display: block;
-  width: 8rem;
+  /* About one line of text tall (the mark is 14:1), and well below any Kinema
+     mark: an attribution, not a badge. */
+  width: 12rem;
   height: auto;
 }
 

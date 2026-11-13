@@ -144,7 +144,11 @@ export default function PictureSoundSetup() {
             note={item.gives}
             hint={
               here.length > 0
-                ? item.costs
+                ? `${
+                    item.key === AUDIO_DIRECT_KEY
+                      ? `${here.map((d) => `${d.name} ${d.detail}`).join('; ')}. `
+                      : ''
+                  }${item.costs}`
                 : `${item.costs} Nothing connected now can; with the first choice, Kinema uses it when something that can is connected.`
             }
           />

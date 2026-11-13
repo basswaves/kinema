@@ -382,7 +382,7 @@ export function describeAudioPath(
 
 /** Levelling and the dialogue lift (soundLevel.ts): what mpv's `af` holds now. */
 function levellingRow(): StatRow {
-  const { af, level, notApplied } = appliedLevel();
+  const { af, level, layout, notApplied } = appliedLevel();
   if (notApplied === 'passthrough' && (level.levelling !== 'off' || level.dialogue)) {
     return {
       label: 'Levelling',
@@ -392,7 +392,7 @@ function levellingRow(): StatRow {
   }
   return {
     label: 'Levelling',
-    value: af ? describeLevel(level) : 'none',
+    value: af ? describeLevel(level, layout ?? null) : 'none',
     note: af ? 'on the decoded sound, before it leaves Kinema' : undefined,
   };
 }

@@ -157,8 +157,15 @@ export async function saveLevel(titleKey: string, level: SoundLevel): Promise<vo
   await setSetting(SOUND_BY_TITLE_KEY, JSON.stringify(all));
 }
 
-/** The level in words, for the notice and the details panel. */
-export function describeLevel(level: SoundLevel): string {
+/**
+ * The level in words, for the notice and the details panel. Given the track's
+ * layout (null when unknown), says what `filterFor` builds for it: a track
+ * with no centre channel to lift is never called "lifted".
+ */
+export function describeLevel(level: SoundLevel, layout?: string | null): string {
+  if (layout !== undefined && level.dialogue && !(layout && canLiftDialogue(layout))) {
+    level = { ...level, dialogue: false };
+  }
   const label = LEVELLINGS.find((x) => x.id === level.levelling)?.label.toLowerCase() ?? 'off';
   const levelling = level.levelling === 'off' ? 'no levelling' : `levelling ${label}`;
   return level.dialogue ? `Dialogue lifted, ${levelling}` : `Sound as mixed, ${levelling}`;
@@ -176,7 +183,12 @@ export async function decodedAfterAll(): Promise<boolean | null> {
 }
 
 /** What is on mpv now, for the details panel. */
-let applied: { af: string; level: SoundLevel; notApplied: NotApplied } = {
+let applied: {
+  af: string;
+  level: SoundLevel;
+  layout?: string | null;
+  notApplied: NotApplied;
+} = {
   af: '',
   level: NO_LEVEL,
   notApplied: null,
@@ -201,7 +213,7 @@ export async function applyLevel(
     try {
       await mpvCommand('set', ['af', af]);
       console.log(
-        `audio: ${af ? describeLevel(level).toLowerCase() : 'no filters'}` +
+        `audio: ${af ? describeLevel(level, track?.layout).toLowerCase() : 'no filters'}` +
           (notApplied ? ' (sound goes to the receiver untouched)' : '')
       );
     } catch (e) {
@@ -211,10 +223,10 @@ export async function applyLevel(
       } catch {
         // Nothing more to undo.
       }
-      applied = { af: '', level, notApplied };
+      applied = { af: '', level, layout: track?.layout ?? null, notApplied };
       return notApplied;
     }
   }
-  applied = { af, level, notApplied };
+  applied = { af, level, layout: track?.layout ?? null, notApplied };
   return notApplied;
 }

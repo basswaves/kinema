@@ -72,4 +72,10 @@ describe('describeLevel', () => {
       'Dialogue lifted, levelling most'
     );
   });
+  it('does not call a track with no centre channel lifted', () => {
+    const on = { levelling: 'more', dialogue: true } as const;
+    expect(describeLevel(on, 'mono')).toBe('Sound as mixed, levelling more');
+    expect(describeLevel(on, null)).toBe('Sound as mixed, levelling more');
+    expect(describeLevel(on, '5.1')).toMatch(/^Dialogue lifted/);
+  });
 });

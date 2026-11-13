@@ -80,10 +80,10 @@ export function useSoundLevel({
   const changeLevel = useCallback(
     (next: SoundLevel) => {
       setLevel(next);
-      say(`${describeLevel(next)}, for this title`);
+      say(`${describeLevel(next, layout ?? null)}, for this title`);
       void saveLevel(titleKey, next).catch((e) => console.warn('audio: levelling not kept', e));
     },
-    [titleKey, say]
+    [titleKey, say, layout]
   );
 
   return { level, notApplied, canLift: canLiftDialogue(layout), changeLevel };

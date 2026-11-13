@@ -1195,6 +1195,9 @@ export default function Settings({
                 {/* The one rendering switch in the app, and it exists only
                     because the right answer depends on hardware this code
                     cannot see. Everything else the app decides for itself. */}
+                {/* Not on Android: Media3 times its own frames, and the choice
+                    is applied only where mpv is (usePlaybackEngine.ts). */}
+                {can?.engine !== 'media3' && (
                 <ChoiceRow
                   label="Frame timing"
                   choices={[
@@ -1215,6 +1218,7 @@ export default function Settings({
                     </>
                   }
                 />
+                )}
               </section>
               {can?.offers_player && <VideoPlayerSection linux={can.system === 'Linux'} />}
               </>

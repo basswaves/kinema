@@ -82,6 +82,7 @@ export const SETTINGS_INDEX: SettingEntry[] = [
     label: 'Frame timing',
     about: 'stutter smooth video sync judder',
     values: ['Match the sound', 'Match the screen'],
+    when: (can) => can.engine !== 'media3',
   },
   {
     section: 'playback',

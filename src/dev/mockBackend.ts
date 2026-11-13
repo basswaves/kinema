@@ -670,6 +670,10 @@ const settings = new Map<string, string>([['tmdb_api_key', 'fixture']]);
 {
   const look = typeof localStorage !== 'undefined' ? localStorage.getItem('kinemaMockLook') : null;
   if (look) settings.set('look', look);
+  // `kinemaMockStepDown`: a remembered step-down memory (player/stepDown.ts),
+  // for the Settings reset (e2e/step-down-reset.e2e.ts).
+  const steps = typeof localStorage !== 'undefined' ? localStorage.getItem('kinemaMockStepDown') : null;
+  if (steps) settings.set('player_step_down', steps);
 }
 let clock = 1000;
 

@@ -9,6 +9,7 @@ const code = Object.values(
 ).join('\n');
 
 const desktop = {
+  engine: 'mpv',
   windowed: true,
   network_shares: false,
   offers_player: true,

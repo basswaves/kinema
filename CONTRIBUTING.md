@@ -552,14 +552,21 @@ reasoning is in [docs/DESIGN.md](docs/DESIGN.md) and [docs/HISTORY.md](docs/HIST
 - **When a graphics card cannot keep up, the desktop player steps down — and
   only then.** The picture Kinema aims for is the full one. But a card that
   drops frames shows a stuttering film, which is further from the creator's
-  intent than a slightly cheaper way of drawing it. So only once frames are
-  being dropped (judged over short windows early in a film; seeks, pauses and
-  stalls do not count), the player gives up the least visible processing
-  first — HDR peak measuring, then the chroma scaler, then correct
-  downscaling, then perceptual gamut mapping — one step at a time. It is
-  remembered for that graphics card, never goes back up by itself, and the
-  details panel names every step and why. A healthy card never sees it. It
-  is not for Android, where the system's decoder and display do the work.
+  intent than a slightly cheaper way of drawing it. So only once the card
+  itself drops frames (judged over short windows early in a film), the
+  player gives up the least visible processing first — HDR peak measuring,
+  then the chroma scaler, then correct downscaling, then perceptual gamut
+  mapping — one step at a time. Only drops the card caused count: not the
+  frames mpv leaves out on purpose when a film is faster than the screen,
+  not a decoder that cannot keep up (software decoding), and not seeks,
+  pauses, stalls or the player opening and closing — no step can help those.
+  A step after which the drops did not fall is put back at once. The level
+  is remembered for that graphics card; after three films that play clean
+  at it, the next film tries one step back up. Settings → Advanced shows
+  what is given up and has a line that forgets it (a reset, not a quality
+  choice). The details panel names every step and why. A healthy card never
+  sees it. It is not for Android, where the system's decoder and display do
+  the work.
 - **Dolby Vision profile 7 on a device with no profile 7 decoder plays its
   HDR10 base layer, and says so.** Most Dolby Vision Blu-ray remuxes are
   profile 7, and Media3 falls back to the plain picture only for profiles 4

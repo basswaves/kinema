@@ -4512,6 +4512,55 @@ The same measuring found three faults, fixed with it:
   200 openings with stacks ready to be taken (slowest 1.3 s); cause unknown,
   nothing changed for it.
 
+## Stepping down counts only the graphics card, and comes back up (2026-11-13)
+
+D6 (2026-10-10) let the desktop player give up the cheapest part of the
+picture when frames dropped, remembered it per graphics card and never went
+back up. An outside review (A3-03) found two machines stepped down for drops
+the card did not cause, and stuck there:
+
+- **A weak processor.** On a Linux test PC, a 4K H.264 film decoded in
+  software (`hwdec-current=no`) lost frames because the processor could not
+  decode them in time; mpv's video output dropped them late
+  (`decoder-frame-drop-count` 0, `frame-drop-count` 45). D6 called it 13.8 %
+  missed and went to level 2. Every step is graphics work, so the drops went
+  on, and the next 1080p film, which had dropped nothing, played at level 3.
+- **A screen slower than the film.** On a strong card (TV PC), the screen
+  could not switch to 59.94 Hz and stayed at 30 Hz, so mpv showed every second
+  frame of a 59.94 fps film, by design: `frame-drop-count` 1786,
+  `decoder-frame-drop-count` 0, `vo-delayed-frame-count` 0. D6 called it
+  49.9 % missed and went to level 2 and then 3; the drops did not fall, and a
+  later film that dropped nothing played at level 3.
+
+The owner approved changing D6 (2026-11-13):
+
+- **Only the card's drops count** (`judgeWindow`). When the film is faster
+  than the screen (`container-fps`/`estimated-vf-fps` above `display-fps`),
+  the frames the screen cannot show come off `frame-drop-count` first and the
+  share is of the frames it could show. A window where the decoder dropped
+  frames, or where the film is decoded in software, is not counted when it
+  is behind (a clean one still says the card kept up). The first few seconds
+  after the first picture are not measured, and a window that ends paused,
+  waiting, ended or closed is thrown away.
+- **A step whose drops did not fall is put back** (`decide`): the next window
+  measured after it must miss at most three quarters of what put it down.
+  This also covers a screen rate mpv does not report.
+- **Three clean films lead one step back up** (`CLEAN_FILMS`). Both stored
+  levels the review saw were wrong. A wrong level costs picture on every film
+  until it is climbed back; trying the level above on a card that does need
+  it costs about ten seconds of dropped frames in one film's first minute.
+  Three keeps a wrong level to three films per step, and a card that really
+  needs it to one short stutter in four films. A clean film is one watched
+  through the 45 s watch with at least two windows the card was measured
+  fine in and no step taken.
+- **Settings → Advanced → Picture steps given up** shows what is given up on
+  each graphics card and has a line, *Forget the steps given up*, that
+  clears the memory and says how many cards it forgot. It is a reset, not a
+  quality choice: Kinema still picks every rendering option.
+
+The details panel still names every step in force, and now says when the
+level will be tried back and where it can be forgotten.
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

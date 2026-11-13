@@ -47,7 +47,7 @@ import { startRow } from './startTime';
 import { goesDirect, readAudioSettings, targetDevice } from './audioOutput';
 import { getEquipment, type DisplayMode } from './equipment';
 import { capabilitiesNow, screenOwner } from '../capabilities';
-import { currentStepDown, stepsInForce, type StepState } from './stepDown';
+import { CLEAN_FILMS, currentStepDown, stepsInForce, type StepState } from './stepDown';
 
 export interface StatRow {
   label: string;
@@ -339,7 +339,7 @@ export function describeStepDown(state: StepState, hdrSource: boolean): StatRow 
   return {
     label: 'Dropped to keep up',
     value: steps.map((s) => s.label).join(' · '),
-    note: `${why}. Remembered for this graphics card; the picture is otherwise as set.`,
+    note: `${why}. Remembered for this graphics card; after ${CLEAN_FILMS} films that play clean, one step is tried back, and Settings → Advanced can forget it. The picture is otherwise as set.`,
     warn: true,
   };
 }

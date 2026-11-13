@@ -40,6 +40,7 @@ import FocusInput from './FocusInput';
 import BackupSection from './BackupSection';
 import ImportWatchedSection from './ImportWatchedSection';
 import MoveSection from './MoveSection';
+import StepDownSection from './StepDownSection';
 import VideoPlayerSection from './VideoPlayerSection';
 import AccountSection, { AccountAppFields } from './AccountSection';
 import {
@@ -1816,6 +1817,7 @@ export default function Settings({
                   </p>
                 </section>
 
+                <StepDownSection />
                 <MoveSection />
                 <BackupSection />
 

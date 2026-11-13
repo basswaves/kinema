@@ -317,6 +317,12 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   },
   {
     section: 'advanced',
+    label: 'Picture steps given up',
+    about: 'step down dropped frames graphics card reset forget full picture',
+    when: (can) => can.engine === 'mpv',
+  },
+  {
+    section: 'advanced',
     label: 'Move to a new computer',
     about: 'export import library file watch history settings playlists transfer migrate',
     when: (can) => can.folder_picker,

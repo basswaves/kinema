@@ -132,6 +132,20 @@ null-check passes them straight through and the panel confidently states
 "0.00× SDR white". Treat non-positive as absent, and gate on the transfer
 function instead.
 
+### Dropped frames the graphics card did not cause
+
+`frame-drop-count` counts every frame the video output left out, for any
+reason. A 59.94 fps film on a screen left at 30 Hz drops every second frame
+by design: 1786 in one film, with `decoder-frame-drop-count` and
+`vo-delayed-frame-count` both 0. A film decoded in software
+(`hwdec-current=no`) on a slow processor reaches the output late, and the
+output drops it there, so `decoder-frame-drop-count` can stay 0 even when the
+decoder is the limit. Read as "the graphics card fell behind", both stepped a
+player down for good (A3-03). **Do:** take the frames the screen cannot show
+(film rate above `display-fps`) off before counting, and treat drops under
+software decoding or with decoder drops as not the card's
+(`stepDown.ts` `judgeWindow`).
+
 ### The verbose log answers rendering questions that reasoning cannot
 
 `msg-level=all=v` records what libplacebo *did*, not what it was asked to do:

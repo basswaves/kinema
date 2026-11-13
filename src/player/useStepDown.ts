@@ -1,13 +1,15 @@
 /**
- * Watching a film for dropped frames, and stepping down when they come
- * (stepDown.ts says why, and what the steps are).
+ * Watching a film for frames the graphics card drops, and stepping down when
+ * they come (stepDown.ts says why, what the steps are, and which drops count).
  *
  * mpv is polled, not observed: an observed property has to be registered when
  * mpv starts and one added later silently does nothing (docs/GOTCHAS.md), and
- * these are scalars read a few times a minute. Each film is watched from its
- * first picture for `WATCH_MS`, in windows of `WINDOW_MS`; a window that
- * missed too many frames puts one more rung down and the watch carries on,
- * after a short quiet for mpv to rebuild its shaders.
+ * these are scalars read a few times a minute. Each film is watched from a
+ * short quiet after its first picture for `WATCH_MS`, in windows of
+ * `WINDOW_MS`; a window where the card missed too many frames puts one more
+ * rung down and the watch carries on, after a short quiet for mpv to rebuild
+ * its shaders. A rung that did not help is put back and the watch ends; a film
+ * watched through clean counts towards trying the level above.
  *
  * Nothing here runs where Media3 plays.
  */
@@ -20,20 +22,40 @@ import {
   SETTLE_MS,
   WATCH_MS,
   WINDOW_MS,
+  cleanFilm,
   currentStepDown,
+  decide,
   judgeWindow,
-  nextLevel,
+  newWatch,
+  recordCleanFilm,
+  stepBackTo,
   stepDownTo,
+  type Rates,
   type Sample,
 } from './stepDown';
 
-async function sample(session: Session, scrubbing: boolean): Promise<Sample> {
+const count = async (name: string) => (await readProperty<number>(name, 'int64')) ?? 0;
+
+async function sample(session: Session): Promise<Sample> {
   return {
     at: performance.now(),
     pos: await readProperty<number>('time-pos', 'double'),
-    dropped: (await readProperty<number>('frame-drop-count', 'int64')) ?? 0,
-    delayed: (await readProperty<number>('vo-delayed-frame-count', 'int64')) ?? 0,
-    held: session.paused || scrubbing,
+    dropped: await count('frame-drop-count'),
+    decoderDropped: await count('decoder-frame-drop-count'),
+    delayed: await count('vo-delayed-frame-count'),
+    // Anything but a film playing on: its frames are the moment's, not the card's.
+    held:
+      session.paused || session.scrubbing || session.waiting || session.ended || !session.open,
+  };
+}
+
+async function rates(): Promise<Rates> {
+  return {
+    fps:
+      (await readProperty<number>('container-fps', 'double')) ??
+      (await readProperty<number>('estimated-vf-fps', 'double')),
+    displayFps: await readProperty<number>('display-fps', 'double'),
+    hwdec: await readProperty<string>('hwdec-current', 'string'),
   };
 }
 
@@ -54,22 +76,28 @@ export function useStepDown({
     const startedAt = performance.now();
     /** The start of the window being measured; null while settling. */
     let base: Sample | null = null;
-    let settleUntil = startedAt;
+    // The player is still opening for a moment after the first picture.
+    let settleUntil = startedAt + SETTLE_MS;
     let hdr: boolean | null = null;
     let busy = false;
+    let watch = newWatch();
+    let toldNotGpu = false;
 
     const id = window.setInterval(() => {
       if (busy || stopped) return;
-      if (performance.now() - startedAt > WATCH_MS) {
+      if (watch.done || performance.now() - startedAt > WATCH_MS) {
         window.clearInterval(id);
+        // Only a film watched to the end of the watch, still open, counts.
+        if (!stopped && !watch.done && cleanFilm(watch)) {
+          void recordCleanFilm().catch((e) => console.warn('step down: could not count', e));
+        }
         return;
       }
       if (performance.now() < settleUntil) return;
       busy = true;
       void (async () => {
         try {
-          const s = sessionRef.current;
-          const now = await sample(s, s.scrubbing);
+          const now = await sample(sessionRef.current);
           if (stopped) return;
           if (base === null || now.held) {
             base = now.held ? null : now;
@@ -77,21 +105,26 @@ export function useStepDown({
           }
           if (now.at - base.at < WINDOW_MS) return;
 
-          const fps =
-            (await readProperty<number>('container-fps', 'double')) ??
-            (await readProperty<number>('estimated-vf-fps', 'double'));
-          const verdict = judgeWindow(base, now, fps);
+          const verdict = judgeWindow(base, now, await rates());
           base = now;
-          if (verdict.kind !== 'behind') return;
-
-          hdr ??= isHdr(await readProperty<string>('video-params/gamma', 'string'));
-          const next = nextLevel(currentStepDown().level, hdr);
-          if (next === null) {
-            // Everything that could be given up has been: nothing left to do.
-            window.clearInterval(id);
-            return;
+          if (stopped) return;
+          if (verdict.kind === 'not-gpu' && !toldNotGpu) {
+            toldNotGpu = true;
+            console.info(
+              `step down: ${verdict.percent.toFixed(1)}% of frames missed, not counted: ${
+                verdict.why === 'decoder' ? 'the decoder dropped frames' : 'decoded in software'
+              }, which no rung can help`
+            );
           }
-          await stepDownTo(next, verdict.percent);
+          if (verdict.kind === 'behind' || verdict.kind === 'fine') {
+            hdr ??= isHdr(await readProperty<string>('video-params/gamma', 'string'));
+          }
+          if (stopped) return;
+          const { watch: next, action } = decide(watch, verdict, currentStepDown().level, hdr ?? false);
+          watch = next;
+          if (action.kind === 'down') await stepDownTo(action.to, action.percent);
+          else if (action.kind === 'undo') await stepBackTo(action.to, action.before, action.after);
+          else return;
           base = null;
           settleUntil = performance.now() + SETTLE_MS;
         } catch (e) {

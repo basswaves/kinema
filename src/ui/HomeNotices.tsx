@@ -17,7 +17,9 @@
  * Quiet on purpose: one line each, in the flow of the page, reached with one
  * press of Down from the hero — never a dialog in front of what you came for.
  */
+import { useEffect, useState } from 'react';
 import { useCapabilities } from '../capabilities';
+import { listWorthALook } from '../library/worthALook';
 import FocusGroup, { FocusProvider } from './FocusGroup';
 import { useNavGroup } from './focusGroups';
 import FocusButton from './FocusButton';
@@ -50,6 +52,28 @@ interface Props {
   onDismissFfmpeg: () => void;
 }
 
+/**
+ * What the review notice says. Worth a look counts in the number but is not
+ * unidentified: those files are matched and on Home, only a second look is
+ * asked for. Say each for what it is.
+ */
+export function reviewNoticeWords(total: number, worth: number): { head: string; tail: string } {
+  const w = Math.min(Math.max(worth, 0), total);
+  const unidentified = total - w;
+  if (unidentified === 0) {
+    return {
+      head: `${count(w, 'match', 'matches')} worth a second look,`,
+      tail: ' made by Kinema before an update. They are on Home as matched; looking takes a few seconds each.',
+    };
+  }
+  const notOnHome = `so ${unidentified === 1 ? 'it is' : 'they are'} not on Home yet.`;
+  const more = w === 0 ? '' : ` ${count(w, 'other match', 'other matches')} worth a second look.`;
+  return {
+    head: `${count(unidentified, 'video')} could not be identified for certain,`,
+    tail: ` ${notOnHome}${more} Picking the right title takes a few seconds each.`,
+  };
+}
+
 export default function HomeNotices({
   scanTrouble,
   onDismissScanTrouble,
@@ -65,6 +89,19 @@ export default function HomeNotices({
   onFfmpeg,
   onDismissFfmpeg,
 }: Props) {
+  // How many of the count are Worth a look: matched, and on Home.
+  const [worth, setWorth] = useState(0);
+  useEffect(() => {
+    let live = true;
+    if (reviewCount === 0) return;
+    listWorthALook()
+      .then((l) => live && setWorth(l.length))
+      .catch(() => live && setWorth(0));
+    return () => {
+      live = false;
+    };
+  }, [reviewCount]);
+  const words = reviewNoticeWords(reviewCount, reviewCount === 0 ? 0 : worth);
   const empty =
     !scanTrouble && reviewCount === 0 && upgrades.length === 0 && !keyRejected && !ffmpegMissing;
   // Not a place to move to while empty — see ContinueRail.tsx.
@@ -145,14 +182,8 @@ export default function HomeNotices({
               ?
             </span>
             <div className="home-notice-text">
-              <strong>
-                {count(reviewCount, 'video')} could not be identified for certain,
-              </strong>
-              <span className="muted">
-                {' '}
-                so {reviewCount === 1 ? 'it is' : 'they are'} not on Home yet. Picking the right
-                title takes a few seconds each.
-              </span>
+              <strong>{words.head}</strong>
+              <span className="muted">{words.tail}</span>
             </div>
             {/* Stable keys on these, so Back from the review queue lands on
                 Review again — docs/GOTCHAS.md, "Back can only return to a

@@ -109,6 +109,33 @@ export default function FolderBrowser({ request }: { request: FolderRequest }) {
     })();
   }, [ask, loadPlaces]);
 
+  // Android's answer can reach us a moment after the dialog closes: while the
+  // permission still reads as not given, look again when the app comes back
+  // to the front, so a granted permission is never left saying "needs permission".
+  const waiting = access !== null && access.read !== 'granted';
+  useEffect(() => {
+    if (!waiting) return;
+    const recheck = () => {
+      if (document.visibilityState === 'hidden') return;
+      storageAccess()
+        .then(async (now) => {
+          if (now.read !== 'granted') return;
+          setAccess(now);
+          setError(null);
+          await loadPlaces();
+        })
+        .catch(() => {});
+    };
+    document.addEventListener('visibilitychange', recheck);
+    window.addEventListener('focus', recheck);
+    const later = window.setTimeout(recheck, 800);
+    return () => {
+      document.removeEventListener('visibilitychange', recheck);
+      window.removeEventListener('focus', recheck);
+      window.clearTimeout(later);
+    };
+  }, [waiting, loadPlaces]);
+
   /** Somewhere else: what was shown goes at once, the new contents follow. */
   const go = useCallback((next: Spot | null) => {
     setListing(null);
@@ -356,8 +383,8 @@ export default function FolderBrowser({ request }: { request: FolderRequest }) {
               {access?.allFiles === 'off' && (
                 <div className="folder-note">
                   <p className="muted">
-                    Subtitle files beside your films need one more permission, All files access.
-                    Films play without it.
+                    Subtitle files, and films in older formats (.vob, .iso, .divx, .ogm, .rmvb),
+                    need one more permission, All files access. Other films play without it.
                   </p>
                   <p className="muted">
                     Android opens its own settings, sometimes a list of apps: switch Kinema on

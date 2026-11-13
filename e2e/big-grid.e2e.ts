@@ -168,10 +168,13 @@ test('a wheel turned away from the ring keeps its distance and the ring', async 
   expect(await box.evaluate((b) => b.scrollTop)).toBeGreaterThan(start + 5000);
   expect(await focusKey(page)).toBe(ring);
   expect(await drawnCards(page)).toBeLessThan(200);
-  // A key then goes on from the ring: the page comes back to it.
+  // A key then goes on from what is on screen: the ring lands there and the
+  // page stays where the wheel took it (A9-02).
   await press(page, 'ArrowDown');
   await settled(page);
   expect(await ringIsOnScreen(page)).toBe(true);
+  expect(await box.evaluate((b) => b.scrollTop)).toBeGreaterThan(start + 5000);
+  expect(await focusKey(page)).not.toBe(ring);
 });
 
 test('a page that jumps to the top is not left without its first rows, even on a slow computer', async ({ page, browserName }) => {

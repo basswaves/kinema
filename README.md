@@ -137,7 +137,7 @@ what shapes it.
    anything Kinema is not sure about is put aside for you to check, never
    guessed.
 
-Nothing to sign up for, nothing left running, nothing written to your media.
+Nothing to sign up for, nothing left running, nothing written to your media unless you press the optional .nfo export yourself.
 It is an early project made by one person: if something misbehaves on your
 equipment, [tell us](#when-something-goes-wrong) — that is how it gets better.
 
@@ -362,7 +362,8 @@ press:
 - **Where your videos are.** Point it at where you keep your movies, and
   another at your TV shows if they live somewhere else. Local drives and
   network shares both work. Nothing is moved, renamed or written to — the
-  files are only read.
+  files are only read. The one exception is an optional export of .nfo files
+  that you have to press yourself.
 
 On Android there is no system folder picker on a TV, so Kinema shows its own:
 the device's storage, a USB drive, or a network drive (a NAS or a computer's

@@ -67,8 +67,8 @@
     {
       "id": "opensubtitles",
       "name": "OpenSubtitles",
-      "hosts": ["api.opensubtitles.com"],
-      "sends": "The title's numbers, season and episode, a fingerprint of the video file (not the file itself), the languages you want, and your sign-in if you added one. The subtitle is then downloaded from the address OpenSubtitles gives.",
+      "hosts": ["api.opensubtitles.com", "www.opensubtitles.com"],
+      "sends": "The title's numbers, season and episode, a fingerprint of the video file (not the file itself), the languages you want, and your sign-in if you added one. The subtitle is then downloaded from the address OpenSubtitles gives (www.opensubtitles.com, or another host OpenSubtitles names for your account).",
       "when": "Only when you ask for subtitles, and for forced subtitles by themselves if you switched that on.",
       "stop": "Do not ask; forced subtitles are switched off in Settings, Language & subtitles.",
       "section": "subtitles",

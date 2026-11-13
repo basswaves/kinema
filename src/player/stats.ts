@@ -187,7 +187,12 @@ function near(value: number, target: number): boolean {
  * makes an uneven division even, and interpolating the difference away would
  * invent frames nobody shot.
  */
-export function describeCadence(sourceFps: number | null, displayHz: number | null): StatRow {
+export function describeCadence(
+  sourceFps: number | null,
+  displayHz: number | null,
+  /** Refresh rates the screen lists. A faster mode is only named when it is in here. */
+  modeRates: number[] = []
+): StatRow {
   if (!sourceFps || !displayHz) {
     return { label: 'Cadence', value: DASH };
   }
@@ -207,9 +212,11 @@ export function describeCadence(sourceFps: number | null, displayHz: number | nu
     return {
       label: 'Cadence',
       value: '3:2 pulldown, uneven',
-      note: `frames alternate between 3 and 2 refreshes; judders on pans. A ${(
-        sourceFps * 5
-      ).toFixed(0)} Hz display mode would give an even 5:5`,
+      note: `frames alternate between 3 and 2 refreshes; judders on pans${
+        modeRates.some((r) => near(r, sourceFps * 5))
+          ? `. The screen's ${(sourceFps * 5).toFixed(0)} Hz mode would give an even 5:5`
+          : ''
+      }`,
       warn: true,
     };
   }
@@ -599,6 +606,7 @@ async function readOutputCheck(from: {
   fps: number | null;
   displayHz: number | null;
   hdrSource: boolean;
+  sourceKnown: boolean;
   hdrOut: OutputFacts['hdrOut'];
   dolbyVision: number | null;
   codec: string | null;
@@ -606,9 +614,13 @@ async function readOutputCheck(from: {
 }): Promise<StatGroup | null> {
   const [fullscreen, screen, policies, audioSettings, equipment, inCount, outCount] =
     await Promise.all([
-      getCurrentWindow()
-        .isFullscreen()
-        .catch(() => false),
+      // Where mpv has a window of its own it is started full screen (engine.ts);
+      // Kinema's own window is not the one on show.
+      capabilitiesNow()?.mpv_video.own_window
+        ? Promise.resolve(true)
+        : getCurrentWindow()
+            .isFullscreen()
+            .catch(() => false),
       invoke<ScreenNowRaw>('screen_now').catch(() => null),
       readSwitchPolicies(),
       readAudioSettings(),
@@ -637,6 +649,7 @@ async function readOutputCheck(from: {
     fps: from.fps,
     displayHz: from.displayHz,
     hdrSource: from.hdrSource,
+    sourceKnown: from.sourceKnown,
     hdrOut: from.hdrOut,
     dolbyVision: from.dolbyVision,
     switches,
@@ -854,6 +867,7 @@ export async function readPlaybackStats(): Promise<StatGroup[]> {
     fps: displayedFps,
     displayHz: displayFps,
     hdrSource,
+    sourceKnown: gamma !== null,
     dolbyVision,
     hdrOut: hdrOutcome({
       sourceGamma: gamma,

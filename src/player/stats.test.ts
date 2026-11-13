@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  describeCadence,
   describeDrawing,
   describeAudioPath,
   describeDolbyVision,
@@ -158,5 +159,13 @@ describe('describeDrawing', () => {
     expect(describeDrawing({ ...base, mode: 'processor', since: 1762600000 })?.value).toBe('processor');
     expect(describeDrawing({ ...base, mode: 'processor' })?.note).toContain('tried again');
     expect(describeDrawing({ ...base, mode: 'given', value: '1' })?.note).toBe('WEBKIT_DISABLE_DMABUF_RENDERER=1');
+  });
+});
+
+describe('describeCadence', () => {
+  it('names a faster mode only when the screen lists it', () => {
+    expect(describeCadence(24, 60).note).not.toMatch(/120/);
+    expect(describeCadence(24, 60, [60, 50]).note).not.toMatch(/120/);
+    expect(describeCadence(24, 60, [60, 120]).note).toMatch(/120 Hz mode/);
   });
 });

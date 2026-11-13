@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AudioDevice, DisplayMode } from './equipment';
 import { DEFAULT_SWITCH_SETTINGS } from './displayMode';
-import { outputCheck, type Check, type OutputFacts } from './outputCheck';
+import { checkHdr, checkSound, outputCheck, type Check, type OutputFacts } from './outputCheck';
 
 const rateOf = (hz: number) => ([23, 59].includes(hz) ? ((hz + 1) * 1000) / 1001 : hz);
 const mode = (width: number, height: number, hz: number): DisplayMode => ({
@@ -304,5 +304,20 @@ describe('outputCheck colour depth', () => {
     expect(c['Colour depth']?.why).toMatch(/driver is set to send 8 bits/);
     expect(c['Colour depth']?.fix).toMatch(/10 or 12 bpc/);
     expect(c['Colour depth']?.fix).toMatch(/YCbCr 4:2:2 first/);
+  });
+});
+
+describe('output check: what is not known', () => {
+  it('gives no SDR verdict before mpv has reported the source', () => {
+    const c = checkHdr({ ...base, hdrSource: false, sourceKnown: false });
+    expect(c).toMatchObject({ verdict: 'info', value: 'not known yet' });
+  });
+
+  it('says mono plainly', () => {
+    const a = { ...base.audio!, inChannels: 1, outChannels: 2, codec: 'aac', outFormat: 'float', direct: false, device: null };
+    expect(checkSound({ ...base, audio: a })?.value).toBe('decoded, mono on both speakers');
+    expect(checkSound({ ...base, audio: { ...a, outChannels: 1 } })?.value).toBe(
+      'decoded, mono kept'
+    );
   });
 });

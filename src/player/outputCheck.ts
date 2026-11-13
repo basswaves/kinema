@@ -57,6 +57,8 @@ export interface OutputFacts {
   fps: number | null;
   displayHz: number | null;
   hdrSource: boolean;
+  /** mpv has reported the source's transfer. False: hdrSource is a guess. Absent counts as known. */
+  sourceKnown?: boolean;
   /** From `describeHdr`: what happened to the dynamic range. */
   hdrOut: 'passthrough' | 'compressed' | 'sdr' | 'unknown';
   /** The track's Dolby Vision profile, or null. Always shown as HDR10. */
@@ -154,6 +156,7 @@ export function checkPicture(f: OutputFacts): Check | null {
 export function checkHdr(f: OutputFacts): Check {
   const label = 'HDR';
   const owner = screenOwner(f.system);
+  if (f.sourceKnown === false) return { label, verdict: 'info', value: 'not known yet' };
   if (!f.hdrSource) return { label, verdict: 'native', value: 'SDR film, shown as SDR' };
   const dv = f.dolbyVision && f.dolbyVision > 0 ? f.dolbyVision : null;
   switch (f.hdrOut) {
@@ -413,7 +416,12 @@ export function checkSound(f: OutputFacts): Check | null {
   return {
     label,
     verdict: 'native',
-    value: `decoded, all ${a.outChannels ?? ''} channels kept`.replace('all  ', 'all '),
+    value:
+      a.inChannels === 1 && a.outChannels === 2
+        ? 'decoded, mono on both speakers'
+        : a.outChannels === 1
+          ? 'decoded, mono kept'
+          : `decoded, all ${a.outChannels ?? ''} channels kept`.replace('all  ', 'all '),
     why:
       stream && !couldPass
         ? `${a.device?.name ?? 'The device'} does not take ${CODEC_NAME[stream] ?? stream} untouched, so it gets lossless PCM instead.`

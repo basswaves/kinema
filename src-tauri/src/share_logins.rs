@@ -55,7 +55,7 @@ pub fn register(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wr
 }
 
 /// Locks (`seal`) or unlocks (`unseal`) a password with the key store.
-fn key_store(command: &str, text: &str) -> Result<String, String> {
+pub(crate) fn key_store(command: &str, text: &str) -> Result<String, String> {
     #[cfg(target_os = "android")]
     {
         #[derive(Deserialize)]

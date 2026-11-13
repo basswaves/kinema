@@ -1080,9 +1080,43 @@ fn backup_before_upgrade(conn: &Connection, dir: &Path) -> Result<Option<std::pa
 
     conn.execute("VACUUM INTO ?1", [target.to_string_lossy()])
         .map_err(|e| DbError::Backup(format!("{}: {e}", target.display())))?;
+    leave_secrets_out(&target)?;
 
     prune_backups(dir);
     Ok(Some(target))
+}
+
+/// Settings that hold a sign-in or a key: a safety copy of the library does
+/// not carry them, so a copy that is passed around or picked up by another
+/// backup tool never carries a way into someone's accounts. Restoring a copy
+/// means connecting SIMKL and Trakt again and typing the OMDb key and the
+/// OpenSubtitles password once more; the watch history is all there.
+const SECRET_SETTINGS: [&str; 9] = [
+    "simkl_access_token",
+    "simkl_refresh_token",
+    "trakt_access_token",
+    "trakt_refresh_token",
+    "trakt_client_secret",
+    "tmdb_api_key",
+    "omdb_api_key",
+    "opensubtitles_password",
+    "opensubtitles_token",
+];
+
+/// Removes [`SECRET_SETTINGS`] from a fresh copy. A copy that cannot be
+/// cleaned is deleted rather than kept with the secrets in it.
+fn leave_secrets_out(copy: &Path) -> Result<(), DbError> {
+    let clean = || -> rusqlite::Result<()> {
+        let conn = Connection::open(copy)?;
+        for key in SECRET_SETTINGS {
+            conn.execute("DELETE FROM settings WHERE key = ?1", [key])?;
+        }
+        Ok(())
+    };
+    clean().map_err(|e| {
+        let _ = std::fs::remove_file(copy);
+        DbError::Backup(format!("{}: {e}", copy.display()))
+    })
 }
 
 /// Keep the newest [`BACKUPS_KEPT`] copies. Best effort: a copy that cannot be
@@ -1176,6 +1210,7 @@ fn periodic_backup_at(
     let target = dir.join(format!("{AUTO_PREFIX}v{SCHEMA_VERSION}-{now}.db"));
     conn.execute("VACUUM INTO ?1", [target.to_string_lossy()])
         .map_err(|e| DbError::Backup(format!("{}: {e}", target.display())))?;
+    leave_secrets_out(&target)?;
 
     let mut copies = auto_copies(dir);
     copies.sort_by_key(|(stamp, _)| std::cmp::Reverse(*stamp));
@@ -1544,7 +1579,8 @@ mod tests {
                  size_bytes, modified_at, first_seen_at, last_seen_at)
                  VALUES (1, 1, 'C:\\m\\a.mkv', 'C:\\m', 'a.mkv', 'mkv', 1, 1, 1, 1);
              INSERT INTO playback_state (file_id, position_secs, completed, updated_at)
-                 VALUES (1, 812.5, 0, 1);",
+                 VALUES (1, 812.5, 0, 1);
+             INSERT INTO settings (key, value) VALUES ('simkl_access_token', 'x'), ('opensubtitles_password', 'y');",
         )
         .unwrap();
         (dir, conn)
@@ -1856,6 +1892,16 @@ mod tests {
             })
             .expect("the resume point is in the copy");
         assert_eq!(position, 812.5);
+        let secrets_in = |c: &Connection| -> i64 {
+            c.query_row(
+                "SELECT COUNT(*) FROM settings WHERE key IN ('simkl_access_token', 'opensubtitles_password')",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap()
+        };
+        assert_eq!(secrets_in(&copy), 0, "sign-ins stay out of the copy");
+        assert_eq!(secrets_in(&writer), 2, "and stay in the library itself");
 
         assert!(periodic_backup_at(&writer, &backups, 1_000_000 + WEEK - 1).unwrap().is_none());
         assert!(periodic_backup_at(&writer, &backups, 1_000_000 + WEEK).unwrap().is_some());

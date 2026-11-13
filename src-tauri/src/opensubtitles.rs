@@ -71,6 +71,19 @@ fn store(conn: &Connection, key: &str, value: &str) -> Result<(), String> {
     crate::settings::store(conn, key, value)
 }
 
+/// A password kept as `plain:` by an older Kinema is sealed the way this
+/// system seals it, on first read. Where nothing can seal it (Linux, or a
+/// key store that does not answer) it stays as it was: a sign-in is never
+/// lost for the sake of locking it.
+fn seal_kept_password(conn: &Connection) {
+    let Some(stored) = setting(conn, PASSWORD_KEY) else { return };
+    let Some(plain) = stored.strip_prefix("plain:") else { return };
+    let sealed = protect(plain);
+    if !sealed.starts_with("plain:") {
+        let _ = store(conn, PASSWORD_KEY, &sealed);
+    }
+}
+
 fn clear(conn: &Connection, key: &str) -> Result<(), String> {
     conn.execute("DELETE FROM settings WHERE key = ?1", [key])
         .map(|_| ())
@@ -82,14 +95,19 @@ fn clear(conn: &Connection, key: &str) -> Result<(), String> {
 /// Kept so Kinema can sign in again when the day's sign-in runs out.
 ///
 /// On Windows it is encrypted with DPAPI to the Windows user — only that user
-/// on that PC can read it back, so the weekly safety copies of the library
-/// carry only the encrypted form. Elsewhere it is kept as it is, in Kinema's
-/// own settings, which is how Kodi and Jellyfin keep theirs; a port needs no
-/// secret store to work.
+/// on that PC can read it back. On Android it is locked by the system's key
+/// store, as network-share passwords are (`share_logins.rs`). On Linux, with
+/// no secret store every desktop has, it is kept as it is, in Kinema's own
+/// settings, which is how Kodi and Jellyfin keep theirs. The safety copies of
+/// the library leave it out altogether (`db.rs`, `SECRET_SETTINGS`).
 fn protect(password: &str) -> String {
     #[cfg(windows)]
     if let Some(sealed) = dpapi::seal(password.as_bytes()) {
         return format!("dpapi:{}", hex(&sealed));
+    }
+    #[cfg(target_os = "android")]
+    if let Ok(sealed) = crate::share_logins::key_store("seal", password) {
+        return format!("keystore:{sealed}");
     }
     format!("plain:{password}")
 }
@@ -97,6 +115,10 @@ fn protect(password: &str) -> String {
 fn unprotect(stored: &str) -> Option<String> {
     if let Some(plain) = stored.strip_prefix("plain:") {
         return Some(plain.to_string());
+    }
+    #[cfg(target_os = "android")]
+    if let Some(sealed) = stored.strip_prefix("keystore:") {
+        return crate::share_logins::key_store("unseal", sealed).ok();
     }
     #[cfg(windows)]
     if let Some(sealed) = stored.strip_prefix("dpapi:") {
@@ -435,6 +457,7 @@ async fn session(app: &tauri::AppHandle) -> Result<Session, String> {
         let db = app.state::<Db>();
         let conn = db.0.lock().map_err(to_string_err)?;
         let key = api_key(&conn).ok_or("This copy of Kinema has no OpenSubtitles app key.")?;
+        seal_kept_password(&conn);
         (
             key,
             base(&conn),
@@ -940,6 +963,18 @@ mod tests {
         assert_eq!(unprotect(&kept).as_deref(), Some("correct horse"));
         assert_eq!(unprotect("plain:abc").as_deref(), Some("abc"));
         assert_eq!(unprotect("dpapi:zz"), None);
+    }
+
+    #[test]
+    fn an_old_plain_password_is_sealed_where_it_can_be_and_never_lost() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);").unwrap();
+        store(&conn, PASSWORD_KEY, "plain:old secret").unwrap();
+        seal_kept_password(&conn);
+        let now = setting(&conn, PASSWORD_KEY).unwrap();
+        #[cfg(windows)]
+        assert!(now.starts_with("dpapi:") && !now.contains("old secret"));
+        assert_eq!(unprotect(&now).as_deref(), Some("old secret"));
     }
 
     #[test]

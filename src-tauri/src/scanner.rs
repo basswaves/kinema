@@ -82,6 +82,16 @@ pub struct ScanReport {
     gone_lines: Vec<(PathBuf, Vec<i64>)>,
 }
 
+/// The same file time, allowing for the clock change. A FAT drive keeps local
+/// time, so when summer or winter time begins every file on it moves by exactly
+/// an hour with the size unchanged; read as "changed", the whole drive would be
+/// probed again twice a year (A7-08). An hour is all that is forgiven, and the
+/// stored time is left as it was, so the answer is the same at every scan.
+fn same_time(stored: i64, found: i64) -> bool {
+    let d = (stored - found).abs();
+    d == 0 || d == 3600
+}
+
 fn mtime_secs(meta: &std::fs::Metadata) -> i64 {
     meta.modified()
         .ok()
@@ -627,7 +637,7 @@ fn write_batch(
 
             match existing {
                 Some((id, old_size, old_mtime, was_missing))
-                    if old_size == file.size && old_mtime == file.modified =>
+                    if old_size == file.size && same_time(old_mtime, file.modified) =>
                 {
                     if was_missing {
                         touch.execute(params![id, now])?;
@@ -1452,5 +1462,14 @@ mod tests {
         let offline = scan_all(&mut conn).unwrap();
         assert_eq!(offline.files_missing, 0);
         assert!(offline.errors[0].starts_with("root unavailable"));
+    }
+
+    #[test]
+    fn a_clock_change_is_not_a_changed_file() {
+        assert!(super::same_time(1000, 1000));
+        assert!(super::same_time(1000, 1000 + 3600));
+        assert!(super::same_time(1000 + 3600, 1000));
+        assert!(!super::same_time(1000, 1000 + 7200));
+        assert!(!super::same_time(1000, 1001));
     }
 }

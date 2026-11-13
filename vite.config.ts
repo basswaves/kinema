@@ -34,7 +34,8 @@ export default defineConfig(async () => ({
   // project, each with its own tests. Left in, `vitest run` ran every copy's
   // tests as well as these (over a thousand files instead of a few hundred).
   test: {
-    exclude: [...configDefaults.exclude, '.claude/**'],
+    // notes/ is a separate, private clone: its review scripts are not Kinema's tests.
+    exclude: [...configDefaults.exclude, '.claude/**', 'notes/**'],
   },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`

@@ -125,6 +125,33 @@ pub fn carried_setting(key: &str) -> bool {
         || SECRET.iter().any(|s| key.contains(s)))
 }
 
+/// Subtitle size and box are stored per screen, by an id of this computer's
+/// monitors, so a new computer would never find them. What goes in the file
+/// is one entry for any screen (`*`), the style most screens had. Safe to
+/// run again on its own output.
+fn portable_subtitle_style(stored: &str) -> Option<String> {
+    let parsed: Value = serde_json::from_str(stored).ok()?;
+    let entries = parsed.as_object()?;
+    let mut tally: Vec<(Value, usize)> = Vec::new();
+    for v in entries.values().filter(|v| v.is_object()) {
+        match tally.iter_mut().find(|(seen, _)| seen == v) {
+            Some((_, n)) => *n += 1,
+            None => tally.push((v.clone(), 1)),
+        }
+    }
+    // The first of equals wins; max_by_key keeps the last, so take it by hand.
+    let mut best: Option<&(Value, usize)> = None;
+    for t in &tally {
+        if best.is_none_or(|b| t.1 > b.1) {
+            best = Some(t);
+        }
+    }
+    let mut out = Map::new();
+    let Some(best) = best else { return Some(stored.to_string()) };
+    out.insert("*".into(), best.0.clone());
+    Some(Value::Object(out).to_string())
+}
+
 fn json_of(v: Sql) -> Value {
     match v {
         Sql::Null => Value::Null,
@@ -230,6 +257,14 @@ pub fn export(conn: &Connection) -> rusqlite::Result<MoveFile> {
     for row in stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))? {
         let (k, v) = row?;
         if carried_setting(&k) {
+            let v = if k == "subtitle_style" {
+                match portable_subtitle_style(&v) {
+                    Some(p) => p,
+                    None => continue,
+                }
+            } else {
+                v
+            };
             settings.insert(k, v.into());
         }
     }
@@ -378,6 +413,16 @@ pub fn import(conn: &mut Connection, file: &MoveFile) -> Result<MoveReport, Stri
 
     for (k, v) in &file.settings {
         if let (true, Some(v)) = (carried_setting(k), v.as_str()) {
+            // A file from before the screens were left out still has them.
+            let v = if k == "subtitle_style" {
+                match portable_subtitle_style(v) {
+                    Some(p) => p,
+                    None => continue,
+                }
+            } else {
+                v.to_string()
+            };
+            let v = v.as_str();
             tx.execute(
                 "INSERT INTO settings (key, value) VALUES (?1, ?2)
                  ON CONFLICT(key) DO UPDATE SET value = excluded.value",
@@ -687,6 +732,16 @@ mod tests {
         let before = r#"{"file_name":"x.mkv","size_bytes":1,"what":"match","kind":"series","provider":"tmdb","provider_id":"1","reason":null}"#;
         let h: Hand = serde_json::from_str(before).unwrap();
         assert_eq!(h.placed, None);
+    }
+
+    #[test]
+    fn subtitle_style_goes_without_this_computers_screens() {
+        let one = r#"{"A":{"size":"normal","box":true},"B":{"size":"large","box":true},"C":{"size":"large","box":true}}"#;
+        let want = r#"{"*":{"box":true,"size":"large"}}"#;
+        assert_eq!(portable_subtitle_style(one).unwrap(), want);
+        assert_eq!(portable_subtitle_style(want).unwrap(), want);
+        assert_eq!(portable_subtitle_style("{}").unwrap(), "{}");
+        assert_eq!(portable_subtitle_style("not json"), None);
     }
 
     #[test]

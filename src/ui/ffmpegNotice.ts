@@ -107,7 +107,9 @@ export function ffmpegLacksWords(lacks: string[]): string | null {
   ];
   return (
     `This ffmpeg cannot decode ${formats.join(' or ')} — some systems’ own builds leave them ` +
-    `out, Fedora’s ffmpeg-free among them. So ${costs.join('; and ')}. Everything else ` +
-    `works. A full build of ffmpeg has them (on Fedora, from RPM Fusion).`
+    `out, Fedora’s ffmpeg-free among them. So ${costs.join('; and ')}. Where the player ` +
+    `uses the system’s own codec libraries too (on Linux), the same gaps can leave a film ` +
+    `with no picture or no sound; the player says so when they do. A full build ` +
+    `of ffmpeg has them (on Fedora, from RPM Fusion).`
   );
 }

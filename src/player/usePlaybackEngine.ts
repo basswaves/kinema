@@ -20,6 +20,15 @@ import {
   releaseAudioDevice,
   silencedAudioTrack,
 } from './audioOutput';
+import {
+  cannotDecodeNotice,
+  otherSoundPlays,
+  readDecoders,
+  readPictureVerdict,
+  readTrackFacts,
+  soundGap,
+  type Gap,
+} from './decodeCheck';
 import { matchHdrToDisplay } from './displayHdr';
 import { mayswitch, restoreScreen } from './displaySwitch';
 import {
@@ -66,6 +75,13 @@ import { noteStart } from './startTime';
 const COVER_MAX_MS = 8000;
 /** How long after playback starts to check that the sound actually opened. */
 const AUDIO_CHECK_MS = 1500;
+/**
+ * How often, and for how long after the file opens, mpv is asked whether its
+ * picture can be decoded (decodeCheck.ts). A decoder that turns out nothing
+ * shows within a second or two; a working one shows its first frame sooner.
+ */
+const PICTURE_CHECK_MS = 1000;
+const PICTURE_CHECKS = 12;
 /** How often the sound output is read while a film plays (soundWatch.ts). */
 const SOUND_WATCH_MS = 2000;
 /**
@@ -122,6 +138,25 @@ export function usePlaybackEngine({
   const videoSync = useRef<string>(VIDEO_SYNC_MODES.audio);
   /** The sound check below, for the sound watch to run after it reopens the sound. */
   const checkAudio = useRef<(() => void) | null>(null);
+  /**
+   * What this system cannot decode in the open file (decodeCheck.ts): said in
+   * one notice, since a film can lack both — HEVC with E-AC-3 is common.
+   */
+  const gaps = useRef<{ picture: Gap | null; sound: Gap | null; otherSound: boolean }>({
+    picture: null,
+    sound: null,
+    otherSound: false,
+  });
+  const sayGaps = () => {
+    const { picture, sound, otherSound } = gaps.current;
+    const found = [picture, sound].filter((g): g is Gap => g !== null);
+    const words = cannotDecodeNotice(found, capabilitiesNow()?.system ?? 'The system', otherSound);
+    if (words) setNotice(words);
+  };
+  const sayGapsRef = useRef(sayGaps);
+  useLayoutEffect(() => {
+    sayGapsRef.current = sayGaps;
+  });
 
   // Play → first picture (startTime.ts): logged once, kept for the details panel.
   useEffect(() => {
@@ -145,6 +180,7 @@ export function usePlaybackEngine({
     dispatch({ type: 'load', path: target.path, at: performance.now() });
     setNotice(null);
     audioFallback.current = 0;
+    gaps.current = { picture: null, sound: null, otherSound: false };
 
     (async () => {
       try {
@@ -272,6 +308,18 @@ export function usePlaybackEngine({
           if (disposed) return;
           const track = await silencedAudioTrack(lastAid.current);
           if (track === null) return;
+          // A track this system cannot decode is not an output that refused
+          // it: no fallback would open it, so say what is wrong instead.
+          const [tracks, decoders] = await Promise.all([readTrackFacts(), readDecoders()]);
+          if (disposed) return;
+          const gap = soundGap(tracks, track, decoders);
+          if (gap) {
+            console.warn(`audio: this system has no decoder for ${gap.codec}`);
+            gaps.current.sound = gap;
+            gaps.current.otherSound = otherSoundPlays(tracks, track, decoders);
+            sayGapsRef.current();
+            return;
+          }
           const step = audioFallback.current++;
           const system = capabilitiesNow()?.system ?? 'The system';
           if (await applyFallback(step, track).catch(() => false)) {
@@ -531,6 +579,39 @@ export function usePlaybackEngine({
     seq: session.seq,
     watching: session.open && session.frameShown,
   });
+
+  // A picture this system cannot decode: said, rather than a black window with
+  // sound (decodeCheck.ts). Asked for a few seconds after the file opens,
+  // until the first picture arrives or it is clear none will. Mpv only.
+  useEffect(() => {
+    if (!session.open || !hasMpv()) return;
+    const path = session.path;
+    let live = true;
+    let timer = 0;
+    let left = PICTURE_CHECKS;
+    const check = async () => {
+      const verdict = await readPictureVerdict(path).catch(() => null);
+      if (!live) return;
+      if (verdict?.state === 'shown') return;
+      if (verdict?.state === 'none') {
+        if (verdict.gap) {
+          const g = verdict.gap;
+          console.warn(
+            `player: this system ${g.why === 'no-decoder' ? 'has no decoder for' : 'decodes no frames of'} ${g.codec}${g.profile ? ` (${g.profile})` : ''} video`
+          );
+          gaps.current.picture = g;
+          sayGapsRef.current();
+        }
+        return;
+      }
+      if (--left > 0) timer = window.setTimeout(() => void check(), PICTURE_CHECK_MS);
+    };
+    timer = window.setTimeout(() => void check(), PICTURE_CHECK_MS);
+    return () => {
+      live = false;
+      window.clearTimeout(timer);
+    };
+  }, [session.open, session.seq, session.path]);
 
   // The cover never outstays its purpose: if no first frame is reported in
   // time — a file with no video, an event that never comes — it goes anyway.

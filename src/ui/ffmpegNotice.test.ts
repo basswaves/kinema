@@ -21,6 +21,9 @@ describe('ffmpegLacksWords', () => {
     expect(words).toContain('cannot decode HEVC video or E-AC-3 sound');
     expect(words).toContain('for HEVC video, the picture shape is not measured');
     expect(words).toContain('first sound track is E-AC-3, intros and credits are not found');
+    // The player shares the system's codec libraries on Linux (review A3-01).
+    expect(words).not.toContain('Everything else works');
+    expect(words).toContain('the player says so');
   });
 
   it('only says the costs that follow from what is missing', () => {

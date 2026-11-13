@@ -41,6 +41,7 @@ import {
   videoFacts,
 } from './engine';
 import { DISPLAY_MATCH_KEY, matchOn, switchSettings } from './systemOutput';
+import { readPictureVerdict } from './decodeCheck';
 
 /** Android's way (`systemOutput.ts`) rather than Kinema's own. */
 const bySystem = () => capabilitiesNow()?.system_output === true;
@@ -186,21 +187,51 @@ async function pictureScreen(): Promise<string | null> {
   return names?.split(',')[0]?.trim() || null;
 }
 
-/** The film as mpv decodes it. Waits for the first frame's parameters. */
-export async function filmNow(): Promise<Film | null> {
-  if (bySystem()) return poll(videoFacts, (v) => v.width > 0 && v.height > 0, PARAMS_WAIT_MS);
-  const gamma = await poll(
-    () => mpvGet('video-params/gamma', 'string') as Promise<string | null>,
-    (v) => v.length > 0,
-    PARAMS_WAIT_MS
-  );
-  if (gamma === null) return null;
+/**
+ * How often, while waiting for the first frame, mpv is asked whether a
+ * picture can come at all (decodeCheck.ts): a dozen reads each time, so not
+ * at every poll.
+ */
+const VERDICT_EVERY_MS = 500;
+
+/**
+ * Why `filmNow` found no film: no picture will come for this file — it has
+ * none, or this system cannot decode it — or none came in time.
+ */
+export type NoFilm = 'no-picture' | 'timeout';
+
+/**
+ * The film as mpv decodes it. Waits for the first frame's parameters — but
+ * not for a picture that cannot come (review A3-05, A3-01): a file with no
+ * video track, or one this system cannot decode, used to hold its sound
+ * paused for the whole wait. `path` is the file being waited for; without it
+ * only the wait ends it.
+ */
+export async function filmNow(path?: string): Promise<Film | NoFilm> {
+  if (bySystem()) {
+    const facts = await poll(videoFacts, (v) => v.width > 0 && v.height > 0, PARAMS_WAIT_MS);
+    return facts ?? 'timeout';
+  }
+  let gamma: string | null;
+  const until = Date.now() + PARAMS_WAIT_MS;
+  let askedAt = 0;
+  for (;;) {
+    gamma = ((await mpvGet('video-params/gamma', 'string').catch(() => null)) as string | null) || null;
+    if (gamma) break;
+    if (path && Date.now() - askedAt >= VERDICT_EVERY_MS) {
+      askedAt = Date.now();
+      const verdict = await readPictureVerdict(path).catch(() => null);
+      if (verdict?.state === 'none') return 'no-picture';
+    }
+    if (Date.now() > until) return 'timeout';
+    await sleep(150);
+  }
   const [width, height, fps] = await Promise.all([
     mpvGet('video-params/w', 'int64').catch(() => null) as Promise<number | null>,
     mpvGet('video-params/h', 'int64').catch(() => null) as Promise<number | null>,
     mpvGet('container-fps', 'double').catch(() => null) as Promise<number | null>,
   ]);
-  if (!width || !height) return null;
+  if (!width || !height) return 'timeout';
   return { width, height, fps: fps || null, hdr: gamma === 'pq' || gamma === 'hlg' };
 }
 

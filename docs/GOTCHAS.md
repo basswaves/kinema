@@ -320,6 +320,37 @@ separate file" (cost a rebuild, 2026-10-30). Only short codes reach `lang`:
 a title the file name ends with, and read a spelled-out tag yourself
 (`trackLanguage` in tracks.ts).
 
+### A track mpv cannot decode is dropped, and only the log says so
+
+On Linux mpv uses the system's own codec libraries, and some systems' builds
+leave formats out (Fedora's `libavcodec-free`: no HEVC, no E-AC-3, H.264 only
+through OpenH264). mpv logs `Failed to initialize a decoder for codec 'hevc'`,
+deselects the track (`vid` reads `no`) and plays on: sound and a black
+window, or a picture and silence. To the player that silence looked exactly
+like a sound output that refused to open, so it ran the output fallbacks and
+said "playing in stereo" for a track nothing could decode. And the screen
+switch waited its full 15 s, paused, for a first frame that could not come
+(review 2026-11, A3-01/02/05).
+
+A decoder can also open and then fail on every frame (10-bit, interlaced or
+8K H.264 through OpenH264): the track stays selected, `vo-configured` stays
+`no`, and no property counts the errors.
+
+**Do:** read `decoder-list` as a **string** (JSON, like `vo-passes`; never the
+node format) and look for the track's `codec`. For the decoder that turns out
+nothing, read `reader-pts` from `demuxer-cache-state` (also a string): with no
+picture it races to the end of the file within a second or two, where a
+decoder that works holds it within a fraction of a second of the position
+(also over an `smb://` share or `http://` with mpv's cache on: read-ahead
+moves `cache-end`, not `reader-pts`).
+
+**But not on one read.** A recording cut mid-GOP, through a full ffmpeg,
+skips to its first keyframe: the position reads 0 while the reader is
+already 6 s ahead, for a few milliseconds before its picture, and a full
+ffmpeg logs decode errors for it too, so counting errors does not separate
+the two cases either. Believe "no frames" only once it has held, still with
+no picture, for 3 s. `decodeCheck.ts`.
+
 ---
 
 ## Tauri

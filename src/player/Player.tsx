@@ -64,6 +64,7 @@ import { useVolume } from './useVolume';
 import { VOLUME_STEP, wheelVolumeSteps } from './volume';
 import { nameOf, noteFirstFrame, targetFor } from '../library/opened';
 import { isSoundLostNotice } from './soundWatch';
+import { isNoPictureNotice } from './decodeCheck';
 
 interface Props {
   target: PlaybackTarget;
@@ -250,9 +251,10 @@ export default function Player({ target, onExit, onPlayTarget }: Props) {
 
   // A notice about the sound says its piece and goes; the film is playing.
   // Except the one saying the film paused because the sound went away: while
-  // paused, it is the only thing that tells whoever comes back why.
+  // paused, it is the only thing that tells whoever comes back why. And the
+  // one saying there is no picture: the screen stays black, so it stays.
   useEffect(() => {
-    if (!notice || (paused && isSoundLostNotice(notice))) return;
+    if (!notice || (paused && isSoundLostNotice(notice)) || isNoPictureNotice(notice)) return;
     const id = window.setTimeout(() => setNotice(null), AUDIO_NOTICE_MS);
     return () => window.clearTimeout(id);
   }, [notice, paused]);

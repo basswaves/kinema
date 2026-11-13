@@ -27,8 +27,14 @@ export function useScreen({
    * switch is a film that plays in the mode it is in.
    */
   const matchScreen = useCallback(async () => {
-    const film = await filmNow().catch(() => null);
-    if (!film) {
+    const film = await filmNow(sessionRef.current.path).catch(() => 'timeout' as const);
+    if (film === 'no-picture') {
+      // Nothing to match: no video track, or none this system can decode
+      // (decodeCheck.ts says which, on screen).
+      console.log('display: this file has no picture to match the screen to');
+      return;
+    }
+    if (film === 'timeout') {
       // Said, because the film then plays in whatever mode the screen is in.
       console.warn('display: the first frame did not arrive in time; the screen is left as it is');
       return;
@@ -45,7 +51,7 @@ export function useScreen({
       console.warn('display: switch failed', e);
     }
     setNotice(null);
-  }, [setNotice]);
+  }, [setNotice, sessionRef]);
 
   /**
    * The only way out of the player, and the only place that gives the desktop

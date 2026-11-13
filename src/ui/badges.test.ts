@@ -142,6 +142,22 @@ describe('buildBadges', () => {
     expect(immersive(aac)).toBe(false);
   });
 
+  it('drops UHD from the name’s source when the file’s picture is below 4K', () => {
+    const base = facts();
+    const withVideo = (width: number, height: number) => ({
+      ...base,
+      details: { ...base.details!, video: { ...base.details!.video!, width, height } },
+    });
+    const source = (f: FileFacts) =>
+      buildBadges(f, REMUX)
+        .flatMap((r) => r.badges)
+        .find((b) => b.label === 'Source')?.value;
+    expect(source(withVideo(320, 180))).toBe('Blu-ray remux');
+    expect(source(withVideo(1920, 1080))).toBe('Blu-ray remux');
+    expect(source(withVideo(3840, 1600))).toBe('UHD Blu-ray remux');
+    expect(source(withVideo(3840, 2160))).toBe('UHD Blu-ray remux');
+  });
+
   it('shows nothing at all for a file nothing is known about', () => {
     expect(buildBadges(facts({ details: null }), null)).toEqual([]);
   });

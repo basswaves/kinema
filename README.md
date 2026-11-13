@@ -177,8 +177,9 @@ audio and subtitles, volume. Back steps back to wherever you came from.
   format (TrueHD Atmos, DTS:X, DD+ Atmos), frame rate, bit depth and the aspect
   ratio measured from the picture itself, so a 2.39:1 film in a 16:9 file says
   2.39:1. Where it came from (UHD Blu-ray remux, WEB-DL…) is read from the
-  release name, and so is Auro-3D (shown only if the file has a PCM or lossless
-  sound track to hold it); nothing else is.
+  release name ("UHD" only if the picture is 4K), and so is Auro-3D (shown
+  only if the file has a PCM or lossless sound track to hold it); nothing
+  else is.
 - **Keeps home videos and clips apart.** A Videos folder holds what is neither
   a film nor a show, never matched, each with a picture taken from the file,
   under the Library tab. In the TV layout, Library → Folders browses your

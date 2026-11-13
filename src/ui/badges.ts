@@ -355,7 +355,18 @@ export function buildBadges(
     sound.push({ label: 'Immersive', value: 'Auro-3D' });
   }
 
-  const source = release ? sourceLabel(release) : null;
+  // The name's "UHD" is dropped when the file's own picture is below 4K: the
+  // source can only come from the name, but not against what was measured.
+  const measured = video && video.width > 0 && video.height > 0;
+  const belowUhd =
+    measured && !['4K UHD', '8K'].includes(resolutionLabel(video.width, video.height, video.interlaced));
+  const named =
+    release && belowUhd && release.source === 'Ultra HD Blu-ray'
+      ? { ...release, source: 'Blu-ray' }
+      : release && belowUhd && release.source === 'Ultra HDTV'
+        ? { ...release, source: 'HDTV' }
+        : release;
+  const source = named ? sourceLabel(named) : null;
   if (source) file.push({ label: 'Source', value: source });
   for (const edition of release?.editions ?? []) file.push({ label: 'Edition', value: edition });
   const subtitles = details?.subtitles ?? [];

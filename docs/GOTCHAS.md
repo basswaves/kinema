@@ -584,6 +584,28 @@ watched to the end. Tests had no such row, so nothing failed. **Do:** a
 query over `media_files` that reads `title_id` as a number says
 `AND m.title_id IS NOT NULL`; a test library has one file with no title.
 
+---
+
+### `PRAGMA optimize` before the data exists makes the statistics worse than none (2026-11-13)
+
+The scan ran `PRAGMA optimize` straight after the file walk, when no new file
+had a title yet. SQLite recorded every file as sharing one title
+(`idx_media_title 5000 5000`), so the title index looked useless. For each
+title's counts the bundled SQLite then read the whole `media_files` table
+(`SCAN m`; Python's SQLite, without STAT4, chose `idx_media_files_missing`,
+which matches every file — the same cost): Home read every file once per
+title, 11.4 s at 5000 titles, 51 ms with statistics that know the titles.
+Nothing ever fixed it: `PRAGMA optimize` re-analyses a table only when its row
+count changes a lot, and matching changes no counts. A second trap hides a
+fix: an `ANALYZE` on one connection does not reach another — each loads the
+statistics once, so the window's connection keeps the old ones until restart.
+Measure in the bundled SQLite too (a Rust test): Python's picks other plans.
+**Do:** take statistics
+only once the columns the indexes cover have their real values
+(`db::refresh_statistics_if_stale`, after matching); then `ANALYZE
+sqlite_schema` on every other open connection (`db::reload_statistics`). The
+tests in `db.rs` reproduce the poisoned plan in the bundled SQLite.
+
 ## Library and intro detection
 
 ### A graceful fallback with nothing to show for it is a silent bug

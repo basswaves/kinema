@@ -108,6 +108,9 @@ export const listLibraryRoots = () => invoke<LibraryRoot[]>('list_library_roots'
 
 export const scanLibrary = () => invoke<ScanReport>('scan_library');
 
+/** After matching: refresh the database's planner statistics if the titles changed them (best effort). */
+export const refreshQueryStatistics = () => invoke<boolean>('refresh_query_statistics');
+
 export const listUnparsed = (limit: number) => invoke<MediaFile[]>('list_unparsed', { limit });
 
 /** Settings keys and defaults for running the user's own Skiptro install. */

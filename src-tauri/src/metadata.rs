@@ -473,7 +473,7 @@ pub(crate) const TITLE_SELECT: &str = "
            (SELECT s.tomatometer FROM omdb_scores s WHERE s.imdb_id = t.imdb_id)
       FROM titles t";
 
-fn map_title(r: &rusqlite::Row) -> rusqlite::Result<Title> {
+pub(crate) fn map_title(r: &rusqlite::Row) -> rusqlite::Result<Title> {
     Ok(Title {
         id: r.get(0)?,
         kind: r.get(1)?,

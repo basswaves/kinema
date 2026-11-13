@@ -391,13 +391,46 @@ pub async fn scan_library(app: tauri::AppHandle) -> Result<ScanReport, String> {
         let _running = running;
         let db = app.state::<ScanDb>();
         let mut conn = db.0.lock().map_err(to_string_err)?;
+        // No planner statistics here: new files have no title yet, and
+        // statistics taken now make Home read every file once per title
+        // (`refresh_query_statistics`, after matching, takes them).
         let report = scanner::scan_all(&mut conn).map_err(to_string_err)?;
-        // Lets SQLite refresh the statistics its query planner chooses
-        // indexes by, for the tables this scan has just changed. Cheap (it
-        // looks only at what is stale) and best effort: the library works
-        // the same without it.
-        let _ = conn.execute_batch("PRAGMA optimize");
         Ok(report)
+    })
+    .await
+    .map_err(to_string_err)?
+}
+
+/// After matching: refresh SQLite's planner statistics if they no longer
+/// describe the library (`db::refresh_statistics_if_stale`), on the scanner's
+/// connection, then have the window's connection read them again. Best effort:
+/// a failure is logged and the library works as before.
+#[tauri::command]
+pub async fn refresh_query_statistics(app: tauri::AppHandle) -> Result<bool, String> {
+    use tauri::Manager;
+    tauri::async_runtime::spawn_blocking(move || {
+        let started = std::time::Instant::now();
+        let refreshed = {
+            let scan = app.state::<ScanDb>();
+            let conn = scan.0.lock().map_err(to_string_err)?;
+            crate::db::refresh_statistics_if_stale(&conn)
+        };
+        match refreshed {
+            Ok(false) => Ok(false),
+            Ok(true) => {
+                let db = app.state::<Db>();
+                let conn = db.0.lock().map_err(to_string_err)?;
+                if let Err(e) = crate::db::reload_statistics(&conn) {
+                    crate::log!("library: statistics refreshed, the window could not reload them: {e}");
+                }
+                crate::log!("library: query statistics refreshed in {} ms", started.elapsed().as_millis());
+                Ok(true)
+            }
+            Err(e) => {
+                crate::log!("library: could not refresh query statistics: {e}");
+                Ok(false)
+            }
+        }
     })
     .await
     .map_err(to_string_err)?

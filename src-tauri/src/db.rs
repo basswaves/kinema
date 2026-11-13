@@ -1185,6 +1185,87 @@ pub fn open_secondary(path: &Path) -> rusqlite::Result<Connection> {
     Ok(conn)
 }
 
+/// Refresh the query planner's statistics if they no longer describe the
+/// library. Returns whether it did. Call it once matching has ended.
+///
+/// SQLite picks an index by these statistics (`sqlite_stat1`). Taken at the
+/// wrong moment they are worse than none: the scan used to take them right
+/// after the file walk, when no file had a title yet, so the title index
+/// (`idx_media_title`) was recorded as useless — every file the same "title".
+/// Matching then linked the titles, and nothing took them again: `PRAGMA
+/// optimize` only looks at a table whose row count has changed a lot, and
+/// matching changes no counts. From then on the planner preferred
+/// `idx_media_files_missing` (`missing = 0`, every file) for each title's
+/// counts, so Home read every file once per title: 12–25 s at 5000 titles.
+/// With statistics that know the titles: about 0.1 s.
+///
+/// Cheap when nothing changed (two counts over an index), so it can run after
+/// every scan; that is also what repairs a library whose statistics were taken
+/// by an older Kinema. `analysis_limit` keeps the refresh itself short on a
+/// big library or a slow device: an estimate is all the planner needs.
+///
+/// The refreshed statistics reach only this connection. Another one keeps the
+/// statistics it loaded until it reads them again — see [`reload_statistics`].
+pub fn refresh_statistics_if_stale(conn: &Connection) -> rusqlite::Result<bool> {
+    // Files, and how many files share one title (no title counts as one group,
+    // the way ANALYZE counts it).
+    let (files, linked, groups): (i64, i64, i64) = conn.query_row(
+        "SELECT COUNT(*), COUNT(title_id),
+                COUNT(DISTINCT title_id) + (COUNT(*) > COUNT(title_id))
+           FROM media_files",
+        [],
+        |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+    )?;
+    // Statistics taken with no titles would only record that again.
+    if linked == 0 {
+        return Ok(false);
+    }
+    let has_table: bool = conn.query_row(
+        "SELECT EXISTS (SELECT 1 FROM sqlite_schema WHERE name = 'sqlite_stat1')",
+        [],
+        |r| r.get(0),
+    )?;
+    let stored: Option<String> = if has_table {
+        conn.query_row(
+            "SELECT stat FROM sqlite_stat1 WHERE idx = 'idx_media_title'",
+            [],
+            |r| r.get(0),
+        )
+        .map(Some)
+        .or_else(|e| match e {
+            rusqlite::Error::QueryReturnedNoRows => Ok(None),
+            e => Err(e),
+        })?
+    } else {
+        None
+    };
+    // "rows files-per-title"; anything unreadable is treated as missing.
+    let parsed = stored.as_deref().and_then(|s| {
+        let mut it = s.split_whitespace().map(|n| n.parse::<i64>().ok());
+        Some((it.next()??, it.next()??))
+    });
+    let actual = (files + groups - 1) / groups.max(1);
+    let stale = match parsed {
+        None => true,
+        Some((rows, per_title)) => {
+            per_title > actual * 2 + 1 || rows > files * 2 || files > rows * 2
+        }
+    };
+    if !stale {
+        return Ok(false);
+    }
+    conn.execute_batch("PRAGMA analysis_limit=1000; ANALYZE; PRAGMA analysis_limit=0;")?;
+    Ok(true)
+}
+
+/// Make this connection read the planner's statistics again, after another
+/// connection refreshed them. Each connection loads them once, when it first
+/// reads the schema, and an ANALYZE elsewhere does not tell it: without this
+/// the window's connection would keep the old ones until Kinema restarts.
+pub fn reload_statistics(conn: &Connection) -> rusqlite::Result<()> {
+    conn.execute_batch("ANALYZE sqlite_schema")
+}
+
 /// Every migration, in order. The index is the version it produces.
 pub(crate) const MIGRATIONS: [&str; SCHEMA_VERSION as usize] = [
     SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4, SCHEMA_V5, SCHEMA_V6, SCHEMA_V7, SCHEMA_V8,
@@ -1779,5 +1860,160 @@ mod tests {
         assert_eq!(auto_copy_stamp("library-auto-v18-1790682921.db"), Some(1790682921));
         assert_eq!(auto_copy_stamp("library-v13-1790682921.db"), None);
         assert_eq!(auto_copy_stamp("library-auto-v18-soon.db"), None);
+    }
+
+    /// A library as a first scan leaves it: `files` films, none with a title.
+    fn scanned_library(name: &str, files: i64) -> (std::path::PathBuf, Connection) {
+        let dir = std::env::temp_dir().join(format!("pn-db-stats-{name}"));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("library.db");
+        let conn = open(&path).unwrap();
+        conn.execute_batch(
+            "INSERT INTO library_roots (id, path, kind, added_at) VALUES (1, '/lib', 'movies', 0);",
+        )
+        .unwrap();
+        let tx = conn.unchecked_transaction().unwrap();
+        for i in 0..files {
+            tx.execute(
+                "INSERT INTO media_files (root_id, path, parent_dir, file_name, extension,
+                     size_bytes, modified_at, first_seen_at, last_seen_at, match_status)
+                 VALUES (1, ?1, '/lib', ?1, 'mkv', 1, 0, 0, 0, 'parsed')",
+                [format!("/lib/Film {i}.mkv")],
+            )
+            .unwrap();
+        }
+        tx.commit().unwrap();
+        (path, conn)
+    }
+
+    /// What matching does: a title for every file.
+    fn match_all(conn: &Connection) {
+        let tx = conn.unchecked_transaction().unwrap();
+        let ids: Vec<i64> = tx
+            .prepare("SELECT id FROM media_files")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        for id in ids {
+            tx.execute(
+                "INSERT INTO titles (kind, provider, provider_id, title, fetched_at)
+                 VALUES ('movie', 'tmdb', ?1, ?1, 0)",
+                [id.to_string()],
+            )
+            .unwrap();
+            tx.execute(
+                "UPDATE media_files SET title_id = last_insert_rowid(), match_status = 'matched'
+                  WHERE id = ?1",
+                [id],
+            )
+            .unwrap();
+        }
+        tx.commit().unwrap();
+    }
+
+    /// The indexes Home's list (`list_titles`) reads files by.
+    fn home_plan(conn: &Connection) -> String {
+        let mut stmt = conn
+            .prepare(&format!("EXPLAIN QUERY PLAN {}", crate::metadata::TITLE_SELECT))
+            .unwrap();
+        let rows = stmt
+            .query_map(rusqlite::named_params! { ":art": "" }, |r| r.get::<_, String>(3))
+            .unwrap();
+        rows.map(Result::unwrap).collect::<Vec<_>>().join("\n")
+    }
+
+    /// Whether Home's list reads every file once per title: a full pass over
+    /// `media_files` (the bundled SQLite) or its `missing` index, which matches
+    /// every file (a SQLite without STAT4 chooses that).
+    fn reads_every_file(conn: &Connection) -> bool {
+        home_plan(conn)
+            .lines()
+            .any(|l| l.trim() == "SCAN m" || l.contains("idx_media_files_missing"))
+    }
+
+    /// The trap behind a 12 s Home: statistics taken before any file had a
+    /// title (what the scan used to do) make the planner read every file once
+    /// per title. Refreshing once matching has ended puts the title index back.
+    #[test]
+    fn statistics_taken_before_matching_are_refreshed_after_it() {
+        let (_, conn) = scanned_library("before-matching", 2000);
+        conn.execute_batch("PRAGMA optimize").unwrap();
+        match_all(&conn);
+        // `PRAGMA optimize` again (a later scan) does not notice: no row
+        // count changed. This is the state real libraries were left in.
+        conn.execute_batch("PRAGMA optimize").unwrap();
+        assert!(reads_every_file(&conn), "the trap should reproduce: {}", home_plan(&conn));
+
+        assert!(refresh_statistics_if_stale(&conn).unwrap());
+        assert!(!reads_every_file(&conn), "{}", home_plan(&conn));
+        assert!(home_plan(&conn).contains("idx_media_title"));
+        // Current now: the next scan's check does nothing.
+        assert!(!refresh_statistics_if_stale(&conn).unwrap());
+    }
+
+    /// A fresh library has no statistics; the first matching that links any
+    /// title takes them, and they record the titles.
+    #[test]
+    fn a_first_scan_ends_with_statistics_that_know_the_titles() {
+        let (_, conn) = scanned_library("first-scan", 500);
+        // Nothing linked yet (no network on the first run, say): nothing taken.
+        assert!(!refresh_statistics_if_stale(&conn).unwrap());
+        match_all(&conn);
+        assert!(refresh_statistics_if_stale(&conn).unwrap());
+        let stat: String = conn
+            .query_row("SELECT stat FROM sqlite_stat1 WHERE idx = 'idx_media_title'", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(stat.split_whitespace().nth(1), Some("1"), "{stat}");
+        assert!(!reads_every_file(&conn), "{}", home_plan(&conn));
+    }
+
+    /// Timings for the review finding A7-01, in the bundled SQLite:
+    /// `cargo test --lib home_list_timing -- --ignored --nocapture`.
+    #[test]
+    #[ignore]
+    fn home_list_timing_before_and_after_the_refresh() {
+        let files: i64 = std::env::var("KINEMA_A7_FILES").ok().and_then(|s| s.parse().ok()).unwrap_or(5000);
+        let (_, conn) = scanned_library("timing", files);
+        conn.execute_batch("PRAGMA optimize").unwrap();
+        match_all(&conn);
+        let time = |label: &str| {
+            let start = std::time::Instant::now();
+            let mut stmt = conn.prepare(crate::metadata::TITLE_SELECT).unwrap();
+            let rows = stmt
+                .query_map(rusqlite::named_params! { ":art": "" }, crate::metadata::map_title)
+                .unwrap()
+                .count();
+            eprintln!("A7-01 {label}: {rows} titles, {} ms", start.elapsed().as_millis());
+        };
+        time("statistics from before matching");
+        let start = std::time::Instant::now();
+        assert!(refresh_statistics_if_stale(&conn).unwrap());
+        eprintln!("A7-01 refresh: {} ms", start.elapsed().as_millis());
+        time("after the refresh");
+        let start = std::time::Instant::now();
+        assert!(!refresh_statistics_if_stale(&conn).unwrap());
+        eprintln!("A7-01 check with nothing to do: {} ms", start.elapsed().as_millis());
+    }
+
+    /// The scan refreshes on its own connection; the window's connection must
+    /// be told, or it keeps the old statistics until Kinema restarts.
+    #[test]
+    fn the_other_connection_uses_refreshed_statistics_once_reloaded() {
+        let (path, window) = scanned_library("two-connections", 2000);
+        window.execute_batch("PRAGMA optimize").unwrap();
+        match_all(&window);
+        let scanner = open_secondary(&path).unwrap();
+        assert!(reads_every_file(&window));
+
+        assert!(refresh_statistics_if_stale(&scanner).unwrap());
+        assert!(
+            reads_every_file(&window),
+            "an ANALYZE elsewhere is expected to reach this connection only on a reload"
+        );
+        reload_statistics(&window).unwrap();
+        assert!(!reads_every_file(&window), "{}", home_plan(&window));
     }
 }

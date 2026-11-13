@@ -1785,6 +1785,7 @@ const handlers: Record<string, Handler> = {
       files_unchanged: files.length, files_missing: 0, errors: SCAN_ERRORS, duration_ms: 5,
     };
   },
+  refresh_query_statistics: () => false,
   list_unparsed: () => [],
   save_parse_results: () => 0,
   library_stats: () => ({

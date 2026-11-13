@@ -25,6 +25,7 @@ import {
   measurePictures,
   probeLibrary,
   refreshImdbRatings,
+  refreshQueryStatistics,
   listUnparsed,
   saveParseResults,
   scanLibrary,
@@ -379,6 +380,10 @@ export async function runScanPipeline(): Promise<ScanOutcome> {
       unmatched += outcome.unmatched;
       errors.push(...outcome.errors);
     }
+    // Once the titles are linked, so the database chooses its indexes by
+    // them: statistics from before matching made Home take seconds on a big
+    // library. Usually nothing to do; a failure is only logged.
+    await refreshQueryStatistics().catch(() => undefined);
 
     // Details before artwork. The details pass is what finds logos and cast
     // photos for titles matched before those were stored, and it used to run

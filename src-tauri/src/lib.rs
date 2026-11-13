@@ -456,6 +456,7 @@ pub fn run() {
             library::remove_library_root,
             library::list_library_roots,
             library::scan_library,
+            library::refresh_query_statistics,
             library::list_unparsed,
             library::list_media_files,
             library::save_parse_results,

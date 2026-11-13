@@ -47,6 +47,7 @@ import { keyCommand, keyFromValue, KEY_PROPERTY, MPV_KEYS } from './mpvKeys';
 import { MOUSE_PROPERTY, parseMouse, type MouseEvent } from './mpvMouse';
 import * as media3 from './media3';
 import type { Film } from './displayMode';
+import type { FileState } from './session';
 
 /** Whether this system plays through Media3 rather than mpv. */
 const isMedia3 = () => capabilitiesNow()?.engine === 'media3';
@@ -424,6 +425,14 @@ export async function openFile(
 export async function discFailure(): Promise<DiscFailure | null> {
   if (isMedia3() || openDisc === null) return null;
   return invoke<DiscFailure | null>('disc_failure', { from: discLogMark }).catch(() => null);
+}
+
+/**
+ * What a file that failed to open turned out to be (there, empty, not allowed),
+ * so the screen says the truth. `unknown` when the backend cannot say.
+ */
+export async function fileState(path: string): Promise<FileState> {
+  return invoke<FileState>('file_state', { path }).catch(() => 'unknown' as const);
 }
 
 /**

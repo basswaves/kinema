@@ -35,6 +35,7 @@ import {
   addSubtitlesBeside,
   chooseTrack,
   discFailure,
+  fileState,
   fitWindowForPlayer,
   giveBackEngineSoon,
   hasMpv,
@@ -414,11 +415,15 @@ export function usePlaybackEngine({
           // another file was started meanwhile.
           const failed = sessionRef.current.path;
           const { detail } = event;
-          void discFailure().then((disc) => {
+          void (async () => {
+            const disc = await discFailure();
+            const state = disc ? 'unknown' : await fileState(failed);
             if (sessionRef.current.path !== failed) return;
-            const message = disc ? discFailedMessage(disc) : loadFailedMessage(detail);
+            const message = disc
+              ? discFailedMessage(disc)
+              : loadFailedMessage(detail, state, failed);
             dispatch({ type: 'error', message });
-          });
+          })();
           // Reveal the controls and leave them up: nothing is playing, so there
           // is nothing for them to cover, and Back is the way out.
           revealOsd();

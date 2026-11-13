@@ -427,6 +427,18 @@ fn walk_local(
             continue;
         }
 
+        // A name that is not valid text (an old Latin-1 name on Linux) cannot
+        // be stored as it is: the stored copy would name a file that does not
+        // exist, and Play would fail on it every time (A7-06). Say so instead.
+        if entry.path().to_str().is_none() {
+            found(Err(Unread {
+                path: entry.path().to_string_lossy().into_owned(),
+                why: "its name is not valid text (UTF-8); rename the file or its folder, then scan again"
+                    .to_string(),
+            }))?;
+            continue;
+        }
+
         let meta = match entry.metadata() {
             Ok(m) => m,
             Err(e) => {

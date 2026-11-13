@@ -12,6 +12,7 @@ mod default_player;
 pub use default_player::uninstall_cleanup;
 mod detect;
 mod disc;
+mod file_state;
 mod display;
 mod engine;
 mod equipment;
@@ -595,6 +596,7 @@ pub fn run() {
             probe::probe_library,
             disc::disc_source,
             disc::disc_failure,
+            file_state::file_state,
             imdb::refresh_imdb_ratings,
             omdb::list_titles_needing_scores,
             omdb::save_omdb_scores,

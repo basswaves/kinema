@@ -194,9 +194,17 @@ describe('loadFailedMessage', () => {
     );
   });
 
-  it('says what usually causes it when the engine gave none', () => {
-    expect(loadFailedMessage()).toContain('may have been moved or deleted');
-    expect(loadFailedMessage('')).toContain('may have been moved or deleted');
+  it('says what the file is when the engine gave no words', () => {
+    expect(loadFailedMessage(undefined, 'missing')).toContain('may have been moved or deleted');
+    expect(loadFailedMessage('', 'readable')).toContain('may be damaged or incomplete');
+    expect(loadFailedMessage(undefined, 'readable')).not.toContain('moved');
+    expect(loadFailedMessage(undefined, 'empty')).toContain('empty');
+    expect(loadFailedMessage(undefined, 'denied')).toContain('not allowed to read');
+    expect(loadFailedMessage()).not.toContain('moved or deleted');
+  });
+
+  it('names a stored path that is not valid text', () => {
+    expect(loadFailedMessage(undefined, 'missing', '/m/Caf� Noir.mkv')).toContain('not valid text');
   });
 });
 

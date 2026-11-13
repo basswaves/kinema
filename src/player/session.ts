@@ -123,14 +123,38 @@ export function initialSession(path: string): Session {
 }
 
 /**
- * What the player says when the engine could not play the file. `detail` is
- * the engine's own words, when it gave any.
+ * What the file turned out to be when the engine could not open it, as the
+ * backend's `file_state` answers: there or not, empty, not allowed, or fine to
+ * read (so damaged or not a video). `unknown` for an address or a share.
  */
-export function loadFailedMessage(detail?: string): string {
-  return detail
-    ? `Could not play this file: ${detail}`
-    : 'Could not play this file. It may have been moved or deleted, ' +
-        'or the drive it is on may be unavailable.';
+export type FileState = 'readable' | 'missing' | 'empty' | 'denied' | 'unknown';
+
+/**
+ * What the player says when the engine could not play the file. `detail` is
+ * the engine's own words, when it gave any; `state` is what a look at the file
+ * found, so a file that is right there is never said to have been moved
+ * (A3-04, A5-06, A7-06).
+ */
+export function loadFailedMessage(
+  detail?: string,
+  state: FileState = 'unknown',
+  path?: string
+): string {
+  if (state === 'denied') {
+    return 'Could not play this file: Kinema is not allowed to read it. Check who may read the file.';
+  }
+  if (state === 'empty') return 'Could not play this file: it is empty (0 bytes).';
+  if (state === 'missing') {
+    return path?.includes('�')
+      ? 'Could not play this file: its name is not valid text (UTF-8), so it cannot be opened. ' +
+          'Rename the file or its folder, then scan again.'
+      : 'Could not play this file. It may have been moved or deleted, ' +
+          'or the drive it is on may be unavailable.';
+  }
+  if (detail) return `Could not play this file: ${detail}`;
+  return state === 'readable'
+    ? 'Could not play this file. It could not be read as a video; it may be damaged or incomplete.'
+    : 'Could not play this file. It may be damaged, or the drive or share it is on may be unavailable.';
 }
 
 /**

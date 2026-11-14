@@ -5,6 +5,121 @@ Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [semantic
 versioning](https://semver.org/), with the usual caveat that a `0.x` release
 makes no stability promises.
 
+## [0.16.0] — 2026-11-14
+
+An outside review of the whole program led to most of this release: what
+Kinema says when something goes wrong now says what is true, secrets are kept
+safer, and the installers and the release itself are stricter.
+
+### Security
+
+- **Library safety copies no longer hold your sign-ins or keys.** SIMKL and
+  Trakt sign-ins, your TMDB and OMDb keys and your OpenSubtitles password are
+  left out of the copies Kinema makes of the library, and a copy that cannot be
+  cleaned is deleted. Restoring a copy means signing in again.
+- **Sign-ins and keys are sealed.** On Windows and Android the same nine
+  settings are now stored sealed by the system, and old plain values are sealed
+  the first time they are read. On Linux, which has no such store here, the
+  Kinema folder and the library are readable only by you.
+- **Android no longer lets the system back up Kinema's data.**
+- **A file that only points to an address** (a playlist or script named
+  `.mkv`) is no longer followed, so a downloaded file cannot make the player
+  contact an address of its own choosing.
+- **Page lookups give up after 30 seconds** and a service's "wait a long time"
+  answer fails plainly, so one stuck answer no longer stops every later lookup
+  until you restart. A damaged `.nfo` file with huge contents no longer slows
+  a scan, and an `.nfo` over 1 MB is left unread.
+
+### Added
+
+- **TMDB's credit in its own words**, with its logo, in Settings, the README
+  and the site.
+- **Every package carries the licence and notice**: the ZIP, the installer, the
+  `.deb` and the `.rpm`.
+- **Android: a film whose sound this device cannot play says so** and plays on
+  without it, instead of silence with no explanation. Sound in LPCM and some
+  AAC/MPEG inside `.m2ts` files now plays.
+- **Linux: when the system cannot decode a film's picture or sound** (for
+  example HEVC on a Fedora without the full codecs), the player says so rather
+  than showing nothing.
+
+### Changed
+
+- **Step down only counts what the graphics card caused.** A film faster than
+  the screen, or dropped frames from the decoder or from software decoding, no
+  longer lower later films for good. A step that did not help is put back, and
+  one level comes back after three clean films.
+- **A first scan with no internet blames the connection**, not your file
+  names. An answer from a service that Kinema cannot read is said plainly, and
+  never wipes a stored Rotten Tomatoes score.
+- **Two files that differ only by a country** (`A Show (US)` and `A Show (UK)`)
+  are kept as two rows in Needs attention.
+- **A tie between near names** is no longer settled by popularity unless the
+  winner's name is the file's name: a short film is no longer linked to a
+  longer title that only looks like it.
+- **Big libraries open faster.** A library of five thousand titles took ten seconds
+  or more to show Home; now about a second, even on a slow PC.
+- **Posters and backdrops are drawn from a screen-sized copy**, never the
+  original, so a huge picture beside a film cannot fill a small computer's
+  memory. Episode pictures are fetched only for episodes you have a file for.
+- **Text on a TV is never smaller than 12 px**, and the Light look keeps the
+  top bar readable over posters. On a very large window the text keeps growing.
+  Home's big title stops at three lines, and buttons use Kinema's own font.
+- **A mouse's side Back button and Alt+Left go back**, like Escape. After the
+  mouse wheel has moved the page, the next arrow key starts from what is on
+  screen.
+- **Windows: running the setup again over an installed Kinema updates it in
+  place**, keeping shortcuts and default-player choices. Uninstalling now also
+  clears the built-in browser's cache. The folder dialog says whether it wants
+  the movies or the TV folder.
+- **Android: the folder browser notices a permission you gave** when you come
+  back to the app, and says which films "All files access" adds.
+- **Settings: the chosen section stays in view** in a small window.
+- **Setup pages say what is true**: the intros page says Kinema's own finding
+  needs ffmpeg when none is installed, and the sound question shows what the
+  connected output takes untouched.
+- **What leaves your computer** lists the host a subtitle is downloaded from.
+- **Move to a new computer** carries the subtitle size and box for any screen.
+
+### Fixed
+
+- **A drive that stops answering no longer freezes the window.** Kinema says
+  "The drive this film is on is not answering" after 20 seconds, keys keep
+  working, and a second start no longer hangs behind it. Quitting no longer
+  waits long on such a drive.
+- **When progress cannot be saved, Kinema says so** (disk full, folder not
+  writable), keeps trying, and says when it works again. A library that is
+  read-only or cannot be opened gets one start-up message and nothing behind it.
+- **A damaged, empty or unreadable file is called that**, not "may have been
+  moved or deleted". The same on Android, where Media3's code names no longer
+  show. A file Kinema is not allowed to read says so.
+- **A file with no picture** starts at once instead of waiting 15 seconds.
+- **Anything saved while the clock ran a year ahead is set back to now**, so it
+  stops sitting first in Continue watching and the TMDB refresh comes on time.
+- **A FAT drive's files are not read again** when the clock moves an hour for
+  summer or winter.
+- **Linux: a file whose name is not valid text** is listed under "could not
+  read" with what to do, instead of being added and then not playing.
+- **Needs attention: searching no longer moves the ring to Ignore these**, so a
+  second OK cannot ignore files without asking.
+- **Badges and panels say only what is known.** No "UHD" for a file below 4K,
+  no Auro-3D from a name when the sound cannot hold it, "Dialogue lifted" only
+  when it was, "mono" for mono, no "SDR" tick or "0 Hz" before mpv has
+  answered, no "press f for full screen" where it is already, no faster-mode
+  hint for a screen that lacks one. Home's "could not be identified" count
+  leaves out matches that are only worth a second look.
+- **Version choice:** a tiny sample is never taken over the real picture beside
+  it.
+- **Your equipment** no longer lists one sound device twice.
+- **High contrast: the chosen season's name** is readable again.
+- **Android: Frame timing** is no longer offered, as it does nothing there.
+- **Installers and packages:** removing the rpm leaves no empty Kinema folders.
+  The README now says the Windows setup needs the internet once (for WebView2),
+  and its Fedora line skips optional extras.
+- **Release builds are checked:** a release stops if the tag and the program's
+  version differ, downloads are pinned by checksum, and the installer must
+  start on Fedora before anything is published.
+
 ## [0.15.3] — 2026-11-12
 
 ### Added

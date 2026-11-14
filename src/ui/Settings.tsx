@@ -329,13 +329,18 @@ export default function Settings({
     // first) has nothing to land on yet: its entry in the list, then.
     const ready = document.querySelector('.settings-content button, .settings-content input');
     focusTo(ready ? 'settings-content' : `settings-nav:${goneTo.id}`);
-    // In a window too low for the whole list the chosen entry can sit below the
-    // edge; keep it in view (a no-op wherever it already is).
+  }, [goneTo]);
+
+  // In a window too low for the whole list the list scrolls itself (the page
+  // cannot move a sticky list); keep the chosen entry in view whichever way it
+  // was chosen (a no-op wherever it already is). A10-07.
+  useEffect(() => {
+    // Scrolls the list itself and then the page (until the list sticks).
     const frame = requestAnimationFrame(() =>
       document.querySelector('.settings-nav button.active')?.scrollIntoView({ block: 'nearest' })
     );
     return () => cancelAnimationFrame(frame);
-  }, [goneTo]);
+  }, [section]);
 
   // Land on the open section in the list — or, from Home's notice, straight
   // on the review queue.

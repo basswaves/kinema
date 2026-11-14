@@ -526,6 +526,31 @@ test('a setup page whose question comes late still starts on it, unless the remo
   expect(await focused(page)).toBe('Finish');
 });
 
+test('first run: a first scan with the services unreachable says the internet, not the names (A2-01)', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('kinemaMockEmpty', '1');
+    localStorage.setItem('kinemaMockNoMatch', '1');
+    // The scanner's own words when the lookups got no connection (reach.ts).
+    localStorage.setItem('kinemaMockScanErrors', JSON.stringify(['TMDB could not be reached']));
+  });
+  await firstRunToSetupPage(page, 'windows', 'Picture and sound');
+  for (let i = 0; i < 8 && (await page.locator('.setup-pages').count()) > 0; i++) {
+    for (let j = 0; j < 4 && !/^(Next|Finish)$/.test((await focused(page)) ?? ''); j++) {
+      await press(page, 'ArrowUp');
+    }
+    await press(page, 'Enter');
+    await drawn(page);
+  }
+  await expect(page.locator('.setup-pages')).toHaveCount(0);
+
+  await expect(page.locator('.browse-notice')).toContainText('could not reach the services');
+  await expect(page.locator('.nothing-named h1')).toContainText('could not reach the internet to name');
+  await expect(page.locator('.nothing-named')).toContainText('nothing needs renaming');
+  await expect(page.locator('.nothing-named h1')).not.toContainText('could not name');
+});
+
 test('first run: a folder whose files all go unnamed ends on what was found, never Welcome again', async ({
   page,
 }) => {

@@ -151,3 +151,31 @@ test('Bring it in is reached by keys with empty fields, and says which field to 
   await press(page, 'Enter');
   await expect(page.locator('.settings-warn')).toHaveText('Fill in the API key first.');
 });
+
+test('in a small window the chosen section stays fully in view in the list (A10-07)', async ({ page }) => {
+  await page.setViewportSize({ width: 854, height: 480 });
+  await settings(page);
+  const inView = () =>
+    page.evaluate(() => {
+      const b = document.querySelector('.settings-nav button.active')!.getBoundingClientRect();
+      return { top: Math.round(b.top), bottom: Math.round(b.bottom), height: window.innerHeight };
+    });
+  const names = (await page.locator('.settings-nav button').allTextContents()).map((n) => n.trim());
+  // The last sections, chosen by keys (Enter on the entry).
+  for (const name of [names[names.length - 2], names[names.length - 1]]) {
+    await page.locator('.settings-nav button', { hasText: name }).first().focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.settings-nav button.active')).toContainText(name);
+    await settled(page);
+    const r = await inView();
+    expect(r.top, `${name} top`).toBeGreaterThanOrEqual(0);
+    expect(r.bottom, `${name} bottom`).toBeLessThanOrEqual(r.height);
+  }
+  // By mouse: the first, then the last again.
+  await page.locator('.settings-nav button').first().click();
+  await settled(page);
+  await page.locator('.settings-nav button', { hasText: names[names.length - 1] }).first().click();
+  await settled(page);
+  const r = await inView();
+  expect(r.bottom).toBeLessThanOrEqual(r.height);
+});

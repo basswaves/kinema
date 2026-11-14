@@ -4574,9 +4574,18 @@ screen (every second frame never shown), or let the driver lower the format
 for the length of the film. For video made at 50 or 60 frames a second,
 motion is what was made; an 8-bit 4:2:0 link carries an 8-bit 4:2:0 source
 untouched, and HDR at 8 bits is dithered. So the switch now asks the way
-Settings does when the old call refuses, and the desktop's own format comes
-back with the desktop's mode after the film. Films at 24 fps never meet this:
-their modes fit the link in full.
+Settings does when the old call refuses (`SetDisplayConfig`, the driver free
+to change the signal), and the desktop's own format comes back with the
+desktop's mode after the film. Films at 24 fps never meet this: their modes
+fit the link in full.
+
+On the TV PC with the receiver set back to its limited 4K mode, that call was
+taken without an error, and Windows still kept 30 Hz (GTX 1070, 2026-11-14):
+how Settings gets 8-bit 4:2:0 there is not something the public call does.
+The ask stays — it costs a log line, and another driver may take it — and
+what does help is the details panel saying the refusal. The cause on that PC
+was the receiver's 4K signal setting, which is the first thing the panel
+names.
 
 Kinema says either outcome in the details panel: a mode refused ("Kinema
 asked the screen for … and Windows or the graphics driver refused it", with

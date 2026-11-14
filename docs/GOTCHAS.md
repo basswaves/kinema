@@ -2352,6 +2352,12 @@ not die with the process: the restore record covers a crash. The link's format
 before is kept in the record and the restore checks it came back. The details
 panel says a refused mode (Motion) and a lowered link (Colour depth).
 
+On the TV PC (GTX 1070, receiver in its limited 4K mode) that call was taken
+without an error and Windows still kept 30 Hz — `SDC_ALLOW_CHANGES` let it pick
+the nearest mode the link could carry in the format it was in. So it is no
+cure: the "asked for … and Windows kept …" check after every switch is what
+catches it, and the details panel is what says it.
+
 ### Probing the device's formats needs nothing open
 
 `IAudioClient::IsFormatSupported` in exclusive mode answers without opening the

@@ -83,13 +83,16 @@ safer, and the installers and the release itself are stricter.
 
 ### Fixed
 
-- **A 50 or 60 fps video switches the screen to 50 or 60 Hz** where the
-  connection has room for that rate only in fewer bits or less colour detail.
-  Windows' older call refused such a mode, so the film played at 30 Hz with
-  every second frame left out; Kinema now asks as Windows' own display settings
-  do, the graphics driver lowers the link for the film, and the desktop's own
-  format comes back after it. The details panel says when a mode was refused or
-  the link lowered, and what usually stands in the way.
+- **When the screen cannot switch to a video's rate, the details panel says
+  so**: what Kinema asked for, that it was refused or another rate kept, how
+  many frames are left out, and what usually stands in the way (the TV input's
+  deep colour setting, the receiver's 4K signal setting, the cable). It also
+  says when the graphics driver lowered the link's colour format to fit a rate.
+  Before, only app.log said it. When Windows' older call refuses a mode, Kinema
+  now also asks as Windows' own display settings do.
+- **When Windows blocks sending sound untouched**, the details panel says so
+  instead of calling the decoded sound fine, and Settings gives the right way
+  to the "exclusive control" setting in Windows 11.
 - **A drive that stops answering no longer freezes the window.** Kinema says
   "The drive this film is on is not answering" after 20 seconds, keys keep
   working, and a second start no longer hangs behind it. Quitting no longer

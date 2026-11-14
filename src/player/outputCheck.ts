@@ -442,6 +442,21 @@ export function checkSound(f: OutputFacts): Check | null {
     stream !== null &&
     (a.device?.bitstream.some((b) => b.codec === stream && b.result === 'yes') ?? false);
   const folded = a.inChannels !== null && a.outChannels !== null && a.outChannels < a.inChannels;
+  // The device takes it, but Windows will not let a program have the device
+  // to itself, which passthrough needs: said, not passed off as the device's
+  // own limit.
+  const blocked =
+    stream !== null &&
+    (a.device?.bitstream.some((b) => b.codec === stream && b.result === 'not_allowed') ?? false);
+  if (blocked && a.direct) {
+    return {
+      label,
+      verdict: 'limited',
+      value: `decoded by Kinema${folded ? `, folded from ${a.inChannels} to ${a.outChannels} channels` : ''}`,
+      why: `Windows does not let programs take exclusive control of ${a.device?.name ?? 'the device'}, which sending ${CODEC_NAME[stream!] ?? stream} untouched needs, so any Atmos or DTS:X height sound is lost.`,
+      fix: 'Windows Settings → System → Sound → More sound settings → Playback → this device → Properties → Advanced → tick “Allow applications to take exclusive control of this device”, then start the film again.',
+    };
+  }
   if (couldPass && !a.direct) {
     return {
       label,

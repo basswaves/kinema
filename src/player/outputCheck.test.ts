@@ -430,3 +430,22 @@ describe('outputCheck: what the switch asked for and got', () => {
     expect(c['Colour depth']?.why).toMatch(/lowered the link/);
   });
 });
+
+// TV PC (2026-11-14): "Send sound straight to the receiver" on, but Windows'
+// exclusive control switched off for the receiver — the panel said nothing.
+describe('outputCheck sound: Windows blocks exclusive control', () => {
+  it('says the block and where to lift it, not that the device cannot take it', () => {
+    const blockedReceiver: AudioDevice = {
+      ...receiver,
+      bitstream: receiver.bitstream.map((b) => ({ ...b, result: 'not_allowed' })),
+    };
+    const c = checkSound({
+      ...base,
+      audio: { ...base.audio!, direct: true, outFormat: 'floatp', device: blockedReceiver },
+    });
+    expect(c).toMatchObject({ verdict: 'limited', value: 'decoded by Kinema' });
+    expect(c?.why).toMatch(/does not let programs take exclusive control of AV receiver/);
+    expect(c?.why).not.toMatch(/does not take/);
+    expect(c?.fix).toMatch(/More sound settings → Playback .* Advanced/);
+  });
+});

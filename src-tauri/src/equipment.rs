@@ -354,7 +354,11 @@ pub fn audio_notes(a: &AudioDevice) -> Vec<String> {
     if a.bitstream.iter().any(|b| b.result == Probe::NotAllowed) {
         notes.push(
             "Windows does not let programs take exclusive control of this device, which \
-             passing audio through untouched needs. Sound settings → this device → Advanced."
+             sending sound to it untouched needs, so Kinema decodes it instead. To allow it: \
+             Windows Settings → System → Sound → More sound settings (at the bottom) → \
+             Playback → this device → Properties → Advanced → tick \"Allow applications to \
+             take exclusive control of this device\". (Or press Windows+R and type mmsys.cpl \
+             for the same Sound window.) Then check again here."
                 .into(),
         );
     } else if a.bitstream.iter().any(|b| b.remembered) {

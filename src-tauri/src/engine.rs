@@ -85,10 +85,80 @@ pub fn shut_down<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
     #[cfg(desktop)]
     {
         use tauri_plugin_libmpv::MpvExt;
-        if let Err(e) = app.mpv().destroy("main") {
-            crate::log!("mpv: could not shut down on exit: {e}");
+        // mpv's demuxer thread can sit in a read() on a share that has gone
+        // silent, and destroy waits for it: the process stayed alive after
+        // quit (A5-01). Wait a short while, then go on and leave it.
+        let handle = app.clone();
+        match within(EXIT_WAIT, move || handle.mpv().destroy("main").map_err(|e| e.to_string())) {
+            Some(Ok(())) => {}
+            Some(Err(e)) => crate::log!("mpv: could not shut down on exit: {e}"),
+            None => crate::log!(
+                "mpv: did not shut down within {} s (the film's drive is not answering?); leaving it",
+                EXIT_WAIT.as_secs()
+            ),
         }
     }
     #[cfg(mobile)]
     let _ = app;
+}
+
+/// How long quitting waits on the film's drive or on mpv before leaving them.
+#[cfg_attr(mobile, allow(dead_code))]
+pub const EXIT_WAIT: std::time::Duration = std::time::Duration::from_secs(3);
+
+/// The longest the whole exit may take once it has begun; then the process
+/// ends whatever is still waiting (a window close the plugin handles itself,
+/// a file look on a dead mount).
+const EXIT_LIMIT: std::time::Duration = std::time::Duration::from_secs(8);
+
+/// Run `f` on its own thread and wait at most `limit` for its answer. `None`
+/// if it has not finished: the thread is left behind, to end with the process.
+#[cfg_attr(mobile, allow(dead_code))]
+pub fn within<T: Send + 'static>(
+    limit: std::time::Duration,
+    f: impl FnOnce() -> T + Send + 'static,
+) -> Option<T> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = tx.send(f());
+    });
+    rx.recv_timeout(limit).ok()
+}
+
+/// Once the app has begun to quit, end the process after `EXIT_LIMIT` whatever
+/// is still waiting. The library saves on its own as each change is made, so
+/// nothing of Kinema's own is lost by this; only a wait on a drive is cut.
+pub fn arm_exit_limit() {
+    static ARMED: std::sync::Once = std::sync::Once::new();
+    ARMED.call_once(|| {
+        std::thread::spawn(|| {
+            std::thread::sleep(EXIT_LIMIT);
+            crate::log!(
+                "exit: still running {} s after quit began; ending the process",
+                EXIT_LIMIT.as_secs()
+            );
+            std::process::exit(0);
+        });
+    });
+}
+
+#[cfg(test)]
+mod exit_tests {
+    use super::within;
+    use std::time::{Duration, Instant};
+
+    #[test]
+    fn a_quick_job_gives_its_answer() {
+        assert_eq!(within(Duration::from_secs(2), || 7), Some(7));
+    }
+
+    #[test]
+    fn a_stuck_job_is_left_after_the_limit() {
+        let start = Instant::now();
+        let r = within(Duration::from_millis(200), || {
+            std::thread::sleep(Duration::from_secs(30));
+        });
+        assert!(r.is_none());
+        assert!(start.elapsed() < Duration::from_secs(5));
+    }
 }

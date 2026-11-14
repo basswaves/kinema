@@ -348,6 +348,11 @@ pub fn run() {
                 // with no window, no message and nothing in either log — an app
                 // that "just doesn't start". A dialog is the only surface left
                 // this early, since the webview does not exist yet.
+                // The library is not open, so none of its state is managed. The
+                // dialog turns the same loop that runs the page, and a page
+                // asking for it would panic every command (A5-02): hold it
+                // on a blank page until we exit.
+                startup_dialog::hold_page(app.handle());
                 startup_dialog::tell(
                     app.handle(),
                     "Kinema could not start",
@@ -631,12 +636,17 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
         .run(|app, event| {
-            // Windows does not end a child with its parent: without this a
-            // Skiptro started by the scan goes on scanning after the window
-            // has closed, where nobody can see it or stop it.
+            // Quitting never waits long on a drive that has gone silent (A5-01).
+            if let tauri::RunEvent::ExitRequested { .. } = event {
+                engine::arm_exit_limit();
+            }
             if let tauri::RunEvent::Exit = event {
+                engine::arm_exit_limit();
                 // The player before the process ends (engine.rs says why).
                 engine::shut_down(app);
+                // Windows does not end a child with its parent: without this a
+                // Skiptro started by the scan goes on scanning after the window
+                // has closed, where nobody can see it or stop it.
                 app.state::<jobs::Jobs>().stop_detection();
                 // The screen goes back to the desktop's own mode however the
                 // app is closed; a crash is caught at the next launch instead.

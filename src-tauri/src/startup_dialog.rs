@@ -29,6 +29,23 @@ pub fn any_shown() -> bool {
     SHOWN.load(std::sync::atomic::Ordering::Relaxed)
 }
 
+/// Where the page is parked while a start that cannot go on is explained.
+const HELD_PAGE: &str = "about:blank";
+
+/// Park the page on a blank one. For a start that is about to end: the
+/// library is not open, nothing is managed, and a page that loaded while the
+/// dialog's loop ran would call commands that panic for want of state.
+pub fn hold_page(app: &tauri::AppHandle) {
+    use tauri::Manager;
+    if let Some(window) = app.get_webview_window("main") {
+        if let Ok(url) = HELD_PAGE.parse() {
+            if let Err(e) = window.navigate(url) {
+                crate::log!("window: could not hold the page: {e}");
+            }
+        }
+    }
+}
+
 /// Say something, and wait until it has been read.
 pub fn tell(app: &tauri::AppHandle, title: &str, message: &str, kind: Kind) {
     ask(app, title, message, kind, "OK", None);
@@ -98,4 +115,12 @@ fn gtk_dialog(title: &str, message: &str, kind: Kind, ok: &str, cancel: Option<&
         gtk::main_iteration();
     }
     answer == gtk::ResponseType::Accept
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn the_held_page_is_a_url() {
+        assert!(super::HELD_PAGE.parse::<tauri::Url>().is_ok());
+    }
 }

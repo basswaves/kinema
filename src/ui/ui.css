@@ -2222,6 +2222,10 @@ button.cast-member {
   grid-template-columns: 13rem minmax(0, 1fr);
   gap: 2.5rem;
   align-items: start;
+  /* At least the visible height, so the page can always scroll far enough for
+   * the list to stick, even beside a short section: otherwise the list's foot
+   * hangs below a low window with no way to scroll to it (A10-07). */
+  min-height: calc(100vh - 4.5rem - var(--safe-top));
 }
 
 .settings-nav {
@@ -2321,6 +2325,7 @@ button.cast-member {
   .settings-layout {
     grid-template-columns: 1fr;
     gap: 1.25rem;
+    min-height: 0;
   }
 
   .settings-nav {

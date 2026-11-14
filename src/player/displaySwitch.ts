@@ -235,12 +235,35 @@ export async function filmNow(path?: string): Promise<Film | NoFilm> {
   return { width, height, fps: fps || null, hdr: gamma === 'pq' || gamma === 'hlg' };
 }
 
+/** The screen's link as the system reports it: "10-bit YCbCr 4:2:2", or null. */
+type LinkOf = { link_bits?: number | null; link_encoding?: string | null };
+const linkName = (s: LinkOf): string | null =>
+  s.link_bits ? `${s.link_bits}-bit${s.link_encoding ? ` ${s.link_encoding}` : ''}` : null;
+
+/**
+ * What the last switch for the film on screen asked for and what it got, for
+ * the details panel (outputCheck.ts): a mode the driver refused, or one it
+ * could make only by lowering the link's colour format, is said there rather
+ * than only in app.log. Null when nothing was asked of the screen.
+ */
+export interface SwitchOutcome {
+  asked: { width: number; height: number; rate: number };
+  /** The screen after, or null when the switch failed outright. */
+  got: { width: number; height: number; rate: number } | null;
+  error: string | null;
+  linkBefore: string | null;
+  linkAfter: string | null;
+}
+let outcome: SwitchOutcome | null = null;
+export const switchOutcome = (): SwitchOutcome | null => outcome;
+
 /**
  * Switch the screen for this film if the settings and the screen call for it.
  * Returns whether anything changed; the caller re-applies the colour-space
  * hint when it did, since HDR may now be on.
  */
 export async function switchForFilm(film: Film, onSwitching?: () => void): Promise<boolean> {
+  outcome = null;
   if (bySystem()) return switchBySystem(film, onSwitching);
   if (!(await isPictureFullscreen().catch(() => false))) return false;
   const name = await pictureScreen();
@@ -254,13 +277,28 @@ export async function switchForFilm(film: Film, onSwitching?: () => void): Promi
       film.hdr ? ' HDR' : ''
     } → ${target.width}×${target.height}@${formatRate(target.rate)}${target.hdr ? ' + HDR on' : ''}`
   );
-  const after = await invoke<Screen & { exact_rate: number }>('switch_screen', {
-    width: target.width,
-    height: target.height,
-    hz: target.hz,
-    hdr: target.hdr,
-    screen: name,
-  });
+  const asked = { width: target.width, height: target.height, rate: target.rate };
+  const linkBefore = linkName(screen as Screen & LinkOf);
+  let after: Screen & LinkOf & { exact_rate: number };
+  try {
+    after = await invoke<Screen & LinkOf & { exact_rate: number }>('switch_screen', {
+      width: target.width,
+      height: target.height,
+      hz: target.hz,
+      hdr: target.hdr,
+      screen: name,
+    });
+  } catch (e) {
+    outcome = { asked, got: null, error: String(e), linkBefore, linkAfter: null };
+    throw e;
+  }
+  outcome = {
+    asked,
+    got: { width: after.width, height: after.height, rate: after.rate },
+    error: null,
+    linkBefore,
+    linkAfter: linkName(after),
+  };
   // mpv does not notice the change: its window is a child of ours, and it kept
   // reporting 59.972 Hz for a monitor switched to 23.976 (selftest, 2026-09-25).
   // Its display-timed frame pacing and the stats panel's cadence both depend
@@ -293,6 +331,7 @@ async function switchBySystem(film: Film, onSwitching?: () => void): Promise<boo
 
 /** Put the screen back as it was before the first switch. */
 export async function restoreScreen(): Promise<void> {
+  outcome = null;
   if (bySystem()) {
     await restoreScreenMode().catch((e) => console.warn('display: restore failed', e));
     return;

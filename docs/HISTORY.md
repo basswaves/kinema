@@ -4561,6 +4561,28 @@ The owner approved changing D6 (2026-11-13):
 The details panel still names every step in force, and now says when the
 level will be tried back and where it can be forgotten.
 
+## A refresh rate the link has room for only in fewer bits (2026-11-14)
+
+A 59.94 fps clip on the TV PC played at 30 Hz: the desktop ran 4K at 30 Hz
+in 10-bit YCbCr 4:2:2, and the old Windows call Kinema switched with refused
+4K at 59.94 Hz in that format. Windows' own Settings set the mode by letting
+the driver drop to 8-bit 4:2:0, which is all the link had room for at 4K
+60 Hz. Nothing on screen said any of it.
+
+Two ways were open: keep the colour format and show 60 fps video on a 30 Hz
+screen (every second frame never shown), or let the driver lower the format
+for the length of the film. For video made at 50 or 60 frames a second,
+motion is what was made; an 8-bit 4:2:0 link carries an 8-bit 4:2:0 source
+untouched, and HDR at 8 bits is dithered. So the switch now asks the way
+Settings does when the old call refuses, and the desktop's own format comes
+back with the desktop's mode after the film. Films at 24 fps never meet this:
+their modes fit the link in full.
+
+Kinema says either outcome in the details panel: a mode refused ("Kinema
+asked the screen for … and Windows or the graphics driver refused it", with
+where the bandwidth usually goes missing), and a link lowered to fit ("The
+graphics driver lowered the link from … to …").
+
 ## Open items
 
 They are in [ROADMAP.md](ROADMAP.md). This document is for what was done and

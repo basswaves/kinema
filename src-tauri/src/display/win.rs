@@ -3,7 +3,9 @@
 //! Everything here is compiled on Windows only.
 
 use super::ScreenNow;
-use crate::equipment::win::{header, hdr_state, link_of, modes, path_for, signal_of};
+use crate::equipment::win::{
+    active_config, header, hdr_state, link_of, modes, path_for, signal_of, source_gdi,
+};
 use crate::equipment::{rate_meaning, HdrState};
 use std::mem::size_of;
 use windows::core::PCWSTR;
@@ -76,6 +78,19 @@ pub fn set_mode(gdi: &str, width: u32, height: u32, hz: u32) -> Result<(), Strin
     let test = unsafe {
         ChangeDisplaySettingsExW(PCWSTR(name.as_ptr()), Some(&dm), None, CDS_TEST, None)
     };
+    if test == DISP_CHANGE_BADMODE || test == DISP_CHANGE_FAILED {
+        // The old call keeps the link's colour format, and some links have
+        // room for a mode only in a smaller one: a TV PC at 4K 30 Hz, 10-bit
+        // YCbCr 4:2:2, listed 4K 59.94 Hz and refused it here, while Windows'
+        // Settings set it, at 8-bit 4:2:0 (2026-11-14). Asked the way
+        // Settings asks, the driver may lower the format to fit.
+        crate::log!(
+            "display: {width}×{height}@{hz} refused in the link's current colour format ({}); asking as Windows' Settings does",
+            result_name(test)
+        );
+        return set_mode_letting_driver_fit(gdi, width, height, hz)
+            .map_err(|e| format!("{width}×{height}@{hz}: {} ({e})", result_name(test)));
+    }
     if test != DISP_CHANGE_SUCCESSFUL {
         return Err(format!("{width}×{height}@{hz}: {}", result_name(test)));
     }
@@ -87,6 +102,53 @@ pub fn set_mode(gdi: &str, width: u32, height: u32, hz: u32) -> Result<(), Strin
         return Err(format!("{width}×{height}@{hz}: {}", result_name(done)));
     }
     Ok(())
+}
+
+/// "No target mode given": Windows picks one for the source mode and the
+/// path's refresh rate (wingdi.h `DISPLAYCONFIG_PATH_MODE_IDX_INVALID`).
+const NO_MODE: u32 = 0xffff_ffff;
+
+/// A Windows refresh as listed (59) as the exact fraction (60000/1001).
+fn rational(hz: u32) -> DISPLAYCONFIG_RATIONAL {
+    if crate::equipment::rate_meaning(hz) == f64::from(hz) {
+        DISPLAYCONFIG_RATIONAL { Numerator: hz, Denominator: 1 }
+    } else {
+        DISPLAYCONFIG_RATIONAL { Numerator: (hz + 1) * 1000, Denominator: 1001 }
+    }
+}
+
+/// The mode set as Windows' own Settings sets it (`SetDisplayConfig`): the
+/// desktop's size and the path's refresh, with no target mode, so the driver
+/// chooses the signal — and may lower the bit depth or chroma for a rate the
+/// cable has no room for otherwise. Not saved (no `SDC_SAVE_TO_DATABASE`):
+/// `reset_mode` puts the saved mode back. Unlike `CDS_FULLSCREEN` it does not
+/// end with the process; the restore record covers a crash.
+pub fn set_mode_letting_driver_fit(gdi: &str, width: u32, height: u32, hz: u32) -> Result<(), String> {
+    let (mut paths, mut modes) = active_config().map_err(|e| e.to_string())?;
+    let path = paths
+        .iter_mut()
+        .find(|p| source_gdi(p).as_deref() == Some(gdi))
+        .ok_or_else(|| format!("no display path for {gdi}"))?;
+    let source = unsafe { path.sourceInfo.Anonymous.modeInfoIdx } as usize;
+    let entry = modes
+        .get_mut(source)
+        .filter(|m| m.infoType == DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE)
+        .ok_or("the desktop's mode could not be read")?;
+    let mut desktop = unsafe { entry.Anonymous.sourceMode };
+    desktop.width = width;
+    desktop.height = height;
+    entry.Anonymous.sourceMode = desktop;
+    path.targetInfo.Anonymous.modeInfoIdx = NO_MODE;
+    path.targetInfo.refreshRate = rational(hz);
+    let how = SDC_USE_SUPPLIED_DISPLAY_CONFIG | SDC_ALLOW_CHANGES;
+    let code = unsafe { SetDisplayConfig(Some(&paths), Some(&modes), how | SDC_VALIDATE) };
+    if code != 0 {
+        return Err(format!("Windows would not take it either: error {code}"));
+    }
+    match unsafe { SetDisplayConfig(Some(&paths), Some(&modes), how | SDC_APPLY) } {
+        0 => Ok(()),
+        code => Err(format!("Windows would not set it: error {code}")),
+    }
 }
 
 /// The desktop's own mode, set with `CDS_RESET` so the driver does a full

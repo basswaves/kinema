@@ -27,6 +27,7 @@ import type { AudioDevice, DisplayMode } from './equipment';
 import { cadenceRank, type SwitchSettings } from './displayMode';
 import { formatRate } from './equipment';
 import { screenOwner } from '../capabilities';
+import type { SwitchOutcome } from './displaySwitch';
 
 export type Verdict = 'native' | 'limited' | 'info';
 
@@ -64,6 +65,8 @@ export interface OutputFacts {
   /** The track's Dolby Vision profile, or null. Always shown as HDR10. */
   dolbyVision?: number | null;
   switches: SwitchSettings;
+  /** What the switch for this film asked of the screen and got (displaySwitch.ts). */
+  switched?: SwitchOutcome | null;
   audio: {
     /** mpv's decoder name: truehd, dts, eac3, ac3, aac, … */
     codec: string | null;
@@ -270,18 +273,50 @@ export function checkMotion(f: OutputFacts): Check | null {
     return { label, verdict: 'native', value: `even, ${pair}` };
   }
   const fps = f.fps;
+  const hz = f.displayHz;
+  // More frames than refreshes: some are left out, evenly or not.
+  const value =
+    fps > hz * 1.01
+      ? `${Math.round((1 - hz / fps) * 100)} % of frames left out, ${pair}`
+      : `judders, ${pair}`;
+  const why =
+    fps > hz * 1.01
+      ? 'The video has more frames than the screen has refreshes, so some are never shown and motion is less smooth.'
+      : 'The screen’s refresh rate does not divide evenly by the video’s, so pans judder.';
+  // A fitting mode was asked for and not had: said, with what stood in the way.
+  const s = f.switched;
+  if (
+    s &&
+    evenCadence(fps, s.asked.rate) &&
+    (s.error || (s.got && !evenCadence(fps, s.got.rate)))
+  ) {
+    const asked = `${s.asked.width}×${s.asked.height} at ${formatRate(s.asked.rate)} Hz`;
+    const owner =
+      screenOwner(f.system) === 'Windows' ? 'Windows or the graphics driver' : 'the desktop';
+    return {
+      label,
+      verdict: 'limited',
+      value,
+      why:
+        `${why} Kinema asked the screen for ${asked}, which fits the video, and ${owner} ` +
+        (s.error ? 'refused it.' : `kept ${formatRate(s.got!.rate)} Hz.`) +
+        ' Usually the connection has no room for that mode: every part of the chain — graphics card, cable, receiver, TV input — must carry it.',
+      fix:
+        'If they are all made for it, look for the TV input’s enhanced or deep colour HDMI setting, the receiver’s ' +
+        '4K signal setting, and a cable rated 18 Gbps or more.',
+    };
+  }
   const fitting = (f.screen?.modes ?? [])
     .filter((m) => evenCadence(fps, m.rate))
     .sort((a, b) => b.width * b.height - a.width * a.height);
   const here = fitting.some(
     (m) => f.screen && m.width === f.screen.width && m.height === f.screen.height
   );
-  const why = 'The screen’s refresh rate does not divide evenly by the video’s, so pans judder.';
   if (here) {
     return {
       label,
       verdict: 'limited',
-      value: `judders, ${pair}`,
+      value,
       why,
       fix: !f.switches.refresh
         ? 'Settings → Picture & sound → Screen → Match the refresh rate: this screen has an even mode at its current resolution.'
@@ -295,14 +330,14 @@ export function checkMotion(f: OutputFacts): Check | null {
     return {
       label,
       verdict: 'info',
-      value: `judders, ${pair}`,
+      value,
       why: `${why} This screen offers an even rate only at ${m.width}×${m.height}, and Kinema will not lower the resolution to get it.`,
     };
   }
   return {
     label,
     verdict: 'info',
-    value: `judders, ${pair}`,
+    value,
     why: `${why} This screen has no mode that fits the video.`,
   };
 }
@@ -312,8 +347,24 @@ export function checkColourDepth(f: OutputFacts): Check | null {
   if (!bits) return null;
   const label = 'Colour depth';
   const link = `${bits}-bit ${f.screen?.linkEncoding ?? ''}`.trim();
+  const sw = f.switched;
+  const lowered =
+    sw?.got && sw.linkBefore && sw.linkAfter && sw.linkBefore !== sw.linkAfter
+      ? `The graphics driver lowered the link from ${sw.linkBefore} to ${sw.linkAfter} to fit ` +
+        `${formatRate(sw.got.rate)} Hz: the connection has no room for that rate at ${sw.linkBefore}. ` +
+        'Smooth motion was put before colour depth; the desktop’s own format comes back after the film.'
+      : undefined;
   if (f.hdrOut !== 'passthrough') {
+    if (lowered) return { label, verdict: 'info', value: `${link} to the screen`, why: lowered };
     return { label, verdict: 'native', value: `${link} to the screen` };
+  }
+  if (lowered && bits < 10) {
+    return {
+      label,
+      verdict: 'limited',
+      value: `HDR squeezed to ${link}`,
+      why: `HDR is made for 10 bits. ${lowered}`,
+    };
   }
   if (bits >= 10) return { label, verdict: 'native', value: `HDR at ${link}` };
   // Whether the cable is the limit or the driver's setting. 10-bit RGB at 4K

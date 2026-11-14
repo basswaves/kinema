@@ -40,7 +40,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { readProperty, type ScalarFormat, mpvGet } from './engine';
 import { outputCheck, type OutputFacts } from './outputCheck';
-import { readSwitchPolicies, screenIdOf, switchSettingsFor } from './displaySwitch';
+import { readSwitchPolicies, screenIdOf, switchOutcome, switchSettingsFor } from './displaySwitch';
 import { describeDelay } from './audioDelay';
 import { appliedLevel, describeLevel } from './soundLevel';
 import { startRow } from './startTime';
@@ -656,6 +656,7 @@ async function readOutputCheck(from: {
     hdrOut: from.hdrOut,
     dolbyVision: from.dolbyVision,
     switches,
+    switched: switchOutcome(),
     audio: {
       codec: from.codec,
       outFormat: from.outFormat,

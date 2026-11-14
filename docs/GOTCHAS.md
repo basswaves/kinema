@@ -2331,6 +2331,27 @@ the convention madVR and Kodi rely on. The *current* mode is exact —
 `QueryDisplayConfig` gives it as a fraction (`59972/1000` on the development monitor here) — so
 use that for anything already running.
 
+### The old mode call refuses a rate the link has room for only in a smaller colour format
+
+On the TV PC (desktop at 4K 30 Hz, 10-bit YCbCr 4:2:2, set in the graphics
+driver), a 59.94 fps film asked for 4K@59.94. `EnumDisplaySettings` listed the
+mode, and `ChangeDisplaySettingsEx`'s `CDS_TEST` answered "not supported"
+(`DISP_CHANGE_BADMODE`). Windows' own Settings set the same mode at once, at
+8-bit YCbCr 4:2:0: the link had room for 4K60 only in the smaller format, and
+the old call keeps the format the link is in. The film played at 30 Hz with
+every second frame left out, and app.log was the only place that said so.
+
+**Do:** when `CDS_TEST` refuses a listed mode, ask as Settings does —
+`SetDisplayConfig` with the desktop's new size, the path's refresh as an exact
+fraction, no target mode (`DISPLAYCONFIG_PATH_MODE_IDX_INVALID`) and
+`SDC_ALLOW_CHANGES`, validated first (`display/win.rs` →
+`set_mode_letting_driver_fit`). Not saved to the database, so `reset_mode`
+(`ChangeDisplaySettingsEx(NULL)`) still puts the desktop's mode back — proven
+on a second monitor at 50 and 59.94 Hz — but unlike `CDS_FULLSCREEN` it does
+not die with the process: the restore record covers a crash. The link's format
+before is kept in the record and the restore checks it came back. The details
+panel says a refused mode (Motion) and a lowered link (Colour depth).
+
 ### Probing the device's formats needs nothing open
 
 `IAudioClient::IsFormatSupported` in exclusive mode answers without opening the

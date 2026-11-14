@@ -321,3 +321,112 @@ describe('output check: what is not known', () => {
     );
   });
 });
+
+// A TV PC (2026-11-14): desktop at 4K 30 Hz, 10-bit YCbCr 4:2:2; a 59.94 fps
+// clip asked for 4K 59.94 Hz, which the link had room for only at 8-bit 4:2:0.
+describe('outputCheck: what the switch asked for and got', () => {
+  const sdr60: OutputFacts = {
+    ...base,
+    source: { width: 3840, height: 2160 },
+    drawn: { width: 3840, height: 2160 },
+    hdrSource: false,
+    hdrOut: 'sdr',
+    fps: 60000 / 1001,
+    screen: {
+      ...base.screen!,
+      hdr: 'off',
+      linkBits: 10,
+      linkEncoding: 'YCbCr 4:2:2',
+      modes: [...tvModes, mode(3840, 2160, 30)],
+    },
+  };
+  const asked = { width: 3840, height: 2160, rate: 60000 / 1001 };
+
+  it('a refused mode is said, with the frames left out and what stands in the way', () => {
+    const c = byLabel(
+      outputCheck({
+        ...sdr60,
+        displayHz: 30000 / 1001,
+        switched: {
+          asked,
+          got: null,
+          error: 'not supported',
+          linkBefore: '10-bit YCbCr 4:2:2',
+          linkAfter: null,
+        },
+      })
+    );
+    expect(c.Motion).toMatchObject({
+      verdict: 'limited',
+      value: '50 % of frames left out, 59.94 fps on 29.97 Hz',
+    });
+    expect(c.Motion?.why).toMatch(/asked the screen for 3840×2160 at 59.94 Hz.*refused it/);
+    expect(c.Motion?.fix).toMatch(/18 Gbps/);
+  });
+
+  it('a mode kept at another rate is said as kept', () => {
+    const c = byLabel(
+      outputCheck({
+        ...sdr60,
+        displayHz: 30,
+        switched: {
+          asked,
+          got: { width: 3840, height: 2160, rate: 30 },
+          error: null,
+          linkBefore: null,
+          linkAfter: null,
+        },
+      })
+    );
+    expect(c.Motion?.why).toMatch(/kept 30 Hz/);
+  });
+
+  it('a link lowered to fit the rate is said under colour depth, and motion is even', () => {
+    const c = byLabel(
+      outputCheck({
+        ...sdr60,
+        displayHz: 60000 / 1001,
+        screen: { ...sdr60.screen!, linkBits: 8, linkEncoding: 'YCbCr 4:2:0' },
+        switched: {
+          asked,
+          got: asked,
+          error: null,
+          linkBefore: '10-bit YCbCr 4:2:2',
+          linkAfter: '8-bit YCbCr 4:2:0',
+        },
+      })
+    );
+    expect(c.Motion).toMatchObject({ verdict: 'native', value: 'even, 59.94 fps on 59.94 Hz' });
+    expect(c['Colour depth']).toMatchObject({
+      verdict: 'info',
+      value: '8-bit YCbCr 4:2:0 to the screen',
+    });
+    expect(c['Colour depth']?.why).toMatch(
+      /lowered the link from 10-bit YCbCr 4:2:2 to 8-bit YCbCr 4:2:0 to fit 59.94 Hz/
+    );
+  });
+
+  it('HDR on a lowered link says why it is 8 bits', () => {
+    const c = byLabel(
+      outputCheck({
+        ...sdr60,
+        hdrSource: true,
+        hdrOut: 'passthrough',
+        displayHz: 60000 / 1001,
+        screen: { ...sdr60.screen!, hdr: 'on', linkBits: 8, linkEncoding: 'YCbCr 4:2:0' },
+        switched: {
+          asked,
+          got: asked,
+          error: null,
+          linkBefore: '10-bit YCbCr 4:2:2',
+          linkAfter: '8-bit YCbCr 4:2:0',
+        },
+      })
+    );
+    expect(c['Colour depth']).toMatchObject({
+      verdict: 'limited',
+      value: 'HDR squeezed to 8-bit YCbCr 4:2:0',
+    });
+    expect(c['Colour depth']?.why).toMatch(/lowered the link/);
+  });
+});

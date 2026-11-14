@@ -92,6 +92,11 @@ pub struct Original {
     /// sdr-native (2) rather than the default, which "HDR off" alone loses.
     #[serde(default)]
     pub color_mode: Option<u32>,
+    /// Windows: the link's colour format before ("10-bit YCbCr 4:2:2"). A
+    /// switch the driver could make only in a smaller format lowers it, and
+    /// the restore checks it came back.
+    #[serde(default)]
+    pub link: Option<String>,
 }
 
 fn load_original(app: &tauri::AppHandle) -> Option<Original> {
@@ -129,6 +134,17 @@ fn describe_signal(signal: Option<(u32, u32, f64)>) -> String {
     match signal {
         Some((w, h, rate)) => format!("{w}×{h}@{}", crate::equipment::format_rate(rate)),
         None => "unknown".into(),
+    }
+}
+
+/// The link's colour format: "10-bit YCbCr 4:2:2".
+#[cfg_attr(not(windows), allow(dead_code))]
+fn describe_link(s: &ScreenNow) -> String {
+    match (s.link_bits, s.link_encoding.as_deref()) {
+        (Some(b), Some(e)) => format!("{b}-bit {e}"),
+        (Some(b), None) => format!("{b}-bit"),
+        (None, Some(e)) => e.to_string(),
+        (None, None) => "link format unknown".into(),
     }
 }
 
@@ -205,6 +221,7 @@ pub async fn switch_screen(
                 hdr_on: None,
                 signal: before.signal,
                 color_mode: None,
+                link: Some(describe_link(&before)),
             });
             if hdr_change.is_some() && original.hdr_on.is_none() {
                 original.hdr_on = Some(before.hdr == HdrState::On);
@@ -228,14 +245,16 @@ pub async fn switch_screen(
                 after = win::screen_now(&gdi)?;
             }
             crate::log!(
-                "display: {} {} HDR {:?} (signal {}) → {} HDR {:?} (signal {})",
+                "display: {} {} HDR {:?} (signal {}, {}) → {} HDR {:?} (signal {}, {})",
                 gdi,
                 describe(before.width, before.height, before.hz),
                 before.hdr,
                 describe_signal(before.signal),
+                describe_link(&before),
                 describe(after.width, after.height, after.hz),
                 after.hdr,
-                describe_signal(after.signal)
+                describe_signal(after.signal),
+                describe_link(&after)
             );
             if (after.width, after.height, after.hz) != (width, height, hz) {
                 crate::log!(
@@ -268,6 +287,7 @@ pub async fn switch_screen(
                 hdr_on: None,
                 signal: before.signal,
                 color_mode: colour,
+                link: None,
             });
             if hdr_change.is_some() && original.hdr_on.is_none() {
                 original.hdr_on = Some(before.hdr == HdrState::On);
@@ -326,12 +346,15 @@ pub fn restore(app: &tauri::AppHandle) -> Result<bool, String> {
         // only a full mode change (done by hand in the NVIDIA panel) cleared
         // it. So the signal is checked against the one before the first
         // switch, and a mismatch gets a forced mode change.
-        if !same_signal(original.signal, now.signal) {
+        let link_back = original.link.as_ref().is_none_or(|l| *l == describe_link(&now));
+        if !same_signal(original.signal, now.signal) || !link_back {
             crate::log!(
-                "display: {gdi} is back at {} but the signal is {} (was {}); forcing a full mode change",
+                "display: {gdi} is back at {} but the signal is {}, {} (was {}, {}); forcing a full mode change",
                 describe(now.width, now.height, now.hz),
                 describe_signal(now.signal),
-                describe_signal(original.signal)
+                describe_link(&now),
+                describe_signal(original.signal),
+                original.link.as_deref().unwrap_or("unknown")
             );
             // Belt and braces, so a refusal is no failure: the desktop is
             // already back at Windows' own mode. Returned as an error, it
@@ -345,11 +368,12 @@ pub fn restore(app: &tauri::AppHandle) -> Result<bool, String> {
             now = win::screen_now(gdi)?;
         }
         crate::log!(
-            "display: restored {} to {} HDR {:?} (signal {})",
+            "display: restored {} to {} HDR {:?} (signal {}, {})",
             gdi,
             describe(now.width, now.height, now.hz),
             now.hdr,
-            describe_signal(now.signal)
+            describe_signal(now.signal),
+            describe_link(&now)
         );
     }
     #[cfg(target_os = "linux")]
@@ -535,7 +559,13 @@ mod tests {
             "before: {}×{}@{} ({:?}), signal {:?}",
             before.width, before.height, before.hz, before.hdr, before.signal
         );
-        win::set_mode(&gdi, 1920, 1080, hz).unwrap();
+        // KINEMA_SWITCH_CCD=1: the way Windows' Settings switches, which
+        // `set_mode` falls back to when the old call refuses a mode.
+        if std::env::var("KINEMA_SWITCH_CCD").is_ok() {
+            win::set_mode_letting_driver_fit(&gdi, 1920, 1080, hz).unwrap();
+        } else {
+            win::set_mode(&gdi, 1920, 1080, hz).unwrap();
+        }
         std::thread::sleep(std::time::Duration::from_secs(4));
         let during = win::screen_now(&gdi).unwrap();
         println!(

@@ -125,7 +125,7 @@ pub(crate) fn signal_of(gdi_name: &str) -> Option<(u32, u32, f64)> {
     Some((signal.activeSize.cx, signal.activeSize.cy, rate))
 }
 
-fn active_config(
+pub(crate) fn active_config(
 ) -> windows::core::Result<(Vec<DISPLAYCONFIG_PATH_INFO>, Vec<DISPLAYCONFIG_MODE_INFO>)> {
     let (mut n_paths, mut n_modes) = (0u32, 0u32);
     unsafe { GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &mut n_paths, &mut n_modes) }
@@ -337,19 +337,22 @@ pub(crate) fn path_for(gdi_name: &str) -> Option<DISPLAYCONFIG_PATH_INFO> {
     if gdi_name.is_empty() {
         return None;
     }
-    active_paths().ok()?.into_iter().find(|p| {
-        let s = &p.sourceInfo;
-        let mut source = DISPLAYCONFIG_SOURCE_DEVICE_NAME {
-            header: header::<DISPLAYCONFIG_SOURCE_DEVICE_NAME>(
-                DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME,
-                s.adapterId,
-                s.id,
-            ),
-            ..Default::default()
-        };
-        (unsafe { DisplayConfigGetDeviceInfo(&mut source.header) } == 0)
-            && wide(&source.viewGdiDeviceName) == gdi_name
-    })
+    active_paths().ok()?.into_iter().find(|p| source_gdi(p).as_deref() == Some(gdi_name))
+}
+
+/// The GDI name (`\\.\DISPLAY1`) of a display path's source.
+pub(crate) fn source_gdi(p: &DISPLAYCONFIG_PATH_INFO) -> Option<String> {
+    let s = &p.sourceInfo;
+    let mut source = DISPLAYCONFIG_SOURCE_DEVICE_NAME {
+        header: header::<DISPLAYCONFIG_SOURCE_DEVICE_NAME>(
+            DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME,
+            s.adapterId,
+            s.id,
+        ),
+        ..Default::default()
+    };
+    (unsafe { DisplayConfigGetDeviceInfo(&mut source.header) } == 0)
+        .then(|| wide(&source.viewGdiDeviceName))
 }
 
 fn displays(outputs: &HashMap<String, OutputInfo>, problems: &mut Vec<String>) -> Vec<Display> {

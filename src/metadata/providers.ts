@@ -395,6 +395,37 @@ export class RateLimited extends Error {}
 export class RequestTimedOut extends Error {}
 
 /**
+ * The same limit for the body: headers that arrive and a body that then stalls
+ * would otherwise wait for ever, because the timer above ends with the headers.
+ * Reading the body gets what is left of {@link REQUEST_TIMEOUT_MS}.
+ */
+function limitBody(
+  response: Response,
+  controller: AbortController,
+  startedAt: number,
+  label: string
+): Response {
+  for (const method of ['json', 'text', 'arrayBuffer'] as const) {
+    const read = response[method]?.bind(response) as (() => Promise<unknown>) | undefined;
+    if (!read) continue;
+    (response as unknown as Record<string, () => Promise<unknown>>)[method] = () => {
+      const left = Math.max(0, REQUEST_TIMEOUT_MS - (Date.now() - startedAt));
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const limit = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          controller.abort();
+          reject(new RequestTimedOut(`${label}: no answer within ${REQUEST_TIMEOUT_MS / 1000} s`));
+        }, left);
+      });
+      const body = read();
+      body.catch(() => undefined);
+      return Promise.race([body, limit]).finally(() => clearTimeout(timer));
+    };
+  }
+  return response;
+}
+
+/**
  * `fetch`, but a 429 is waited out rather than treated as a failure.
  *
  * Honours `Retry-After` when the server sends one (up to MAX_RETRY_WAIT_MS),
@@ -418,6 +449,7 @@ export async function fetchPolitely(
       }, REQUEST_TIMEOUT_MS);
     });
     let response: Response;
+    const startedAt = Date.now();
     try {
       const request = fetch(url, { method: 'GET', headers, connectTimeout, signal: controller.signal });
       request.catch(() => undefined); // a request lost to the limit must not end unhandled
@@ -425,7 +457,9 @@ export async function fetchPolitely(
     } finally {
       clearTimeout(timer);
     }
-    if (response.status !== 429 || attempt >= RATE_LIMIT_RETRIES) return response;
+    if (response.status !== 429 || attempt >= RATE_LIMIT_RETRIES) {
+      return limitBody(response, controller, startedAt, label);
+    }
 
     const header = Number(response.headers.get('retry-after'));
     const waitMs = Number.isFinite(header) && header > 0 ? header * 1000 : 1000 * 2 ** attempt;
@@ -445,8 +479,11 @@ export async function readJson<T>(response: Response, service: string): Promise<
   let data: unknown;
   try {
     data = await response.json();
-  } catch {
-    throw new Error(`${service} sent an answer Kinema could not read`);
+  } catch (e) {
+    if (e instanceof RequestTimedOut) throw e;
+    const plain = new Error(`${service} sent an answer Kinema could not read`);
+    (plain as Error & { cause?: unknown }).cause = e;
+    throw plain;
   }
   if (data === null || typeof data !== 'object') {
     throw new Error(`${service} sent an answer Kinema could not read`);

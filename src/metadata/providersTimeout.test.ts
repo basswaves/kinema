@@ -2,7 +2,7 @@
 // hold the one-at-a-time queue (review A6-01, A6-06).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-type Fake = { status: number; retryAfter?: string; body?: unknown } | 'never';
+type Fake = { status: number; retryAfter?: string; body?: unknown } | 'never' | 'stall';
 let script: Fake[] = [];
 let calls = 0;
 vi.mock('@tauri-apps/plugin-http', () => ({
@@ -10,11 +10,13 @@ vi.mock('@tauri-apps/plugin-http', () => ({
     calls++;
     const next = script.shift() ?? { status: 200, body: { results: [] } };
     if (next === 'never') return new Promise(() => undefined);
+    const stalls = next === 'stall';
+    const spec = stalls ? { status: 200, retryAfter: undefined, body: undefined } : next;
     return Promise.resolve({
-      ok: next.status < 300,
-      status: next.status,
-      headers: { get: (n: string) => (n === 'retry-after' ? (next.retryAfter ?? null) : null) },
-      json: async () => next.body,
+      ok: spec.status < 300,
+      status: spec.status,
+      headers: { get: (n: string) => (n === 'retry-after' ? (spec.retryAfter ?? null) : null) },
+      json: () => (stalls ? new Promise(() => undefined) : Promise.resolve(spec.body)),
     });
   }),
 }));
@@ -39,6 +41,15 @@ describe('page lookup limits', () => {
     expect(await a).toMatch(/no answer/);
     expect(await b).toBe('ok');
     expect(calls).toBe(2);
+  });
+
+  it('headers that arrive and a body that then stalls fail after the limit too', async () => {
+    script = ['stall', { status: 200, body: [] }];
+    const a = settle(P.tvmazeSearch('A'));
+    const b = settle(P.tvmazeSearch('B'));
+    await vi.advanceTimersByTimeAsync(P.REQUEST_TIMEOUT_MS + 1_000);
+    expect(await a).toMatch(/no answer/);
+    expect(await b).toBe('ok');
   });
 
   it('a 429 asking for a day fails at once with a plain message', async () => {

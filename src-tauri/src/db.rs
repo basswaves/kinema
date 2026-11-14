@@ -1028,6 +1028,18 @@ pub fn open(path: &Path) -> Result<Connection, DbError> {
     }
     migrate(&conn)?;
     clamp_future_times(&conn, crate::util::now_secs())?;
+    // Statistics an older Kinema took before matching keep Home slow until the
+    // next scan; check them at every start too (two counts when they are fine).
+    // Best effort: the library works without. A7-01, Linux test PC.
+    let started = std::time::Instant::now();
+    match refresh_statistics_if_stale(&conn) {
+        Ok(true) => crate::log!(
+            "library: query statistics refreshed at start in {} ms",
+            started.elapsed().as_millis()
+        ),
+        Ok(false) => {}
+        Err(e) => crate::log!("library: could not check the query statistics at start: {e}"),
+    }
     let reasked = crate::lifecycle::reask_after_new_rules(&conn)?;
     if reasked > 0 {
         crate::log!("matching: new rules; {reasked} refused or untitled file(s) will be read again");
@@ -2063,6 +2075,21 @@ mod tests {
         assert!(!reads_every_file(&conn), "{}", home_plan(&conn));
         assert!(home_plan(&conn).contains("idx_media_title"));
         // Current now: the next scan's check does nothing.
+        assert!(!refresh_statistics_if_stale(&conn).unwrap());
+    }
+
+    /// A library left with the old statistics by an older Kinema is repaired
+    /// when it is opened, not only after the next scan (Linux test PC: Home
+    /// took 11–15 s at 5000 titles until a scan ran).
+    #[test]
+    fn stale_statistics_are_refreshed_when_the_library_opens() {
+        let (path, conn) = scanned_library("on-open", 2000);
+        conn.execute_batch("PRAGMA optimize").unwrap();
+        match_all(&conn);
+        assert!(reads_every_file(&conn), "the trap should reproduce: {}", home_plan(&conn));
+        drop(conn);
+        let conn = open(&path).unwrap();
+        assert!(!reads_every_file(&conn), "{}", home_plan(&conn));
         assert!(!refresh_statistics_if_stale(&conn).unwrap());
     }
 

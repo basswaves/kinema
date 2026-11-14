@@ -2731,6 +2731,24 @@ drawing with it: a segfault in the `vo` thread during `exit()`, after
 everything else had worked (seen in a nested KWin under gdb; WSLg happened
 to survive it). `RunEvent::Exit` now destroys mpv first, on every system.
 
+### Quitting with a film on a dead network mount: three silent waits
+
+A film on a share that has stopped answering (sshfs stopped, a dead SMB
+server) left Kinema running after its window closed, with nothing in the log:
+
+1. The close button never reaches `ExitRequested`: the mpv plugin's own
+   `CloseRequested` handler prevents the close, destroys mpv (which waits on
+   the demuxer's read for good) and only then closes the window. A quit
+   limit armed in `ExitRequested`/`Exit` never starts. Arm it at the main
+   window's `CloseRequested`.
+2. `std::process::exit` runs the exit-time clean-up, and that waited on the
+   mount too: the limit fired, logged, and the process stayed. End with
+   `_exit` (Linux) / `TerminateProcess` (Windows).
+3. Even then a thread stuck on the mount keeps the ended process listed
+   (defunct) until the mount answers — the kernel's doing — and its single-instance D-Bus name stays owned, so the next start
+   waits on it for good. Give the name back (`tauri_plugin_single_instance::destroy`)
+   before ending. `engine.rs`, `arm_exit_limit`.
+
 ### GNOME's colour mode 2 is not HDR
 
 Mutter's `DisplayConfig` lists a screen's `supported-color-modes` as

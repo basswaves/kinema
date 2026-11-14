@@ -638,10 +638,24 @@ pub fn run() {
         .run(|app, event| {
             // Quitting never waits long on a drive that has gone silent (A5-01).
             if let tauri::RunEvent::ExitRequested { .. } = event {
-                engine::arm_exit_limit();
+                engine::arm_exit_limit(app);
+            }
+            // The close button: the mpv plugin holds the window open while it
+            // shuts mpv down, and that waits on a dead drive for good, so
+            // ExitRequested never comes (Linux test PC, sshfs stopped). Start
+            // the limit at the close itself.
+            if let tauri::RunEvent::WindowEvent {
+                label,
+                event: tauri::WindowEvent::CloseRequested { .. },
+                ..
+            } = &event
+            {
+                if label == "main" {
+                    engine::arm_exit_limit(app);
+                }
             }
             if let tauri::RunEvent::Exit = event {
-                engine::arm_exit_limit();
+                engine::arm_exit_limit(app);
                 // The player before the process ends (engine.rs says why).
                 engine::shut_down(app);
                 // Windows does not end a child with its parent: without this a

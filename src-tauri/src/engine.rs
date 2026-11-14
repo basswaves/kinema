@@ -128,18 +128,49 @@ pub fn within<T: Send + 'static>(
 /// Once the app has begun to quit, end the process after `EXIT_LIMIT` whatever
 /// is still waiting. The library saves on its own as each change is made, so
 /// nothing of Kinema's own is lost by this; only a wait on a drive is cut.
-pub fn arm_exit_limit() {
+pub fn arm_exit_limit<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
     static ARMED: std::sync::Once = std::sync::Once::new();
     ARMED.call_once(|| {
-        std::thread::spawn(|| {
+        let app = app.clone();
+        std::thread::spawn(move || {
             std::thread::sleep(EXIT_LIMIT);
             crate::log!(
                 "exit: still running {} s after quit began; ending the process",
                 EXIT_LIMIT.as_secs()
             );
-            std::process::exit(0);
+            // A thread stuck on a dead mount keeps even an ended process
+            // listed, holding the single-instance name: the next start then
+            // waits on it for good (Linux test PC). Give the name back first.
+            #[cfg(desktop)]
+            within(std::time::Duration::from_secs(1), move || {
+                tauri_plugin_single_instance::destroy(&app)
+            });
+            #[cfg(mobile)]
+            let _ = app;
+            hard_exit();
         });
     });
+}
+
+/// End the process at once, without the exit-time clean-up: `process::exit`
+/// runs that clean-up, and on the Linux test PC it waited on the dead mount
+/// too (the limit fired, the process stayed). Nothing of Kinema's own is
+/// pending here: the library writes each change as it is made.
+fn hard_exit() -> ! {
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    // SAFETY: `_exit` takes a plain status and never returns.
+    unsafe {
+        libc::_exit(0)
+    }
+    #[cfg(windows)]
+    {
+        use windows::Win32::System::Threading::{GetCurrentProcess, TerminateProcess};
+        // SAFETY: the pseudo-handle of this process; on success it does not return.
+        let _ = unsafe { TerminateProcess(GetCurrentProcess(), 0) };
+        std::process::exit(0)
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "android", windows)))]
+    std::process::exit(0)
 }
 
 #[cfg(test)]

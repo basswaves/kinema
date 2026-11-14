@@ -170,6 +170,18 @@ test('in a small window the chosen section stays fully in view in the list (A10-
     const r = await inView();
     expect(r.top, `${name} top`).toBeGreaterThanOrEqual(0);
     expect(r.bottom, `${name} bottom`).toBeLessThanOrEqual(r.height);
+    // And with the page at its top, where the list is not stuck yet: CI's
+    // WebKit got there by timing, so it is set here outright.
+    await page.evaluate(() => {
+      // The page scrolls in a box of its own, not the window.
+      let box = document.querySelector('.settings-nav')!.parentElement;
+      while (box && !(box.scrollHeight > box.clientHeight && /auto|scroll/.test(getComputedStyle(box).overflowY)))
+        box = box.parentElement;
+      (box ?? document.scrollingElement!).scrollTop = 0;
+    });
+    await settled(page);
+    const top = await inView();
+    expect(top.bottom, `${name} bottom, page at its top`).toBeLessThanOrEqual(top.height);
   }
   // By mouse: the first, then the last again.
   await page.locator('.settings-nav button').first().click();

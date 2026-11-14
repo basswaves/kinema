@@ -2222,10 +2222,6 @@ button.cast-member {
   grid-template-columns: 13rem minmax(0, 1fr);
   gap: 2.5rem;
   align-items: start;
-  /* At least the visible height, so the page can always scroll far enough for
-   * the list to stick, even beside a short section: otherwise the list's foot
-   * hangs below a low window with no way to scroll to it (A10-07). */
-  min-height: calc(100vh - 4.5rem - var(--safe-top));
 }
 
 .settings-nav {
@@ -2237,7 +2233,10 @@ button.cast-member {
   /* Sticky, so scrolling the page never moves it: in a window lower than the
    * list it scrolls itself instead (A10-07). The padding keeps the focus ring
    * of the first and last entry from being clipped. */
-  max-height: calc(100vh - 4.5rem - var(--safe-top) - 1rem);
+  /* Sized for where it sits before the page scrolls (under the title, about
+   * 8.2rem down), so it fits whether stuck or not: sized for its stuck place,
+   * its foot hung below a low window until the page scrolled (CI, WebKit). */
+  max-height: calc(100vh - 9rem - var(--safe-top));
   overflow-y: auto;
   padding: 3px;
   margin: -3px;
@@ -2325,7 +2324,6 @@ button.cast-member {
   .settings-layout {
     grid-template-columns: 1fr;
     gap: 1.25rem;
-    min-height: 0;
   }
 
   .settings-nav {
